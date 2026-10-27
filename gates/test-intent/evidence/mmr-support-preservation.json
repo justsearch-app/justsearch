@@ -1,0 +1,140 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T18:14:44.236Z",
+  "revision": "1b5027a656cbe7a244b46fc053cb7bb4781580dd",
+  "tree": "238f3332dc760f846212fa229b53d1545613e373",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexing:test --tests \"io.justsearch.indexing.rag.ContextBudgeterEmptyPrefixTest.nonemptyPrefixesPreserveUtf16Policy\" --tests \"io.justsearch.indexing.rag.ContextBudgeterEmptyPrefixTest.malformedSurrogatePolicyIsUnchanged\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1956
+    },
+    {
+      "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.mcp.MmrFailureInterfacesIntegrationTest.cancelledSupplierWithNormallyReturningProviderPreservesWorkerAndOutwardBoundaries\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8775
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexing/src/test/java/io/justsearch/indexing/rag/ContextBudgeterEmptyPrefixTest.java#nonemptyPrefixesPreserveUtf16Policy",
+      "file": "modules/indexing/src/test/java/io/justsearch/indexing/rag/ContextBudgeterEmptyPrefixTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7f6f8970a435dc9b686cf35c957d3406a355132c0ea3e281d136ee2ead30196b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nonemptyPrefixesPreserveUtf16Policy(x, 1, x, false)[1]",
+          "status": "passed"
+        },
+        {
+          "name": "nonemptyPrefixesPreserveUtf16Policy(&#x1f600;, 2, &#x1f600;, false)[2]",
+          "status": "passed"
+        },
+        {
+          "name": "nonemptyPrefixesPreserveUtf16Policy(&#x1f600;x, 2, &#x1f600;, true)[3]",
+          "status": "passed"
+        },
+        {
+          "name": "nonemptyPrefixesPreserveUtf16Policy(ab&#x1f600;, 3, ab, true)[4]",
+          "status": "passed"
+        },
+        {
+          "name": "nonemptyPrefixesPreserveUtf16Policy( &#x1f600;, 1,  , true)[5]",
+          "status": "passed"
+        },
+        {
+          "name": "nonemptyPrefixesPreserveUtf16Policy(éx, 1, e, true)[6]",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexing/src/test/java/io/justsearch/indexing/rag/ContextBudgeterEmptyPrefixTest.java#malformedSurrogatePolicyIsUnchanged",
+      "file": "modules/indexing/src/test/java/io/justsearch/indexing/rag/ContextBudgeterEmptyPrefixTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7f6f8970a435dc9b686cf35c957d3406a355132c0ea3e281d136ee2ead30196b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedSurrogatePolicyIsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrFailureInterfacesIntegrationTest.java#cancelledSupplierWithNormallyReturningProviderPreservesWorkerAndOutwardBoundaries",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrFailureInterfacesIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8cc58ef2bcae4418b61e1bfeb1a550f2e5c010080f9ce1611ce705468374d59d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledSupplierWithNormallyReturningProviderPreservesWorkerAndOutwardBoundaries()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b1462152fbf317526e7bff86dbe72605a5da94d4",
+    "revision": "b1462152fbf317526e7bff86dbe72605a5da94d4",
+    "overlays": [
+      "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrEngineFixture.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexing:test --tests \"io.justsearch.indexing.rag.ContextBudgeterEmptyPrefixTest.nonemptyPrefixesPreserveUtf16Policy\" --tests \"io.justsearch.indexing.rag.ContextBudgeterEmptyPrefixTest.malformedSurrogatePolicyIsUnchanged\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 2208
+      },
+      {
+        "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.mcp.MmrFailureInterfacesIntegrationTest.cancelledSupplierWithNormallyReturningProviderPreservesWorkerAndOutwardBoundaries\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 10530
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexing/src/test/java/io/justsearch/indexing/rag/ContextBudgeterEmptyPrefixTest.java#nonemptyPrefixesPreserveUtf16Policy",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexing/src/test/java/io/justsearch/indexing/rag/ContextBudgeterEmptyPrefixTest.java#malformedSurrogatePolicyIsUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrFailureInterfacesIntegrationTest.java#cancelledSupplierWithNormallyReturningProviderPreservesWorkerAndOutwardBoundaries",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:cb5d30d01bb9499efc339731e6f886638a5f9d1b0d9935b0c54bed514ad30875"
+}

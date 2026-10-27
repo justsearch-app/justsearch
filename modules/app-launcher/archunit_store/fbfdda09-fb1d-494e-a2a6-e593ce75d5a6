@@ -63,7 +63,6 @@ Method io.justsearch.indexerworker.server.KnowledgeServer.readOnlyOpensForTest()
 Method io.justsearch.indexerworker.server.KnowledgeServer.rebuildBrakeExhaustedForTest() is never referenced
 Method io.justsearch.indexerworker.server.KnowledgeServer.releaseModelReadyLatchForTests() is never referenced
 Method io.justsearch.indexerworker.server.KnowledgeServer.signalBusForTests() is never referenced
-Method io.justsearch.indexerworker.services.RagContextOps$ChunkRerankResult.wasReranked() is never referenced
 Method io.justsearch.indexerworker.services.RagContextOps.searchChunksWithMeta(java.lang.String, java.util.Set, int, int, boolean, java.lang.String, io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes$RuntimeSearchFilters, java.util.List, io.justsearch.core.context.EngineContext$Urgency, io.justsearch.core.execution.EngineTaskLifetime) is never referenced
 Method io.justsearch.indexerworker.services.RootWatcherRegistry.watchedRoots() is never referenced
 Method io.justsearch.indexerworker.services.SearchOrchestrator.deriveActualMode(boolean, boolean, boolean) is never referenced

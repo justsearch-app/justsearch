@@ -6,12 +6,16 @@ import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+import io.opentelemetry.context.Context;
 import io.opentelemetry.context.propagation.ContextPropagators;
 import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.resources.Resource;
-import io.opentelemetry.sdk.trace.SpanProcessor;
+import io.opentelemetry.sdk.trace.ReadWriteSpan;
+import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.SpanProcessor;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
@@ -20,6 +24,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +32,8 @@ public final class TracingBootstrap implements AutoCloseable {
 	private static final Logger log = LoggerFactory.getLogger(TracingBootstrap.class);
 	private static TracingBootstrap indexingBootstrap;
 	private final SdkTracerProvider tracerProvider;
+	private final BatchSpanProcessor localSpanProcessor;
+	private volatile boolean shutdown;
 	private boolean processLifetime;
 
 	/**
@@ -86,12 +93,16 @@ public final class TracingBootstrap implements AutoCloseable {
 
 	TracingBootstrap(
 			Path dataDir, TelemetryHealthState healthState, Sampler sampler, Map<String, String> env) {
-		var tracesFile = dataDir.resolve("telemetry").resolve("traces.ndjson");
-		var exporter = new NdjsonSpanExporter(tracesFile, healthState);
+		this(new NdjsonSpanExporter(dataDir.resolve("telemetry").resolve("traces.ndjson"), healthState),
+			sampler, env);
+	}
+
+	TracingBootstrap(SpanExporter exporter, Sampler sampler, Map<String, String> env) {
+		localSpanProcessor = BatchSpanProcessor.builder(exporter).build();
 		var builder = SdkTracerProvider.builder()
 			.setSampler(sampler)
 			.setResource(buildResource(env))
-			.addSpanProcessor(BatchSpanProcessor.builder(exporter).build());
+			.addSpanProcessor(localProcessorWithShutdownSignal());
 		var workflowSpanProcessor = buildWorkflowSpanAttributeProcessor(env);
 		if (workflowSpanProcessor != null) {
 			builder.addSpanProcessor(workflowSpanProcessor);
@@ -133,8 +144,12 @@ public final class TracingBootstrap implements AutoCloseable {
 	/** Final teardown after all Engine span producers drain; never call during local recovery. */
 	public static synchronized void shutdownIndexing() {
 		if (indexingBootstrap == null) return;
+		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
 		try {
-			indexingBootstrap.tracerProvider.close();
+			indexingBootstrap.flush(deadline);
+			// Provider.close() has its own ten-second wait. Share the flush budget instead.
+			indexingBootstrap.tracerProvider.shutdown()
+				.join(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
 		} finally {
 			indexingBootstrap = null;
 		}
@@ -152,11 +167,108 @@ public final class TracingBootstrap implements AutoCloseable {
 	 * next batch export cycle. Failures are logged but not thrown.
 	 */
 	public void flush() {
+		flush(System.nanoTime() + TimeUnit.SECONDS.toNanos(5));
+	}
+
+	private void flush(long deadline) {
 		try {
-			tracerProvider.forceFlush().join(5, TimeUnit.SECONDS);
+			if (shutdown || Thread.currentThread().isInterrupted()) return;
+			if (!awaitFreshLocalFlush(this::requestLocalFlush, deadline)) return;
+			// Preserve flushing of the other processors, including batched OTLP.
+			if (shutdown || Thread.currentThread().isInterrupted()
+					|| flushTimeRemaining(deadline) <= 0) return;
+			if (awaitFlush(tracerProvider.forceFlush(), deadline)) {
+				log.debug("Explicit span flush completed");
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		} catch (Exception e) {
 			log.warn("Explicit span flush failed", e);
 		}
+	}
+
+	boolean awaitFreshLocalFlush(Supplier<CompletableResultCode> request, long deadline)
+			throws InterruptedException {
+		var first = request.get();
+		if (first == null || !awaitFlush(first, deadline)) return false;
+		// BatchSpanProcessor 1.60.1:270-271 completes before retiring the request;
+		// :300-310 can return that stale identity or the shared success sentinel.
+		// A fresh generation covers pre-close ends, except the accepted SDK accounting
+		// residual at :213-216 when another producer is between offer and increment.
+		while (!shutdown && !Thread.currentThread().isInterrupted()) {
+			long remaining = flushTimeRemaining(deadline);
+			if (remaining <= 0) return false;
+			var next = request.get();
+			if (next == null) return false;
+			if (next != first && next != CompletableResultCode.ofSuccess()) {
+				return awaitFlush(next, deadline);
+			}
+			remaining = flushTimeRemaining(deadline);
+			if (remaining <= 0) return false;
+			TimeUnit.NANOSECONDS.sleep(Math.min(remaining, TimeUnit.MICROSECONDS.toNanos(100)));
+		}
+		return false;
+	}
+
+	private long flushTimeRemaining(long deadline) {
+		long remaining = deadline - System.nanoTime();
+		if (remaining <= 0) log.warn("Explicit span flush expired after 5 seconds");
+		return remaining;
+	}
+
+	private boolean awaitFlush(CompletableResultCode result, long deadline) {
+		while (!shutdown && !Thread.currentThread().isInterrupted()) {
+			long remaining = flushTimeRemaining(deadline);
+			if (remaining <= 0) return false;
+			// SDK 1.60.1 isDone()/join() take an untimed monitor held by completion callbacks;
+			// blocking callbacks can exceed this deadline (SDK 1.67 moves them outside, #8773).
+			if (result.isDone()) {
+				if (!result.isSuccess()) log.warn("Explicit span flush failed");
+				return result.isSuccess();
+			}
+			result.join(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(10)), TimeUnit.NANOSECONDS);
+		}
+		return false;
+	}
+
+	private CompletableResultCode requestLocalFlush() {
+		synchronized (localSpanProcessor) {
+			return shutdown ? null : localSpanProcessor.forceFlush();
+		}
+	}
+
+	private SpanProcessor localProcessorWithShutdownSignal() {
+		// The SDK exposes no shutdown query. Coordinate requests with provider-driven shutdown
+		// before it can retire the worker, and let callers already waiting notice promptly.
+		return new SpanProcessor() {
+			@Override
+			public void onStart(Context parent, ReadWriteSpan span) {
+				localSpanProcessor.onStart(parent, span);
+			}
+
+			@Override
+			public boolean isStartRequired() { return localSpanProcessor.isStartRequired(); }
+
+			@Override
+			public void onEnd(ReadableSpan span) { localSpanProcessor.onEnd(span); }
+
+			@Override
+			public boolean isEndRequired() { return localSpanProcessor.isEndRequired(); }
+
+			@Override
+			public CompletableResultCode forceFlush() {
+				var result = requestLocalFlush();
+				return result == null ? CompletableResultCode.ofSuccess() : result;
+			}
+
+			@Override
+			public CompletableResultCode shutdown() {
+				synchronized (localSpanProcessor) {
+					shutdown = true;
+				}
+				return localSpanProcessor.shutdown();
+			}
+		};
 	}
 
 	private static SpanExporter buildOptionalOtlpExporter(Map<String, String> env) {

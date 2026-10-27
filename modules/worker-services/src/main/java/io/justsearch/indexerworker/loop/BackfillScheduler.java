@@ -26,6 +26,7 @@ import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
 import java.util.ArrayDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,6 +98,8 @@ public final class BackfillScheduler {
   // live snapshot the same way resolvedConfigSupplier.get().rag().chunkVectorsEnabled() already
   // does elsewhere in this class.
 
+  /** Scheduler-local monotonic domain for cycle and embed-share deadlines only. */
+  private final LongSupplier monotonicNanos;
   private final DocumentFieldOps documentFieldOps;
   private final IndexingCoordinator indexingCoordinator;
   private final IndexCountOps indexCountOps;
@@ -146,6 +149,28 @@ public final class BackfillScheduler {
       Supplier<BgeM3Encoder> bgeM3EncoderSupplier,
       Supplier<NerService> nerServiceSupplier,
       Supplier<DisambiguationService> disambiguationServiceSupplier) {
+    this(
+        documentFieldOps, indexingCoordinator, indexCountOps, commitOps, signalBus, indexingPacing,
+        embeddingLifecycle, running, resolvedConfigSupplier, spladeEncoderSupplier,
+        bgeM3EncoderSupplier, nerServiceSupplier, disambiguationServiceSupplier, System::nanoTime);
+  }
+
+  BackfillScheduler(
+      DocumentFieldOps documentFieldOps,
+      IndexingCoordinator indexingCoordinator,
+      IndexCountOps indexCountOps,
+      CommitOps commitOps,
+      WorkerSignalBus signalBus,
+      IndexingPacing indexingPacing,
+      EmbeddingProviderLifecycle embeddingLifecycle,
+      AtomicBoolean running,
+      Supplier<ResolvedConfig> resolvedConfigSupplier,
+      Supplier<SpladeEncoder> spladeEncoderSupplier,
+      Supplier<BgeM3Encoder> bgeM3EncoderSupplier,
+      Supplier<NerService> nerServiceSupplier,
+      Supplier<DisambiguationService> disambiguationServiceSupplier,
+      LongSupplier monotonicNanos) {
+    this.monotonicNanos = java.util.Objects.requireNonNull(monotonicNanos, "monotonicNanos");
     this.documentFieldOps = documentFieldOps;
     this.indexingCoordinator = indexingCoordinator;
     this.indexCountOps = indexCountOps;
@@ -217,7 +242,7 @@ public final class BackfillScheduler {
   public boolean runIdleCycle() {
     if (signalBus.isIndexingHeld()) return false;
     boolean backfillDidWork = false;
-    final long cycleStartNanos = System.nanoTime();
+    final long cycleStartNanos = monotonicNanos.getAsLong();
     final long cycleDeadlineNanos =
         cycleStartNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(CYCLE_BUDGET_MS);
     final long embedShareDeadlineNanos =
@@ -232,8 +257,10 @@ public final class BackfillScheduler {
             bulkHeld && sparseOrNerOnGpu(),
             embeddingLifecycle.embeddingProvider());
     if (runBackfill) {
+      var batchCommitCounter = new int[] {0};
       CombinedEnrichmentBackfillOps.CombinedOutcome outcome =
-          processCombinedBackfillIfApplicable(cycleDeadlineNanos, embedShareDeadlineNanos);
+          processCombinedBackfillIfApplicable(
+              null, null, batchCommitCounter, cycleDeadlineNanos, embedShareDeadlineNanos);
       recordCombinedOutcome(outcome);
       // The mode-selection probe is the batch that re-selects the head of the pending queue each
       // cycle — the one whose signature repeated byte-identically for 12+ minutes in the field.
@@ -250,7 +277,6 @@ public final class BackfillScheduler {
         // 334 Phase 8/10: tight loop with persistent pending-ID caches across iterations.
         var parentIdCache = new ArrayDeque<String>();
         var chunkIdCache = new ArrayDeque<String>();
-        var batchCommitCounter = new int[] {0};
         backfillDidWork = true;
         // Tempdoc 809 finding 3: an aborted probe means a stop condition came up DURING that batch
         // — pending ingest, the cycle budget, or a bulk deletion that invalidated the documents it
@@ -264,7 +290,7 @@ public final class BackfillScheduler {
         // interruptible too, so it can be the call that spends the budget. Seeding from it keeps
         // the 798 WARN honest — without this, a cycle whose ONLY batch overran would report
         // nothing at all.
-        final boolean[] budgetTripped = {outcome.aborted() && System.nanoTime() >= cycleDeadlineNanos};
+        final boolean[] budgetTripped = {outcome.aborted() && monotonicNanos.getAsLong() >= cycleDeadlineNanos};
         // Tempdoc 798 review F3: cumulative across the whole cycle, mode-selection probe included.
         // Budget exhaustion means very different things depending on this flag, and the diagnostic
         // must not assert non-convergence when enrichment was demonstrably converging.
@@ -281,7 +307,7 @@ public final class BackfillScheduler {
                 // Tempdoc 798: primary indexing outranks background enrichment. Backfill resumes
                 // next idle cycle; a queued ingest job the user is waiting on cannot.
                 if (signalBus.hasPendingIngest()) break;
-                if (System.nanoTime() >= cycleDeadlineNanos) {
+                if (monotonicNanos.getAsLong() >= cycleDeadlineNanos) {
                   budgetTripped[0] = true;
                   break;
                 }
@@ -306,7 +332,7 @@ public final class BackfillScheduler {
                 // Re-read the deadline first: an aborted batch is the most likely way the budget
                 // is now spent, and breaking without this would silently drop 798's WARN.
                 if (tightLoopOutcome.aborted()) {
-                  if (System.nanoTime() >= cycleDeadlineNanos) budgetTripped[0] = true;
+                  if (monotonicNanos.getAsLong() >= cycleDeadlineNanos) budgetTripped[0] = true;
                   break;
                 }
               }
@@ -486,7 +512,7 @@ public final class BackfillScheduler {
           indexingPacing.pace(); // tempdoc 885 item 3: duty cycle, not a stop
           if (signalBus.shouldYieldGpuBackfill()) break; // tempdoc 630: GPU-claimed OR energy-reduced
           if (signalBus.hasPendingIngest()) break; // tempdoc 798: primary indexing outranks backfill
-          if (System.nanoTime() >= cycleDeadlineNanos) {
+          if (monotonicNanos.getAsLong() >= cycleDeadlineNanos) {
             if (anyChunkProgress) {
               log.info(
                   "Chunk-embedding backfill reached its {}ms cycle budget while still embedding"
@@ -606,12 +632,6 @@ public final class BackfillScheduler {
 
   // ==================== Backfill delegates ====================
 
-  private CombinedEnrichmentBackfillOps.CombinedOutcome processCombinedBackfillIfApplicable(
-      long cycleDeadlineNanos, long embedShareDeadlineNanos) {
-    return processCombinedBackfillIfApplicable(
-        null, null, null, cycleDeadlineNanos, embedShareDeadlineNanos);
-  }
-
   /**
    * Non-termination detector (round-15 post-round finding): WARNs when the combined backfill keeps
    * selecting the IDENTICAL work-set cycle after cycle while still attempting encoder work.
@@ -668,7 +688,7 @@ public final class BackfillScheduler {
   private boolean paceAndCheckStopBackfillWork(long cycleDeadlineNanos) {
     indexingPacing.pace();
     return hardStopBackfillWork()
-        || System.nanoTime() >= cycleDeadlineNanos;
+        || monotonicNanos.getAsLong() >= cycleDeadlineNanos;
   }
 
   /** Stop reasons that must not be hidden by a first-unit scheduling floor. */
@@ -716,7 +736,7 @@ public final class BackfillScheduler {
             batchesSinceCommit != null ? batchesSinceCommit : new int[] {0},
             () -> paceAndCheckStopBackfillWork(cycleDeadlineNanos),
             this::hardStopBackfillWork,
-            () -> System.nanoTime() >= embedShareDeadlineNanos,
+            () -> monotonicNanos.getAsLong() >= embedShareDeadlineNanos,
             windowedEmbedProgress));
   }
 

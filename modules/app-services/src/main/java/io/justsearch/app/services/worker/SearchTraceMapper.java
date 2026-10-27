@@ -187,7 +187,8 @@ final class SearchTraceMapper {
       CrossEncoderSkipReason crossEncoderSkipReason,
       boolean expansionApplied,
       String expansionSkipReason,
-      QueryType queryType) {
+      QueryType queryType,
+      String classificationBypassReason) {
     var stages = new java.util.ArrayList<io.justsearch.app.api.knowledge.SearchTrace.TraceStage>();
     for (HeadStage stage : HeadStage.values()) {
       stages.add(
@@ -195,8 +196,9 @@ final class SearchTraceMapper {
             case QUERY_UNDERSTANDING ->
                 stageNode(
                     stage.wireId,
-                    queryType != null ? "executed" : "skipped",
-                    null,
+                    // Historical classifier projection, not evidence of an LLM QU dispatch.
+                    queryType != null ? "executed" : "disabled",
+                    classificationBypassReason,
                     queryType != null ? String.valueOf(queryType) : null,
                     null);
             case EXPANSION ->

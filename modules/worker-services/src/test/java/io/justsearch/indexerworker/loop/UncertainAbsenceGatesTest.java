@@ -233,6 +233,7 @@ final class UncertainAbsenceGatesTest {
   private static Resolver resolver() {
     StaleSourceHandler handler = mock(StaleSourceHandler.class);
     JobQueue jobQueue = mock(JobQueue.class);
+    org.mockito.Mockito.doCallRealMethod().when(jobQueue).ownsClaimForPublication(any());
     IngestionOutcomeJournal journal = mock(IngestionOutcomeJournal.class);
     doAnswer(invocation -> {
           ((Runnable) invocation.getArgument(2)).run();
@@ -244,7 +245,7 @@ final class UncertainAbsenceGatesTest {
     when(extractor.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
     return new Resolver(
         new StaleSnapshotResolver(
-            new WorkerIngestionAuthority(), handler, journal, jobQueue, extractor, delta -> {}),
+            new WorkerIngestionAuthority(), handler, journal, jobQueue, extractor, delta -> {}, new FileMutationFence()),
         handler,
         jobQueue);
   }

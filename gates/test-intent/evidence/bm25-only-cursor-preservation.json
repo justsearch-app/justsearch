@@ -1,0 +1,178 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:9d45475f3a69db424fbbae41fc47ac7e7cfc33cc2c9a8926a1ef27208d30a459"
+  },
+  "createdAt": "2026-10-26T23:10:08.170Z",
+  "revision": "4f9df2c1f8b3c5c0377508c1b9ea8ae97d01d227",
+  "tree": "eb2afd830db25bea6f89d4eb3bbac878b65f238e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew --no-daemon :modules:ui:test --tests \"io.justsearch.app.engine.Bm25OnlyCursorHttpTest.textAndFieldSortedPagesPreserveTheirBoundaries\" --tests \"io.justsearch.app.engine.Bm25OnlyCursorHttpTest.firstPageAndEmptyCursorKeepTheSameLookahead\" --tests \"io.justsearch.app.engine.Bm25OnlyCursorHttpTest.cursorPagesKeepRerankingEligibleAndExcludeUnderstandingAndExpansion\" --tests \"io.justsearch.app.engine.Bm25OnlyCursorHttpTest.fieldSortKeepsExplicitScopeAndProjectionAcrossPages\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16094
+    },
+    {
+      "command": "./gradlew --no-daemon :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.Bm25OnlyCursorTest.genuineDenseFusionStaysCursorlessAndIgnoresInboundCursor\" --tests \"io.justsearch.indexerworker.services.Bm25OnlyCursorTest.textKeepsFuzzyRetriesWhileBm25FallbackDoesNotGainThem\" --tests \"io.justsearch.indexerworker.services.Bm25OnlyCursorTest.malformedRawSyntaxRetainsItsExistingInvalidArgument\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12927
+    },
+    {
+      "command": "./gradlew --no-daemon :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.TextQueryOpsCursorCompatibilityTest.oldSignatureKeepsRawParsingHardFiltersSoftBoostsAndItsOutboundToken\" --tests \"io.justsearch.adapters.lucene.runtime.TextQueryOpsCursorCompatibilityTest.readPathStillOwnsProjectionLimitsAndHistoricalRelevanceTokens\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13536
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java#textAndFieldSortedPagesPreserveTheirBoundaries",
+      "file": "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a94ac88fe86f4257727e13f08f34ba7a8e003419263b1294c9164715721211ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "textAndFieldSortedPagesPreserveTheirBoundaries()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java#firstPageAndEmptyCursorKeepTheSameLookahead",
+      "file": "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a94ac88fe86f4257727e13f08f34ba7a8e003419263b1294c9164715721211ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "firstPageAndEmptyCursorKeepTheSameLookahead()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java#cursorPagesKeepRerankingEligibleAndExcludeUnderstandingAndExpansion",
+      "file": "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a94ac88fe86f4257727e13f08f34ba7a8e003419263b1294c9164715721211ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cursorPagesKeepRerankingEligibleAndExcludeUnderstandingAndExpansion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java#fieldSortKeepsExplicitScopeAndProjectionAcrossPages",
+      "file": "modules/ui/src/test/java/io/justsearch/app/engine/Bm25OnlyCursorHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a94ac88fe86f4257727e13f08f34ba7a8e003419263b1294c9164715721211ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fieldSortKeepsExplicitScopeAndProjectionAcrossPages()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/Bm25OnlyCursorTest.java#genuineDenseFusionStaysCursorlessAndIgnoresInboundCursor",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/Bm25OnlyCursorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:afe60b20abd90fc51237b426710b15b5390f3ce45b8d60c968481b39fb07eecb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "genuineDenseFusionStaysCursorlessAndIgnoresInboundCursor()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/Bm25OnlyCursorTest.java#textKeepsFuzzyRetriesWhileBm25FallbackDoesNotGainThem",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/Bm25OnlyCursorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:afe60b20abd90fc51237b426710b15b5390f3ce45b8d60c968481b39fb07eecb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "textKeepsFuzzyRetriesWhileBm25FallbackDoesNotGainThem()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/Bm25OnlyCursorTest.java#malformedRawSyntaxRetainsItsExistingInvalidArgument",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/Bm25OnlyCursorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:afe60b20abd90fc51237b426710b15b5390f3ce45b8d60c968481b39fb07eecb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedRawSyntaxRetainsItsExistingInvalidArgument()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/TextQueryOpsCursorCompatibilityTest.java#oldSignatureKeepsRawParsingHardFiltersSoftBoostsAndItsOutboundToken",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/TextQueryOpsCursorCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6abd8a8c3b736c04db6fc50bb19e67a96ddee17045001d26ba59ed509b3a8eee",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oldSignatureKeepsRawParsingHardFiltersSoftBoostsAndItsOutboundToken()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/TextQueryOpsCursorCompatibilityTest.java#readPathStillOwnsProjectionLimitsAndHistoricalRelevanceTokens",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/TextQueryOpsCursorCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6abd8a8c3b736c04db6fc50bb19e67a96ddee17045001d26ba59ed509b3a8eee",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readPathStillOwnsProjectionLimitsAndHistoricalRelevanceTokens()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4e5c0ffb086a79a23e3db1164c971904a836441f279736f749d8da9773d5fe82"
+}

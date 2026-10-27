@@ -212,7 +212,7 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
         runtime.documentFieldOps(), runtime.indexCountOps(), mock(BatchStats.class), mock(StaleSnapshotResolver.class),
         mock(StaleSourceHandler.class), IndexingPacing.unthrottled(), new AtomicBoolean(true), java.util.concurrent.ConcurrentHashMap.newKeySet(),
         () -> mock(PathResolutionStore.class), () -> identities, mock(IndexingDocumentOps.StageRecorder.class),
-        () -> false, delta -> {});
+        () -> false, delta -> {}, new FileMutationFence());
   }
 
   private static void refresh(RunningRuntime runtime) {

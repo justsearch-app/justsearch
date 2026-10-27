@@ -6,8 +6,16 @@ import static io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBu
 import static io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.holdBackground;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
@@ -18,6 +26,8 @@ import io.justsearch.indexerworker.embed.EmbeddingService;
 import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
+import io.justsearch.indexing.chunking.ChunkParentRevision;
+import io.justsearch.indexing.rag.ContextBudgeter;
 import io.justsearch.ipc.RetrieveContextRequest;
 import io.justsearch.ipc.RetrieveContextResponse;
 import io.justsearch.ort.SessionAcquisitionRequest;
@@ -28,10 +38,15 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Spec D (item 5a) test R1 and its variants: a RAG retrieval whose query embedding cannot answer
@@ -62,16 +77,16 @@ final class WorkerSearchServiceRagBudgetTest
         "Hello first passage", "Hello second passage", "Hello third passage");
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
-    var nativeSession = org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.class);
-    org.mockito.Mockito.when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
+    var nativeSession = mock(ai.onnxruntime.OrtSession.class);
+    when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
       entered.countDown();
       release.await(10, java.util.concurrent.TimeUnit.SECONDS);
-      return org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.Result.class);
+      return mock(ai.onnxruntime.OrtSession.Result.class);
     });
     try (var handle = gpuHandle("rag-rerank", nativeSession)) {
-      var tokenizer = org.mockito.Mockito.mock(io.justsearch.reranker.RerankerTokenizer.class);
-      org.mockito.Mockito.when(tokenizer.encodePairs(org.mockito.ArgumentMatchers.anyString(),
-          org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(
+      var tokenizer = mock(io.justsearch.reranker.RerankerTokenizer.class);
+      when(tokenizer.encodePairs(anyString(),
+          any(String[].class))).thenReturn(
           new io.justsearch.reranker.RerankerTokenizer.EncodedBatch(
               new long[][] {{1}, {1}, {1}}, new long[][] {{1}, {1}, {1}},
               new long[][] {{0}, {0}, {0}}, 3, 1, 0, 3));
@@ -129,15 +144,15 @@ final class WorkerSearchServiceRagBudgetTest
         "Hello first passage", "Hello second passage", "Hello third passage");
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
-    var nativeSession = org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.class);
-    org.mockito.Mockito.when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
+    var nativeSession = mock(ai.onnxruntime.OrtSession.class);
+    when(nativeSession.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
       entered.countDown();
       release.await(10, java.util.concurrent.TimeUnit.SECONDS);
-      return org.mockito.Mockito.mock(ai.onnxruntime.OrtSession.Result.class);
+      return mock(ai.onnxruntime.OrtSession.Result.class);
     });
     try (var handle = gpuHandle("bm25-mmr", nativeSession)) {
-      var provider = org.mockito.Mockito.mock(EmbeddingProvider.class);
-      org.mockito.Mockito.when(provider.availability()).thenReturn(EmbeddingProvider.Availability.READY);
+      var provider = mock(EmbeddingProvider.class);
+      when(provider.availability()).thenReturn(EmbeddingProvider.Availability.READY);
       org.mockito.stubbing.Answer<float[]> encode = call -> {
         InferenceRequest authority = call.getArgument(1);
         try (var lease = handle.acquire(SessionAcquisitionRequest.from(authority));
@@ -146,14 +161,14 @@ final class WorkerSearchServiceRagBudgetTest
         }
       };
       if (passage) {
-        org.mockito.Mockito.when(provider.embedQuery(org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.any())).thenReturn(new float[] {1f, 0f, 0f, 0f});
+        when(provider.embedQuery(anyString(),
+            any())).thenReturn(new float[] {1f, 0f, 0f, 0f});
       } else {
-        org.mockito.Mockito.when(provider.embedQuery(org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.any())).thenAnswer(encode);
+        when(provider.embedQuery(anyString(),
+            any())).thenAnswer(encode);
       }
-      org.mockito.Mockito.when(provider.embedDocument(org.mockito.ArgumentMatchers.anyString(),
-          org.mockito.ArgumentMatchers.any())).thenAnswer(encode);
+      when(provider.embedDocument(anyString(),
+          any())).thenAnswer(encode);
       var service = new WorkerSearchService(lifecycle, provider);
       var result = new java.util.concurrent.CompletableFuture<RetrieveContextResponse>();
       Thread caller = new Thread(() -> {
@@ -246,6 +261,195 @@ final class WorkerSearchServiceRagBudgetTest
       assertTrue(embeddings.documentCalls.get() >= 1, "MMR tried to embed a candidate");
       assertTrue(response.getChunksCount() >= 1, "the retrieval returned context");
       assertTrue(response.getContext().contains("Hello"), response.getContext());
+    }
+  }
+
+  @ParameterizedTest(name = "partialMmrEmbeddingsKeepAFullWorkerContext({arguments}) [{index}]")
+  @CsvSource({"null,0", "null,1", "empty,2", "throw,1", "nan,1", "dimension,1"})
+  void partialMmrEmbeddingsKeepAFullWorkerContext(String failure, int successes) throws Exception {
+    String[] contents = {"Hello first passage", "Hello second passage", "Hello third passage",
+        "Hello fourth passage", "Hello fifth passage", "Hello sixth passage"};
+    lifecycle = openIndexWithMode(previousProperties, testLuceneExecutors(), "bm25", "mmr", contents);
+    var provider = readyControlledProvider();
+    var documentCalls = new AtomicInteger();
+    when(provider.embedDocument(anyString(), any())).thenAnswer(call -> {
+      if (documentCalls.getAndIncrement() < successes) return new float[] {1, 0, 0, 0};
+      return switch (failure) {
+        case "null" -> null;
+        case "empty" -> new float[0];
+        case "throw" -> throw new IllegalStateException("ordinary document encode failure");
+        case "nan" -> new float[] {Float.NaN, 0, 0, 0};
+        case "dimension" -> new float[] {1, 0};
+        default -> throw new AssertionError(failure);
+      };
+    });
+    var service = new WorkerSearchService(lifecycle, provider);
+    var request = question("Hello").toBuilder().setTopK(3).setMaxContextTokens(10_000).build();
+    var response = assertDoesNotThrow(() -> service.retrieveContext(request, foreground(REQUEST_BUDGET)));
+
+    assertEquals("BM25", response.getRetrievalMode());
+    assertEquals("BM25_CONFIGURED", response.getRetrievalModeReason());
+    assertTrue(response.getUsedChunks());
+    assertEquals(6, response.getChunksFound(), "the real union supplies all six eligible passages");
+    assertEquals(3, response.getChunksCount(), "embedding failure alone cannot underfill context");
+    assertEquals(3, response.getQuality().getChunksIncluded());
+    assertEquals(successes + 1, documentCalls.get(), "first failure ends semantic selection");
+    verify(provider, times(1)).embedQuery(anyString(), any());
+    assertAlignedLiteralSections(response);
+    for (var chunk : response.getChunksList()) {
+      int sourceIndex = Integer.parseInt(chunk.getParentDocId().substring("doc-".length())) - 1;
+      assertEquals(contents[sourceIndex].substring(chunk.getStartChar(), chunk.getEndChar()),
+          chunk.getExcerpt());
+    }
+  }
+
+  @ParameterizedTest(
+      name = "denseQueryFailureAllowsOnlyTheExistingOneMmrRetry({arguments}) [{index}]")
+  @ValueSource(strings = {"null", "empty", "throw", "valid"})
+  void denseQueryFailureAllowsOnlyTheExistingOneMmrRetry(String firstResult) throws Exception {
+    lifecycle = openIndex("mmr", "Hello first passage", "Hello second passage", "Hello third passage");
+    var provider = readyControlledProvider();
+    var queryCalls = new AtomicInteger();
+    when(provider.embedQuery(anyString(), any())).thenAnswer(call -> {
+      InferenceRequest authority = call.getArgument(1);
+      assertFalse(authority.mayCreateSessions());
+      if (queryCalls.incrementAndGet() == 1) {
+        switch (firstResult) {
+          case "null": return null;
+          case "empty": return new float[0];
+          case "throw": throw new IllegalStateException("ordinary dense encode failure");
+          case "valid": break;
+          default: throw new AssertionError(firstResult);
+        }
+      }
+      return new float[] {1, 0, 0, 0};
+    });
+    var service = new WorkerSearchService(lifecycle, provider);
+    var response = service.retrieveContext(question("Hello").toBuilder().setTopK(2).build(),
+        foreground(REQUEST_BUDGET));
+    assertEquals(2, response.getChunksCount());
+    assertEquals(firstResult.equals("valid") ? 1 : 2, queryCalls.get());
+    verify(provider, times(3)).embedDocument(anyString(), any());
+    assertAlignedLiteralSections(response);
+  }
+
+  @ParameterizedTest(
+      name = "workerParentCheckStillObservesCancellationAfterNormallyReturningProviders({arguments}) [{index}]")
+  @ValueSource(strings = {"query", "document"})
+  void workerParentCheckStillObservesCancellationAfterNormallyReturningProviders(String cancelAt)
+      throws Exception {
+    lifecycle = openIndexWithMode(previousProperties, testLuceneExecutors(), "bm25", "mmr",
+        "Hello first passage", "Hello second passage", "Hello third passage");
+    var cancelled = new AtomicBoolean();
+    var provider = readyControlledProvider();
+    when(provider.embedQuery(anyString(), any())).thenAnswer(call -> {
+      if (cancelAt.equals("query")) cancelled.set(true);
+      return new float[] {1, 0, 0, 0};
+    });
+    when(provider.embedDocument(anyString(), any())).thenAnswer(call -> {
+      if (cancelAt.equals("document")) cancelled.set(true);
+      return new float[] {1, 0, 0, 0};
+    });
+    var base = foreground(REQUEST_BUDGET);
+    var call = new CallContext(null, null, cancelled::get, base.engineContext(), base.provenance(),
+        base.childLifetime(), base.deadlineNanos());
+    var service = new WorkerSearchService(lifecycle, provider);
+    var failure = assertThrows(CancellationException.class, () -> service.retrieveContext(
+        question("Hello").toBuilder().setTopK(2).build(), call));
+    assertEquals("inference cancelled", failure.getMessage());
+    verify(provider, times(1)).embedQuery(anyString(), any());
+    verify(provider, times(3)).embedDocument(anyString(), any());
+    // This is a worker-boundary preservation check. Outward fallback translation is held separately.
+  }
+
+  @Test
+  void realAndSameParentSyntheticPassagesKeepTheirSpansThroughMmrAndAssembly() throws Exception {
+    String syntheticText = "Hello synthetic sentence. ".repeat(300);
+    lifecycle = openIndexWithMode(previousProperties, testLuceneExecutors(), "bm25", "mmr", syntheticText);
+    String first = "Hello first real passage";
+    String second = "Hello second real passage";
+    String realText = first + "\n" + second;
+    lifecycle.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+        SchemaFields.DOC_ID, "real-parent", SchemaFields.DOC_UID, "real-parent#0",
+        SchemaFields.PATH, "real-parent", SchemaFields.CONTENT, realText)));
+    for (int index = 0; index < 2; index++) {
+      String text = index == 0 ? first : second;
+      int start = realText.indexOf(text);
+      lifecycle.indexingCoordinator().indexSingle(new IndexDocument(Map.ofEntries(
+          Map.entry(SchemaFields.DOC_ID, "real-chunk-" + index),
+          Map.entry(SchemaFields.DOC_UID, "real-chunk-" + index + "#0"),
+          Map.entry(SchemaFields.PATH, "real-parent"),
+          Map.entry(SchemaFields.PARENT_DOC_ID, "real-parent"),
+          Map.entry(SchemaFields.IS_CHUNK, "true"),
+          Map.entry(SchemaFields.CHUNK_INDEX, Integer.toString(index)),
+          Map.entry(SchemaFields.CHUNK_TOTAL, "2"),
+          Map.entry(SchemaFields.CHUNK_CONTENT, text),
+          Map.entry(SchemaFields.CHUNK_START_CHAR, Integer.toString(start)),
+          Map.entry(SchemaFields.CHUNK_END_CHAR, Integer.toString(start + text.length())),
+          Map.entry(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, ChunkParentRevision.sha256Hex(realText)))));
+    }
+    lifecycle.commitOps().commitAndTrack();
+    lifecycle.commitOps().maybeRefreshBlocking();
+    var provider = readyControlledProvider();
+    var service = new WorkerSearchService(lifecycle, provider);
+    var response = service.retrieveContext(question("Hello").toBuilder().setTopK(4)
+        .setMaxContextTokens(10_000).build(), foreground(REQUEST_BUDGET));
+
+    assertEquals(4, response.getChunksCount());
+    assertTrue(response.getChunksList().stream().anyMatch(c -> c.getParentDocId().equals("real-parent")));
+    assertTrue(response.getChunksList().stream().filter(c -> c.getParentDocId().equals("doc-1")).count() >= 2,
+        "distinct synthetic passages of one parent both reach context");
+    assertEquals(4, response.getChunksList().stream()
+        .map(c -> c.getParentDocId() + ":" + c.getChunkIndex() + ":" + c.getStartChar() + ":" + c.getEndChar())
+        .distinct().count());
+    assertAlignedLiteralSections(response);
+    for (int index = 0; index < response.getChunksCount(); index++) {
+      var chunk = response.getChunks(index);
+      String parent = chunk.getParentDocId().equals("doc-1") ? syntheticText : realText;
+      String literal = parent.substring(chunk.getStartChar(), chunk.getEndChar());
+      assertEquals(literal, response.getSections(index).getContent());
+      assertFalse(response.getSections(index).getTruncated(), "the fixture has room for each literal span");
+      String preview = chunk.getExcerpt();
+      String previewBody = literal.length() > 240 ? preview.substring(0, preview.length() - 3) : preview;
+      assertTrue(literal.startsWith(previewBody), "the preview body comes from the exact parent span");
+      assertFalse(previewBody.isBlank());
+      assertTrue(previewBody.length() <= 240, "the literal body keeps its existing character bound");
+      assertTrue(preview.length() <= 243, "a truncated preview adds three ellipsis characters");
+    }
+    verify(provider, times(1)).embedQuery(anyString(), any());
+    verify(provider, org.mockito.Mockito.atLeast(5)).embedDocument(anyString(), any());
+  }
+
+  private static EmbeddingProvider readyControlledProvider() {
+    var provider = mock(EmbeddingProvider.class);
+    when(provider.availability()).thenReturn(EmbeddingProvider.Availability.READY);
+    when(provider.dimension()).thenReturn(4);
+    when(provider.embedQuery(anyString(), any())).thenReturn(new float[] {1, 0, 0, 0});
+    when(provider.embedDocument(anyString(), any())).thenReturn(new float[] {1, 0, 0, 0});
+    return provider;
+  }
+
+  private static void assertAlignedLiteralSections(RetrieveContextResponse response) {
+    assertEquals(response.getChunksCount(), response.getSectionsCount());
+    String[] rendered = response.getContext().split(ContextBudgeter.SECTION_SEPARATOR);
+    assertEquals(response.getSectionsCount(), rendered.length);
+    for (int i = 0; i < response.getSectionsCount(); i++) {
+      var section = response.getSections(i);
+      assertEquals(i, section.getSectionIndex());
+      assertEquals(i, section.getChunkIndex());
+      String expectedPreview = section.getContent();
+      if (expectedPreview.length() > 240) {
+        // These worded fixtures have a space within the producer's 40-character lookback.
+        // The ellipsis is a display marker, separate from the literal prefix and its 240-char cap.
+        int boundary = expectedPreview.lastIndexOf(' ', 240);
+        assertTrue(boundary >= 200, "the fixture supplies a word boundary within the lookback");
+        expectedPreview = expectedPreview.substring(0, boundary).stripTrailing() + "...";
+      }
+      assertFalse(response.getChunks(i).getExcerpt().isBlank());
+      assertEquals(expectedPreview, response.getChunks(i).getExcerpt(),
+          "the citation is the exact literal section prefix with its producer-owned ellipsis");
+      assertEquals(ContextBudgeter.sectionHeader(i + 1, section.getSourceLabel()) + section.getContent(),
+          rendered[i]);
     }
   }
 

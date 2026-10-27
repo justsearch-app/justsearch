@@ -15,9 +15,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -233,18 +240,38 @@ final class EngineVduMigrationReplayTest {
 
   private static SwitchBufferCapableQueue.SwitchBufferOp requireBuffered(Path queuePath, String key)
       throws Exception {
-    try (SqliteJobQueue queue = openQueue(queuePath)) {
-      return queue.listSwitchBufferOps().stream()
-          .filter(op -> key.equals(op.key()))
-          .findFirst()
-          .orElseThrow();
+    try (Connection connection = openReadOnlyQueue(queuePath);
+        PreparedStatement statement = connection.prepareStatement(
+            "SELECT generation, key, op, payload, last_updated, revision, accepted_order "
+                + "FROM switch_buffer WHERE key = ?")) {
+      statement.setString(1, key);
+      try (ResultSet row = statement.executeQuery()) {
+        assertTrue(row.next(), "the buffered row must exist");
+        SwitchBufferCapableQueue.SwitchBufferOp buffered =
+            new SwitchBufferCapableQueue.SwitchBufferOp(
+                row.getString(1), row.getString(2), row.getString(3), row.getString(4),
+                row.getLong(5), row.getString(6), row.getLong(7));
+        assertFalse(row.next(), "the buffered key must be unique");
+        return buffered;
+      }
     }
   }
 
   private static long bufferedDepth(Path queuePath) throws Exception {
-    try (SqliteJobQueue queue = openQueue(queuePath)) {
-      return queue.switchBufferDepth();
+    try (Connection connection = openReadOnlyQueue(queuePath);
+        Statement statement = connection.createStatement();
+        ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM switch_buffer")) {
+      assertTrue(row.next(), "the switch buffer count must be returned");
+      return row.getLong(1);
     }
+  }
+
+  private static Connection openReadOnlyQueue(Path queuePath) throws SQLException {
+    // A full queue open runs schema writes and can contend with the live Engine's writer.
+    Properties properties = new Properties();
+    properties.setProperty("open_mode", "1"); // SQLITE_OPEN_READONLY
+    properties.setProperty("busy_timeout", "5000");
+    return DriverManager.getConnection("jdbc:sqlite:" + queuePath, properties);
   }
 
   private static boolean awaitBufferedDepth(Path queuePath, long expected, long timeoutMs)

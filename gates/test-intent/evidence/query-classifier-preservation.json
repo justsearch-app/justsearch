@@ -1,0 +1,646 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:946f0c815895ef666ae4a4cca61d70f491ab76c772fa3e704c460fe85dd7cfcb"
+  },
+  "createdAt": "2026-10-26T23:04:09.568Z",
+  "revision": "c4ca2dcaf6a7a3bac50eddc47113c19e16087b26",
+  "tree": "d8e3484d22b48e3e786038da8a56e9b5d115b553",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew --no-daemon :modules:app-services:test --tests \"io.justsearch.app.services.worker.QueryClassifierTest.baselineClassificationTable\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7221
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryClassifierTest.java#baselineClassificationTable",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryClassifierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5415e8af65c1ed24ad23d71f53bf6289d0ed7a63065c351bfafc2d8dffa4f86f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "baselineClassificationTable(1)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(2)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(3)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(4)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(5)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(6)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(7)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(8)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(9)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(10)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(11)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(12)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(13)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(14)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(15)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(16)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(17)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(18)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(19)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(20)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(21)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(22)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(23)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(24)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(25)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(26)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(27)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(28)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(29)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(30)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(31)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(32)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(33)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(34)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(35)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(36)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(37)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(38)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(39)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(40)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(41)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(42)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(43)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(44)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(45)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(46)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(47)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(48)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(49)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(50)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(51)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(52)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(53)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(54)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(55)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(56)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(57)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(58)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(59)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(60)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(61)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(62)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(63)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(64)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(65)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(66)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(67)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(68)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(69)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(70)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(71)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(72)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(73)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(74)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(75)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(76)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(77)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(78)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(79)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(80)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(81)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(82)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(83)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(84)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(85)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(86)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(87)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(88)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(89)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(90)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(91)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(92)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(93)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(94)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(95)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(96)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(97)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(98)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(99)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(100)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(101)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(102)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(103)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(104)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(105)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(106)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(107)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(108)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(109)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(110)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(111)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(112)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(113)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(114)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(115)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(116)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(117)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(118)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(119)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(120)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(121)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(122)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(123)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(124)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(125)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(126)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(127)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(128)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(129)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(130)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(131)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(132)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(133)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(134)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(135)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(136)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(137)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(138)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(139)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(140)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(141)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(142)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(143)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(144)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(145)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(146)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(147)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(148)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(149)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(150)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(151)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:564116f4506cd1d3cc3064a7fbb4fa33ccfef86dc37f7e0b89e3fdcbf2815c9c"
+}

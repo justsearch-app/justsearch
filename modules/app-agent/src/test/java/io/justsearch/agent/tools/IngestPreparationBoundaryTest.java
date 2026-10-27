@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -217,20 +218,49 @@ class IngestPreparationBoundaryTest {
 
   @Test
   void socketInputIsRefusedAsAnUnsupportedFileType() throws IOException {
-    Path socketPath = tempDir.resolve("ingest.sock");
-    java.nio.channels.ServerSocketChannel socket;
+    Path socketDirectory = System.getProperty("os.name").startsWith("Windows")
+        ? tempDir : Files.createTempDirectory(Path.of("/tmp"), "js-ing-");
+    Path socketPath = socketDirectory.resolve("ingest.sock");
     try {
-      socket = java.nio.channels.ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX);
-    } catch (UnsupportedOperationException unsupported) {
-      assumeTrue(false, "Unix-domain sockets are unsupported: " + unsupported);
-      return;
-    }
-    try (socket) {
-      socket.bind(java.net.UnixDomainSocketAddress.of(socketPath));
-      assertTrue(Files.readAttributes(socketPath, java.nio.file.attribute.BasicFileAttributes.class,
-          java.nio.file.LinkOption.NOFOLLOW_LINKS).isOther(), "fixture must be a special file");
-      assertBadRequest(json(Map.of("paths", List.of(socketPath.toString()))),
-          "Path is not a readable regular file or directory");
+      if (!socketDirectory.equals(tempDir)
+          && Files.getFileStore(socketDirectory).supportsFileAttributeView("posix")) {
+        Files.setPosixFilePermissions(socketDirectory, PosixFilePermissions.fromString("rwx------"));
+      }
+      java.nio.channels.ServerSocketChannel socket;
+      try {
+        socket = java.nio.channels.ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX);
+      } catch (UnsupportedOperationException unsupported) {
+        assumeTrue(false, "Unix-domain sockets are unsupported: " + unsupported);
+        return;
+      }
+      try (socket) {
+        socket.bind(java.net.UnixDomainSocketAddress.of(socketPath));
+        var attributes = Files.readAttributes(socketPath,
+            java.nio.file.attribute.BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        assertTrue(attributes.isOther(), "fixture must be a special file");
+        assertFalse(attributes.isSymbolicLink());
+        assertFalse(attributes.isRegularFile());
+        assertFalse(attributes.isDirectory());
+        OperationPreparationRefused refused = assertThrows(OperationPreparationRefused.class,
+            () -> prepare(tool(List.of()), json(Map.of("paths", List.of(socketPath.toString())))));
+        assertFalse(refused.refusal().success());
+        assertEquals("BAD_REQUEST", refused.refusal().errorCode().orElseThrow());
+        assertEquals("Path is not a readable regular file or directory: " + socketPath,
+            refused.refusal().message());
+      }
+      Files.delete(socketPath);
+      Files.writeString(socketPath, "content");
+      OperationPreparation prepared =
+          prepare(tool(List.of()), json(Map.of("paths", List.of(socketPath.toString()))));
+      RecordedRootPlan plan = RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson());
+      assertEquals(1, plan.roots().size());
+      assertEquals(socketPath.toAbsolutePath().normalize(), plan.roots().get(0).path());
+      assertTrue(plan.roots().get(0).singleFile());
+    } finally {
+      Files.deleteIfExists(socketPath);
+      if (!socketDirectory.equals(tempDir)) {
+        Files.delete(socketDirectory);
+      }
     }
   }
 

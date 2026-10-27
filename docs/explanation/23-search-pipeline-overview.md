@@ -125,6 +125,54 @@ Three retrieval models can run in any combination:
 | 2a  | **Filter Value Normalization** (async) | Two-tier: deterministic prefix/contains matching (0 ms); LLM grammar-constrained enum fallback (~400–1200 ms GPU). Gated by `JUSTSEARCH_FILTER_NORM_ENABLED`. Fires on both search and answer paths (366) |
 | 2b  | **Query Understanding** (async) | LLM extracts `boostFilters` from natural language queries; applied as `BooleanClause.SHOULD` + `BoostQuery(ConstantScoreQuery, weight=20)`. Gated by `JUSTSEARCH_QU_ENABLED`. Bypassed when explicit filters present (363) |
 
+The historical `searchTrace` stage `query-understanding` projects deterministic
+classification, not actual LLM query-understanding dispatch. With classification
+enabled, its detail is the raw enum; an explicit pipeline bypass takes precedence
+over the Lucene-syntax bypass. Disabled classification has status `disabled`,
+reason `DISABLED`, and no raw detail. Disabled, explicit-pipeline and LUCENE paths
+use effective `INFORMATIONAL` policy; actual LLM QU has its own SIMPLE-only guard.
+The original query text and reasonless legacy artifacts are preserved.
+The diagnostic renderer supports raw classification and bypass reasons, but no live search surface mounts it. See
+[`KnowledgeSearchEngine`](../../modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeSearchEngine.java),
+[`SearchTraceMapper`](../../modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchTraceMapper.java)
+and the [UI consumer checks](../../modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts).
+
+Let `D` be the original caller deadline. The original QU completion is bounded by
+`min(QU start + 8000 ms, D - 1500 ms base reserve - 500 ms response margin)`;
+without `D`, the 8000 ms limit applies. Remaining time is recomputed after
+synchronous setup, and a nonpositive budget skips or abandons assistance.
+Projection cancellation forwards to the original completion. Timeout or
+cancellation abandons queued work, while running producers retain ownership until
+actual exit; neither proves native termination. These rules are implemented in
+[`QueryUnderstandingService`](../../modules/app-services/src/main/java/io/justsearch/app/services/worker/QueryUnderstandingService.java)
+and [`EngineFutures`](../../modules/core/src/main/java/io/justsearch/core/execution/EngineFutures.java).
+
+The original expansion completion is bounded at submission by
+`min(search start + 1500 ms, D - 500 ms)`, even while QU or base retrieval is
+pending. The submitted expansion has exactly one owner. If the cutoff arrives
+before the collector claims it, a JDK delayed-executor task cancels it with
+`cancel(true)`: queued work is abandoned before dispatch, running producers are
+interrupted while retaining ownership until actual exit, and the collector skips
+with `TIMEOUT`. Once the collector owns it, the timer does nothing; the collector's
+timed wait ends at the same cutoff and cancels with `cancel(true)`. A cancellation
+seen during that wait always comes from elsewhere and still propagates. Final
+cleanup cancels expansion that nobody else owns. The branch for two
+or more known sources never launches expansion it cannot consume;
+`PER_SOURCE_RETRIEVAL` is diagnostic, not a degradation warning. A successful
+expanded re-search retains its independent `min(now + 1500 ms, D)` deadline and
+can cross the completion cutoff, with base-result fallback. The fixed QU reserve
+does not bound every later stage. Expansion timeout wording must preserve the
+base route: a HYBRID base is not keyword-only. See the
+[durable budget checks](../../modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java).
+
+The fixed 1500 ms reserve has a qualified finite warmed calibration; it is not a
+universal latency guarantee. A finite real-model comparison rejected broader
+multi-token classification after a target-rank regression. The assistance dispatch
+and budget changes described above preserve the existing classifier rules and
+SIMPLE classification policy. Aggregate ranking remains undecided because
+expansion varied between runs; see the measurements and limits in the
+[quality register](../reference/search-quality-register.md#query-classification-budgets-diagnostics-and-open-gates).
+
 ### Retrieval (index half - `SearchOrchestrator`)
 
 Stages 3–8 are **not sequential** — stages 6, 7, and 8 execute in parallel
