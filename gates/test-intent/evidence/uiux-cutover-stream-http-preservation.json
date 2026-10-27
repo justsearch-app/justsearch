@@ -1,0 +1,111 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:2d1969b6b8353f3ec6c85ce8147b82ce96f4300a9d8dc2b78184a9acf18592a4",
+    "adapterPatch": "gates/test-intent/evidence/http-lifetime/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-27T07:01:49.320Z",
+  "revision": "ee92a253a795b7a49a3bcf374042edc12fadbf9b",
+  "tree": "97488e213b55953b5c598457b5af9a92ee700c28",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.RequestAdmissionCompletionTest.successfulAsyncAndOrdinaryFiniteResponsesReleaseTheirOwnReferences\" --tests \"io.justsearch.ui.api.RequestAdmissionCompletionTest.successfulLeaseProjectionKeepsExactOpRemovalUpdatedAtAndHttpStatusOutcome\" --tests \"io.justsearch.ui.api.RequestAdmissionCompletionTest.synchronousCommittedWire200PreservesInternal500LeaseFailure\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 185045
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestAdmissionCompletionTest.java#successfulAsyncAndOrdinaryFiniteResponsesReleaseTheirOwnReferences",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestAdmissionCompletionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:40ac59a755607185d4a0ba4f2f66cdb64e62eb577ac11a774ea0d1e66cab4b33",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successfulAsyncAndOrdinaryFiniteResponsesReleaseTheirOwnReferences()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestAdmissionCompletionTest.java#successfulLeaseProjectionKeepsExactOpRemovalUpdatedAtAndHttpStatusOutcome",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestAdmissionCompletionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:40ac59a755607185d4a0ba4f2f66cdb64e62eb577ac11a774ea0d1e66cab4b33",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successfulLeaseProjectionKeepsExactOpRemovalUpdatedAtAndHttpStatusOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestAdmissionCompletionTest.java#synchronousCommittedWire200PreservesInternal500LeaseFailure",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RequestAdmissionCompletionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:40ac59a755607185d4a0ba4f2f66cdb64e62eb577ac11a774ea0d1e66cab4b33",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "synchronousCommittedWire200PreservesInternal500LeaseFailure()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "784f94fd04",
+    "revision": "784f94fd049b9b2c39708437fa262c32a58c32b1",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.RequestAdmissionCompletionTest.successfulAsyncAndOrdinaryFiniteResponsesReleaseTheirOwnReferences\" --tests \"io.justsearch.ui.api.RequestAdmissionCompletionTest.successfulLeaseProjectionKeepsExactOpRemovalUpdatedAtAndHttpStatusOutcome\" --tests \"io.justsearch.ui.api.RequestAdmissionCompletionTest.synchronousCommittedWire200PreservesInternal500LeaseFailure\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 0,
+        "durationMs": 241211
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestAdmissionCompletionTest.java#successfulAsyncAndOrdinaryFiniteResponsesReleaseTheirOwnReferences",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestAdmissionCompletionTest.java#successfulLeaseProjectionKeepsExactOpRemovalUpdatedAtAndHttpStatusOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/RequestAdmissionCompletionTest.java#synchronousCommittedWire200PreservesInternal500LeaseFailure",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:a09be30af11cc350161891c3d0915fb965c8ad99d0062200a55b038ec300336c"
+}

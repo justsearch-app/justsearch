@@ -7118,7 +7118,8 @@ public final class KnowledgeServer implements Closeable {
             || (encoderRecoveryReservation != null
             && encoderRecoveryReservation.querySettings == null
             && (current.encoderSet != null || current.queryRoleSet != null))) {
-          throw new IllegalStateException("Index serving view is unavailable");
+          throw new io.justsearch.app.api.ServingUnavailableException(
+              "Index serving view is unavailable", executors.retryAfterSeconds());
         }
         current.holders++;
         return new ServingLease(current);

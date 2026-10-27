@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T07:56:40.789Z",
+  "revision": "bd558647f6115e8e92c7cc2501880745573ae4bc",
+  "tree": "62aca50aa0c7fd87d33c8ac45a83551512329ab9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/43e7ujly/tmp/test-intent-vitest-5-1793087792058.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2735
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 rail to bare Search retires refusal notice and its alert without changing drafts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bffe5857853b541bd5c6b7e76394f358a08611fe1d22901bc7ae367abfac9094",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S84 rail to bare Search retires refusal notice and its alert without changing drafts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 fresh address to bare Search retires refusal notice and its alert without changing drafts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bffe5857853b541bd5c6b7e76394f358a08611fe1d22901bc7ae367abfac9094",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S84 fresh address to bare Search retires refusal notice and its alert without changing drafts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 accepted modal navigation retires refusal while keeping the underlying preparation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bffe5857853b541bd5c6b7e76394f358a08611fe1d22901bc7ae367abfac9094",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S84 accepted modal navigation retires refusal while keeping the underlying preparation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bd558647f6",
+    "revision": "bd558647f6115e8e92c7cc2501880745573ae4bc",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/43e7ujly/tmp/test-intent-vitest-5-1793087798107.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2136,
+        "output": "JSON report written to /home/elias/.cache/am/43e7ujly/tmp/test-intent-vitest-5-1793087798107.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 rail to bare Search retires refusal notice and its alert without changing drafts",
+        "classification": "assertion",
+        "detail": "S84 rail to bare Search retires refusal notice and its alert without changing drafts:  AssertionError: expected <section …(2)>…(2)</section> to be null\n    at /home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/test-intent-before-yqR6xR/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts:145:42\n    at file:///home/elias/.cache/am/43e7ujly/tmp/refusal-r"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 fresh address to bare Search retires refusal notice and its alert without changing drafts",
+        "classification": "assertion",
+        "detail": "S84 fresh address to bare Search retires refusal notice and its alert without changing drafts:  AssertionError: expected <section …(2)>…(2)</section> to be null\n    at /home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/test-intent-before-yqR6xR/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts:145:42\n    at file:///home/elias/.cache/am/43e7ujly/tmp/refusal-r"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 accepted modal navigation retires refusal while keeping the underlying preparation",
+        "classification": "assertion",
+        "detail": "S84 accepted modal navigation retires refusal while keeping the underlying preparation:  AssertionError: expected <section …(2)>…(2)</section> to be null\n    at /home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/test-intent-before-yqR6xR/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts:186:42\n    at file:///home/elias/.cache/am/43e7ujly/tmp/refusal-r"
+      }
+    ]
+  },
+  "digest": "sha256:5d5de090fcf13a9b36e7aa0263724cea9e83089b01664a6512afab79847acc05"
+}

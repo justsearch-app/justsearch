@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-19T17:06:30.049Z",
-  "revision": "0bae5c52383ab13671449f32bc50f99dd8941922",
-  "tree": "17ce32bfc64e9b4ed86faccdbadfce6190e664ca",
+  "createdAt": "2026-10-26T12:08:44.194Z",
+  "revision": "d20893a8e55fe19fde21b47e36ecaa070a05d933",
+  "tree": "24b19bf40aba7c3ef4b594886fa95d3bfc073ba6",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,24 +18,24 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-search.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.search.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.tier.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-search-mode/tmp/evidence-work/test-intent-vitest-3503818-1792429586445.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-search.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.search.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.tier.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3819261-1793016510718.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3583
+      "durationMs": 5764
     }
   ],
   "checks": [
     {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#offers Search, Ask and Delegate, and nothing else",
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#offers Search, Ask, Delegate and Structured, and nothing else",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "S1.1 — the composer offers three modes, Search by default offers Search, Ask and Delegate, and nothing else",
+          "name": "S1.1 / XT1 — the composer offers four modes, Search by default offers Search, Ask, Delegate and Structured, and nothing else",
           "status": "passed"
         }
       ]
@@ -44,13 +44,13 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#starts a fresh window in Search (S1.2) and badges it as the default",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "S1.1 — the composer offers three modes, Search by default starts a fresh window in Search (S1.2) and badges it as the default",
+          "name": "S1.1 / XT1 — the composer offers four modes, Search by default starts a fresh window in Search (S1.2) and badges it as the default",
           "status": "passed"
         }
       ]
@@ -59,13 +59,13 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#labels Search by what it does and makes no \"no AI\" claim",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "S1.1 — the composer offers three modes, Search by default labels Search by what it does and makes no \"no AI\" claim",
+          "name": "S1.1 / XT1 — the composer offers four modes, Search by default labels Search by what it does and makes no \"no AI\" claim",
           "status": "passed"
         }
       ]
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#is always the search control, even while a run holds a decision or is running",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#keeps the standing stop beside it while something is running — a search stops nothing",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#names the delegate chord only when the chord would actually delegate",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#says a scoped Ask asks about the chosen files, and that the delegate chord leaves them behind",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#starts in Search, says so to assistive tech, and words what Enter does",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#restores the draft into the composer without searching, asking or delegating",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps Shift+Enter a newline and an IME Enter the IME’s, in Search mode too",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -179,7 +179,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not search a half-composed IME string, and searches once composition ends",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -194,7 +194,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#sends the quick pass while typing and the refined pass on settle, through the one intent seam",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -209,7 +209,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#runs the full pass at once on Enter, superseding the staged ones",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -224,7 +224,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#typing in Ask mode issues no search at all",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -239,7 +239,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#types, lists, selects and opens; Ask keeps the query and states the reason",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -254,7 +254,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#renders the shared card, opens a hit in the pane, and keeps a multi-file choice",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -329,7 +329,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#sends the chosen documents as paths, each document once",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -344,7 +344,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#fixes the set when asked: a later re-rank or filter does not change it",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -359,7 +359,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#drops a chosen row that a new result list no longer holds — visibly",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -374,7 +374,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#offers no ask about an empty choice, and never sends an empty set as a whole-index ask",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -389,7 +389,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#scopes \"Ask about this file\" from the card menu to that one document",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -404,7 +404,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#counts several hits from one document once",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -419,7 +419,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#takes only chosen rows, never the rest of the list",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -434,7 +434,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#refuses an empty choice, ids that are not on screen, and hits with no path",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -449,7 +449,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#drops chosen rows that left the list, and keeps the same rows when nothing left",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -464,7 +464,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#words the act and the scope by document count",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -479,7 +479,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not carry the files into a later ordinary Ask",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -494,7 +494,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#drops a prepared scope on New session",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -509,7 +509,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#Retry of a scoped answer keeps the same files, and says so",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -521,16 +521,16 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#after a reload the turn does not look scoped, and Retry/Edit say they search all files",
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#DS1 after reload Retry/Edit say the original Ask inputs are unknown",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later after a reload the turn does not look scoped, and Retry/Edit say they search all files",
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later DS1 after reload Retry/Edit say the original Ask inputs are unknown",
           "status": "passed"
         }
       ]
@@ -539,7 +539,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#keeps the same files when the turn carries its scope, and says all files when it does not",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -554,7 +554,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#leaves a streaming answer streaming, in the sidebar, and reopens it with one click",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -569,7 +569,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#never steers a live delegated run",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -584,7 +584,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#lights no row for a search — a search is not a turn, and leaves the conversation one click away",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:52136b8daaf4aee0aa30b339c4a4faa2404a033bb2515b7fc87b86d88f5afee2",
+      "contentDigest": "sha256:758ca05f7bdf826cfb2b4e7af86b7783a7000f4eb869ce27419a6db7f90794c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -599,7 +599,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#stops showing the previous rows the moment the query changes",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -614,7 +614,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows nothing for a cleared query, even when the earlier request answers late",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -629,7 +629,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#says \"no documents matched\" and \"search failed\" in different words",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -644,7 +644,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#is stale while the store holds a newer query than the one its rows answered",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:800b42653b0c5f4647c48a37dd20b2e7eed74cd217e7f1cd46fee8ea725ebe1d",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -659,7 +659,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows a scope chip the default window pinned, and removing it re-runs the search unrestricted",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -674,7 +674,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps a facet filter removable when it leaves zero hits",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -689,7 +689,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows a date range set elsewhere, and clears it",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -704,7 +704,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#follows a search made in the other window when the reader comes back",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -719,7 +719,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows the shared query on a first entry, in the composer and in the list",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -734,7 +734,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#returns to the list with the shared query after a conversation, too",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -749,7 +749,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#never overwrites an unsent Ask draft; Search mode then searches what the composer holds",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -764,7 +764,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps a restored draft on a first entry and shows no list it would contradict",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -779,7 +779,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#has no developer \"Search this text\" entry, and \"Search everything\" shows results",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -794,7 +794,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps the results, the query and the chosen scope with the results, and none in the conversation",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:10717031a5be5315e57a4f9d714e44deec5113864efa9ad22dd3d01f739523c3",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -881,6 +881,306 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:337630b2a6859556847de943342788935f59f9cc50e1d0697775c5825888fb0d"
+  "failBefore": {
+    "ref": "9f7686e4c4be74fc7344ac6a853f5324bbba21c4",
+    "revision": "9f7686e4c4be74fc7344ac6a853f5324bbba21c4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-search.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.search.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.tier.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3819261-1793016518089.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 5773
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#offers Search, Ask, Delegate and Structured, and nothing else",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#starts a fresh window in Search (S1.2) and badges it as the default",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#labels Search by what it does and makes no \"no AI\" claim",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#is always the search control, even while a run holds a decision or is running",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#keeps the standing stop beside it while something is running — a search stops nothing",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#names the delegate chord only when the chord would actually delegate",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#says a scoped Ask asks about the chosen files, and that the delegate chord leaves them behind",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#starts in Search, says so to assistive tech, and words what Enter does",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#restores the draft into the composer without searching, asking or delegating",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps Shift+Enter a newline and an IME Enter the IME’s, in Search mode too",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not search a half-composed IME string, and searches once composition ends",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#sends the quick pass while typing and the refined pass on settle, through the one intent seam",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#runs the full pass at once on Enter, superseding the staged ones",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#typing in Ask mode issues no search at all",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#types, lists, selects and opens; Ask keeps the query and states the reason",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#renders the shared card, opens a hit in the pane, and keeps a multi-file choice",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.search.test.ts#shows each hit’s path as the shared card does: its folders on the row, the full path on hover",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts#a plain click opens and leaves the selection alone",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts#Ctrl and Shift choose without opening, and Shift ranges from the row read last",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.test.ts#the row menu opens without choosing, and offers choosing to the keyboard",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#sends the chosen documents as paths, each document once",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#fixes the set when asked: a later re-rank or filter does not change it",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#drops a chosen row that a new result list no longer holds — visibly",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#offers no ask about an empty choice, and never sends an empty set as a whole-index ask",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#scopes \"Ask about this file\" from the card menu to that one document",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#counts several hits from one document once",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#takes only chosen rows, never the rest of the list",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#refuses an empty choice, ids that are not on screen, and hits with no path",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#drops chosen rows that left the list, and keeps the same rows when nothing left",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#words the act and the scope by document count",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not carry the files into a later ordinary Ask",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#drops a prepared scope on New session",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#Retry of a scoped answer keeps the same files, and says so",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#DS1 after reload Retry/Edit say the original Ask inputs are unknown",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#keeps the same files when the turn carries its scope, and says all files when it does not",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#leaves a streaming answer streaming, in the sidebar, and reopens it with one click",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#never steers a live delegated run",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#lights no row for a search — a search is not a turn, and leaves the conversation one click away",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#stops showing the previous rows the moment the query changes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows nothing for a cleared query, even when the earlier request answers late",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#says \"no documents matched\" and \"search failed\" in different words",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts#is stale while the store holds a newer query than the one its rows answered",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows a scope chip the default window pinned, and removing it re-runs the search unrestricted",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps a facet filter removable when it leaves zero hits",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows a date range set elsewhere, and clears it",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#follows a search made in the other window when the reader comes back",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows the shared query on a first entry, in the composer and in the list",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#returns to the list with the shared query after a conversation, too",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#never overwrites an unsent Ask draft; Search mode then searches what the composer holds",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps a restored draft on a first entry and shows no list it would contradict",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#has no developer \"Search this text\" entry, and \"Search everything\" shows results",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#keeps the results, the query and the chosen scope with the results, and none in the conversation",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts#searches on the default tier — no ask, no agent — and asks on the ask tier",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts#sends plain Enter at the CHOSEN tier — the mode governs the default key",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts#names the key that now runs, in every mode",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts#yields the ask tier reason for the delegate tier when the mode changes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#shows any other failure as a failure, not as a missing file",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:6dcea4d97ff04b6e0649f842062e811ac14811d76bcf641bc0e041d0913b521e"
 }

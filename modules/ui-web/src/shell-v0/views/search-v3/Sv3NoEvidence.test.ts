@@ -222,14 +222,19 @@ describe('WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13)', (
       prompt: choice === 'edit' ? 'Edited model question' : question });
     expect(dispatches()[0]).not.toHaveProperty('context');
   });
-  it.each(['retry', 'edit'] as const)('a reloaded no-evidence %s remains an Ask', async choice => {
+  it.each(['retry', 'edit'] as const)('DS1 restored no-evidence Ask %s refuses unknown scope before fork', async choice => {
     online(); const el = await loaded(saved().slice(0, 2));
+    const composer = el.shadowRoot!.querySelector('jf-sv3-composer')!;
+    const field = composer.shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid=sv3-composer-input]')!;
+    field.value = 'unrelated B'; field.dispatchEvent(new Event('input')); await settle(el);
     const main = el.shadowRoot!.querySelector('jf-sv3-main')!;
     main.dispatchEvent(new CustomEvent('sv3-branch-action', { bubbles: true, composed: true,
       detail: { action: choice, turnId: userId, ...(choice === 'edit' ? { text: 'Edited Ask' } : {}) } }));
     await settle(el);
-    expect(dispatches()).toHaveLength(1);
-    expect(dispatches()[0]?.shapeId).toBe('core.rag-ask');
+    expect(field.value).toBe('unrelated B');
+    expect(dispatches()).toHaveLength(0);
+    expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('/branch?'))).toHaveLength(0);
+    expect(el.shadowRoot!.textContent).toContain('original Ask inputs are not known');
   });
   it('offers the action only on the latest turn after a cold load', async () => {
     online(); const el = await loaded(saved());

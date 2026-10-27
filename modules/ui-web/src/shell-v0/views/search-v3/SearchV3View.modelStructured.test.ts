@@ -101,17 +101,19 @@ it.each(['retry', 'edit'])('cold %s keeps the model turn a persistent model answ
   expect(dispatches()[0]).toMatchObject({ shapeId: 'core.free-chat', sessionId: 'fork', prompt: action === 'edit' ? 'edited model' : question });
   expect(dispatches()[0]).not.toHaveProperty('schema'); expect(dispatches()[0]).not.toHaveProperty('context');
 });
-it.each(['retry', 'edit'])('cold %s keeps Structured, awaiting schema review without sending a model answer', async action => {
+it.each(['retry', 'edit'])('DS1 cold Structured %s refuses before fork with B kept and no model answer', async action => {
   const view = await mount(true); const main = part(view, 'jf-sv3-main');
+  const field = part(view, 'jf-sv3-composer').shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid=sv3-composer-input]')!;
+  field.value = 'unrelated B'; field.dispatchEvent(new Event('input')); await settle(view);
   expect(main.shadowRoot!.querySelector('[data-testid="sv3-answer-without-files"]')).toBeNull();
   const turnId = main.shadowRoot!.querySelectorAll('[data-testid="sv3-turn-question"]')[2]!.getAttribute('data-item-id')!.replace(/:q$/, '');
   main.dispatchEvent(new CustomEvent('sv3-branch-action', { bubbles: true, composed: true,
     detail: { action, turnId, ...(action === 'edit' ? { text: 'edited extraction' } : {}) } }));
   await settle(view);
   expect(dispatches()).toHaveLength(0);
-  const c = part(view, 'jf-sv3-composer'); expect(c.getAttribute('tier')).toBe('structured');
-  expect(c.shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid="sv3-composer-input"]')!.value)
-    .toBe(action === 'edit' ? 'edited extraction' : question);
+  expect(field.value).toBe('unrelated B');
+  expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('/branch?'))).toHaveLength(0);
+  expect(view.shadowRoot!.textContent).toContain('original schema or summary input is not available');
 });
 it('remembered Structured Retry reuses its schema without becoming a model answer', async () => {
   const view = await mount(true);

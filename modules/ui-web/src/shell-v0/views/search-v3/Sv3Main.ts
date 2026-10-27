@@ -1383,11 +1383,11 @@ export class Sv3Main extends JfElement {
   declare modelAnswerUnavailableReason: string;
   declare modelAnswerBusy: boolean;
   /**
-   * WP1.1 S1.7 — which turns this window limited to chosen files. Window-local: a reloaded turn is
-   * not in it, and its Edit then says it searches all files, which is what it will do.
+   * WP1.1 S1.7 — known own Ask inputs in this window. Null is known unrestricted;
+   * an absent reloaded turn has unknown inputs, so Retry/Edit must refuse.
    */
   declare structuredNotes: ReadonlyMap<string, string>;
-  declare turnScopes: ReadonlyMap<string, Sv3AskScope>;
+  declare turnScopes: ReadonlyMap<string, Sv3AskScope | null>;
   /**
    * The ONE live agent run, or null. Rendered against `run.turnId` and no other turn, so the feed
    * cannot appear under a turn that did not open it (tempdoc 822 Phase F2).
@@ -2165,7 +2165,7 @@ export class Sv3Main extends JfElement {
            id space by construction (feed ids are the controller's entry/call ids). -->
       <div class="ask-bubble" data-testid="sv3-turn-question" data-item-id=${`${turn.id}:q`}>${turn.question}</div>
       ${this.scopeLine(turn)}
-      ${turn.shapeId === 'core.extract' ? html`<p class="ask-scope">${this.structuredNotes.get(turn.id) ?? 'Structured Retry/Edit opens the instruction with the current composer schema and stated inputs; review and send.'}</p>` : nothing}
+      ${turn.shapeId === 'core.extract' ? html`<p class="ask-scope">${this.structuredNotes.get(turn.id) ?? 'Original Structured inputs are unavailable. Prepare a new Structured task and review its schema and inputs.'}</p>` : nothing}
       ${canEdit && !this.streaming
         ? html`<jf-control
             class="ask-edit"
@@ -2229,7 +2229,7 @@ export class Sv3Main extends JfElement {
         }}
       ></textarea>
       <p class="ask-scope" data-testid="sv3-turn-edit-scope">
-        ${turn.kind === 'model' ? 'This answer does not search your files.' : sv3ExplainsRankingTrace(turn) ? 'Repeats Explain with its original ranking trace; after reload, start Explain from the result again.' : turn.shapeId === 'core.summarize' ? 'Repeats Summarize with its original input; after reload, choose the original files or passage before sending.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Opens in Structured with the current composer schema and stated inputs; review and send.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
+        ${turn.kind === 'model' ? 'This answer does not search your files.' : sv3ExplainsRankingTrace(turn) ? 'Repeats Explain with its original ranking trace; after reload, start Explain from the result again.' : turn.shapeId === 'core.summarize' ? 'Repeats Summarize with its original input; after reload, choose the original files or passage before sending.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Original Structured inputs are unavailable. Prepare a new Structured task and review its schema and inputs.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id))}
       </p>
       <div class="ask-edit-acts">
         <jf-control

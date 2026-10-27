@@ -2,13 +2,13 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:551a36c61d6a0a3c4a749bacda70f9c94eb0e4b46a62f050ad267c16d4babf92",
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
     "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
-    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-27T13:25:51.106Z",
-  "revision": "7a1196e180c667b774bd1623c65242888df1270e",
-  "tree": "30879ce9538b1d53d06b05b81f7a2d57f3daa8dd",
+  "createdAt": "2026-10-27T15:47:26.200Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "a1b5d3f27a2908ef37409d6dfbf9edf549d41bd4",
   "environment": {
     "cudaVisibleDevices": "-1",
     "displayUnset": true,
@@ -23,23 +23,534 @@
   },
   "runs": [
     {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.exactReadPreservesNullableRowsAndRejectsDifferentExpectedPathAndChangedJournal\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.pairingOldPWithIncomingQRefusesTheEntireBatchWithoutChangingEitherFile\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.duplicateAndDotAliasPathsRefuseTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.oneStaleExpectationOrIssuedClaimPreventsEveryWriteInAMultiFileBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.aDoneRowWithAnActuallyIssuedHiddenClaimRefusesTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.successfulBatchReturnsActualNewRowsAndReceiptsIncludingNullOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.laterExactDeletePreventsReadmissionEvenWithTheCompleteCurrentSnapshot\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.readOnlyPredicateDoesNotWaitForTheQueueOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.confirmedCommitWithRestoreFailureThrowsAndReloadFindsReplacements\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.encodedWatcherPredecessorHasOnlyItsRealRootReceiptAuthority\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.rootOmissionCannotBorrowAMissingUpsertButCanProveItsConditionalDeleteLineage\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.immutableReadOnlyServingGenerationPreservesOrdinaryReadmission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.reservedCollectionOwnerStillBlocksReadmissionAndOmission\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.schema.WireRecordSchemaGenTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 79579,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-native-refresh-c336214e/run-1.log",
-      "outputDigest": "sha256:6b85cc3aaa8724983aeb253695f1951b4a92a551c0e6d65231ac44680b0c0fb9"
+      "durationMs": 435079,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-1.log",
+      "outputDigest": "sha256:546e8a234ab8eb01ccd419ef605f10b8fe965b1362373166088bd1aaa9f8a340"
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.operations.CoreOperationCatalogTest\" --tests \"io.justsearch.app.services.settings.ForgetSettingsProjectionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 812616,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-2.log",
+      "outputDigest": "sha256:99fc362784a8fcb2fb8ac48857c9bbeb0be1cdf922d99b8654d35be2aba024ad"
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.IndexingControllerForgetHttpContractTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1184918,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-3.log",
+      "outputDigest": "sha256:a69e3477ec6d86c54f70ad289270488f640b9b9c2b4d0620afbab418a7ef6ae0"
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherMigrationReplayTest\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.exactReadPreservesNullableRowsAndRejectsDifferentExpectedPathAndChangedJournal\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.pairingOldPWithIncomingQRefusesTheEntireBatchWithoutChangingEitherFile\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.duplicateAndDotAliasPathsRefuseTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.oneStaleExpectationOrIssuedClaimPreventsEveryWriteInAMultiFileBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.aDoneRowWithAnActuallyIssuedHiddenClaimRefusesTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.successfulBatchReturnsActualNewRowsAndReceiptsIncludingNullOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.laterExactDeletePreventsReadmissionEvenWithTheCompleteCurrentSnapshot\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.readOnlyPredicateDoesNotWaitForTheQueueOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.confirmedCommitWithRestoreFailureThrowsAndReloadFindsReplacements\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.encodedWatcherPredecessorHasOnlyItsRealRootReceiptAuthority\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.rootOmissionCannotBorrowAMissingUpsertButCanProveItsConditionalDeleteLineage\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.immutableReadOnlyServingGenerationPreservesOrdinaryReadmission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.reservedCollectionOwnerStillBlocksReadmissionAndOmission\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 1,
+      "durationMs": 302769,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-4.log",
+      "outputDigest": "sha256:35aee43c6397f6aa3825839c5f471e951aacc6914e9f51e1937e6bc9024fb131"
     },
     {
       "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 61775,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-native-refresh-c336214e/run-2.log",
-      "outputDigest": "sha256:f5b6fd489fb823aa0694449b530534c6a916114e8d279594e2db7c67020b0a09"
+      "durationMs": 113136,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-5.log",
+      "outputDigest": "sha256:51c08df47722b60126e5a580624711f88ecffc525e4da2cdb4fd00386cbae0dc"
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals\" --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.S55OutsideFileCompletesWithoutPermanentRuleAndUnrestrictedNewWriterCanPublishAgain\" --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor\" --tests \"io.justsearch.app.engine.EngineForgetMovePublicationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 271803,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-6.log",
+      "outputDigest": "sha256:a9b852d706fb7edabf87f7ac51ae7b5517accb2afa3cb4a29a2f1d84dca7eceb"
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.excludes.LiteralExclusionPolicyTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 337190,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-7.log",
+      "outputDigest": "sha256:2941623e602687c718f37dd840490ba7c1f0f22dabce6d10872118a1e3147849"
+    },
+    {
+      "command": "npx vitest run --configLoader runner \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-6-1793116044641.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1554,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-8.log",
+      "outputDigest": "sha256:759cd2de4d488771bef3879209f1116a9520e688c0e171a15b096149495b2dfd"
     }
   ],
   "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/schema/WireRecordSchemaGenTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/schema/WireRecordSchemaGenTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2c848923a651a58ea3e688c8486778d5b20e508d7488d65317b68e465ab278dd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentHistoryResponse",
+          "status": "passed"
+        },
+        {
+          "name": "FolderBrowseResponse",
+          "status": "passed"
+        },
+        {
+          "name": "ForgetOutcome",
+          "status": "passed"
+        },
+        {
+          "name": "SearchTrace.HitStage",
+          "status": "passed"
+        },
+        {
+          "name": "AiPackImportStatus",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionsResponse",
+          "status": "passed"
+        },
+        {
+          "name": "AiRuntimeStatusResponse",
+          "status": "passed"
+        },
+        {
+          "name": "FailedIndexingJobsResponse",
+          "status": "passed"
+        },
+        {
+          "name": "ForgetPage",
+          "status": "passed"
+        },
+        {
+          "name": "SearchTrace",
+          "status": "passed"
+        },
+        {
+          "name": "EffectivePolicy",
+          "status": "passed"
+        },
+        {
+          "name": "InferenceStatusResponse",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsV2",
+          "status": "passed"
+        },
+        {
+          "name": "FolderFilesResponse",
+          "status": "passed"
+        },
+        {
+          "name": "OperationOutcomeView",
+          "status": "passed"
+        },
+        {
+          "name": "FailedJobsResponse",
+          "status": "passed"
+        },
+        {
+          "name": "SearchTrace.TraceStage",
+          "status": "passed"
+        },
+        {
+          "name": "LiveRunsResponse",
+          "status": "passed"
+        },
+        {
+          "name": "AiInstallStatus",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7ad6833497f34bf8782e770b41f1a2bff4594158ba213d9776d270f927be3c26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexGcHasMediumRiskInlineConfirmUiOnly()",
+          "status": "passed"
+        },
+        {
+          "name": "bulkReindexAndRecoveryRebuildDeclareDurableReindexOwnership()",
+          "status": "passed"
+        },
+        {
+          "name": "preflightAiPackHasLowRiskNoConfirmRequiringPath()",
+          "status": "passed"
+        },
+        {
+          "name": "activateRuntimeVariantHasMediumRiskInlineConfirmRequiringVariantId()",
+          "status": "passed"
+        },
+        {
+          "name": "recoverComponentHasStrictArgumentsAndOperatorPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "allMutatingOperationsAuditAtLeastMetadata()",
+          "status": "passed"
+        },
+        {
+          "name": "clearFailedJobsHasMediumRiskInlineConfirmUiOnly()",
+          "status": "passed"
+        },
+        {
+          "name": "copyDiagnosticSummaryIsHeadLocalLowRiskMetadataOnlyUserOperation()",
+          "status": "passed"
+        },
+        {
+          "name": "applyExcludesHasHighRiskTypedConfirm()",
+          "status": "passed"
+        },
+        {
+          "name": "pingBackendHasLowRiskNoneConfirmAndAllExecutors()",
+          "status": "passed"
+        },
+        {
+          "name": "bulkReindexHasHighRiskInlineConfirmAndUiAgentExecutors()",
+          "status": "passed"
+        },
+        {
+          "name": "previewExcludesHasLowRiskNoConfirm()",
+          "status": "passed"
+        },
+        {
+          "name": "resetSettingsHasMediumRiskInlineConfirmNoArgs()",
+          "status": "passed"
+        },
+        {
+          "name": "startAiInstallHasMediumRiskInlineConfirm()",
+          "status": "passed"
+        },
+        {
+          "name": "setChatEnabledIsLowRiskNoConfirmNoPreconditionsAndSupersedesSwitchMode()",
+          "status": "passed"
+        },
+        {
+          "name": "exportDiagnosticsIsUserAudienceWhileStateMutatingSiblingsStayOperator()",
+          "status": "passed"
+        },
+        {
+          "name": "repairAiInstallHasMediumRiskInlineConfirm()",
+          "status": "passed"
+        },
+        {
+          "name": "reconfigureIsAUiOnlyNoConfirmReconfigureRecordWithWitnessEnvelope()",
+          "status": "passed"
+        },
+        {
+          "name": "allEntriesHaveCoreProvenance()",
+          "status": "passed"
+        },
+        {
+          "name": "reindexHasLowRiskNoConfirmUiAndAgent()",
+          "status": "passed"
+        },
+        {
+          "name": "allowlistAddDigestHasMediumRiskInlineConfirmRequiringManifestSha()",
+          "status": "passed"
+        },
+        {
+          "name": "createUserPolicyHasMediumRiskInlineConfirmRequiringManifestSha()",
+          "status": "passed"
+        },
+        {
+          "name": "switchInferenceModeHasMediumRiskInlineConfirmAndEnumArg()",
+          "status": "passed"
+        },
+        {
+          "name": "exportDiagnosticsHasLowRiskNoConfirmUiOnly()",
+          "status": "passed"
+        },
+        {
+          "name": "importAiPackHasMediumRiskInlineConfirmRequiringPath()",
+          "status": "passed"
+        },
+        {
+          "name": "namespaceIsCore()",
+          "status": "passed"
+        },
+        {
+          "name": "removeWatchedRootHasMediumRiskInlineConfirmUiOnly()",
+          "status": "passed"
+        },
+        {
+          "name": "reconfigureHasMediumRiskAndAcceptsAnExplicitRefreshIntent()",
+          "status": "passed"
+        },
+        {
+          "name": "triggerOfflineProcessingHasLowRiskNoConfirm()",
+          "status": "passed"
+        },
+        {
+          "name": "addWatchedRootHasLowRiskNoConfirmUiAndAgent()",
+          "status": "passed"
+        },
+        {
+          "name": "findByIdValueResolvesEachEntry()",
+          "status": "passed"
+        },
+        {
+          "name": "activateInstalledModelsHasHighRiskInlineConfirmDurableReindexPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "definitionsContainTheExpectedSeedEntries()",
+          "status": "passed"
+        },
+        {
+          "name": "deactivateRuntimeVariantHasMediumRiskInlineConfirmNoArgs()",
+          "status": "passed"
+        },
+        {
+          "name": "cancelAiInstallHasMediumRiskInlineConfirm()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/ForgetSettingsProjectionTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/ForgetSettingsProjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:72ae7be94c7ee75ccca5cd3804f1ce10d63c2f0763a601f6ff942f63be57105c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] false, false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] false, true",
+          "status": "passed"
+        },
+        {
+          "name": "[3] true, false",
+          "status": "passed"
+        },
+        {
+          "name": "[4] true, true",
+          "status": "passed"
+        },
+        {
+          "name": "RF55ProjectionIsNonterminalAndWD55WithdrawalRemovesOnlyOwnedEntryAfterFreshMerge()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerForgetHttpContractTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerForgetHttpContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b583a2a2178a7d4d465141b83a7fbd4263d0b8cf583d809e8eb31f19ba4db4fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56UnfinishedHttpPageUsesCanonicalSchemaExactBytesAndExplicitContinuation()",
+          "status": "passed"
+        },
+        {
+          "name": "N55NonWebviewHttpCallersCannotReadPrivateTargetsAndMalformedQueriesCannotMutate()",
+          "status": "passed"
+        },
+        {
+          "name": "N56MissingIntentHttpObservationIsExplicitUnknownRatherThanFictitiousSuccess()",
+          "status": "passed"
+        },
+        {
+          "name": "N55UnavailableAndUnsupportedOwnersNeverBecomeEmptySuccessfulHttpLists()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2ef43c413759c1b5c7d63b2f6363a03db1d1cab4d9c11188844e1f8d72486aaa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "missingEarlierUpsertWaitsForCommittedPerPathReconciliation()",
+          "status": "failed"
+        },
+        {
+          "name": "replacementDebtSurvivesAcknowledgementOfTheOlderExactVersion()",
+          "status": "failed"
+        },
+        {
+          "name": "[1] unavailable",
+          "status": "failed"
+        },
+        {
+          "name": "[2] removed-readded",
+          "status": "failed"
+        },
+        {
+          "name": "[3] reassigned",
+          "status": "failed"
+        },
+        {
+          "name": "laterDefaultAdmissionKeepsItsExactRevisionAcrossReconciliation()",
+          "status": "failed"
+        },
+        {
+          "name": "[1] offline",
+          "status": "passed"
+        },
+        {
+          "name": "[2] unreadable",
+          "status": "passed"
+        },
+        {
+          "name": "[3] incomplete",
+          "status": "passed"
+        },
+        {
+          "name": "[4] volume",
+          "status": "passed"
+        },
+        {
+          "name": "[5] identity",
+          "status": "passed"
+        },
+        {
+          "name": "[6] generation",
+          "status": "passed"
+        },
+        {
+          "name": "[7] foreign-generation",
+          "status": "passed"
+        },
+        {
+          "name": "[8] key",
+          "status": "passed"
+        },
+        {
+          "name": "[9] membership",
+          "status": "passed"
+        },
+        {
+          "name": "[10] collection",
+          "status": "passed"
+        },
+        {
+          "name": "[1] before-target-commit",
+          "status": "failed"
+        },
+        {
+          "name": "[2] after-target-commit",
+          "status": "failed"
+        },
+        {
+          "name": "[3] after-pointer",
+          "status": "failed"
+        },
+        {
+          "name": "[1] prefix-before",
+          "status": "failed"
+        },
+        {
+          "name": "[2] collection-before",
+          "status": "failed"
+        },
+        {
+          "name": "[3] prefix-after",
+          "status": "failed"
+        },
+        {
+          "name": "[4] collection-after",
+          "status": "failed"
+        },
+        {
+          "name": "[1] recreated",
+          "status": "failed"
+        },
+        {
+          "name": "[2] modified",
+          "status": "failed"
+        },
+        {
+          "name": "[3] same-stamp",
+          "status": "failed"
+        },
+        {
+          "name": "[1] true",
+          "status": "failed"
+        },
+        {
+          "name": "[2] false",
+          "status": "passed"
+        },
+        {
+          "name": "[1] unchanged",
+          "status": "failed"
+        },
+        {
+          "name": "[2] same-stamp",
+          "status": "failed"
+        },
+        {
+          "name": "reconciliationReceiptIsAppliedInsteadOfRejectedAsUnsupported()",
+          "status": "failed"
+        },
+        {
+          "name": "aRetryReprobesAReappearedSourceBeforeDestructiveReplay()",
+          "status": "failed"
+        },
+        {
+          "name": "returnedWatcherStartsBeforeItsFreshFilesystemSnapshot()",
+          "status": "failed"
+        },
+        {
+          "name": "[1] valid",
+          "status": "failed"
+        },
+        {
+          "name": "[2] identity",
+          "status": "passed"
+        },
+        {
+          "name": "[3] volume",
+          "status": "passed"
+        },
+        {
+          "name": "[4] membership",
+          "status": "passed"
+        },
+        {
+          "name": "committedPointerCannotBlindlyAcknowledgeRetainedRootDebt()",
+          "status": "failed"
+        },
+        {
+          "name": "exactRevisionRefusalIsVisibleAndKeepsTheReadableProjection()",
+          "status": "passed"
+        }
+      ]
+    },
     {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#exactReadPreservesNullableRowsAndRejectsDifferentExpectedPathAndChangedJournal",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
@@ -526,8 +1037,241 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06b8e136b409c4ef9e5ee770926f383c984dd2532ba8fa432dae20c8baacbf1d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55OutsideFileCompletesWithoutPermanentRuleAndUnrestrictedNewWriterCanPublishAgain",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06b8e136b409c4ef9e5ee770926f383c984dd2532ba8fa432dae20c8baacbf1d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S55OutsideFileCompletesWithoutPermanentRuleAndUnrestrictedNewWriterCanPublishAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06b8e136b409c4ef9e5ee770926f383c984dd2532ba8fa432dae20c8baacbf1d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetMovePublicationTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetMovePublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2879171d617343e6cf25b3c3ce0f3805f452df34c32bc8b047365dcb1575ab53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "MD55ExplicitElapsedRequestDeadlineWithoutCancellationCannotPublishAtWorkerFence()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55AlreadyAdmittedPublisherKeepsForgetIncompleteUntilExplicitRetry()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55ExpiredRenameCannotRekeyAfterRootRetirementAndCompletedForget()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55ExpiredMoveCannotRepublishAfterCompletedOutsideFileForget()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55CancelledUndoCannotRepublishAfterCompletedOutsideFileForget()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55CancelledMoveBeforeSignalCannotRepublishAfterCompletedOutsideFileForget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/excludes/LiteralExclusionPolicyTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/excludes/LiteralExclusionPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5827bd89ff2d6537d567abe66706ad5026530e0e66a5bb65d00ad3fe53572963",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "RF55FilePreservesUnixPunctuationBackslashAndTrailingSpace()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55FolderUsesSeparatorPrefixOutsideRecordedRoot()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55CapacityCountsLiteralsAndGlobExpansionTogether()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55CapacityRejects513MixedEntries()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55LegacyStringsNeverBecomeLiteralTokens()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55RecordedProjectionOmitsLongLiteralsAndRetainsLegacyGlobs()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55MalformedObjectNeverWidensToGlobOrRoot()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55OperatingSystemCaseRulesRemainExplicit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5543bdbda0a2543ebecae87992a3618c996fa97eb85021229a22fe48c89cb373",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchResultActions (577 Phase 8) registers the core verbs for the search-result-row context, in priority order",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) is idempotent — a second boot call does not duplicate the verbs",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) verbs are disabled for a payload without a path",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) handlers ride the one platform/clipboard seams",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) S56.6 offers forget only to the host callback and leaves all ordinary verbs available",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) S56.9 keeps help and agent-history verbs absent even in a capable host",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions RF55 exact rows visibly distinguish trailing whitespace, control characters and slash pairs",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions RF55 keeps exact path objects out of the glob editor and retains their bytes on a glob save",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions RF55 removes a precise keep-out only through the witnessed save without editing glob text",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX1 editor preserves the saved list and names every literal fallback warning",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX2 pattern help explains character classes and alternatives for previously saved lists",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions keeps the witness read with the draft and never refreshes it before saving",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (503) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (200) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions preserves a conflicting draft and blocks effects until explicit reload and a new attempt",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions waits through open202 during Save and rejects overlapping clicks",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions retains uncertain bytes across timeout and a later check instead of minting a new mutation",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions renders disabled controls after failed load and retains a conflicting draft across remount",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions unblocks reload after a stalled GET and ignores its late result after a newer observation",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions EX4 editor reports input limit refusal without applying or discarding the draft",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions EX4 editor reports expanded limit refusal without applying or discarding the draft",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:6494d94e7212f14990f2893951477d209931b7a1d939af0151ade4096210e206"
+  "digest": "sha256:20d45e3d719879bd9ed3f309abeca7dd3df59dd6a95f8661d94937465f2a0820"
 }

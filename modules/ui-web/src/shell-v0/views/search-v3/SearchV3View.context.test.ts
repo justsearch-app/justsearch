@@ -506,6 +506,14 @@ async function contextNotice(el: Mounted): Promise<string> {
   return bar.shadowRoot?.querySelector('[role="status"]')?.textContent?.trim() ?? '';
 }
 
+/** RR15: visibly retire a known unissued question before a DIFFERENT submission. */
+async function discardRetainedQuestion(el: Mounted): Promise<void> {
+  const control = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid=sv3-residency-discard]');
+  expect(control).not.toBeNull();
+  control!.click();
+  await settle(el);
+}
+
 /** Read the next prompt, then finish its stream so no work survives the case. */
 async function nextContext(el: Mounted): Promise<unknown> {
   await ask(el, 'and the third?');
@@ -1639,6 +1647,7 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
       expect(composer.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('Keep this question');
       expect(await contextNotice(el)).toContain('Question not sent');
       backend.failHistoryFor.clear();
+      await discardRetainedQuestion(el);
       await nextContext(el);
       expect(backend.dispatches).toHaveLength(1);
       expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(backend.histories['uc-ctx']?.contextFloor);
@@ -1683,7 +1692,7 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
     },
   );
 
-  it('sends in another conversation while the first question waits for context (X28)', async () => {
+  it('requires explicit retirement before sending in another conversation while context waits (X28/RR15)', async () => {
     twoTurnConversation();
     backend.conversations.push(conversationRow('uc-other', 'The other conversation'));
     backend.threads['uc-other'] = {
@@ -1724,6 +1733,14 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
       }
       await settle(el);
       expect(el.sessions.activeId).toBe('uc-other');
+      await ask(el, 'Question in the other conversation');
+      expect(backend.dispatches).toHaveLength(0);
+      expect(el.shadowRoot!.textContent).toContain('explicitly discard');
+      await discardRetainedQuestion(el);
+      for (const button of el.shadowRoot!.querySelectorAll<HTMLButtonElement>('.notice button')) {
+        if (button.textContent?.includes('Discard this extra recovery copy')) button.click();
+      }
+      await settle(el);
       await ask(el, 'Question in the other conversation');
       expect(backend.dispatches.filter((d) => d.conversationId === 'uc-other')).toEqual([
         expect.objectContaining({ question: 'Question in the other conversation' }),
@@ -1790,6 +1807,7 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
       expect(await contextNotice(el)).toContain('The submitted question to recover');
       expect(await contextNotice(el)).not.toContain('could not be confirmed');
       expect(field.value).toBe('My newer draft');
+      await discardRetainedQuestion(el);
       await nextContext(el);
       expect(await contextNotice(el)).toBe('');
     } finally {
@@ -1963,6 +1981,11 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
       if (entry === 'reload') el = await mount();
       else await openTheOnlyConversation(el);
       expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+      const review = el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid=sv3-draft-review-confirm]');
+      if (review) {
+        expect(backend.dispatches).toHaveLength(0); review.click(); await settle(el);
+        expect(backend.dispatches).toHaveLength(0);
+      }
       const reads = backend.historyReads.length;
       await ask(el, 'Keep this follow-up');
       expect(backend.historyReads.length).toBeGreaterThan(reads);
@@ -1972,6 +1995,7 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
       const composer = await region(el, 'jf-sv3-composer');
       expect(composer.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('Keep this follow-up');
       backend.failHistoryFor.clear();
+      await discardRetainedQuestion(el);
       expect(await nextContext(el)).toEqual([
         { role: 'user', content: 'and the second one?' },
         { role: 'assistant', content: 'The same lock.' },

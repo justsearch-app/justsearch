@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T07:56:45.252Z",
+  "revision": "bd558647f6115e8e92c7cc2501880745573ae4bc",
+  "tree": "f988238bfde48aeae89abf15c06e04e84f317be6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/43e7ujly/tmp/test-intent-vitest-201-1793087803099.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2151
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 traversal to bare Search retires refusal notice and its alert without changing drafts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bffe5857853b541bd5c6b7e76394f358a08611fe1d22901bc7ae367abfac9094",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S84 traversal to bare Search retires refusal notice and its alert without changing drafts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 preservation another proposal still reports the genuine capacity limit after retirement",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bffe5857853b541bd5c6b7e76394f358a08611fe1d22901bc7ae367abfac9094",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S84 preservation another proposal still reports the genuine capacity limit after retirement",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 preservation rejected unknown navigation keeps refusal available for explicit discard",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bffe5857853b541bd5c6b7e76394f358a08611fe1d22901bc7ae367abfac9094",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S84 preservation rejected unknown navigation keeps refusal available for explicit discard",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:78dc767015cca7e151bdaee1017e676dbe3c8c011ed1983f84d82edf773f2a5e"
+}

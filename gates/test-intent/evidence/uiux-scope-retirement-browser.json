@@ -1,0 +1,1740 @@
+{
+  "schema": "builder-browser-evidence.v1",
+  "task": "D-T24 / no silent all-files after retirement within HO9",
+  "createdAt": "2026-10-27T09:46:52Z",
+  "baseline": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+  "candidate": "uncommitted working tree",
+  "files": {
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts": "sha256:ba0a60a76a279ce61fc33063dbc9d756b4a1cb3bdad64b753b88642ee9cdd70d",
+    "modules/ui-web/src/shell-v0/views/search-v3/Sv3Composer.ts": "sha256:f6c2ca6201beba5cc04ef30ca46a0736ded3c1c1a6b3dc7e73761072a6ced54a",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829"
+  },
+  "sources": {
+    "HO9": {
+      "adoption": "owner-agreed",
+      "location": "/home/elias/dev/justsearch/tmp/verify/agreed/wp1.3b.md:33",
+      "quote": "One-shot hand-off data (forced shape, selection, auto-run flag) is used only by the window that shows the hand-off. It never reaches a later, unrelated send in either window, including after the user abandons the prepared task (switches mode or conversation, clears, navigates away)."
+    },
+    "D-T24": {
+      "adoption": "agent-adopted, delegated-choice",
+      "location": "Builder brief in this session; /home/elias/dev/justsearch/tmp/verify/wp1.5d-compat/builder-9-brief.md",
+      "decision": "Retire one-shot context as HO9 requires; visibly block retained unchanged text until an explicit file/mode choice or a changed question."
+    }
+  },
+  "scope": {
+    "tempEvidence": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work",
+    "native": "Own private native Engine, HOME/data/index/corpus and loopback services. Unchanged installed native code, private before/after Vite source and dependencies. No native build or model-quality claim.",
+    "browser": "Own headless Chromium with fresh short /tmp/jsv-* profiles, removed by each run. Native sandbox startup fails (recorded); --no-sandbox against own loopback services.",
+    "sharedResources": [
+      "CPU",
+      "npm cache",
+      "preinstalled Engine and Chromium files read",
+      "permitted existing llama-server binary and Qwen3.5-4B-Q4_K_M.gguf model read"
+    ],
+    "excluded": [
+      "owner apps/data/display",
+      "dev stack",
+      "GPU",
+      "downloads",
+      "issue actions",
+      "commits/push/publication"
+    ],
+    "initialFailures": "The first implementation caused four cold-arrival assertions and one context-reload assertion; fixed without modifying existing checks. One temporary evidence adapter syntax error and two npm invocations from the wrong directory ran no accepted check. Logs retained in temp.",
+    "restartSequencing": "Fresh Engine HOME/data between case groups. One successor supervisor was launched while the predecessor shutdown poll still reported running; its cleanup is retained. Later transitions waited for supervisor completion before launch. No other session process was stopped."
+  },
+  "verifierScriptDigests": {
+    "/home/elias/dev/justsearch/tmp/verify/wp1.5-flip/verifier-4-findings/matrix/scope-return.mjs": "sha256:87a66e43a055d6884eed7719d8992f8b0000a524110edeaee6d95bbdbac2c2a1",
+    "/home/elias/dev/justsearch/tmp/verify/wp1.5-flip/verifier-4-findings/matrix/browser-lib.mjs": "sha256:e876e55e7475ec2efe652d02bc96b8ae03054f2e72b59d90378da96f37f29e4f",
+    "/home/elias/dev/justsearch/tmp/verify/wp1.5-flip/verifier-4-findings/r2/scope-issued.mjs": "sha256:0e970c373af8ab2f3369c6c9e21c68b80b823946d9ec3f6bb3ce8d653632a523"
+  },
+  "adaptations": [
+    "D-T24 supersedes the old requirement to retain live chosen-file authority: adapted scope-return assertions require a visible retirement notice and no send instead. Original verifier scope-return was also run unchanged on baseline (3 intended failures).",
+    "r2 scope-issued sequence retained; removed unrelated pooled-checkout switch and controlled residency gate. Sends go directly to own native Engine. Added rail and Forward-after-Back variants and asserted native inference available.",
+    "Conversation control authors one genuine completed model turn through UI, then hands off chosen input, visits its saved row and goes Back. No model work beyond the seed is sent.",
+    "after, after-online and after-conversation are intermediate passes; final-candidate claims use final-scope (13 cases) and final-conversation was not launched after unexpected final-scope Engine exit 1; its conversation Back and guard-carry rows remain unverified."
+  ],
+  "commands": {
+    "npm-ci": {
+      "root": 0,
+      "source-ui": 0,
+      "before-ui": 0,
+      "method": "Plain npm ci; evidence producer clones also run their own plain npm ci."
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "cwd": "modules/ui-web",
+      "exit": 0,
+      "logDigest": "sha256:c8d2e1bbc6c37e08225a662df8d8fc9af17316c77b6aafc9b776350e0f188ab3"
+    },
+    "lint": {
+      "command": "npm run lint",
+      "cwd": "modules/ui-web",
+      "exit": 0,
+      "logDigest": "sha256:901a6221b089f44724e9d7454a1a8547652691fe55522109007a8e9f755ce437"
+    },
+    "unit-before": {
+      "command": "npm run test:unit:run -- --configLoader runner --maxWorkers=4 <context,coldArrival,scopeRetirement,handoffs files>",
+      "cwd": "<shared-clone-before>/modules/ui-web",
+      "exit": 1,
+      "passed": 150,
+      "assertionFailures": 6,
+      "total": 156,
+      "logDigest": "sha256:e0fe51ab160a8067324d3da54740025efa03265d4e1dd852ec96bc898fb017c7"
+    },
+    "unit-after": {
+      "command": "npm run test:unit:run -- --configLoader runner --maxWorkers=4",
+      "cwd": "modules/ui-web",
+      "exit": 0,
+      "files": 649,
+      "passed": 8267,
+      "skipped": 0,
+      "logDigest": "sha256:c0c4eae7ade162f071a0116edf7abb23ae231b223e997de597f912d09e12d0e9"
+    },
+    "ui-gates": {
+      "command": "node scripts/ci/run-ui-web-gates.mjs",
+      "exit": 0,
+      "passed": 28,
+      "total": 28,
+      "logDigest": "sha256:0d9de61819a29928bf6d1e00ac63750c27b4707b88aee8e313a633234b3f9793"
+    },
+    "test-intent": {
+      "command": "node scripts/governance/gates/test-intent/cli.mjs check --base origin/main",
+      "exit": 1,
+      "base": "be1f315b50721165cc9ec9c5b4d0ec857e939a2f",
+      "remaining": [
+        "missing independent acceptance",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusFixtureWork.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java"
+      ],
+      "logDigest": "sha256:eccc717be9f612b25befe1bc1c45e60c0bd606627aa16b7b8c5ccc2d0a703911",
+      "baselineControl": "The same eight JVM items occur on 887587e2c3 against the identical be1f315b5072 base; the baseline control additionally flags the overlaid new scope-retirement test, absent from its old changeset. None of the JVM files was edited."
+    },
+    "native-build": {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:installDist",
+      "exit": 130,
+      "result": "Canceled while queued before acquiring a slot. No Gradle build is claimed. All native browser groups use the unchanged preinstalled Engine from this source checkout, with identical install hashes; each frontend is served from its own source/dependencies."
+    },
+    "preflight": {
+      "result": ".agents/preflight does not exist"
+    },
+    "official-evidence": {
+      "command": "node scripts/governance/gates/test-intent/run-evidence.mjs --out <repair/preservation file> [--before 887587e2c3 --before-root <private temp>] --check <ids>",
+      "exit": 0,
+      "repairBeforeAssertions": 6,
+      "repairAfterPasses": 6,
+      "preservationPasses": 3,
+      "method": "Unchanged producer; temporary Git adapter translates only worktree creation/removal into shared clones, own npm ci and guarded removal; private object/index directory. Adapter source in task temp."
+    }
+  },
+  "cases": [
+    {
+      "phase": "before",
+      "name": "D-T24-Forward-after-Back-1",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /files and mode.*not kept/i. Input:",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/D-T24-Forward-after-Back-1",
+      "resultDigest": "sha256:57db951c67fbcbc50b6ac27c274595f6e9a039db8a4af753fa8f729a094dff36",
+      "finalCandidate": false,
+      "observationDigest": "sha256:5c535080f9c52332145487c33374c5b769b7e1f0469c1d3facffd2caf7140fa8",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The local AI model is offline \n             \n          \n         \n           \n             \n                \n                \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:b8b0b495e064b7777c2d5b86a91119cfacf55b796741565ba72d60c1e53ba489",
+        "prepared.json": "sha256:fad469e8d08ebbb5c6c0f1523fb8553b6c389c5e2da55d43eebd230d3c9cdcb2",
+        "returned.json": "sha256:94a19eaa47a1a2552971e99a791fca2d6324274342b6b1398054b61472a9f0b8"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "D-T24-Forward-after-Back-2",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /files and mode.*not kept/i. Input:",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/D-T24-Forward-after-Back-2",
+      "resultDigest": "sha256:607121cd1fc8e882e0ff2d35e220fa509d97b993bddb659171f242645ceec6ab",
+      "finalCandidate": false,
+      "observationDigest": "sha256:85da500c6e9458bf9d66be4ebdd3fdac1599efbe95b17d9becc73352e8989652",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The local AI model is offline \n             \n          \n         \n           \n             \n                \n                \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:7150c64b5168c24d75894904cd56a4de4b8d277ab05a2a1bf6fbfb395d290be1",
+        "prepared.json": "sha256:fe94de4a27e11e85403138fa4515146a1b250867530ba327c5db67a223b8a96c",
+        "returned.json": "sha256:05e429a1daff0528d8c4be2f5357f6f1b1b4295b79637099576649e8ee8ed7d3"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "D-T24-Forward-after-Back-3",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /files and mode.*not kept/i. Input:",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/D-T24-Forward-after-Back-3",
+      "resultDigest": "sha256:256a25d31dfad90793f5245ea2322400f17c96ac5f70f98352b50db85d036539",
+      "finalCandidate": false,
+      "observationDigest": "sha256:883767c06638f287440e9ec712275c15363d04711e7d627286b262d22328c4fd",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The local AI model is offline \n             \n          \n         \n           \n             \n                \n                \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:de45870e42f621e2016e8d2af31470f998af0f776dddf85c1c6db5578b94ad2b",
+        "prepared.json": "sha256:547866bc80ec13a071efd4ef52f6257e6892d11e6f456719e9f7e95147c77d4c",
+        "returned.json": "sha256:90e372d7f740b6d5e05f8a95be14a2347f83c84eba5fc3708792e898cc364047"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "D-T24-Library-Back-1",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /files and mode.*not kept/i. Input:",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/D-T24-Library-Back-1",
+      "resultDigest": "sha256:169c29153283d4c0ef39c6cb63ab056a4e68b4805d3d02971968f5a8f4638f24",
+      "finalCandidate": false,
+      "observationDigest": "sha256:043b8f1c40ec884d57e1c0862c269ca67d7de499ac9709e4e3bd53d099df0f6f",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The local AI model is offline \n             \n          \n         \n           \n             \n                \n                \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:235f77a106aff4d14c9adafd9a0900757da359142fe6b378e7c4b9c300886d69",
+        "prepared.json": "sha256:883e7f965eb21f9ce00865a7d0994580f75a427e0b201b60d00da2eba3b11d84",
+        "returned.json": "sha256:6235799a2069fc5a3b099c6206f08f09bacb059789273375b51fb514e2d2f40a"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "D-T24-Library-Back-2",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /files and mode.*not kept/i. Input:",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/D-T24-Library-Back-2",
+      "resultDigest": "sha256:67e874660bf31b1fc15b15e6310f74f1c8b1ce346f774193707844ae9796c2da",
+      "finalCandidate": false,
+      "observationDigest": "sha256:4bd5f00240c21b019c3436aa66fff3b532f28c4371017358aa2513721e0d8d07",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The local AI model is offline \n             \n          \n         \n           \n             \n                \n                \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:07307a6dcbb5472920dc85e7b5b34501123b0b47a3f727b5b7b1307b99f93d09",
+        "prepared.json": "sha256:cbaea2ad5ef5d77aa0cf228c497681ffff1f3812da9ad83a97c1636d8e3a52f4",
+        "returned.json": "sha256:a635d5c8749c74cb8fd22f66c1aa77c2e604f986f91b4427d7eb3b6ae2f6b047"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "D-T24-Library-Back-3",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /files and mode.*not kept/i. Input:",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/D-T24-Library-Back-3",
+      "resultDigest": "sha256:0d5ba2d0c8a4ce265e118171c194619d21ef75c9cd8ee7ba572160ad5eab93e9",
+      "finalCandidate": false,
+      "observationDigest": "sha256:7e5f95bd1d46fa49bd30a107a45037bedf49428326c2b70b37f6913b1d80de68",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The local AI model is offline \n             \n          \n         \n           \n             \n                \n                \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:b6e9b6d9cda91cb7325515bb68ba8fb50b08b655c6d808c5c790d9dd92f4cf1f",
+        "prepared.json": "sha256:a1886eeac80d8494ef591ea907f6662e18c4a1abc214cbdaf39397cbf0d1f3b2",
+        "returned.json": "sha256:b2f1fc48eda272e9a8f2301094c082066f4d91c0b616a5f1e6f2c04b23cb639e"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "D-T24-Library-rail-1",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /files and mode.*not kept/i. Input:",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/D-T24-Library-rail-1",
+      "resultDigest": "sha256:f18fe83380d078cbf3c776b75becac60404277bbd62062e7488eabb1d0ddd9a2",
+      "finalCandidate": false,
+      "observationDigest": "sha256:6c53788c952763810af743744c7bcc62f8651f5a8fee67ecf2e076e09106bae2",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The local AI model is offline \n             \n          \n         \n           \n             \n                \n                \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:d50d873befce40440ac5b872aa963f78e0f38704da908acc195a0de8f8b8d29d",
+        "prepared.json": "sha256:681b6e2a01412a84c1a8110ceabe267a21e27de9d286983541a48b91e0c481cd",
+        "returned.json": "sha256:1dba27f838c0dcc072713c1b0326f4543fae9a1da783163257f4344187df305a"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "D-T24-Library-rail-2",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /files and mode.*not kept/i. Input:",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/D-T24-Library-rail-2",
+      "resultDigest": "sha256:ac60e075dd6e12d55cb9ad19217e668e277e142f4e318e465e7bd0082f151aa1",
+      "finalCandidate": false,
+      "observationDigest": "sha256:34712cc58c4ac9cbd985e3ad47d09cbaf942e8f7186e1eb03fe55213b89d5e0d",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The local AI model is offline \n             \n          \n         \n           \n             \n                \n                \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:e80e832165e62fe2878a4524f4b555c9c546155d82d9e3e4bf3d6d41661f68d9",
+        "prepared.json": "sha256:20aac91d18571fc27ac5ba5425333ef39fbb7d0b55dd3a67fca63e62545b63eb",
+        "returned.json": "sha256:2f8ba0613b4a9b4ec2dec3f6ccddb02b3175c2555e9ecb5b4fb89bcefe010748"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "D-T24-Library-rail-3",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /files and mode.*not kept/i. Input:",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/D-T24-Library-rail-3",
+      "resultDigest": "sha256:4a316c36756c337e930353165c5aebce4794c1ebf96467b7cda887658f2235f8",
+      "finalCandidate": false,
+      "observationDigest": "sha256:8e2d76e9d3f25c46030441cf40e50fcdf22ada01fbb7b5e7d846504599bca2bc",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The local AI model is offline \n             \n          \n         \n           \n             \n                \n                \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:e754c529c174b68b64966fc9ff45bea6a782d9a20bcdc45f292e77996d3d6d29",
+        "prepared.json": "sha256:141d79d6b8b3a6c3268ab55f99914db886e69b2afecad54b8c14fcfdfd7b7a28",
+        "returned.json": "sha256:aa6824f27f9d4bab9344bd98b1781da82dba0de2a7fee346ce2e9ef823422be0"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "r4-scope-Library-Back-1",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: the offered review must retain the chosen-file scope for B",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/r4-scope-Library-Back-1",
+      "resultDigest": "sha256:ec153657febc2526162a32ca85f731aaf3b7c3914eee1cfeb3f9462e41987a72",
+      "finalCandidate": false,
+      "observationDigest": "sha256:1d0cc738b07f397b4ac8aac64066c15547f432e38a0006173701a237ca87b661",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "Library.json": "sha256:5b980ffdcc9dccec3aea7469b3ef42486d2b6253e692f93931f00adda8be7c85",
+        "after-Back.json": "sha256:88e729cae0404d254a9ad2241de9c309c21f7cd9ffc705c3dc5c4b01befffcad",
+        "before-Library.json": "sha256:21a7b312f7e83d42998c153300a98f12a1afeaef8d59db9e9860f4e59c610c33",
+        "navigations.json": "sha256:b8bbfcc64ff051eef9d38461b54163768087a9ba2477e46775aa0b5f29ebb9d5"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "r4-scope-Library-Back-2",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: the offered review must retain the chosen-file scope for B",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/r4-scope-Library-Back-2",
+      "resultDigest": "sha256:20c26b1978cd5a809ef632b5e0351b79adb6bd0f70cad68f5a15305d403c3ebc",
+      "finalCandidate": false,
+      "observationDigest": "sha256:6a3d07086d67cb0cec50504885ba5720ab3b0e1a67093d7a2a039fc35312e8fa",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "Library.json": "sha256:ce9c180718272383b7b782ae70276679f3e768d33f912e886d2cf7ec296d5046",
+        "after-Back.json": "sha256:f3a919fadcfadbc1acd3d0e873794c86a0efcd1b7af9574c8f31e688e65fb22f",
+        "before-Library.json": "sha256:f43afab186aed6d0cb8df8b164ac13d55f0389bf7cd4b554a61bdad64bb69b4c",
+        "navigations.json": "sha256:813fa6f5ba12eeaeb61c567e95bf0ce6af57aefcac7ce9b1977a1f5ce5c28dd1"
+      }
+    },
+    {
+      "phase": "before",
+      "name": "r4-scope-Library-Back-3",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: the offered review must retain the chosen-file scope for B",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before/r4-scope-Library-Back-3",
+      "resultDigest": "sha256:0e4a9bb0ab8b681e38ac8dc5c6efd005a4623b7c3254bf712229433261de0f22",
+      "finalCandidate": false,
+      "observationDigest": "sha256:713ea1426acd9bad90a192032a7b423b5d66e3e2d314c70aa387452f553ff0e9",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "Library.json": "sha256:79a696e4e76fc001c12672390acf53bc35c86486b95810cb62c0021da53c7919",
+        "after-Back.json": "sha256:34409754a749bcddb56192007c9be9093bb231bea1fe2a5771953a20d7182b9a",
+        "before-Library.json": "sha256:cf9b435e4e00353a21b39cc70e11cc92bd33ab199a67c6c013d474ed66cc20e3",
+        "navigations.json": "sha256:088ec2ff7f4c37ad3d6195dca20961873055ba3497b62af960ad1853984a0869"
+      }
+    },
+    {
+      "phase": "before-online",
+      "name": "D-T24-online-Forward-after-Back",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: unchanged retired text is blocked even with the CPU model ready",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before-online/D-T24-online-Forward-after-Back",
+      "resultDigest": "sha256:cb491c503c974cff4d5a49b00a3fe5432c267ddcd48558865bbc100f8d494d2c",
+      "finalCandidate": false,
+      "observationDigest": "sha256:006f84812fab51df41f312c02e4c0554cc0b12ec05cb9c856b5fa833f8e600c8",
+      "requestDocIds": [
+        []
+      ],
+      "modelAvailable": true,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n          \n         \n           \n             \n                \n                 Ask or search… \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B",
+      "snapshots": {
+        "after-Back-proposal.json": "sha256:34968d1102a4e3f6ce8e5d5f898b598631bf184b1760820b515f5871a4bab1ae",
+        "after-review-and-Send.json": "sha256:c199e646ce1690ffc2a5dfeb7700fb8cc82bf09da721c123a59359f6c458cc3b",
+        "before-Library-chosen.json": "sha256:4288462030c1da7c9e69433bafc3ba24c0e44b9734d23e35b9e5bcd5fcb7662d",
+        "navigations.json": "sha256:c407ac0dbe09950291cd32d3587fc0cecaf31d07b3069baf344aaedb0e66786e"
+      }
+    },
+    {
+      "phase": "before-online",
+      "name": "D-T24-online-Library-Back",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: unchanged retired text is blocked even with the CPU model ready",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before-online/D-T24-online-Library-Back",
+      "resultDigest": "sha256:960e0625e4dd763192fe04044d6b10121db528678be11df040d18fc9fc8792fd",
+      "finalCandidate": false,
+      "observationDigest": "sha256:6cd58eab914e01efac9803b7ee59291f8330626796f099104ace70ce51275904",
+      "requestDocIds": [
+        []
+      ],
+      "modelAvailable": true,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n          \n         \n           \n             \n                \n                 Ask or search… \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B",
+      "snapshots": {
+        "after-Back-proposal.json": "sha256:a80313fb95ca04fe33ee4657fa6c129e8a2fd002c8397fb66665d17064f12a7b",
+        "after-review-and-Send.json": "sha256:31a3e262a5241d6375fe9a8556ec06a2db276145a7e559f02659ce4c64eff7bf",
+        "before-Library-chosen.json": "sha256:546edc2fcec6770b52cbde4af484ccb187fce6e573bb5a8a9afc36d7d5993ea5",
+        "navigations.json": "sha256:8e00291f717aa5bc9d8c5b43e3d6560a2f7b07ffb1625a01c5a084ad1290f22f"
+      }
+    },
+    {
+      "phase": "before-online",
+      "name": "D-T24-online-Library-rail",
+      "status": "fail",
+      "failure": "AssertionError [ERR_ASSERTION]: unchanged retired text is blocked even with the CPU model ready",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before-online/D-T24-online-Library-rail",
+      "resultDigest": "sha256:ecf5cd7271caae644c6f0719e744b2ed55114d1429556c1f8e6e22699c9b271e",
+      "finalCandidate": false,
+      "observationDigest": "sha256:53419879dd338e5b570fd0b7d0568ba6246ecb1bedecf4dd4341195ea6fc7b0a",
+      "requestDocIds": [
+        []
+      ],
+      "modelAvailable": true,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n          \n         \n           \n             \n                \n                 Ask or search… \n             \n           \n            \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B",
+      "snapshots": {
+        "after-Back-proposal.json": "sha256:1412ceda1569ddbc53eb656e1ac082d0547e289f24015e2941493f1b8b0f51a7",
+        "after-review-and-Send.json": "sha256:a3916f5e375ee8f6fea93bfcd56c48f89339d3cdfb693b7d16afd8b4bc7bdb4a",
+        "before-Library-chosen.json": "sha256:610e7f8d713d5fe901d3cc673ebedd7d47b2b9d07d1137d3fb857c7fcdea951e",
+        "navigations.json": "sha256:c721d73fd26fa73b09990319caf8eaf080946051e3fc8c5931e256720ca9dcbf"
+      }
+    },
+    {
+      "phase": "before-conversation",
+      "name": "D-T24-conversation-Back",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/before-conversation/D-T24-conversation-Back",
+      "resultDigest": "sha256:50873fe46c394612a3c3f82a675190073a0d5cb847de8c36a0a37bc6973eb996",
+      "finalCandidate": false,
+      "observationDigest": "sha256:63ab5357efbab4e95c0708161513daf57114f208d84caa121a03fd1bf4c7f705",
+      "modelDispatches": 1,
+      "keptText": "",
+      "snapshots": {
+        "after-Back.json": "sha256:761cc752de1555bc721076d7ca76290ef8004bb61f14a129c85441f38fc6ff79",
+        "conversation.json": "sha256:38c8bc8563c0bb8d76bf2f516543ce426e9186a18c39623beba40e320df2914a",
+        "genuine-seed.json": "sha256:4d3c34700b5a3cfcc739446d60f44d201206afb869864adc631073e069b3b2e1",
+        "incoming.json": "sha256:d6e0e3a84cadc20ab8cad625669383b1e8b3419714e0e067b4809cca5feb1e01",
+        "navigations.json": "sha256:f2f016201fa3c9b5e64dcf14af556461855b8aa93bffcf31f1f9e45cbeb93368",
+        "saved-conversation.json": "sha256:35e869c35fa33acf3f7e620e1af83e51df19bfb6ade467bea089d74ec7fd8dba"
+      }
+    },
+    {
+      "phase": "after",
+      "name": "D-T24-Forward-after-Back-1",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after/D-T24-Forward-after-Back-1",
+      "resultDigest": "sha256:b5883d304dcd3d65fcb38ac47a5333a61fea11e96e0968f8aa90d0294e89ae64",
+      "finalCandidate": false,
+      "observationDigest": "sha256:0900931bad95027ccb64b0e116cf4584ccfdca0a42561420832538f558ebe6cc",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:52c4add9f5c39eb11a78604fb6b75fd6b3b34ffa78a0c3f86c70bf8ceae0ab95",
+        "prepared.json": "sha256:a64af6c6683c22894c784984bfc86effda03cbe3ecf9fa3d4ee38a0c73a66f01",
+        "returned.json": "sha256:1515fdd972dd408910fd527bcea724708c6d9969d2ac14864af3322ef74a49b6"
+      }
+    },
+    {
+      "phase": "after",
+      "name": "D-T24-Forward-after-Back-2",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after/D-T24-Forward-after-Back-2",
+      "resultDigest": "sha256:c0071bf7c09a33fd764219f42bb7a588b5e0a9f9da0457c4fb6569a20398135a",
+      "finalCandidate": false,
+      "observationDigest": "sha256:b6d2ee2efd92cb996ee50fddb3e54df4df5be9d292b080027b2a0b92edacb337",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:507d23325c7db1a22a9ef17fff622a33f0d55b894fb5c6737663d507933f245c",
+        "prepared.json": "sha256:e2ddabd8950e1d5f250ded6d7799870c8f4f5a7dc3932a327010b92d5db29722",
+        "returned.json": "sha256:08978cb522167c5a33ea48c692c4fdf05490931af61e068a961286883ade8372"
+      }
+    },
+    {
+      "phase": "after",
+      "name": "D-T24-Forward-after-Back-3",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after/D-T24-Forward-after-Back-3",
+      "resultDigest": "sha256:fff54220373319bce9e13f4fc8701099a620f046da02a768446bdd34dd158141",
+      "finalCandidate": false,
+      "observationDigest": "sha256:d9fc6ee95ad963bfc1c5d553f1de6fa722467681af52539b33bbba168e900b8a",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:bf8f0c00b419b1883ccbcac120f854acdb9acaa1d22d22dc752d38357d295264",
+        "prepared.json": "sha256:cf131ab6da68e78ea0563fee6ed7bbe7cb241f5dc97762e471d478f4c1589b33",
+        "returned.json": "sha256:11f56a881d2713be9caffc83dbf3942df6b5496b6bf98c39e9c4e0f1ae6327c5"
+      }
+    },
+    {
+      "phase": "after",
+      "name": "D-T24-Library-Back-1",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after/D-T24-Library-Back-1",
+      "resultDigest": "sha256:b8f3c1ed6ae7646d85874632efadf31dbc87c76fb53696cfb0b0ceff3c74cc45",
+      "finalCandidate": false,
+      "observationDigest": "sha256:d03ea501edffe9ee08238228d1b524e2d865c6953b6bebdf8f5027a28f0bd373",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:87fd81ba127e4ae5ae80fa455d9c8b26229252504d58a4e9bd82bd05707cd7d0",
+        "prepared.json": "sha256:80410f264dc0549639c94413f50b24ee7cd0e82122559e150451265fa8762fb3",
+        "returned.json": "sha256:1c46c17a05a33d9891b961108806cd9dd6ffe635d60e0b20b47e72c45da7a137"
+      }
+    },
+    {
+      "phase": "after",
+      "name": "D-T24-Library-Back-2",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after/D-T24-Library-Back-2",
+      "resultDigest": "sha256:9128d5540ab058681486bc676fccb741b2d3f8b5afbdface0f8e1097ea7da879",
+      "finalCandidate": false,
+      "observationDigest": "sha256:8989d0167063b582ef87c7f7c02ed7a494b814b223539504ddaaa16f690d7cb9",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:9625f14200c3164e05245323592e3d0d9878b0d278eb573f7b2533b36a7cbe72",
+        "prepared.json": "sha256:467abbf64feea0cbfd6db71006ab116b91b94860752f2947e9406ff20c939c91",
+        "returned.json": "sha256:15701e490feb679dfa903e4c2c8ec1108d2a45470c2f19dff28da017fc6b714f"
+      }
+    },
+    {
+      "phase": "after",
+      "name": "D-T24-Library-Back-3",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after/D-T24-Library-Back-3",
+      "resultDigest": "sha256:bd84da3271b3b2573aba8e7ca820e6d7c3614c58a547ad792d8894caa8bbde31",
+      "finalCandidate": false,
+      "observationDigest": "sha256:5ca4b6d3ea6b32f3e73b801cf1efcdc75d8d3a620e470ba35353dc6dd64170fd",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:8a1c8ac7b06a88b5bae883ab68143dd866a67eb378c29de792045875d75145aa",
+        "prepared.json": "sha256:12e069c5608ff0839489635fb79b16c0237374ec26e55aa38cf9d7c2c8680122",
+        "returned.json": "sha256:16ed7d0cbbd12143c28730229c05e4415b9945f986bc533bdd4dfc5fcf55e566"
+      }
+    },
+    {
+      "phase": "after",
+      "name": "D-T24-Library-rail-1",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after/D-T24-Library-rail-1",
+      "resultDigest": "sha256:fad83250971a0680650e868adea5ed97f7d2373c86694d426d72a731bec92d8a",
+      "finalCandidate": false,
+      "observationDigest": "sha256:dd63075a419b103eb8c864294f986cfcb3029b4796f41120c7bd380ebf1cdd3b",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:6cf653ff8cf0ede06d14e6f6f6e3c87fc430d568fd718f71f5a3a941eac8f942",
+        "prepared.json": "sha256:ae5c68fce1f39146ffa27c32317c2a5a6e6e1fb0c3d5eec47340c36691c6515f",
+        "returned.json": "sha256:1d227a1518e1bce979db05079297b9aceda55e5cdae35cc05b01f8d82445d413"
+      }
+    },
+    {
+      "phase": "after",
+      "name": "D-T24-Library-rail-2",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after/D-T24-Library-rail-2",
+      "resultDigest": "sha256:3baef554e4b48e78608c9e6390d1794dcb60a7819161b7b4da2bcec77ccf5b2f",
+      "finalCandidate": false,
+      "observationDigest": "sha256:58136d28ec0b5536c68ab6a98d1c07d30bb8d74e9209806f159994c8203058ee",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:121cdfedf202ae19f124abbd9d3595d866d5c309e84ce15c20f0247017f178b8",
+        "prepared.json": "sha256:246ef402fbf1c46893d7f371f4f134e60f47749858eec02f4593ccb5a7ffeb4c",
+        "returned.json": "sha256:b7a0efce4ac6ffe502a3a2f9253cffcaf76c2684bdba2725a90c5a739ea3b888"
+      }
+    },
+    {
+      "phase": "after",
+      "name": "D-T24-Library-rail-3",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after/D-T24-Library-rail-3",
+      "resultDigest": "sha256:10b4e470a383d7cea39d1ace7ea9f7ee215afb49256b4a46797ade56801a382b",
+      "finalCandidate": false,
+      "observationDigest": "sha256:3baadb04c28f92ba1d35030cd46b6b55200d41d160763230a0ccb3a225d10d6f",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n      \n             \n             \n                 \n               \n                ↑",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:4bceb56e0d0bdd5e1b13f9151acc58048a7a50295ce773fb47c15fdb3ec0b196",
+        "prepared.json": "sha256:0952fda1dabd7af032a4e1cbb579bb4fc6ee628ecab0e00db30e6fcf61ea09e7",
+        "returned.json": "sha256:9042d396e2fdc39b1b188a6d4953bf4534957caa66afbe2bbd03e2ece329dc00"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-Forward-after-Back-1",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-Forward-after-Back-1",
+      "resultDigest": "sha256:b5883d304dcd3d65fcb38ac47a5333a61fea11e96e0968f8aa90d0294e89ae64",
+      "finalCandidate": false,
+      "observationDigest": "sha256:d3da85a6de05e39c8ff17fde3ad1c2d5df4187ccd8659bf871ca1517bc8bc33f",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:98d2dc34c07c840baccd61574df7e38e98b50f5adf1367e72fa21298e7306bd1",
+        "prepared.json": "sha256:7dca1e4b85d136ca325a5935af4a75cb8ffebbbf0dcbe7366f001af326ae0526",
+        "returned.json": "sha256:e5d8b95af9d697b8c681a14c5681f764aa924ba6d309ac66841829d8069cf560"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-Forward-after-Back-2",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-Forward-after-Back-2",
+      "resultDigest": "sha256:c0071bf7c09a33fd764219f42bb7a588b5e0a9f9da0457c4fb6569a20398135a",
+      "finalCandidate": false,
+      "observationDigest": "sha256:7d2e282e721e07e160841259905b09be0de744a52d86e43dc608c33a336c3558",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:3352b2bf1be8e3026d2bcc6643e80f195d6a713bc712fd283b7f83e4d67acafd",
+        "prepared.json": "sha256:ba1d953fa625d5cef6faac927e659bc21bbee02625f9d03bc775b42b94fa0c3b",
+        "returned.json": "sha256:41d755d5540feb38841e3733301b548f6ca907107be95cbac5a1e11a299cecc7"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-Forward-after-Back-3",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-Forward-after-Back-3",
+      "resultDigest": "sha256:fff54220373319bce9e13f4fc8701099a620f046da02a768446bdd34dd158141",
+      "finalCandidate": false,
+      "observationDigest": "sha256:21dfb6d78112d09a45ab2790b6e4f6378f0bcef5ff482f941ca853ebe5473e7d",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:a71b46157b295a9cf4e6bfe6adb4f7c1a8e003bf9e28813e8a3f9637048be602",
+        "prepared.json": "sha256:0868d82a5e108ffa3ca4c5bf43fd2dd6a39e66b5fe486ba3324481d915409a9b",
+        "returned.json": "sha256:2be3a11dbeb07f3165af08e6902332a1e4d990092dbc4f218f71b1cdc5db349e"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-Library-Back-1",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-Library-Back-1",
+      "resultDigest": "sha256:b8f3c1ed6ae7646d85874632efadf31dbc87c76fb53696cfb0b0ceff3c74cc45",
+      "finalCandidate": false,
+      "observationDigest": "sha256:fbb41655a8a317619a1457cecf46e5024e952a3de30a73df445a6dc9c617458b",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:fba5a5229a7ed87bc7141d609699e03a01e9bf385caa5f7e2469bf5a35e83f73",
+        "prepared.json": "sha256:941b02323c9b5a24f0125303f45d2d1178ea2d86852bcec25a1458b307feb262",
+        "returned.json": "sha256:72d9e7a6f5f5aeddbb5c5db5c656b88e39179c252eaa81069dbf04b2ab728bb5"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-Library-Back-2",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-Library-Back-2",
+      "resultDigest": "sha256:9128d5540ab058681486bc676fccb741b2d3f8b5afbdface0f8e1097ea7da879",
+      "finalCandidate": false,
+      "observationDigest": "sha256:bbf6553a5da744d9a8cff3c1e100a5ea6c0850b9f1146b851c312771b1030705",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:710d8d0b5a1d6191dc755c9841673644e878a3e048c543ecb4f1b70f9dc2a55e",
+        "prepared.json": "sha256:de16eaa6f909ad9d09299a4e0db6781dabf827175429ee11a2e088b0c5d83afd",
+        "returned.json": "sha256:56ca708b925ddbfc1d285ee3df06b805fd302d53b4e638be4347aa9f74373e07"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-Library-Back-3",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-Library-Back-3",
+      "resultDigest": "sha256:bd84da3271b3b2573aba8e7ca820e6d7c3614c58a547ad792d8894caa8bbde31",
+      "finalCandidate": false,
+      "observationDigest": "sha256:19adfba798835abbaa170a3d8c8ccd8115d8ae2a2dfc5635fc7c11c72295c5ef",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:fdcc0784fc39244a3b02143d4ac6099aa8dfddde5f6fec8b42ae12998ff5d1fb",
+        "prepared.json": "sha256:be6e81ce2eba045a5048da3741088b886394a9b20a6a8ca1ba471f4d679e3ab5",
+        "returned.json": "sha256:514a733faeac00569bb593536d80ee12d12f0aa0b73d30f888cbbf36305d44d9"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-Library-rail-1",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-Library-rail-1",
+      "resultDigest": "sha256:fad83250971a0680650e868adea5ed97f7d2373c86694d426d72a731bec92d8a",
+      "finalCandidate": false,
+      "observationDigest": "sha256:6fa1c05a1a3f387d2cef291a1bd1b30bf3ef7c271e4c5f19b3cefac95dd0e570",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:36d15d64137f3e776280ad5ef2196eec2a65b3f4ae543a33843b6db24fa86bd3",
+        "prepared.json": "sha256:b6600ef089b3f3d7fc25399ee1a926bcd5970f89305e9e016c8dae7ba2d77975",
+        "returned.json": "sha256:0c5b09399087e6485c647d0b4fb9100c1b1abe1ee778b2f1307bdef5dfacf03f"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-Library-rail-2",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-Library-rail-2",
+      "resultDigest": "sha256:3baef554e4b48e78608c9e6390d1794dcb60a7819161b7b4da2bcec77ccf5b2f",
+      "finalCandidate": false,
+      "observationDigest": "sha256:1482a7bc39f3a29e341fdc61b96d5546054de06ac48bc53d603c26f8066782f3",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:bb2b8482a7a52ce2555de8002be9e22f119e91721ee8697aa79f55cd8cbe83bd",
+        "prepared.json": "sha256:69bdbeaf94cf64e9a2f70fc0ea206e1e5a3a17a3c3d3ffc6061b24e0d2dd73a3",
+        "returned.json": "sha256:f84883bcb02ed3d25014692720ebb2667d75c286489a385f89a0cbe87ad06331"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-Library-rail-3",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-Library-rail-3",
+      "resultDigest": "sha256:10b4e470a383d7cea39d1ace7ea9f7ee215afb49256b4a46797ade56801a382b",
+      "finalCandidate": false,
+      "observationDigest": "sha256:9cc7b46cb8f1f4ecdfbcba6f571545cf353ef6bcdc875285bb52f2ceb39fc2e1",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:a85e3f7e4edd53872fc9ca355bbba7595bab75bd65bb75695e1c391712c80254",
+        "prepared.json": "sha256:4ca2dc1981a186b64188cb576f9b44aa51c3e851f5f6377ab5ceac6eddb9a89e",
+        "returned.json": "sha256:1b502a4dee901e60ba48a596e8f481f4a7db842f710e85d545f450c39fd4596e"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-explicit-current-Ask-choice",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-explicit-current-Ask-choice",
+      "resultDigest": "sha256:732fa40d627a9f8b1956ea60534bbd50655304bea114999277bd534ee6fc822a",
+      "finalCandidate": false,
+      "observationDigest": "sha256:41b2b3b3491f098fdf1203e9e6e994cfd8aa11b3553803efaa225415d6a55861",
+      "explicitChoice": "Ask menu item, already displayed",
+      "chosenRequest": {
+        "shapeId": "core.rag-ask",
+        "docIds": [],
+        "question": "Original B after choosing Ask",
+        "selection": null
+      },
+      "snapshots": {
+        "blocked.json": "sha256:fa7de9f6c538abccec5ae0ccca8fe5294fc7777ee48002f3a6a3c6f65363c360",
+        "explicit-choice.json": "sha256:d3c630eedee3696e48d712a743aafefdfe73dfd2837584ba4505d6990af27017",
+        "navigations.json": "sha256:5084b3c7823120c16d9e1c8306f467f5b5a58a45133a4cbdaa0fdd0bd5fee0e5"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-online-Forward-after-Back",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-online-Forward-after-Back",
+      "resultDigest": "sha256:a85b221c305e1bb58ce01202349eeb99ba885dbc98c6c2fd86e5e7335236fee6",
+      "finalCandidate": false,
+      "observationDigest": "sha256:fee37cea241a3d8e29aaf95e7e361a6b4c0c29c4c088ad8c88c5d6fa0d8d0f2f",
+      "requestDocIds": [],
+      "modelAvailable": true,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "snapshots": {
+        "after-Back-proposal.json": "sha256:254ef1b0a2fcee9cc4c8cd2f46343938d3bb091eb438d67fbb428cfb02ceb180",
+        "after-review-and-Send.json": "sha256:9f2ba8da65cf14460acab4dc44686faf9deba5821dce9aae00946617b1d6c18d",
+        "before-Library-chosen.json": "sha256:2f85a650a7d577cd3a252367ad74a8a4483227637c1e5c5986b6bfc1976116ef",
+        "navigations.json": "sha256:3589ff97c6fdbe0463ab7b3821a54a02077b27da5dd32db5f1efd18e1fbc971a"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-online-Library-Back",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-online-Library-Back",
+      "resultDigest": "sha256:d620e772a63f967521dd758b222845bf07345023f9b4240be1547fc2ea58b59b",
+      "finalCandidate": false,
+      "observationDigest": "sha256:983d534d9e020566f4a5e6fffde839a144f158f49c2130cb4dd466ef4cd7cad1",
+      "requestDocIds": [],
+      "modelAvailable": true,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "snapshots": {
+        "after-Back-proposal.json": "sha256:0391015429b5dc6a89268ad45be60519f9e5c3d57cae866b6b26b112a06fd6fc",
+        "after-review-and-Send.json": "sha256:2fa572993fb65f6029f91ff2e03e2433066574d0bd8b47c59dddff122ac14061",
+        "before-Library-chosen.json": "sha256:18d41711a08d63fee9be762c44490137de5ea5c84cce57d380a900366a84e0f3",
+        "navigations.json": "sha256:0882d0582309a99c631684e097dbe5ccbda22d84e043c26d17c12a5a53fffe7a"
+      }
+    },
+    {
+      "phase": "after-online",
+      "name": "D-T24-online-Library-rail",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-online/D-T24-online-Library-rail",
+      "resultDigest": "sha256:f418acf6d0df27b916b127d17c8228a2f3993b9a7fd5bdc0b5fc2c6703fdd815",
+      "finalCandidate": false,
+      "observationDigest": "sha256:14e346b30d117b1456f021b2a50e40a977ff87d662f0edfe7fc5826f4beabcb0",
+      "requestDocIds": [],
+      "modelAvailable": true,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "snapshots": {
+        "after-Back-proposal.json": "sha256:7c7e2279aa6cbaa6c2df0bcbb127412cbe58acbb6670a241cd6b1af268374772",
+        "after-review-and-Send.json": "sha256:59d1a95927225b4a67e40b03652b0aa2ce41c152aa953e2977db544e76fe56de",
+        "before-Library-chosen.json": "sha256:80c70f21751e95268a42764126c5c5e99267ec5e1a501561d647d4d9e289b6a9",
+        "navigations.json": "sha256:8f93cbde9bbf1c0022b0a8c5ec7f9938c04c71689540c8c324d61e57249ae1a4"
+      }
+    },
+    {
+      "phase": "after-conversation",
+      "name": "D-T24-conversation-Back",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/after-conversation/D-T24-conversation-Back",
+      "resultDigest": "sha256:50873fe46c394612a3c3f82a675190073a0d5cb847de8c36a0a37bc6973eb996",
+      "finalCandidate": false,
+      "observationDigest": "sha256:24e1dec3c749132ec958df1c1342da684adc0132b1f0b8b7216d89e1a7e2fa05",
+      "modelDispatches": 1,
+      "keptText": "",
+      "snapshots": {
+        "after-Back.json": "sha256:3207fb5f778138d046351365caea970bf2ddaf62d5079d84e719375afcc7924d",
+        "conversation.json": "sha256:49dfe3550dca7bc43f6dcf3861365c1fbd0d4f28d6f34535aba59c8499d55c26",
+        "genuine-seed.json": "sha256:25f315b1ce8d90de69e29e6dcf7e4a5bbc777ecf647ac7881aa958c9c28f82e3",
+        "incoming.json": "sha256:0c93817d520e6723b721b5a933d08114559d53e6a7bd77b4984db5347b57cb78",
+        "navigations.json": "sha256:e8d700fbca0529f29774f78d09bc168533f95ac51bbeede40f087c199d666519",
+        "saved-conversation.json": "sha256:ea946cad6f6bcaa8d2f740ce005098f740862ca1e3f6370558c8a58e84f762da"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-Forward-after-Back-1",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-Forward-after-Back-1",
+      "resultDigest": "sha256:b5883d304dcd3d65fcb38ac47a5333a61fea11e96e0968f8aa90d0294e89ae64",
+      "finalCandidate": true,
+      "observationDigest": "sha256:57f13ced7f2034315f82c175c18141feffd5e805a5d0bb016f14afa5b954db78",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:8729c7e2fa6f8687716850401d12ed8fcee79c72fe9858794cdffc9b36783b6d",
+        "prepared.json": "sha256:c90fbe8ddf14a8129cb9da11ce1622975e0763d658f1a141463fb35b484ac87d",
+        "returned.json": "sha256:f62ef5d14a8cf4967d35a6f6ef06ad2f11d9ed74ae5bd070356ac204eb79cdd2"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-Forward-after-Back-2",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-Forward-after-Back-2",
+      "resultDigest": "sha256:c0071bf7c09a33fd764219f42bb7a588b5e0a9f9da0457c4fb6569a20398135a",
+      "finalCandidate": true,
+      "observationDigest": "sha256:7a2e800374e28c3ca061ef8b433aa914cb29d23d5bce244d5718cb155c38171e",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:5659d28b6cc8139549d36888b7f3f72cb388904fbdf6efddb96f1678d5550d5a",
+        "prepared.json": "sha256:31446fc48d2a1222101031081523660a0f9f01b4f8c1c3e38f2207f92138418d",
+        "returned.json": "sha256:d4a9d0e14fc71bbe1a7fc918437e96c4b975b92e48249ee4d91936196cd72bcf"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-Forward-after-Back-3",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-Forward-after-Back-3",
+      "resultDigest": "sha256:fff54220373319bce9e13f4fc8701099a620f046da02a768446bdd34dd158141",
+      "finalCandidate": true,
+      "observationDigest": "sha256:24d25996d6facd6c92dfa8183c414479188ffc89fb7aa598a358aad1dd938941",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:15c49335a8b0ee305b147277fc4aaf143f0601897799dd1375b78707686f6565",
+        "prepared.json": "sha256:4c8193f17301615cb697bda2fe3c0643b01d5c3efeee545595cd78b0f7422bb2",
+        "returned.json": "sha256:bf391470a5ed234e03ad3edf65bf9df13752a71a9a970d7a60685525bbfe900c"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-Library-Back-1",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-Library-Back-1",
+      "resultDigest": "sha256:b8f3c1ed6ae7646d85874632efadf31dbc87c76fb53696cfb0b0ceff3c74cc45",
+      "finalCandidate": true,
+      "observationDigest": "sha256:9b1d92ea67f34787a00f915937115ac115e0515a562a22718387d5a06689e30f",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:8cd4235b199c2496bc9abb16c5d6e6aba6e52cf28faff5bc7eecf7a95a554daa",
+        "prepared.json": "sha256:25a8ec89c27db37f360e49cf3944b6fa7cb17fb26775434ef2129a8dad9fe4ef",
+        "returned.json": "sha256:622ef473fff9f4f08b64f24c4e1fb91a1ec33c06045dff9da12d190916138f0c"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-Library-Back-2",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-Library-Back-2",
+      "resultDigest": "sha256:9128d5540ab058681486bc676fccb741b2d3f8b5afbdface0f8e1097ea7da879",
+      "finalCandidate": true,
+      "observationDigest": "sha256:2dbfc9b2030990e39f012de9f30dcb988aad119a14d4a757a930cabcfc9a4e2a",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:9207ef8a3f1a08de0fb516e81a9943cae50b53257f4081e1c830f80b13a468a2",
+        "prepared.json": "sha256:76ca1ae0a20e7b72cbd20651342e43ee5ca58e67fdaca4201bcc935485513b13",
+        "returned.json": "sha256:451f711d6508573b805b5d6b3fbdb120969fbfb1f08b5a7afff1575af431faf9"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-Library-Back-3",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-Library-Back-3",
+      "resultDigest": "sha256:bd84da3271b3b2573aba8e7ca820e6d7c3614c58a547ad792d8894caa8bbde31",
+      "finalCandidate": true,
+      "observationDigest": "sha256:3b228638390263dbf1a6ae713cbd024a7e93311716bc4f8d4dcaa4933aad642d",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:50979e0abf32c1039feb230f0cdc60bc93dc52e7ef6b7b86f340e3419a89b24a",
+        "prepared.json": "sha256:4b4d3698649a0d7fbf3748e331458e78c68ca6f4b9248540de915704cff91489",
+        "returned.json": "sha256:25f4076e41c4b3a3bb0df4daba71528ee1e78e8999ca56385faa1c622f8858a3"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-Library-rail-1",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-Library-rail-1",
+      "resultDigest": "sha256:fad83250971a0680650e868adea5ed97f7d2373c86694d426d72a731bec92d8a",
+      "finalCandidate": true,
+      "observationDigest": "sha256:6cc69774e286c509d42fe4eb1c2eae5e1a2947d4720f50dc66e3ceb88a7f35e5",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:21580267d0c888d00d78776ebaa68d47fb039676ceda7ed88189c4b089b00090",
+        "prepared.json": "sha256:0cc28ed2a086c298ea66bc3db6b91e36d89a24b9ca27a6c6f7c2bc07abadc1c5",
+        "returned.json": "sha256:a0a3ea32a8b9d44aaeb8c072a0f6b26357dfb2455d2badf135c40ed6d24c1ccd"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-Library-rail-2",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-Library-rail-2",
+      "resultDigest": "sha256:3baef554e4b48e78608c9e6390d1794dcb60a7819161b7b4da2bcec77ccf5b2f",
+      "finalCandidate": true,
+      "observationDigest": "sha256:edb82f81cbdf56eafa5e64cc5dfcd6a75d0f7e68b659c9a500a8079206a47aec",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:b7ae9fef8822a673c8cd79ad65b1dd3f7be6e1e573b425fb9c24c6f99e1c1c2a",
+        "prepared.json": "sha256:3978e211ebfd74340e9ae680e97480661e35c542a338b09df72f9585734d1ae5",
+        "returned.json": "sha256:633d9f5d0514991da549c345ca735b975a74a790be7be8ea8e623f6eb73f0fb6"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-Library-rail-3",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-Library-rail-3",
+      "resultDigest": "sha256:10b4e470a383d7cea39d1ace7ea9f7ee215afb49256b4a46797ade56801a382b",
+      "finalCandidate": true,
+      "observationDigest": "sha256:b3f5fd409d3d6f6d2b676832a972c9ba6629ed04db424594ff66e590edbef7d2",
+      "modelDispatches": 0,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "keptText": "Chosen B",
+      "snapshots": {
+        "navigations.json": "sha256:9f5710a77469f98265fdd0156f3598bafad5fb2b0cc69189191c70be0ca4f0da",
+        "prepared.json": "sha256:e0ed79070eb78e73be05f65fbaaf169035c6f14672a74d3e3854fa24fde1bcd4",
+        "returned.json": "sha256:e0eb10cdb8779b80caba24d4feda5231592e011f5dba9fc18874cb5a248ea428"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-explicit-current-Ask-choice",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-explicit-current-Ask-choice",
+      "resultDigest": "sha256:732fa40d627a9f8b1956ea60534bbd50655304bea114999277bd534ee6fc822a",
+      "finalCandidate": true,
+      "observationDigest": "sha256:f31a372052333530a3e4d8dcdbe53efc5af4397ce624273ca44ebf110d835a15",
+      "explicitChoice": "Ask menu item, already displayed",
+      "chosenRequest": {
+        "shapeId": "core.rag-ask",
+        "docIds": [],
+        "question": "Original B after choosing Ask",
+        "selection": null
+      },
+      "snapshots": {
+        "blocked.json": "sha256:5ae6267dd8e077a12cb08c6ea803f19d22ed8c435ba1bc2f9799e025149fd484",
+        "explicit-choice.json": "sha256:267b095cfdb2b6a202382b3dc18d3717a5053efc9f3067f08f68d4b80da7e949",
+        "navigations.json": "sha256:6225484d8d536b6afffe17d20e7c7ed0798c51b824e3a6a9604cdc82c19cb6fb"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-online-Forward-after-Back",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-online-Forward-after-Back",
+      "resultDigest": "sha256:a85b221c305e1bb58ce01202349eeb99ba885dbc98c6c2fd86e5e7335236fee6",
+      "finalCandidate": true,
+      "observationDigest": "sha256:160376723a35d73fb0e0f301062037c48a9c35396b836ac45ed84938b6c596af",
+      "requestDocIds": [],
+      "modelAvailable": true,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "snapshots": {
+        "after-Back-proposal.json": "sha256:dcb3a0d7ede032759ece89f0f917bb35fbd4f5c4c145ce63d077ec035147231a",
+        "after-review-and-Send.json": "sha256:6b7fcf45b994fb648be6a057591e6184e60358972953752b735da214b5ec0bab",
+        "before-Library-chosen.json": "sha256:caa159c472fac280a68bc8c1bf67d11b0e363724cd6c1e84e323469df070af63",
+        "navigations.json": "sha256:e86eabfb869006ba2685d62afac0ba28b32f77cdd73edbcc4feda93cda7b0d6d"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-online-Library-Back",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-online-Library-Back",
+      "resultDigest": "sha256:d620e772a63f967521dd758b222845bf07345023f9b4240be1547fc2ea58b59b",
+      "finalCandidate": true,
+      "observationDigest": "sha256:d1f075d59912a1d6a1791619b574abcc6f7d0de1b1a2e59d4546f2a9a0944d2e",
+      "requestDocIds": [],
+      "modelAvailable": true,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "snapshots": {
+        "after-Back-proposal.json": "sha256:7c8c5d7965d8dfe5520864211467934297f34515aec32276fa41612d81106e12",
+        "after-review-and-Send.json": "sha256:d4a23b4a9e2ef9de42a41126b1374bfe05e253253ed7ed8f51379ec5de013585",
+        "before-Library-chosen.json": "sha256:68991d039760d7e272416e638648ffc611829f6071c3a9b39520642561282574",
+        "navigations.json": "sha256:37d253d4bea9d06a5f9c8aaff50f224d4ac7690e417414397ba642ff690a3dba"
+      }
+    },
+    {
+      "phase": "final-scope",
+      "name": "D-T24-online-Library-rail",
+      "status": "pass",
+      "failure": "",
+      "evidenceDirectory": "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/final-scope/D-T24-online-Library-rail",
+      "resultDigest": "sha256:f418acf6d0df27b916b127d17c8228a2f3993b9a7fd5bdc0b5fc2c6703fdd815",
+      "finalCandidate": true,
+      "observationDigest": "sha256:d85779d1c824652b1ca36f60177d706eb2705e1920209a4d1ca5d58a3ea71359",
+      "requestDocIds": [],
+      "modelAvailable": true,
+      "notice": "Semantic search degraded. \n          Open Health \n          \n          \n          Open Health \n          \n       \n        \n         \n          \n        \n       \n   \n     \n       \n        \n     \n          \n                The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n             \n          \n         \n           \n             \n                \n                \n             \n           \n             The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending. \n            \n           \n             \n                \n        \n       \n          \n          \n   \n          Ask \n          \n       \n   \n       \n      \n      \n        \n       \n          \n       \n   \n          Standard \n          \n       \n   \n       \n      \n       Qwen3.5-4B \n             \n             \n                 \n               \n           ",
+      "snapshots": {
+        "after-Back-proposal.json": "sha256:1ce138c18f357c2325ae3a2dfe876d2b0201a63d645ad261a7e5011b902f121e",
+        "after-review-and-Send.json": "sha256:70ddbbc9f8325be6c4012b7315bb5a2f7b58c88b3a227b1c10f9f1448d3d2e97",
+        "before-Library-chosen.json": "sha256:c9d8878547fed2a6929ad37716aedc50637f060c11eaf8e8a791fe91119092db",
+        "navigations.json": "sha256:f33f21c2758b577c0d1887051a173d0a2bf8f76905100e5e88b6114de1e5fe9e"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "label": "runtime-after",
+      "ready": {
+        "label": "after",
+        "head": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+        "tree": "/home/elias/dev/js-uiux-compat-ingress",
+        "port": 34543,
+        "enginePort": 33463,
+        "profile": "/tmp/jsv-eng-nqrp7scj",
+        "corpus": "/tmp/jsv-eng-nqrp7scj/corpus",
+        "chosen": "/tmp/jsv-eng-nqrp7scj/corpus/chosen-alpha.txt",
+        "decoy": "/tmp/jsv-eng-nqrp7scj/corpus/unchosen-decoy.txt",
+        "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture"
+      },
+      "modelProcesses": [],
+      "installHashesDigest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "cleanup": {
+        "profileRemoved": true,
+        "engineExit": 143,
+        "viteExit": 143
+      },
+      "cleanupDigest": "sha256:1618b407aa0285674c4b2cc1e6d4a941b110f196fc618341564fc50e53b1fadb",
+      "serviceFailure": null,
+      "settingsResult": null,
+      "jobs": [
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/roundtrips.mjs"
+          ],
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "label": "runtime-after-conversation",
+      "ready": {
+        "label": "after-conversation",
+        "head": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+        "tree": "/home/elias/dev/js-uiux-compat-ingress",
+        "port": 50377,
+        "enginePort": 37937,
+        "profile": "/tmp/jsv-eng-rzo9g08r",
+        "corpus": "/tmp/jsv-eng-rzo9g08r/corpus",
+        "chosen": "/tmp/jsv-eng-rzo9g08r/corpus/chosen-alpha.txt",
+        "decoy": "/tmp/jsv-eng-rzo9g08r/corpus/unchosen-decoy.txt",
+        "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture"
+      },
+      "modelProcesses": [
+        {
+          "pid": 891,
+          "startticks": "16924302",
+          "argv": [
+            "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+            "-m",
+            "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "--cache-ram",
+            "1024",
+            "--jinja",
+            "--reasoning-format",
+            "deepseek",
+            "--reasoning-budget",
+            "0",
+            "--host",
+            "127.0.0.1",
+            "--metrics",
+            "--port",
+            "46809",
+            "-c",
+            "16384",
+            "-ngl",
+            "0",
+            "--device",
+            "none",
+            "-np",
+            "2",
+            "-kvu",
+            "-ctk",
+            "q8_0",
+            "-ctv",
+            "q8_0",
+            "-fa",
+            "on",
+            "-fit",
+            "off",
+            ""
+          ],
+          "selectedEnvironment": {
+            "CUDA_VISIBLE_DEVICES": "-1",
+            "HOME": "/tmp/jsv-eng-rzo9g08r/home",
+            "TMPDIR": "/tmp/jsv-eng-rzo9g08r/tmp",
+            "JAVA_TOOL_OPTIONS": null,
+            "JDK_JAVA_OPTIONS": null,
+            "JAVA_OPTS": null,
+            "_JAVA_OPTIONS": null,
+            "JUSTSEARCH_HOME": "/tmp/jsv-eng-rzo9g08r/data",
+            "JUSTSEARCH_DATA_DIR": "/tmp/jsv-eng-rzo9g08r/data",
+            "JUSTSEARCH_API_PORT": "0",
+            "JUSTSEARCH_GPU_LAYERS": "0",
+            "JUSTSEARCH_LLM_MODEL_PATH": "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf"
+          }
+        }
+      ],
+      "installHashesDigest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "cleanup": {
+        "profileRemoved": true,
+        "engineExit": 1,
+        "viteExit": 143
+      },
+      "cleanupDigest": "sha256:dcfe036cee0ef85c11fe1bdc604ffb3f619696a1444716a503969ec9f37c4e7b",
+      "serviceFailure": null,
+      "settingsResult": {
+        "pass_": true,
+        "model": "Qwen3.5-4B-Q4_K_M.gguf",
+        "gpuLayers": 0
+      },
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/cpu-settings.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/conversation.mjs"
+          ],
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "label": "runtime-after-online",
+      "ready": {
+        "label": "after-online",
+        "head": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+        "tree": "/home/elias/dev/js-uiux-compat-ingress",
+        "port": 40259,
+        "enginePort": 41197,
+        "profile": "/tmp/jsv-eng-7l1rp3pp",
+        "corpus": "/tmp/jsv-eng-7l1rp3pp/corpus",
+        "chosen": "/tmp/jsv-eng-7l1rp3pp/corpus/chosen-alpha.txt",
+        "decoy": "/tmp/jsv-eng-7l1rp3pp/corpus/unchosen-decoy.txt",
+        "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture"
+      },
+      "modelProcesses": [
+        {
+          "pid": 742,
+          "startticks": "16903980",
+          "argv": [
+            "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+            "-m",
+            "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "--cache-ram",
+            "1024",
+            "--jinja",
+            "--reasoning-format",
+            "deepseek",
+            "--reasoning-budget",
+            "0",
+            "--host",
+            "127.0.0.1",
+            "--metrics",
+            "--port",
+            "38893",
+            "-c",
+            "16384",
+            "-ngl",
+            "0",
+            "--device",
+            "none",
+            "-np",
+            "2",
+            "-kvu",
+            "-ctk",
+            "q8_0",
+            "-ctv",
+            "q8_0",
+            "-fa",
+            "on",
+            "-fit",
+            "off",
+            ""
+          ],
+          "selectedEnvironment": {
+            "CUDA_VISIBLE_DEVICES": "-1",
+            "HOME": "/tmp/jsv-eng-7l1rp3pp/home",
+            "TMPDIR": "/tmp/jsv-eng-7l1rp3pp/tmp",
+            "JAVA_TOOL_OPTIONS": null,
+            "JDK_JAVA_OPTIONS": null,
+            "JAVA_OPTS": null,
+            "_JAVA_OPTIONS": null,
+            "JUSTSEARCH_HOME": "/tmp/jsv-eng-7l1rp3pp/data",
+            "JUSTSEARCH_DATA_DIR": "/tmp/jsv-eng-7l1rp3pp/data",
+            "JUSTSEARCH_API_PORT": "0",
+            "JUSTSEARCH_GPU_LAYERS": "0",
+            "JUSTSEARCH_LLM_MODEL_PATH": "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf"
+          }
+        }
+      ],
+      "installHashesDigest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "cleanup": {
+        "profileRemoved": true,
+        "engineExit": 143,
+        "viteExit": 143
+      },
+      "cleanupDigest": "sha256:edaa1ca61d39c3d98c0679cd48a3d28c63def21b9fdb9263403a4e3637c3f081",
+      "serviceFailure": null,
+      "settingsResult": {
+        "pass_": true,
+        "model": "Qwen3.5-4B-Q4_K_M.gguf",
+        "gpuLayers": 0
+      },
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/cpu-settings.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/roundtrips.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/scope-issued.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/mode-choice.mjs"
+          ],
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "label": "runtime-before",
+      "ready": {
+        "label": "before",
+        "head": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+        "tree": "/home/elias/.cache/am/qffrcyie/tmp/before",
+        "port": 36247,
+        "enginePort": 39673,
+        "profile": "/tmp/jsv-eng-90m88g4f",
+        "corpus": "/tmp/jsv-eng-90m88g4f/corpus",
+        "chosen": "/tmp/jsv-eng-90m88g4f/corpus/chosen-alpha.txt",
+        "decoy": "/tmp/jsv-eng-90m88g4f/corpus/unchosen-decoy.txt",
+        "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture"
+      },
+      "modelProcesses": [],
+      "installHashesDigest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "cleanup": {
+        "profileRemoved": true,
+        "engineExit": 143,
+        "viteExit": 143
+      },
+      "cleanupDigest": "sha256:60689c405afecd1716f0d91b298b029ae4458e2d0dfc7cd218fc098cd55f8891",
+      "serviceFailure": null,
+      "settingsResult": null,
+      "jobs": [
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/scope-return.mjs"
+          ],
+          "exit": 1
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/roundtrips.mjs"
+          ],
+          "exit": 1
+        }
+      ]
+    },
+    {
+      "label": "runtime-before-conversation",
+      "ready": {
+        "label": "before-conversation",
+        "head": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+        "tree": "/home/elias/.cache/am/qffrcyie/tmp/before",
+        "port": 44817,
+        "enginePort": 43157,
+        "profile": "/tmp/jsv-eng-ehipephj",
+        "corpus": "/tmp/jsv-eng-ehipephj/corpus",
+        "chosen": "/tmp/jsv-eng-ehipephj/corpus/chosen-alpha.txt",
+        "decoy": "/tmp/jsv-eng-ehipephj/corpus/unchosen-decoy.txt",
+        "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture"
+      },
+      "modelProcesses": [
+        {
+          "pid": 888,
+          "startticks": "16879209",
+          "argv": [
+            "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+            "-m",
+            "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "--cache-ram",
+            "1024",
+            "--jinja",
+            "--reasoning-format",
+            "deepseek",
+            "--reasoning-budget",
+            "0",
+            "--host",
+            "127.0.0.1",
+            "--metrics",
+            "--port",
+            "33007",
+            "-c",
+            "16384",
+            "-ngl",
+            "0",
+            "--device",
+            "none",
+            "-np",
+            "2",
+            "-kvu",
+            "-ctk",
+            "q8_0",
+            "-ctv",
+            "q8_0",
+            "-fa",
+            "on",
+            "-fit",
+            "off",
+            ""
+          ],
+          "selectedEnvironment": {
+            "CUDA_VISIBLE_DEVICES": "-1",
+            "HOME": "/tmp/jsv-eng-ehipephj/home",
+            "TMPDIR": "/tmp/jsv-eng-ehipephj/tmp",
+            "JAVA_TOOL_OPTIONS": null,
+            "JDK_JAVA_OPTIONS": null,
+            "JAVA_OPTS": null,
+            "_JAVA_OPTIONS": null,
+            "JUSTSEARCH_HOME": "/tmp/jsv-eng-ehipephj/data",
+            "JUSTSEARCH_DATA_DIR": "/tmp/jsv-eng-ehipephj/data",
+            "JUSTSEARCH_API_PORT": "0",
+            "JUSTSEARCH_GPU_LAYERS": "0",
+            "JUSTSEARCH_LLM_MODEL_PATH": "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf"
+          }
+        }
+      ],
+      "installHashesDigest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "cleanup": {
+        "profileRemoved": true,
+        "engineExit": 1,
+        "viteExit": 143
+      },
+      "cleanupDigest": "sha256:ba2cd3bf056eac48aba58fa8f7251d7aaf5f587cc53f9addf91bcf28233f11ba",
+      "serviceFailure": null,
+      "settingsResult": {
+        "pass_": true,
+        "model": "Qwen3.5-4B-Q4_K_M.gguf",
+        "gpuLayers": 0
+      },
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/cpu-settings.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/conversation.mjs"
+          ],
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "label": "runtime-before-online",
+      "ready": {
+        "label": "before-online",
+        "head": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+        "tree": "/home/elias/.cache/am/qffrcyie/tmp/before",
+        "port": 57919,
+        "enginePort": 46307,
+        "profile": "/tmp/jsv-eng-re9s9r33",
+        "corpus": "/tmp/jsv-eng-re9s9r33/corpus",
+        "chosen": "/tmp/jsv-eng-re9s9r33/corpus/chosen-alpha.txt",
+        "decoy": "/tmp/jsv-eng-re9s9r33/corpus/unchosen-decoy.txt",
+        "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture"
+      },
+      "modelProcesses": [
+        {
+          "pid": 845,
+          "startticks": "16864197",
+          "argv": [
+            "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+            "-m",
+            "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "--cache-ram",
+            "1024",
+            "--jinja",
+            "--reasoning-format",
+            "deepseek",
+            "--reasoning-budget",
+            "0",
+            "--host",
+            "127.0.0.1",
+            "--metrics",
+            "--port",
+            "35071",
+            "-c",
+            "16384",
+            "-ngl",
+            "0",
+            "--device",
+            "none",
+            "-np",
+            "2",
+            "-kvu",
+            "-ctk",
+            "q8_0",
+            "-ctv",
+            "q8_0",
+            "-fa",
+            "on",
+            "-fit",
+            "off",
+            ""
+          ],
+          "selectedEnvironment": {
+            "CUDA_VISIBLE_DEVICES": "-1",
+            "HOME": "/tmp/jsv-eng-re9s9r33/home",
+            "TMPDIR": "/tmp/jsv-eng-re9s9r33/tmp",
+            "JAVA_TOOL_OPTIONS": null,
+            "JDK_JAVA_OPTIONS": null,
+            "JAVA_OPTS": null,
+            "_JAVA_OPTIONS": null,
+            "JUSTSEARCH_HOME": "/tmp/jsv-eng-re9s9r33/data",
+            "JUSTSEARCH_DATA_DIR": "/tmp/jsv-eng-re9s9r33/data",
+            "JUSTSEARCH_API_PORT": "0",
+            "JUSTSEARCH_GPU_LAYERS": "0",
+            "JUSTSEARCH_LLM_MODEL_PATH": "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf"
+          }
+        }
+      ],
+      "installHashesDigest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "cleanup": {
+        "profileRemoved": true,
+        "engineExit": 1,
+        "viteExit": 143
+      },
+      "cleanupDigest": "sha256:310d19d2b61dc90bdb5701f0da797c0fd59acdb2e717f66da58d3772c8e9a557",
+      "serviceFailure": null,
+      "settingsResult": {
+        "pass_": true,
+        "model": "Qwen3.5-4B-Q4_K_M.gguf",
+        "gpuLayers": 0
+      },
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/cpu-settings.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/scope-issued.mjs"
+          ],
+          "exit": 1
+        }
+      ]
+    },
+    {
+      "label": "runtime-final-scope",
+      "ready": {
+        "label": "final-scope",
+        "head": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+        "tree": "/home/elias/dev/js-uiux-compat-ingress",
+        "port": 47311,
+        "enginePort": 37583,
+        "profile": "/tmp/jsv-eng-jeh94alc",
+        "corpus": "/tmp/jsv-eng-jeh94alc/corpus",
+        "chosen": "/tmp/jsv-eng-jeh94alc/corpus/chosen-alpha.txt",
+        "decoy": "/tmp/jsv-eng-jeh94alc/corpus/unchosen-decoy.txt",
+        "scope": "Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture"
+      },
+      "modelProcesses": [
+        {
+          "pid": 1002,
+          "startticks": "16971575",
+          "argv": [
+            "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+            "-m",
+            "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "--cache-ram",
+            "1024",
+            "--jinja",
+            "--reasoning-format",
+            "deepseek",
+            "--reasoning-budget",
+            "0",
+            "--host",
+            "127.0.0.1",
+            "--metrics",
+            "--port",
+            "33311",
+            "-c",
+            "16384",
+            "-ngl",
+            "0",
+            "--device",
+            "none",
+            "-np",
+            "2",
+            "-kvu",
+            "-ctk",
+            "q8_0",
+            "-ctv",
+            "q8_0",
+            "-fa",
+            "on",
+            "-fit",
+            "off",
+            ""
+          ],
+          "selectedEnvironment": {
+            "CUDA_VISIBLE_DEVICES": "-1",
+            "HOME": "/tmp/jsv-eng-jeh94alc/home",
+            "TMPDIR": "/tmp/jsv-eng-jeh94alc/tmp",
+            "JAVA_TOOL_OPTIONS": null,
+            "JDK_JAVA_OPTIONS": null,
+            "JAVA_OPTS": null,
+            "_JAVA_OPTIONS": null,
+            "JUSTSEARCH_HOME": "/tmp/jsv-eng-jeh94alc/data",
+            "JUSTSEARCH_DATA_DIR": "/tmp/jsv-eng-jeh94alc/data",
+            "JUSTSEARCH_API_PORT": "0",
+            "JUSTSEARCH_GPU_LAYERS": "0",
+            "JUSTSEARCH_LLM_MODEL_PATH": "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf"
+          }
+        }
+      ],
+      "installHashesDigest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "cleanup": {
+        "profileRemoved": true,
+        "engineExit": 1,
+        "viteExit": 143
+      },
+      "cleanupDigest": "sha256:3ddcd1066fb9f088517269489117744f0a1a86d39c2477659e3a84b91a8f396a",
+      "serviceFailure": "Engine exited 1 unexpectedly after all case jobs completed; supervisor reports Own service exited. Crash report path is in engine.log; private crash file was removed by supplied harness cleanup.",
+      "settingsResult": {
+        "pass_": true,
+        "model": "Qwen3.5-4B-Q4_K_M.gguf",
+        "gpuLayers": 0
+      },
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/cpu-settings.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/roundtrips.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/scope-issued.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/qffrcyie/tmp/scope-return-work/browser/mode-choice.mjs"
+          ],
+          "exit": 0
+        }
+      ]
+    }
+  ],
+  "harness": {
+    "mode-choice.mjs": {
+      "digest": "sha256:d4ce3be5dceeffa578e56812d7f064efefe776909c88e647e9e5738da08ac88e",
+      "source": "import fs from 'node:fs';\nimport {run,boot,text,work,sleep,assert,info,eventually} from './browser-lib.mjs';\nconst row=await run('D-T24-explicit-current-Ask-choice',async({p,wire,dir,snap})=>{\n const B='Original B after choosing Ask';await boot(p,{query:B,mode:'ask',docIds:[info.chosen]});\n await p.getByRole('button',{name:'Manage indexed folders',exact:true}).click();await sleep(500);await p.goBack();await p.getByTestId('sv3-composer-input').waitFor();await sleep(600);\n assert.match(await text(p,'jf-sv3-composer'),/not kept/);await p.getByTestId('sv3-composer-input').press('Enter');await sleep(300);assert.equal(work(wire).length,0);await snap('blocked');\n await p.getByTestId('sv3-composer-tier').click();await p.locator('[data-testid=\"sv3-composer-tier-option\"][data-tier=\"ask\"]').click();await sleep(300);assert.doesNotMatch(await text(p,'jf-sv3-composer'),/not kept/);await snap('explicit-choice');\n await p.getByTestId('sv3-composer-input').press('Enter');const body=await eventually(async()=>{const r=work(wire).find(x=>x.url.endsWith('/api/chat/dispatch'));assert.ok(r);return JSON.parse(r.body);});\n assert.equal(body.shapeId,'core.rag-ask');assert.deepEqual(body.docIds,[]);assert.equal(body.selection,undefined);assert.equal(body.question,B);\n fs.writeFileSync(dir+'/observations.json',JSON.stringify({body,explicitChoice:'Ask menu item, already displayed',withoutChoiceDispatches:0},null,2));\n});if(row.status!=='pass')process.exitCode=1;\n"
+    },
+    "browser-lib.mjs": {
+      "digest": "sha256:e876e55e7475ec2efe652d02bc96b8ae03054f2e72b59d90378da96f37f29e4f",
+      "source": "import fs from 'node:fs';import path from 'node:path';import {pathToFileURL} from 'node:url';import assert from 'node:assert/strict';export {assert};\nexport const E=path.dirname(new URL(import.meta.url).pathname);\nexport const info=JSON.parse(fs.readFileSync(process.env.RUNTIME_INFO,'utf8'));\nexport const {chromium}=await import(pathToFileURL(info.tree+'/modules/ui-web/node_modules/playwright-core/index.mjs'));\nexport const sleep=ms=>new Promise(r=>setTimeout(r,ms));\nexport async function eventually(fn,ms=30000){let e;const end=Date.now()+ms;while(Date.now()<end){try{return await fn()}catch(x){e=x}await sleep(200)}throw e}\nexport function surfaceUrl(target,state={}){const s=new URLSearchParams();for(const[k,v]of Object.entries(state))for(const x of Array.isArray(v)?v:[v])s.append(k,x);return '#justsearch://surface/'+target+(s.size?'?'+s:'')}\nexport async function text(p,selector='jf-shell'){return p.locator(selector).first().evaluate(e=>{function t(n){if(n.nodeType===3)return n.textContent;if(n.nodeType===1&&['SCRIPT','STYLE'].includes(n.tagName))return '';return [...n.childNodes].map(t).join(' ')+(n.shadowRoot?t(n.shadowRoot):'')}return t(e)})}\nexport async function dismiss(p){const b=p.getByRole('button',{name:'Dismiss',exact:true});if(await b.isVisible())await b.click()}\nexport async function type(input,s){await input.click();await input.press('Control+A');await input.press('Backspace');await input.pressSequentially(s,{delay:1})}\nexport async function boot(p,state={},target='core.search-v3-surface'){if(process.env.BASELINE_DEVELOPER==='1'){await p.goto('http://127.0.0.1:'+info.port+'/?api_port='+info.enginePort);await p.locator('jf-unified-chat-view jf-composer textarea').waitFor({timeout:60000});await dismiss(p);await p.getByRole('button',{name:'Settings',exact:true}).click();await p.getByRole('button',{name:'Developer',exact:true}).click();await p.locator('jf-option-button-group button').filter({hasText:'Show everything'}).click();await p.keyboard.press('Escape');}await p.goto('http://127.0.0.1:'+info.port+'/?api_port='+info.enginePort+surfaceUrl(target,state),{waitUntil:'domcontentloaded'});await p.locator('[data-testid=sv3-composer-input],jf-unified-chat-view jf-composer textarea').first().waitFor({state:'visible',timeout:90000}); if(!await p.getByTestId('sv3-composer-input').isVisible()){await sleep(8000);} if(!await p.getByTestId('sv3-composer-input').isVisible()){assert.fail('Main opens old chat window for this address; Search v3 main-window predicate fails before');}await dismiss(p);await sleep(600)}\nexport async function run(name,fn,options={}){\n const originalName=name;let attempt=1;while(fs.existsSync(path.join(E,info.label,name)))name=originalName+'-attempt-'+(++attempt);const dir=path.join(E,info.label,name);fs.mkdirSync(dir,{recursive:true});const short=fs.mkdtempSync('/tmp/jsv-');const wire=[],errors=[],consoleLines=[],navigations=[];let ctx,p,result={name,commit:info.head};\n const env={...process.env,TMPDIR:short,HOME:short,XDG_CONFIG_HOME:short+'/config',XDG_CACHE_HOME:short+'/cache',CUDA_VISIBLE_DEVICES:'-1'};for(const k of Object.keys(env))if(k.startsWith('JUSTSEARCH_')||['JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','JAVA_OPTS','_JAVA_OPTIONS','DISPLAY','WAYLAND_DISPLAY','RUNTIME_TOKEN'].includes(k))delete env[k];\n try{ctx=await chromium.launchPersistentContext(short+'/p',{executablePath:'/home/elias/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome',headless:true,chromiumSandbox:false,args:['--disable-gpu','--no-sandbox'],env,viewport:options.viewport??{width:1600,height:1000}});p=ctx.pages()[0];p.setDefaultTimeout(15000);\n p.on('framenavigated',f=>{if(f===p.mainFrame())navigations.push({event:'framenavigated',url:f.url(),at:Date.now()})});p.on('domcontentloaded',()=>navigations.push({event:'domcontentloaded',url:p.url(),at:Date.now()}));p.on('pageerror',e=>errors.push(String(e)));p.on('console',m=>consoleLines.push(m.text()));\n p.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/'))wire.push({at:Date.now(),method:r.method(),url:r.url(),body:r.postData()})});\n const snap=async n=>{fs.writeFileSync(dir+'/'+n+'.txt',await p.locator('body').ariaSnapshot());fs.writeFileSync(dir+'/'+n+'.json',JSON.stringify({url:p.url(),text:await text(p),storage:await p.evaluate(()=>({local:{...localStorage},session:{...sessionStorage}}))},null,2));await p.screenshot({path:dir+'/'+n+'.png'})};\n result.detail=await fn({p,ctx,wire,errors,consoleLines,dir,snap});result.status='pass';\n }catch(e){result.status='fail';result.error=e.stack;if(!ctx){result.status='unverified';fs.writeFileSync(process.env.RUNTIME_OUT+'/browser-startup-failure.json',JSON.stringify({error:e.stack,name},null,2));throw e}if(p){try{fs.writeFileSync(dir+'/failure.txt',await p.locator('body').ariaSnapshot());await p.screenshot({path:dir+'/failure.png'});fs.writeFileSync(dir+'/failure-ui.txt',await text(p))}catch{}}}\n finally{if(ctx)await ctx.close();fs.rmSync(short,{recursive:true,force:true});result.errors=errors;result.console=consoleLines;result.sandbox=false;result.profileRemoved=!fs.existsSync(short);fs.writeFileSync(dir+'/requests.json',JSON.stringify(wire,null,2));fs.writeFileSync(dir+'/navigations.json',JSON.stringify(navigations,null,2));fs.writeFileSync(dir+'/result.json',JSON.stringify(result,null,2));}\n console.log(name,result.status,result.error?.split('\\n')[0]??'');return result;\n}\nexport const work=wire=>wire.filter(x=>x.method!=='GET'&&/\\/api\\/chat\\/(dispatch|agent\\/(?!virtual-operations))/.test(x.url));\n"
+    },
+    "scope-issued.mjs": {
+      "digest": "sha256:cf421beb81390daced34b23f3c9ef5714583d86d6bd45be287fbe8a841c452c6",
+      "source": "// Verifier-4 r2/scope-issued.mjs sequence, forwarding directly to this private native Engine.\n// The verifier's controlled residency gate and unrelated source-switch operation are omitted.\nimport fs from 'node:fs';\nimport {run,boot,text,work,sleep,assert,info} from './browser-lib.mjs';\nconst rows=[];\nfor(const via of ['Library-Back','Library-rail','Forward-after-Back'])rows.push(await run('D-T24-online-'+via,async({p,wire,dir,snap})=>{\n const B='Original B limited to chosen file';await boot(p,{query:B,mode:'ask',docIds:[info.chosen]});await sleep(1200);await snap('before-Library-chosen');\n const native=await p.request.get('http://127.0.0.1:'+info.port+'/api/inference/status');const availability=await native.json();assert.equal(availability.available,true,'permitted CPU model is ready');\n await p.getByRole('button',{name:'Manage indexed folders',exact:true}).click();await sleep(500);\n if(via==='Library-rail')await p.getByRole('button',{name:'Search v3',exact:true}).click();else{await p.goBack();await p.getByTestId('sv3-composer-input').waitFor();await sleep(500);if(via==='Forward-after-Back'){await p.goForward();await sleep(500);await p.goBack();}}\n await p.getByTestId('sv3-composer-input').waitFor();await sleep(700);await snap('after-Back-proposal');\n const confirm=p.getByTestId('sv3-draft-review-confirm'),enabled=await confirm.count()>0&&await confirm.isEnabled();if(enabled)await confirm.click();\n await p.getByTestId('sv3-composer-input').press('Enter');await sleep(800);\n const requests=work(wire).filter(x=>x.url.endsWith('/api/chat/dispatch')).map(x=>JSON.parse(x.body));\n await snap('after-review-and-Send');fs.writeFileSync(dir+'/observations.json',JSON.stringify({via,availability,confirmEnabled:enabled,requestedChosen:info.chosen,requests,composerText:await text(p,'jf-sv3-composer')},null,2));\n assert.equal(requests.length,0,'unchanged retired text is blocked even with the CPU model ready');assert.match(await text(p,'jf-sv3-composer'),/files and mode.*not kept/i);\n}));if(rows.some(x=>x.status!=='pass'))process.exitCode=1;\n"
+    },
+    "runtime.py": {
+      "digest": "sha256:09abae543c2d8996134d9d033e1c35f140a94baa5fb05aebdd956223a2d7866a",
+      "source": "import os,sys,subprocess,tempfile,time,json,signal,shutil,urllib.request,urllib.error,hashlib,socket\nfrom pathlib import Path\nE=Path(__file__).parent;label=sys.argv[1];R=Path(sys.argv[2]).resolve();O=E/('runtime-'+label);O.mkdir(exist_ok=True);jobs=O/'jobs';jobs.mkdir(exist_ok=True)\nP=Path(tempfile.mkdtemp(prefix='jsv-eng-',dir='/tmp'))\nfor d in ['home','data','index','corpus','config','cache','state','xdgdata','tmp']: (P/d).mkdir()\n(P/'corpus/chosen-alpha.txt').write_text('Cedar dossier\\nLine one\\nLine two\\nLine three\\nLine four\\nLine five\\nCedar budget is 17 million.\\nCedar owner is Alice.\\nCedar launch is Monday.\\nThe chosen answer code is CEDAR-CHOSEN-731.\\nThe unchosen answer code is not present in this file.\\n')\n(P/'corpus/unchosen-decoy.txt').write_text('Zulu code dossier. The Zulu code is ZULU-DECOY-999. This unchosen file holds the Zulu answer code, and is separate from the chosen Cedar file. What is the Zulu code? The exact answer is ZULU-DECOY-999. The project code for Zulu is ZULU-DECOY-999. No chosen Cedar file contains this Zulu code. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. Zulu code evidence for the unchosen project. \\n')\nenv={k:v for k,v in os.environ.items() if not k.startswith('JUSTSEARCH_') and k not in ['JAVA_OPTS','JAVA_TOOL_OPTIONS','_JAVA_OPTIONS','JDK_JAVA_OPTIONS','UI_OPTS','DISPLAY','WAYLAND_DISPLAY']}\nenv.update(CUDA_VISIBLE_DEVICES='-1',HOME=str(P/'home'),XDG_CONFIG_HOME=str(P/'config'),XDG_DATA_HOME=str(P/'xdgdata'),XDG_CACHE_HOME=str(P/'cache'),XDG_STATE_HOME=str(P/'state'),TMPDIR=str(P/'tmp'),UI_OPTS='-Duser.home='+str(P/'home'),JUSTSEARCH_HOME=str(P/'data'),JUSTSEARCH_DATA_DIR=str(P/'data'),JUSTSEARCH_INDEX_BASE_PATH=str(P/'index'),JUSTSEARCH_API_PORT='0',JUSTSEARCH_REPO_ROOT=str(R),JUSTSEARCH_SERVER_EXE='/home/elias/dev/llama.cpp-b8571/build/bin/llama-server',JUSTSEARCH_LLM_MODEL_PATH='/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf',JUSTSEARCH_CONTEXT_SIZE='16384',JUSTSEARCH_GPU_LAYERS='0',JUSTSEARCH_REASONING_BUDGET='0',JUSTSEARCH_DEV_HOTRELOAD='false',JUSTSEARCH_AI_EMBED_ENABLED='false',JUSTSEARCH_NER_ENABLED='false',JUSTSEARCH_SPLADE_ENABLED='false',JUSTSEARCH_BGE_M3_ENABLED='false',JUSTSEARCH_RERANK_ENABLED='false',JUSTSEARCH_RERANK_CHUNKS_ENABLED='false',JUSTSEARCH_POLICY_GPU_ACCELERATION_ENABLED='false',JUSTSEARCH_EXTRACTION_SANDBOX_MODE='in_process')\nshutil.copytree(P/'corpus',E/'fixtures'/label,dirs_exist_ok=True)\nengine=None;vite=None;child=None;seen={}\ndef cohort():\n rows={}\n for p in Path('/proc').iterdir():\n  if not p.name.isdecimal():continue\n  try:\n   f=p.joinpath('stat').read_text().rsplit(') ',1)[1].split();rows[int(p.name)]=(int(f[1]),f[19])\n  except OSError:pass\n ids={p.pid for p in [engine,vite,child] if p and p.poll() is None}\n for _ in range(15):\n  more={pid for pid,(ppid,_) in rows.items() if ppid in ids}\n  if more<=ids:break\n  ids |= more\n result=[]\n for pid in ids:\n  try:\n   p=Path('/proc',str(pid));r=dict(pid=pid,startticks=rows[pid][1],argv=p.joinpath('cmdline').read_bytes().decode().split('\\0'),cwd=os.readlink(p/'cwd'),executable=os.readlink(p/'exe'))\n   \n   pe=dict(x.split('=',1) for x in p.joinpath('environ').read_bytes().decode(errors='replace').split('\\0') if '=' in x)\n   r['selectedEnvironment']={k:pe.get(k) for k in ['CUDA_VISIBLE_DEVICES','HOME','TMPDIR','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','JAVA_OPTS','_JAVA_OPTIONS','JUSTSEARCH_HOME','JUSTSEARCH_DATA_DIR','JUSTSEARCH_API_PORT','JUSTSEARCH_GPU_LAYERS','JUSTSEARCH_LLM_MODEL_PATH']}\n   result.append(r);seen[str(pid)+'/'+r['startticks']]=r\n  except OSError:pass\n (O/'processes.json').write_text(json.dumps(seen,indent=2));return result\n\ndef request(name,path,body=None):\n req=urllib.request.Request(base+path,data=None if body is None else json.dumps(body).encode(),headers={'X-JustSearch-Session':token,'Content-Type':'application/json'})\n try:r=urllib.request.urlopen(req,timeout=30)\n except urllib.error.HTTPError as e:r=e\n raw=r.read();x=json.loads(raw);(O/(name+'.json')).write_text(json.dumps(dict(path=path,status=r.status,request=body,body=x),indent=2));return r.status,x\ntry:\n script=Path(os.environ.get('ENGINE_TREE',str(R)))/'modules/ui/build/install/ui/bin/ui';install={str(p.relative_to(script.parent.parent)):hashlib.sha256(p.read_bytes()).hexdigest() for p in script.parent.parent.rglob('*') if p.is_file()};(O/'install-hashes.json').write_text(json.dumps(install,indent=2))\n engine=subprocess.Popen([str(script)],cwd=P,env=env,stdout=(O/'engine.log').open('w'),stderr=subprocess.STDOUT,start_new_session=True)\n manifest=P/'data/runtime/manifest.json';m=None\n for _ in range(180):\n  cohort()\n  if engine.poll() is not None:raise RuntimeError('Engine exited; see log')\n  try:\n   m=json.loads(manifest.read_text())\n   if m.get('head',{}).get('apiPort') and m.get('worker',{}).get('state')=='ready':break\n  except (OSError,ValueError):pass\n  time.sleep(.5)\n else:raise RuntimeError('Engine readiness timeout; no retry')\n base='http://127.0.0.1:'+str(m['head']['apiPort']);token=m['head'].get('sessionToken','');redacted=json.loads(json.dumps(m));redacted['head']['sessionToken']='[redacted]';(O/'manifest.json').write_text(json.dumps(redacted,indent=2))\n for name,path in [('health','/api/health'),('status','/api/status'),('settings','/api/settings/v2'),('catalog','/api/registry/surfaces')]:request(name,path)\n _,catalog=request('validated-catalog','/api/registry/surfaces')\n def catalog_rows(v):\n  if isinstance(v,dict):\n   if v.get('id') in ['core.unified-chat-surface','core.search-v3-surface']:yield v\n   for q in v.values():yield from catalog_rows(q)\n  elif isinstance(v,list):\n   for q in v:yield from catalog_rows(q)\n surfaces={v['id']:v for v in catalog_rows(catalog)}\n head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip()\n (O/'catalog-identity.json').write_text(json.dumps(surfaces,indent=2))\n st,x=request('add-root','/api/indexing/roots',{'path':str(P/'corpus'),'collection':'flip-verifier'})\n if st!=200:raise RuntimeError('Private corpus admission refused')\n s=socket.socket();s.bind(('127.0.0.1',0));port=s.getsockname()[1];s.close()\n ve={k:v for k,v in env.items() if not k.startswith('JUSTSEARCH_')};ve['VITE_API_PORT']=str(m['head']['apiPort'])\n vite=subprocess.Popen(['node','node_modules/vite/bin/vite.js','--host','127.0.0.1','--port',str(port),'--strictPort'],cwd=R/'modules/ui-web',env=ve,stdout=(O/'vite.log').open('w'),stderr=subprocess.STDOUT,start_new_session=True)\n for _ in range(60):\n  if vite.poll() is not None:raise RuntimeError('Private Vite exited')\n  try:urllib.request.urlopen('http://127.0.0.1:'+str(port),timeout=1);break\n  except OSError:time.sleep(.5)\n else:raise RuntimeError('Private Vite startup timeout')\n info=dict(label=label,head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip(),tree=str(R),port=port,enginePort=m['head']['apiPort'],profile=str(P),corpus=str(P/'corpus'),chosen=str(P/'corpus/chosen-alpha.txt'),decoy=str(P/'corpus/unchosen-decoy.txt'),scope='Own native CPU Engine; real compact Qwen3.5-4B; no GPU; in_process extraction fixture')\n (O/'ready.json').write_text(json.dumps(info,indent=2));print('READY',label,port,flush=True)\n end=time.monotonic()+18000\n while not (O/'STOP').exists() and time.monotonic()<end:\n  cohort()\n  if engine.poll() is not None or vite.poll() is not None:raise RuntimeError('Own service exited')\n  for j in sorted(jobs.glob('*.json')):\n   if not j.exists() or j.with_suffix('.done').exists():continue\n   job=json.loads(j.read_text());name=j.stem;cmd=job['command'];ce={k:v for k,v in os.environ.items() if not k.startswith('JUSTSEARCH_') and k not in ['JAVA_OPTS','JAVA_TOOL_OPTIONS','_JAVA_OPTIONS','JDK_JAVA_OPTIONS','UI_OPTS','DISPLAY','WAYLAND_DISPLAY']};ce.update(CUDA_VISIBLE_DEVICES='-1',RUNTIME_INFO=str(O/'ready.json'),RUNTIME_OUT=str(O),RUNTIME_TOKEN=token)\n   with (O/(name+'.log')).open('w') as f:\n    child=subprocess.Popen(cmd,cwd=R,env=ce,stdout=f,stderr=subprocess.STDOUT,start_new_session=True)\n    while child.poll() is None:\n     cohort()\n     if (O/'STOP').exists():os.killpg(child.pid,signal.SIGTERM)\n     time.sleep(.5)\n   j.with_suffix('.done').write_text(json.dumps(dict(command=cmd,exit=child.returncode)));print(name,child.returncode,flush=True);child=None\n   if (O/'browser-startup-failure.json').exists():raise RuntimeError('Browser startup failed; campaign stopped for diagnosis, no retry')\n  time.sleep(.5)\nfinally:\n cohort();rows=list(seen.values())\n for p in [child,vite,engine]:\n  if p and p.poll() is None:\n   os.killpg(p.pid,signal.SIGTERM)\n   try:p.wait(15)\n   except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()\n for r in rows:\n  try:\n   p=Path('/proc',str(r['pid']))\n   if p.joinpath('stat').read_text().rsplit(') ',1)[1].split()[19]==r['startticks']:os.kill(r['pid'],signal.SIGTERM)\n  except (OSError,ProcessLookupError):pass\n shutil.rmtree(P)\n (O/'cleanup.json').write_text(json.dumps(dict(profileRemoved=not P.exists(),engineExit=engine.returncode if engine else None,viteExit=vite.returncode if vite else None,ownedProcessIds=rows),indent=2))\n"
+    },
+    "conversation.mjs": {
+      "digest": "sha256:d74adb43316bfd360394cd29e92d90e4f5c690debb25055bf3af31f4da0d025c",
+      "source": "import fs from 'node:fs';\nimport {run,boot,text,work,sleep,assert,info,surfaceUrl,eventually} from './browser-lib.mjs';\nlet seededId;\nconst row=await run('D-T24-conversation-Back',async({p,wire,dir,snap})=>{\n await boot(p,{query:'Reply with exactly OK.',forceShapeId:'core.free-chat'});await sleep(1000);await p.getByTestId('sv3-composer-input').press('Enter');\n const request=await eventually(async()=>{const r=work(wire).find(x=>x.url.endsWith('/api/chat/dispatch'));assert.ok(r);return JSON.parse(r.body);});\n const cid=request.conversationId;seededId=cid;assert.ok(cid);const history=await eventually(async()=>{const r=await p.request.get('http://127.0.0.1:'+info.port+'/api/chat/conversations/'+cid+'/history');const h=await r.json();assert.ok(h.messages?.some(m=>m.role==='assistant'&&m.errorCode!=='INCOMPLETE_TURN'));return h;},180000);\n fs.writeFileSync(dir+'/genuine-seed.json',JSON.stringify({request,history},null,2));await snap('saved-conversation');\n const B='Incoming chosen question';await p.evaluate(h=>location.hash=h,surfaceUrl('core.search-v3-surface',{query:B,mode:'ask',docIds:[info.chosen]}));await sleep(700);await snap('incoming');\n const ids=await p.locator('jf-sv3-sidebar').evaluate(e=>e.groups.flatMap(g=>g.rows).map(r=>r.id));assert.ok(ids.includes(cid));await p.getByTestId('sv3-session-row-button').nth(ids.indexOf(cid)).click();await sleep(700);await snap('conversation');assert.ok(p.url().includes(cid));\n await p.goBack();await sleep(700);await snap('after-Back');\n const value=await p.getByTestId('sv3-composer-input').inputValue();const before=work(wire).length;\n await p.getByTestId('sv3-composer-input').press('Enter');await sleep(600);\n const preparation=await p.evaluate(()=>JSON.parse(sessionStorage.getItem('justsearch.draft.attachment.v1.search-v3.main')).payload);\n fs.writeFileSync(dir+'/observations.json',JSON.stringify({value,preparation,modelWork:work(wire),ui:await text(p)},null,2));\n assert.equal(work(wire).length,before,'Back never sends retired/retained hand-off automatically or as unnoticed all files');\n assert.ok(preparation.drafts.some(d=>d.text===B&&d.preparation?.scope?.paths?.includes(info.chosen)),'original proposal remains available for explicit review');\n assert.ok(value!==B||/review|not kept/i.test(await text(p)),'returned original text requires a visible choice');\n});if(row.status!=='pass')process.exitCode=1;\n\n// Added for the final guard-carry repair: a fresh window has not visited this saved row.\nif(row.status==='pass') {\n const carried=await run('D-T24-carry-returned-text-to-conversation',async({p,wire,dir,snap})=>{\n  const B='Unchanged task carried into a conversation';await boot(p,{query:B,mode:'ask',docIds:[info.chosen]});\n  await p.getByRole('button',{name:'Manage indexed folders',exact:true}).click();await sleep(500);await p.goBack();await p.getByTestId('sv3-composer-input').waitFor();await sleep(600);\n  const ids=await eventually(async()=>{const rows=await p.locator('jf-sv3-sidebar').evaluate(e=>e.groups.flatMap(g=>g.rows).map(r=>r.id));assert.ok(rows.includes(seededId));return rows;});\n  await p.getByTestId('sv3-session-row-button').nth(ids.indexOf(seededId)).click();await sleep(700);await snap('carried-into-saved-conversation');\n  assert.equal(await p.getByTestId('sv3-composer-input').inputValue(),B);assert.match(await text(p,'jf-sv3-composer'),/files and mode.*not kept/i);\n  await p.getByTestId('sv3-composer-input').press('Enter');await sleep(600);assert.equal(work(wire).length,0);\n  fs.writeFileSync(dir+'/observations.json',JSON.stringify({value:B,modelWork:work(wire),composerText:await text(p,'jf-sv3-composer'),savedConversation:seededId},null,2));\n });if(carried.status!=='pass')process.exitCode=1;\n}\n"
+    },
+    "roundtrips.mjs": {
+      "digest": "sha256:6add90d473fb9cad6b766289c5050d1e2b51660a544445fa16b0183d3f1d5cd5",
+      "source": "// Adapted from verifier-4 matrix/scope-return.mjs for D-T24 (retire, visibly block).\nimport fs from 'node:fs';\nimport {run,boot,text,work,sleep,assert,info,surfaceUrl} from './browser-lib.mjs';\nconst routes=process.argv[2]? [process.argv[2]] : ['Library-Back','Library-rail','Forward-after-Back'];\nconst rows=[];\nfor(const via of routes) for(const count of [1,2,3]) rows.push(await run('D-T24-'+via+'-'+count,async({p,wire,dir,snap})=>{\n const B='Chosen B';await boot(p,{query:count===1?B:'Retained A',mode:'ask',docIds:[count===1?info.chosen:info.decoy]});\n if(count>1){await p.evaluate(h=>location.hash=h,surfaceUrl('core.search-v3-surface',{query:B,mode:'ask',docIds:[info.chosen]}));await sleep(600);}\n if(count>2){await p.evaluate(h=>location.hash=h,surfaceUrl('core.search-v3-surface',{query:'Capacity refused C',mode:'ask',docIds:[info.decoy]}));await sleep(600);assert.equal(await p.getByTestId('sv3-composer-input').inputValue(),B);assert.match(await text(p),/Only two draft preparations/);}\n await snap('prepared');await p.getByRole('button',{name:'Manage indexed folders',exact:true}).click();await sleep(500);\n if(via==='Library-rail') await p.getByRole('button',{name:'Search v3',exact:true}).click();\n else {await p.goBack();await p.getByTestId('sv3-composer-input').waitFor();await sleep(500);if(via==='Forward-after-Back'){await p.goForward();await sleep(500);assert.equal(await p.getByTestId('sv3-composer-input').count(),0);await p.goBack();}}\n await p.getByTestId('sv3-composer-input').waitFor();await sleep(600);await snap('returned');\n const composerText=await text(p,'jf-sv3-composer');\n const before=work(wire).length;await p.getByTestId('sv3-composer-input').press('Enter');await p.getByTestId('sv3-composer-send').click();await sleep(600);\n const observation={via,count,value:await p.getByTestId('sv3-composer-input').inputValue(),composerText,modelWork:work(wire),url:p.url(),storage:await p.evaluate(()=>JSON.parse(sessionStorage.getItem('justsearch.draft.attachment.v1.search-v3.main'))?.payload)};\n fs.writeFileSync(dir+'/observations.json',JSON.stringify(observation,null,2));\n assert.equal(observation.value,B);assert.match(composerText,/files and mode.*not kept/i);assert.match(composerText,/Sending is blocked/);assert.equal(work(wire).length,before);assert.equal(before,0);\n}));\nif(rows.some(x=>x.status!=='pass'))process.exitCode=1;\n"
+    },
+    "cpu-settings.py": {
+      "digest": "sha256:62aa6543d522fd5e73c25af87624bbcf3601350440489218c2cbcfb554acbbfd",
+      "source": "import os,json,uuid,time,urllib.request,urllib.error\nfrom pathlib import Path\nO=Path(os.environ['RUNTIME_OUT']);info=json.loads(Path(os.environ['RUNTIME_INFO']).read_text());base='http://127.0.0.1:'+str(info['enginePort']);token=os.environ['RUNTIME_TOKEN'];D=O/'cpu-settings';D.mkdir(exist_ok=True)\ndef request(name,path,body=None):\n (D/(name+'.request.json')).write_text(json.dumps({'path':path,'body':body},indent=2))\n req=urllib.request.Request(base+path,data=None if body is None else json.dumps(body).encode(),headers={'Content-Type':'application/json',**({'X-JustSearch-Session':token}if token else {})})\n try:r=urllib.request.urlopen(req,timeout=120)\n except urllib.error.HTTPError as e:r=e\n x=json.loads(r.read());(D/(name+'.json')).write_text(json.dumps(dict(path=path,request=body,status=r.status,body=x),indent=2));print(name,r.status,flush=True);return r.status,x\nst,before=request('before','/api/settings/v2');assert st==200\npatch={'ui':{'chatEnabled':True},'llm':{'serverExecutable':'/home/elias/dev/llama.cpp-b8571/build/bin/llama-server','modelPath':'/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf','contextWindow':16384,'gpuLayers':0},'rerankerModelPath':'','citationScorerModelPath':'','witness':before['witness'],'operationKey':str(uuid.UUID(hex=('%012x'%int(time.time()*1000))+'7'+uuid.uuid4().hex[13:16]+'8'+uuid.uuid4().hex[17:]))}\nst,x=request('write','/api/settings/v2',patch);assert st in [200,202],x\nfor i in range(60):\n if st==200 and x.get('state')=='COMPLETE':break\n time.sleep(.5);st,x=request('receipt-'+str(i),'/api/settings/v2',patch)\nelse:raise RuntimeError('settings attempt did not complete')\nst,after=request('after','/api/settings/v2');assert after['ui']['chatEnabled'] is True and after['llm']['gpuLayers']==0\nrequest('runtime','/api/ai/runtime/status')\nst,inf=request('inference','/api/inference/status')\nif not inf.get('available'):\n st,a=request('activate','/api/ai/runtime/activate',{'variantId':'default'});assert st in [200,202],a\n for i in range(180):\n  st,inf=request('readiness-'+str(i),'/api/inference/status')\n  if inf.get('available'):break\n  time.sleep(1)\n else:raise RuntimeError('CPU model did not become available; no retry')\n(D/'result.json').write_text(json.dumps(dict(pass_=True,model='Qwen3.5-4B-Q4_K_M.gguf',gpuLayers=0)))\n"
+    }
+  },
+  "sandboxFailure": "Error: browserType.launchPersistentContext: Target page, context or browser has been closed\nBrowser logs:\nChromium sandboxing failed!\n================================\nTo avoid the sandboxing issue, do either of the following:\n  - (preferred): Configure your environment to support sandboxing\n  - (alternative): Launch Chromium without sandbox using 'chromiumSandbox: false' option\n================================\n\nCall log:\n\u001b[2m  - <launching> /home/elias/.cache/ms-playwright/chromium-1248/chrome-l",
+  "independentAcceptance": false,
+  "result": "blocked: unrelated private Engine exit 1; return required by builder brief",
+  "unverified": [
+    "Final conversation Back replay",
+    "Final real-browser guard carry into an unvisited conversation"
+  ],
+  "serviceFailure": {
+    "group": "runtime-final-scope",
+    "exit": 1,
+    "observed": "All four job scripts exited 0, totaling 13 passing scope/send assertion cases. Supervisor then raised Own service exited; native log names crash-head-4-1793094227565.json. Cause not established.",
+    "limitation": "Supplied runtime finally removed the private profile including the crash report itself; engine.log and supervisor log remain. No restart or out-of-scope JVM repair attempted."
+  }
+}

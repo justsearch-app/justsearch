@@ -1,0 +1,151 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T11:43:27.226Z",
+  "revision": "42f911cdba0c337acb1bd0a51ec033d1fe7459fa",
+  "tree": "0d2b60c1afc076cf981d82056f24235f392a4ed2",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/7zqv2x2u/tmp/test-intent-vitest-201-1793101399519.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7705
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary text by pointer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shown mode preserves ordinary text by pointer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary text by keyboard",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shown mode preserves ordinary text by keyboard",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary files by pointer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shown mode preserves ordinary files by pointer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary files by keyboard",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shown mode preserves ordinary files by keyboard",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary schema by pointer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shown mode preserves ordinary schema by pointer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary schema by keyboard",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shown mode preserves ordinary schema by keyboard",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#R3 shown Ask choice still ends retired hand-off block by pointer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3 shown Ask choice still ends retired hand-off block by pointer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#R3 shown Ask choice still ends retired hand-off block by keyboard",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3 shown Ask choice still ends retired hand-off block by keyboard",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:7d8e2c7af2179e917d030e7bd7515894193e166453f3408ee11ea95f947e7bbe"
+}

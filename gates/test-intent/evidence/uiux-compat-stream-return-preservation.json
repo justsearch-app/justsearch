@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T05:14:27.165Z",
+  "revision": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+  "tree": "b5de6200c8b96936cf6364bb65f002536887c061",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/r50zwz6b/tmp/test-intent-vitest-3-1793078062409.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4754
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a preservation one hand-off restores a streaming follow-up and chosen files",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:392e1ef7dc39aa77c9e03fde56d0a365e45c44d200a789ff07d26e855cb53b17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO8a preservation one hand-off restores a streaming follow-up and chosen files",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a preservation a third unretained edited draft still blocks departure without losing inputs",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:392e1ef7dc39aa77c9e03fde56d0a365e45c44d200a789ff07d26e855cb53b17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO8a preservation a third unretained edited draft still blocks departure without losing inputs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a preservation an empty destination still requires an acknowledged recovery write",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:392e1ef7dc39aa77c9e03fde56d0a365e45c44d200a789ff07d26e855cb53b17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO8a preservation an empty destination still requires an acknowledged recovery write",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:af6565c07b52210a9ae0aeaf69be62669e04bc5dc698599b7a65103ffa8d6629"
+}

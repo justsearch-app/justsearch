@@ -394,11 +394,13 @@ public final class ReadPathOps {
             // field has no DocValues in this segment
           }
         }
-        case "long", "boolean" -> {
+        case "long", "boolean", "double" -> {
           try {
             NumericDocValues dv = DocValues.getNumeric(leaf.reader(), def.id);
             if (dv != null && dv.advanceExact(docInLeaf)) {
-              out.put(def.id, Long.toString(dv.longValue()));
+              out.put(def.id, "double".equals(def.type)
+                  ? Double.toString(Double.longBitsToDouble(dv.longValue()))
+                  : Long.toString(dv.longValue()));
             }
           } catch (IllegalStateException ignored) {
             // field has no NumericDocValues in this segment

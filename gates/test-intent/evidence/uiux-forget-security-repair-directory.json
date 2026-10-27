@@ -2,13 +2,13 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:551a36c61d6a0a3c4a749bacda70f9c94eb0e4b46a62f050ad267c16d4babf92",
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
     "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
-    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-27T13:41:36.562Z",
-  "revision": "7a1196e180c667b774bd1623c65242888df1270e",
-  "tree": "6aa96c1ff2a7e747d2427891728f2382b12ec766",
+  "createdAt": "2026-10-27T15:50:25.382Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "d661d52c066f6f51a95d170d71bda2bc1c53873d",
   "environment": {
     "cudaVisibleDevices": "-1",
     "displayUnset": true,
@@ -26,17 +26,17 @@
       "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorExclusionStillCannotCertifyAProjectionOwner\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.allCommittedAckConsumersRetainAReplayedProjectionOwner\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorOperatorExclusionNeverInventsUiOmissionAuthority\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 88532,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-security-refresh-c04e6dec/run-3.log",
-      "outputDigest": "sha256:59dbeae23f62ceb2efdf5cb914661e97a9d6853137aaf1d03e6a739bf370e214"
+      "durationMs": 61000,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-security-9536809b/run-3.log",
+      "outputDigest": "sha256:bae7883ffb622bd5139d0683efa04a39c1acf5e18c24c1b417f90fc4d8d57bfc"
     },
     {
       "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest.declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority\" --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest.folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 142365,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-security-refresh-c04e6dec/run-4.log",
-      "outputDigest": "sha256:522a4fcc3bd8d79a315e80229c6a53592809f20cd04455e814aa1778f1c56351"
+      "durationMs": 12939,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-security-9536809b/run-4.log",
+      "outputDigest": "sha256:e0f4ece1bb56fefd7dee07973b42c4058d37a1248671a7cd8f3bcd188456e65b"
     }
   ],
   "checks": [
@@ -298,17 +298,17 @@
         "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorExclusionStillCannotCertifyAProjectionOwner\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.allCommittedAckConsumersRetainAReplayedProjectionOwner\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorOperatorExclusionNeverInventsUiOmissionAuthority\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-shared-clone>",
         "exitCode": 1,
-        "durationMs": 43527,
-        "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-security-refresh-c04e6dec/run-1.log",
-        "outputDigest": "sha256:3997cec48c3499160162fae7a4607a7864632250cb350ba100757b3eaa944fb5"
+        "durationMs": 41451,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-security-9536809b/run-1.log",
+        "outputDigest": "sha256:5cf295f9eadde39bfe60a775accca39f099fc16921bde937f3ae8c865c74da4e"
       },
       {
         "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest.declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority\" --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest.folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-shared-clone>",
         "exitCode": 1,
-        "durationMs": 3231,
-        "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-security-refresh-c04e6dec/run-2.log",
-        "outputDigest": "sha256:5d7e3350f6b3b04302d667e53dc4040d01a4a66a59ce06b9652809275c3b0001"
+        "durationMs": 56615,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-security-9536809b/run-2.log",
+        "outputDigest": "sha256:82d7b1525203f544aa09d9c0d0659a495c4616993bab3abd4ec2d53747685904"
       }
     ],
     "checks": [
@@ -375,9 +375,9 @@
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NativePolicyReplayBoundaryTest.java#folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot",
         "classification": "assertion",
-        "detail": "folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.io.IOException: Reconciliation walk could not read: /home/elias/.cache/am/3p9xfbor/tmp/evidence-before-security-refresh/before/modules/worker-services/build/tmp/test-jvm/test/junit-10502138759780838169/root/private"
+        "detail": "folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.io.IOException: Reconciliation walk could not read: /home/elias/.cache/am/4t4brn6h/tmp/evidence-before-security/before/modules/worker-services/build/tmp/test-jvm/test/junit-9523497181553879875/root/private"
       }
     ]
   },
-  "digest": "sha256:a728f01f1aa04ceca1c0bb9a6085186112193896fe73e34f60070c4f0374c32c"
+  "digest": "sha256:288770cd69f5c68a9695e940a9d7dd9b41aae727eacd0c2021ad5ade46041ecc"
 }

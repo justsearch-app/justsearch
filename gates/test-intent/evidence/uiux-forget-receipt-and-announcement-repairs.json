@@ -2,12 +2,17 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-25T22:46:53.525Z",
-  "revision": "3c127854fcb3f3d672c049861a723730de0503b7",
-  "tree": "8265e71889de2b26e4237f7d8be402bbedb4cbee",
+  "createdAt": "2026-10-27T15:06:31.310Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "2f0b31cb0cab5745312e13855ac83618b46d206a",
   "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
     "platform": "linux",
     "arch": "x64",
     "osRelease": "7.0.0-38-generic",
@@ -18,10 +23,12 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/api/domains/forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2227610-1792968407898.json\"",
+      "command": "npx vitest run --configLoader runner \"src/api/domains/forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-158-1793113584929.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1424
+      "durationMs": 1879,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-receipt-refresh-a3e7150a/run-2.log",
+      "outputDigest": "sha256:eadb8bb6c0c3c0b9cee5869d1960e907adc64dec743c5c18e9abcdb5a1bf6981"
     }
   ],
   "checks": [
@@ -171,25 +178,26 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/api/domains/forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2227610-1792968411650.json\"",
-        "cwd": "<before-worktree>",
+        "command": "npx vitest run --configLoader runner \"src/api/domains/forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-158-1793113589588.json\"",
+        "cwd": "<before-shared-clone>",
         "exitCode": 1,
-        "durationMs": 1563,
-        "output": "JSON report written to /tmp/test-intent-vitest-2227610-1792968411650.json\n\n"
+        "durationMs": 1718,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-receipt-refresh-a3e7150a/run-1.log",
+        "outputDigest": "sha256:ae27806521d9a41cf66a116b6eabde779122a791ddf7cf8fe059bb3f968b6cff"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/api/domains/forget.test.ts",
         "classification": "assertion",
-        "detail": "N56 'success' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' }):  AssertionError: expected 'COMPLETE' to be 'UNKNOWN' // Object.is equality\n    at /tmp/test-intent-before-eDV0gn/modules/ui-web/src/api/domains/forget.test.ts:134:26\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///tmp/test-intent-before-eDV0gn/modules/ui-web/ | N56 'success' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' }):  AssertionE"
+        "detail": "N56 'success' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' }):  AssertionError: expected 'COMPLETE' to be 'UNKNOWN' // Object.is equality\n    at /home/elias/.cache/am/4t4brn6h/tmp/evidence-before-receipt-refresh/before/modules/ui-web/src/api/domains/forget.test.ts:134:26\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///ho | N56 'success' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' }):  AssertionE"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
         "classification": "assertion",
-        "detail": "submits Add once while waiting and announces its outcome:  AssertionError: expected 'Unfinished forgets could not be read.…' to contain 'Folder added'\n    at /tmp/test-intent-before-eDV0gn/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:110:72\n    at file:///tmp/test-intent-before-eDV0gn/modules/ui-web/node_modules/@vitest/runner/dist | exposes row removal progress, suppresses repeats and keeps the other row usable:  AssertionError: expected 'Unfinished forgets could not b"
+        "detail": "submits Add once while waiting and announces its outcome:  AssertionError: expected 'Unfinished forgets could not be read.…' to contain 'Folder added'\n    at /home/elias/.cache/am/4t4brn6h/tmp/evidence-before-receipt-refresh/before/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:110:72\n    at file:///home/elias/.cache/am/4t4brn6h/tmp/ | exposes row removal progress, suppresses repeats and keeps the other row usable:  AssertionError: expected 'Unfinished forgets could not b"
       }
     ]
   },
-  "digest": "sha256:8588a226ca11e41f8b1d79687ce355a066f87618b40b8ea7982e26004436e869"
+  "digest": "sha256:89c92d467a45378c60f0d4c5cd9848b68be89b044a1319926f6cac749bf53bb8"
 }

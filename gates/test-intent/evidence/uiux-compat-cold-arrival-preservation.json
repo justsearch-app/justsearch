@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T03:41:05.194Z",
+  "revision": "b8312014746ce698335d8cceedee15ddaaf18636",
+  "tree": "90ebd8c259bd6db77087dd2f37384554bd550793",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5j29v6lc/tmp/test-intent-vitest-201-1793072461968.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3222
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 old text-only recovery remains reviewable after an incoming task",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 old text-only recovery remains reviewable after an incoming task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 preservation same raw bytes at a different place do not merge draft ownership",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 preservation same raw bytes at a different place do not merge draft ownership",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 preservation old text-only recovery loads without an incoming task and requires review",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 preservation old text-only recovery loads without an incoming task and requires review",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:366810fe544a16b153d9b6744df6620c0814939af023113a075efd3173173c15"
+}

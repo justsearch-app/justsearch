@@ -170,6 +170,15 @@
      const { project, task } = group[0].t;
      const run = sh(`${wrapper} ${project}:${task} ${filters.map((f) => `--tests ${JSON.stringify(f)}`).join(' ')} --rerun -PskipWebBuild=true --console=plain`, root);
      runs.push(run);
+@@ -198,7 +203,7 @@
+     const out = path.join(os.tmpdir(), `test-intent-vitest-${process.pid}-${Date.now()}.json`);
+     const files = [...new Set(ids.map((id) => checkFile(id).replace(/^modules\/ui-web\//, '')))];
+     const config = kind === 'lockdown' ? ' --config vitest.config.lockdown.ts' : '';
+-    const run = sh(`npx vitest run ${files.map((f) => JSON.stringify(f)).join(' ')}${config} --reporter=json --outputFile=${JSON.stringify(out)}`, path.join(root, 'modules', 'ui-web'));
++    const run = sh(`npx vitest run --configLoader runner ${files.map((f) => JSON.stringify(f)).join(' ')}${config} --reporter=json --outputFile=${JSON.stringify(out)}`, path.join(root, 'modules', 'ui-web'));
+     runs.push(run);
+     const parsed = fs.existsSync(out) ? parseVitestJson(fs.readFileSync(out, 'utf8')) : [];
+     fs.rmSync(out, { force: true });
 @@ -274,19 +279,7 @@
  }
  
@@ -233,7 +242,7 @@
 +    producer: {
 +      script: EVIDENCE_PRODUCER, scriptDigest: contentDigest(scriptText),
 +      adapterPatch: 'gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch',
-+      adaptation: 'Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only.'
++      adaptation: 'Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only.'
 +    },
      createdAt: new Date().toISOString(),
      revision: gitOut(['rev-parse', 'HEAD'], REPO_ROOT),

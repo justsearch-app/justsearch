@@ -39,8 +39,7 @@ public final class TextQualityAnalyzer {
     }
 
     // Check alphanumeric ratio
-    long alphaNum = text.chars().filter(Character::isLetterOrDigit).count();
-    double ratio = (double) alphaNum / text.length();
+    double ratio = getAlphanumericRatio(text);
     if (ratio < MIN_ALPHANUMERIC_RATIO) {
       return true;  // Too many garbage characters
     }
@@ -57,14 +56,23 @@ public final class TextQualityAnalyzer {
    * Returns the alphanumeric ratio of the given text.
    *
    * @param text the text to analyze
-   * @return ratio of alphanumeric characters (0.0 to 1.0), or 0.0 for null/empty
+   * @return ratio of letter/digit code points to all code points (0.0 to 1.0), or 0.0 for null/empty
    */
   public static double getAlphanumericRatio(String text) {
     if (text == null || text.isEmpty()) {
       return 0.0;
     }
-    long alphaNum = text.chars().filter(Character::isLetterOrDigit).count();
-    return (double) alphaNum / text.length();
+    int alphaNum = 0;
+    int total = 0;
+    for (int i = 0; i < text.length(); ) {
+      int codePoint = text.codePointAt(i);
+      if (Character.isLetterOrDigit(codePoint)) {
+        alphaNum++;
+      }
+      total++;
+      i += Character.charCount(codePoint);
+    }
+    return (double) alphaNum / total;
   }
 
   /**

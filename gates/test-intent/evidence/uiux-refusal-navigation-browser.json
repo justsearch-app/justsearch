@@ -1,0 +1,1248 @@
+{
+  "schema": "uiux-refusal-navigation-builder-browser.v1",
+  "recordedAt": "2026-10-27T06:13:51.550528+00:00",
+  "role": "builder; not independent acceptance",
+  "base": "cbde03ed952807b8ae1749707678b6f1eaf306b6",
+  "candidateFileDigests": {
+    "modules/ui-web/src/shell-v0/router/URLProjector.ts": "sha256:4514d831e8fd5b2a8c4f30cf9ed2e3559b257f8df029dfdebb1fe0944a93efcc",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts": "sha256:52fa9ed954adec3a8a3207b15cfd519bcc153a11ed9b0c5f5b72768f61dcc220",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4"
+  },
+  "reportFolder": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report",
+  "sources": "Verifier-2 scripts copied into private report folder; adapted runtime uses unchanged installed Engine with matching private Vite; history split so non-model and saved-record groups restart Engine. Native records authored with two completed UI Sends using only permitted compact Qwen CPU. No API mocks.",
+  "rule4": "Explicit fallback. Fresh refused native hash and accepted original pre-boot input entries have no ownership marker; optional ownership implementation withdrawn. URLSource remains byte-identical to baseline. Reload without immediate public-discard acceptance is not claimed repaired.",
+  "counts": {
+    "requestedBefore": {
+      "pass": 2,
+      "fail": 4
+    },
+    "requestedAfter": {
+      "pass": 6,
+      "fail": 0
+    },
+    "componentBefore": {
+      "pass": 109,
+      "fail": 5
+    },
+    "componentAfter": {
+      "pass": 114,
+      "fail": 0
+    },
+    "fullUnit": {
+      "files": 647,
+      "pass": 8252,
+      "fail": 0
+    },
+    "uiGates": {
+      "pass": 28,
+      "fail": 0
+    }
+  },
+  "cases": [
+    {
+      "scenario": "S77",
+      "case": "capacity-refusal-reload",
+      "before": {
+        "status": "fail",
+        "checks": {
+          "secondAccepted": true,
+          "genuineReason": true,
+          "refusedTextKept": true,
+          "oldCurrentKept": true,
+          "reloadAccepts": false,
+          "retainedSecond": true,
+          "noFalseRefusalAfter": true,
+          "noAuto": true
+        },
+        "stages": {
+          "accepted": {
+            "value": "Second unsent draft"
+          },
+          "refused": {
+            "value": "Second unsent draft",
+            "url": "sha256:2589cef056829663add52a7dfa4ab5a99468be27c033ca19a956f821ba33ac2e"
+          },
+          "recovered": {
+            "value": "Second unsent draft",
+            "url": "sha256:94748f195652e72c2917e460366acd8f4e4e27df445c5b8b1e6f0e1fede00103"
+          }
+        },
+        "nativeRequests": {
+          "total": 72,
+          "dispatches": 0,
+          "knowledgeSearches": 0,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/before-capacity/capacity-refusal-reload",
+        "observationsDigest": "sha256:1cda5c663d348781f8caca5d08a8d94af7c3d16ba2df8f0225ff493c289acc9f",
+        "requestsDigest": "sha256:8e808d28a89f6e67fce89984a89b736011d2a8e70d5c3e2bac0ebcc9ac58ee76",
+        "resultDigest": "sha256:d165acb257582c414b3cae5b787269370c724ac93bca590f0d19176b460ead90",
+        "screenshots": {
+          "freed-capacity.png": "sha256:b1e9d8ddbd7143edbe84121b618ddbba3ffd66486db02f8d834dc870c1b1e8bb",
+          "recovered.png": "sha256:0316ae64ed98f13e3a10e0424477ea82e42a555efb06ba6f97aa90fb79760fb9",
+          "failure.png": "sha256:0316ae64ed98f13e3a10e0424477ea82e42a555efb06ba6f97aa90fb79760fb9",
+          "refused.png": "sha256:41503e842f951112000d7768ba54b68893170ae5d55512479bc7207732559417"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      },
+      "after": {
+        "status": "pass",
+        "checks": {
+          "secondAccepted": true,
+          "genuineReason": true,
+          "refusedTextKept": true,
+          "oldCurrentKept": true,
+          "reloadAccepts": true,
+          "retainedSecond": true,
+          "noFalseRefusalAfter": true,
+          "noAuto": true
+        },
+        "stages": {
+          "accepted": {
+            "value": "Second unsent draft"
+          },
+          "refused": {
+            "value": "Second unsent draft",
+            "url": "sha256:5fe0fea00e34dc0cd3278aa24c37a41de5af05d3ae54efb503104bfbe0135e4e"
+          },
+          "recovered": {
+            "value": "Third task to recover after freeing capacity",
+            "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c"
+          }
+        },
+        "nativeRequests": {
+          "total": 72,
+          "dispatches": 0,
+          "knowledgeSearches": 0,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/final-after-capacity/capacity-refusal-reload",
+        "observationsDigest": "sha256:3bc2631066784470e5927df2b0fd48d35cf1dd6207c963aa398a1771430d4cea",
+        "requestsDigest": "sha256:35b9e6f268f8c6aa81c04d4d637b0d537725fc2e51dd4317100622e55ec2649a",
+        "resultDigest": "sha256:f35691d2670dc371ca4e0bc125b58ffe52bd666f6dad8e4b6dc7c6d725f2c2f5",
+        "screenshots": {
+          "freed-capacity.png": "sha256:e9e254f1ad2b988e2cefb051f9bbe399618d5a2a1d74b39a7da2c4b9c6bb87cc",
+          "recovered.png": "sha256:2a00657bd1126a7c96693e0d32e4dfe4ef01e1b3f2474419f55d7d14f9e02287",
+          "refused.png": "sha256:7d660094e5ad2667fcbe9642f4f797f8588ddfdc9d083d0781dd8e1a8bc0e33c"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      }
+    },
+    {
+      "scenario": "S79",
+      "case": "refused-handoff-navigation",
+      "before": {
+        "status": "fail",
+        "checks": {
+          "realRefusal": true,
+          "incomingRetained": true,
+          "conversationAAddress": false,
+          "conversationBAddress": false,
+          "backAddress": false,
+          "forwardAddress": true,
+          "laterValid": true,
+          "noAuto": true
+        },
+        "stages": {
+          "refused": {
+            "composer": "Small existing draft",
+            "url": "sha256:be1a9fb74a0f46675e85de71c222b8e37fc084759bc0ea20f68e20f67880d06e"
+          },
+          "first": {
+            "composer": "",
+            "url": "sha256:be1a9fb74a0f46675e85de71c222b8e37fc084759bc0ea20f68e20f67880d06e"
+          },
+          "second": {
+            "composer": "",
+            "url": "sha256:be1a9fb74a0f46675e85de71c222b8e37fc084759bc0ea20f68e20f67880d06e"
+          },
+          "back": {
+            "composer": "",
+            "url": "sha256:1ed23b3f6ca8cfcc5be6bfddc8948c3496d71ca09a2616c8951efb0a02c6c8da"
+          },
+          "forward": {
+            "composer": "",
+            "url": "sha256:be1a9fb74a0f46675e85de71c222b8e37fc084759bc0ea20f68e20f67880d06e"
+          },
+          "laterState": {
+            "composer": "Later valid task is accepted",
+            "url": "sha256:1ed23b3f6ca8cfcc5be6bfddc8948c3496d71ca09a2616c8951efb0a02c6c8da"
+          }
+        },
+        "nativeRequests": {
+          "total": 55,
+          "dispatches": 0,
+          "knowledgeSearches": 0,
+          "conversationHistoryUrls": [
+            "http://127.0.0.1:46291/api/chat/conversations/uc-0f87cae3-c175-416a-8eba-7f0929e029a1/history",
+            "http://127.0.0.1:46291/api/chat/conversations/uc-a3ac01e2-c17f-4f80-9aee-4b1ecc478510/history"
+          ]
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/before-navigation/refused-handoff-navigation",
+        "observationsDigest": "sha256:776fa355e58bdd8fec91eaa817ce38a5b7602910890abd6c48cca846066f3b99",
+        "requestsDigest": "sha256:f4d7283fe2dc62a00408a863303d05a16e1a3cf2034d7692b461192f08af0ad2",
+        "resultDigest": "sha256:764e4675fccceba7da8b3589e9bbc240fd4814ca3ec1853933f07528f0a985ff",
+        "screenshots": {
+          "conversation-a.png": "sha256:29b7439e6480694ed6e55c16b387c7d3448f4295cf7fbc537c6456a8329efae2",
+          "forward.png": "sha256:ee616acd89c9b9449db29558a143e30661a1b3b937d88bd9d558040764b8427c",
+          "conversation-b.png": "sha256:514e75c0defad404b570de52e8c634fcb368daaf44cd2e71f87cc757bf6a419d",
+          "failure.png": "sha256:5dd5d38ebe37b9f8cfdb6f96f3584db0e5b3f2ea416815decbbd57447120b277",
+          "back.png": "sha256:ee616acd89c9b9449db29558a143e30661a1b3b937d88bd9d558040764b8427c",
+          "refused.png": "sha256:8fc7c656313c505ae058d00fc296124e680f213d7a343ac8e3e625d098a03558",
+          "later-valid.png": "sha256:5dd5d38ebe37b9f8cfdb6f96f3584db0e5b3f2ea416815decbbd57447120b277"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      },
+      "after": {
+        "status": "pass",
+        "checks": {
+          "realRefusal": true,
+          "incomingRetained": true,
+          "conversationAAddress": true,
+          "conversationBAddress": true,
+          "backAddress": true,
+          "forwardAddress": true,
+          "laterValid": true,
+          "noAuto": true
+        },
+        "stages": {
+          "refused": {
+            "composer": "Small existing draft",
+            "url": "sha256:e33ac1ad9e2a873cb13b8cc075a4dd9d5d6431ff0afc61253ebeb898b6010d4e"
+          },
+          "first": {
+            "composer": "",
+            "url": "sha256:9aff74f77bd1c5ce9498d528b5cd56160ff9564878a3409350de93780a72bcdd"
+          },
+          "second": {
+            "composer": "",
+            "url": "sha256:0cfcf4b17da6125ede02d6a3ec4e4ab306b1af6c375cd9457220c06a049b057f"
+          },
+          "back": {
+            "composer": "",
+            "url": "sha256:9aff74f77bd1c5ce9498d528b5cd56160ff9564878a3409350de93780a72bcdd"
+          },
+          "forward": {
+            "composer": "",
+            "url": "sha256:0cfcf4b17da6125ede02d6a3ec4e4ab306b1af6c375cd9457220c06a049b057f"
+          },
+          "laterState": {
+            "composer": "Later valid task is accepted",
+            "url": "sha256:8710e061e3f34ddeb4b1321f9794f9c654d6e9d4fd6f917fc798b0c6fcd3d650"
+          }
+        },
+        "nativeRequests": {
+          "total": 63,
+          "dispatches": 0,
+          "knowledgeSearches": 0,
+          "conversationHistoryUrls": [
+            "http://127.0.0.1:36863/api/chat/conversations/uc-79c184d3-ef1f-4e66-936f-6979701ea16f/history",
+            "http://127.0.0.1:36863/api/chat/conversations/uc-851dfe53-b7a7-474b-aedd-439658a31735/history"
+          ]
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/final-after-navigation/refused-handoff-navigation",
+        "observationsDigest": "sha256:729b7b24e32fa5cb04e43853d4d1b97b7bc63a551f3bca59aa10492c1705d45e",
+        "requestsDigest": "sha256:fffa018e6639e3ccfc09e0c18e87c554db0a38e07d5120436de5779de45d3b8f",
+        "resultDigest": "sha256:02f166ee5cf6c9f5544e4ad84534774c2929ec3000da3d8bbacc0727d65f37cb",
+        "screenshots": {
+          "conversation-a.png": "sha256:22236f665bd2b46a94cfe30ec4b1aeec0f81521d327d3246d2fde2f816f073fb",
+          "forward.png": "sha256:f7d1635e47bc18700c11309b9944f437549d5b92a39ef0c2674378adfe0b707e",
+          "conversation-b.png": "sha256:51f72c23c839738fe4535ad772154b0be1c978fbedef6ab418718b8b52bcc3c3",
+          "back.png": "sha256:fe8da73872c39dd110688841af9428c3bc83d56969806415844810747c05b516",
+          "refused.png": "sha256:bfc4feac9c28ae09a88c4a65e60f2d7d993740a1950bd08f6fdf26c07c45c8b8",
+          "later-valid.png": "sha256:046a0e31d57b9b874b3188364f05dcb483928c35a42bf1f541e63836401f7504"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      }
+    },
+    {
+      "scenario": "S80",
+      "case": "refused-handoff-search-and-retry",
+      "before": {
+        "status": "fail",
+        "checks": {
+          "realRefusal": true,
+          "searchAddress": false,
+          "incomingCanBeEntered": true,
+          "laterAddressCanonical": true,
+          "noAuto": true
+        },
+        "stages": {
+          "refused": {
+            "composer": "Earlier ordinary draft",
+            "url": "sha256:dcced34a0680f0710ffe5bda56e00fa7ddff6602923a468c939a5bfb93556452"
+          },
+          "searched": {
+            "composer": "Cedar",
+            "url": "sha256:dcced34a0680f0710ffe5bda56e00fa7ddff6602923a468c939a5bfb93556452"
+          },
+          "recovered": {
+            "composer": "Incoming oversized-scope task can be entered later",
+            "url": "sha256:94748f195652e72c2917e460366acd8f4e4e27df445c5b8b1e6f0e1fede00103"
+          }
+        },
+        "nativeRequests": {
+          "total": 40,
+          "dispatches": 0,
+          "knowledgeSearches": 2,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/before-capacity/refused-handoff-search-and-retry",
+        "observationsDigest": "sha256:145e6d5dac437c95609a0a0a85efe3679f5b79464ccdf710eba5244566887dc2",
+        "requestsDigest": "sha256:2a11bb4a005ac2476f2d8eca2d69fdeaa09051dc81a4ebafaccb452ac6962ea9",
+        "resultDigest": "sha256:82c82a5873dd67dab38bf548974698d52688f0fe9a7bbda470216f8cb25cdceb",
+        "screenshots": {
+          "searched.png": "sha256:7c72ebd86a51aa1633a50f3f86e6ee6cd56ae69d2aab05913a296d9467262218",
+          "failure.png": "sha256:6e79574738329c2d5d88367e925ae9a9bb048c8ac3253afed0dd1144c6f423a9",
+          "incoming-recovered.png": "sha256:6e79574738329c2d5d88367e925ae9a9bb048c8ac3253afed0dd1144c6f423a9"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      },
+      "after": {
+        "status": "pass",
+        "checks": {
+          "realRefusal": true,
+          "searchAddress": true,
+          "incomingCanBeEntered": true,
+          "laterAddressCanonical": true,
+          "noAuto": true
+        },
+        "stages": {
+          "refused": {
+            "composer": "Earlier ordinary draft",
+            "url": "sha256:2ecff0ee2c3ceb9641830223acbbde3f16f69a9514468ce68b2d72c97e71f48f"
+          },
+          "searched": {
+            "composer": "Cedar",
+            "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c"
+          },
+          "recovered": {
+            "composer": "Incoming oversized-scope task can be entered later",
+            "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c"
+          }
+        },
+        "nativeRequests": {
+          "total": 40,
+          "dispatches": 0,
+          "knowledgeSearches": 2,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/final-after-capacity/refused-handoff-search-and-retry",
+        "observationsDigest": "sha256:03c363527fdc703815fdb1437786bfd84672e299774dd4b06511af3e3db5e232",
+        "requestsDigest": "sha256:3c74719255b405c246c4960bb16c4622ecf60da2ad50974760acc999bcca0655",
+        "resultDigest": "sha256:e09128edff8614d84a69d59b1d7eec92ef872afb2da5856d2eb66dd607ec635f",
+        "screenshots": {
+          "searched.png": "sha256:d15c4b596637a36402419e0741ed80cbf15bbc035ba592ef30a16d5b821406fd",
+          "incoming-recovered.png": "sha256:77f14731e2d6fdcc265fa1cf78fbdddd2a5c816360114c32714867f5ed54e183"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      }
+    },
+    {
+      "scenario": "S81",
+      "case": "refusal-search-probe-v2",
+      "before": {
+        "status": "fail",
+        "checks": {
+          "searchMode": true,
+          "searchText": true,
+          "realSearch": true,
+          "addressFollows": false,
+          "noModelWork": true
+        },
+        "stages": {
+          "refused": {
+            "value": "Existing small draft",
+            "url": "sha256:544e2f1dd744ca0ed86574ac72dffbc4563569cb671595ff3ccabc6ac43fd01c"
+          },
+          "searched": {
+            "value": "Cedar",
+            "tier": "search",
+            "url": "sha256:544e2f1dd744ca0ed86574ac72dffbc4563569cb671595ff3ccabc6ac43fd01c"
+          }
+        },
+        "nativeRequests": {
+          "total": 38,
+          "dispatches": 0,
+          "knowledgeSearches": 2,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/before-capacity/refusal-search-probe-v2",
+        "observationsDigest": "sha256:2f038e2f66302994ce100954e3863f31413e03b7c419ded37aea18b983c139d7",
+        "requestsDigest": "sha256:a2560c73b772618eaefde8ec210f25d9004922e11566ad52c6c0ceee3676d548",
+        "resultDigest": "sha256:da1a7330707aff7cdee29a4c54bce52a5ce504c3a18259925e251364ed0550a1",
+        "screenshots": {
+          "searched.png": "sha256:f8f903850245c706741000e3ec162bcdd1df330360a5631ce15ab816d594d28e",
+          "failure.png": "sha256:f8f903850245c706741000e3ec162bcdd1df330360a5631ce15ab816d594d28e",
+          "refused.png": "sha256:4f0d7a1f7e76215024efcacff794a919c92f7bb9f5037d44a37649da86b65f2e"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      },
+      "after": {
+        "status": "pass",
+        "checks": {
+          "searchMode": true,
+          "searchText": true,
+          "realSearch": true,
+          "addressFollows": true,
+          "noModelWork": true
+        },
+        "stages": {
+          "refused": {
+            "value": "Existing small draft",
+            "url": "sha256:bcdef6b8f45c2a15dcded12d975f94f4f0c23e0b6a5b4ee218cf86fac8db7d72"
+          },
+          "searched": {
+            "value": "Cedar",
+            "tier": "search",
+            "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c"
+          }
+        },
+        "nativeRequests": {
+          "total": 38,
+          "dispatches": 0,
+          "knowledgeSearches": 2,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/final-after-capacity/refusal-search-probe-v2",
+        "observationsDigest": "sha256:d2e70a9bd543eae42f1240cad6284c2cd27f0cab01a8c9f0ef99cb74924a539e",
+        "requestsDigest": "sha256:f7473288e44791708f4c0b82f3704160e324eb439a1d8190ea5f07c74e52df09",
+        "resultDigest": "sha256:1e1ed056464044ee1cbff7ecb2fd83c26a822ca9fc701e80fe7ef63d2b7bec22",
+        "screenshots": {
+          "searched.png": "sha256:304a9ee18e68683ddfddba74aaa2157fd0075f4a5c73b4a36242c8f45cb6d7ca",
+          "refused.png": "sha256:3a42c2eecc853fe7ef8ce87d8893b16484e0618e86d951b064bd475705df5ff7"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      }
+    },
+    {
+      "scenario": "S78",
+      "case": "accepted-handoff-history",
+      "before": {
+        "status": "pass",
+        "checks": {
+          "acceptedExact": true,
+          "acceptedCanonical": true,
+          "backKeepsEdits": true,
+          "forwardLibrary": true,
+          "backAgainKeepsEdits": true,
+          "reloadKeepsEdits": true,
+          "noDuplicatedTasks": true,
+          "noAuto": true
+        },
+        "stages": {
+          "accepted": {
+            "composer": "Accepted incoming task",
+            "url": "sha256:94748f195652e72c2917e460366acd8f4e4e27df445c5b8b1e6f0e1fede00103"
+          },
+          "back": {
+            "composer": "Human edits after accepting the incoming task",
+            "url": "sha256:94748f195652e72c2917e460366acd8f4e4e27df445c5b8b1e6f0e1fede00103"
+          },
+          "forward": {
+            "url": "sha256:3cfc9b554a356f9e5daa67662448a7d9145f3b8823b183334c2e6f3aaa4d0afd"
+          },
+          "backAgain": {
+            "composer": "Human edits after accepting the incoming task",
+            "url": "sha256:94748f195652e72c2917e460366acd8f4e4e27df445c5b8b1e6f0e1fede00103"
+          },
+          "reload": {
+            "composer": "Human edits after accepting the incoming task",
+            "url": "sha256:94748f195652e72c2917e460366acd8f4e4e27df445c5b8b1e6f0e1fede00103"
+          }
+        },
+        "nativeRequests": {
+          "total": 87,
+          "dispatches": 0,
+          "knowledgeSearches": 0,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/before-capacity/accepted-handoff-history",
+        "observationsDigest": "sha256:c4f812e50750c3ee2ac96c1a50896e4c126d1e529a270dde50f66f7bd2b04fa0",
+        "requestsDigest": "sha256:8e769f7459a4feeb07399201f6a0ba990094ef5b04b4ffc419e4ef3170ff1fee",
+        "resultDigest": "sha256:4ca0a0373bd11f00a79e8b15623aeac3133b5b5e88fb56cc638e82ff10a5d8c9",
+        "screenshots": {
+          "accepted.png": "sha256:7cd0294bbaadc33591d86cf985ce1a451f856167b018ca3fc51a15b7ca3c2157",
+          "reload.png": "sha256:8b72e5abb9e3551fa7ee91b645f45165e6b7e2e7d8326d08c70e0ed25d117362",
+          "back.png": "sha256:02ec357aaa71a258cec4e761a7f65a23de8b7f23cf1644d78caa4b6718527996"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      },
+      "after": {
+        "status": "pass",
+        "checks": {
+          "acceptedExact": true,
+          "acceptedCanonical": true,
+          "backKeepsEdits": true,
+          "forwardLibrary": true,
+          "backAgainKeepsEdits": true,
+          "reloadKeepsEdits": true,
+          "noDuplicatedTasks": true,
+          "noAuto": true
+        },
+        "stages": {
+          "accepted": {
+            "composer": "Accepted incoming task",
+            "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c"
+          },
+          "back": {
+            "composer": "Human edits after accepting the incoming task",
+            "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c"
+          },
+          "forward": {
+            "url": "sha256:3daad8f2b598a58b52799e9ecece85ffe2aaa7ddef6ece0211d26a33c120675e"
+          },
+          "backAgain": {
+            "composer": "Human edits after accepting the incoming task",
+            "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c"
+          },
+          "reload": {
+            "composer": "Human edits after accepting the incoming task",
+            "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c"
+          }
+        },
+        "nativeRequests": {
+          "total": 87,
+          "dispatches": 0,
+          "knowledgeSearches": 0,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/final-after-capacity/accepted-handoff-history",
+        "observationsDigest": "sha256:7f537d2d070f292ab988f91186a19f5b5e3c0ae5d8c7705f2d914ba81288c591",
+        "requestsDigest": "sha256:b5aa0ae7811bbf7f4b0cbad30b5ed7a158c7be6d0f9e5441a492b3c201f37828",
+        "resultDigest": "sha256:ab85865a753c06035feda2c894380de400e055575b08dc455f8dbb105e860a3a",
+        "screenshots": {
+          "accepted.png": "sha256:f6994b26ae932874041d248c086fd6c3aededcfe2144cd02058371f361a3318a",
+          "reload.png": "sha256:2ff8a84852a3e8c0f97b5f738edd5cc6e8eddd78940254fa2aeaedb2a69147e4",
+          "back.png": "sha256:5dc8337b3cb5fe88d4b1eaf2affd024829563a19d2bc1d5a0485e1e9d8c0d381"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false
+      }
+    },
+    {
+      "scenario": "S67",
+      "case": "cold-replacement",
+      "before": {
+        "status": "pass",
+        "checks": {
+          "text": true,
+          "noAutomaticModelWork": true,
+          "chosen": true
+        },
+        "stages": {
+          "first": {
+            "text": "Old task on unrelated decoy",
+            "url": "sha256:94748f195652e72c2917e460366acd8f4e4e27df445c5b8b1e6f0e1fede00103"
+          },
+          "checks": {
+            "text": true
+          }
+        },
+        "nativeRequests": {
+          "total": 66,
+          "dispatches": 0,
+          "knowledgeSearches": 0,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/before-capacity/cold-replacement",
+        "observationsDigest": "sha256:2ed1d838800935cce03347dca3cc5d11761d4ed7d9c71c7e61f00e19a41871f4",
+        "requestsDigest": "sha256:59e9ada514f445c9d45894d1ed7834a3f1ccf4a489b80e41e9c7879d6571462c",
+        "resultDigest": "sha256:64af72018fb3cae67713094d86f40607e25d5dc8a3fe01826b23cc69d265553c",
+        "screenshots": {
+          "first.png": "sha256:75ac09e2fec6204087a3d35294f32ff4d7f5e919607e38b135aa222042d22485",
+          "second.png": "sha256:8f76dd61e7001e9993a27e6fc59df29ba60f064cdfe6ea85835024965afb3005"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false,
+        "exactText": "  Explain # & % 日本語\nexactly  ",
+        "incomingUrl": "sha256:8fb540ab90a533f067072030f0d70fcfe783d4da9d30b52605098827a232b379",
+        "finalUrl": "sha256:cfd91eed26b33c210ae076fc9b5dbcd88c06aa4dbe261e1ef960447be55c65d1"
+      },
+      "after": {
+        "status": "pass",
+        "checks": {
+          "text": true,
+          "noAutomaticModelWork": true,
+          "chosen": true
+        },
+        "stages": {
+          "first": {
+            "text": "Old task on unrelated decoy",
+            "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c"
+          },
+          "checks": {
+            "text": true
+          }
+        },
+        "nativeRequests": {
+          "total": 66,
+          "dispatches": 0,
+          "knowledgeSearches": 0,
+          "conversationHistoryUrls": []
+        },
+        "evidencePath": "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/final-after-capacity/cold-replacement",
+        "observationsDigest": "sha256:774eecee4ea1c362eda268bd1703925d0137db205e5c3191a441c413ef09c011",
+        "requestsDigest": "sha256:bed297138b179b1680088a0a08d68493a5f4cb9d0a0ac699b342b236647fe8b2",
+        "resultDigest": "sha256:3e37f36ead090351608818548df275410f556c0e08b1991d573a645c0a03e5ac",
+        "screenshots": {
+          "first.png": "sha256:dfef6f37b461b28157c38552035e21ca48457c9a464b3a35b7cc72820152d01e",
+          "second.png": "sha256:3aa99a0fec7c0ba021cf969ac38b1b3e8207fedbfc51dfed691b0e2ee8392a0f"
+        },
+        "browserProfileRemoved": true,
+        "sandbox": false,
+        "exactText": "  Explain # & % 日本語\nexactly  ",
+        "incomingUrl": "sha256:bf56e8d892b09aa11f110089aa57bc37bffbc070cacdefdb2384dc6c002ab19d",
+        "finalUrl": "sha256:4cc71e93755af04098ce27986ff8463def898ab68572651dd1cc389fdd68a194"
+      }
+    }
+  ],
+  "visibleAudit": {
+    "before": {
+      "incomingTextVisible": false,
+      "fileCountVisible": false,
+      "snapshotDigest": "sha256:776fa355e58bdd8fec91eaa817ce38a5b7602910890abd6c48cca846066f3b99",
+      "immediatelyAfterPublicDiscard": {
+        "textbox": "Second unsent draft",
+        "draftTexts": [
+          "Second unsent draft"
+        ],
+        "url": "sha256:2589cef056829663add52a7dfa4ab5a99468be27c033ca19a956f821ba33ac2e",
+        "ariaDigest": "sha256:0750604162cf3aec8e9b0e7748af4047242c0b14e8165736990e79c89d0d5547",
+        "snapshotDigest": "sha256:ad3d1f51b65710ca51d8b8d751d54f14b24ad4147563d4e5aac8459428d5eb1a"
+      }
+    },
+    "after": {
+      "incomingTextVisible": true,
+      "fileCountVisible": true,
+      "snapshotDigest": "sha256:729b7b24e32fa5cb04e43853d4d1b97b7bc63a551f3bca59aa10492c1705d45e",
+      "immediatelyAfterPublicDiscard": {
+        "textbox": "Third task to recover after freeing capacity",
+        "draftTexts": [
+          "Third task to recover after freeing capacity",
+          "Second unsent draft"
+        ],
+        "url": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c",
+        "ariaDigest": "sha256:121dad625a1727152c0f7999a99843fe8ea83b5c44cfda9d10171e5a90d65286",
+        "snapshotDigest": "sha256:0048386ce5051118729aac03e6bcf879183a962440fc2056b8194975c31c511b"
+      }
+    }
+  },
+  "isolatedReload": [
+    {
+      "label": "before-reload",
+      "status": "unverified under explicit rule-4 fallback",
+      "observedChecks": {
+        "genuineCapacityRefusal": true,
+        "oldComposer": true,
+        "ownedEntry": false,
+        "unacceptedAddress": true,
+        "reloadPrepares": false,
+        "reloadMode": false,
+        "chosenFiles": true,
+        "secondRetained": true,
+        "canonical": true,
+        "noAuto": true
+      },
+      "historyStateAtRefusal": null,
+      "beforeUrl": "sha256:4159e0eb8becd9146ba91e19d539991c31cf305769b75d12ca596417cde914b3",
+      "afterUrl": "sha256:86040d9b3fe72d4acae2f331fb23e426063171852d92c67ea1228768b717f477",
+      "composerAfterReload": "Second retained task",
+      "snapshotDigest": "sha256:b6c0a5ba109c1c7f2afbeac08e49dff2053cd301ccfc68d3a3a49e537bad7042",
+      "fixture": "Own browser init script restores a valid one-draft recovery envelope before UI startup to isolate reload. This is separate from the actual public-discard case."
+    },
+    {
+      "label": "final-after-capacity",
+      "status": "unverified under explicit rule-4 fallback",
+      "observedChecks": {
+        "genuineCapacityRefusal": true,
+        "oldComposer": true,
+        "unacceptedAddress": true,
+        "reloadPrepares": false,
+        "reloadMode": false,
+        "chosenFiles": true,
+        "secondRetained": true,
+        "canonical": true,
+        "noAuto": true
+      },
+      "historyStateAtRefusal": null,
+      "beforeUrl": "sha256:ed0aa34f76e4153ab7c7b4f9c71f0b44f17036b01dc638b26be0b1ada8ac2aea",
+      "afterUrl": "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c",
+      "composerAfterReload": "Second retained task",
+      "snapshotDigest": "sha256:8467db960990527b5adcb404abc775e102617b788fa5f52cbfdb5949b6b718bf",
+      "fixture": "Own browser init script restores a valid one-draft recovery envelope before UI startup to isolate reload. This is separate from the actual public-discard case."
+    }
+  ],
+  "runtimeGroups": [
+    {
+      "label": "before-capacity",
+      "profileRemoved": true,
+      "engineExit": 143,
+      "viteExit": 143,
+      "processManifestDigest": "sha256:d92643ac039e8c2072d98c85e962662069b3be92b8c0a717f9da03617f249b09",
+      "cleanupDigest": "sha256:1889e5b61053fc649c3901a7e94c27a3e28f69df4e4ec19db0a7926f68497eec",
+      "installedEngineHashManifest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "modelCpuChecks": [],
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/prerequisites.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/capacity-extra.mjs"
+          ],
+          "exit": 1
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/refusal-search-probe-v2.mjs"
+          ],
+          "exit": 1
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/history-nonmodel.mjs"
+          ],
+          "exit": 1
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/cold-case.mjs"
+          ],
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "label": "before-navigation",
+      "profileRemoved": true,
+      "engineExit": 1,
+      "viteExit": 143,
+      "processManifestDigest": "sha256:610dccc79aa10bf39d52d481314241882bbd512085e97fdc266edffd36316a8f",
+      "cleanupDigest": "sha256:dabd57dedf33bb00fe431b5ec30c200b3566ac3e9eef43242ce04a1bee6206ad",
+      "installedEngineHashManifest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "modelCpuChecks": [
+        {
+          "device": "none",
+          "gpuLayers": "0",
+          "CUDA_VISIBLE_DEVICES": "-1",
+          "pid": 808,
+          "startticks": "15627607"
+        }
+      ],
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/prerequisites.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/cpu-settings.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/create-records.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/history-navigation.mjs"
+          ],
+          "exit": 1
+        }
+      ]
+    },
+    {
+      "label": "before-reload",
+      "profileRemoved": true,
+      "engineExit": 143,
+      "viteExit": 143,
+      "processManifestDigest": "sha256:c2ab7298fff2a8e4dda483d5a6e653e56b88473d0c2f37d22a62c4ca5aef58b7",
+      "cleanupDigest": "sha256:2274794e0c2fd32e710da67424daf86fdd989c7daba4b74ca923ede6e1145299",
+      "installedEngineHashManifest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "modelCpuChecks": [],
+      "jobs": [
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/reload-unaccepted.mjs"
+          ],
+          "exit": 1
+        }
+      ]
+    },
+    {
+      "label": "final-after-capacity",
+      "profileRemoved": true,
+      "engineExit": 143,
+      "viteExit": 143,
+      "processManifestDigest": "sha256:9dda0658a1259e628148a5603b456fc43ddb53ea3fad8ee53ee1fcc602421c7f",
+      "cleanupDigest": "sha256:2e9979ad357618b9974fd7d196088c2ca29fbe60dbcd07c9b05cb3d936f1e8f2",
+      "installedEngineHashManifest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "modelCpuChecks": [],
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/prerequisites.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/capacity-extra.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/refusal-search-probe-v2.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/history-nonmodel.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/cold-case.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/reload-unaccepted.mjs"
+          ],
+          "exit": 1
+        }
+      ]
+    },
+    {
+      "label": "final-after-navigation",
+      "profileRemoved": true,
+      "engineExit": 143,
+      "viteExit": 143,
+      "processManifestDigest": "sha256:6a0dc7e546495de790ac199be0e4e5ed2597ccb25c4b673e9940f4e11f0b84c0",
+      "cleanupDigest": "sha256:5f54f4170ef91f7906a6124fb42b8108c6f25baa58bacc6ff7d5fb353751ab2d",
+      "installedEngineHashManifest": "sha256:d8c823983462ef58f4e3377a68eba1bf3ece2bc8105dabc2571904f559d01e95",
+      "modelCpuChecks": [
+        {
+          "device": "none",
+          "gpuLayers": "0",
+          "CUDA_VISIBLE_DEVICES": "-1",
+          "pid": 806,
+          "startticks": "15693589"
+        }
+      ],
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/prerequisites.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/cpu-settings.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/create-records.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/history-navigation.mjs"
+          ],
+          "exit": 0
+        }
+      ]
+    }
+  ],
+  "urls": {
+    "sha256:2589cef056829663add52a7dfa4ab5a99468be27c033ca19a956f821ba33ac2e": "http://127.0.0.1:33275/?api_port=33987#justsearch://surface/core.search-v3-surface?query=Third+task+to+recover+after+freeing+capacity&mode=ask&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fchosen-alpha.txt",
+    "sha256:94748f195652e72c2917e460366acd8f4e4e27df445c5b8b1e6f0e1fede00103": "http://127.0.0.1:33275/?api_port=33987#justsearch://surface/core.search-v3-surface",
+    "sha256:5fe0fea00e34dc0cd3278aa24c37a41de5af05d3ae54efb503104bfbe0135e4e": "http://127.0.0.1:55079/?api_port=40427#justsearch://surface/core.search-v3-surface?query=Third+task+to+recover+after+freeing+capacity&mode=ask&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fchosen-alpha.txt",
+    "sha256:7baff116b952c7b0ea1951939f31987f348bb2d528bbbef3bccc29ce3397cc5c": "http://127.0.0.1:55079/?api_port=40427#justsearch://surface/core.search-v3-surface",
+    "sha256:be1a9fb74a0f46675e85de71c222b8e37fc084759bc0ea20f68e20f67880d06e": "http://127.0.0.1:37055/?api_port=46291#justsearch://surface/core.search-v3-surface?query=Incoming+text+parked+after+genuine+file-count+refusal&mode=ask&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-0.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-1.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-2.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-3.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-4.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-5.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-6.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-7.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-8.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-9.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-10.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-11.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-12.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-13.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-14.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-15.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-16.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-17.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-18.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-19.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-20.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-21.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-22.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-23.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-24.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-25.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-26.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-27.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-28.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-29.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-30.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-31.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-32.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-33.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-34.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-35.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-36.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-37.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-38.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-39.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-40.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-41.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-42.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-43.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-44.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-45.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-46.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-47.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-48.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-49.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-50.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-51.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-52.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-53.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-54.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-55.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-56.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-57.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-58.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-59.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-60.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-61.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-62.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-63.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-64.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-65.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-66.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-67.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-68.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-69.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-70.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-71.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-72.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-73.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-74.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-75.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-76.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-77.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-78.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-79.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-80.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-81.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-82.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-83.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-84.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-85.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-86.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-87.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-88.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-89.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-90.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-91.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-92.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-93.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-94.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-95.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-96.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-97.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-98.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-99.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-100.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-101.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-102.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-103.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-104.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-105.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-106.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-107.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-108.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-109.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-110.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-111.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-112.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-113.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-114.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-115.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-116.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-117.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-118.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-119.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-120.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-121.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-122.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-123.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-124.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-125.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-126.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-127.txt&docIds=%2Ftmp%2Fjsv-eng-0zbhk3kc%2Fcorpus%2Ftoo-many-128.txt",
+    "sha256:1ed23b3f6ca8cfcc5be6bfddc8948c3496d71ca09a2616c8951efb0a02c6c8da": "http://127.0.0.1:37055/?api_port=46291#justsearch://surface/core.search-v3-surface",
+    "sha256:e33ac1ad9e2a873cb13b8cc075a4dd9d5d6431ff0afc61253ebeb898b6010d4e": "http://127.0.0.1:60499/?api_port=36863#justsearch://surface/core.search-v3-surface?query=Incoming+text+parked+after+genuine+file-count+refusal&mode=ask&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-0.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-1.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-2.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-3.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-4.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-5.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-6.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-7.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-8.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-9.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-10.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-11.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-12.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-13.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-14.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-15.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-16.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-17.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-18.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-19.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-20.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-21.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-22.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-23.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-24.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-25.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-26.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-27.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-28.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-29.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-30.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-31.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-32.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-33.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-34.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-35.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-36.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-37.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-38.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-39.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-40.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-41.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-42.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-43.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-44.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-45.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-46.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-47.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-48.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-49.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-50.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-51.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-52.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-53.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-54.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-55.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-56.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-57.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-58.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-59.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-60.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-61.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-62.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-63.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-64.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-65.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-66.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-67.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-68.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-69.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-70.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-71.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-72.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-73.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-74.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-75.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-76.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-77.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-78.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-79.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-80.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-81.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-82.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-83.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-84.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-85.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-86.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-87.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-88.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-89.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-90.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-91.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-92.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-93.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-94.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-95.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-96.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-97.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-98.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-99.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-100.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-101.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-102.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-103.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-104.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-105.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-106.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-107.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-108.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-109.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-110.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-111.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-112.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-113.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-114.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-115.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-116.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-117.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-118.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-119.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-120.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-121.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-122.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-123.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-124.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-125.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-126.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-127.txt&docIds=%2Ftmp%2Fjsv-eng-3rme3sta%2Fcorpus%2Ftoo-many-128.txt",
+    "sha256:9aff74f77bd1c5ce9498d528b5cd56160ff9564878a3409350de93780a72bcdd": "http://127.0.0.1:60499/?api_port=36863#justsearch://surface/core.search-v3-surface?conversationId=uc-79c184d3-ef1f-4e66-936f-6979701ea16f",
+    "sha256:0cfcf4b17da6125ede02d6a3ec4e4ab306b1af6c375cd9457220c06a049b057f": "http://127.0.0.1:60499/?api_port=36863#justsearch://surface/core.search-v3-surface?conversationId=uc-851dfe53-b7a7-474b-aedd-439658a31735",
+    "sha256:8710e061e3f34ddeb4b1321f9794f9c654d6e9d4fd6f917fc798b0c6fcd3d650": "http://127.0.0.1:60499/?api_port=36863#justsearch://surface/core.search-v3-surface",
+    "sha256:dcced34a0680f0710ffe5bda56e00fa7ddff6602923a468c939a5bfb93556452": "http://127.0.0.1:33275/?api_port=33987#justsearch://surface/core.search-v3-surface?query=Incoming+oversized-scope+task+can+be+entered+later&mode=ask&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-0.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-1.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-2.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-3.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-4.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-5.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-6.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-7.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-8.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-9.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-10.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-11.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-12.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-13.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-14.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-15.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-16.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-17.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-18.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-19.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-20.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-21.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-22.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-23.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-24.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-25.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-26.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-27.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-28.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-29.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-30.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-31.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-32.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-33.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-34.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-35.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-36.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-37.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-38.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-39.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-40.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-41.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-42.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-43.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-44.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-45.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-46.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-47.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-48.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-49.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-50.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-51.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-52.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-53.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-54.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-55.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-56.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-57.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-58.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-59.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-60.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-61.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-62.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-63.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-64.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-65.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-66.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-67.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-68.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-69.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-70.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-71.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-72.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-73.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-74.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-75.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-76.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-77.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-78.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-79.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-80.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-81.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-82.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-83.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-84.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-85.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-86.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-87.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-88.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-89.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-90.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-91.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-92.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-93.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-94.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-95.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-96.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-97.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-98.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-99.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-100.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-101.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-102.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-103.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-104.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-105.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-106.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-107.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-108.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-109.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-110.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-111.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-112.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-113.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-114.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-115.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-116.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-117.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-118.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-119.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-120.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-121.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-122.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-123.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-124.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-125.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-126.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-127.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Flimit-128.txt",
+    "sha256:2ecff0ee2c3ceb9641830223acbbde3f16f69a9514468ce68b2d72c97e71f48f": "http://127.0.0.1:55079/?api_port=40427#justsearch://surface/core.search-v3-surface?query=Incoming+oversized-scope+task+can+be+entered+later&mode=ask&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-0.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-1.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-2.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-3.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-4.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-5.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-6.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-7.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-8.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-9.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-10.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-11.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-12.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-13.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-14.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-15.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-16.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-17.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-18.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-19.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-20.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-21.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-22.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-23.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-24.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-25.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-26.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-27.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-28.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-29.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-30.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-31.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-32.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-33.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-34.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-35.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-36.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-37.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-38.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-39.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-40.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-41.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-42.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-43.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-44.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-45.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-46.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-47.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-48.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-49.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-50.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-51.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-52.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-53.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-54.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-55.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-56.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-57.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-58.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-59.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-60.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-61.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-62.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-63.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-64.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-65.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-66.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-67.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-68.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-69.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-70.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-71.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-72.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-73.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-74.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-75.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-76.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-77.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-78.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-79.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-80.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-81.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-82.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-83.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-84.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-85.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-86.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-87.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-88.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-89.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-90.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-91.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-92.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-93.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-94.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-95.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-96.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-97.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-98.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-99.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-100.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-101.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-102.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-103.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-104.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-105.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-106.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-107.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-108.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-109.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-110.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-111.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-112.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-113.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-114.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-115.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-116.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-117.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-118.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-119.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-120.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-121.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-122.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-123.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-124.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-125.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-126.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-127.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Flimit-128.txt",
+    "sha256:544e2f1dd744ca0ed86574ac72dffbc4563569cb671595ff3ccabc6ac43fd01c": "http://127.0.0.1:33275/?api_port=33987#justsearch://surface/core.search-v3-surface?query=Incoming+refused+task+for+file-count+check&mode=ask&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-0.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-1.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-2.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-3.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-4.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-5.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-6.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-7.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-8.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-9.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-10.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-11.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-12.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-13.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-14.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-15.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-16.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-17.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-18.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-19.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-20.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-21.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-22.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-23.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-24.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-25.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-26.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-27.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-28.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-29.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-30.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-31.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-32.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-33.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-34.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-35.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-36.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-37.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-38.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-39.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-40.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-41.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-42.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-43.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-44.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-45.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-46.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-47.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-48.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-49.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-50.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-51.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-52.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-53.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-54.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-55.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-56.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-57.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-58.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-59.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-60.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-61.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-62.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-63.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-64.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-65.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-66.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-67.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-68.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-69.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-70.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-71.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-72.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-73.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-74.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-75.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-76.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-77.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-78.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-79.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-80.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-81.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-82.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-83.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-84.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-85.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-86.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-87.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-88.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-89.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-90.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-91.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-92.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-93.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-94.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-95.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-96.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-97.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-98.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-99.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-100.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-101.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-102.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-103.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-104.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-105.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-106.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-107.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-108.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-109.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-110.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-111.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-112.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-113.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-114.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-115.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-116.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-117.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-118.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-119.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-120.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-121.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-122.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-123.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-124.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-125.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-126.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-127.txt&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fscope-128.txt",
+    "sha256:bcdef6b8f45c2a15dcded12d975f94f4f0c23e0b6a5b4ee218cf86fac8db7d72": "http://127.0.0.1:55079/?api_port=40427#justsearch://surface/core.search-v3-surface?query=Incoming+refused+task+for+file-count+check&mode=ask&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-0.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-1.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-2.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-3.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-4.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-5.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-6.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-7.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-8.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-9.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-10.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-11.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-12.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-13.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-14.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-15.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-16.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-17.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-18.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-19.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-20.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-21.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-22.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-23.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-24.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-25.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-26.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-27.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-28.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-29.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-30.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-31.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-32.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-33.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-34.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-35.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-36.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-37.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-38.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-39.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-40.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-41.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-42.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-43.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-44.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-45.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-46.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-47.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-48.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-49.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-50.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-51.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-52.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-53.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-54.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-55.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-56.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-57.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-58.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-59.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-60.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-61.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-62.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-63.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-64.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-65.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-66.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-67.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-68.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-69.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-70.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-71.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-72.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-73.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-74.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-75.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-76.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-77.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-78.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-79.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-80.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-81.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-82.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-83.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-84.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-85.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-86.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-87.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-88.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-89.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-90.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-91.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-92.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-93.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-94.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-95.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-96.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-97.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-98.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-99.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-100.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-101.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-102.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-103.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-104.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-105.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-106.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-107.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-108.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-109.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-110.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-111.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-112.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-113.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-114.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-115.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-116.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-117.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-118.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-119.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-120.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-121.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-122.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-123.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-124.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-125.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-126.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-127.txt&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fscope-128.txt",
+    "sha256:3cfc9b554a356f9e5daa67662448a7d9145f3b8823b183334c2e6f3aaa4d0afd": "http://127.0.0.1:33275/?api_port=33987#justsearch://surface/core.library-surface",
+    "sha256:3daad8f2b598a58b52799e9ecece85ffe2aaa7ddef6ece0211d26a33c120675e": "http://127.0.0.1:55079/?api_port=40427#justsearch://surface/core.library-surface",
+    "sha256:8fb540ab90a533f067072030f0d70fcfe783d4da9d30b52605098827a232b379": "http://127.0.0.1:33275/#justsearch://surface/core.ask-surface?query=++Explain+%23+%26+%25+%E6%97%A5%E6%9C%AC%E8%AA%9E%0Aexactly++&docIds=%2Ftmp%2Fjsv-eng-b1nqy343%2Fcorpus%2Fchosen-alpha.txt",
+    "sha256:cfd91eed26b33c210ae076fc9b5dbcd88c06aa4dbe261e1ef960447be55c65d1": "http://127.0.0.1:33275/#justsearch://surface/core.search-v3-surface",
+    "sha256:bf56e8d892b09aa11f110089aa57bc37bffbc070cacdefdb2384dc6c002ab19d": "http://127.0.0.1:55079/#justsearch://surface/core.ask-surface?query=++Explain+%23+%26+%25+%E6%97%A5%E6%9C%AC%E8%AA%9E%0Aexactly++&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fchosen-alpha.txt",
+    "sha256:4cc71e93755af04098ce27986ff8463def898ab68572651dd1cc389fdd68a194": "http://127.0.0.1:55079/#justsearch://surface/core.search-v3-surface",
+    "sha256:4159e0eb8becd9146ba91e19d539991c31cf305769b75d12ca596417cde914b3": "http://127.0.0.1:35005/?api_port=35353#justsearch://surface/core.search-v3-surface?query=Unaccepted+reload+task&mode=ask&docIds=%2Ftmp%2Fjsv-eng-jc_lr9to%2Fcorpus%2Fchosen-alpha.txt",
+    "sha256:86040d9b3fe72d4acae2f331fb23e426063171852d92c67ea1228768b717f477": "http://127.0.0.1:35005/?api_port=35353#justsearch://surface/core.search-v3-surface",
+    "sha256:ed0aa34f76e4153ab7c7b4f9c71f0b44f17036b01dc638b26be0b1ada8ac2aea": "http://127.0.0.1:55079/?api_port=40427#justsearch://surface/core.search-v3-surface?query=Unaccepted+reload+task&mode=ask&docIds=%2Ftmp%2Fjsv-eng-ptb_1njk%2Fcorpus%2Fchosen-alpha.txt"
+  },
+  "commands": [
+    {
+      "record": "after-paired-final.command.json",
+      "command": [
+        "npm",
+        "run",
+        "test:unit:run",
+        "--",
+        "src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts",
+        "src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "src/shell-v0/router/sources/URLSource.test.ts",
+        "--configLoader",
+        "runner",
+        "--maxWorkers=4",
+        "--reporter=json",
+        "--outputFile=/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/after-paired-final.json"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress/modules/ui-web",
+      "start": "2026-10-27T06:05:53.802842+00:00",
+      "end": "2026-10-27T06:05:58.114539+00:00",
+      "exit": 0,
+      "logDigest": "sha256:b0c14494c137583f164fbb0d69b2f861d734063ba8e5b1594998b7b1f4bb6c4d"
+    },
+    {
+      "record": "after-paired.command.json",
+      "command": [
+        "npm",
+        "run",
+        "test:unit:run",
+        "--",
+        "src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts",
+        "src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "src/shell-v0/router/sources/URLSource.test.ts",
+        "--configLoader",
+        "runner",
+        "--maxWorkers=4",
+        "--reporter=json",
+        "--outputFile=/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/after-paired.json"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress/modules/ui-web",
+      "start": "2026-10-27T06:00:11.171863+00:00",
+      "end": "2026-10-27T06:00:18.599636+00:00",
+      "exit": 0,
+      "logDigest": "sha256:d6c2755b16cd212e942827fc351932164eab538eb247be2a89f55880751a85d6"
+    },
+    {
+      "record": "before-paired-final.command.json",
+      "command": [
+        "npm",
+        "run",
+        "test:unit:run",
+        "--",
+        "src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts",
+        "src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "src/shell-v0/router/sources/URLSource.test.ts",
+        "--configLoader",
+        "runner",
+        "--maxWorkers=4",
+        "--reporter=json",
+        "--outputFile=/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/before-paired-final.json"
+      ],
+      "cwd": "/home/elias/.cache/am/_xy5z8ko/tmp/before/modules/ui-web",
+      "start": "2026-10-27T06:05:54.907282+00:00",
+      "end": "2026-10-27T06:05:59.542388+00:00",
+      "exit": 1,
+      "logDigest": "sha256:778397fd5f2ef914cb2325b1ebdb4290bce629363edee4037de2fd3f345ea452"
+    },
+    {
+      "record": "before-paired.command.json",
+      "command": [
+        "npm",
+        "run",
+        "test:unit:run",
+        "--",
+        "src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts",
+        "src/shell-v0/chrome/Shell.tabIdentity.test.ts",
+        "src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "src/shell-v0/router/sources/URLSource.test.ts",
+        "--configLoader",
+        "runner",
+        "--maxWorkers=4",
+        "--reporter=json",
+        "--outputFile=/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/before-paired.json"
+      ],
+      "cwd": "/home/elias/.cache/am/_xy5z8ko/tmp/before/modules/ui-web",
+      "start": "2026-10-27T06:00:12.375966+00:00",
+      "end": "2026-10-27T06:00:20.019129+00:00",
+      "exit": 1,
+      "logDigest": "sha256:3af7d4a763cccd5cd8a24f39b6af67d67b31924f756110c0f0f2d871a95e4e15"
+    },
+    {
+      "record": "evidence-preservation.command.json",
+      "command": [
+        "node",
+        "scripts/governance/gates/test-intent/run-evidence.mjs",
+        "--out",
+        "gates/test-intent/evidence/uiux-refusal-navigation-preservation.json",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 accepted address and edited text survive Library traversal and reload without delivery",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S67 preservation cold valid arrival retains earlier draft without a false refusal",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S76 preservation genuine refusal names the file limit and keeps existing draft",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation canonical accepted reload keeps human edits without delivering old inputs",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation original pre-boot input entry keeps human edits without delivering old inputs",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation owned input history traversal keeps human edits without delivering old inputs"
+      ],
+      "exit": 0,
+      "logDigest": "sha256:73a5e5dd8a7fbb99120ef9d7d56115f2ff4b05fcae65abdf8e57f4a6d613095b"
+    },
+    {
+      "record": "evidence-repair.command.json",
+      "command": [
+        "node",
+        "scripts/governance/gates/test-intent/run-evidence.mjs",
+        "--out",
+        "gates/test-intent/evidence/uiux-refusal-navigation-repair.json",
+        "--before",
+        "cbde03ed95",
+        "--before-root",
+        "/home/elias/.cache/am/_xy5z8ko/tmp",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S79 refusal allows conversation addresses and subsequent traversal",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S80 S81 Search after refusal projects its current address",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S82 refusal notice shows exact incoming text and file count",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S77 discard prepares parked hand-off immediately with mode and files",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S83 navigation retires refusal so later discard cannot resurrect it"
+      ],
+      "exit": 0,
+      "logDigest": "sha256:d5f6dcb4d527d079370407475cc266c0dea10e8d196ad3f79e27ff0661932218"
+    },
+    {
+      "record": "final-lint.command.json",
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress/modules/ui-web",
+      "start": "2026-10-27T06:07:18.705794+00:00",
+      "end": "2026-10-27T06:07:19.864350+00:00",
+      "exit": 0,
+      "logDigest": "sha256:901a6221b089f44724e9d7454a1a8547652691fe55522109007a8e9f755ce437"
+    },
+    {
+      "record": "final-test-intent.command.json",
+      "command": [
+        "node",
+        "scripts/governance/gates/test-intent/cli.mjs",
+        "check",
+        "--base",
+        "f17b988e2f"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress",
+      "start": "2026-10-27T06:11:43.700931+00:00",
+      "end": "2026-10-27T06:11:45.489726+00:00",
+      "exit": 1,
+      "logDigest": "sha256:804ea270fc9fe26963f1632a460141e498dd3532d871b3b0376beb9461c09fea"
+    },
+    {
+      "record": "final-typecheck.command.json",
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress/modules/ui-web",
+      "start": "2026-10-27T06:06:23.588292+00:00",
+      "end": "2026-10-27T06:06:25.991613+00:00",
+      "exit": 0,
+      "logDigest": "sha256:c8d2e1bbc6c37e08225a662df8d8fc9af17316c77b6aafc9b776350e0f188ab3"
+    },
+    {
+      "record": "final-ui-gates.command.json",
+      "command": [
+        "node",
+        "scripts/ci/run-ui-web-gates.mjs"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress",
+      "start": "2026-10-27T06:07:17.543926+00:00",
+      "end": "2026-10-27T06:07:20.270343+00:00",
+      "exit": 0,
+      "logDigest": "sha256:0d9de61819a29928bf6d1e00ac63750c27b4707b88aee8e313a633234b3f9793"
+    },
+    {
+      "record": "final-unit.command.json",
+      "command": [
+        "npm",
+        "run",
+        "test:unit:run",
+        "--",
+        "--configLoader",
+        "runner",
+        "--maxWorkers=4"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress/modules/ui-web",
+      "start": "2026-10-27T06:06:22.422431+00:00",
+      "end": "2026-10-27T06:07:50.463923+00:00",
+      "exit": 0,
+      "logDigest": "sha256:fb0b9c6e07e33e52de41d573c2916c69cb5e680f489ff710ae81fd11acf11ac8"
+    },
+    {
+      "record": "initial-evidence-repair.command.json",
+      "command": [
+        "node",
+        "scripts/governance/gates/test-intent/run-evidence.mjs",
+        "--out",
+        "gates/test-intent/evidence/uiux-refusal-navigation-repair.json",
+        "--before",
+        "cbde03ed95",
+        "--before-root",
+        "/home/elias/.cache/am/_xy5z8ko/tmp",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S79 refusal allows conversation addresses and subsequent traversal",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S80 S81 Search after refusal projects its current address",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S82 refusal notice shows exact incoming text and file count",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S77 discard prepares parked hand-off immediately with mode and files",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S83 navigation retires refusal so later discard cannot resurrect it",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S77 reload of an owned unaccepted task address prepares it as fresh"
+      ],
+      "exit": 2,
+      "logDigest": "sha256:9da52c1b59b6217944bc6180981782fec798ab8dc568842843b17607fefea366"
+    },
+    {
+      "record": "lint-no-cache.command.json",
+      "command": [
+        "npm",
+        "run",
+        "lint",
+        "--",
+        "--no-cache"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress/modules/ui-web",
+      "start": "2026-10-27T05:58:07.101037+00:00",
+      "end": "2026-10-27T05:58:07.243532+00:00",
+      "exit": 2,
+      "logDigest": "sha256:7956fb526581e2036ac1f2d649f9f1cdbb7a35d25ec4f9f8d84e90e93d8c3df0"
+    },
+    {
+      "record": "sandbox-probe.command.json",
+      "command": [
+        "node",
+        "/home/elias/.cache/am/_xy5z8ko/tmp/refusal-report/scripts/sandbox-probe.mjs"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress",
+      "start": "2026-10-27T06:04:14.600989+00:00",
+      "end": "2026-10-27T06:04:15.030843+00:00",
+      "exit": 1,
+      "logDigest": "sha256:cf85da1bbdea3fc16e4d6fa488689557883b1c2800d7aaaf6bc9fe93df2eb661"
+    },
+    {
+      "record": "test-intent.command.json",
+      "command": [
+        "node",
+        "scripts/governance/gates/test-intent/cli.mjs",
+        "check",
+        "--base",
+        "f17b988e2f"
+      ],
+      "cwd": "/home/elias/dev/js-uiux-compat-ingress",
+      "start": "2026-10-27T06:03:42.753947+00:00",
+      "end": "2026-10-27T06:03:44.093720+00:00",
+      "exit": 1,
+      "logDigest": "sha256:0d1a2291013f7b3531a0e36d2edf2d399d349d4940a6bfd69a7f6b147997d250"
+    }
+  ],
+  "harnessDigests": {
+    "browser-lib.mjs": "sha256:a9a394faffc0ca579e7c371f0f7474a72d661f66045424d4d351ce3277fffbf1",
+    "history-nonmodel.mjs": "sha256:6505cc6126b70741fb97c11fb649bf21de7769e0ee2e88ffce542a578b92bc57",
+    "cold-case.mjs": "sha256:33d1ef7fa7af0f8d55ce338e98bcaf4ecab1a7754ea74ded96c5c028f455eb0c",
+    "history-extra.mjs": "sha256:f6cc180354cabdcefc486cc1c0f746d36b370ad150d3fd97bb0075bca7cb8924",
+    "create-records.mjs": "sha256:86fccf8689bcdd289c5b546a0ec20853308fff2a73141e8e0c9f2e3f21479f8c",
+    "history-navigation.mjs": "sha256:2190a80c2a788d66ae6ba498c3ba34bfb8110b75315fb9573481503f51c52480",
+    "runtime.py": "sha256:5ff5f8a6d586d610250df665eef18089e694b4a82225fad47bf231ca64bed090",
+    "prerequisites.py": "sha256:69025adec9f23d17a6ea5e87d009c39a673c50b4a5a1ad03c51ec1d1999a4340",
+    "cpu-settings.py": "sha256:af054fd465fb1969220634c2ccfae0ff0f572fd7192491b0578dc3278709faa8",
+    "capacity-extra.mjs": "sha256:7e307cb69853b7a9f6e34676f3f0fcf7f8a97ba12b7ef90819a21a3a6245ed7b",
+    "sandbox-probe.mjs": "sha256:5124c86655505d15f8f0dd38883ff28ce254394edc2fabf1d7e20d8551a6cbe1",
+    "reload-unaccepted.mjs": "sha256:0870e44e212f8527ad3401f95c1cd38085f36c0a8064b4bb54485d4df124fe31",
+    "refusal-search-probe-v2.mjs": "sha256:a09e021742586ed1f9d56e3176e4e2ca1962c12d19ecf22783567b1a5f31db01"
+  },
+  "unitReports": {
+    "before-paired-final.json": "sha256:1de5f6c099e553c4025ed9db894a282aedb2ba9db3db7c146840f4f3b48d36ad",
+    "after-paired-final.json": "sha256:2f8d23789c67cb02786cddc58a8672a6e76fbf0f9408cd46013ceadf28336ec9"
+  },
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "-1",
+    "processLaunches": "Inherited JUSTSEARCH_* and JVM option variables stripped; GRADLE_OPTS retained; own Engine HOME/data/index/XDG/corpus only; headless Chromium short /tmp/jsv- profiles; one Engine at a time.",
+    "sandbox": "Own native sandbox probe failed No usable sandbox; permitted --no-sandbox used only for own loopback services; profile cleanup verified. Probe itself tested no product case.",
+    "sharedResources": [
+      "machine CPU",
+      "npm cache",
+      "installed unchanged Engine and Chromium executables (read only)",
+      "permitted llama-server and Qwen GGUF (read only)"
+    ],
+    "excluded": "No owner app/data/display, dev stack, external services, GPU, model download, Gradle build, source commit or publish; no logs under /tmp/js-linux-port."
+  }
+}

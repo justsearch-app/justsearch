@@ -60,11 +60,26 @@ public final class ChunkDocumentWriter {
     if (documentFieldOps == null) {
       return 0;
     }
+    String parentTokenCountRaw =
+        documentFieldOps.getDocumentField(parentDocId, SchemaFields.PARENT_TOKEN_COUNT);
+    Long parentTokenCount =
+        parentTokenCountRaw == null || parentTokenCountRaw.isBlank()
+            ? null
+            : Long.parseLong(parentTokenCountRaw);
+    return regenerateChunksFromExistingParent(documentFieldOps, indexingCoordinator,
+        parentDocId, content, chunkSpladeEnabled, parentTokenCount);
+  }
+
+  /** Regenerates replacement text with its refreshed count before the parent update is published. */
+  public static int regenerateChunksFromExistingParent(
+      DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator,
+      String parentDocId, String content, boolean chunkSpladeEnabled, Long parentTokenCount) {
+    if (documentFieldOps == null) {
+      return 0;
+    }
     String mime = documentFieldOps.getDocumentField(parentDocId, SchemaFields.MIME);
     String mimeBase = documentFieldOps.getDocumentField(parentDocId, SchemaFields.MIME_BASE);
     String fileKind = documentFieldOps.getDocumentField(parentDocId, SchemaFields.FILE_KIND);
-    String parentTokenCountRaw =
-        documentFieldOps.getDocumentField(parentDocId, SchemaFields.PARENT_TOKEN_COUNT);
     // Tempdoc 811 item 3 — inherit the parent's collection tag so the chunk branch can scope on it.
     String collection = documentFieldOps.getDocumentField(parentDocId, SchemaFields.COLLECTION);
     String parentDocUid = documentFieldOps.getDocumentField(parentDocId, SchemaFields.DOC_UID);
@@ -72,10 +87,6 @@ public final class ChunkDocumentWriter {
     boolean isMarkdown = "markdown".equalsIgnoreCase(fileKind);
     String preview = LanguageUtils.contentPreview(content, CONTENT_PREVIEW_MAX_CHARS, isMarkdown);
     String language = LanguageUtils.resolveLanguage(preview);
-    Long parentTokenCount =
-        parentTokenCountRaw == null || parentTokenCountRaw.isBlank()
-            ? null
-            : Long.parseLong(parentTokenCountRaw);
 
     return regenerateChunks(
         documentFieldOps,

@@ -113,9 +113,9 @@ describe('shell actions — AI install palette reachability (727 F-1)', () => {
     expect(getAction('core.action.shell.go-to-chat')).toBeUndefined();
     expect(await invokeAction('core.action.shell.go-to-search')).toEqual({
       kind: 'navigate',
-      to: 'core.unified-chat-surface',
+      to: 'core.search-v3-surface',
     });
-    expect(navigate).toHaveBeenCalledWith('core.unified-chat-surface');
+    expect(navigate).toHaveBeenCalledWith('core.search-v3-surface');
   });
 
   // On pre-fix code, `core.start-ai-install` / `core.repair-ai-install` were excluded from

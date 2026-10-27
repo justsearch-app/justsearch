@@ -30,17 +30,17 @@ describe('NavigationJournal', () => {
     });
 
     it('records a navigation entry', () => {
-      recordNavigation('core.search-surface', 'justsearch://surface/core.search-surface', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'justsearch://surface/core.search-v3-surface', 'Search', 'RAIL');
       const state = getJournalState();
       expect(state.entries).toHaveLength(1);
       expect(state.cursor).toBe(0);
-      expect(state.entries[0]!.surfaceId).toBe('core.search-surface');
+      expect(state.entries[0]!.surfaceId).toBe('core.search-v3-surface');
       expect(state.entries[0]!.label).toBe('Search');
       expect(state.entries[0]!.transport).toBe('RAIL');
     });
 
     it('advances cursor on subsequent navigations', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
       recordNavigation('core.health-surface', 'url3', 'Health', 'RAIL');
       const state = getJournalState();
@@ -49,7 +49,7 @@ describe('NavigationJournal', () => {
     });
 
     it('truncates forward entries on branch', async () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
       recordNavigation('core.health-surface', 'url3', 'Health', 'RAIL');
 
@@ -67,18 +67,18 @@ describe('NavigationJournal', () => {
     });
 
     it('snapshots departing surface state on new navigation', () => {
-      recordNavigation('core.search-surface', 'justsearch://surface/core.search-surface', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'justsearch://surface/core.search-v3-surface', 'Search', 'RAIL');
       // Simulate URLProjector replaceState updating the hash (user typed a query)
-      window.location.hash = '#justsearch://surface/core.search-surface?query=rust';
+      window.location.hash = '#justsearch://surface/core.search-v3-surface?query=rust';
       // Navigate away — the snapshot should update the Search entry
       recordNavigation('core.library-surface', 'justsearch://surface/core.library-surface', 'Library', 'RAIL');
       const state = getJournalState();
-      expect(state.entries[0]!.url).toBe('justsearch://surface/core.search-surface?query=rust');
+      expect(state.entries[0]!.url).toBe('justsearch://surface/core.search-v3-surface?query=rust');
     });
 
     it('R2 keeps an incoming recovery URL out of the departing surface journal entry', () => {
-      const stage = 'justsearch://surface/core.unified-chat-surface';
-      recordNavigation('core.unified-chat-surface', stage, 'Search', 'RAIL');
+      const stage = 'justsearch://surface/core.search-v3-surface';
+      recordNavigation('core.search-v3-surface', stage, 'Search', 'RAIL');
       window.location.hash = '#justsearch://surface/core.settings-surface?focusSettingsRecovery=true';
       recordNavigation('core.settings-surface', 'justsearch://surface/core.settings-surface', 'Settings', 'URL_BAR');
       const state = getJournalState();
@@ -87,9 +87,9 @@ describe('NavigationJournal', () => {
     });
 
     it('de-duplicates consecutive same-surface navigations', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
-      recordNavigation('core.search-surface', 'url2', 'Search', 'RAIL');
-      recordNavigation('core.search-surface', 'url3', 'Search', 'BUTTON');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url2', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url3', 'Search', 'BUTTON');
       const state = getJournalState();
       expect(state.entries).toHaveLength(1);
       expect(state.cursor).toBe(0);
@@ -99,9 +99,9 @@ describe('NavigationJournal', () => {
     });
 
     it('does not de-duplicate different surfaces', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
-      recordNavigation('core.search-surface', 'url3', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url3', 'Search', 'RAIL');
       expect(getJournalState().entries).toHaveLength(3);
     });
 
@@ -122,24 +122,24 @@ describe('NavigationJournal', () => {
     });
 
     it('canGoBack is false with one entry', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       expect(canGoBack()).toBe(false);
     });
 
     it('canGoBack is true with two entries', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
       expect(canGoBack()).toBe(true);
     });
 
     it('canGoForward is false at end', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
       expect(canGoForward()).toBe(false);
     });
 
     it('canGoForward is true after navigateBack', async () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
       await navigateBack(mockDispatch);
@@ -149,23 +149,23 @@ describe('NavigationJournal', () => {
 
   describe('peek', () => {
     it('peekBack returns null when at start', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       expect(peekBack()).toBeNull();
     });
 
     it('peekBack returns previous entry', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
-      expect(peekBack()!.surfaceId).toBe('core.search-surface');
+      expect(peekBack()!.surfaceId).toBe('core.search-v3-surface');
     });
 
     it('peekForward returns null at end', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       expect(peekForward()).toBeNull();
     });
 
     it('peekForward returns next entry after navigateBack', async () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
       await navigateBack(mockDispatch);
@@ -175,7 +175,7 @@ describe('NavigationJournal', () => {
 
   describe('navigateBack/Forward', () => {
     it('navigateBack dispatches previous entry', async () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
@@ -183,7 +183,7 @@ describe('NavigationJournal', () => {
 
       expect(mockDispatch).toHaveBeenCalledWith(
         expect.objectContaining({
-          address: { kind: 'navigate', target: 'core.search-surface', state: {} },
+          address: { kind: 'navigate', target: 'core.search-v3-surface', state: {} },
           transport: 'BUTTON',
         }),
         { pushHistory: false },
@@ -192,7 +192,7 @@ describe('NavigationJournal', () => {
     });
 
     it('navigateForward dispatches next entry', async () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
@@ -211,8 +211,8 @@ describe('NavigationJournal', () => {
 
     it('navigateBack restores state from recorded URL', async () => {
       recordNavigation(
-        'core.search-surface',
-        'justsearch://surface/core.search-surface?query=rust',
+        'core.search-v3-surface',
+        'justsearch://surface/core.search-v3-surface?query=rust',
         'Search',
         'RAIL',
       );
@@ -225,7 +225,7 @@ describe('NavigationJournal', () => {
         expect.objectContaining({
           address: {
             kind: 'navigate',
-            target: 'core.search-surface',
+            target: 'core.search-v3-surface',
             state: { query: 'rust' },
           },
         }),
@@ -234,14 +234,14 @@ describe('NavigationJournal', () => {
     });
 
     it('navigateBack is no-op when cannot go back', async () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
       await navigateBack(mockDispatch);
       expect(mockDispatch).not.toHaveBeenCalled();
     });
 
     it('isNavigatingHistory suppresses recording during back/forward', async () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
 
       let capturedFlag = false;
@@ -261,7 +261,7 @@ describe('NavigationJournal', () => {
 
   describe('subscribe', () => {
     it('fires listener immediately with current state', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       const listener = vi.fn();
       subscribeJournal(listener);
       expect(listener).toHaveBeenCalledTimes(1);
@@ -274,7 +274,7 @@ describe('NavigationJournal', () => {
       const listener = vi.fn();
       subscribeJournal(listener);
       listener.mockClear();
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       expect(listener).toHaveBeenCalledTimes(1);
     });
 
@@ -283,14 +283,14 @@ describe('NavigationJournal', () => {
       const unsub = subscribeJournal(listener);
       listener.mockClear();
       unsub();
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       expect(listener).not.toHaveBeenCalled();
     });
   });
 
   describe('persistence', () => {
     it('round-trips through localStorage', () => {
-      recordNavigation('core.search-surface', 'url1', 'Search', 'RAIL');
+      recordNavigation('core.search-v3-surface', 'url1', 'Search', 'RAIL');
       recordNavigation('core.library-surface', 'url2', 'Library', 'RAIL');
 
       // Simulate fresh module load by resetting in-memory state only
@@ -305,7 +305,7 @@ describe('NavigationJournal', () => {
       const state = getJournalState();
       expect(state.entries).toHaveLength(2);
       expect(state.cursor).toBe(1);
-      expect(state.entries[0]!.surfaceId).toBe('core.search-surface');
+      expect(state.entries[0]!.surfaceId).toBe('core.search-v3-surface');
     });
   });
 });

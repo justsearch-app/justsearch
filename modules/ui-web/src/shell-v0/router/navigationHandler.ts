@@ -44,7 +44,7 @@
  * checkpoint that actually does something.
  */
 
-import { parkSearchV3Handoff, takeSearchV3Handoff, takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../utils/compose.js';
+import { parkSearchV3Handoff, peekSearchV3Handoff, takeSearchV3Handoff, takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../utils/compose.js';
 import { coerceAndValidate } from './stateValidator.js';
 import { getSurfaceStateSchema, resolveSurfaceStateSchema } from './surfaceSchemas.js';
 import type { StoreAdapter } from './storeRegistry.js';
@@ -55,6 +55,13 @@ import {
   flushPendingNavigationWrite,
   pushAddress,
 } from './URLProjector.js';
+
+// Compatibility addresses name a mode of Search, not a separate state consumer.
+const COMPATIBILITY_SHAPES: Readonly<Record<string, string>> = {
+  'core.ask-surface': 'core.rag-ask',
+  'core.free-chat-surface': 'core.free-chat',
+  'core.extract-surface': 'core.extract',
+};
 
 /** Callback the Shell exposes for setting its active surface. */
 export type SetActiveSurfaceFn = (surfaceId: string) => void;
@@ -103,6 +110,8 @@ export interface NavigationHandlerConfig {
 }
 
 export interface NavigationHandleOptions {
+  /** Internal provenance: history/journal restoration never replays a prepared draft. */
+  taskOrigin?: 'fresh' | 'restore';
   /**
    * When true (default) the handler pushes a new history entry via
    * `pushAddress`. When false (used by popstate-driven activations), the
@@ -136,6 +145,14 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
         return;
       }
 
+      // Lower before schema hydration: the legacy Ask store is not read by Search v3.
+      // Retain the raw task so the existing hand-off validation can refuse invalid scope.
+      const compatibilityShape = Object.hasOwn(COMPATIBILITY_SHAPES, addr.target) ? COMPATIBILITY_SHAPES[addr.target] : undefined;
+      if (compatibilityShape) {
+        addr = { ...addr, target: 'core.search-v3-surface',
+          state: { forceShapeId: compatibilityShape, ...addr.state } };
+      }
+
       // 0. MODAL placement (tempdoc 855 §11.1) — the target opens as a window
       //    OVER the current stage surface instead of replacing it. Two skips
       //    below are load-bearing, not stylistic:
@@ -155,10 +172,10 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       //    was added is reported to the opener as `info.pushed` — the Shell needs
       //    it because `history.back()` is only a valid close when this navigation
       //    is what put the settings address on the stack (855 §11.1 D3/D4).
-      // Tempdoc 864 PR C — `push: false` is the popstate path, i.e. the browser has ALREADY moved
-      // and this address is where it landed. That is the one arrival where an absent argument is a
-      // value rather than a silence; see StoreAdapter.clearsOnTraversal.
-      const traversal = options?.push === false;
+      // Tempdoc 864 PR C — absent arguments clear stores only for actual traversal.
+      // A native fresh hash push also emits popstate and has already moved history,
+      // but it must not clear B after its incoming task is refused by capacity.
+      const traversal = options?.push === false && options.taskOrigin !== 'fresh';
 
       // Review finding F4 — settle the OUTGOING surface's debt first. A claim made within the
       // projector's 75ms window and followed straight away by a surface change would otherwise be
@@ -169,6 +186,7 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       if (!traversal) flushPendingNavigationWrite();
 
       if (config.getPlacement?.(addr.target) === 'MODAL') {
+        if (peekSearchV3Handoff()?.refused) takeSearchV3Handoff();
         applyState(addr.target, addr.state, traversal);
         // Tempdoc 855 §11.1 D3 — never stack a SECOND entry for the address we are already on.
         // Re-navigating to Settings (rail affordance pressed twice, a command-palette repeat) would
@@ -187,10 +205,11 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
         return;
       }
 
-      // A hand-off is read once, never URL-projected. Its verb's task outranks a conversation id.
+      // A hand-off is consumed only after safe intake. Its verb's task outranks a conversation id.
+      const incomingState = addr.state;
       if (addr.target === 'core.search-v3-surface' &&
-          ['query', 'docIds', 'forceShapeId', 'mode'].some(key => Object.hasOwn(addr.state, key))) {
-        parkSearchV3Handoff(addr.state);
+          ['query', 'docIds', 'forceShapeId', 'mode', 'affordance', 'selection'].some(key => Object.hasOwn(addr.state, key))) {
+        parkSearchV3Handoff(addr.state, options?.taskOrigin ?? (traversal ? 'restore' : 'fresh'));
         addr = { ...addr, state: {} };
       } else {
         takeSearchV3Handoff();
@@ -219,10 +238,11 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       // because Navigation realization moved to the handler.
       const push = options?.push !== false;
       if (push) {
+        const pending = addr.target === 'core.search-v3-surface' ? peekSearchV3Handoff() : null;
         pushAddress({
           kind: 'navigate',
           target: addr.target,
-          state: addr.state,
+          state: pending?.origin === 'fresh' ? incomingState : addr.state,
         });
       }
 

@@ -21,6 +21,7 @@
  *    this listener).
  */
 
+import { canonicalSurfaceId } from '../../shell-v0/router/surfaceIdentity.js';
 import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 import type {
   Altitude,
@@ -265,6 +266,12 @@ function rebuildIndex(catalog: SurfaceCatalog): void {
     // get a typed `factory: SurfaceFactory` they can call directly;
     // the catalog never exposes the raw mountTag for dispatch.
     next.set(entry.id, stampFactory(entry));
+  }
+  // A previous-version cached catalog can still carry a retired main window. Once its
+  // successor is present, expose only that canonical entry; old addresses use the resolver.
+  for (const id of next.keys()) {
+    const canonical = canonicalSurfaceId(id);
+    if (canonical !== id && next.has(canonical)) next.delete(id);
   }
   entriesById = next;
   for (const listener of listeners) {
@@ -548,6 +555,12 @@ export function mergePluginSurfaceContributions(
     };
     next.set(c.id, stampFactory(surface));
   }
+  // A previous-version cached catalog can still carry a retired main window. Once its
+  // successor is present, expose only that canonical entry; old addresses use the resolver.
+  for (const id of next.keys()) {
+    const canonical = canonicalSurfaceId(id);
+    if (canonical !== id && next.has(canonical)) next.delete(id);
+  }
   entriesById = next;
   for (const listener of listeners) {
     try {
@@ -573,6 +586,12 @@ export function removePluginSurfaceContributions(pluginId: string): void {
     }
   }
   if (!changed) return;
+  // A previous-version cached catalog can still carry a retired main window. Once its
+  // successor is present, expose only that canonical entry; old addresses use the resolver.
+  for (const id of next.keys()) {
+    const canonical = canonicalSurfaceId(id);
+    if (canonical !== id && next.has(canonical)) next.delete(id);
+  }
   entriesById = next;
   for (const listener of listeners) {
     try {

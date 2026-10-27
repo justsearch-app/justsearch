@@ -1,0 +1,121 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T06:07:57.699Z",
+  "revision": "cbde03ed952807b8ae1749707678b6f1eaf306b6",
+  "tree": "7c40f9369d83e9908bfa0e8816a1af2ab20695ce",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_xy5z8ko/tmp/test-intent-vitest-3-1793081274762.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2935
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 accepted address and edited text survive Library traversal and reload without delivery",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S78 accepted address and edited text survive Library traversal and reload without delivery",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S67 preservation cold valid arrival retains earlier draft without a false refusal",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 preservation cold valid arrival retains earlier draft without a false refusal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S76 preservation genuine refusal names the file limit and keeps existing draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S76 preservation genuine refusal names the file limit and keeps existing draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation canonical accepted reload keeps human edits without delivering old inputs",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S78 preservation canonical accepted reload keeps human edits without delivering old inputs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation original pre-boot input entry keeps human edits without delivering old inputs",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S78 preservation original pre-boot input entry keeps human edits without delivering old inputs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation owned input history traversal keeps human edits without delivering old inputs",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S78 preservation owned input history traversal keeps human edits without delivering old inputs",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2570475cfdc065f7bb5437ae3a9b1892ad3e6453c693103e285fa80be7237cb4"
+}

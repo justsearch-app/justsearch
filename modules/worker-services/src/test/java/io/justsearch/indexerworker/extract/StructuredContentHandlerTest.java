@@ -188,14 +188,13 @@ class StructuredContentHandlerTest {
       chars(handler, "Page 2 text");
 
       StructuredDocument doc = handler.getDocument();
-      assertEquals(3, doc.elements().size());
+      assertEquals(2, doc.elements().size());
       assertInstanceOf(Paragraph.class, doc.elements().get(0));
-      assertInstanceOf(PageBreak.class, doc.elements().get(1));
-      assertInstanceOf(Paragraph.class, doc.elements().get(2));
+      assertInstanceOf(Paragraph.class, doc.elements().get(1));
 
       assertEquals(0, ((Paragraph) doc.elements().get(0)).pageIndex());
-      assertEquals(1, ((Paragraph) doc.elements().get(2)).pageIndex());
-      assertEquals(2, doc.pageCount());
+      assertEquals(0, ((Paragraph) doc.elements().get(1)).pageIndex());
+      assertEquals(1, doc.pageCount());
     }
 
     @Test
@@ -311,14 +310,13 @@ class StructuredContentHandlerTest {
       handler.endElement("", "ul", "ul");
 
       StructuredDocument doc = handler.getDocument();
-      assertEquals(6, doc.elements().size());
+      assertEquals(5, doc.elements().size());
       assertInstanceOf(Heading.class, doc.elements().get(0));
       assertInstanceOf(Paragraph.class, doc.elements().get(1));
       assertInstanceOf(Table.class, doc.elements().get(2));
-      assertInstanceOf(PageBreak.class, doc.elements().get(3));
-      assertInstanceOf(Heading.class, doc.elements().get(4));
-      assertInstanceOf(ListBlock.class, doc.elements().get(5));
-      assertEquals(2, doc.pageCount());
+      assertInstanceOf(Heading.class, doc.elements().get(3));
+      assertInstanceOf(ListBlock.class, doc.elements().get(4));
+      assertEquals(1, doc.pageCount());
     }
   }
 

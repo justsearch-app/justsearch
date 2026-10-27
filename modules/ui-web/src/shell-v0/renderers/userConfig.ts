@@ -20,6 +20,8 @@
  * unconditionally from day one.
  */
 
+import { canonicalSurfaceId } from '../router/surfaceIdentity.js';
+
 /** Density override; affects component-token resolution via the semantic-token tier. */
 export type DensityVariant = 'compact' | 'comfortable' | 'spacious';
 
@@ -170,4 +172,36 @@ export interface RendererUserConfig {
    * so it survives reload, mirroring `activeLayoutId`'s persistence shape.
    */
   railExpanded?: boolean;
+}
+
+/** WP1.5a: retire saved keys once, so resetting a migrated preference cannot resurrect it. */
+export function normalizeSurfacePreferences(config: RendererUserConfig): RendererUserConfig {
+  const rekey = <T>(entries: Record<string, T> | undefined): Record<string, T> | undefined => {
+    if (!entries) return entries;
+    const next: Record<string, T> = Object.create(null);
+    for (const [id, value] of Object.entries(entries)) {
+      const key = canonicalSurfaceId(id);
+      if (key === id || !Object.hasOwn(entries, key)) next[key] = value;
+    }
+    return next;
+  };
+  const overrides = rekey(config.surfaceOverride);
+  if (overrides) {
+    for (const [id, target] of Object.entries(overrides)) {
+      const canonical = canonicalSurfaceId(target);
+      if (canonical === id) delete overrides[id];
+      else overrides[id] = canonical;
+    }
+  }
+  const order = Array.isArray(config.surfaceOrder) ? config.surfaceOrder.filter(id =>
+    canonicalSurfaceId(id) === id || !config.surfaceOrder!.includes(canonicalSurfaceId(id)),
+  ).map(canonicalSurfaceId) : undefined;
+  const next: RendererUserConfig = {
+    ...config,
+    ...(config.surfaceVisibility && { surfaceVisibility: rekey(config.surfaceVisibility) }),
+    ...(overrides && { surfaceOverride: overrides }),
+    ...(order && { surfaceOrder: [...new Set(order)] }),
+    ...(config.secondaryActiveSurface && { secondaryActiveSurface: canonicalSurfaceId(config.secondaryActiveSurface) }),
+  };
+  return JSON.stringify(next) === JSON.stringify(config) ? config : next;
 }

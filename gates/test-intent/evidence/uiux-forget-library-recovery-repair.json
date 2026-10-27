@@ -2,13 +2,13 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a8a45696b29fda15875699de89b4143f9979b1c1aac8ad6df609e0722925fbc7",
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
     "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
-    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-27T11:21:27.127Z",
-  "revision": "7a1196e180c667b774bd1623c65242888df1270e",
-  "tree": "fd323e67cf0bb973d61ca7f834249d171ad8e1a6",
+  "createdAt": "2026-10-27T15:52:35.943Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "55d187604343b8a3fb5cd6945c2b984714ba7d0f",
   "environment": {
     "cudaVisibleDevices": "-1",
     "displayUnset": true,
@@ -23,12 +23,12 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3p9xfbor/tmp/test-intent-vitest-12-1793100064411.json\"",
+      "command": "npx vitest run --configLoader runner \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-24098-1793116336267.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 12649,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-library-4834e076/run-2.log",
-      "outputDigest": "sha256:5876dee7c9bb63717e5efd4847bc91d06adc13cd994e12791fdc1ceac79eaf0a"
+      "durationMs": 8790,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-library-6d3af28d/run-2.log",
+      "outputDigest": "sha256:dbd663b4fdc148aced0abffdb15e9e58b0bc4bac61fc9a53e26a4a8b2c71f561"
     }
   ],
   "checks": [
@@ -103,21 +103,21 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3p9xfbor/tmp/test-intent-vitest-12-1793100077087.json\"",
+        "command": "npx vitest run --configLoader runner \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-24098-1793116347672.json\"",
         "cwd": "<before-shared-clone>",
         "exitCode": 1,
-        "durationMs": 10036,
-        "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-library-4834e076/run-1.log",
-        "outputDigest": "sha256:202eca6828814f06c9ed1baa9ce0c20f094ca9990d62a1ffa4ce0b7fc98577f2"
+        "durationMs": 8264,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-library-6d3af28d/run-1.log",
+        "outputDigest": "sha256:1d0fe4a7fe3d3ece3c1f3494a14843c373f1a8e1a902a4241dcc59dc2f01bd48"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
         "classification": "assertion",
-        "detail": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=false):  AssertionError: expected 3 to be 2 // Object.is equality\n    at /home/elias/.cache/am/3p9xfbor/tmp/evidence-before-library/before/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:191:37\n    at file:///home/elias/.cache/am/3p9xfbor/tmp/evidence-before-library/before/modul | LR56 Library Retry reconciles actual retained or alongside Search (alongside=true):  AssertionError: expected 3"
+        "detail": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=false):  AssertionError: expected 3 to be 2 // Object.is equality\n    at /home/elias/.cache/am/4t4brn6h/tmp/evidence-before-library/before/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:191:37\n    at file:///home/elias/.cache/am/4t4brn6h/tmp/evidence-before-library/before/modul | LR56 Library Retry reconciles actual retained or alongside Search (alongside=true):  AssertionError: expected 3"
       }
     ]
   },
-  "digest": "sha256:5770944eef6dcc2868dc6fa3c11f5d132e471e4a5380e9f1d4ec2dbfb9502749"
+  "digest": "sha256:e1a4b73429552af18c828837eb6ef879c2808a285d9264da48c863832a695b55"
 }

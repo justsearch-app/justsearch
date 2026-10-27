@@ -2,12 +2,17 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-25T22:44:23.191Z",
-  "revision": "3c127854fcb3f3d672c049861a723730de0503b7",
-  "tree": "176bf2345e452047c188247d61a05614cb29b34d",
+  "createdAt": "2026-10-27T15:34:49.404Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "6bfe7661b8393d2272ff8b4be6d4f1384fe62961",
   "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
     "platform": "linux",
     "arch": "x64",
     "osRelease": "7.0.0-38-generic",
@@ -18,10 +23,12 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/api/domains/forget.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/ConfirmDialog.forget-abort.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2224207-1792968257691.json\"",
+      "command": "npx vitest run --configLoader runner \"src/api/domains/forget.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/ConfirmDialog.forget-abort.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-5249-1793115284572.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 5499
+      "durationMs": 4831,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-ui-refresh-8fa81c30/run-1.log",
+      "outputDigest": "sha256:d4ec70830a0d7cd6af7f6942f066f07de2ac198b269758693700b60e1c275eed"
     }
   ],
   "checks": [
@@ -412,8 +419,63 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:91719b753d591cf6654bca1a8d6ae5250f21d80682d751ca69c9774731fce5d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "confirmed Forget immediately republishes the live choice [ '/docs/sub/report\\[1].txt ' ]",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget immediately republishes the live choice [ '/docs/sub/report\\[1].txt ', …(1) ]",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed FILE Forget prunes a kept draft across reload and navigation",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed FOLDER Forget prunes a kept draft across reload and navigation",
+          "status": "passed"
+        },
+        {
+          "name": "forgetting the last kept file requires reselection rather than granting all-file scope",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget preserves saved turn scopes while pruning a live prepared Ask",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget prunes a retained submission without rewriting its saved turn",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget prunes an incoming handoff selection and its kept file preparation",
+          "status": "passed"
+        },
+        {
+          "name": "a confirmed card Forget arriving after navigation prunes the kept draft without replacing current text",
+          "status": "passed"
+        },
+        {
+          "name": "a live kept Ask losing its final file stays blocked when returning without reload",
+          "status": "passed"
+        },
+        {
+          "name": "a live Structured draft losing its final file keeps its schema and requires reselection",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:884d59226cd445e3b825f1b7186fb5d2fd954a1a57038a731beb3bf64538a72a"
+  "digest": "sha256:d42fa55e7a105e351b7d0dcf4c037c5ab727ca24c531f16e934e3369f1de32a2"
 }

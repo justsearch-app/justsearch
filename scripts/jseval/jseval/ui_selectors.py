@@ -69,6 +69,7 @@ CSS_COMPOSER_TEXTAREA = 'jf-composer textarea'
 # Search v3 has its own composer, which opens in Search mode: Enter in this textarea searches. The
 # retired standalone `search-input` testid above is retained only for old, independently-owned steps.
 CSS_SV3_WINDOW = 'jf-sv3-window'
+CSS_SV3_DEGRADATION_COMPACT = 'jf-sv3-window [data-testid="sv3-degradation"][data-open="false"]'
 CSS_SV3_COMPOSER_TEXTAREA = 'jf-sv3-window jf-sv3-composer textarea'
 CSS_SV3_PALETTE = 'jf-sv3-window jf-sv3-palette'
 # Search v3's Search mode renders its results on the shared `<jf-results-card>`, inside its own

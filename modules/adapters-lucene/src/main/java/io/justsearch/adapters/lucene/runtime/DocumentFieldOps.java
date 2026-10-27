@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import org.apache.lucene.index.DocValues;
+import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.index.Term;
@@ -683,7 +684,15 @@ public final class DocumentFieldOps {
       return List.of();
     }
       return bridge.withSearcher(searcher -> {
-        Query valueQuery = new TermQuery(new Term(field, value));
+        FieldMapper.FieldDef def = session.fieldMapper.fieldDef(field);
+        Query valueQuery;
+        if (def != null && "double".equals(def.type)) {
+          Double numeric = FieldMapper.asDouble(value);
+          if (numeric == null) return List.of();
+          valueQuery = DoublePoint.newExactQuery(field, numeric);
+        } else {
+          valueQuery = new TermQuery(new Term(field, value));
+        }
         Query query =
             excludeChunks
                 ? new BooleanQuery.Builder()

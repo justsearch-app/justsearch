@@ -36,6 +36,7 @@
  * old keys in place (so a revert reads the old data).
  */
 
+import { normalizeSurfacePreferences } from '../renderers/userConfig.js';
 import type { RendererUserConfig } from '../renderers/userConfig.js';
 // Allowlisted in eslint.config.js — see 511-followup-B. This file is
 // state/projection mirroring a wire enum and pre-dates the
@@ -549,7 +550,9 @@ function ensureInitialized(): void {
   if (v2Raw !== null) {
     const parsed = parseDocument(v2Raw);
     if (parsed !== null) {
-      setDocumentFromView(parsed);
+      const migrated = migrateSurfacePreferences(parsed);
+      setDocumentFromView(migrated);
+      if (migrated !== parsed) saveDocument(migrated);
       return;
     }
     // F9: parseDocument returned null. Distinguish a document written by
@@ -577,18 +580,31 @@ function ensureInitialized(): void {
   if (v1Raw !== null) {
     const parsed = parseDocument(v1Raw);
     if (parsed !== null) {
-      setDocumentFromView(parsed);
+      const migrated = migrateSurfacePreferences(parsed);
+      setDocumentFromView(migrated);
       // Persist as v2 so future boots take the fast path.
       // V1 key is preserved (revertible) per the legacy migration
       // convention.
-      saveDocument(parsed);
+      saveDocument(migrated);
       return;
     }
   }
   // No consolidated document — try V1.5 alpha → V1.5.1 → V2 migration.
   const migrated = migrateFromLegacy();
-  storageSig.set(migrateV1ToV2(migrated));
+  setDocumentFromView(migrateSurfacePreferences(viewFromStorage(migrateV1ToV2(migrated))));
   saveDocument(docSig.get());
+}
+
+/** Normalize active and inactive profiles together, preserving explicit successor preferences. */
+function migrateSurfacePreferences(doc: UserStateV1): UserStateV1 {
+  let changed = false;
+  const profiles = Object.fromEntries(Object.entries(doc.profiles).map(([id, profile]) => {
+    const userConfig = normalizeSurfacePreferences(profile.userConfig);
+    if (userConfig === profile.userConfig) return [id, profile];
+    changed = true;
+    return [id, { ...profile, userConfig }];
+  }));
+  return changed ? { ...doc, profiles, userConfig: profiles[doc.activeProfileId]!.userConfig } : doc;
 }
 
 function parseDocument(raw: string): UserStateV1 | null {

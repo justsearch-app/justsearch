@@ -1,0 +1,2739 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T11:51:54.940Z",
+  "revision": "5b8ec276a0c71138b8c99f9aa94b95e439eedf7b",
+  "tree": "17b62ab5b3cb626d1124a026935bdb5fc1612fde",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.coldDraft.test.ts\" \"src/shell-v0/controllers/draftPersistence.test.ts\" \"src/shell-v0/router/sources/URLSource.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.structured.test.ts\" \"src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts\" \"src/shell-v0/views/search-v3/sv3-search.test.ts\" \"src/shell-v0/views/search-v3/sv3-recovery.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" \"src/shell-v0/views/search-v3/sv3-occlusion.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts\" \"src/shell-v0/router/sv3ConversationUrl.test.ts\" \"src/shell-v0/router/URLProjector.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3803619-1793015505611.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9321
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.coldDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fa9a6fc5d21c24e24c2406fcc764c2aeffb82d67533390b06e077a41f30ef1fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC15 cold 'old alias Ask' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold 'answer FreeChat' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold 'retired Search query' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold 'retired Agent files' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold 'answer Structured files' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold 'invalid empty scope' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold 'invalid selection' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold 'invalid mode' preserves legacy until routing has prepared the task",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold conversation address outranks the pointer without disposing of the old draft",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold incoming edits survive leave return reload and restart while legacy stays saved",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold native link is settled before ordinary boot can transfer legacy",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold queued native delivery waits for the initial drain before draft disposition",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold no-ingress transfer waits for native absence then remains one time after Clear",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 FC15 a restored journal task cannot replace legacy text or issue it",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold rapid arrivals before hydration preserve only the latest prepared scope",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold reconnect ignores startup completion from the disconnected Shell lifecycle",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 cold stale native startup cannot replace a newer task after Shell reconnects",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 neighboring successor collision keeps its text and the exact old value after restart",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 neighboring destination write refusal keeps the old copy for a later clean mount",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 neighboring two pending Shell mounts retain the durable transfer when the last tab closes",
+          "status": "passed"
+        },
+        {
+          "name": "FC15 neighboring a tab closing before its ingress settles cannot erase another tab transfer",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 a real reload origin never applies an old URL task over successor raw B or disposes legacy A",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts",
+      "file": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3a95afd4c7f8d6efd8ecf015b60334f044412ec945470941ff9fe10fac6f3be4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DraftPersistence (tempdoc 609 §R T2.1) flushes a draft to localStorage on disconnect",
+          "status": "passed"
+        },
+        {
+          "name": "DraftPersistence (tempdoc 609 §R T2.1) rehydrates a fresh instance from storage on first connect (the reload path)",
+          "status": "passed"
+        },
+        {
+          "name": "DraftPersistence (tempdoc 609 §R T2.1) does NOT clobber the live in-memory draft when a RETAINED instance reconnects",
+          "status": "passed"
+        },
+        {
+          "name": "DraftPersistence (tempdoc 609 §R T2.1) removes the storage entry when the draft is emptied",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 a failed raw read never authorizes overwriting an unread sole copy on disconnect",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 failed destination re-read during adoption preserves another tab sole successor before disconnect",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/sources/URLSource.test.ts",
+      "file": "modules/ui-web/src/shell-v0/router/sources/URLSource.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:10a3045eb291ea2e575339ed4ee88610e5dade48ca5e815c672ff4507d86020d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "URLSource — boot read dispatches the parsed Intent when hash starts with #justsearch://",
+          "status": "passed"
+        },
+        {
+          "name": "URLSource — boot read emits nothing when no hash is present",
+          "status": "passed"
+        },
+        {
+          "name": "URLSource — boot read emits nothing when hash is unrelated (no justsearch:// prefix)",
+          "status": "passed"
+        },
+        {
+          "name": "URLSource — boot read emits nothing on malformed justsearch URLs",
+          "status": "passed"
+        },
+        {
+          "name": "URLSource — popstate dispatches with pushHistory: false on popstate (browser already moved history)",
+          "status": "passed"
+        },
+        {
+          "name": "URLSource — popstate teardown removes the popstate listener",
+          "status": "passed"
+        },
+        {
+          "name": "URLSource — SSR safety returns a no-op teardown when no window is available",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 native URL provenance is bounded and conservative consumes a matching native push once; traversal/reload and missing metadata restore",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 native URL provenance is bounded and conservative cancellation, stale/unmatched destinations, untrusted events and stop cannot authorize a push",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 boot NavigationTiming navigate distinguishes fresh URL from automatic or unknown restoration",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 boot NavigationTiming reload distinguishes fresh URL from automatic or unknown restoration",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 boot NavigationTiming back_forward distinguishes fresh URL from automatic or unknown restoration",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 boot NavigationTiming undefined distinguishes fresh URL from automatic or unknown restoration",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 boot NavigationTiming unusable distinguishes fresh URL from automatic or unknown restoration",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5c545311fc85d3922d4de0654fb92a36fd961b04c770999b4c2ef977a812fed5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "branching a conversation from a turn forks at the turn’s OWN answer, opens the branch, and loads both of its records",
+          "status": "passed"
+        },
+        {
+          "name": "branching a conversation from a turn says so and changes nothing when the store refuses the branch",
+          "status": "passed"
+        },
+        {
+          "name": "branching a conversation closes a citation pane open on the parent closes the pane once \"Branch\" claims the child conversation (route #4 -> openBranch)",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager shows the base as version 1 of the fork and pages forward into the branch",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager shows a branch as version 2 once it has a turn of its own",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager renders NO pager on a root conversation nothing forked from",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager refuses to step past the first version",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch forks BEFORE the question, not after its answer, and re-sends into the branch",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch forks a THIRD turn at the turn before it, not at the conversation’s first answer",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch forks the FIRST question at the empty-prefix sentinel",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch keeps the rewrite in the editor when the branch is refused",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch holds the rewrite and says why when a stream starts under the open editor",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch retries a turn by re-sending its ORIGINAL question from the same fork point",
+          "status": "passed"
+        },
+        {
+          "name": "a turn that names no store message offers no branch affordance offers neither Edit nor Retry on a turn whose fork point is a run-plane id",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version retries a tool-less Delegate turn as a Delegate, after reload, while the composer shows Ask",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version edits the FIRST question of a Delegate conversation at the empty-prefix sentinel",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version runs even when no documents are indexed — the Ask-only gate does not apply",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a branch’s own Delegate turn as a SIBLING of that branch",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a retry’s own first turn as a third version of the original, not a branch of the retry",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version branches from a Delegate turn without running anything, and leaves the composer in Delegate",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while the model is unavailable, keeps the edited text, and forks nothing",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead keeps the edited text and says why when the agent becomes unavailable during the fork",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while another run is active, and says so",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead says the branch failed and runs nothing when the store refuses the fork",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead gives an INHERITED Delegate turn no Retry or Edit — it belongs to the parent",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches asks about the branches, names them, and deletes them with it on consent",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches TD1 TD2 TD9 confirms distinguishing facts and the complete nested tree",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches TD1 TD7 does not invent a creation date for an incomplete deletion record",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches leaves everything when the reader declines, and says nothing",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches reports which branch failed after a partially completed cascade",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches displays a refusal from another client without asking to delete branches",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches says so when the store refuses the delete outright",
+          "status": "passed"
+        },
+        {
+          "name": "two reloads of the same conversation cannot land out of order discards the SUPERSEDED /history answer however late it arrives",
+          "status": "passed"
+        },
+        {
+          "name": "CD3 confirmed conversation deletion forgets the open deleted child and cached turns when the next cascade child fails",
+          "status": "passed"
+        },
+        {
+          "name": "CD3 confirmed conversation deletion forgets a cached open conversation when a refreshed list confirms its deletion",
+          "status": "passed"
+        },
+        {
+          "name": "a deletion refresh clears this window without claiming another windows active conversation",
+          "status": "passed"
+        },
+        {
+          "name": "forgets cached turns after restart when the missing server row is confirmed absent",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.1 discovers every old version on both sides after reload without enlarging recents",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery BF2a refreshes base and branch versions after existing list reads without typing reads",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.2 hides counts while pending and failed and preserves typing",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.2 refreshes old fork membership on creation and deletion",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.3 S16.4 names the immediate parent and opens it through an accessible native control",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.3 restores the neutral immediate-parent control for an old locked branch",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.3 uses a neutral name for a hidden parent on an empty branch",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.1 pages an empty continuation at the last answer from base and branch",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.1 keeps the parent fork on the first own turn and own forks on later turns",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.2 ignores a stale successful read after a newer deletion refresh",
+          "status": "passed"
+        },
+        {
+          "name": "S16.2 never labels a removed open branch as the base version while absence is unconfirmed",
+          "status": "passed"
+        },
+        {
+          "name": "BN1 S16.2 Retry sends while complete fork reads are still pending",
+          "status": "passed"
+        },
+        {
+          "name": "S16.1 S16.2 waits for branch lineage before presenting a fork count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ba4743df6b52e0784678ceefbd9541eac0a17492a94cec993e30c3bbba48a4ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the effective-context FLOOR round-trips against the store sets the floor on the turn’s own question, re-reads /history, and dims what is above",
+          "status": "passed"
+        },
+        {
+          "name": "the effective-context FLOOR round-trips against the store keeps the divider’s controls REACHABLE — separator is on the hairline, not the row",
+          "status": "passed"
+        },
+        {
+          "name": "the effective-context FLOOR round-trips against the store restores the full context from the divider’s own control",
+          "status": "passed"
+        },
+        {
+          "name": "the effective-context FLOOR round-trips against the store re-reads /history even when the write was REFUSED, and says which act failed",
+          "status": "passed"
+        },
+        {
+          "name": "COMPACTION and its summary compacts up to a turn, then discloses and EDITS the summary in place",
+          "status": "passed"
+        },
+        {
+          "name": "COMPACTION and its summary keeps a REFUSED summary edit open, with the reader’s correction still in it",
+          "status": "passed"
+        },
+        {
+          "name": "COMPACTION and its summary says the summarization did not happen when the compaction came back empty",
+          "status": "passed"
+        },
+        {
+          "name": "hiding a TURN from the next prompt excludes both of the turn’s messages, dims it, and counts it in the bar",
+          "status": "passed"
+        },
+        {
+          "name": "hiding a TURN from the next prompt offers INCLUDE for a turn already hidden, and puts it back",
+          "status": "passed"
+        },
+        {
+          "name": "hiding a TURN from the next prompt puts every hidden turn back in one act from the bar",
+          "status": "passed"
+        },
+        {
+          "name": "a turn the endpoints cannot address offers NO context affordance renders no ⋯ trigger on an agent turn, whose ids belong to the run plane",
+          "status": "passed"
+        },
+        {
+          "name": "a turn the endpoints cannot address offers NO context affordance withholds the trigger on SETTLED turns too while the window is streaming",
+          "status": "passed"
+        },
+        {
+          "name": "a turn the endpoints cannot address offers NO context affordance renders no ⋯ trigger on a LIVE turn — its handle is positional until the record speaks",
+          "status": "passed"
+        },
+        {
+          "name": "how full the context is, and what is in it renders no meter until a turn has reported an occupancy",
+          "status": "passed"
+        },
+        {
+          "name": "how full the context is, and what is in it reads the occupancy off the turn’s own terminal and draws it against n_ctx",
+          "status": "passed"
+        },
+        {
+          "name": "how full the context is, and what is in it leaves the meter behind when the reader claims another conversation",
+          "status": "passed"
+        },
+        {
+          "name": "how full the context is, and what is in it opens the shared inspector on a prompt that agrees with the transcript",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) sends the earlier turns as context, oldest first, on the conversation’s own id",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) sends no context with the first question of a new conversation",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) leaves out excluded messages and everything above the floor, and leads with the summary",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) does not bring older turns back when the floor’s own message is excluded (S2.9)",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) places a floor that sits on a message not shown here by the saved order",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) leaves out a hidden message from INSIDE a combined answer, as the bar counts it",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) starts at a floor set INSIDE a combined answer, sending nothing saved before it",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) starts at a floor on the LAST message of a combined answer, sending only that message",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) does not send older turns before the conversation’s context settings have arrived",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) refuses the follow-up when the conversation’s context settings cannot be read",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) shows in the inspector exactly the messages it sends — one hidden answer, not its turn",
+          "status": "passed"
+        },
+        {
+          "name": "the \"Interpreted as\" note survives a cold reload (S2.1) shows each note on its own turn live, after the record refresh, and after a reload",
+          "status": "passed"
+        },
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) counts unique hidden messages not shown here beside the hidden turns on screen",
+          "status": "passed"
+        },
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) shows and undoes exclusions that are ALL off screen, without inventing a turn count",
+          "status": "passed"
+        },
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) clears every recorded exclusion once each, on screen and off",
+          "status": "passed"
+        },
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) says the context starts at a message not shown here, shows and edits its summary, and restores",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) reports a PARTIALLY refused Include all as a failure and shows what was really saved",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) does not wipe the bar when the reload after Include all fails",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks Include all unconfirmed when its reload failed",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks Restore unconfirmed when its reload failed",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) leaves the bar on the saved floor when Restore is refused AND its reload fails",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) queues the next write until the previous refresh has settled",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R1' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R4' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R5' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R10' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'include' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'compact' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'summary' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved floor unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved compact unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved summary unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved restore unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved exclude unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved include unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved include-all unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps an honest refusal after context recovers and the composer becomes \"\" (X20)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps an honest refusal after context recovers and the composer becomes \"A different draft\" (X20)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) requires explicit retirement before sending in another conversation while context waits (X28/RR15)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the refused-send reason through failed background retries (X19)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps a refused question visible beside newer input through retry and recovery (X15)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) re-reads interrupted first history on reattach after screen switch and retries failures (X14a)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) re-reads interrupted first history on reattach after reparent and retries failures (X14a)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) refuses follow-up after an interrupted first history read and a failed re-read (X14b)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) confirms a lost write response by reading history before sending Ask",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) retries unconfirmed context on backoff and reconnect and cancels retries on disconnect",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) sends the submitted question after a context wait and keeps later input: A newer unsent question",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) sends the submitted question after a context wait and keeps later input: Submitted question",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) warns after a failed history read on load and refuses Ask with its draft kept",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) warns after a failed history read on reload and refuses Ask with its draft kept",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) refuses Ask when a load read is still pending and its confirmation read fails",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) recovers a failed load history read on backoff without another action",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) waits for queued context writes before Ask and sends the question once",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) Include all uses the exclusions saved by an earlier queued action after its failed refresh",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) automatically confirms saved context when a backoff retry succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the conversation the reader moved to on ITS saved state while the undo finishes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO1 HO2 a cold address query arrives intact and is consumed from the address",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.summarize prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.extract prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO5 HO9 a selection is local to its prepared turn",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO5 the real Explain sender with empty docIds sends the ranking trace",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 editing Explain instructions keeps its model trace inspectable in the submitted turn",
+          "status": "passed"
+        },
+        {
+          "name": "HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 two arrivals replace preparation without sending",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 an incoming query replaces typed Search without creating a conversation place",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 HO8 cold third-snapshot intake refuses without replacing the raw or typed draft",
+          "status": "passed"
+        },
+        {
+          "name": "HO11 an answer link ignores agent affordance and conversation and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 an empty file hand-off cannot widen to the whole index",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary Retry menu names the original summary inputs",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary retry states its missing inputs and never sends an all-files Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary edit states its missing inputs and never sends an all-files Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 an outgoing conversation keeps its unsent draft and files one click away",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 abandoning a prepared selection cannot attach it to another mode send",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 abandoning a hand-off for an unvisited conversation clears its file scope",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 leaving the window retires prepared context while a layout reparent keeps it",
+          "status": "passed"
+        },
+        {
+          "name": "HO10 unavailable chat still shows the prepared task and chosen files",
+          "status": "passed"
+        },
+        {
+          "name": "HO12 an incoming task puts keyboard focus in the composer",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 malformed selection data is refused visibly without a crash",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a streaming Ask stays live and keeps its draft and files across a hand-off",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a held real controller keeps its decision and reopens from the sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a locked conversation is left intact by incoming preparation",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 a refused unreadable-document hand-off keeps the instruction and files",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 D7 a Structured hand-off with no files uses typed text and waits for send",
+          "status": "passed"
+        },
+        {
+          "name": "HO12 keyboard palette search after a hand-off returns focus to the composer",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 a reloaded Explain Retry menu states its actual restoration limit",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 HO5 a reloaded Explain retry refuses before fork and preserves unrelated B",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 HO5 a reloaded Explain edit refuses before fork and preserves unrelated B",
+          "status": "passed"
+        },
+        {
+          "name": "merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
+          "status": "passed"
+        },
+        {
+          "name": "merge an unscoped Summarize input failure is not a no-matching-files result",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'inline trace'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'shortened'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'different question'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'emptied'",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 transfers the legacy draft durably once and never resurrects it after Clear",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 defers legacy transfer for an explicit arrival until a later clean mount",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 a failed durable write leaves the legacy draft recoverable",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.rag-ask prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.free-chat prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.extract prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a workflow compatibility mount announces its unavailable disposition",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"mode\":[\"ask\",\"search\"]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"forceShapeId\":[]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"docIds\":[\"\",\"chosen.md\"]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return",
+          "status": "passed"
+        },
+        {
+          "name": "C8 W3 a workflow answer link stays unprepared and announces its unavailable disposition",
+          "status": "passed"
+        },
+        {
+          "name": "C7 C8 an outgoing compatibility view cannot consume the main window arrival",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 a shared line passage is highlighted without inventing a missing citation position",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 changing the address place keeps the shared reader until explicitly closed",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 allows two whole same-text proposals, refusing a third before replacement or a request",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 ordinary compatibility model tier changes retain the actual no-retrieval proposal before any leave",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 rejected fresh hash intake preserves live conversation B and both snapshots before traversal clearing",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 bare history restoration cannot retire live B when both existing recovery slots are needed",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 bare history restoration cannot retire review B when both existing recovery slots are needed",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 one-slot automatic hero navigation retains B at its origin while explicit New retires current B",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:68759cc65ce61667b54746b020f86cc565f9d3d39237b40202a7275befe8e1b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IR15 initial context confirmation pagehide latches abandonment before a delayed initial Send can issue or clear",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation pagehide-return latches abandonment before a delayed initial Send can issue or clear",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation hidden latches abandonment before a delayed initial Send can issue or clear",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation hidden-return latches abandonment before a delayed initial Send can issue or clear",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation pagehide-return keeps both captured A and newer B through return and reload without sending",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation hidden-return keeps both captured A and newer B through return and reload without sending",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation disconnect-return abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation navigation-ABA abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation search-placement-ABA abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation New abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation handoff abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation discard abandons a pending initial Send without a late dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation unchanged preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation newer text preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation same-text assignment preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation edit-away-back preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation empty preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation IME preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation future parameters preserves initial captured A semantics when no placement is abandoned",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation core.rag-ask compatibility initial context wait honors latched hide and preserves schema/raw",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation core.extract compatibility initial context wait honors latched hide and preserves schema/raw",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation core.rag-ask keeps captured scope schema and effort while newer input changes future parameters",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation core.extract keeps captured scope schema and effort while newer input changes future parameters",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation failed response after hide preserves raw input and never invents dispatch or Stop",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation still pending after hide preserves raw input and never invents dispatch or Stop",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation confirmed removal abandons an initial context wait and retains the draft without Stop",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation core.rag-ask already issued Send keeps its stream on hide and sends no Stop or replacement",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation core.free-chat already issued Send keeps its stream on hide and sends no Stop or replacement",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial context confirmation core.extract already issued Send keeps its stream on hide and sends no Stop or replacement",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat retry with unchanged while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat edit with unchanged while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat retry with pagehide-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat edit with pagehide-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat edit with hidden-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat retry with hidden-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat retry with navigation-ABA while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat edit with disconnect-return while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        },
+        {
+          "name": "IR15 initial Retry/Edit fork continuation core.free-chat edit with discard while the fork waits cannot issue an abandoned task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:23cf803ed69a435ba3774e4c7d2ce45bc41b11c6137faa1d31c919e2998a23f1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps schema third and model choice fourth, with distinct request and live turn identities",
+          "status": "passed"
+        },
+        {
+          "name": "never classifies a live Structured NO_CONTENT as no-evidence or offers the model action",
+          "status": "passed"
+        },
+        {
+          "name": "cold retry keeps the model turn a persistent model answer",
+          "status": "passed"
+        },
+        {
+          "name": "cold edit keeps the model turn a persistent model answer",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 cold Structured retry refuses before fork with B kept and no model answer",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 cold Structured edit refuses before fork with B kept and no model answer",
+          "status": "passed"
+        },
+        {
+          "name": "remembered Structured Retry reuses its schema without becoming a model answer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d8dd65634d6dace8ddd9633b623f2c9a49f3d32496674782534a67c15c93f94d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "NR15 human admission and RR15 refusal recovery marks explicit human Send and removes an unaccepted optimistic answer",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery allows human Send from positively unloaded chat without granting Delegate or force",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery zero documents do not block human core.free-chat (unloaded=false)",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery zero documents do not block human core.free-chat (unloaded=true)",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery zero documents do not block human core.extract (unloaded=false)",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery zero documents do not block human core.extract (unloaded=true)",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery retains A and newer B across same-tab reload, review-only",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery one explicit force continues captured A exactly once after 200 without a READY poll",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery one explicit force continues captured A exactly once after 202 without a READY poll",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery unknown transport delivery never claims not sent or offers blind retry",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative GPU_BUSY forceAllowed=true without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative GPU_BUSY forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative GAME_MODE forceAllowed=true without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative GAME_MODE forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative RELOAD_BACKOFF forceAllowed=true without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative RELOAD_BACKOFF forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative LOADING forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative HELD_MODEL forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery different during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery same during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery away-and-back during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery empty during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery ime during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery hide during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery pagehide during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery disconnect during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery New during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery Stop during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery Stop during admission cannot be undone by a late typed LOADING refusal",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a second unresolved submission cannot replace retained A with newer B",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery refuses issuance when session retention fails, preserving raw and live input",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery rejects singleton-array shape without touching any stored or live text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery rejects singleton-array effort without touching any stored or live text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery rejects singleton-array delivery without touching any stored or live text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery EOF without a terminal remains unknown delivery and blocks a second submission",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery changing the chosen file through the card action during force revokes the old task",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery compatibility free-chat composer owns clearing its submitted draft",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery malformed attachment preserves its bytes and blocks unsafe issuance",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery version attachment preserves its bytes and blocks unsafe issuance",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery unknown-field attachment preserves its bytes and blocks unsafe issuance",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery oversize attachment preserves its bytes and blocks unsafe issuance",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery UTF8 input bounds refuse before issuance, without truncation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery ready then explicit off keeps human Send unavailable and draft intact",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery unknown-delivery retention ACK failure blocks issuance before clearing the composer",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery failed retirement keeps A and the newer B companion in existing bytes and live input",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery retiring a task after navigation retains the originating newer draft",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery initial context wait respects newer text without losing captured A",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery initial context wait respects same-text assignment without losing captured A",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery initial context wait respects navigation away and back without losing captured A",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery initial context wait respects discard without losing captured A",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery done retires the unresolved slot and allows another fresh submission",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery CANCELLED retires the unresolved slot and allows another fresh submission",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery overlapping same-owner mounts reject a stale writer without overwriting the first task",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery main and known compatibility shape owners retain independent unresolved slots",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery schema during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery effort during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery tier during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery selection during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery clear selection during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery context during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery handoff during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery navigation during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery reload during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery free-chat compatibility sends subsequent turns with zero documents and preserves newer input",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a model-answer turn action never clears or restores unrelated composer text on success",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a model-answer turn action never clears or restores unrelated composer text on refusal",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery grounded Ask still requires indexed documents and never falls through to model or Delegate",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 scope-count cap refuses before replacing current text/settings or any request",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 scope-id-UTF8 cap refuses before replacing current text/settings or any request",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 schema-UTF8 cap refuses before replacing current text/settings or any request",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 serialized-UTF8 cap refuses before replacing current text/settings or any request",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid task-field attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid draft-field attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid payload-field attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid scope-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid scope-count attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid raw-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid raw-UTF8 attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid draft-UTF8 attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid schema-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid schema-UTF8 attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid place-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid record-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid reselection-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid effort-value attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid delivery-value attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid three-places attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid typed-version attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid incarnation-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid preparation-kind-array attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid preparation-scope-kind-array attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 raw preserves raw C and session B before refusing a third incoming snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 incoming preserves raw C and session B before refusing a third incoming snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery tab-isolated Storage realms retain distinct tasks and a copied attachment restores only for review",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery summarize preserves its exact live passage but persists no excerpt, history or force authority",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery Explain retention excludes the embedded backend ranking trace and preserves user instructions",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery an overlapping stale owner cannot retire a task after its live owner retries back to the same inputs",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 saved core.rag-ask Retry/Edit require their own exact scope and preserve B",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 saved core.free-chat Retry/Edit require their own exact scope and preserve B",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery an explicit force retains its lock through the follow-up dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a stale force control cannot load or dispatch after explicit retirement",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a transport load failure retains A and newer input without a follow-up dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a http load failure retains A and newer input without a follow-up dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a typed load failure retains A and newer input without a follow-up dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery untyped HTTP rejection remains delivery unknown with no inferred force authority",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery force continuation rechecks off status without granting background readiness",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery force continuation rechecks failed status without granting background readiness",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery force continuation rechecks loading status without granting background readiness",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery exact UTF8 user-text and scope limits are accepted, with captured effort and scope intact",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery exact schema UTF8 limit is accepted for typed Structured",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery Stop through late transport loss stays revoked and cannot become a saved stopped claim",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery choosing a file after a free-chat handoff replaces its model-only preparation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery supported Summarize with a passage does not acquire an indexed-document prerequisite",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery the real chosen-result Ask control remains operable for human admission while unloaded",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery confirmed deletion during force revokes the old target without sending Stop",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery ordinary Retry becomes available after its interval but the timer never submits",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery context that changes during the follow-up confirmation cannot replace the captured force context",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a forced Structured success consumes only its original one-send file preparation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothing starts in Search, says so to assistive tech, and words what Enter does",
+          "status": "passed"
+        },
+        {
+          "name": "S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothing restores the draft into the composer without searching, asking or delegating",
+          "status": "passed"
+        },
+        {
+          "name": "S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothing keeps Shift+Enter a newline and an IME Enter the IME’s, in Search mode too",
+          "status": "passed"
+        },
+        {
+          "name": "S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothing does not search a half-composed IME string, and searches once composition ends",
+          "status": "passed"
+        },
+        {
+          "name": "S1.3 — the same staged searches the default window sends, and no turn sends the quick pass while typing and the refined pass on settle, through the one intent seam",
+          "status": "passed"
+        },
+        {
+          "name": "S1.3 — the same staged searches the default window sends, and no turn runs the full pass at once on Enter, superseding the staged ones",
+          "status": "passed"
+        },
+        {
+          "name": "S1.3 — the same staged searches the default window sends, and no turn typing in Ask mode issues no search at all",
+          "status": "passed"
+        },
+        {
+          "name": "S1.4 — with chat unavailable, Search works and every ask says why it cannot types, lists, selects and opens; Ask keeps the query and states the reason",
+          "status": "passed"
+        },
+        {
+          "name": "S1.5 — results use the shared results card and open in the document pane renders the shared card, opens a hit in the pane, and keeps a multi-file choice",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files sends the chosen documents as paths, each document once",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files fixes the set when asked: a later re-rank or filter does not change it",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files drops a chosen row that a new result list no longer holds — visibly",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files offers no ask about an empty choice, and never sends an empty set as a whole-index ask",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — an Ask about the chosen files retrieves from exactly those files scopes \"Ask about this file\" from the card menu to that one document",
+          "status": "passed"
+        },
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later does not carry the files into a later ordinary Ask",
+          "status": "passed"
+        },
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later drops a prepared scope on New session",
+          "status": "passed"
+        },
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later Retry of a scoped answer keeps the same files, and says so",
+          "status": "passed"
+        },
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later DS1 known live chosen-file Ask Edit forks its own exact inputs while unrelated review-required B remains recoverable",
+          "status": "passed"
+        },
+        {
+          "name": "S1.7 — chosen files belong to one Ask and its re-sends, nothing later DS1 after reload Retry/Edit say the original Ask inputs are unknown",
+          "status": "passed"
+        },
+        {
+          "name": "S1.8 — a search shows results and keeps the conversation one click away leaves a streaming answer streaming, in the sidebar, and reopens it with one click",
+          "status": "passed"
+        },
+        {
+          "name": "S1.8 — a search shows results and keeps the conversation one click away never steers a live delegated run",
+          "status": "passed"
+        },
+        {
+          "name": "S1.9 — an older query’s results are never shown as the current ones stops showing the previous rows the moment the query changes",
+          "status": "passed"
+        },
+        {
+          "name": "S1.9 — an older query’s results are never shown as the current ones shows nothing for a cleared query, even when the earlier request answers late",
+          "status": "passed"
+        },
+        {
+          "name": "S1.9 — an older query’s results are never shown as the current ones says \"no documents matched\" and \"search failed\" in different words",
+          "status": "passed"
+        },
+        {
+          "name": "S1.10 — nothing restricts results invisibly shows a scope chip the default window pinned, and removing it re-runs the search unrestricted",
+          "status": "passed"
+        },
+        {
+          "name": "S1.10 — nothing restricts results invisibly keeps a facet filter removable when it leaves zero hits",
+          "status": "passed"
+        },
+        {
+          "name": "S1.10 — nothing restricts results invisibly shows a date range set elsewhere, and clears it",
+          "status": "passed"
+        },
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query follows a search made in the other window when the reader comes back",
+          "status": "passed"
+        },
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query shows the shared query on a first entry, in the composer and in the list",
+          "status": "passed"
+        },
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query returns to the list with the shared query after a conversation, too",
+          "status": "passed"
+        },
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query never overwrites an unsent Ask draft; Search mode then searches what the composer holds",
+          "status": "passed"
+        },
+        {
+          "name": "S1.10 — the composer, the heading and the rows describe the one shared query keeps a restored draft on a first entry and shows no list it would contradict",
+          "status": "passed"
+        },
+        {
+          "name": "S1.11 — the palette’s search uses Search mode has no developer \"Search this text\" entry, and \"Search everything\" shows results",
+          "status": "passed"
+        },
+        {
+          "name": "S1.13 — Back and Forward between results and a conversation keeps the results, the query and the chosen scope with the results, and none in the conversation",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 ambiguous restored draft ownership does not issue an unscoped Enter from restored search-v3.composer",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 ambiguous restored draft ownership does not issue an unscoped Enter from restored unified-chat.composer",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 ambiguous restored draft ownership does not stage an edited restored draft through the typing debounce",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 review establishes current intent without issuing it keeps typed A separate from same bytes A until current review",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 review establishes current intent without issuing it keeps typed A separate from newer raw B until current review",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 review establishes current intent without issuing it explicit Search uses current effective filters and starts only on the next deliberate operation",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 review establishes current intent without issuing it an independent shared search C runs while restored B stays in its composer",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 review establishes current intent without issuing it real chosen-row preparation survives same-tab reload as data requiring explicit review",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 a known live unrestricted Ask still retries as Ask when the unrelated composer is Delegate",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:13107cc2d3c1265b526a879127dd1a0a5b3f5bbeb7c469b856d163d1ba8bbfb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XT1 XT9 offers Structured by keyboard with a labelled multiline schema kept within this window",
+          "status": "passed"
+        },
+        {
+          "name": "XT2 XT4 sends extraction schema and instruction and renders only terminal JSON literally with sources",
+          "status": "passed"
+        },
+        {
+          "name": "XT5 rejects schema {bad} at the box without sending or clearing",
+          "status": "passed"
+        },
+        {
+          "name": "XT5 rejects schema [] at the box without sending or clearing",
+          "status": "passed"
+        },
+        {
+          "name": "XT5 rejects schema null at the box without sending or clearing",
+          "status": "passed"
+        },
+        {
+          "name": "XT5 XD1 keeps undelivered extraction drafts and drops the unrecorded failed turn on reload",
+          "status": "passed"
+        },
+        {
+          "name": "XT6 keeps schema and instruction when chat is unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 XT8 restored Structured retry preserves B and requires exact own inputs",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 XT8 restored Structured edit preserves B and requires exact own inputs",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 XT8 restored Structured branch preserves B and requires exact own inputs",
+          "status": "passed"
+        },
+        {
+          "name": "XT4 retains instruction schema and files when the chosen file count is refused",
+          "status": "passed"
+        },
+        {
+          "name": "XT4 sends deduplicated chosen files as selection inputs",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 Structured forwards the same saved conversation context as Ask",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 honours both the context floor and excluded messages",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Stop ends Structured as stopped without presenting partial JSON as complete",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:de8c3a49bb959c1657319bbada0810c3d451ff4f44f317a6566e9602c1e4aadd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) reloads only unscoped NO_CONTENT as no-evidence, including legacy records",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) uses the persisted scope fact even when the message changes",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) preserves scoped and other errors, and the fallback facts beside no-evidence",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) frames free chat from the old window as a model answer and preserves ids",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b record classification (NE1, NE3, NE4, NE8, F2) an unanswered saved model question is unfinished, never completed empty (F2)",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b live action (NE1, NE2, NE5, NE9, NE11) offers one accessible action and dispatches free chat once without client history or documents",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b live action (NE1, NE2, NE5, NE9, NE11) keeps no-evidence and allows retry after model LLM_ERROR",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b live action (NE1, NE2, NE5, NE9, NE11) keeps no-evidence and allows retry after model CANCELLED",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) keeps the stored error id so a later model turn can Retry/Edit after no-evidence",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) labels a streaming model answer and says it does not search",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a reloaded model answer retry sends free chat without client history",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a reloaded model answer edit sends free chat without client history",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) DS1 restored no-evidence Ask retry refuses unknown scope before fork",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) DS1 restored no-evidence Ask edit refuses unknown scope before fork",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) offers the action only on the latest turn after a cold load",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) explains the model gate and rechecks it on activation, without dispatching an Ask",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a model answer settling after a conversation switch lands in the original conversation",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) a lock refusal after activation keeps the original outcome and can retry after unlock (NE11)",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) waits for a context write before allowing a model answer to consume saved history (NE6)",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) keeps the existing follow-up rewrite note beside no-evidence (HN9)",
+          "status": "passed"
+        },
+        {
+          "name": "WP4.2b model identity and dispatch on reload (NE6, NE7, NE11, D13) the action answers its own question and preserves an unsent composer draft (NE2)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cb1740c86e49bd596f1d3df600bc3dcf8f475859a95f0d2e3efbc94cd38a88ec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.1 / XT1 — the composer offers four modes, Search by default offers Search, Ask, Delegate and Structured, and nothing else",
+          "status": "passed"
+        },
+        {
+          "name": "S1.1 / XT1 — the composer offers four modes, Search by default starts a fresh window in Search (S1.2) and badges it as the default",
+          "status": "passed"
+        },
+        {
+          "name": "S1.1 / XT1 — the composer offers four modes, Search by default labels Search by what it does and makes no \"no AI\" claim",
+          "status": "passed"
+        },
+        {
+          "name": "S1.1 — the send hint in Search mode says what each key sends is always the search control, even while a run holds a decision or is running",
+          "status": "passed"
+        },
+        {
+          "name": "S1.1 — the send hint in Search mode says what each key sends keeps the standing stop beside it while something is running — a search stops nothing",
+          "status": "passed"
+        },
+        {
+          "name": "S1.1 — the send hint in Search mode says what each key sends names the delegate chord only when the chord would actually delegate",
+          "status": "passed"
+        },
+        {
+          "name": "S1.1 — the send hint in Search mode says what each key sends says a scoped Ask asks about the chosen files, and that the delegate chord leaves them behind",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set counts several hits from one document once",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set takes only chosen rows, never the rest of the list",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set refuses an empty choice, ids that are not on screen, and hits with no path",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set drops chosen rows that left the list, and keeps the same rows when nothing left",
+          "status": "passed"
+        },
+        {
+          "name": "S1.6 — the chosen set is documents, by path, never an empty or invalid set words the act and the scope by document count",
+          "status": "passed"
+        },
+        {
+          "name": "S1.7 — a re-send says what it will search keeps the same files when the turn carries its scope, and says all files when it does not",
+          "status": "passed"
+        },
+        {
+          "name": "S1.9 — results of an older query are never the current ones is stale while the store holds a newer query than the one its rows answered",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-recovery.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-recovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16bae6e11bb50e0d1486d0dbb7992d93bcb1c435ec8f96722e3c8bedd9973e42",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 session proposal trust boundary reads the strict original text-only payload and strict new data-only proposal",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":[\"search\"]}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"ask\",\"scope\":{\"kind\":[\"files\"],\"paths\":[\"id\"]}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"search\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/alpha.md\"]}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"delegate\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/alpha.md\"]}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"model\",\"forceAllowed\":true}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[]}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/alpha.md\",\"/alpha.md\"]}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[\" \"]}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"summarize\",\"scope\":{\"kind\":\"all\"}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"structured\",\"schema\":\"{}\",\"scope\":{\"kind\":\"all\"}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"ask\",\"scope\":{\"kind\":\"files\",\"paths\":[\"/alpha.md\"],\"excerpt\":\"private bytes\"}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary rejects unsupported/authority-bearing proposal {\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"},\"approved\":true}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary retains valid data without inventing request approval {\"kind\":\"search\"}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary retains valid data without inventing request approval {\"kind\":\"delegate\"}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary retains valid data without inventing request approval {\"kind\":\"model\"}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary retains valid data without inventing request approval {\"kind\":\"ask\",\"scope\":{\"kind\":\"all\"}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary retains valid data without inventing request approval {\"kind\":\"ask\",\"scope\":{\"kind\":\"reselect\",\"paths\":[]}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary retains valid data without inventing request approval {\"kind\":\"structured\",\"schema\":\"{unfinished\",\"scope\":{\"kind\":\"typed\"}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary retains valid data without inventing request approval {\"kind\":\"summarize\",\"scope\":{\"kind\":\"reselect\",\"paths\":[\"/alpha.md\"]}}",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary keeps two different proposals even at identical text/place, refuses a third or duplicate",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 session proposal trust boundary enforces existing UTF-8, schema and ID bounds without truncation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:39676ad475838969a26bc7d021398276401552450589f74e04023f4929aadb18",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window mounts with its five regions renders sidebar, topbar, main and composer inside the window host",
+          "status": "passed"
+        },
+        {
+          "name": "the window mounts with its five regions names the window in the topbar and carries ONLY controls that do something",
+          "status": "passed"
+        },
+        {
+          "name": "the window mounts with its five regions opens with an empty sidebar: no sessions until this window has searched",
+          "status": "passed"
+        },
+        {
+          "name": "the window mounts with its five regions claims nothing about the corpus when the window is docked without a search",
+          "status": "passed"
+        },
+        {
+          "name": "the window mounts with its five regions gives the composer a field, its effort control and a send control",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them opens on the empty hero: headline up, content region empty",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them docks into the band, dropping the headline and revealing the results",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them keeps the send control disabled until the field carries something to send",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them docks on send and returns to the hero on Escape",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them compacts the effort control into a real glyph that keeps its whole name",
+          "status": "passed"
+        },
+        {
+          "name": "the composer has two anatomies and one way between them routes an external write of the dev attribute through the same morph",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Linux Tauri shell",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Windows Tauri shell",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a macOS Tauri shell",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a Linux browser",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a API absent",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does applies composer state once and clears morph flags in a reduced motion",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does adopts on connect and removes on the last disconnect",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does scopes the morph attribute to the transition and clears it afterwards",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does never waits on a frame inside the transition callback, which the browser suspends",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does clears the flag on EVERY path a state change can take",
+          "status": "passed"
+        },
+        {
+          "name": "the document-level morph sheet lives exactly as long as the window does swaps instantly under reduced motion, without reaching the API at all",
+          "status": "passed"
+        },
+        {
+          "name": "the session rows render the spec anatomy spends a status colour on the three non-resting states and none on the resting one",
+          "status": "passed"
+        },
+        {
+          "name": "the session rows render the spec anatomy runs the duty-cycled ping on the in-motion row only",
+          "status": "passed"
+        },
+        {
+          "name": "the session rows render the spec anatomy puts every state on the HOST as an attribute, which is what the fills key off",
+          "status": "passed"
+        },
+        {
+          "name": "the session rows render the spec anatomy makes the row a real button and marks an active one for assistive tech",
+          "status": "passed"
+        },
+        {
+          "name": "the window never scrolls; one inner region does clips the window host and the main column",
+          "status": "passed"
+        },
+        {
+          "name": "the window never scrolls; one inner region does clips every region host, so no region can become a second scroller",
+          "status": "passed"
+        },
+        {
+          "name": "the window never scrolls; one inner region does keeps the ONE transcript scroller and only the bounded recovery data row may scroll separately",
+          "status": "passed"
+        },
+        {
+          "name": "the window never scrolls; one inner region does adopts the scroller mixin exactly once across the rendered window",
+          "status": "passed"
+        },
+        {
+          "name": "the surface is registered as the main Search window declares core.search-v3-surface as USER/RAIL",
+          "status": "passed"
+        },
+        {
+          "name": "the surface is registered as the main Search window loads lazily on its first activation",
+          "status": "passed"
+        },
+        {
+          "name": "the surface is registered as the main Search window is in the component vocabulary, with every region it composes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-occlusion.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-occlusion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0bb070220d13780432c700fc5e2124c80e04623f6af161e656038e55478d33ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "859 §B — the dock floats over the transcript wraps the context bar and the composer in ONE positioned wrapper inside the column",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the dock floats over the transcript is click-through except for the two centred content columns inside it",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the dock floats over the transcript gives the context bar its own surface, off the composer's ONE multiplier",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the dock floats over the transcript 859 live-leg — the composer banners float too, so they carry the SAME glass recipe",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the dock floats over the transcript floats only in DOCKED, at the sticky rung, anchored to the bottom",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the dock floats over the transcript keeps the UNCONDITIONAL .dock rule free of any containing-block creator",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the dock floats over the transcript D11 — both resize grips move one rung UP, so DOM order cannot decide who covers whom",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the dock floats over the transcript D12 — the veil is strictly the strip BELOW the glass box, never behind it",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the dock floats over the transcript adds no dock or transcript scroller; only the bounded sibling recovery data row may scroll",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the scroller reads the band pads AND scroll-pads by it, with the calc() that keeps the existing inset",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the scroller reads the band declares a NON-ZERO default IN px, because both readers parse the same string",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the window publishes the band writes the measured height on the host once docked",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the window publishes the band writes a DELIBERATE zero in hero, where the composer IS the content region",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the window publishes the band D8 — a ZERO measurement never replaces a real one",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the window publishes the band D8 — hero's deliberate zero does NOT survive into an unmeasurable docked state",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the window publishes the band needs no ResizeObserver to be correct on a platform that has none",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the window publishes the band D5 — publishing a new band triggers a nav remeasure, not a re-render",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B / D3 — the two appearance escapes are ONE code path zeroes the blur multiplier under prefers-reduced-transparency",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B / D1 — the transcript follows CONTENT GROWTH, not every render (c) a cold thread open lands at the END, not at the top",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B / D1 — the transcript follows CONTENT GROWTH, not every render (a) an agent-run feed that GROWS the content is followed",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B / D1 — the transcript follows CONTENT GROWTH, not every render resets its yardstick when the scroller NODE swaps arms",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B / D1 — the transcript follows CONTENT GROWTH, not every render a render that added NOTHING moves the reader nowhere",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B / D1 — the transcript follows CONTENT GROWTH, not every render (b) opening a disclosure is NOT followed — a reveal is a navigation intent",
+          "status": "passed"
+        },
+        {
+          "name": "859 §B — the transcript reads the visible region feeds the navigation controller the published band",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4577ba16eff4522f6961075a62611ea7ea2e9c3f96fb9fad967fcf0b9126913f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window follows the conversation in the address (864 PR C) a store restore from outside the window swaps the transcript",
+          "status": "passed"
+        },
+        {
+          "name": "the window follows the conversation in the address (864 PR C) following the address also moves the per-tab reload pointer",
+          "status": "passed"
+        },
+        {
+          "name": "the window follows the conversation in the address (864 PR C) a restore to no conversation returns the window to the hero",
+          "status": "passed"
+        },
+        {
+          "name": "the window follows the conversation in the address (864 PR C) the address outranks the per-tab reload pointer on mount",
+          "status": "passed"
+        },
+        {
+          "name": "the window follows the conversation in the address (864 PR C) with nothing in the address the reload pointer still restores, without re-claiming",
+          "status": "passed"
+        },
+        {
+          "name": "a popstate landing on the hero writes no history (F1) adds no history entry when the address returns to the hero",
+          "status": "passed"
+        },
+        {
+          "name": "a popstate landing on the hero writes no history (F1) makes no claim at all while following the address to the hero",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C2 settles the accepted New address before an immediate reload can read it",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C3 raw retirement throw refuses without losing B or another writer",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C3 raw retirement nonack refuses without losing B or another writer",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C3 raw retirement read refuses without losing B or another writer",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C3 raw retirement successor refuses without losing B or another writer",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C8 refused history departure names the moved address and blocks ambient Send and Search",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C10 before-write retains live work and distinguishes post-write uncertainty",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C10 readback retains live work and distinguishes post-write uncertainty",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C10 schema-only retains live work and distinguishes post-write uncertainty",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C10 partial warning survives C8 origin return and a stale lifecycle write",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C5 C6 retained same-text-files proposal stays manual through New and fresh mount",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C5 C6 retained empty-schema proposal stays manual through New and fresh mount",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C4 pointer retirement throw refuses and retains recoverable current settings",
+          "status": "passed"
+        },
+        {
+          "name": "New retirement at the public boundary N14 C4 pointer retirement nonack refuses and retains recoverable current settings",
+          "status": "passed"
+        },
+        {
+          "name": "N14 DS1 every nonempty raw string requires review before an edit can stage Search",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:82249eeb720c6315c3fac90e32b68093a74dc458e1b9860565afa456f722e4fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "TD10a 1-level active removal keeps the draft typed before completion",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a 3-level active removal keeps the draft typed before completion",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a inactive removal and late completion preserve a newer conversation draft",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a removal while the screen is disconnected preserves the retained draft",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a a lost response closes the confirmed transcript without erasing the draft",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a reload during removal keeps the draft when authoritative deletion arrives",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a cancel never invents or restores draft text",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a refused never invents or restores draft text",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a empty never invents or restores draft text",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a reconnect and duplicate reports preserve the current draft without continuing deletion",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a a follow-up waiting on context cannot resurrect the removed conversation or send its draft",
+          "status": "passed"
+        },
+        {
+          "name": "TD10a a concurrent send elsewhere and its late failure cannot overwrite the next draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/sv3ConversationUrl.test.ts",
+      "file": "modules/ui-web/src/shell-v0/router/sv3ConversationUrl.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1a8e47226460f3355760f7beb266a564a0af6852f7e160cba656acd13a8ce7c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) the frontend-only surface HAS a state schema — the §2.11 blocker is gone",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) S16.4 app Back returns an original-navigation claim to its branch without looping",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) a conversation swap moves the hash and adds a history entry",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) Back undoes a conversation swap",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) Back does not push an entry of its own — a second Back keeps going",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) forward and back walk several conversation switches",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) a new session is a navigation, and Back returns to the conversation it left",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) forward onto the hero clears the claim — an absent id is a value on a traversal",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) a fresh load deep-links into the conversation the hash names",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) a reload keeps the reader on the conversation they were reading",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) re-claiming the conversation already open adds no entry",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) a claim still inside the debounce survives an immediate surface change",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) deleting the open conversation corrects the address without an entry",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 conversation identity in the URL (864 PR C) other surfaces still project with replaceState only",
+          "status": "passed"
+        },
+        {
+          "name": "a navigational write that duplicates the current address degrades to replace (F2) pushes when the browser is somewhere else",
+          "status": "passed"
+        },
+        {
+          "name": "a navigational write that duplicates the current address degrades to replace (F2) replaces when the browser is already showing that address",
+          "status": "passed"
+        },
+        {
+          "name": "D3: a top-level search param does not suppress the hash-borne conversationId restore a cold load with ?theme= ahead of the hash still deep-links into the conversation the hash names",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/URLProjector.test.ts",
+      "file": "modules/ui-web/src/shell-v0/router/URLProjector.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:54bd5c6297086457faf47f90448e1a27a7979fb634c174b7d6b7e90c4535fd8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "URLProjector activate is a no-op for surfaces with no declared schema",
+          "status": "passed"
+        },
+        {
+          "name": "URLProjector activate writes the canonical URL on initial subscribe",
+          "status": "passed"
+        },
+        {
+          "name": "URLProjector state changes after activation re-emit the URL",
+          "status": "passed"
+        },
+        {
+          "name": "URLProjector rapid emits coalesce into a single trailing write (G2)",
+          "status": "passed"
+        },
+        {
+          "name": "URLProjector repeat activation for the same surface is a no-op",
+          "status": "passed"
+        },
+        {
+          "name": "URLProjector activating a different surface tears down prior subscriptions",
+          "status": "passed"
+        },
+        {
+          "name": "URLProjector pushAddress writes via history.pushState",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:795a944e36d8fbcfa606a8df57e38789c39629b5c924c145f27fb103b7309c4e"
+}

@@ -79,6 +79,12 @@ it.each(['done', 'error'] as const)('XD2 announces Structured %s exactly once po
   try {
     // Two identical outcomes must each be announced; record refresh/rerender must not repeat either.
     for (let run = 0; run < 2; run++) {
+      if (terminal === 'error' && run === 1) {
+        // RR15: an untyped error has no delivery proof. Review it before a fresh submission.
+        expect(view.shadowRoot!.textContent).toContain('Delivery unknown');
+        const discard = view.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid=sv3-residency-discard]');
+        expect(discard).not.toBeNull(); discard!.click(); await drain(view);
+      }
       const input = q<HTMLTextAreaElement>(composer, 'sv3-composer-input');
       input.value = 'extract city'; input.dispatchEvent(new Event('input'));
       await view.updateComplete; await composer.updateComplete;

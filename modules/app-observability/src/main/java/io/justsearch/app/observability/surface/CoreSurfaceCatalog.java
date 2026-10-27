@@ -110,7 +110,7 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
 
   // Tempdoc 561 surface tier: the standalone `core.agent-surface` (jf-agent-surface) is retired.
   // Its conversation shape (SHAPE_AGENT_RUN) folds into the one interaction window
-  // (core.unified-chat-surface), which now consumes the agent-run shape alongside ask/chat/extract.
+  // (core.search-v3-surface), which now consumes the agent-run shape alongside ask/chat/extract.
 
   /** Slice 454 phase 9 — Settings surface (theme, keyboard, autostart, reset). */
   public static final SurfaceRef SETTINGS_SURFACE_ID = new SurfaceRef("core.settings-surface");
@@ -136,7 +136,7 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
 
   // Search Thread S5b (the great retirement): the standalone `core.search-surface` (jf-search-surface,
   // Slice 463 Search HUD) Surface entry is RETIRED. Its retrieve tier folded into the one interaction
-  // window (`core.unified-chat-surface`), matching the `core.agent-surface` retirement precedent above
+  // window (`core.search-v3-surface`), matching the `core.agent-surface` retirement precedent above
   // (constants removed, comment left). FE deep-links alias via RETIRED_SURFACE_ALIASES.
 
   /** Slice 3a.2.e — Logs surface (EngineLog DiagnosticChannel consumer). */
@@ -201,10 +201,10 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
    * picks the shape via affordance toggles; the backend dispatches dynamically
    * through {@code POST /api/chat/dispatch}.
    */
-  public static final SurfaceRef UNIFIED_CHAT_SURFACE_ID =
-      new SurfaceRef("core.unified-chat-surface");
+  public static final SurfaceRef SEARCH_V3_SURFACE_ID =
+      new SurfaceRef("core.search-v3-surface");
 
-  public static final String UNIFIED_CHAT_MOUNT_TAG = "jf-unified-chat-view";
+  public static final String SEARCH_V3_MOUNT_TAG = "jf-sv3-window";
 
   /** Slice 496 §3.B: FreeChat surface. */
   public static final SurfaceRef FREE_CHAT_SURFACE_ID = new SurfaceRef("core.free-chat-surface");
@@ -222,9 +222,9 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
   /**
    * Slice 491 F5 — ConversationShape for the agent run. The agent loop's encapsulated runner
    * (ToolIteratingShapeRunner) mounts this shape. Tempdoc 561 surface tier: it is now consumed by
-   * the one interaction window ({@code core.unified-chat-surface}) — the standalone agent surface
+   * the one interaction window ({@code core.search-v3-surface}) — the standalone agent surface
    * was retired — so the discoverable user mount for {@code core.agent-run} is the unified window,
-   * whose FE view ({@code jf-unified-chat-view}) presets the agent affordance from the shape-id.
+   * whose FE view ({@code jf-sv3-window}) presets the agent affordance from the shape-id.
    */
   private static final ConversationShapeRef SHAPE_AGENT_RUN =
       new ConversationShapeRef("core.agent-run");
@@ -482,10 +482,10 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
           // core.agent-surface (561) and core.workflow-surface (565 §15.C) were retired and their
           // shapes folded in (a second visible workflow surface is now an interaction-surface gate fail).
           new Surface(
-              UNIFIED_CHAT_SURFACE_ID,
+              SEARCH_V3_SURFACE_ID,
               Presentation.of(
-                  new I18nKey("registry-surface.unified-chat-surface.label"),
-                  new I18nKey("registry-surface.unified-chat-surface.description")),
+                  new I18nKey("registry-surface.search-v3-surface.label"),
+                  new I18nKey("registry-surface.search-v3-surface.description")),
               Audience.USER,
               Placement.RAIL,
               new SurfaceConsumes(
@@ -499,18 +499,14 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
                       SHAPE_EXTRACT,
                       SHAPE_AGENT_RUN,
                       SHAPE_WORKFLOW_RUN)),
-              UNIFIED_CHAT_MOUNT_TAG,
+              SEARCH_V3_MOUNT_TAG,
               Provenance.core("1.0"),
               java.util.Optional.of(
                   SurfaceStateSchemaLoader.require(
-                      UNIFIED_CHAT_SURFACE_ID,
+                      SEARCH_V3_SURFACE_ID,
                       List.of(
                           new io.justsearch.agent.api.registry.StateBinding(
-                              "/query", "unified-chat", "query"),
-                          new io.justsearch.agent.api.registry.StateBinding(
-                              "/docIds", "unified-chat", "docIds"),
-                          new io.justsearch.agent.api.registry.StateBinding(
-                              "/affordance", "unified-chat", "affordance"))))),
+                              "/conversationId", "sv3.conversation", "conversationId"))))),
           // Slice 491 §9.D Phase E C3 — Ask compatibility surface for the
           // RAG-grounded Q&A shape. Audience composition rule (slice 449 §0
           // D2): provenance CORE → no floor lift; consumes no DiagnosticChannels
@@ -679,7 +675,7 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
           // standalone rich surface (facets / trace / "why this result?" / date-filter pane) it kept
           // URL-routable is retired along with it; the retrieve tier's carry-forward scope is
           // jf-results-card + route chip + scope chips + landing only. FE deep-links to
-          // core.search-surface alias to core.unified-chat-surface (RETIRED_SURFACE_ALIASES).
+          // core.search-surface alias to core.search-v3-surface (RETIRED_SURFACE_ALIASES).
           // Slice 3a.2.e — Logs surface. Consumes the core.engine-log
           // DiagnosticChannel (slice 448 substrate). OPERATOR audience
           // because raw log tail is operator/dev-mode UX, not end-user.

@@ -7,7 +7,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import org.junit.jupiter.api.Test;
 
-class VerifierStatus5Test extends VerifierStatusIsolationTest {
+class VerifierStatus5Test extends StatusIsolationFixtureSupport {
   @Test void realEncryptionOwnerPublishesItsCanonicalStateChange(@org.junit.jupiter.api.io.TempDir java.nio.file.Path data) throws Exception {
     try(var f=new Fixture(true)) {
       var keys=new io.justsearch.app.services.encryption.DataKeyManager(new io.justsearch.app.services.encryption.EncryptionKeystore(data));

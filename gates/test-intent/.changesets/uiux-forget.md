@@ -95,7 +95,7 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsCurrentEnvelopeTest.java"
       ],
       "class": "New",
-      "behaviour": "The current operations/settings envelope is semantic version 6. Existing migration, contention, preservation, recovery, context-length and revision assertions remain, including legacy v0–v5 fixtures. A new actual v5 operations reopen asserts row and sqlite_sequence preservation across the semantic migration. Only current-writer version expectations advance from 5 to 6. The nested fresh-writer/current-version/reopen assertion executes unchanged through UiSettingsCurrentEnvelopeTest, which supplies the same fresh @TempDir input and invokes the original method. This gives the unchanged producer a standalone XML identity without editing the existing main test, duplicating its assertions, changing its conditions or synthesizing XML. The complete original nested suite remains part of the full module checks.",
+      "behaviour": "The current operations/settings envelope is semantic version 6. Existing migration, contention, preservation, recovery, context-length and revision assertions remain, including legacy v0\u2013v5 fixtures. A new actual v5 operations reopen asserts row and sqlite_sequence preservation across the semantic migration. Only current-writer version expectations advance from 5 to 6. The nested fresh-writer/current-version/reopen assertion executes unchanged through UiSettingsCurrentEnvelopeTest, which supplies the same fresh @TempDir input and invokes the original method. This gives the unchanged producer a standalone XML identity without editing the existing main test, duplicating its assertions, changing its conditions or synthesizing XML. The complete original nested suite remains part of the full module checks.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -153,7 +153,7 @@ Isolated new files remain subject to independent scenario and execution review e
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
           "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
           "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
-          "choice": "S55.1–S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled. The independently challenged integration probe uses the mechanical Forget+main baseline, existing real owners and explicit setup assertions; the root-only control converged, so no failure or production repair is claimed for that case. R2 and N55.3, adopted after independent receipt challenge PASS1/PASS2: keep-out safety and native migration convergence both matter, with matching real control and specific admitted-target proof; R7/R6/R5 qualifications remain bounded as agreed. Adopted contract4 and implementation clarifications5: distinguish strict UI omission from current-policy normal readmission, retain exact queue/root/physical ownership and publication versions; real R2 is the repair discriminator while root-only R1 stays preservation.",
+          "choice": "S55.1\u2013S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled. The independently challenged integration probe uses the mechanical Forget+main baseline, existing real owners and explicit setup assertions; the root-only control converged, so no failure or production repair is claimed for that case. R2 and N55.3, adopted after independent receipt challenge PASS1/PASS2: keep-out safety and native migration convergence both matter, with matching real control and specific admitted-target proof; R7/R6/R5 qualifications remain bounded as agreed. Adopted contract4 and implementation clarifications5: distinguish strict UI omission from current-policy normal readmission, retain exact queue/root/physical ownership and publication versions; real R2 is the repair discriminator while root-only R1 stays preservation.",
           "label": "agent choice"
         }
       ],
@@ -415,6 +415,30 @@ Isolated new files remain subject to independent scenario and execution review e
       "evidence": "gates/test-intent/evidence/uiux-forget-literal-policy-new.json",
       "newChecks": [
         "modules/configuration/src/test/java/io/justsearch/configuration/excludes/LiteralExclusionPolicyTest.java"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java",
+        "modules/app-services/src/test/resources/registry/emitter/ui-operation-wire.golden.json"
+      ],
+      "class": "New",
+      "behaviour": "The exhaustive catalog fixtures include the three added Forget operations and their real production handlers. The original handlers, 37 golden operation objects, ordering and assertions remain unchanged. The unchanged validators and wire conformance check now also cover the intended Forget operations. Exactly the two fixture patches granted in round 4 decision 1 were applied by the orchestrator before this merge.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "Round 4 decision 1 grants exactly the three real Forget handler registrations in the manual validator fixture and the three new operation objects in the wire golden. All original registration objects and assertions remain; these fixtures enumerate the full core operation catalog.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-fixture-grants.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java"
       ],
       "repaired": false
     }

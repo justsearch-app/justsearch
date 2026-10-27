@@ -2,13 +2,13 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:551a36c61d6a0a3c4a749bacda70f9c94eb0e4b46a62f050ad267c16d4babf92",
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
     "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
-    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-27T13:14:19.426Z",
-  "revision": "7a1196e180c667b774bd1623c65242888df1270e",
-  "tree": "9b2e9a8d74cb83d0ecdc1e5ec6a7aeadeb72b584",
+  "createdAt": "2026-10-27T15:52:10.190Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "a52cbf58fdbff65f892f355118000f4eac1e1095",
   "environment": {
     "cudaVisibleDevices": "-1",
     "displayUnset": true,
@@ -26,9 +26,9 @@
       "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetFolderIdentityTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 548235,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-folder-cb5ac8be/run-2.log",
-      "outputDigest": "sha256:38510501a9c14cc147a5c6279b7c1de99d60549a486fd6424ee39804d5ee7d7c"
+      "durationMs": 19273,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-folder-b0202b00/run-2.log",
+      "outputDigest": "sha256:f73316e7ead2b867382d27eccc32b32831e6a191dcf674432eaa260c0f059261"
     }
   ],
   "checks": [
@@ -86,9 +86,9 @@
         "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetFolderIdentityTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-shared-clone>",
         "exitCode": 1,
-        "durationMs": 86534,
-        "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-folder-cb5ac8be/run-1.log",
-        "outputDigest": "sha256:fc65efb31ac08cfd6969662d7351e504b9beb75745775ef7d0dc1ab24cfc7dd9"
+        "durationMs": 21303,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-folder-b0202b00/run-1.log",
+        "outputDigest": "sha256:5b13c8b9a47c5ead9a89e2120f3455be8783f6c4e190087af960cff1bccaea5e"
       }
     ],
     "checks": [
@@ -99,5 +99,5 @@
       }
     ]
   },
-  "digest": "sha256:2334309e7419c7d32ea1b213452ccd274fa3076365446d218129106145e0489b"
+  "digest": "sha256:095f764b2963be184ac999df5a46474ab18c0e4163c47a97a79b996472524438"
 }

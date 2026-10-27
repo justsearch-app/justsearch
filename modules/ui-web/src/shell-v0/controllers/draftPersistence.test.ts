@@ -69,3 +69,47 @@ describe('DraftPersistence (tempdoc 609 §R T2.1)', () => {
     expect(localStorage.getItem(__draftStorageKey(KEY))).toBeNull();
   });
 });
+
+it('DS1 a failed raw read never authorizes overwriting an unread sole copy on disconnect', () => {
+  __resetDraftProvidersForTest(); document.body.replaceChildren();
+  const key = __draftStorageKey(KEY);
+  localStorage.setItem(key, 'unread original A');
+  const original = localStorage.getItem;
+  const descriptor = Object.getOwnPropertyDescriptor(localStorage, 'getItem')
+    ?? { configurable: true, writable: true, enumerable: false, value: original };
+  Object.defineProperty(localStorage, 'getItem', { ...descriptor, value: (candidate: string) => {
+    if (candidate === key) throw new DOMException('read denied', 'SecurityError');
+    return original(candidate);
+  } });
+  try {
+    const el = mount(); el.value = 'new live B'; el.remove();
+    expect(original(key)).toBe('unread original A');
+    expect(el.value).toBe('new live B');
+  } finally {
+    Object.defineProperty(localStorage, 'getItem', descriptor);
+    localStorage.removeItem(key); __resetDraftProvidersForTest();
+  }
+});
+
+it('DS1 failed destination re-read during adoption preserves another tab sole successor before disconnect', () => {
+  __resetDraftProvidersForTest(); document.body.replaceChildren();
+  const key = __draftStorageKey(KEY);
+  const el = mount(); // This mount successfully observed the destination as empty.
+  localStorage.setItem(key, 'unread original A'); // Another tab now owns the sole successor copy.
+  const original = localStorage.getItem;
+  const descriptor = Object.getOwnPropertyDescriptor(localStorage, 'getItem')
+    ?? { configurable: true, writable: true, enumerable: false, value: original };
+  Object.defineProperty(localStorage, 'getItem', { ...descriptor, value: (candidate: string) => {
+    if (candidate === key) throw new DOMException('read denied', 'SecurityError');
+    return original(candidate);
+  } });
+  try {
+    el.persist.adoptLegacy('test.legacy');
+    el.value = 'new live B'; el.remove();
+    expect(original(key)).toBe('unread original A');
+    expect(el.value).toBe('new live B');
+  } finally {
+    Object.defineProperty(localStorage, 'getItem', descriptor);
+    localStorage.removeItem(key); __resetDraftProvidersForTest();
+  }
+});

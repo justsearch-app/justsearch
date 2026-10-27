@@ -2,13 +2,13 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:551a36c61d6a0a3c4a749bacda70f9c94eb0e4b46a62f050ad267c16d4babf92",
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
     "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
-    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-27T13:25:51.106Z",
-  "revision": "7a1196e180c667b774bd1623c65242888df1270e",
-  "tree": "30879ce9538b1d53d06b05b81f7a2d57f3daa8dd",
+  "createdAt": "2026-10-27T15:54:02.391Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "4511ab7892d26df5c7162d3bc5150c0feb292e58",
   "environment": {
     "cudaVisibleDevices": "-1",
     "displayUnset": true,
@@ -23,465 +23,15 @@
   },
   "runs": [
     {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.exactReadPreservesNullableRowsAndRejectsDifferentExpectedPathAndChangedJournal\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.pairingOldPWithIncomingQRefusesTheEntireBatchWithoutChangingEitherFile\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.duplicateAndDotAliasPathsRefuseTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.oneStaleExpectationOrIssuedClaimPreventsEveryWriteInAMultiFileBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.aDoneRowWithAnActuallyIssuedHiddenClaimRefusesTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.successfulBatchReturnsActualNewRowsAndReceiptsIncludingNullOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.laterExactDeletePreventsReadmissionEvenWithTheCompleteCurrentSnapshot\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.readOnlyPredicateDoesNotWaitForTheQueueOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.confirmedCommitWithRestoreFailureThrowsAndReloadFindsReplacements\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.encodedWatcherPredecessorHasOnlyItsRealRootReceiptAuthority\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.rootOmissionCannotBorrowAMissingUpsertButCanProveItsConditionalDeleteLineage\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.immutableReadOnlyServingGenerationPreservesOrdinaryReadmission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.reservedCollectionOwnerStillBlocksReadmissionAndOmission\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.immutableReadOnlyServingGenerationPreservesOrdinaryReadmission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.reservedCollectionOwnerStillBlocksReadmissionAndOmission\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 79579,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-native-refresh-c336214e/run-1.log",
-      "outputDigest": "sha256:6b85cc3aaa8724983aeb253695f1951b4a92a551c0e6d65231ac44680b0c0fb9"
-    },
-    {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest\" --rerun -PskipWebBuild=true --console=plain",
-      "cwd": ".",
-      "exitCode": 0,
-      "durationMs": 61775,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-native-refresh-c336214e/run-2.log",
-      "outputDigest": "sha256:f5b6fd489fb823aa0694449b530534c6a916114e8d279594e2db7c67020b0a09"
+      "durationMs": 12027,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-preserve-before-985193c2/run-2.log",
+      "outputDigest": "sha256:0b5e4d4ce1766b7b50631d5c5336225e840cbf35bb194de731163ca21af43352"
     }
   ],
   "checks": [
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#exactReadPreservesNullableRowsAndRejectsDifferentExpectedPathAndChangedJournal",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "exactReadPreservesNullableRowsAndRejectsDifferentExpectedPathAndChangedJournal()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#pairingOldPWithIncomingQRefusesTheEntireBatchWithoutChangingEitherFile",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "pairingOldPWithIncomingQRefusesTheEntireBatchWithoutChangingEitherFile()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#duplicateAndDotAliasPathsRefuseTheWholeBatch",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "duplicateAndDotAliasPathsRefuseTheWholeBatch()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#oneStaleExpectationOrIssuedClaimPreventsEveryWriteInAMultiFileBatch",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "oneStaleExpectationOrIssuedClaimPreventsEveryWriteInAMultiFileBatch()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#aDoneRowWithAnActuallyIssuedHiddenClaimRefusesTheWholeBatch",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "aDoneRowWithAnActuallyIssuedHiddenClaimRefusesTheWholeBatch()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#successfulBatchReturnsActualNewRowsAndReceiptsIncludingNullOwner",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "successfulBatchReturnsActualNewRowsAndReceiptsIncludingNullOwner()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#laterExactDeletePreventsReadmissionEvenWithTheCompleteCurrentSnapshot",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "laterExactDeletePreventsReadmissionEvenWithTheCompleteCurrentSnapshot()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#readOnlyPredicateDoesNotWaitForTheQueueOwner",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "readOnlyPredicateDoesNotWaitForTheQueueOwner()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#confirmedCommitWithRestoreFailureThrowsAndReloadFindsReplacements",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "confirmedCommitWithRestoreFailureThrowsAndReloadFindsReplacements()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement(witness)",
-          "status": "passed"
-        },
-        {
-          "name": "postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement(projection)",
-          "status": "passed"
-        },
-        {
-          "name": "postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement(feed)",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#encodedWatcherPredecessorHasOnlyItsRealRootReceiptAuthority",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "encodedWatcherPredecessorHasOnlyItsRealRootReceiptAuthority()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java#rootOmissionCannotBorrowAMissingUpsertButCanProveItsConditionalDeleteLineage",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/NativePolicyAdmissionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:4c7c75392003155cc6406d32e2c4a73d51096376ddb130e7f3111249b0e09621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "rootOmissionCannotBorrowAMissingUpsertButCanProveItsConditionalDeleteLineage()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "publicSaveAllowAfterSubscribedAncestorGlobReadmitsCurrentBytes()",
-          "status": "passed"
-        },
-        {
-          "name": "subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder()",
-          "status": "passed"
-        },
-        {
-          "name": "committedBootReadmitsPresentSourceBeforeSubscriptionWithoutInventingAWatchOrReceipt()",
-          "status": "passed"
-        },
-        {
-          "name": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(declared)",
-          "status": "passed"
-        },
-        {
-          "name": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(subscribed)",
-          "status": "passed"
-        },
-        {
-          "name": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(awaiting)",
-          "status": "passed"
-        },
-        {
-          "name": "[1] simple",
-          "status": "passed"
-        },
-        {
-          "name": "[2] mixed",
-          "status": "passed"
-        },
-        {
-          "name": "[3] root",
-          "status": "passed"
-        },
-        {
-          "name": "unknownRecordedVolumeNeverCreatesReplacementOrAdoptsARecord()",
-          "status": "passed"
-        },
-        {
-          "name": "ancestorChangeAfterRealCommitIsUnconfirmedAndRetainsTheNewAuthoritativeReceipt()",
-          "status": "passed"
-        },
-        {
-          "name": "supportedOperatorAllowingPolicyCanReadmitButOperatorExclusionCannotCertifyUiOmission()",
-          "status": "passed"
-        },
-        {
-          "name": "liveNoRootDebtCertifiesOnlyItsExactCurrentUiSkipAndFinalPublicationSnapshot()",
-          "status": "passed"
-        },
-        {
-          "name": "ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership()",
-          "status": "passed"
-        },
-        {
-          "name": "genuineAlreadyAdmittedUiSkipNeedsNoReadOfNowUnreadableSourceContent()",
-          "status": "passed"
-        },
-        {
-          "name": "reservedCollectionOwnerStillBlocksReadmissionAndOmission()",
-          "status": "passed"
-        },
-        {
-          "name": "ancestorReplacedByALinkIntoProtectedFixtureStorageRefusesBeforeAnyQueueEffect()",
-          "status": "passed"
-        },
-        {
-          "name": "realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence()",
-          "status": "passed"
-        },
-        {
-          "name": "[1] simple",
-          "status": "passed"
-        },
-        {
-          "name": "[2] mixed",
-          "status": "passed"
-        },
-        {
-          "name": "[3] root",
-          "status": "passed"
-        },
-        {
-          "name": "acceptedProjectionPathIsProtectedBeforeItsRowsAreReplayedOnTarget()",
-          "status": "passed"
-        },
-        {
-          "name": "allCommittedAckConsumersRetainAReplayedProjectionOwner(simple)",
-          "status": "passed"
-        },
-        {
-          "name": "allCommittedAckConsumersRetainAReplayedProjectionOwner(mixed)",
-          "status": "passed"
-        },
-        {
-          "name": "allCommittedAckConsumersRetainAReplayedProjectionOwner(root)",
-          "status": "passed"
-        },
-        {
-          "name": "ancestorOperatorExclusionNeverInventsUiOmissionAuthority()",
-          "status": "passed"
-        },
-        {
-          "name": "ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication()",
-          "status": "passed"
-        },
-        {
-          "name": "ancestorExclusionStillCannotCertifyAProjectionOwner()",
-          "status": "passed"
-        },
-        {
-          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(parent)",
-          "status": "passed"
-        },
-        {
-          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(missing-parent)",
-          "status": "passed"
-        },
-        {
-          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(blank-marker)",
-          "status": "passed"
-        },
-        {
-          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(reserved-id)",
-          "status": "passed"
-        },
-        {
-          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(late-alias)",
-          "status": "passed"
-        },
-        {
-          "name": "ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy()",
-          "status": "passed"
-        },
-        {
-          "name": "[1] simple, false",
-          "status": "passed"
-        },
-        {
-          "name": "[2] simple, true",
-          "status": "passed"
-        },
-        {
-          "name": "[3] mixed, false",
-          "status": "passed"
-        },
-        {
-          "name": "[4] mixed, true",
-          "status": "passed"
-        },
-        {
-          "name": "[5] root, false",
-          "status": "passed"
-        },
-        {
-          "name": "[6] root, true",
-          "status": "passed"
-        },
-        {
-          "name": "ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible()",
-          "status": "passed"
-        },
-        {
-          "name": "[1] simple",
-          "status": "passed"
-        },
-        {
-          "name": "[2] mixed",
-          "status": "passed"
-        },
-        {
-          "name": "[3] root",
-          "status": "passed"
-        },
-        {
-          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,target)",
-          "status": "passed"
-        },
-        {
-          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,serving)",
-          "status": "passed"
-        },
-        {
-          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,both)",
-          "status": "passed"
-        },
-        {
-          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(dot,target)",
-          "status": "passed"
-        },
-        {
-          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(dot,serving)",
-          "status": "passed"
-        },
-        {
-          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(dotdot,target)",
-          "status": "passed"
-        },
-        {
-          "name": "immutableReadOnlyServingGenerationPreservesOrdinaryReadmission()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NativePolicyReplayBoundaryTest.java",
-      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NativePolicyReplayBoundaryTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:dc400fd7ea26d026358b7884749be16d699ac6f2db17c81d2a1636ce2591166c",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "defaultOwnerIsExactAndNestedIndependentRootsRemainOutsideParentAuthority()",
-          "status": "passed"
-        },
-        {
-          "name": "currentPublicationIdentityRejectsIdenticalPolicyAba()",
-          "status": "passed"
-        },
-        {
-          "name": "knownExcludedFileNeedsNoContentReadButEligibleUnreadableSiblingRemainsUnknown()",
-          "status": "passed"
-        },
-        {
-          "name": "fileLiteralAtANowDirectoryNeverPrunesItsEligibleChildren()",
-          "status": "passed"
-        },
-        {
-          "name": "declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority()",
-          "status": "passed"
-        },
-        {
-          "name": "folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot()",
-          "status": "passed"
-        },
-        {
-          "name": "malformedPolicyOrUnsharedPublicationOwnerHasNoOmissionAuthority()",
-          "status": "passed"
-        }
-      ]
-    },
     {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
@@ -528,6 +78,38 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:6494d94e7212f14990f2893951477d209931b7a1d939af0151ade4096210e206"
+  "failBefore": {
+    "ref": "d320fb3f13",
+    "revision": "d320fb3f130cb6c707a27c835e4a655e79c2168c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.immutableReadOnlyServingGenerationPreservesOrdinaryReadmission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.reservedCollectionOwnerStillBlocksReadmissionAndOmission\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 0,
+        "durationMs": 6129,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-preserve-before-985193c2/run-1.log",
+        "outputDigest": "sha256:c1240125d6df80a6a2e1cb721222f2c3a7945699050aa129e43899c1d9b0c81b"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#immutableReadOnlyServingGenerationPreservesOrdinaryReadmission",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#reservedCollectionOwnerStillBlocksReadmissionAndOmission",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:37bc412e0625b8f042e460db246b2e7386dc709bcfeaf63981d05b31065b3dc4"
 }

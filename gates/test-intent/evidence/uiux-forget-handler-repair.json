@@ -2,13 +2,13 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:551a36c61d6a0a3c4a749bacda70f9c94eb0e4b46a62f050ad267c16d4babf92",
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
     "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
-    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-27T13:26:22.568Z",
-  "revision": "7a1196e180c667b774bd1623c65242888df1270e",
-  "tree": "aa81a6fbecd2641b5a8a398132bc3a20d79a2079",
+  "createdAt": "2026-10-27T15:51:22.760Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "d68b42bb43ca623b6d96e62e2cac8100e22cfdc2",
   "environment": {
     "cudaVisibleDevices": "-1",
     "displayUnset": true,
@@ -26,17 +26,17 @@
       "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.operations.OperationHistoryPendingTest\" --tests \"io.justsearch.app.observability.operations.OperationHistoryPolicyTest\" --tests \"io.justsearch.app.observability.operations.OperationPreparationStoreTest\" --tests \"io.justsearch.app.observability.operations.SqliteOperationStoreStartupContentionTest\" --tests \"io.justsearch.app.observability.operations.SqliteOperationStoreTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 15943,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-repairs-refresh-a31788f0/run-1.log",
-      "outputDigest": "sha256:c2729b3007b15da435e19200315dc68402000f56c71a511a321d1b1d10c5ddc9"
+      "durationMs": 15439,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-repairs-refresh-ad9fe8d3/run-1.log",
+      "outputDigest": "sha256:35aa5036536c506038bfcc8276b1dc4476587d49304934d5de95e9670ce9efdc"
     },
     {
       "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest\" --tests \"io.justsearch.app.services.settings.UiSettingsCurrentEnvelopeTest\" --tests \"io.justsearch.app.services.settings.UiSettingsStoreRevisionTest\" --tests \"io.justsearch.app.services.registry.operations.ForgetHandlersTest\" --tests \"io.justsearch.app.services.registry.operations.handlers.ForgetDecisionValidationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5962,
-      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-repairs-refresh-a31788f0/run-2.log",
-      "outputDigest": "sha256:87e123d0cb8d68bf20a2c451ee0fdb2e1887fedf8840d10616be9cb2ae86ce2d"
+      "durationMs": 2906,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-repairs-refresh-ad9fe8d3/run-2.log",
+      "outputDigest": "sha256:1bddfa2311031cd278b33447b5bff652321660df626a2cd110a77458f4679a03"
     }
   ],
   "checks": [
@@ -464,5 +464,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:a71b11d4ea7ea1dc011229aa3c3fd5c85bfae56c789d042d6481ee65394d67c8"
+  "digest": "sha256:1419ead3d3eb07917e1d5a4294894a38e03d1df1150b750f76c89174e4a98c9a"
 }

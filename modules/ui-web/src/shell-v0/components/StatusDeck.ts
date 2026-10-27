@@ -120,7 +120,7 @@ const NUM = new Intl.NumberFormat();
  * yields the degradation fact to. Declared in `plugin-api/CorePlugin.ts` (`CORE_SURFACES`); mirrored
  * here the same way `chrome/Shell.ts` mirrors it as `INTERACTION_SURFACE_ID`.
  */
-const BANNER_OWNING_SURFACE_ID = 'core.unified-chat-surface';
+const BANNER_OWNING_SURFACE_ID = 'core.search-v3-surface';
 
 export class StatusDeck extends JfElement {
   private focusedItem: string | null = null;

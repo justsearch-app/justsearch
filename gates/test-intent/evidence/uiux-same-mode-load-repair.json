@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T11:43:07.204Z",
+  "revision": "42f911cdba0c337acb1bd0a51ec033d1fe7459fa",
+  "tree": "a445b13427da8506ced2d34c437e94f9df2a30b2",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/7zqv2x2u/tmp/test-intent-vitest-5-1793101374580.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4278
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#pending Load anyway survives shown Ask choice by pointer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pending Load anyway survives shown Ask choice by pointer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#pending Load anyway survives shown Ask choice by keyboard",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ba85ff6b71b1aa7e284ce0dcda8e962301941a3f92f8e7c934db16f3bd0bff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pending Load anyway survives shown Ask choice by keyboard",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "42f911cdba",
+    "revision": "42f911cdba0c337acb1bd0a51ec033d1fe7459fa",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/7zqv2x2u/tmp/test-intent-vitest-5-1793101382533.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3829,
+        "output": "JSON report written to /home/elias/.cache/am/7zqv2x2u/tmp/test-intent-vitest-5-1793101382533.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#pending Load anyway survives shown Ask choice by pointer",
+        "classification": "assertion",
+        "detail": "pending Load anyway survives shown Ask choice by pointer:  AssertionError: expected [ { shapeId: 'core.rag-ask', …(5) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/7zqv2x2u/tmp/same-mode-work/test-intent-before-mUL2y7/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#pending Load anyway survives shown Ask choice by keyboard",
+        "classification": "assertion",
+        "detail": "pending Load anyway survives shown Ask choice by keyboard:  AssertionError: expected [ { shapeId: 'core.rag-ask', …(5) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/7zqv2x2u/tmp/same-mode-work/test-intent-before-mUL2y7/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file"
+      }
+    ]
+  },
+  "digest": "sha256:59fe4e3c13ff519597edb6d0bc68769f6851aa56ad27e624465fee37b79a4173"
+}

@@ -1,0 +1,20 @@
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchTraceMapper.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchTraceMapper.java
+@@ -176,6 +176,17 @@
+    * single canonical source. Iterates the closed {@link HeadStage} vocabulary through an exhaustive
+    * {@code switch} (no {@code default}), so every declared stage is emitted.
+    */
++  // Test-only before-state signature compatibility; ignores new diagnostic context.
++  static java.util.List<io.justsearch.app.api.knowledge.SearchTrace.TraceStage> buildHeadStages(
++      PipelineConfig pipelineConfig, long lambdaMartNs, long crossEncoderMs,
++      boolean lambdaMartApplied, String lambdaMartSkipReason, boolean crossEncoderApplied,
++      CrossEncoderSkipReason crossEncoderSkipReason, boolean expansionApplied,
++      String expansionSkipReason, QueryType queryType, String classificationBypassReason) {
++    return buildHeadStages(pipelineConfig, lambdaMartNs, crossEncoderMs, lambdaMartApplied,
++        lambdaMartSkipReason, crossEncoderApplied, crossEncoderSkipReason, expansionApplied,
++        expansionSkipReason, queryType);
++  }
++
+   // Package-private for the U5 exhaustiveness regression test (every HeadStage emits a node).
+   static java.util.List<io.justsearch.app.api.knowledge.SearchTrace.TraceStage> buildHeadStages(
+       PipelineConfig pipelineConfig,

@@ -345,7 +345,8 @@ public class LocalApiServer {
       try {
         buildAndStartApp(bindPort);
       } catch (Exception e) {
-        if (configuredPort != null && configuredPort != 0 && isBindFailure(e)) {
+        if (configuredPort != null && configuredPort != 0 && isBindFailure(e)
+            && requestReleasesDrained(this.app)) {
           log.warn("Failed to bind to explicit port {} ({}). Falling back to ephemeral port.",
               configuredPort, e.getMessage());
           eventBuffer.warn("LocalApiServer",
@@ -623,7 +624,14 @@ public class LocalApiServer {
     RouteContractPolicy.validateLifecycleRoutes(
         RouteManifestController.handlerMethodPaths(this.app), RouteContractPolicy.CONTRACTS);
 
-    this.app.start("127.0.0.1", bindPort);
+    Javalin starting = this.app;
+    try {
+      this.app.start("127.0.0.1", bindPort);
+    } catch (RuntimeException | Error failure) {
+      try { stopHttpTransport(starting); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   /**
@@ -1029,7 +1037,19 @@ public class LocalApiServer {
     return io.justsearch.app.engine.EngineSupervisionPolicy.GRACEFUL_STOP_DEADLINE_MS / 2;
   }
 
+  private static boolean requestReleasesDrained(Javalin transport) {
+    var owner = transport.jettyServer().server().getBean(RequestReleaseOwner.class);
+    return owner == null || owner.drained();
+  }
+
   static void stopHttpTransport(Javalin transport) {
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(transportStopBudgetMs());
+    var owner = transport.jettyServer().server().getBean(RequestReleaseOwner.class);
+    if (owner != null) {
+      owner.stop(transport, deadline);
+      return;
+    }
+    // Standalone transports without these admission filters keep their existing teardown path.
     if (transport.jettyServer().server().isStopped()) return;
     // Shutdown can follow executor-registry closure. This short-lived daemon owns only
     // transport teardown and must remain available independently of that registry.
@@ -1041,7 +1061,7 @@ public class LocalApiServer {
     thread.setDaemon(true);
     thread.start();
     try {
-      stopping.get(transportStopBudgetMs(), java.util.concurrent.TimeUnit.MILLISECONDS);
+      stopping.get(Math.max(0, deadline - System.nanoTime()), java.util.concurrent.TimeUnit.NANOSECONDS);
     } catch (java.util.concurrent.TimeoutException exhausted) {
       // Jetty 11 selectors await suspended pool threads without a timeout. Interrupt that
       // teardown and let the remaining owners close; this daemon owns only HTTP resources.

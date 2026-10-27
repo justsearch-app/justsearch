@@ -138,6 +138,16 @@ function apiProxyPlugin() {
       return
     }
 
+    let upstreamResponse
+    const fail = (err) => {
+      if (res.destroyed || res.writableEnded) return
+      if (res.headersSent) {
+        res.destroy(err)
+      } else {
+        res.writeHead(502, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: `Backend unavailable: ${err.message}` }))
+      }
+    }
     const proxyReq = http.request({
       hostname: '127.0.0.1',
       port,
@@ -148,6 +158,13 @@ function apiProxyPlugin() {
       // SSE stream can't starve subsequent in-page fetches under CDP automation.
       agent: false,
     }, (proxyRes) => {
+      upstreamResponse = proxyRes
+      proxyRes.on('error', fail)
+      if (res.destroyed || res.writableEnded) {
+        proxyRes.destroy()
+        proxyReq.destroy()
+        return
+      }
       const headers = Object.fromEntries(
         Object.entries(proxyRes.headers).filter(([k]) => !HOP_BY_HOP_HEADERS.has(k.toLowerCase()))
       )
@@ -155,12 +172,18 @@ function apiProxyPlugin() {
       proxyRes.pipe(res)
     })
 
-    proxyReq.on('error', (err) => {
-      if (!res.headersSent) {
-        res.writeHead(502, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ error: `Backend unavailable: ${err.message}` }))
-      }
-    })
+    proxyReq.on('error', fail)
+    // A complete incoming GET/upload body is not the end of its response. Only
+    // a premature downstream response close or an aborted upload owns cancellation.
+    const depart = () => {
+      if (res.writableFinished) return
+      upstreamResponse?.destroy()
+      proxyReq.destroy()
+    }
+    res.on('close', depart)
+    res.on('error', depart)
+    req.on('aborted', depart)
+    req.on('error', depart)
 
     req.pipe(proxyReq)
   }

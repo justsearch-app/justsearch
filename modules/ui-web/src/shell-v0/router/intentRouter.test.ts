@@ -233,10 +233,10 @@ describe('IntentRouter — Query intents (548 S4-A)', () => {
 
     expect(navSpy).toHaveBeenCalledTimes(1);
     // Search Thread S5b — the standalone Search rail surface is retired; the default query surface
-    // is now the one window (core.unified-chat-surface), which owns the retrieve tier.
+    // is now the one window (core.search-v3-surface), which owns the retrieve tier.
     expect(navSpy.mock.calls[0]![0]).toEqual({
       kind: 'navigate',
-      target: 'core.unified-chat-surface',
+      target: 'core.search-v3-surface',
       state: { query: 'rust ownership' },
     });
   });
@@ -295,7 +295,7 @@ describe('IntentRouter — Answer intents (548 §4.5)', () => {
     takePendingAutoRun();
   });
 
-  it('parks the answer shape + auto-run flag in the compose one-shots', async () => {
+  it('parks the answer shape without an automatic send', async () => {
     const { handler: navHandler } = makeNavHandler();
     const router = makeRouter({ navigationHandler: navHandler });
 
@@ -304,9 +304,9 @@ describe('IntentRouter — Answer intents (548 §4.5)', () => {
       transport: 'LLM_EMISSION',
     });
 
-    // UnifiedChatView drains these on connect: forced shape + run-on-arrival.
+    // The named shape is prepared; Search always waits for Send.
     expect(takePendingForceShape()).toBe('core.summarize');
-    expect(takePendingAutoRun()).toBe(true);
+    expect(takePendingAutoRun()).toBe(false);
   });
 
   it('does NOT park the auto-run flag when the chat surface is unresolved', async () => {
@@ -335,8 +335,8 @@ describe('IntentRouter — Answer intents (548 §4.5)', () => {
     expect(navSpy).toHaveBeenCalledTimes(1);
     expect(navSpy.mock.calls[0]![0]).toEqual({
       kind: 'navigate',
-      target: 'core.unified-chat-surface',
-      state: { query: 'what is rust' },
+      target: 'core.search-v3-surface',
+      state: { query: 'what is rust', forceShapeId: 'core.rag-ask' },
     });
   });
 
@@ -358,6 +358,16 @@ describe('IntentRouter — Answer intents (548 §4.5)', () => {
       target: 'core.ask-surface',
       state: { lang: 'en', prompt: 'sum it' },
     });
+  });
+
+  it('C2 C6 A2 keeps answer file scope while the named shape outranks conflicting state', async () => {
+    const { handler: navHandler, spy: navSpy } = makeNavHandler();
+    const router = makeRouter({ navigationHandler: navHandler, answerSurfaceId: 'core.search-v3-surface' });
+    await router.dispatch({ transport: 'URL_DEEPLINK', address: { kind: 'answer', prompt: 'Extract chosen',
+      shape: 'core.extract', state: { docIds: ['chosen.md'], forceShapeId: 'core.agent-run', query: 'stale' } } });
+    expect(navSpy.mock.calls[0]![0]).toEqual({ kind: 'navigate', target: 'core.search-v3-surface',
+      state: { docIds: ['chosen.md'], forceShapeId: 'core.extract', query: 'Extract chosen' } });
+    expect(takePendingAutoRun()).toBe(false);
   });
 
   it('does NOT call the handler when the chat surface is unresolved', async () => {

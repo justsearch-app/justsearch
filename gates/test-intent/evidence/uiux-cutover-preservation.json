@@ -1,0 +1,275 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T11:50:04.664Z",
+  "revision": "5b8ec276a0c71138b8c99f9aa94b95e439eedf7b",
+  "tree": "17b62ab5b3cb626d1124a026935bdb5fc1612fde",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/chrome/Rail.test.ts\" \"src/shell-v0/state/NavigationJournal.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3801198-1793015394601.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4196
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selection.test.ts#C5 A8 leaving Search does not clear another surface selection",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:36bf3cc46a1b5b130812d748623122d049a4994c3caabc5b341b53d127c1d645",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C5 A8 leaving Search does not clear another surface selection",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:921c820eb06a87bd62741af2ca06c681db2c768da5dfede4380310c662f6907e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Rail.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Rail.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:23a67a71d5c08910ff0180c3d37ae0cb47fb93b4b1f3dc57972352003e6706e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Rail — altitude-projected homing (tempdoc 571) bands DIAGNOSTIC surfaces (Logs + Health) together, below the product surfaces",
+          "status": "passed"
+        },
+        {
+          "name": "Rail — altitude-projected homing (tempdoc 571) keeps the TRUST Activity surface first-class in the product band (NOT in diagnostics)",
+          "status": "passed"
+        },
+        {
+          "name": "Rail — altitude-projected homing (tempdoc 571) renders no diagnostics band when no surface is DIAGNOSTIC altitude",
+          "status": "passed"
+        },
+        {
+          "name": "Rail — altitude-projected homing (tempdoc 571) §6 — DERIVES TRUST position adjacent to the interaction surface (not catalog placement)",
+          "status": "passed"
+        },
+        {
+          "name": "Rail — collapsed/expanded chrome (Search Thread S5b) defaults to collapsed (icon-only, no visible labels)",
+          "status": "passed"
+        },
+        {
+          "name": "Rail — collapsed/expanded chrome (Search Thread S5b) renders a text label beside each icon when expanded",
+          "status": "passed"
+        },
+        {
+          "name": "Rail — collapsed/expanded chrome (Search Thread S5b) the expand toggle is a keyboard-accessible native button that dispatches rail-expand-toggle",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/NavigationJournal.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/NavigationJournal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:26fd32de12f82b25749a7f16b4e6faea711229c5ad37e979e4bb253c41d29fd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "NavigationJournal recording starts empty",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal recording records a navigation entry",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal recording advances cursor on subsequent navigations",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal recording truncates forward entries on branch",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal recording snapshots departing surface state on new navigation",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal recording R2 keeps an incoming recovery URL out of the departing surface journal entry",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal recording de-duplicates consecutive same-surface navigations",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal recording does not de-duplicate different surfaces",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal recording evicts oldest entries at capacity",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal back/forward state canGoBack is false when empty",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal back/forward state canGoBack is false with one entry",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal back/forward state canGoBack is true with two entries",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal back/forward state canGoForward is false at end",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal back/forward state canGoForward is true after navigateBack",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal peek peekBack returns null when at start",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal peek peekBack returns previous entry",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal peek peekForward returns null at end",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal peek peekForward returns next entry after navigateBack",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal navigateBack/Forward navigateBack dispatches previous entry",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal navigateBack/Forward navigateForward dispatches next entry",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal navigateBack/Forward navigateBack restores state from recorded URL",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal navigateBack/Forward navigateBack is no-op when cannot go back",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal navigateBack/Forward isNavigatingHistory suppresses recording during back/forward",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal subscribe fires listener immediately with current state",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal subscribe fires listener on record",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal subscribe unsubscribe stops firing",
+          "status": "passed"
+        },
+        {
+          "name": "NavigationJournal persistence round-trips through localStorage",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "98e2d9bc56cb15042de7a6c2191889eb382097bd",
+    "revision": "98e2d9bc56cb15042de7a6c2191889eb382097bd",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-selection.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/chrome/Rail.test.ts\" \"src/shell-v0/state/NavigationJournal.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3801198-1793015400358.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3967,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3801198-1793015400358.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-selection.test.ts#C5 A8 leaving Search does not clear another surface selection",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts#C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Rail.test.ts",
+        "classification": "assertion",
+        "detail": "Rail — altitude-projected homing (tempdoc 571) §6 — DERIVES TRUST position adjacent to the interaction surface (not catalog placement):  AssertionError: expected 'core.browse-surface' to be 'core.activity-surface' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-5R6jaZ/modules/ui-web/src/shell-v0/chrome/Rail.test.ts:100:37\n    at file:///home/elias/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/NavigationJournal.test.ts",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:8748c1e87f7d0d363b36afd1b94c1f23f239d2333180c630fc2c30d9c77eea6b"
+}

@@ -32,14 +32,7 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
       operations: ['core.reindex', 'core.add-watched-root', 'core.remove-watched-root', 'core.preview-excludes', 'core.apply-excludes'],
       resources: ['core.indexed-roots'],
     },
-    // Tempdoc 521 §22 Phase D — Library pairs with Search by default. Search Thread S5b: the
-    // standalone `core.search-surface` is retired; `Shell.resolveSecondarySurface` reads this off
-    // the live catalog (`getSurface(pairedId)`), so leaving the old id here would silently resolve
-    // to nothing and fall through to the "first non-primary rail surface" fallback (dead, not
-    // broken — but a stale declared intent). Repointed to `core.unified-chat-surface`, which owns
-    // the retrieve tier now AND already declares the reciprocal pairing (`splitPairing: { secondary:
-    // 'core.library-surface' }` below) — the honest, symmetric choice, not a silent no-op.
-    splitPairing: { secondary: 'core.unified-chat-surface' },
+    splitPairing: { secondary: 'core.search-v3-surface' },
   },
   {
     id: 'core.help-surface',
@@ -82,19 +75,15 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
     audience: 'DEVELOPER',
     placement: 'DEEPLINK',
   },
-  // Tempdoc 851 (owner decision 2026-08-19): `core.search-v2-surface` is retired. The 818 window
-  // never reached its §5 cutover, so it is deleted un-promoted rather than left registered as a
-  // third window; Search v3 is the successor. A second search window here is a regression.
-  // Tempdoc 822 slice 1 — Search v3: the window rebuilt on a new design system, built
-  // from scratch beside the shipped window. DEVELOPER/DEEPLINK and off-rail for the same reason
-  // its retired predecessor was: a visible peer would recreate the defect 687 deleted.
+  // WP1.5a — the main Search window, keeping its established identity and saved state.
   {
     id: 'core.search-v3-surface',
     mountTag: 'jf-sv3-window',
     labelKey: 'registry-surface.search-v3-surface.label',
     descriptionKey: 'registry-surface.search-v3-surface.description',
-    audience: 'DEVELOPER',
-    placement: 'DEEPLINK',
+    audience: 'USER',
+    placement: 'RAIL',
+    splitPairing: { secondary: 'core.library-surface' },
   },
   {
     id: 'core.brain-surface',
@@ -103,27 +92,6 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
     descriptionKey: 'registry-surface.brain-surface.description',
     audience: 'USER',
     placement: 'RAIL',
-  },
-  // Tempdoc 561 surface tier: `core.agent-surface` (the standalone RAIL agent window) is retired.
-  // The agent run + its retrospective fold into the one interaction window (core.unified-chat-surface).
-  // Tempdoc 565 §15.C — `core.workflow-surface` (the standalone RAIL workflow window) is retired. The
-  // workflow run is a MODE of the one interaction window (core.unified-chat-surface), rendered through
-  // the same run-render authority; `core.workflow-run` joins its consumed shapes (interaction-surface
-  // gate scope). A second visible workflow surface is now a build failure.
-  {
-    id: 'core.unified-chat-surface',
-    // 507 Phase 3 regression: this was `jf-chat-shape-mount`, but that wrapper
-    // requires a single `shape-id` derived from `consumes.conversationShapes`.
-    // unified-chat is a multi-shape host (Documents/Schema/Tools affordance
-    // bar) with its own dispatch; it mounts UnifiedChatView directly.
-    mountTag: 'jf-unified-chat-view',
-    labelKey: 'registry-surface.unified-chat-surface.label',
-    descriptionKey: 'registry-surface.unified-chat-surface.description',
-    audience: 'USER',
-    placement: 'RAIL',
-    consumes: {},
-    // Tempdoc 521 §22 Phase D — chat pairs with Library for context.
-    splitPairing: { secondary: 'core.library-surface' },
   },
   {
     // Tempdoc 855 §9.2 — Settings opens as a centered window over the stage (<jf-settings-window>),
