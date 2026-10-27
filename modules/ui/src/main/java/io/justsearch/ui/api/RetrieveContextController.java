@@ -289,6 +289,19 @@ public class RetrieveContextController {
       ctx.json(response);
     } catch (Exception e) {
       if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
+      var cancelled = io.justsearch.app.services.worker.EngineRequestEnds.cancellation(e);
+      if (cancelled != null
+          || io.justsearch.app.services.worker.EngineRequestEnds.isDeadline(e)) {
+        var code = cancelled != null ? io.justsearch.app.api.ApiErrorCode.SERVICE_UNAVAILABLE
+            : io.justsearch.app.api.ApiErrorCode.TIMEOUT;
+        Map<String, Object> failure = ApiErrorHandler.toResponse(code, cancelled != null ? cancelled : e);
+        failure.put("ok", false);
+        if (cancelled instanceof io.justsearch.app.api.EngineWorkCancelledException reason) {
+          failure.put("reasonCode", reason.reasonCode());
+        }
+        ctx.status(ApiErrorHandler.httpStatusFor(code)).json(failure);
+        return;
+      }
       log.error("Failed to retrieve context", e);
       ctx.status(500).json(Map.of("ok", false, "error", e.getMessage()));
     }
