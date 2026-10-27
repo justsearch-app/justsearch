@@ -1285,19 +1285,18 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       touch();
     }
 
-    // Restore llama-server runtime. Tempdoc 772 §Design "Design 1": the bundled runtime is not the
-    // only possible runtime source — a RUNTIME-tier package the plan supplies can deliver one too.
-    // So fail RUNTIME_MISSING only when the bundled restore fails AND the plan supplies no runtime
-    // package. Today no pack-delivered runtime package exists (see planSuppliesRuntime), so for
-    // every real install this stays exactly today's "restore or fail" — the second clause is
-    // dormant-but-correct until such a package is introduced.
-    updateState("running", "restore_runtime", "Restoring AI runtime...");
-    boolean bundledRuntimePresent = RuntimeRestoreUtil.ensureRuntimePresent(homeDir);
-    if (!runtimePreconditionMet(bundledRuntimePresent, plan, registry)) {
-      fail(
-          "RUNTIME_MISSING",
-          "Bundled AI runtime is missing and no runtime-supplying package is planned.");
-      return;
+    // Windows retains its bundled runtime prerequisite. Targets without that baseline only
+    // need llama-server when the selected plan includes a model that actually uses it.
+    if (NativeTargets.current().hasCpuBaselineRuntime()
+        || planIncludesChatRuntimeConsumer(plan, registry)) {
+      updateState("running", "restore_runtime", "Restoring AI runtime...");
+      boolean bundledRuntimePresent = RuntimeRestoreUtil.ensureRuntimePresent(homeDir);
+      if (!runtimePreconditionMet(bundledRuntimePresent, plan, registry)) {
+        fail(
+            "RUNTIME_MISSING",
+            "Bundled AI runtime is missing and no runtime-supplying package is planned.");
+        return;
+      }
     }
 
     // Reclaim BITS jobs an earlier crash left in the queue (tempdoc 840). Here rather than at app
@@ -2005,22 +2004,26 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     return bundledRuntimePresent || planSuppliesRuntime(plan, registry);
   }
 
+  private static boolean planIncludesChatRuntimeConsumer(InstallPlan plan, ModelRegistry registry) {
+    return registry.packages().stream()
+        .filter(pkg -> pkg.variants().stream().anyMatch(
+            variant -> variant.targetEP() == ExecutionProvider.LLAMA_SERVER))
+        .anyMatch(pkg -> plan.alreadyInstalled().contains(pkg.id())
+            || plan.downloads().stream().anyMatch(dl -> dl.packageId().equals(pkg.id())));
+  }
+
   /**
-   * Whether the plan already supplies a working runtime via a pack-delivered RUNTIME-tier package —
-   * i.e. a RUNTIME-tier package that is <em>hardware-independent</em> ({@code requiresCuda=false})
-   * appears in {@code downloads()} or {@code alreadyInstalled()}. The hardware-independence filter is
-   * deliberate: {@code cuda-runtime} is a RUNTIME-tier package too, but it is a CUDA DLL supplement
-   * ({@code requiresCuda=true}), not a from-scratch runtime supplier — counting it would change
-   * today's behavior on GPU hardware (proceed instead of RUNTIME_MISSING when the bundled restore
-   * fails). No hardware-independent RUNTIME package exists in any production registry today, so this
-   * returns false for every real install and the bundled-runtime restore stays the sole runtime
-   * source — behavior is unchanged. It activates only for a future hardware-independent runtime
-   * package (tempdoc 772 Q3 / §Design "Design 1").
+   * A selected RUNTIME package supplies the runtime on targets without a bundled baseline,
+   * including GPU-specific packages. Windows keeps its existing hardware-independent filter:
+   * its CUDA supplement does not replace the bundled restore prerequisite.
    */
   static boolean planSuppliesRuntime(InstallPlan plan, ModelRegistry registry) {
     Set<String> runtimePackIds = new HashSet<>();
     for (ModelPackage pkg : registry.packages()) {
-      if (pkg.tier() == CapabilityTier.RUNTIME && !pkg.requiresCuda()) {
+      if (pkg.tier() == CapabilityTier.RUNTIME
+          && (!pkg.requiresCuda()
+              || (!NativeTargets.current().hasCpuBaselineRuntime()
+                  && NativeTargets.current().targetId().equals(pkg.nativeTarget())))) {
         runtimePackIds.add(pkg.id());
       }
     }

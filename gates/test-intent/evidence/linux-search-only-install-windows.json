@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T23:52:49.866Z",
+  "revision": "4bf35243943bc50832349912658b45486649bc27",
+  "tree": "7c895b6f44619e87a9c0c59ccb90e2ade4316183",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.LinuxSearchOnlyInstallTest.windowsInstallStillRestoresAndRefusesAMissingBundledRuntime\" --tests \"io.justsearch.app.services.ai.install.LinuxSearchOnlyInstallTest.windowsPlansRetainTheirPackagesAndRuntimePrecondition\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3337
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxSearchOnlyInstallTest.java#windowsInstallStillRestoresAndRefusesAMissingBundledRuntime",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxSearchOnlyInstallTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8534293ce72ea5f5866f012fa79799b963580d79b5e1abac03fdf20a08782781",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "windowsInstallStillRestoresAndRefusesAMissingBundledRuntime()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxSearchOnlyInstallTest.java#windowsPlansRetainTheirPackagesAndRuntimePrecondition",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxSearchOnlyInstallTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8534293ce72ea5f5866f012fa79799b963580d79b5e1abac03fdf20a08782781",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "windowsPlansRetainTheirPackagesAndRuntimePrecondition()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:71034b23a545cebb519f5816d319f88ffff86fafb283e4a17e5daa5bbcbcc2c4"
+}
