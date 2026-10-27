@@ -1,0 +1,75 @@
+---
+schema: test-intent.v1
+task: t-20261027-ingest-socket
+author-role: builder
+author-session: 01a17b47-08d2-7a22-82e9-470da2fdee8e
+---
+
+# Keep the ingest socket fixture below the Unix-domain pathname limit
+
+The fixture relocation keeps the refusal oracle. The additional same-path regular-file control
+uses the existing readable-file type guard and documented absolute-path acceptance. Execution
+evidence was attempted with run-evidence.mjs for the modified method: its JUnit XML records
+one executed, passing case with no skips, but the script exited 2 during its Git snapshot
+(`git add -A`: "unable to create temporary file: Read-only file system") before writing the
+evidence file. This worktree uses /home/elias/dev/justsearch/.git as its common Git directory;
+the New entry's evidence path remains pending. Baseline e11a279f0c6e
+with unchanged TMPDIR ran all 11 cases: the socket bind raised java.net.SocketException
+("Unix domain path too long") and the other 10 passed, with no skips. A diagnostic rerun retaining only failed JUnit
+temporary directories reproduced the same bind error: the socket pathname measured
+174 bytes (parent directory 162 bytes). The measured path is recorded in
+tmp/socket-path-measurement.json; the retained empty directory was removed non-recursively. The candidate ran all
+11 cases successfully, with no skips; :modules:app-agent:spotlessCheck and
+:modules:app-agent:pmdTest also succeeded. Logs and JUnit XML are retained under this checkout
+and the temporary before clone for independent review. The builder records no acceptance.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/tools/IngestPreparationBoundaryTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Only socketInputIsRefusedAsAnUnsupportedFileType changes. Its socket moves from JUnit tempDir to Files.createTempDirectory(Path.of(\"/tmp\"), \"js-ing-\") on non-Windows hosts; Windows keeps tempDir. The directory has rwx------ POSIX permissions where supported. The bound node remains other, not a symlink, regular file or directory. The existing unsupported-channel-open assumption is retained; bind, path and permission failures propagate. The BAD_REQUEST and readable-regular-file-or-directory refusal oracle is retained, including the exact path-bearing message. The channel closes before replacing or finally deleting the node, and cleanup removes only that node and this test-created directory. No global properties, selection, tags, other tests or production code change.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including red-main and flaky-test repairs",
+          "choice": "Relocate only the Unix-domain socket fixture into a unique short /tmp directory on non-Windows hosts, with owner-only POSIX permissions where supported. Preserve the unsupported-channel-open assumption, special-file witnesses, BAD_REQUEST refusal and its message; close and remove only fixture-owned resources.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/tools/IngestPreparationBoundaryTest.java"
+      ],
+      "class": "New",
+      "repaired": false,
+      "behaviour": "After closing the Unix-domain socket and deleting its node, write a readable ordinary file at that exact pathname. Using prepare(tool(List.of()), ...) and RecordedRootPlan.fromReplayPayload, require successful preparation with exactly one single-file root whose path equals the normalized absolute former socket path. No watched roots are configured. This same-path control distinguishes type rejection from a location or name rejection; it pins already-supported regular-file and absolute-path behavior, not repaired production behavior.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including red-main and flaky-test repairs",
+          "choice": "Add an ordinary-file control at the exact former socket pathname after channel closure and socket-node deletion. The expectation follows from IngestTool.attributes (modules/app-agent/src/main/java/io/justsearch/agent/tools/IngestTool.java:252-266), which accepts readable regular files, and its resolvePath absolute-path branch (:231-237), documented as \"absolute ⇒ normalize\" in docs/tempdocs/877-agent-tool-centralisation.md:302-306. With no watched roots, preparing the replacement file must yield one single-file root at that normalized absolute path. This checks that socket refusal is caused by file type rather than the relocated directory or filename.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ingest-socket-short-path.json",
+      "newChecks": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/tools/IngestPreparationBoundaryTest.java#socketInputIsRefusedAsAnUnsupportedFileType"
+      ]
+    }
+  ]
+}
+```
+
+## Acceptance records
