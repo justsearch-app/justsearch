@@ -64,6 +64,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const POLL_INTERVAL_MS = 15_000;
+const MERGE_POLL_INTERVAL_MS = 60_000;
 const DEFAULT_TIMEOUT_SEC = 1800;
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PREVIEW_SCRIPT = path.resolve(SCRIPT_DIR, '..', 'ci', 'preview-squash-message.mjs');
@@ -220,7 +221,7 @@ function requiredChecksSummary(checks) {
   return checks.reported ? `${checks.reported} reported, ${checks.passed} passed, ${checks.pending} pending` : 'none reported yet';
 }
 
-export function classifyMergePoll(before, after, rows, watchedHead, passingForMs = 0) {
+export function classifyMergePoll(before, after, rows, watchedHead, passingForMs = 0, requiredContexts = []) {
   for (const snapshot of [before, after]) {
     const classified = classifyMergeSnapshot(snapshot);
     if (classified.verdict === 'pass') return classified;
@@ -242,7 +243,8 @@ export function classifyMergePoll(before, after, rows, watchedHead, passingForMs
   if (!after.autoMergeRequest) {
     return { verdict: 'fail', key: 'AUTO_MERGE_OFF', message: 'auto-merge is off; enqueue again after a fix' };
   }
-  const allPassed = checks.reported > 0 && checks.passed === checks.reported;
+  const allPassed = requiredContexts.length > 0 && checks.passed === checks.reported &&
+    requiredContexts.every((context) => rows.some((row) => row.name === context && classifyRequiredChecks([row]).passed === 1));
   if (allPassed && passingForMs >= 600_000) {
     return { verdict: 'fail', key: 'STALLED', message: `merge stalled for 10 minutes with required checks passing; mergeStateStatus ${after.mergeStateStatus}` };
   }
@@ -256,10 +258,11 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
   pause = sleep,
   emit = emitTransition,
   repo = null,
+  head = null,
 } = {}) {
   const deadline = now() + timeoutSec * 1000;
   const viewArgs = ['pr', 'view', String(prNumber), '--json',
-    'state,mergedAt,mergeCommit,headRefOid,isDraft,mergeStateStatus,autoMergeRequest'];
+    'state,mergedAt,mergeCommit,headRefOid,baseRefName,isDraft,mergeStateStatus,autoMergeRequest'];
   const checksArgs = ['pr', 'checks', String(prNumber), '--required', '--json', 'name,state,bucket,link'];
   if (repo) { viewArgs.push('--repo', repo); checksArgs.push('--repo', repo); }
   const readSnapshot = () => {
@@ -268,6 +271,7 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
     const snapshot = loaded.value;
     if (!snapshot || !['OPEN', 'CLOSED', 'MERGED'].includes(snapshot.state) ||
         typeof snapshot.headRefOid !== 'string' || !snapshot.headRefOid ||
+        typeof snapshot.baseRefName !== 'string' || !snapshot.baseRefName ||
         typeof snapshot.isDraft !== 'boolean' || typeof snapshot.mergeStateStatus !== 'string' ||
         !Object.hasOwn(snapshot, 'autoMergeRequest')) {
       return { error: new Error('invalid gh JSON: incomplete PR snapshot') };
@@ -275,7 +279,8 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
     return loaded;
   };
   let previousKey = null;
-  let watchedHead = null;
+  let watchedHead = head?.toLowerCase() ?? null;
+  let requiredContexts = null;
   let passingSince = null;
   for (;;) {
     const before = readSnapshot();
@@ -284,6 +289,29 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
       return 2;
     }
     if (watchedHead === null) watchedHead = before.value.headRefOid;
+    if (requiredContexts === null) {
+      const rules = loadJson(bin, ['api', `repos/${repo || '{owner}/{repo}'}/rules/branches/${encodeURIComponent(before.value.baseRefName)}`]);
+      requiredContexts = [];
+      let reason = rules.error?.message;
+      if (!reason) {
+        try {
+          if (!Array.isArray(rules.value)) throw new Error('invalid branch rules JSON');
+          const contexts = rules.value.filter((rule) => rule?.type === 'required_status_checks')
+            .flatMap((rule) => {
+              const checks = rule.parameters?.required_status_checks;
+              if (!Array.isArray(checks) || checks.some((check) => typeof check?.context !== 'string' || !check.context)) {
+                throw new Error('invalid required status check contexts');
+              }
+              return checks.map((check) => check.context);
+            });
+          requiredContexts = [...new Set(contexts)];
+          if (!requiredContexts.length) reason = 'branch rules returned no required contexts';
+        } catch (error) {
+          reason = error.message;
+        }
+      }
+      if (reason) process.stderr.write(`run-gh merge-wait: stall detection disabled: ${reason}; timeout still applies\n`);
+    }
     const checks = loadJson(bin, checksArgs);
     const after = readSnapshot();
     let classified = classifyMergeSnapshot(before.value);
@@ -298,10 +326,10 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
           process.stderr.write(`run-gh merge-wait: ${checks.error.message}\n`);
           return 2;
         }
-        classified = classifyMergePoll(before.value, after.value, checks.value, watchedHead);
+        classified = classifyMergePoll(before.value, after.value, checks.value, watchedHead, 0, requiredContexts);
         if (classified.allPassed) {
           if (passingSince === null) passingSince = now();
-          classified = classifyMergePoll(before.value, after.value, checks.value, watchedHead, now() - passingSince);
+          classified = classifyMergePoll(before.value, after.value, checks.value, watchedHead, now() - passingSince, requiredContexts);
         } else {
           passingSince = null;
         }
@@ -311,10 +339,11 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
     if (classified.verdict === 'pass') return 0;
     if (classified.verdict === 'fail') return 1;
     if (now() >= deadline) {
-      process.stderr.write(`run-gh merge-wait: TIMEOUT after ${timeoutSec}s; required checks: ${requiredChecksSummary(classifyRequiredChecks(checks.value))}\n`);
+      const missing = requiredContexts.filter((context) => !checks.value.some((row) => row.name === context));
+      process.stderr.write(`run-gh merge-wait: TIMEOUT after ${timeoutSec}s; required checks: ${requiredChecksSummary(classifyRequiredChecks(checks.value))}${missing.length ? `; not reported yet: ${missing.join(', ')}` : ''}\n`);
       return 3;
     }
-    await pause(POLL_INTERVAL_MS);
+    await pause(MERGE_POLL_INTERVAL_MS);
   }
 }
 
@@ -549,7 +578,7 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
   const result = run(bin, mergeArgs, { stdio: 'inherit', windowsHide: true });
   const failure = childFailure('squash auto-merge request', result, writeError);
   if (failure === 0) {
-    writeError(`run-gh enqueue: run node scripts/dev/run-gh.mjs merge-wait ${prNumber}${repo ? ` --repo ${repo}` : ''} --timeout-sec 5400 in the background.\n`);
+    writeError(`run-gh enqueue: run node scripts/dev/run-gh.mjs merge-wait ${prNumber}${repo ? ` --repo ${repo}` : ''} --head ${after.value.headRefOid} --timeout-sec 5400 in the background.\n`);
   }
   return failure;
 }
@@ -573,12 +602,17 @@ async function main() {
   if (argv[0] === 'merge-wait') {
     const { timeoutSec, rest } = parseTimeoutSec(argv.slice(1));
     const repoFlag = parseValueFlag(rest, '--repo');
-    const prNumber = repoFlag.rest[0];
+    const headFlag = parseValueFlag(repoFlag.rest, '--head');
+    if (rest.includes('--head') && (!/^[a-f0-9]{40}$/i.test(headFlag.value ?? '') || headFlag.rest.includes('--head'))) {
+      process.stderr.write('run-gh merge-wait: --head must be a 40-hex SHA\n');
+      process.exit(2);
+    }
+    const prNumber = headFlag.rest[0];
     if (!prNumber) {
       process.stderr.write('run-gh merge-wait: missing <pr-number>\n');
       process.exit(2);
     }
-    process.exit(await mergeWait(bin, prNumber, timeoutSec, { repo: repoFlag.value }));
+    process.exit(await mergeWait(bin, prNumber, timeoutSec, { repo: repoFlag.value, head: headFlag.value }));
   }
 
   if (argv[0] === 'run-wait-sha') {

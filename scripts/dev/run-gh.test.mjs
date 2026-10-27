@@ -14,6 +14,7 @@ import * as runGh from './run-gh.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { buildSquashMessagePreview } from '../ci/preview-squash-message.mjs';
 import {
   decodeChecksExit,
@@ -215,8 +216,8 @@ run('parseValueFlag extracts a named value without swallowing a following flag',
 await runAsync('merge-wait times out deterministically while a PR stays pending', async () => {
   let clock = 0;
   const code = await mergeWait('gh', 7, 1, {
-    loadJson: (_bin, args) => ({ value: args[1] === 'checks' ? [] : {
-      state: 'OPEN', headRefOid: 'a'.repeat(40), isDraft: false,
+    loadJson: (_bin, args) => ({ value: args[0] === 'api' || args[1] === 'checks' ? [] : {
+      state: 'OPEN', headRefOid: 'a'.repeat(40), baseRefName: 'main', isDraft: false,
       mergeStateStatus: 'QUEUED', autoMergeRequest: {},
     } }),
     now: () => clock,
@@ -352,21 +353,29 @@ for (const [label, results, expected] of [
 // --- merge-wait outcome coverage (all GitHub responses are fakes) ---
 const openMergePr = {
   state: 'OPEN', mergedAt: null, mergeCommit: null, headRefOid: 'a'.repeat(40),
+  baseRefName: 'main',
   isDraft: false, mergeStateStatus: 'BLOCKED', autoMergeRequest: { enabledAt: '2026-10-27' },
 };
 const requiredRow = (state = 'SUCCESS', bucket = 'pass', name = 'required') => ({
   name, state, bucket, link: `https://example.test/checks/${name}`,
 });
-async function observeMerge(polls, { timeoutSec = 1, step = 15_000, repo = null } = {}) {
+const requiredRules = (...contexts) => [{
+  type: 'required_status_checks', parameters: { required_status_checks: contexts.map((context) => ({ context })) },
+}];
+async function observeMerge(polls, {
+  timeoutSec = 1, step = 15_000, repo = null, head = null,
+  rules = requiredRules('required'), rulesError = null,
+} = {}) {
   let clock = 0; let poll = 0; let views = 0;
-  const calls = []; let stderr = '';
+  const calls = []; const pauses = []; let stderr = '';
   const originalWrite = process.stderr.write;
   process.stderr.write = (message) => { stderr += message; return true; };
   try {
     const code = await mergeWait('fake-gh', 7, timeoutSec, {
-      repo,
+      repo, head,
       loadJson: (bin, args) => {
         assert.equal(bin, 'fake-gh'); calls.push(args);
+        if (args[0] === 'api') return rulesError ? { error: new Error(rulesError) } : { value: rules };
         const current = polls[Math.min(poll, polls.length - 1)];
         if (args[1] === 'checks') return current.checkError
           ? { error: new Error(current.checkError) } : { value: current.checks ?? [requiredRow('PENDING', 'pending')] };
@@ -376,9 +385,9 @@ async function observeMerge(polls, { timeoutSec = 1, step = 15_000, repo = null 
         return { value: { ...openMergePr, ...(views++ % 2 ? current.after ?? current.before : current.before) } };
       },
       now: () => clock,
-      pause: async () => { clock += step; poll += 1; views = 0; },
+      pause: async (ms) => { pauses.push(ms); clock += step ?? ms; poll += 1; views = 0; },
     });
-    return { code, calls, stderr, poll };
+    return { code, calls, stderr, poll, pauses };
   } finally {
     process.stderr.write = originalWrite;
   }
@@ -451,7 +460,7 @@ await runAsync('M9 current pending rerun and STALE are pending', async () => {
 await runAsync('M10 timeout reports counts and never mutates auto-merge', async () => {
   const result = await observeMerge([{ checks: [requiredRow(), requiredRow('QUEUED', 'pending')] }]);
   assert.equal(result.code, 3); assert.match(result.stderr, /TIMEOUT.*2 reported, 1 passed, 1 pending/);
-  assert.ok(result.calls.every((args) => ['view', 'checks'].includes(args[1])));
+  assert.ok(result.calls.every((args) => args[0] === 'api' || ['view', 'checks'].includes(args[1])));
 });
 await runAsync('M10 zero checks never passes or starts the stall timer', async () => {
   const result = await observeMerge([{ checks: [] }], { timeoutSec: 900, step: 300_000 });
@@ -497,9 +506,11 @@ await runAsync('a new head during a poll is rejected on the next stable poll', a
 });
 await runAsync('R1 every PR view and required-check query targets the supplied repo', async () => {
   const result = await observeMerge([{}], { repo: 'owner/repo' });
-  assert.equal(result.code, 3); assert.equal(result.calls.length, 6);
-  for (const args of result.calls) assert.deepEqual(args.slice(-2), ['--repo', 'owner/repo']);
-  assert.deepEqual(result.calls.slice(0, 3).map((args) => args[1]), ['view', 'checks', 'view']);
+  assert.equal(result.code, 3);
+  const prCalls = result.calls.filter((args) => args[0] === 'pr');
+  assert.equal(prCalls.length, 6);
+  for (const args of prCalls) assert.deepEqual(args.slice(-2), ['--repo', 'owner/repo']);
+  assert.deepEqual(prCalls.slice(0, 3).map((args) => args[1]), ['view', 'checks', 'view']);
   assert.match(result.calls[0][4], /headRefOid/); assert.match(result.calls[0][4], /autoMergeRequest/);
 });
 for (const repo of [null, 'owner/repo']) run(`E1 enqueue success prints the background observer next step (${repo})`, () => {
@@ -510,7 +521,7 @@ for (const repo of [null, 'owner/repo']) run(`E1 enqueue success prints the back
   });
   assert.equal(code, 0);
   assert.equal(stderr.trim().split('\n').length, 1);
-  assert.ok(stderr.includes(`node scripts/dev/run-gh.mjs merge-wait 7${repo ? ` --repo ${repo}` : ''} --timeout-sec 5400`));
+  assert.ok(stderr.includes(`node scripts/dev/run-gh.mjs merge-wait 7${repo ? ` --repo ${repo}` : ''} --head ${snapshot.headRefOid} --timeout-sec 5400`));
   assert.match(stderr, /background/);
 });
 run('E1 enqueue failure emits no observer next step and preserves exit status', () => {
@@ -551,11 +562,133 @@ await runAsync('M1 first-snapshot merge wins over subsequent checks and snapshot
     checkError: 'network', afterError: 'network',
   }]);
   assert.equal(result.code, 0); assert.match(result.stderr, /merged at landed/);
-  assert.deepEqual(result.calls.map((args) => args[1]), ['view', 'checks', 'view']);
+  assert.deepEqual(result.calls.filter((args) => args[0] === 'pr').map((args) => args[1]), ['view', 'checks', 'view']);
 });
 await runAsync('M11 second PR snapshot error exits 2', async () => {
   const result = await observeMerge([{ afterError: 'network' }]);
   assert.equal(result.code, 2); assert.match(result.stderr, /network/);
+});
+
+await runAsync('missing required context never starts a stall and is named on timeout', async () => {
+  const result = await observeMerge([{ checks: [requiredRow()] }], {
+    timeoutSec: 900, step: 60_000, rules: requiredRules('required', 'late context'),
+  });
+  assert.equal(result.code, 3);
+  assert.match(result.stderr, /TIMEOUT.*not reported yet: late context/);
+  assert.doesNotMatch(result.stderr, /stalled/);
+});
+await runAsync('stall starts only after the last required context reports a pass', async () => {
+  const result = await observeMerge([
+    { checks: [requiredRow()] },
+    { checks: [requiredRow()] },
+    { checks: [requiredRow(), requiredRow('SKIPPED', 'skipping', 'late')] },
+  ], { timeoutSec: 1800, step: 300_000, rules: requiredRules('required', 'late') });
+  assert.equal(result.code, 1); assert.equal(result.poll, 4);
+  assert.match(result.stderr, /stalled/);
+});
+await runAsync('a missing context resets an already running stall timer', async () => {
+  const result = await observeMerge([
+    { checks: [requiredRow(), requiredRow('NEUTRAL', 'pass', 'late')] },
+    { checks: [requiredRow()] },
+    { checks: [requiredRow(), requiredRow('NEUTRAL', 'pass', 'late')] },
+  ], { timeoutSec: 1800, step: 300_000, rules: requiredRules('required', 'late') });
+  assert.equal(result.code, 1); assert.equal(result.poll, 4);
+});
+await runAsync('required contexts are the union across rules, including duplicate contexts', async () => {
+  const result = await observeMerge([{ checks: [requiredRow()] }], {
+    timeoutSec: 900, step: 60_000,
+    rules: [...requiredRules('required'), { type: 'pull_request' }, ...requiredRules('late', 'required')],
+  });
+  assert.equal(result.code, 3);
+  assert.match(result.stderr, /not reported yet: late/);
+});
+for (const [label, options] of [
+  ['API failure', { rulesError: 'forbidden' }],
+  ['no rules', { rules: [] }],
+  ['no required contexts', { rules: [{ type: 'pull_request' }] }],
+  ['empty required set', { rules: requiredRules() }],
+  ['malformed rules', { rules: {} }],
+  ['malformed required contexts', { rules: [...requiredRules('required'), { type: 'required_status_checks', parameters: {} }] }],
+]) await runAsync(`unavailable required contexts disable only stall detection (${label})`, async () => {
+  const result = await observeMerge([{ checks: [requiredRow()] }], { timeoutSec: 900, step: 60_000, ...options });
+  assert.equal(result.code, 3);
+  assert.equal(result.stderr.split('\n').filter((line) => /stall detection disabled/.test(line)).length, 1);
+  assert.match(result.stderr, /TIMEOUT/);
+  assert.equal(result.calls.filter((args) => args[0] === 'api').length, 1);
+});
+for (const repo of [null, 'owner/repo']) await runAsync(`rules are read once for the initial base (${repo})`, async () => {
+  const result = await observeMerge([{ before: { baseRefName: 'release/v1' } }], { repo });
+  assert.deepEqual(result.calls.filter((args) => args[0] === 'api'), [
+    ['api', `repos/${repo ?? '{owner}/{repo}'}/rules/branches/release%2Fv1`],
+  ]);
+  for (const args of result.calls.filter((args) => args[1] === 'view')) assert.match(args[4], /baseRefName/);
+});
+await runAsync('enqueue head mismatch is rejected on the first stable poll', async () => {
+  const result = await observeMerge([{ before: { headRefOid: 'b'.repeat(40) } }], { head: 'a'.repeat(40) });
+  assert.equal(result.code, 1); assert.equal(result.poll, 0); assert.match(result.stderr, /new head.*enqueue again/);
+});
+await runAsync('matching enqueue head continues observing', async () => {
+  const result = await observeMerge([{}], { head: openMergePr.headRefOid });
+  assert.equal(result.code, 3); assert.doesNotMatch(result.stderr, /new head/);
+});
+await runAsync('merge-wait pauses 60 seconds and keeps view/checks/view per poll', async () => {
+  const result = await observeMerge([{}], { timeoutSec: 120, step: null });
+  assert.equal(result.code, 3); assert.deepEqual(result.pauses, [60_000, 60_000]);
+  assert.deepEqual(result.calls.filter((args) => args[0] === 'pr').map((args) => args[1]),
+    ['view', 'checks', 'view', 'view', 'checks', 'view', 'view', 'checks', 'view']);
+});
+await runAsync('run-wait-sha retains its 15 second poll interval', async () => {
+  const pauses = []; let clock = 0;
+  const code = await runWaitSha('fake-gh', 'abc', 15, {}, {
+    loadJson: () => ({ value: [] }), now: () => clock,
+    pause: async (ms) => { pauses.push(ms); clock += ms; }, emit: (_prefix, value) => value.key,
+  });
+  assert.equal(code, 3); assert.deepEqual(pauses, [15_000]);
+});
+
+// Exercise the CLI parser with every child gh call replaced in the subprocess.
+const cliGhStub = `
+  import childProcess from 'node:child_process';
+  import { syncBuiltinESMExports } from 'node:module';
+  let clock = 0;
+  Date.now = () => clock++ * 1000;
+  childProcess.spawnSync = (_bin, args) => ({ status: 0, stdout: JSON.stringify(
+    args[0] === 'api' ? ${JSON.stringify(requiredRules('required'))} :
+    args[1] === 'checks' ? [] : ${JSON.stringify({ ...openMergePr, headRefOid: 'b'.repeat(40) })}
+  ) });
+  syncBuiltinESMExports();
+`;
+function mergeWaitCli(args) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'run-gh-cli-'));
+  const stderrPath = path.join(directory, 'stderr');
+  const stderrFd = fs.openSync(stderrPath, 'w');
+  try {
+    const result = spawnSync(process.execPath, [
+      '--import', `data:text/javascript,${encodeURIComponent(cliGhStub)}`,
+      path.join(import.meta.dirname, 'run-gh.mjs'), 'merge-wait', '7', '--timeout-sec', '0.000001', ...args,
+    ], { stdio: ['ignore', 'ignore', stderrFd], timeout: 2000 });
+    assert.ifError(result.error);
+    return { status: result.status, stderr: fs.readFileSync(stderrPath, 'utf8') };
+  } finally {
+    fs.closeSync(stderrFd);
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+for (const args of [['--head'], ['--head', '--repo', 'owner/repo'], ['--head', 'xyz'],
+  ['--head', 'a'.repeat(39)], ['--head', 'a'.repeat(41)], ['--head', 'g'.repeat(40)],
+  ['--head', 'a'.repeat(40), '--head', 'b'.repeat(40)]]) {
+  run(`CLI rejects malformed head ${JSON.stringify(args)}`, () => {
+    const result = mergeWaitCli(args);
+    assert.equal(result.status, 2); assert.match(result.stderr, /--head.*40.*hex/i);
+  });
+}
+for (const head of ['a'.repeat(40), 'ABCDEF'.repeat(6) + '1234']) run(`CLI watches supplied hex head ${head}`, () => {
+  const result = mergeWaitCli(['--head', head]);
+  assert.equal(result.status, 1); assert.match(result.stderr, /new head/);
+});
+run('CLI normalizes uppercase hex for the matching watched head', () => {
+  const result = mergeWaitCli(['--head', 'B'.repeat(40)]);
+  assert.equal(result.status, 3); assert.doesNotMatch(result.stderr, /new head/);
 });
 
 // --- Report ---
