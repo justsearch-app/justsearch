@@ -35,3 +35,15 @@ The existing oracle is unchanged; only the observation becomes consistent.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17c1b-6df1-7c33-b900-0772b7fa08de",
+  "verdict": "accept",
+  "digest": "sha256:9d5003fb7194c8456f04bcadc8030bec57892f0c953376881232dd547ebf3902"
+}
+```
