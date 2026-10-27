@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-27T02:15:28.604Z",
-  "revision": "97010be1933e826700d444db3a8c7bdcb834cbcb",
-  "tree": "61d4920e807ba01930aaa7468af27326b7197e27",
+  "createdAt": "2026-10-27T02:31:18.323Z",
+  "revision": "c3e8509d04cf48c44c9f87d85b9ba853da259c07",
+  "tree": "0719101ba88c32b1251be18a207221bea13353d8",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 13742
+      "durationMs": 14289
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3957be43b345c888e3382d71fe3afb0a8483bae085d94f1856e7c3e73424aad1",
+      "contentDigest": "sha256:aa64a424c81b07887ad292fe7ac08026037dc1bd1f017c731995689242bd7005",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -82,5 +82,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:90efd7510defd88fda59375619b2996021aa4fb3bbe8f34d29520c85c1ea5bb1"
+  "digest": "sha256:01d68be1c3bdb4e959245cd3ec535250dd1f76cc74ba7669ba77b2a53b06312e"
 }
