@@ -18,7 +18,7 @@ use crate::BackendState;
 
 const INTENT_SCHEMA_VERSION: u32 = 1;
 const EVIDENCE_SCHEMA_VERSION: u32 = 1;
-const DESCRIPTOR_SCHEMA_VERSION: u32 = 1;
+const DESCRIPTOR_SCHEMA_VERSION: u32 = 2;
 const HEAD_TIMEOUT: Duration = Duration::from_secs(15);
 const BACKEND_EXIT_TIMEOUT: Duration = Duration::from_secs(30);
 const BACKEND_READY_TIMEOUT: Duration = Duration::from_secs(60);
@@ -46,6 +46,58 @@ struct ReleaseDescriptor {
     compatibility: Vec<ReleaseStoreCompatibility>,
 }
 
+/// Wire v2 is authenticated as a whole, then projected onto the running platform.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReleaseEnvelope {
+    schema_version: u32,
+    sequence: u64,
+    version: String,
+    channel: String,
+    metadata_key_id: String,
+    metadata_root_policy: String,
+    targets: HashMap<String, ReleaseTarget>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseTarget {
+    artifact: ReleaseArtifact,
+    compatibility: Vec<ReleaseStoreCompatibility>,
+}
+
+fn running_target() -> Result<&'static str, String> {
+    if cfg!(all(windows, target_arch = "x86_64")) {
+        Ok("windows-x86_64")
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        Ok("linux-x86_64")
+    } else {
+        Err("Application updates are unsupported on this platform".into())
+    }
+}
+
+fn parse_descriptor(bytes: &[u8], target: &str) -> Result<ReleaseDescriptor, String> {
+    let mut envelope: ReleaseEnvelope = serde_json::from_slice(bytes)
+        .map_err(|error| format!("Release descriptor is invalid: {error}"))?;
+    if envelope.schema_version != DESCRIPTOR_SCHEMA_VERSION {
+        return Err("Unsupported release descriptor schema".into());
+    }
+    let selected = envelope
+        .targets
+        .remove(target)
+        .ok_or_else(|| format!("Release descriptor has no target for {target}"))?;
+    Ok(ReleaseDescriptor {
+        schema_version: envelope.schema_version,
+        sequence: envelope.sequence,
+        version: envelope.version,
+        channel: envelope.channel,
+        target: target.into(),
+        metadata_key_id: envelope.metadata_key_id,
+        metadata_root_policy: envelope.metadata_root_policy,
+        artifact: selected.artifact,
+        compatibility: selected.compatibility,
+    })
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ReleaseArtifact {
@@ -54,6 +106,7 @@ struct ReleaseArtifact {
     size: u64,
     signature: String,
     public_key: String,
+    key_id: String,
 }
 
 /// Target-side compatibility declaration copied from the release's reviewed store register.
@@ -511,7 +564,10 @@ pub(crate) async fn run_install_now(
         app.package_info().version.to_string(),
     )
     .await?;
-    // The coordinator persisted the Windows launch witness before the shell exits.
+    // Linux waits for apt before restarting; Windows transfers control to NSIS.
+    #[cfg(target_os = "linux")]
+    app.request_restart();
+    #[cfg(not(target_os = "linux"))]
     app.exit(0);
     Ok(())
 }
@@ -731,21 +787,30 @@ async fn finish_staged_update(
     let (process_id, launched_at_epoch_ms) = match launch {
         Ok(witness) => witness,
         Err(error) => {
+            if error.repair_required {
+                let message = error.message;
+                mark_repair_required_at(root, coordinator, intent, &message)?;
+                return Err(message);
+            }
             let restart = edge.resume();
             let (phase, message) = match restart {
                 Ok(()) => (
                     UpgradePhase::Cancelled,
-                    format!("Installer launch failed; Engine supervision was resumed: {error}"),
+                    format!("Installer launch failed; Engine supervision was resumed: {}", error.message),
                 ),
                 Err(restart_error) => (
                     UpgradePhase::RepairRequired,
                     format!(
-                        "Installer launch failed and Engine supervised resume failed: {error}; {restart_error}"
+                        "Installer launch failed and Engine supervised resume failed: {}; {restart_error}", error.message
                     ),
                 ),
             };
             transition(&mut intent, phase, Some(message.clone()))?;
             persist_intent_at(root, coordinator, &intent)?;
+            #[cfg(target_os = "linux")]
+            if intent.phase == UpgradePhase::Cancelled {
+                set_state(coordinator, "available", Some(message.clone()));
+            }
             return Err(message);
         }
     };
@@ -821,7 +886,7 @@ trait UpgradeHandoff: Sync {
     ) -> Result<crate::containment::JobEmpty, String>;
     fn terminate_contained(&self) -> Result<(), String>;
     fn resume(&self) -> Result<(), String>;
-    fn launch(&self, path: &Path) -> Result<(u32, u128), String>;
+    fn launch(&self, path: &Path) -> Result<(u32, u128), InstallerError>;
 }
 
 struct ShellUpgradeHandoff<'a> {
@@ -902,11 +967,18 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
         }
         result
     }
-    fn launch(&self, path: &Path) -> Result<(u32, u128), String> {
+    fn launch(&self, path: &Path) -> Result<(u32, u128), InstallerError> {
         if self.backend.host.quit_started() {
             return Err("Quit won; update remains staged".into());
         }
-        launch_installer(path)
+        #[cfg(target_os = "linux")]
+        {
+            linux_installer::launch(path)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            launch_installer(path).map_err(InstallerError::from)
+        }
     }
 }
 
@@ -1399,18 +1471,12 @@ async fn check_release(app: &AppHandle) -> Result<Option<ReleaseDescriptor>, Str
     let descriptor_bytes = fetch_bytes(&client, &descriptor_url).await?;
     let signature = fetch_text(&client, &format!("{descriptor_url}.sig")).await?;
     verify_metadata_signature(&descriptor_bytes, signature.trim())?;
-    let descriptor: ReleaseDescriptor = serde_json::from_slice(&descriptor_bytes)
-        .map_err(|error| format!("Release descriptor is invalid: {error}"))?;
+    let descriptor = parse_descriptor(&descriptor_bytes, running_target()?)?;
     validate_descriptor(&descriptor)?;
 
     let sequence_path = sequence_path(app);
     let sequence = read_sequence(&sequence_path)?;
-    if descriptor.sequence < sequence.highest_accepted_sequence {
-        return Err(format!(
-            "Release sequence {} is older than accepted sequence {}",
-            descriptor.sequence, sequence.highest_accepted_sequence
-        ));
-    }
+    validate_sequence(descriptor.sequence, sequence.highest_accepted_sequence)?;
 
     let update = updater_for(app, &descriptor)?
         .check()
@@ -1430,6 +1496,16 @@ async fn check_release(app: &AppHandle) -> Result<Option<ReleaseDescriptor>, Str
     Ok(Some(descriptor))
 }
 
+fn validate_sequence(sequence: u64, highest: u64) -> Result<(), String> {
+    if sequence < highest {
+        Err(format!(
+            "Release sequence {sequence} is older than accepted sequence {highest}"
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 fn updater_for(
     app: &AppHandle,
     descriptor: &ReleaseDescriptor,
@@ -1437,6 +1513,7 @@ fn updater_for(
     let latest = latest_url()?;
     app.updater_builder()
         .pubkey(descriptor.artifact.public_key.clone())
+        .target(running_target()?)
         .endpoints(vec![latest
             .parse()
             .map_err(|error| format!("Invalid updater endpoint: {error}"))?])
@@ -1453,18 +1530,25 @@ fn require_closed_set(
         || update.download_url.as_str() != descriptor.artifact.url
         || update.signature.trim() != descriptor.artifact.signature.trim()
     {
-        return Err("release.v1.json and latest.json do not describe the same artifact".into());
+        return Err("release.v2.json and latest.json do not describe the same artifact".into());
     }
     Ok(())
 }
 
 fn validate_descriptor(descriptor: &ReleaseDescriptor) -> Result<(), String> {
+    validate_descriptor_with_key_id(descriptor, &metadata_root_key_id()?)
+}
+
+fn validate_descriptor_with_key_id(
+    descriptor: &ReleaseDescriptor,
+    key_id: &str,
+) -> Result<(), String> {
     if descriptor.schema_version != DESCRIPTOR_SCHEMA_VERSION
         || descriptor.channel != "stable"
-        || descriptor.target != "windows-x86_64"
+        || descriptor.target != running_target()?
         || descriptor.sequence == 0
         || descriptor.version.trim().is_empty()
-        || descriptor.metadata_key_id != metadata_root_key_id()?
+        || descriptor.metadata_key_id != key_id
         || descriptor.metadata_root_policy != "OFFLINE_LONG_LIVED_V1"
     {
         return Err("Release descriptor identity or metadata key id is invalid".into());
@@ -1479,6 +1563,7 @@ fn validate_descriptor(descriptor: &ReleaseDescriptor) -> Result<(), String> {
         || descriptor.artifact.size == 0
         || descriptor.artifact.signature.trim().is_empty()
         || descriptor.artifact.public_key.trim().is_empty()
+        || descriptor.artifact.key_id.trim().is_empty()
     {
         return Err("Release descriptor artifact fields are incomplete".into());
     }
@@ -1552,8 +1637,16 @@ fn validate_store_compatibility_against(
 }
 
 fn verify_metadata_signature(bytes: &[u8], signature: &str) -> Result<(), String> {
+    verify_metadata_signature_with_key(bytes, signature, &metadata_root_key()?)
+}
+
+fn verify_metadata_signature_with_key(
+    bytes: &[u8],
+    signature: &str,
+    public_key: &str,
+) -> Result<(), String> {
     let key = base64::engine::general_purpose::STANDARD
-        .decode(metadata_root_key()?.trim())
+        .decode(public_key.trim())
         .map_err(|error| format!("Metadata root key is not base64: {error}"))?;
     if key.len() != 32 {
         return Err("Metadata root key must decode to 32 Ed25519 bytes".into());
@@ -1913,9 +2006,9 @@ fn descriptor_url() -> Result<String, String> {
 
 fn latest_url() -> Result<String, String> {
     descriptor_url()?
-        .strip_suffix("release.v1.json")
+        .strip_suffix("release.v2.json")
         .map(|prefix| format!("{prefix}latest.json"))
-        .ok_or_else(|| "Release descriptor URL must end with release.v1.json".into())
+        .ok_or_else(|| "Release descriptor URL must end with release.v2.json".into())
 }
 
 fn metadata_root_key() -> Result<String, String> {
@@ -2009,7 +2102,11 @@ fn stage_installer(
     let directory = staging_root(app).join(attempt_id);
     fs::create_dir_all(&directory)
         .map_err(|error| format!("Failed to create installer staging directory: {error}"))?;
-    let path = directory.join("JustSearch-update-setup.exe");
+    let path = directory.join(if cfg!(target_os = "linux") {
+        "JustSearch-update.deb"
+    } else {
+        "JustSearch-update-setup.exe"
+    });
     write_bytes_atomic(&path, bytes)?;
     let staged = StagedArtifact {
         path: path.to_string_lossy().into_owned(),
@@ -2036,9 +2133,7 @@ fn validate_staged_artifact(staged: &StagedArtifact, root: &Path) -> Result<(), 
     if bytes.len() as u64 != staged.size || sha256_bytes(&bytes) != staged.sha256 {
         return Err("Staged installer failed post-write size or digest verification".into());
     }
-    if bytes.get(0..2) != Some(b"MZ") {
-        return Err("Staged installer is not a Windows executable".into());
-    }
+    validate_installer_format(&bytes)?;
     Ok(())
 }
 
@@ -2115,9 +2210,47 @@ fn launch_installer(path: &Path) -> Result<(u32, u128), String> {
     Ok((process_id, now_epoch_ms()))
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn launch_installer(_path: &Path) -> Result<(u32, u128), String> {
     Err("Application updater installer launch is Windows-only".into())
+}
+
+#[derive(Debug)]
+struct InstallerError {
+    message: String,
+    repair_required: bool,
+}
+impl From<String> for InstallerError {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            repair_required: false,
+        }
+    }
+}
+impl From<&str> for InstallerError {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[path = "updater_linux.rs"]
+mod linux_installer;
+
+fn validate_installer_format(bytes: &[u8]) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        linux_installer::validate_deb(bytes)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        if bytes.get(0..2) == Some(b"MZ") {
+            Ok(())
+        } else {
+            Err("Authenticated updater artifact is not a Windows NSIS executable".into())
+        }
+    }
 }
 
 fn read_intent(path: &Path) -> Result<Option<UpgradeIntent>, String> {
@@ -2444,9 +2577,7 @@ fn checked_installer_bytes(
         {
             return Err("Downloaded installer bytes do not match release descriptor".into());
         }
-        if bytes.get(0..2) != Some(b"MZ") {
-            return Err("Authenticated updater artifact is not a Windows NSIS executable".into());
-        }
+        validate_installer_format(&bytes)?;
         Ok(bytes)
     });
     if let Err(error) = &result {
@@ -2627,9 +2758,8 @@ mod tests {
         // These are the configurations used by check_release and post_head. Keep the clients
         // local to this child: a global provider installed by another test must not satisfy this.
         for timeout in [Duration::from_secs(20), HEAD_TIMEOUT] {
-            let client = std::panic::catch_unwind(|| {
-                reqwest::Client::builder().timeout(timeout).build()
-            });
+            let client =
+                std::panic::catch_unwind(|| reqwest::Client::builder().timeout(timeout).build());
             assert!(
                 matches!(client, Ok(Ok(_))),
                 "client construction must not panic or fail",
@@ -2921,11 +3051,11 @@ mod tests {
         let attempt = root.join("attempt");
         fs::create_dir_all(&attempt).unwrap();
         let path = attempt.join("installer.exe");
-        fs::write(&path, b"MZsafe").unwrap();
+        fs::write(&path, fixture_installer_bytes()).unwrap();
         let staged = StagedArtifact {
             path: path.to_string_lossy().into_owned(),
-            sha256: sha256_bytes(b"MZsafe"),
-            size: 6,
+            sha256: sha256_bytes(fixture_installer_bytes()),
+            size: fixture_installer_bytes().len() as u64,
         };
         validate_staged_artifact(&staged, &root).unwrap();
         fs::write(&path, b"MZevil").unwrap();
@@ -2934,7 +3064,7 @@ mod tests {
             .contains("post-write"));
 
         let outside = dir.path().join("outside.exe");
-        fs::write(&outside, b"MZsafe").unwrap();
+        fs::write(&outside, fixture_installer_bytes()).unwrap();
         let escaped = StagedArtifact {
             path: outside.to_string_lossy().into_owned(),
             ..staged
@@ -3045,13 +3175,13 @@ mod tests {
 
         // The transport allowance tracks the gate exactly - never wider.
         assert_eq!(
-            ensure_https("http://127.0.0.1:8765/release.v1.json").is_ok(),
+            ensure_https("http://127.0.0.1:8765/release.v2.json").is_ok(),
             sandbox_test_mode(),
             "loopback HTTP is permitted if and only if this build was compiled for qualification"
         );
         // Non-loopback plaintext is refused in every build, gated or not.
-        assert!(ensure_https("http://example.com/release.v1.json").is_err());
-        assert!(ensure_https("https://example.com/release.v1.json").is_ok());
+        assert!(ensure_https("http://example.com/release.v2.json").is_err());
+        assert!(ensure_https("https://example.com/release.v2.json").is_ok());
     }
 
     #[test]
@@ -3281,11 +3411,11 @@ mod tests {
         let staging_root = directory.join("staged");
         let staged_path = staging_root.join("attempt-1").join("installer.exe");
         fs::create_dir_all(staged_path.parent().unwrap()).unwrap();
-        fs::write(&staged_path, b"MZfixture").unwrap();
+        fs::write(&staged_path, fixture_installer_bytes()).unwrap();
         let staged = StagedArtifact {
             path: staged_path.to_string_lossy().into_owned(),
-            sha256: sha256_bytes(b"MZfixture"),
-            size: 9,
+            sha256: sha256_bytes(fixture_installer_bytes()),
+            size: fixture_installer_bytes().len() as u64,
         };
         let witness = InstallerLaunchWitness {
             schema_version: 1,
@@ -3561,8 +3691,8 @@ mod tests {
         for kind in ["transport", "signature", "digest", "size", "executable"] {
             let coordinator = UpdateCoordinator::default();
             let mut descriptor = test_descriptor(vec![]);
-            descriptor.artifact.sha256 = sha256_bytes(b"MZfixture");
-            descriptor.artifact.size = 9;
+            descriptor.artifact.sha256 = sha256_bytes(fixture_installer_bytes());
+            descriptor.artifact.size = fixture_installer_bytes().len() as u64;
             *coordinator.pending.lock().unwrap() = Some(descriptor.clone());
             set_state(&coordinator, "downloading", None);
             set_download_progress(&coordinator, 7, Some(9));
@@ -3573,7 +3703,7 @@ mod tests {
                 "digest" => Ok(b"MZtampered".to_vec()),
                 "size" => {
                     descriptor.artifact.size = 99;
-                    Ok(b"MZfixture".to_vec())
+                    Ok(fixture_installer_bytes().to_vec())
                 }
                 _ => {
                     descriptor.artifact.sha256 = sha256_bytes(b"not an exe");
@@ -3596,13 +3726,15 @@ mod tests {
         }
     }
 
-    fn test_descriptor(compatibility: Vec<ReleaseStoreCompatibility>) -> ReleaseDescriptor {
+    pub(super) fn test_descriptor(
+        compatibility: Vec<ReleaseStoreCompatibility>,
+    ) -> ReleaseDescriptor {
         ReleaseDescriptor {
-            schema_version: 1,
+            schema_version: 2,
             sequence: 3,
             version: "1.1.0".into(),
             channel: "stable".into(),
-            target: "windows-x86_64".into(),
+            target: running_target().unwrap().into(),
             metadata_key_id: "metadata-test".into(),
             metadata_root_policy: "OFFLINE_LONG_LIVED_V1".into(),
             artifact: ReleaseArtifact {
@@ -3611,6 +3743,7 @@ mod tests {
                 size: 1,
                 signature: "signature".into(),
                 public_key: "public-key".into(),
+                key_id: "fixture-artifact".into(),
             },
             compatibility,
         }
@@ -3632,3 +3765,16 @@ mod actor_hold_witness_tests;
 #[cfg(all(test, target_os = "linux"))]
 #[path = "updater_connection_tests.rs"]
 mod connection_tests;
+
+#[cfg(test)]
+fn fixture_installer_bytes() -> &'static [u8] {
+    if cfg!(target_os = "linux") {
+        b"!<arch>\ndebian-binary   0           0     0     100644  4         `\n2.0\n"
+    } else {
+        b"MZfixture"
+    }
+}
+
+#[cfg(test)]
+#[path = "updater_v2_tests.rs"]
+mod v2_tests;

@@ -161,8 +161,8 @@ try {
     $updaterAssets = @(
       $artifactSignature,
       (Join-Path $outDirPath "latest.json"),
-      (Join-Path $outDirPath "release.v1.json"),
-      (Join-Path $outDirPath "release.v1.json.sig"))
+      (Join-Path $outDirPath "release.v2.json"),
+      (Join-Path $outDirPath "release.v2.json.sig"))
   }
 
   # 5. Generate SHA256SUMS over the closed set -- basenames, so 'sha256sum -c' works from OutDir.

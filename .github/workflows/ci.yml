@@ -254,7 +254,7 @@ jobs:
         run: node scripts/ci/check-ui-step-coverage.mjs
 
       - name: Release asset compatibility tests
-        run: node --test scripts/release/app-release-assets.test.mjs
+        run: node --test scripts/release/app-release-assets.test.mjs scripts/release/updater-v2.test.mjs scripts/ci/derive-release-sequence-v2.test.mjs
 
       - name: Test module dependencies, logging, prerequisites and ORT native assets
         run: >-
@@ -1932,7 +1932,9 @@ jobs:
 
       - name: Cargo test
         working-directory: modules/shell/src-tauri
-        run: cargo test --lib --locked
+        run: |
+          cargo test --lib --locked
+          cargo test --bin supervisor-conformance --features supervisor-conformance --locked
 
       # Lane F stage B item B10 (stages/B.md Q2, answer (a)). `cargo test --lib` above proves the
       # supervisor's DECISIONS — supervisor.rs's table, read from the same register the Node harness
@@ -2005,7 +2007,9 @@ jobs:
 
       - name: Cargo test
         working-directory: modules/shell/src-tauri
-        run: cargo test --lib --locked
+        run: |
+          cargo test --lib --locked
+          cargo test --bin supervisor-conformance --features supervisor-conformance --locked
 
   # `:modules:system-tests:integrationTest` ran in NO lane until now: ci.yml ran only
   # `:modules:system-tests:test`, and the module's `check` depends on `test` alone

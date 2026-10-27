@@ -165,7 +165,7 @@ See allowlist evaluation rules in `docs/explanation/14-ai-pack-spec.md`.
   - Launch checks are on by default about 30 seconds after chrome mount. Set
     `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process to suppress only
     the automatic check; manual Settings/recovery checks still work when policy allows them.
-  - Discovery requests `release.v1.json`, `release.v1.json.sig` and `latest.json` from the configured
+  - Discovery requests `release.v2.json`, `release.v2.json.sig` and `latest.json` from the configured
     GitHub release feed, following download/CDN redirects. Installation rechecks `latest.json` and
     downloads the signed installer only on request. The contacted hosts see request IP and time;
     these requests send no document content or queries. Builds without a configured feed make no

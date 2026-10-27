@@ -256,17 +256,17 @@ jobs:
           # unset, the build stays GREEN while every update check in the shipped app fails at
           # runtime (tempdoc 801 D14.a item 2 — the one silent member of the trust-input set;
           # provisioning audit 2026-08-13, trap b). Assert it here, in the same guard as the keys,
-          # with the same shape rules updater.rs enforces (ensure_https + release.v1.json suffix).
+          # with the same shape rules updater.rs enforces (ensure_https + release.v2.json suffix).
           if (-not $env:RELEASE_DESCRIPTOR_URL) {
             throw "JUSTSEARCH_RELEASE_DESCRIPTOR_URL is required for a tag release (compile-pinned; unset = runtime-dead updater in the shipped app)."
           }
           if (-not $env:RELEASE_DESCRIPTOR_URL.StartsWith("https://")) {
             throw "JUSTSEARCH_RELEASE_DESCRIPTOR_URL must be HTTPS (updater.rs ensure_https rejects it at runtime otherwise)."
           }
-          if (-not $env:RELEASE_DESCRIPTOR_URL.EndsWith("release.v1.json")) {
-            throw "JUSTSEARCH_RELEASE_DESCRIPTOR_URL must end with release.v1.json (updater.rs derives latest.json from that suffix)."
+          if (-not $env:RELEASE_DESCRIPTOR_URL.EndsWith("release.v2.json")) {
+            throw "JUSTSEARCH_RELEASE_DESCRIPTOR_URL must end with release.v2.json (updater.rs derives latest.json from that suffix)."
           }
-          $expectedDescriptorUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download/release.v1.json"
+          $expectedDescriptorUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download/release.v2.json"
           if ($env:RELEASE_DESCRIPTOR_URL -ne $expectedDescriptorUrl) {
             throw "JUSTSEARCH_RELEASE_DESCRIPTOR_URL must match the current repository identity. Expected '$expectedDescriptorUrl', got '$env:RELEASE_DESCRIPTOR_URL'."
           }
@@ -356,7 +356,7 @@ jobs:
               # and updater.rs permanently refuses any descriptor below its persisted
               # highest_accepted_sequence — bricking updates for every client that ever accepted
               # one, with no in-client recovery (tempdoc 801 D14.b). The derivation below reads the
-              # sequence out of the already-published release.v1.json assets instead, so it is
+              # sequence out of the already-published v1/v2 descriptor assets instead, so it is
               # independent of this file's identity and monotonic against exactly the values
               # clients can hold. Its floor is 41 (= v0.2.0's published 40, plus one), which is why
               # even a zero-descriptor API result can never regress below what is already shipped.
@@ -574,7 +574,7 @@ jobs:
           $installers = @(Get-ChildItem -LiteralPath $verifyDir -Filter "*-setup.exe" -File)
           if ($installers.Count -ne 1) { throw "Downloaded release has no unique NSIS installer." }
           $installer = $installers[0]
-          if (Test-Path -LiteralPath (Join-Path $verifyDir "release.v1.json")) {
+          if (Test-Path -LiteralPath (Join-Path $verifyDir "release.v2.json")) {
             & node scripts/release/app-release-assets.mjs verify `
               --installer $installer.FullName `
               --artifact-signature "$($installer.FullName).sig" `

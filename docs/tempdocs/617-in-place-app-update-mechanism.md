@@ -18,6 +18,14 @@ related:
 
 # 617 - Full auto-update: decisions before design (374 G1 deep-dive)
 
+> **Descriptor update (2026-10-27).** New clients use signed descriptor v2 with explicit Windows
+> and Linux targets and one shared release sequence history across v1/v2. Linux applies a verified
+> Debian package through pkexec/apt and relaunches only on success. New releases omit the v1
+> descriptor; installed 0.3.0 clients receive a recoverable check error and upgrade manually.
+> The root key, signature/hash checks, Engine handoff and owner reconciliation remain required.
+> See [Cut a release](../how-to/cut-a-release.md) for the current format and commands; the v1
+> design below is dated history.
+
 > **Implementation update (2026-07-31).** The decision-scoping text below is
 > retained as dated history. The implemented design supersedes its earlier
 > assumption that `tauri-plugin-updater` belongs only to a future silent tier.
