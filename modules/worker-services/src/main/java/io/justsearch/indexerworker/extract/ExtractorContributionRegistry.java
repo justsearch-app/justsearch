@@ -110,6 +110,14 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
     return composer.keys();
   }
 
+  /** The core Tika contribution's artifact policy, or the default for other providers. */
+  public synchronized TikaExtractionPolicy policy() {
+    ExtractorContribution coreTika = composer.get("core.tika").orElse(null);
+    return coreTika != null && coreTika.provider() instanceof PolicyDrivenTikaExtractor policyDriven
+        ? policyDriven.policy()
+        : TikaExtractionPolicy.defaults();
+  }
+
   /** Dispatch substrate: the first installed contribution (install order) whose predicate matches. */
   private synchronized ContentExtractorProvider select(Path file) {
     if (closed) throw new IngestionServiceUnavailableException("Extractor registry is closed");
