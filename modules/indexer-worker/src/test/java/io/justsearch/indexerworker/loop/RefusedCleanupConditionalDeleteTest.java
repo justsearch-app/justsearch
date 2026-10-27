@@ -140,7 +140,7 @@ final class RefusedCleanupConditionalDeleteTest extends LuceneExecutorTestBase {
               mock(StaleSnapshotResolver.class), new StaleSourceHandler(active.indexingCoordinator()),
               IndexingPacing.unthrottled(), new AtomicBoolean(true), new HashSet<>(),
               () -> mock(PathResolutionStore.class), () -> mock(DocumentIdentityStore.class),
-              mock(IndexingDocumentOps.StageRecorder.class), () -> false, ignored -> { });
+              mock(IndexingDocumentOps.StageRecorder.class), () -> false, ignored -> { }, new FileMutationFence());
           extractor.extractAll(claims);
           active.commitOps().commitAndTrack(CommitReason.DRAIN);
           active.commitOps().maybeRefreshBlocking();

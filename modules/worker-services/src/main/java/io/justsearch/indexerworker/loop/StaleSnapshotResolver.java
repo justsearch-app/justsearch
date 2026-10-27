@@ -6,7 +6,9 @@ import io.justsearch.indexerworker.extract.ValidatedExtractionArtifact;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.function.LongConsumer;
 
 /**
@@ -36,6 +38,7 @@ public final class StaleSnapshotResolver {
   private final JobQueue jobQueue;
   private final TimeboxedContentExtractor contentExtractor;
   private final LongConsumer indexedDelta;
+  private final FileMutationFence fileMutationFence;
 
   public StaleSnapshotResolver(
       WorkerIngestionAuthority ingestionAuthority,
@@ -43,13 +46,15 @@ public final class StaleSnapshotResolver {
       IngestionOutcomeJournal journal,
       JobQueue jobQueue,
       TimeboxedContentExtractor contentExtractor,
-      LongConsumer indexedDelta) {
+      LongConsumer indexedDelta,
+      FileMutationFence fileMutationFence) {
     this.ingestionAuthority = ingestionAuthority;
     this.staleSourceHandler = staleSourceHandler;
     this.journal = journal;
     this.jobQueue = jobQueue;
     this.contentExtractor = contentExtractor;
     this.indexedDelta = indexedDelta;
+    this.fileMutationFence = Objects.requireNonNull(fileMutationFence, "file mutation fence");
   }
 
   /**
@@ -66,12 +71,7 @@ public final class StaleSnapshotResolver {
       String collection,
       ValidatedExtractionArtifact artifact,
       String timing, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
-    FileFreshnessSnapshot.SourceValidationResult validation =
-        FileFreshnessSnapshot.fromEnvelope(envelope).validateNow();
-    if (validation == FileFreshnessSnapshot.SourceValidationResult.FRESH) {
-      return false;
-    }
-    return handleStale(filePath, envelope, collection, artifact, timing, validation, provenance, claim);
+    return handleStale(filePath, envelope, collection, artifact, timing, null, provenance, claim);
   }
 
   /** Records a caller-proven stale condition through the same fail-closed outcome path. */
@@ -143,38 +143,26 @@ public final class StaleSnapshotResolver {
       ValidatedExtractionArtifact artifact,
       String timing,
       FileFreshnessSnapshot.SourceValidationResult observed, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
-    FileFreshnessSnapshot.SourceValidationResult validation = observed;
-    if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED
-        || validation == FileFreshnessSnapshot.SourceValidationResult.UNREADABLE) {
-      // Task t-20261013-ef3c41: "could not observe it" is never a deletion. Only a confirmed
-      // absence (not found while its root is present) removes the document; a source that cannot
-      // be read keeps its content and is retried with growing back-off; a source that came back
-      // between the two looks is simply re-processed.
-      SourcePresence.Verdict verdict =
-          ingestionAuthority.presence(filePath, claim == null ? null : claim.ingestionRoot());
-      if (verdict == SourcePresence.Verdict.ABSENT) {
-        validation = FileFreshnessSnapshot.SourceValidationResult.DELETED;
-      } else if (verdict == SourcePresence.Verdict.PRESENT
-          && validation == FileFreshnessSnapshot.SourceValidationResult.DELETED) {
-        validation = FileFreshnessSnapshot.SourceValidationResult.FILE_KEY_CHANGED;
-      } else {
-        IngestionOutcome kept = ingestionAuthority.notConfirmedAbsent(verdict, filePath, null);
-        journal.recordOutcomeSafely(
-            filePath,
-            "STALE_UNCONFIRMED_KEPT",
-            () ->
-                jobQueue.markClaimFailed(
-                    claim,
-                    kept,
-                    LedgerEntryFactory.forEnvelope(
-                        envelope, collection, artifact, contentExtractor.extractionPolicy(),
-                        provenance)));
-        return true;
-      }
+    var observation = observeStale(filePath, envelope, observed, claim);
+    if (observation.superseded()) return true;
+    var validation = observation.validation();
+    if (validation == FileFreshnessSnapshot.SourceValidationResult.FRESH) return false;
+    if (observation.terminal() != null) {
+      SourceAdmission terminal = observation.terminal();
+      journal.recordOutcomeSafely(filePath, "STALE_UNCONFIRMED_KEPT", () -> {
+        var entry = LedgerEntryFactory.forEnvelope(
+            envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance);
+        if (terminal.action() == SourceAdmissionAction.SKIP_DONE) {
+          jobQueue.markClaimDone(claim, terminal.outcome(), entry);
+        } else {
+          jobQueue.markClaimFailed(claim, terminal.outcome(), entry);
+        }
+      });
+      return true;
     }
     IngestionOutcome staleOutcome = ingestionAuthority.staleOutcome(validation, timing);
     if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED) {
-      indexedDelta.accept(staleSourceHandler.deleteMissingSource(filePath));
+      indexedDelta.accept(observation.deletedCount());
       journal.recordOutcomeSafely(
           filePath,
           "STALE_DELETED",
@@ -196,5 +184,56 @@ public final class StaleSnapshotResolver {
                 LedgerEntryFactory.forEnvelope(
                     envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance)));
     return true;
+  }
+
+  /** Only local observations leave the short fence; queue notifications retain their old owner. */
+  private record StaleObservation(FileFreshnessSnapshot.SourceValidationResult validation,
+      SourceAdmission terminal, int deletedCount, boolean superseded) {}
+
+  private StaleObservation observeStale(Path filePath, FileEnvelope envelope,
+      FileFreshnessSnapshot.SourceValidationResult known, JobQueue.IndexJob claim) {
+    fileMutationFence.lock();
+    try {
+      // Content mismatch is independently proven by the extractor. Absence/unreadability
+      // always needs the original snapshot and root/presence checks after fence entry.
+      var validation = known == null || known == FileFreshnessSnapshot.SourceValidationResult.DELETED
+          || known == FileFreshnessSnapshot.SourceValidationResult.UNREADABLE
+          ? FileFreshnessSnapshot.fromEnvelope(envelope).validateNow() : known;
+      if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED
+          || validation == FileFreshnessSnapshot.SourceValidationResult.UNREADABLE) {
+        if (claim == null) {
+          return new StaleObservation(validation, null, 0, true);
+        }
+        // Presence alone does not establish current policy or an issued ingestion boundary.
+        // Reuse full admission, including its no-follow source/root/volume/exclusion checks.
+        SourceAdmission admission;
+        try {
+          admission = ingestionAuthority.admit(claim);
+        } catch (IOException unreadable) {
+          admission = SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
+              ingestionAuthority.sourceUnreadable(filePath, unreadable));
+        }
+        if (admission.action() == SourceAdmissionAction.ADMIT) {
+          if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED) {
+            return new StaleObservation(
+                FileFreshnessSnapshot.SourceValidationResult.FILE_KEY_CHANGED, null, 0, false);
+          }
+          return new StaleObservation(validation,
+              SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
+                  ingestionAuthority.sourceUnreadable(filePath, null)), 0, false);
+        }
+        if (admission.action() != SourceAdmissionAction.STALE_DONE) {
+          return new StaleObservation(validation, admission, 0, false);
+        }
+        if (!jobQueue.ownsClaimForPublication(claim)) {
+          return new StaleObservation(validation, null, 0, true);
+        }
+        return new StaleObservation(FileFreshnessSnapshot.SourceValidationResult.DELETED, null,
+            staleSourceHandler.deleteMissingSource(filePath), false);
+      }
+      return new StaleObservation(validation, null, 0, false);
+    } finally {
+      fileMutationFence.unlock();
+    }
   }
 }

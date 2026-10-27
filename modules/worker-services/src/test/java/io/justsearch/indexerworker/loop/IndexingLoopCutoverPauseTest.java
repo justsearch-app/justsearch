@@ -186,6 +186,7 @@ final class IndexingLoopCutoverPauseTest {
   }
 
   private static IndexingLoop newLoop(JobQueue queue) {
+    doCallRealMethod().when(queue).ownsClaimForPublication(any());
     return new IndexingLoop(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
