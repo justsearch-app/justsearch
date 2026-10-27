@@ -86,7 +86,7 @@ configuration precedence, recovery and ledger rows were verified separately on r
           "delegationLocation": "task t-20261026-8f2d61 request",
           "delegationScope": "Unicode text extraction: text extracted from the user's files is measured, decoded and stored correctly",
           "label": "agent choice",
-          "choice": "Invariant of the configured-limit repair: on every composition the policy an extractor reports is the policy that stamps and bounds its artifacts. The registry's reported policy therefore also governs ordinary contributions installed beside a configured core Tika extractor, stays the same after the registry is closed, and returns to the defaults only when core Tika is explicitly uninstalled."
+          "choice": "Invariant of the configured-limit repair: on every composition the policy an extractor reports is the policy that stamps and bounds its artifacts. Settled registry contract: all policy-driven contributions in one registry share one equal policy, whatever their ids; installing a policy-driven contribution with a different policy is rejected before any state changes; the registry reports that shared policy and stamps ordinary contributions' artifacts with it; it is recomputed on install and explicit uninstall, returns to the defaults when the last policy-driven contribution is explicitly uninstalled (or none was installed), and is kept unchanged by close."
         }
       ],
       "evidence": "gates/test-intent/evidence/extraction-configured-limits-registry.json",
