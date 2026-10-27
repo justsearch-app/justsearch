@@ -80,7 +80,7 @@ abstract class LocalApiIntegrationTestBase {
 
     // Policy discovery reads the global home and AI switches. Publish this fixture's launch
     // properties first so a retained foreign store cannot choose its policy inputs.
-    config = TestResolvedConfigHelper.storeFromEnvironment();
+    TestResolvedConfigHelper.storeFromEnvironment();
     // Discover policy before preparing settings, as HeadlessApp.loadPolicySources() does, so
     // settings candidates retain the same restart-only source fingerprint.
     new io.justsearch.app.services.policy.EnterprisePolicyServiceImpl().snapshot();
@@ -220,7 +220,7 @@ abstract class LocalApiIntegrationTestBase {
   protected void configureSettingsComponents(
       io.justsearch.app.services.settings.FixedSettingsComponentComposer composer,
       io.justsearch.core.component.EngineComponentRegistry registry,
-      io.justsearch.configuration.resolved.ConfigStore config, UiSettingsStore settings)
+      ConfigStore config, UiSettingsStore settings)
       throws Exception {}
 
   /** Hook for subclasses that need to customize the server under test (e.g. a session token). */
