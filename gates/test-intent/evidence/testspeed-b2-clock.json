@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T02:31:18.323Z",
+  "revision": "c3e8509d04cf48c44c9f87d85b9ba853da259c07",
+  "tree": "0719101ba88c32b1251be18a207221bea13353d8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14289
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa64a424c81b07887ad292fe7ac08026037dc1bd1f017c731995689242bd7005",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] 4999999999",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 5000000000",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 5000000001",
+          "status": "passed"
+        },
+        {
+          "name": "the budget-trip WARN still fires when a slow cycle advances nothing",
+          "status": "passed"
+        },
+        {
+          "name": "a single batch that outlives the cycle budget still yields within budget + one encode slice",
+          "status": "passed"
+        },
+        {
+          "name": "a root removed MID-batch: its remaining documents are neither encoded nor written",
+          "status": "passed"
+        },
+        {
+          "name": "[1] 2999999999",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 3000000000",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 3000000001",
+          "status": "passed"
+        },
+        {
+          "name": "pending ingest arriving MID-batch preempts without finishing the batch",
+          "status": "passed"
+        },
+        {
+          "name": "documents an interrupted batch never reached are picked up by the next cycle",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:01d68be1c3bdb4e959245cd3ec535250dd1f76cc74ba7669ba77b2a53b06312e"
+}
