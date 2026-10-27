@@ -43,11 +43,12 @@ final class VerifierCappedBacklogStatusTest {
       long end=System.nanoTime()+12000_000_000L;
       io.justsearch.ipc.StatusResponse observed=null; long expiredDeferred=0, deferred=0;
       while(System.nanoTime()<end) {
+        boolean inRetryPause=h.inRetryPause();
         var rows=h.rows(); long now=System.currentTimeMillis();
         boolean capped=rows.stream().anyMatch(r->r.state().equals("PENDING") && "DEFER_WITHOUT_ATTEMPT".equals(r.policy()) && r.retry()-now>6500);
-        if(capped && h.inRetryPause() && rows.stream().allMatch(r->r.state().equals("PENDING"))) {
+        if(capped && inRetryPause && rows.stream().allMatch(r->r.state().equals("PENDING"))) {
           var status=service.indexStatus(StatusRequest.getDefaultInstance(),CallContext.none());
-          if(status.getMigration().getProcessingJobsCount()==0) {
+          if(h.inRetryPause() && status.getMigration().getProcessingJobsCount()==0) {
             observed=status;
             expiredDeferred=rows.stream().filter(r->"DEFER_WITHOUT_ATTEMPT".equals(r.policy()) && r.retry()<now).count();
             deferred=rows.stream().filter(r->"DEFER_WITHOUT_ATTEMPT".equals(r.policy())).count();
