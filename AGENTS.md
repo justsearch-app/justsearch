@@ -1,4 +1,4 @@
-<!-- Agent System entry for project justsearch. Method: ~/.local/share/agent-method. Private folder: ~/dev/agent-private. Method commit: ea2f52ce0bc5. Checksum: b56839d71864. -->
+<!-- Agent System entry for project justsearch. Method: ~/.local/share/agent-method. Private folder: ~/dev/agent-private. Method commit: 10de03655cc4. Checksum: d1190ba6866e. -->
 # Working agreement
 
 This is how agents work in this project. The project's maintainer owns these rules; project knowledge
@@ -40,7 +40,11 @@ CPU, memory and disk, CI runners and the merge queue; then complexity and upkeep
    asked for. Count added machinery against a change in design and in review.
 4. **Do not block the user.** Run long commands in the background and stay available to talk. Tell
    them unprompted when you are blocked or the forecast moves. Run only as many lanes in parallel as
-   this machine and CI can carry.
+   this machine and CI can carry. Never end a turn while something outside you is still pending
+   (CI, a merge, a delegated session) without a background wait armed to wake you: one that ends on
+   every outcome, failure and stall as well as success, and by the stop time at the latest, through
+   the host's completion notice. Time passing alone does not wake you; a wait with nothing armed is
+   stopping.
 
 ## Invariants
 
