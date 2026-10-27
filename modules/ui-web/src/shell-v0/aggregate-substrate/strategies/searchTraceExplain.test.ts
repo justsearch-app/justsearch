@@ -73,7 +73,7 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
     });
     const parts = userSummaryParts(trace);
     expect(parts).toContain('Keyword search');
-    expect(parts).toContain('AI expansion timed out — keyword results only');
+    expect(parts).toContain('AI expansion timed out');
     expect(parts).toContain('semantic ranking blocked (ENCODER_OOM)');
     const user = renderToHost(trace).querySelector('[data-testid="search-explain-user"]');
     expect(user?.textContent).toContain('Keyword search');
@@ -136,6 +136,86 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
     expect(rows[0]?.textContent).toContain('executed (cc) · 42ms');
     expect(rows[1]?.textContent).toContain('skipped (dense-only)');
     expect(rows[2]?.textContent).toContain('executed · 8ms');
+  });
+
+
+  it('shows raw classifier detail and explicit pipeline bypass together in diagnostics', () => {
+    const trace = searchTraceSchema.parse({
+      version: 1, effectiveMode: 'HYBRID',
+      stages: [{ id: 'query-understanding', status: 'executed', detail: 'NAVIGATIONAL', reason: 'EXPLICIT_PIPELINE' }],
+    });
+    const host = renderToHost(trace);
+    const row = host.querySelector('[data-stage="query-understanding"]');
+    expect(row?.textContent).toContain('NAVIGATIONAL');
+    expect(row?.textContent).toContain('classifier policy bypassed: explicit pipeline');
+    expect(row?.textContent).toContain('Query understanding');
+    expect(host.querySelector('[data-altitude="user"]')?.textContent).not.toContain('bypassed');
+    expect(host.querySelector('details')?.open).toBe(false);
+  });
+
+  it('shows raw classifier detail and Lucene bypass together in diagnostics', () => {
+    const trace = searchTraceSchema.parse({
+      version: 1, effectiveMode: 'TEXT',
+      stages: [{ id: 'query-understanding', status: 'executed', detail: 'NAVIGATIONAL', reason: 'LUCENE_SYNTAX' }],
+    });
+    const host = renderToHost(trace);
+    expect(host.querySelector('[data-stage="query-understanding"]')?.textContent)
+      .toContain('NAVIGATIONAL; classifier policy bypassed: Lucene syntax');
+    expect(host.querySelector('[data-altitude="user"]')?.textContent).not.toContain('Lucene');
+  });
+
+  it('keeps per-source expansion skip readable and diagnostic without a degradation warning', () => {
+    const trace = searchTraceSchema.parse({
+      version: 1, effectiveMode: 'HYBRID',
+      stages: [{ id: 'expansion', status: 'skipped', reason: 'PER_SOURCE_RETRIEVAL' }],
+    });
+    const host = renderToHost(trace);
+    expect(host.querySelector('[data-stage="expansion"]')?.textContent)
+      .toContain('per-source retrieval uses separate queries');
+    expect(userSummaryParts(trace)).toEqual(['Hybrid search']);
+  });
+
+  it('does not claim keyword-only results when expansion times out over a preserved hybrid base', () => {
+    const trace = searchTraceSchema.parse({
+      version: 1, effectiveMode: 'HYBRID',
+      stages: [{ id: 'expansion', status: 'skipped', reason: 'TIMEOUT' }],
+    });
+    expect(userSummaryParts(trace)).toEqual(['Hybrid search', 'AI expansion timed out']);
+    const user = renderToHost(trace).querySelector('[data-altitude="user"]');
+    expect(user?.textContent).not.toContain('keyword results only');
+  });
+
+  it('renders unknown historical classifier reasons alongside their unchanged details', () => {
+    const trace = searchTraceSchema.parse({
+      version: 1, stages: [{ id: 'query-understanding', status: 'executed', detail: 'LEGACY_TYPE', reason: 'LEGACY_REASON' }],
+    });
+    const row = renderToHost(trace).querySelector('[data-stage="query-understanding"]');
+    expect(row?.textContent).toContain('LEGACY_TYPE');
+    expect(row?.textContent).toContain('LEGACY_REASON');
+  });
+
+  it('does not reinterpret a legacy reasonless classifier row as disabled or LLM dispatch', () => {
+    const trace = searchTraceSchema.parse({
+      version: 1, effectiveMode: 'TEXT',
+      stages: [{ id: 'query-understanding', status: 'executed', detail: 'INFORMATIONAL' }],
+    });
+    const host = renderToHost(trace);
+    const row = host.querySelector('[data-stage="query-understanding"]');
+    expect(row?.textContent).toContain('Query understanding');
+    expect(row?.textContent).toContain('executed (INFORMATIONAL)');
+    expect(row?.textContent).not.toMatch(/disabled|bypassed|LLM/);
+    expect(userSummaryParts(trace)).toEqual(['Keyword search']);
+  });
+
+  it('renders disabled classification without inventing a detected value', () => {
+    const trace = searchTraceSchema.parse({
+      version: 1, effectiveMode: 'TEXT',
+      stages: [{ id: 'query-understanding', status: 'disabled', reason: 'DISABLED' }],
+    });
+    const row = renderToHost(trace).querySelector('[data-stage="query-understanding"]');
+    expect(row?.textContent).toContain('disabled (DISABLED)');
+    expect(row?.textContent).not.toContain('INFORMATIONAL');
+    expect(userSummaryParts(trace)).toEqual(['Keyword search']);
   });
 
   it('STAGE_LABELS covers the closed StageId vocabulary exactly', () => {
