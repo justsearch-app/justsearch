@@ -328,6 +328,54 @@ worktree registration, shared node_modules or source object writes are needed.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation original pre-boot input entry keeps human edits without delivering old inputs",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation owned input history traversal keeps human edits without delivering old inputs"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Same-surface rail, fresh address, and modal navigation clear the refusal notice and its recovery alert, preserve exact current/retained drafts, and prevent later discard from preparing the retired task.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md (WP1.5 source and W3/C8/A3/A7 amendments); orchestrator builder-6 brief, 2026-10-27",
+          "delegationScope": "Design and implement the JustSearch UI/UX Search v3 cutover, preserving supported hand-offs, human Send and document reading.",
+          "choice": "Agent-adopted refusal navigation rule: accepted navigation away retires the parked hand-off and its visible refusal. The stale recovery alert retires with that refusal; a later proposal must still report a genuine capacity limit. Unknown rejected navigation keeps the refusal available for the existing explicit discard action.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/uiux-refusal-retirement-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 rail to bare Search retires refusal notice and its alert without changing drafts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 fresh address to bare Search retires refusal notice and its alert without changing drafts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 accepted modal navigation retires refusal while keeping the underlying preparation"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve traversal retirement, real two-draft refusal on another arrival, and rejected-navigation refusal plus immediate intake after explicit discard. Nothing sends automatically.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md (WP1.5 source and W3/C8/A3/A7 amendments); orchestrator builder-6 brief, 2026-10-27",
+          "delegationScope": "Design and implement the JustSearch UI/UX Search v3 cutover, preserving supported hand-offs, human Send and document reading.",
+          "choice": "Agent-adopted refusal navigation rule: accepted navigation away retires the parked hand-off and its visible refusal. The stale recovery alert retires with that refusal; a later proposal must still report a genuine capacity limit. Unknown rejected navigation keeps the refusal available for the existing explicit discard action.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-refusal-retirement-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 traversal to bare Search retires refusal notice and its alert without changing drafts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 preservation another proposal still reports the genuine capacity limit after retirement",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 preservation rejected unknown navigation keeps refusal available for explicit discard"
+      ]
     }
   ]
 }
@@ -722,3 +770,74 @@ and short headless Chromium profile; no owner apps/data/display, dev stack, GPU 
 download. Full logs/screenshots stay outside gates; the compact browser evidence is
 under 200 KB. No Gradle build is claimed; the unchanged preinstalled Engine serves
 the corresponding private frontend. All changes remain uncommitted.
+
+
+Refusal notice retirement completion, 2026-10-27 (agent-adopted, delegated-choice):
+
+The navigation handler already takes the parked hand-off on bare Search navigation.
+Absent fresh state does not hydrate stores, and reselecting the mounted surface does
+not reconnect SearchV3View. Consequently its local refusedHandoff and recoveryError
+survive without any notification. `takeSearchV3Handoff` now emits the existing
+`sv3-handoff` notification when it removes a refused task; the receiver's empty-register
+branch invokes the existing retirement method and requests a render. No new event,
+store, format, retention rule or capacity limit is introduced.
+
+The old two-draft alert is the failed arrival's explanation, so it clears with the
+refusal. Capacity remains enforced on each new preparation attempt. The new component
+file checks the exact current draft and retained copies, absence of the notice/alert,
+and discard without resurrection. On bd558647f6, rail and fresh-address cases fail
+at the stale notice assertion; traversal already passes through the store receiver.
+A modal navigation also retires the refused register explicitly before opening its
+window; it previously bypassed the normal handler branch entirely. Three repair cases
+fail at the stale notice assertion on bd558647f6. With traversal and both other
+preservation cases plus the eleven unchanged refusal-navigation checks, the paired
+result is before 14 pass / 3 fail; after 17 pass / 0 fail.
+Previously accepted test files remain byte-identical. Official producer evidence uses
+the same shared-clone/private-npm Git adapter convention documented above; all source
+changes remain uncommitted. This is builder evidence, not independent acceptance.
+
+Final completion checks and limits for the refusal-notice retirement:
+
+- Causes: normal navigation consumes the refused register at `navigationHandler.ts:215`
+  without a store change or remount; `compose.ts:257` previously made that silent.
+  `SearchV3View.ts:4035` previously returned without retiring its local notice.
+  Modal navigation at `navigationHandler.ts:188` bypassed register consumption entirely.
+- `SearchV3View.refusalRetirement.test.ts`: six new checks, three repair and three
+  preservation. The official producer records three assertion failures on bd558647f6
+  and three candidate passes for repair; three preservation candidate passes. The
+  paired new-file plus unchanged refusal-navigation run gives 14 pass / 3 intended
+  failures before, 17 pass / 0 failures after. No accepted test file was edited.
+- Final full `npm run test:unit:run -- --configLoader runner --maxWorkers=4`: exit 0,
+  648 files / 8,258 tests, zero skips. Lint exit 0; UI gates exit 0, 28/28.
+  Typecheck's initial unused copied test constant was removed; final result is
+  recorded in the compact browser/command evidence. No assertion was weakened.
+- `gates/test-intent/evidence/uiux-refusal-retirement-browser.json` records eight
+  requested final browser cases passing: trusted rail pointer and native fresh hash
+  retirement, S77 capacity/discard/reload, S78 accepted-address history/reload,
+  S79 refusal/conversation history/later arrival, S80/S81 Search and retry, and S67
+  full-document cold arrival. Both retirement probes fail on bd558647f6 specifically
+  because the refusal notice persists; B stays exact and discard never prepares C.
+  After repair the notice and its old capacity alert both disappear, while retained
+  drafts and the genuine limit on another incoming proposal remain intact.
+- Each case group uses fresh own Engine HOME/data/index/corpus and headless Chromium
+  profiles. The two saved records were authored by two completed actual UI Sends on
+  the permitted Qwen CPU model; actual argv contains `--device none -ngl 0` and
+  CUDA_VISIBLE_DEVICES=-1. No hand-off sends automatically. All owned service groups
+  and short Chromium profiles have cleanup records. No 429 blocked a final case.
+- The first history run's S79 later-arrival assertion failed during a Vite reload
+  while production source was being edited; its earlier history assertions passed.
+  That failed attempt is retained, not counted as a pass. The frozen final source
+  passes the unchanged scripts on fresh services. Native Chromium sandbox startup
+  failed; permitted --no-sandbox was used only against own loopback services.
+- `node scripts/governance/gates/test-intent/cli.mjs check --base origin/main` exits 1:
+  missing independent acceptance and three unrelated uncovered JVM files:
+  `IngestPreparationBoundaryTest.java`, `HeldInferenceCompositionFixture.java`,
+  `VerifierCappedBacklogStatusTest.java`. All three also fail on bd558647f6 against
+  the exact same main commit a9a5928a92cc. They are outside this assignment; no JVM
+  tests or their changesets were changed. The orchestrator must reconcile them.
+- Plain npm ci ran independently in the source root, source UI and shared-clone
+  baseline UI. Shared resources touched: CPU, npm cache, installed Engine/Chromium,
+  and the permitted read-only llama executable/model. No Gradle build, dev stack,
+  owner data/display, GPU, model download, commit, push or publication is claimed.
+  Browser evidence is under 200 KB; full logs/screenshots stay in the private temp
+  report folder named in that evidence. Independent verification remains outstanding.

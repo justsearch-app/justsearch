@@ -257,6 +257,8 @@ export function parkSearchV3Handoff(state: Record<string, unknown>, origin: 'fre
 export function takeSearchV3Handoff(): typeof searchV3Handoff {
   const value = searchV3Handoff;
   searchV3Handoff = null;
+  // Navigation can retire a refusal without changing any store or remounting the view.
+  if (value?.refused) window.dispatchEvent(new Event('sv3-handoff'));
   return value;
 }
 

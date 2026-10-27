@@ -186,6 +186,7 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       if (!traversal) flushPendingNavigationWrite();
 
       if (config.getPlacement?.(addr.target) === 'MODAL') {
+        if (peekSearchV3Handoff()?.refused) takeSearchV3Handoff();
         applyState(addr.target, addr.state, traversal);
         // Tempdoc 855 §11.1 D3 — never stack a SECOND entry for the address we are already on.
         // Re-navigating to Settings (rail affordance pressed twice, a command-palette repeat) would

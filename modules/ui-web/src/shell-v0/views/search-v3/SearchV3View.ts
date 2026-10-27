@@ -4032,7 +4032,10 @@ export class SearchV3View extends JfElement {
   private receiveHandoff = (): boolean => {
     if (this.shapeId) return false;
     const incoming = peekSearchV3Handoff();
-    if (incoming === null) return false;
+    if (incoming === null) {
+      if (this.retireRefusedHandoff()) this.requestUpdate();
+      return false;
+    }
     if (incoming.refused) return true;
     if (incoming.origin === 'restore') {
       takeSearchV3Handoff();
