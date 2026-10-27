@@ -18,7 +18,9 @@ class VerifierStatus3Test extends VerifierStatusIsolationTest {
           assertTrue(statusThreads()<40,"sampler threads must stay bounded");
         }
       }finally{f.block.set(false);f.release.countDown();}
+      f.drainPublications(null);
       f.handler.sampleAndBuildStatusSnapshot();
+      f.drainPublications(null);
       var recovered=get(f,"?fresh=true");assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
       Thread.sleep(1200);assertTrue(statusThreads()<10,"finished producer threads must clear");
       System.out.println("OWN-LONG-HANG maxStatusThreads="+high+" recovered=true");

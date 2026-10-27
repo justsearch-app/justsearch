@@ -45,7 +45,10 @@ class VerifierStatus5Test extends VerifierStatusIsolationTest {
       var after=client.send(HttpRequest.newBuilder(uri).GET().build(),HttpResponse.BodyHandlers.ofString());
       long oldCounter=Long.parseLong(before.headers().firstValue("X-JustSearch-Status-Change").orElse("0"));
       long staleCounter=Long.parseLong(after.headers().firstValue("X-JustSearch-Status-Change").orElse("0"));
-      f.block.set(false);f.release.countDown();f.handler.sampleAndBuildStatusSnapshot();
+      f.block.set(false);f.release.countDown();
+      f.drainPublications(null);
+      f.handler.sampleAndBuildStatusSnapshot();
+      f.drainPublications(null);
       var recovered=get(f,"?fresh=true");assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
       var last=client.send(HttpRequest.newBuilder(uri).GET().build(),HttpResponse.BodyHandlers.ofString());
       long recoveredCounter=Long.parseLong(last.headers().firstValue("X-JustSearch-Status-Change").orElse("0"));
