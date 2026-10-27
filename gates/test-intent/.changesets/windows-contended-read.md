@@ -127,3 +127,13 @@ running on Windows CI as the real-system check.
   "digest": "sha256:6262ec5d6065eabb57530e8ca9895fe632c94f40db920f6cc962a83e80f05307"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17d31-3548-7b40-bcc4-131df45c7145",
+  "verdict": "accept",
+  "digest": "sha256:21820c1307403cf824e4b43d86c20f1bc04d589d433a22701140b71981ea2161"
+}
+```
