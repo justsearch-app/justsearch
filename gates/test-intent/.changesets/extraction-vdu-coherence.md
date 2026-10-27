@@ -25,6 +25,11 @@ author-session: uq-vdu-builder
           "choice": "VC1–VC5: real-index VDU replacements refresh parent and chunk token counts, remove only the pending-fallback reason from stored reads, preview metadata, exact filters and facets, complete unspecified text outcomes, refresh numeric query/sort and cached corpus/fusion inputs across refresh/reopen, and handle repeated, identical and legacy replacements. VC-N1–VC-N4 controls preserve nonreplacement descriptors/chunks, refuse stale source through WorkerIngestService, retain baseline routing/provenance and other reason codes, avoid rewriting untouched documents, preserve supplied status and retain existing content-dependent SPLADE/NER invalidation. BC2–BC3 controls preserve true/false truncation and OCR values through replacement and unrelated updates, project vdu_processed through real worker preview metadata, leave ingestion-history owners untouched through all public replacement forms, and retain the index fingerprint across reopen.",
           "label": "agent choice"
         }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-vdu-coherence-repair.json",
+      "repaired": true,
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduResultWriterCoherenceTest.java"
       ]
     },
     {
@@ -42,6 +47,11 @@ author-session: uq-vdu-builder
           "choice": "BC1, BC-N1–BC-N3: stored true, false and absent booleans survive unconditional, conditional, stale, batch, enrichment, status, fresh declaration, move and legacy migration paths across reopen; scalar types and expected retry comparisons retain their meaning; historical false changes only on re-extraction.",
           "label": "agent choice"
         }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-vdu-coherence-repair.json",
+      "repaired": true,
+      "newChecks": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/StoredBooleanUpdateTest.java"
       ]
     },
     {
@@ -59,6 +69,11 @@ author-session: uq-vdu-builder
           "choice": "BC-N1: stored numeric boolean strings and incoming boolean/numeric representations retain their meaning, absent stays absent.",
           "label": "agent choice"
         }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-vdu-coherence-repair.json",
+      "repaired": true,
+      "newChecks": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/FieldMapperTest.java#storedNumericBooleanStringsKeepBooleanMeaningWithoutChangingOtherInputs"
       ]
     },
     {
@@ -76,6 +91,11 @@ author-session: uq-vdu-builder
           "choice": "BC3: the real HTTP preview endpoint reports vduProcessed true for the worker stored numeric form and the existing true string.",
           "label": "agent choice"
         }
+      ],
+      "evidence": "gates/test-intent/evidence/extraction-vdu-coherence-repair.json",
+      "repaired": true,
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/PreviewControllerTest.java"
       ]
     }
   ]

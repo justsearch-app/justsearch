@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-26T15:24:01.941Z",
-  "revision": "a588476ad33ac36157dd63669edec0fe3039affe",
-  "tree": "ed6acf1a5c9977472b64459e05f3fb1fb2515468",
+  "createdAt": "2026-10-27T10:57:20.439Z",
+  "revision": "653f049ae3abb0b00b604e407c0a1e377deaee35",
+  "tree": "98cb3d24e17f0d4c1d5c1615c4a3fc75f4b4938e",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.text.TextQualityAnalyzerTest.symbolEmojiAndDigitKeycapCategoryRulesRemainStable\" --tests \"io.justsearch.indexerworker.text.TextQualityAnalyzerTest.isolatedReversedAndSeparatedSurrogatesRemainTotal\" --tests \"io.justsearch.indexerworker.text.TextQualityAnalyzerTest.bmpLengthAndDensityNeighborsRemainUnchanged\" --tests \"io.justsearch.indexerworker.text.TextQualityAnalyzerTest.existingCategoriesMarkersAndDecompositionRulesRemainStable\" --tests \"io.justsearch.indexerworker.extract.ExtractionDropoutPolicyTest.surrogateAndCategoryBoundariesRetainTheExistingRules\" --tests \"io.justsearch.indexerworker.loop.ops.VisualRoutingDecisionTest.independentMixedPdfSignalStillQueuesEnrichment\" --tests \"io.justsearch.indexerworker.extract.ExtractionDropoutFallbackChainTest.supplementaryQualityDoesNotEraseMissingPagesOrBudgetGates\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3580
+      "durationMs": 10808
     }
   ],
   "checks": [
@@ -132,5 +132,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:5489f166f40a7053f86a855cd61ad9fe2f7ab641e60c28472f01172c847760cc"
+  "digest": "sha256:5cc1eca484faf13fca7d2f1ccad65abce778a5f8af182bf1414120f020c4e614"
 }

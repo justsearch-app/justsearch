@@ -7,7 +7,7 @@ author-session: 01a17a07-0aaf-7bd3-afc4-646d3d17121a
 
 # PDF physical-page inference test intent
 
-All listed checks are durable. Existing expectation replacements are classified New under the current gate schema (which has no Changed class). Independent acceptance remains pending.
+All listed checks are durable. Existing expectation replacements in StructuredContentHandlerTest are classified Obsolete under D4/PD5. Independent acceptance remains pending.
 
 ```json
 {
@@ -30,12 +30,7 @@ All listed checks are durable. Existing expectation replacements are classified 
       ],
       "evidence": "gates/test-intent/evidence/extraction-unicode-pdf-pages-repair.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPageWrapperTest.java#similarClassNamesDoNotStartPages",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPageWrapperTest.java#exactWhitespaceSeparatedClassTokenStartsPage",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPageWrapperTest.java#preambleBelongsToFirstPageWithoutInventingABoundary",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPageWrapperTest.java#everyStructuredElementUsesPhysicalPageBeforeEnrichment",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPageWrapperTest.java#emptyWrappersCountAndBlankFirstPageKeepsItsBoundary",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPageWrapperTest.java#truncationStillIgnoresLaterPageWrappers"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPageWrapperTest.java"
       ],
       "repaired": true
     },
@@ -57,37 +52,15 @@ All listed checks are durable. Existing expectation replacements are classified 
       ],
       "evidence": "gates/test-intent/evidence/extraction-unicode-pdf-pages-repair.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPdfPageInferenceTest.java#physicalPagesAndMissingIndicesAgreeBeforeEnrichment"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPdfPageInferenceTest.java"
       ],
       "repaired": true
     },
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPdfPageInferenceTest.java"
-      ],
-      "class": "New",
-      "behaviour": "PD1/PD2/PD3/PD6/PD-N2: real Tika/PDFBox physical page counts, no invented separator, blank/image-only first/middle/last/consecutive/all pages, zero-based missing pages before and after enrichment, structured extraction, OCR skip and VDU demand; wrapper-free text and HTML remain unknown-page documents.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "btw you can reconsider the agents previous decisions, proceed autonomously with the work.",
-          "delegationLocation": "task extraction-unicode-pdf-pages request",
-          "delegationScope": "Repair physical PDF page inference only in StructuredContentHandler, with named old expectations and durable SAX/real-PDF regressions; preserve thresholds, routing policies, PDFBox merging and stored documents until re-extraction.",
-          "choice": "PD1/PD2/PD3/PD6/PD-N2: real Tika/PDFBox physical page counts, no invented separator, blank/image-only first/middle/last/consecutive/all pages, zero-based missing pages before and after enrichment, structured extraction, OCR skip and VDU demand; wrapper-free text and HTML remain unknown-page documents.",
-          "label": "agent choice"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/extraction-unicode-pdf-pages-preservation.json",
-      "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredPdfPageInferenceTest.java#wrapperFreePlainTextAndHtmlKeepTextAndUnknownPageCount"
-      ],
-      "repaired": false
-    },
-    {
-      "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredContentHandlerTest.java"
       ],
-      "class": "New",
+      "class": "Obsolete",
       "behaviour": "PD1/PD5: changed wrapper-as-delimiter expectations in PageBreakParsing.divWithPageClass and MixedContent.fullDocumentFlow: first wrapper starts page zero without a separator; preamble and subsequent elements share the first page.",
       "sources": [
         {
@@ -95,16 +68,11 @@ All listed checks are durable. Existing expectation replacements are classified 
           "delegationQuote": "btw you can reconsider the agents previous decisions, proceed autonomously with the work.",
           "delegationLocation": "task extraction-unicode-pdf-pages request",
           "delegationScope": "Repair physical PDF page inference only in StructuredContentHandler, with named old expectations and durable SAX/real-PDF regressions; preserve thresholds, routing policies, PDFBox merging and stored documents until re-extraction.",
-          "choice": "PD1/PD5: changed wrapper-as-delimiter expectations in PageBreakParsing.divWithPageClass and MixedContent.fullDocumentFlow: first wrapper starts page zero without a separator; preamble and subsequent elements share the first page.",
+          "choice": "Text before the first page wrapper belongs to the first page and never creates an extra page or a separator",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/extraction-unicode-pdf-pages-repair.json",
-      "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredContentHandlerTest.java#divWithPageClass",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredContentHandlerTest.java#fullDocumentFlow"
-      ],
-      "repaired": true
+      "conflictSearch": "Searched docs/decisions/ and docs/reference/ for leading page breaks/separators and page wrappers/breaks (leading.{0,50}(page|separator)|page.{0,30}(wrapper|break), case-insensitive): no matching record and no requirement for a leading page break found."
     },
     {
       "items": [
