@@ -604,7 +604,13 @@ Four `gh` CLI quirks (tempdoc 695, 930) worth knowing at merge/wait time:
 
 `node scripts/dev/run-gh.mjs enqueue N` validates the squash preview and managed review
 record, then enables squash auto-merge bound to the validated head, title and body. A new push
-requires a new enqueue. The PR runs the union of lanes that consume its changed files; all
+requires a new enqueue. After enqueue, keep
+`node scripts/dev/run-gh.mjs merge-wait N --timeout-sec 5400` running in the background
+(include `--repo owner/repo` if enqueue used it). Exit 0 means merged. Exit 1 means follow-up
+work on the same task; the message says what needs attention and when to enqueue again.
+Exit 3 means inspect the PR, then start observing again; enqueue again only if the message
+says to. Exit 2 means retry once, then investigate if it fails again.
+The PR runs the union of lanes that consume its changed files; all
 required names report, including intentional skips. Unknown inputs run every lane. Strict stays
 off, so an older green base needs no update push. There is no merge queue.
 `Measured axe` is required: serious and critical accessibility violations block merges.

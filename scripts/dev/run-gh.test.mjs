@@ -10,6 +10,7 @@
  */
 
 import assert from 'node:assert/strict';
+import * as runGh from './run-gh.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -214,7 +215,10 @@ run('parseValueFlag extracts a named value without swallowing a following flag',
 await runAsync('merge-wait times out deterministically while a PR stays pending', async () => {
   let clock = 0;
   const code = await mergeWait('gh', 7, 1, {
-    loadJson: () => ({ value: { state: 'OPEN', mergeStateStatus: 'QUEUED' } }),
+    loadJson: (_bin, args) => ({ value: args[1] === 'checks' ? [] : {
+      state: 'OPEN', headRefOid: 'a'.repeat(40), isDraft: false,
+      mergeStateStatus: 'QUEUED', autoMergeRequest: {},
+    } }),
     now: () => clock,
     pause: async () => { clock = 1000; },
     emit: (_prefix, classified) => classified.key,
@@ -343,6 +347,216 @@ for (const [label, results, expected] of [
     assert(!calls.some((call) => call.args[1] === 'merge'), JSON.stringify(calls));
   });
 }
+
+
+// --- merge-wait outcome coverage (all GitHub responses are fakes) ---
+const openMergePr = {
+  state: 'OPEN', mergedAt: null, mergeCommit: null, headRefOid: 'a'.repeat(40),
+  isDraft: false, mergeStateStatus: 'BLOCKED', autoMergeRequest: { enabledAt: '2026-10-27' },
+};
+const requiredRow = (state = 'SUCCESS', bucket = 'pass', name = 'required') => ({
+  name, state, bucket, link: `https://example.test/checks/${name}`,
+});
+async function observeMerge(polls, { timeoutSec = 1, step = 15_000, repo = null } = {}) {
+  let clock = 0; let poll = 0; let views = 0;
+  const calls = []; let stderr = '';
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (message) => { stderr += message; return true; };
+  try {
+    const code = await mergeWait('fake-gh', 7, timeoutSec, {
+      repo,
+      loadJson: (bin, args) => {
+        assert.equal(bin, 'fake-gh'); calls.push(args);
+        const current = polls[Math.min(poll, polls.length - 1)];
+        if (args[1] === 'checks') return current.checkError
+          ? { error: new Error(current.checkError) } : { value: current.checks ?? [requiredRow('PENDING', 'pending')] };
+        assert.equal(args[1], 'view');
+        if (current.viewError || (views % 2 && current.afterError)) return { error: new Error(current.viewError || current.afterError) };
+        if (Object.hasOwn(current, 'invalidSnapshot')) return { value: current.invalidSnapshot };
+        return { value: { ...openMergePr, ...(views++ % 2 ? current.after ?? current.before : current.before) } };
+      },
+      now: () => clock,
+      pause: async () => { clock += step; poll += 1; views = 0; },
+    });
+    return { code, calls, stderr, poll };
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+}
+for (const position of ['before', 'after']) await runAsync(`M1 merged in ${position} snapshot wins over failures and auto-merge off`, async () => {
+  const merged = { state: 'MERGED', mergedAt: '2026-10-27', mergeCommit: { oid: 'landed' }, autoMergeRequest: null };
+  const result = await observeMerge([{ before: { autoMergeRequest: null }, [position]: merged, checks: [requiredRow('FAILURE', 'fail')] }]);
+  assert.equal(result.code, 0); assert.match(result.stderr, /merged at landed/);
+});
+await runAsync('M1 second snapshot merge wins even over a checks query error', async () => {
+  const result = await observeMerge([{ after: { state: 'MERGED', mergeCommit: { oid: 'landed' } }, checkError: 'network' }]);
+  assert.equal(result.code, 0);
+});
+await runAsync('M2 stable closed PR fails without merging', async () => {
+  const result = await observeMerge([{ before: { state: 'CLOSED', autoMergeRequest: null } }]);
+  assert.equal(result.code, 1); assert.match(result.stderr, /closed without merging/);
+});
+for (const [state, bucket] of [
+  ['FAILURE', 'fail'], ['CANCELLED', 'cancel'], ['STARTUP_FAILURE', 'pending'],
+  ['ERROR', 'pending'], ['FAILURE', 'pending'], ['TIMED_OUT', 'pending'], ['ACTION_REQUIRED', 'pending'],
+]) await runAsync(`M3 required ${state}/${bucket} fails immediately alongside pending rows`, async () => {
+  const result = await observeMerge([{ checks: [requiredRow(state, bucket, 'broken'), requiredRow('PENDING', 'pending', 'waiting'), requiredRow('ERROR', 'fail', 'legacy')] }]);
+  assert.equal(result.code, 1); assert.equal(result.poll, 0);
+  assert.match(result.stderr, /broken.*https:\/\/example.test\/checks\/broken/);
+  assert.match(result.stderr, /legacy.*https:\/\/example.test\/checks\/legacy/);
+});
+await runAsync('M4 auto-merge off requests enqueue after a fix', async () => {
+  const result = await observeMerge([{ before: { autoMergeRequest: null } }]);
+  assert.equal(result.code, 1); assert.match(result.stderr, /auto-merge is off.*enqueue again after a fix/);
+});
+await runAsync('M5 stable new head fails and requests enqueue again', async () => {
+  const result = await observeMerge([{}, { before: { headRefOid: 'b'.repeat(40), autoMergeRequest: null } }], { timeoutSec: 60 });
+  assert.equal(result.code, 1); assert.match(result.stderr, /new head.*enqueue again/);
+});
+for (const [update, reason] of [[{ isDraft: true }, /draft/], [{ mergeStateStatus: 'DIRTY' }, /conflicts/]]) {
+  await runAsync(`M6 terminal PR condition ${JSON.stringify(update)}`, async () => {
+    const result = await observeMerge([{ before: update }]);
+    assert.equal(result.code, 1); assert.match(result.stderr, reason);
+  });
+}
+for (const mergeStateStatus of ['BLOCKED', 'UNKNOWN', 'BEHIND', 'UNSTABLE']) {
+  await runAsync(`M7 ${mergeStateStatus} alone stays pending`, async () => {
+    const result = await observeMerge([{ before: { mergeStateStatus } }]);
+    assert.equal(result.code, 3);
+  });
+  await runAsync(`M7 passing checks stall after ten minutes (${mergeStateStatus})`, async () => {
+    const result = await observeMerge([{ before: { mergeStateStatus }, checks: [requiredRow(), requiredRow('SKIPPED', 'skipping'), requiredRow('NEUTRAL', 'pass')] }], { timeoutSec: 900, step: 60_000 });
+    assert.equal(result.code, 1); assert.equal(result.poll, 10);
+    assert.match(result.stderr, new RegExp(`stall.*${mergeStateStatus}`));
+  });
+}
+await runAsync('M7 pending rerun resets the continuous passing timer', async () => {
+  const result = await observeMerge([
+    { checks: [requiredRow()] }, { checks: [requiredRow()] }, {}, { checks: [requiredRow()] },
+  ], { timeoutSec: 1500, step: 300_000 });
+  assert.equal(result.code, 1); assert.equal(result.poll, 5);
+});
+await runAsync('M8 only required checks are queried, excluding advisory failures', async () => {
+  const result = await observeMerge([{ checks: [requiredRow()] }]);
+  assert.equal(result.code, 3);
+  assert.ok(result.calls.some((args) => args[1] === 'checks'));
+  for (const args of result.calls.filter((args) => args[1] === 'checks')) {
+    assert.deepEqual(args, ['pr', 'checks', '7', '--required', '--json', 'name,state,bucket,link']);
+  }
+});
+await runAsync('M9 current pending rerun and STALE are pending', async () => {
+  const result = await observeMerge([{ checks: [requiredRow('PENDING', 'pending'), requiredRow('STALE', 'pending')] }]);
+  assert.equal(result.code, 3); assert.match(result.stderr, /2 reported, 0 passed, 2 pending/);
+});
+await runAsync('M10 timeout reports counts and never mutates auto-merge', async () => {
+  const result = await observeMerge([{ checks: [requiredRow(), requiredRow('QUEUED', 'pending')] }]);
+  assert.equal(result.code, 3); assert.match(result.stderr, /TIMEOUT.*2 reported, 1 passed, 1 pending/);
+  assert.ok(result.calls.every((args) => ['view', 'checks'].includes(args[1])));
+});
+await runAsync('M10 zero checks never passes or starts the stall timer', async () => {
+  const result = await observeMerge([{ checks: [] }], { timeoutSec: 900, step: 300_000 });
+  assert.equal(result.code, 3); assert.match(result.stderr, /none reported yet/); assert.doesNotMatch(result.stderr, /0 pending/);
+});
+for (const field of ['checkError', 'viewError']) await runAsync(`M11 ${field} returns unexpected error`, async () => {
+  const result = await observeMerge([{ [field]: 'auth/network/rate limit' }]);
+  assert.equal(result.code, 2); assert.match(result.stderr, /auth\/network\/rate limit/);
+});
+for (const [label, result] of [
+  ['empty exit 1', { status: 1, stdout: '', stderr: '' }],
+  ['auth', { status: 1, stderr: 'authenticate first' }],
+  ['non JSON', { status: 0, stdout: 'not json' }],
+  ['malformed rows', { status: 0, stdout: '{}' }],
+  ['incomplete row', { status: 0, stdout: '[{}]' }],
+  ['spawn', { error: new Error('ENOENT') }],
+  ['signal', { status: null, signal: 'SIGTERM', stdout: '[]' }],
+]) run(`M11 required-check decoding rejects ${label}`, () => {
+  assert.ok(runGh.parseRequiredChecksResult(result).error);
+});
+for (const status of [0, 1, 8, 9]) run(`M11 JSON buckets decide independently of exit ${status}`, () => {
+  const row = requiredRow('PENDING', 'pending');
+  assert.deepEqual(runGh.parseRequiredChecksResult({ status, stdout: JSON.stringify([row]) }), { value: [row] });
+});
+run('M11 explicit unregistered message is pending, preserving checks-wait heuristic', () => {
+  assert.deepEqual(runGh.parseRequiredChecksResult({ status: 1, stderr: "no required checks reported on the 'branch' branch" }), { value: [] });
+});
+await runAsync('M12 identical polls emit once and changed check counts emit a transition', async () => {
+  const result = await observeMerge([{}, {}, { checks: [requiredRow(), requiredRow('PENDING', 'pending')] }], { timeoutSec: 45 });
+  assert.equal(result.code, 3);
+  assert.equal(result.stderr.split('\n').filter((line) => line.startsWith('run-gh merge-wait PR')).length, 2);
+});
+for (const change of [{ headRefOid: 'b'.repeat(40) }, { state: 'CLOSED' }]) {
+  await runAsync(`unstable snapshots stay pending rather than trusting stale failure (${JSON.stringify(change)})`, async () => {
+    const result = await observeMerge([{ after: change, checks: [requiredRow('FAILURE', 'fail')] }]);
+    assert.equal(result.code, 3); assert.match(result.stderr, /changed during poll/);
+  });
+}
+await runAsync('a new head during a poll is rejected on the next stable poll', async () => {
+  const change = { headRefOid: 'b'.repeat(40), autoMergeRequest: null };
+  const result = await observeMerge([{ after: change }, { before: change }], { timeoutSec: 60 });
+  assert.equal(result.code, 1); assert.equal(result.poll, 1); assert.match(result.stderr, /new head/);
+});
+await runAsync('R1 every PR view and required-check query targets the supplied repo', async () => {
+  const result = await observeMerge([{}], { repo: 'owner/repo' });
+  assert.equal(result.code, 3); assert.equal(result.calls.length, 6);
+  for (const args of result.calls) assert.deepEqual(args.slice(-2), ['--repo', 'owner/repo']);
+  assert.deepEqual(result.calls.slice(0, 3).map((args) => args[1]), ['view', 'checks', 'view']);
+  assert.match(result.calls[0][4], /headRefOid/); assert.match(result.calls[0][4], /autoMergeRequest/);
+});
+for (const repo of [null, 'owner/repo']) run(`E1 enqueue success prints the background observer next step (${repo})`, () => {
+  let stderr = '';
+  const code = enqueuePullRequest('fake-gh', 7, repo, {
+    run: (_bin, args) => args[1] === 'view' ? snapshotResult() : { status: 0 },
+    writeError: (message) => { stderr += message; },
+  });
+  assert.equal(code, 0);
+  assert.equal(stderr.trim().split('\n').length, 1);
+  assert.ok(stderr.includes(`node scripts/dev/run-gh.mjs merge-wait 7${repo ? ` --repo ${repo}` : ''} --timeout-sec 5400`));
+  assert.match(stderr, /background/);
+});
+run('E1 enqueue failure emits no observer next step and preserves exit status', () => {
+  let stderr = '';
+  const code = enqueuePullRequest('fake-gh', 7, null, {
+    run: (_bin, args) => args[1] === 'view' ? snapshotResult() : { status: 1 },
+    writeError: (message) => { stderr += message; },
+  });
+  assert.equal(code, 1); assert.doesNotMatch(stderr, /merge-wait/);
+});
+
+
+for (const invalidSnapshot of [null, [], {}, { ...openMergePr, headRefOid: null }]) {
+  await runAsync(`M11 malformed snapshot returns error (${JSON.stringify(invalidSnapshot)})`, async () => {
+    const result = await observeMerge([{ invalidSnapshot }]);
+    assert.equal(result.code, 2); assert.match(result.stderr, /incomplete PR snapshot/);
+  });
+}
+await runAsync('M7 unstable snapshots reset the passing timer', async () => {
+  const result = await observeMerge([
+    { checks: [requiredRow()] },
+    { checks: [requiredRow()], after: { state: 'CLOSED' } },
+    { checks: [requiredRow()] },
+  ], { timeoutSec: 1500, step: 300_000 });
+  assert.equal(result.code, 1); assert.equal(result.poll, 4);
+});
+run('required check classifier counts accepted conclusions and leaves unfamiliar states pending', () => {
+  assert.deepEqual(runGh.classifyRequiredChecks([
+    requiredRow('SKIPPED', 'skipping'), requiredRow('NEUTRAL', 'pass'), requiredRow(),
+    requiredRow('STALE', 'pass'), requiredRow('REQUESTED', 'pending'), requiredRow('ERROR', 'fail'),
+  ]), { reported: 6, passed: 3, pending: 2, failures: [requiredRow('ERROR', 'fail')] });
+});
+
+
+await runAsync('M1 first-snapshot merge wins over subsequent checks and snapshot errors', async () => {
+  const result = await observeMerge([{
+    before: { state: 'MERGED', mergeCommit: { oid: 'landed' } },
+    checkError: 'network', afterError: 'network',
+  }]);
+  assert.equal(result.code, 0); assert.match(result.stderr, /merged at landed/);
+  assert.deepEqual(result.calls.map((args) => args[1]), ['view', 'checks', 'view']);
+});
+await runAsync('M11 second PR snapshot error exits 2', async () => {
+  const result = await observeMerge([{ afterError: 'network' }]);
+  assert.equal(result.code, 2); assert.match(result.stderr, /network/);
+});
 
 // --- Report ---
 if (failures.length > 0) {
