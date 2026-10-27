@@ -88,7 +88,7 @@ final class EngineForgetInProcessTest {
       assertEquals(1, entries.size());
       var literal = LiteralExclusion.fromEntry(entries.getFirst());
       assertEquals(exact.toString(), literal.literal().path());
-      var policy = io.justsearch.configuration.excludes.ExclusionPatterns.fromRawJsonStrict(
+      var policy = ExclusionPatterns.fromRawJsonStrict(
           f.config.get().ui().excludePatterns(), false);
       assertTrue(policy.isExcludedPath(watched, exact));
       assertFalse(policy.isExcludedPath(watched, sibling));
@@ -156,7 +156,7 @@ final class EngineForgetInProcessTest {
       assertEquals(1, f.queue.enqueueEntriesWithExactCollection(List.of(new JobQueue.EnqueueEntry(
           sibling, JobQueue.EnqueueEntry.stat(sibling).sizeBytes(), null, siblingHash, watched)), "documents"));
       long extractionDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
-      boolean extracted = false;
+      boolean extracted;
       do {
         f.runtime.commitOps().maybeRefreshBlocking();
         var row = f.queue.watcherReconciliationRow(key(sibling));
@@ -371,7 +371,7 @@ final class EngineForgetInProcessTest {
         } catch (RuntimeException failure) { observationFailure.compareAndSet(null, failure); }
       };
       // Read-only observation of actual queue commits; no notification is blocked or fabricated.
-      try (var subscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run())) {
+      try (var ignoredSubscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run())) {
         String predecessor = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration().getActiveGenerationId();
         var started = f.client.startMigration("forget-native-preservation", TestEngineContexts.FOREGROUND);
         assertTrue(started.accepted(), "SETUP: actual public native migration must be admitted");
@@ -495,8 +495,8 @@ final class EngineForgetInProcessTest {
         // The monitor still owns replay/drain/certification; automatic timing is not under test.
         assertTrue(f.client.requestCutover(true, TestEngineContexts.FOREGROUND).accepted(),
             "SETUP: public SWITCHING/cutover request must be admitted");
-        boolean terminal = false;
-        Object refusal = null;
+        boolean terminal;
+        Object refusal;
         long completionDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
         do {
           var status = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration();
@@ -529,8 +529,9 @@ final class EngineForgetInProcessTest {
               key(sibling), SchemaFields.SOURCE_SHA256));
           assertEquals(0, target.indexCountOps().countByIdAndChunksStrict(key(exact)));
           assertEquals(exactHash, SourceContentHash.sha256(exact));
-          assertTrue(ExclusionPatterns.fromRawJsonStrict(f.config.currentSnapshot().ui().excludePatterns(), false)
-              .isExcludedPath(watched, exact));
+          assertEquals(!removePolicyAfterSkip,
+              ExclusionPatterns.fromRawJsonStrict(f.config.currentSnapshot().ui().excludePatterns(), false)
+                  .isExcludedPath(watched, exact), "the current policy must reflect the completed public Save");
         }
         assertTrue(terminal, "R2 actual native migration did not settle at the observed exact target receipt refusal; "
             + "this bounded observation is not a claim of permanent failure: " + refusal);
@@ -784,7 +785,7 @@ final class EngineForgetInProcessTest {
       return result.response();
     }
     @Override public void close() throws Exception {
-      long until = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
       while (root.admission().activeWorkCount() != 0 && System.nanoTime() < until) Thread.sleep(5);
       try { root.close(); }
       finally {

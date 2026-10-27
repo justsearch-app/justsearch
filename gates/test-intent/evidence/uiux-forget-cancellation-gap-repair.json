@@ -1,0 +1,79 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:551a36c61d6a0a3c4a749bacda70f9c94eb0e4b46a62f050ad267c16d4babf92",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T13:36:52.095Z",
+  "revision": "7a1196e180c667b774bd1623c65242888df1270e",
+  "tree": "c9a08e6612ca729833e0e661dec02aadc5f7131c",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineUnaryCancellationGapTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 390174,
+      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-cancellation-refresh-10636181/run-2.log",
+      "outputDigest": "sha256:adbe6bd20e63da5d5efc44ffe5ae2d2dae633030f4797a4175a911ab6ef04981"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineUnaryCancellationGapTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineUnaryCancellationGapTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1ab868e036e148107fa1689f0849d3fae7c7c2b0c8c2b293196ea9c75947dc29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "MD55CancellationOutcomePollPrecedesSignalHandlers()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55ExpiryOutcomePollPrecedesSignalHandlers()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "be1f315b50",
+    "revision": "be1f315b50721165cc9ec9c5b4d0ec857e939a2f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineUnaryCancellationGapTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 196152,
+        "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-cancellation-refresh-10636181/run-1.log",
+        "outputDigest": "sha256:d138c15bea5477b69d1892b687f39e2d70d2698ce4f3ea21542340db9189da24"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineUnaryCancellationGapTest.java",
+        "classification": "assertion",
+        "detail": "MD55CancellationOutcomePollPrecedesSignalHandlers(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an already-decided CANCELLED/EXPIRED outcome must bar a surviving publisher before signal handlers run ==> expected: <true> but was: <false> | MD55ExpiryOutcomePollPrecedesSignalHandlers(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an already-decided CANCELLED/EXPIRED outcome must bar a surviving publisher before signal handlers run ==> expe"
+      }
+    ]
+  },
+  "digest": "sha256:a0b8d79e93f99a0587b145471891e6768b7dfba61062f99509f51e7ae8e56511"
+}

@@ -2,12 +2,17 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+    "scriptDigest": "sha256:a8a45696b29fda15875699de89b4143f9979b1c1aac8ad6df609e0722925fbc7",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-25T23:45:36.190Z",
-  "revision": "31f6dbb2276b2bbba77e346b2301b455ada836b5",
-  "tree": "cca13ee899144c3d38503d4d58694fe8586ce661",
+  "createdAt": "2026-10-27T11:21:27.127Z",
+  "revision": "7a1196e180c667b774bd1623c65242888df1270e",
+  "tree": "fd323e67cf0bb973d61ca7f834249d171ad8e1a6",
   "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
     "platform": "linux",
     "arch": "x64",
     "osRelease": "7.0.0-38-generic",
@@ -18,10 +23,12 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2399583-1792971917846.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3p9xfbor/tmp/test-intent-vitest-12-1793100064411.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 8012
+      "durationMs": 12649,
+      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-library-4834e076/run-2.log",
+      "outputDigest": "sha256:5876dee7c9bb63717e5efd4847bc91d06adc13cd994e12791fdc1ceac79eaf0a"
     }
   ],
   "checks": [
@@ -87,201 +94,6 @@
           "status": "passed"
         }
       ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library Retry reconciles actual retained or alongside Search (alongside=false)",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=false)",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library Retry reconciles actual retained or alongside Search (alongside=true)",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=true)",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library REFUSED never reconciles unconfirmed target state",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 Library REFUSED never reconciles unconfirmed target state",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library INCOMPLETE never reconciles unconfirmed target state",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 Library INCOMPLETE never reconciles unconfirmed target state",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library UNKNOWN never reconciles unconfirmed target state",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 Library UNKNOWN never reconciles unconfirmed target state",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 mismatched receipt path cannot report completion or reconcile another target",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 mismatched receipt path cannot report completion or reconcile another target",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 mismatched receipt scope cannot report completion or reconcile another target",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 mismatched receipt scope cannot report completion or reconcile another target",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 mismatched receipt key cannot report completion or reconcile another target",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 mismatched receipt key cannot report completion or reconcile another target",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 initial card completion keeps its established target-specific behavior inside Stage",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 initial card completion keeps its established target-specific behavior inside Stage",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 late Library completion reaches its retained owner without clearing a new unrelated draft or scope",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 late Library completion reaches its retained owner without clearing a new unrelated draft or scope",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 late old-API completion cannot regain authority after API-base ABA",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 late old-API completion cannot regain authority after API-base ABA",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 evicted completion origin cannot remint itself or change another retained surface",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 evicted completion origin cannot remint itself or change another retained surface",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 duplicate observed completion preserves the new unrelated pane, query and prepared scope",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "LR56 duplicate observed completion preserves the new unrelated pane, query and prepared scope",
-          "status": "passed"
-        }
-      ]
     }
   ],
   "failBefore": {
@@ -291,85 +103,21 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2399583-1792971927491.json\"",
-        "cwd": "<before-worktree>",
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3p9xfbor/tmp/test-intent-vitest-12-1793100077087.json\"",
+        "cwd": "<before-shared-clone>",
         "exitCode": 1,
-        "durationMs": 8360,
-        "output": "JSON report written to /tmp/test-intent-vitest-2399583-1792971927491.json\n\n"
+        "durationMs": 10036,
+        "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-library-4834e076/run-1.log",
+        "outputDigest": "sha256:202eca6828814f06c9ed1baa9ce0c20f094ca9990d62a1ffa4ce0b7fc98577f2"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
         "classification": "assertion",
-        "detail": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=false):  AssertionError: expected 3 to be 2 // Object.is equality\n    at /tmp/test-intent-before-xs8e6U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:191:37\n    at file:///tmp/test-intent-before-xs8e6U/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 | LR56 Library Retry reconciles actual retained or alongside Search (alongside=true):  AssertionError: expected 3 t"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library Retry reconciles actual retained or alongside Search (alongside=false)",
-        "classification": "assertion",
-        "detail": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=false):  AssertionError: expected 3 to be 2 // Object.is equality\n    at /tmp/test-intent-before-xs8e6U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:191:37\n    at file:///tmp/test-intent-before-xs8e6U/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library Retry reconciles actual retained or alongside Search (alongside=true)",
-        "classification": "assertion",
-        "detail": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=true):  AssertionError: expected 3 to be 2 // Object.is equality\n    at /tmp/test-intent-before-xs8e6U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:191:37\n    at file:///tmp/test-intent-before-xs8e6U/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library REFUSED never reconciles unconfirmed target state",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library INCOMPLETE never reconciles unconfirmed target state",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 Library UNKNOWN never reconciles unconfirmed target state",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 mismatched receipt path cannot report completion or reconcile another target",
-        "classification": "assertion",
-        "detail": "LR56 mismatched receipt path cannot report completion or reconcile another target:  AssertionError: expected '\"/docs/sub/report\\\\[1].txt \" (1 trail…' to contain 'could not be confirmed'\n    at /tmp/test-intent-before-xs8e6U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:209:101\n    at file:///tmp/test-intent-before-xs8e6U/modules/ui-web/node_modules/@"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 mismatched receipt scope cannot report completion or reconcile another target",
-        "classification": "assertion",
-        "detail": "LR56 mismatched receipt scope cannot report completion or reconcile another target:  AssertionError: expected '\"/docs/sub/report\\\\[1].txt \" (1 trail…' to contain 'could not be confirmed'\n    at /tmp/test-intent-before-xs8e6U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:209:101\n    at file:///tmp/test-intent-before-xs8e6U/modules/ui-web/node_modules/@"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 mismatched receipt key cannot report completion or reconcile another target",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 initial card completion keeps its established target-specific behavior inside Stage",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 late Library completion reaches its retained owner without clearing a new unrelated draft or scope",
-        "classification": "assertion",
-        "detail": "LR56 late Library completion reaches its retained owner without clearing a new unrelated draft or scope:  AssertionError: expected 3 to be 2 // Object.is equality\n    at /tmp/test-intent-before-xs8e6U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:228:81\n    at file:///tmp/test-intent-before-xs8e6U/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 late old-API completion cannot regain authority after API-base ABA",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 evicted completion origin cannot remint itself or change another retained surface",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts#LR56 duplicate observed completion preserves the new unrelated pane, query and prepared scope",
-        "classification": "assertion",
-        "detail": "LR56 duplicate observed completion preserves the new unrelated pane, query and prepared scope:  AssertionError: expected 3 to be 2 // Object.is equality\n    at /tmp/test-intent-before-xs8e6U/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:274:99\n    at file:///tmp/test-intent-before-xs8e6U/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        "detail": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=false):  AssertionError: expected 3 to be 2 // Object.is equality\n    at /home/elias/.cache/am/3p9xfbor/tmp/evidence-before-library/before/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:191:37\n    at file:///home/elias/.cache/am/3p9xfbor/tmp/evidence-before-library/before/modul | LR56 Library Retry reconciles actual retained or alongside Search (alongside=true):  AssertionError: expected 3"
       }
     ]
   },
-  "digest": "sha256:5611676d9255ccf2669191a80a185e1223793f80733f5300f0558aa38525821b"
+  "digest": "sha256:5770944eef6dcc2868dc6fa3c11f5d132e471e4a5380e9f1d4ec2dbfb9502749"
 }

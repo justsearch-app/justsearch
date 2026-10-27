@@ -78,8 +78,9 @@ public final class ExclusionPatterns {
     if (!array.isArray()) throw new IllegalArgumentException("Exclude policy must be an array");
     List<Object> patterns = new ArrayList<>();
     for (var entry : array) {
-      patterns.add(entry.isString() ? entry.asString()
-          : LiteralExclusion.fromEntry(JSON.convertValue(entry, java.util.Map.class)));
+      if (entry.isString()) patterns.add(entry.asString());
+      else if (entry.isObject()) patterns.add(LiteralExclusion.fromEntry(JSON.convertValue(entry, java.util.Map.class)));
+      else throw new IllegalArgumentException("Exclude policy entries must be strings or literal rules");
     }
     return fromPatterns(patterns, windows);
   }

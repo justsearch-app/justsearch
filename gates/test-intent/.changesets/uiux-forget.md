@@ -10,8 +10,7 @@ author-session: codex-uiux-forget-builder
 These choices are agent-adopted under the owner's design delegation, not owner-authored scenarios.
 The quoted delegation and its exact scope are reproduced separately in every warrant. The settled
 WP5.5/WP5.6 scenarios include RF55/DF55/WD55/Q55/MD55 and the honest-incomplete amendment.
-No acceptance record is authored here. Evidence paths below are populated by the official formal producer, using the recorded
-machine-rules adapter where indicated; pending paths are not execution claims.
+No acceptance record is authored here. Every named evidence path is populated by the official formal producer through the recorded external machine-rules adapter. The complete watcher preservation entry retains failing evidence and remains unverified on this machine; portable component execution is not native or independent acceptance.
 
 Existing v0–v5 compatibility cases are retained. The final builder report separately inventories
 unchanged-before preservation, version-6 current-writer assertions, and the Library fixture adaptation.
@@ -61,9 +60,7 @@ Isolated new files remain subject to independent scenario and execution review e
       ],
       "evidence": "gates/test-intent/evidence/uiux-forget-current-java.json",
       "newChecks": [
-        "modules/app-api/src/test/java/io/justsearch/app/api/schema/WireRecordSchemaGenTest.java#forgetOutcome",
-        "modules/app-api/src/test/java/io/justsearch/app/api/schema/WireRecordSchemaGenTest.java#forgetPage",
-        "modules/app-api/src/test/java/io/justsearch/app/api/schema/WireRecordSchemaGenTest.java#settingsV2"
+        "modules/app-api/src/test/java/io/justsearch/app/api/schema/WireRecordSchemaGenTest.java"
       ],
       "repaired": false
     },
@@ -94,10 +91,11 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsCurrentEnvelopeTest.java"
       ],
       "class": "New",
-      "behaviour": "The current operations/settings envelope is semantic version 6. Existing migration, contention, preservation, recovery, context-length and revision assertions remain, including legacy v0–v5 fixtures. A new actual v5 operations reopen asserts row and sqlite_sequence preservation across the semantic migration. Only current-writer version expectations advance from 5 to 6.",
+      "behaviour": "The current operations/settings envelope is semantic version 6. Existing migration, contention, preservation, recovery, context-length and revision assertions remain, including legacy v0–v5 fixtures. A new actual v5 operations reopen asserts row and sqlite_sequence preservation across the semantic migration. Only current-writer version expectations advance from 5 to 6. The nested fresh-writer/current-version/reopen assertion executes unchanged through UiSettingsCurrentEnvelopeTest, which supplies the same fresh @TempDir input and invokes the original method. This gives the unchanged producer a standalone XML identity without editing the existing main test, duplicating its assertions, changing its conditions or synthesizing XML. The complete original nested suite remains part of the full module checks.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -108,7 +106,7 @@ Isolated new files remain subject to independent scenario and execution review e
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-forget-current-java.json",
+      "evidence": "gates/test-intent/evidence/uiux-forget-envelope-current.json",
       "newChecks": [
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPendingTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPolicyTest.java",
@@ -116,7 +114,7 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreStartupContentionTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsCurrentEnvelopeTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java"
       ],
       "repaired": false
@@ -148,7 +146,7 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java"
       ],
       "class": "New",
-      "behaviour": "The production process factory/shared settings/operation/index/queue owners retain all original exact removal, source/sibling, outside-FILE and completed-withdrawal assertions, including the unchanged R1 root-only preservation check. Historical control1/control2 were SETUP/INCONCLUSIVE. Exact committed72ef nonexcluded native control3 passed real certification/writable publication and same-profile boot; the first actual completed-Forget R2 target reached a genuine accepted native v3 UPSERT/DONE SKIPPED_POLICY/null-hash receipt and strict target zero, then failed the intended projection-certificate assertion. That before observation was neither a permanent-hold claim nor a setup/compile failure. The R2 control/target assertions remain, with raw actual Forget operation/settings/pointer output added for provenance. A new public settings-service HOT Save check removes the literal only after that real terminal skip, outside publication ownership; it requires a fresh actual unit/receipt/accepted order, real current-byte target publication and same-profile boot while preserving the original completed Forget receipt. This new check is a component public-service path, not degraded Head HTTP evidence. All source in this policy-receipt implementation phase is uncompiled/unexecuted and its unchanged formal record remains pending; earlier logs are historical only. Existing in_process fixture isolation and supported publicly requested SWITCHING after actual readiness remain; no default process isolation or automatic monitor timing claim is made. Final live fixture prerequisite correction: EngineRoot-only setup now performs real ordinary sibling extraction, public watchRoot and ordinary-work settlement before Forget/START. It does not inherit Head watcher initialization automatically. Original3/R1/Fixture bytes stay unchanged; all final paired before/after must use this same public-API setup against72ef. Historical target/control records are unchanged and supply no retroactive pass for the new setup.",
+      "behaviour": "Actual process/shared settings, operation, queue and index owners exercise exact watched-file removal, retained original and sibling bytes, outside-root FILE completion without a permanent rule, completed withdrawal semantics, and the nonexcluded native migration/current-byte/successor-boot control. These three component checks are selected for formal evidence. The unchanged required returned-root S55, completed-Forget R2 and public HOT Save R9 convergence scenarios remain UNVERIFIED on this machine: actual RootIdentity.volume() is null, /dev/disk/by-uuid is unavailable, and native policy refuses without known recorded volume equality. Their tests remain enabled and failing; they are excluded from formal evidence, not silently skipped. R9 failure diagnostics now require the policy state appropriate to its completed public Save instead of contradicting the preceding successful removal assertion; the terminal/convergence oracle remains. No degraded Head HTTP, installed runtime, physical Windows or full native permission pass is claimed.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -159,22 +157,21 @@ Isolated new files remain subject to independent scenario and execution review e
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-forget-current-java.json",
+      "evidence": "gates/test-intent/evidence/uiux-forget-move-deadline-repair.json",
       "newChecks": [
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55CompletedForgetAllowsReturnedRootReplayWithoutPublishingExcludedSource",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R2CompletedWatchedFileForgetSurvivesLaterNativeMigrationAndSuccessorBoot",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R9HotPublicSaveAfterNativePolicySkipReadmitsCurrentBytesAndKeepsCompletedForgetReceipt"
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55OutsideFileCompletesWithoutPermanentRuleAndUnrestrictedNewWriterCanPublishAgain",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor"
       ],
       "repaired": false
     },
     {
       "items": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/ForgetDecisionValidationTest.java"
       ],
       "class": "New",
-      "behaviour": "Real handlers freeze exact consent and original-key retry/withdraw decisions, distinguish whitespace/control/format bytes in presentation, explain the outside-FILE exception and retained copies, and reject malformed/coerced/duplicate/oversized or non-WEBVIEW calls before effects.",
+      "behaviour": "Real handlers freeze exact consent and original-key retry/withdraw decisions, distinguish whitespace/control/format bytes in presentation, explain the outside-FILE exception and retained copies, and reject malformed/coerced/duplicate/oversized or non-WEBVIEW calls before effects. The shared handler mapper retains strict duplicate, trailing-token, missing/unknown-field and scalar/enum validation for frozen Retry/Withdraw targets; a preservation probe executes before and after the mapper repair.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -185,9 +182,10 @@ Isolated new files remain subject to independent scenario and execution review e
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-forget-current-java.json",
+      "evidence": "gates/test-intent/evidence/uiux-forget-handler-repair.json",
       "newChecks": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/ForgetDecisionValidationTest.java"
       ],
       "repaired": false
     },
@@ -284,7 +282,7 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java"
       ],
       "class": "New",
-      "behaviour": "RF55 allowed and excluded physical MOVE preserve the shared destination-policy/identity/publication fence. The ordinary allowed move keeps its actual source/destination bytes, identity and indexed content.",
+      "behaviour": "RF55 allowed and excluded physical MOVE preserve the shared destination-policy/identity/publication fence. The ordinary allowed move keeps its actual source/destination bytes, identity and indexed content. A separate genuine non-singleton context with an elapsed absolute deadline and no cancellation uses the same real Worker/file-fence/identity/Lucene boundary. It must retain the old identity and rows, report no publication, and retain the successful physical move. This check uses released interfaces available on main so its assertion fail-before does not depend on Forget APIs.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -293,11 +291,20 @@ Isolated new files remain subject to independent scenario and execution review e
           "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
           "choice": "RF55: recheck live destination policy inside the same file fence as identity and Lucene publication; preserve ordinary allowed move semantics.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "MD55: original request cancellation or elapsed absolute deadline must be checked under the MOVE file fence before identity and rows; no permanent outside-FILE rule or unrelated cancellation.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-forget-existing-repairs.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java#RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java#RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java#MD55ExpiredNonSingletonMoveCannotPublishAtWorkerFence"
       ],
       "repaired": true
     },
@@ -328,7 +335,7 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetMovePublicationTest.java"
       ],
       "class": "New",
-      "behaviour": "Real physical MOVE/RENAME/undo with actual request expiry or cancellation cannot rekey or republish after outside-FILE Forget completes, including root retirement and delayed resumed publishers. An already admitted publisher keeps Forget incomplete until explicit Retry.",
+      "behaviour": "Real physical MOVE/RENAME/undo with actual request expiry or cancellation cannot rekey or republish after outside-FILE Forget completes, including root retirement and delayed resumed publishers. An already admitted publisher keeps Forget incomplete until explicit Retry. Round 3 corrects the controlled timer fixture: fire the captured alarm before the independent 60-second caller wait can expire on the caller itself and block in the deliberately held failure callback. All publication, terminal-operation, root retirement, exact absence and identity assertions remain; the separate explicit elapsed-clock Worker case is unchanged. Under round 3 decision 2 these complete-Forget integration checks are current-only New capability: a completed Forget and its actual service/operation APIs do not exist on main. The legacy MOVE policy/deadline repairs retain compilable assertion fail-before checks in WorkerMovePublicationFenceTest; the pre-signal outcome repair retains EngineUnaryCancellationGapTest. No missing API or compilation failure is claimed as a fail-before.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -343,7 +350,7 @@ Isolated new files remain subject to independent scenario and execution review e
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetMovePublicationTest.java"
       ],
-      "repaired": true
+      "repaired": false
     },
     {
       "items": [

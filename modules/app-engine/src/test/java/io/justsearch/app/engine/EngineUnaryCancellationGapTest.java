@@ -53,7 +53,7 @@ final class EngineUnaryCancellationGapTest {
     var admission = new EngineAdmissionController(8, 8, 1);
     var alarm = new CompletableFuture<Runnable>();
     var timer = mock(ScheduledExecutorService.class);
-    when(timer.schedule(any(Runnable.class), org.mockito.ArgumentMatchers.anyLong(), any()))
+    when(timer.schedule(any(Runnable.class), anyLong(), any()))
         .thenAnswer(invocation -> {
           alarm.complete(invocation.getArgument(0)); return mock(ScheduledFuture.class);
         });

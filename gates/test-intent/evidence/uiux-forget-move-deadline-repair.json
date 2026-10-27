@@ -1,0 +1,118 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:551a36c61d6a0a3c4a749bacda70f9c94eb0e4b46a62f050ad267c16d4babf92",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T13:26:58.194Z",
+  "revision": "7a1196e180c667b774bd1623c65242888df1270e",
+  "tree": "06e018216886d72a4ca98bb400b50b1d406b5eba",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals\" --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.S55OutsideFileCompletesWithoutPermanentRuleAndUnrestrictedNewWriterCanPublishAgain\" --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor\" --tests \"io.justsearch.app.engine.EngineForgetMovePublicationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 29378,
+      "outputLog": "/home/elias/.cache/am/3p9xfbor/tmp/forget-builder-3-report/evidence-logs/evidence-engine-refresh-ba129af5/run-1.log",
+      "outputDigest": "sha256:0c43ac669ac4018d06f48407e69c5a1d79f8c8b66fd4cdf326860e4a49562c91"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06b8e136b409c4ef9e5ee770926f383c984dd2532ba8fa432dae20c8baacbf1d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#S55OutsideFileCompletesWithoutPermanentRuleAndUnrestrictedNewWriterCanPublishAgain",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06b8e136b409c4ef9e5ee770926f383c984dd2532ba8fa432dae20c8baacbf1d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S55OutsideFileCompletesWithoutPermanentRuleAndUnrestrictedNewWriterCanPublishAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06b8e136b409c4ef9e5ee770926f383c984dd2532ba8fa432dae20c8baacbf1d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetMovePublicationTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetMovePublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2879171d617343e6cf25b3c3ce0f3805f452df34c32bc8b047365dcb1575ab53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "MD55ExplicitElapsedRequestDeadlineWithoutCancellationCannotPublishAtWorkerFence()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55AlreadyAdmittedPublisherKeepsForgetIncompleteUntilExplicitRetry()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55ExpiredRenameCannotRekeyAfterRootRetirementAndCompletedForget()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55ExpiredMoveCannotRepublishAfterCompletedOutsideFileForget()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55CancelledUndoCannotRepublishAfterCompletedOutsideFileForget()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55CancelledMoveBeforeSignalCannotRepublishAfterCompletedOutsideFileForget()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:60d0ca8523c19ed4403136037a5db77755a39e0127dfe6e6893f85a8d89f325c"
+}

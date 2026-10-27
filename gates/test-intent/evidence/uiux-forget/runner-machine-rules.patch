@@ -104,33 +104,40 @@
    if (/gradlew/.test(command) && env.LIGHTGBM_NATIVE_LIB_PATH) {
      // Resolve the named directory itself (it may be a junction); links inside it are not followed.
      const nativeSource = fs.realpathSync(env.LIGHTGBM_NATIVE_LIB_PATH);
-@@ -114,13 +85,32 @@
+@@ -114,13 +85,38 @@
        filter: (source) => !fs.lstatSync(source).isSymbolicLink(),
      });
    }
 -  const res = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
 +  let res;
++  let attemptedCommand = command;
 +  const attempts = [];
 +  let busySince;
 +  let readOnlySince;
 +  for (;;) {
-+    res = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
++    res = spawnSync(attemptedCommand, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
 +    const output = `${res.stdout ?? ''}\n${res.stderr ?? ''}`;
 +    const readOnly = /Read-only file system/.test(output) && /fileHashes(?:\/|\\).*fileHashes.lock/.test(output);
 +    if (res.status !== 75 && !readOnly) break;
 +    const now = Date.now();
-+    if (res.status === 75) busySince ??= now;
++    if (res.status === 75) busySince ??= started;
 +    if (readOnly) readOnlySince ??= now;
 +    if ((busySince && now - busySince >= 3 * 60 * 60 * 1000)
 +        || (readOnlySince && now - readOnlySince >= 60 * 60 * 1000)) break;
-+    attempts.push({ exitCode: res.status, output, at: new Date().toISOString() });
++    attempts.push({ command: attemptedCommand, exitCode: res.status, output, at: new Date().toISOString() });
 +    console.error(`${new Date().toISOString()}: Gradle ${readOnly ? 'read-only cache hazard' : 'slot exit 75'}; retrying in ten minutes`);
-+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10 * 60 * 1000);
++    const remainingMs = started + 3 * 60 * 60 * 1000 - Date.now();
++    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.min(10 * 60 * 1000, Math.max(0, remainingMs)));
++    const remainingSeconds = Math.floor((started + 3 * 60 * 60 * 1000 - Date.now()) / 1000);
++    if (remainingSeconds <= 0) break;
++    attemptedCommand = command.replace('js-gradle-slot ./gradlew', `js-gradle-slot -w ${remainingSeconds} ./gradlew`);
++    console.error(`${new Date().toISOString()}: retrying ${attemptedCommand}`);
 +  }
 +  console.error(`${new Date().toISOString()}: command exit ${res.status}`);
    const signal = res.signal ?? (IS_WIN && (res.status >>> 0) === 0xC000013A ? 'STATUS_CONTROL_C_EXIT' : null);
    return {
-     command,
+-    command,
++    command: attemptedCommand,
      cwd: path.relative(REPO_ROOT, cwd).replaceAll('\\', '/') || '.',
      exitCode: res.status ?? -1,
      durationMs: Date.now() - started,
@@ -138,7 +145,7 @@
      output: [res.stdout ?? '', res.stderr ?? '',
        ...(signal ? [`command interrupted: ${signal}`] : []),
        ...(res.error ? [res.error.message] : []),
-@@ -129,6 +119,15 @@
+@@ -129,6 +125,15 @@
  }
  
  function gitOut(args, cwd, env) {
@@ -154,7 +161,7 @@
    const res = spawnSync('git', ['-c', 'core.longpaths=true', ...args], { cwd, encoding: 'utf8', env: env ?? process.env });
    if (res.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${res.stderr}`);
    return res.stdout.trim();
-@@ -184,7 +183,7 @@
+@@ -184,7 +189,7 @@
    for (const group of gradleGroups.values()) {
      for (const { t } of group) fs.rmSync(path.join(root, t.resultFile), { force: true });
      const filters = [...new Set(group.map(({ t }) => (t.method ? `${t.fqcn}.${t.method}` : t.fqcn)))];
@@ -163,7 +170,7 @@
      const { project, task } = group[0].t;
      const run = sh(`${wrapper} ${project}:${task} ${filters.map((f) => `--tests ${JSON.stringify(f)}`).join(' ')} --rerun -PskipWebBuild=true --console=plain`, root);
      runs.push(run);
-@@ -274,19 +273,7 @@
+@@ -274,19 +279,7 @@
  }
  
  function removeBeforeWorktree(worktree, created) {
@@ -184,7 +191,7 @@
  }
  
  function parseArgs(argv) {
-@@ -346,13 +333,20 @@
+@@ -346,13 +339,20 @@
    let failBefore = null;
    let cleanupError;
    if (args.before) {
@@ -209,7 +216,7 @@
        created = true;
        // Explicit compatibility scaffolding for checks using newly added interfaces. Its bytes are
        // part of the evidence; repaired behavior must remain absent from this before-state patch.
-@@ -370,7 +364,7 @@
+@@ -370,7 +370,7 @@
          revision: gitOut(['rev-parse', `${args.before}^{commit}`], REPO_ROOT),
          overlays: args.overlays,
          patches,
@@ -218,7 +225,7 @@
          checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
        };
      } catch (e) {
-@@ -390,11 +384,18 @@
+@@ -390,11 +390,18 @@
  
    const evidence = {
      schema: EVIDENCE_SCHEMA,
@@ -238,7 +245,7 @@
        platform: process.platform,
        arch: process.arch,
        osRelease: os.release(),
-@@ -403,7 +404,7 @@
+@@ -403,7 +410,7 @@
        cargo: runs.some((r) => /^cargo /.test(r.command)) ? toolVersion('cargo --version') : null,
        ci: Boolean(process.env.CI),
      },

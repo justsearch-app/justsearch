@@ -90,16 +90,16 @@ final class EngineForgetQueueRuntimeTest {
         var runtimeLock = (ReentrantLock) field(f.server, KnowledgeServer.class, "runtimeSwapLock");
         var display = new AtomicInteger(); var walks = new AtomicInteger();
         String sourceHash = io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(key(source));
-        try (var displayObserver = f.queue.changeStream().subscribe(delta -> {
+        try (var ignoredDisplayObserver = f.queue.changeStream().subscribe(delta -> {
               if (delta instanceof IndexingJobChangeFeed.Delta.Update update
                   && sourceHash.equals(update.row().pathHash()) && "DONE".equals(update.row().state())) {
                 observeOwners(f, observerFailure); display.incrementAndGet();
               }
             });
-            var walkObserver = f.queue.subscribeRecordedWalks(changed -> {
+            var ignoredWalkObserver = f.queue.subscribeRecordedWalks(changed -> {
               if (walkKey.equals(changed)) { observeOwners(f, observerFailure); walks.incrementAndGet(); }
             });
-            var stream = f.client.subscribeIndexingJobs(frame -> {
+            var ignoredStream = f.client.subscribeIndexingJobs(frame -> {
               if (frame.hasSnapshot()) snapshot.countDown();
               else if (deltaEntered.getCount() != 0) {
                 deltaEntered.countDown();

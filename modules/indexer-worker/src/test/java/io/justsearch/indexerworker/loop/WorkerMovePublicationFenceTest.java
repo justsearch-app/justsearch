@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.loop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -32,16 +33,22 @@ class WorkerMovePublicationFenceTest extends LuceneExecutorTestBase {
   @Test
   @org.junit.jupiter.api.Timeout(30)
   void RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence() throws Exception {
-    moveDestinationPolicyRace(true);
+    moveDestinationPolicyRace(true, false);
   }
 
   @Test
   @org.junit.jupiter.api.Timeout(30)
   void RF55AllowedMovePreservesPhysicalOutcomeIdentityAndIndexedContent() throws Exception {
-    moveDestinationPolicyRace(false);
+    moveDestinationPolicyRace(false, false);
   }
 
-  private void moveDestinationPolicyRace(boolean blocked) throws Exception {
+  @Test
+  @org.junit.jupiter.api.Timeout(30)
+  void MD55ExpiredNonSingletonMoveCannotPublishAtWorkerFence() throws Exception {
+    moveDestinationPolicyRace(false, true);
+  }
+
+  private void moveDestinationPolicyRace(boolean blocked, boolean expired) throws Exception {
     Path root = Files.createDirectory(temp.resolve("move-source"));
     Path original = Files.writeString(root.resolve("public.txt"), "physical original");
     Path destination = Files.createDirectory(root.resolve("private")).resolve("moved.txt");
@@ -78,18 +85,24 @@ class WorkerMovePublicationFenceTest extends LuceneExecutorTestBase {
         service.setDocumentIdentityStore(identities);
         service.useExclusionRoots(() -> List.of(root));
         Files.move(original, destination); // The user's physical move has already succeeded.
+        var maintenance = CallContext.none();
+        var context = expired ? new CallContext(null, null, CallContext.CancelSignal.NEVER,
+            maintenance.engineContext(), maintenance.provenance(), maintenance.childLifetime(),
+            System.nanoTime() - 1) : maintenance;
+        assertFalse(context.cancelled(), "the elapsed-clock check must not borrow cancellation");
         var moving = FenceRace.start("forget-policy-move", () -> service.updateDocumentPaths(
             io.justsearch.ipc.UpdatePathsRequest.newBuilder().addMappings(io.justsearch.ipc.PathMapping.newBuilder()
-                .setOldPath(original.toString()).setNewPath(destination.toString())).build(), CallContext.none()));
+                .setOldPath(original.toString()).setNewPath(destination.toString())).build(), context));
         try {
           assertTrue(admitted.await(10, java.util.concurrent.TimeUnit.SECONDS));
           installed.update(config(blocked ? "[\"private/**\"]" : "[]"));
         } finally { resume.countDown(); }
         var response = moving.get();
-        assertEquals(blocked ? 0 : 1, response.getUpdatedCount(),
-            "a newly excluded destination cannot publish identity or indexed rows");
+        assertEquals(blocked || expired ? 0 : 1, response.getUpdatedCount(), expired
+            ? "an elapsed non-singleton request cannot publish identity or indexed rows"
+            : "a newly excluded destination cannot publish identity or indexed rows");
         runtime.commitOps().maybeRefreshBlocking();
-        if (blocked) {
+        if (blocked || expired) {
           assertEquals(identity, identities.lookup(oldHash).orElseThrow());
           assertTrue(identities.lookup(newHash).isEmpty());
           assertEquals(null, runtime.documentFieldOps().getDocumentField(key(destination), SchemaFields.DOC_ID));

@@ -40,8 +40,8 @@ final class ForgetGenerationAdmissionTest {
     var manager = new IndexGenerationManager(directory.resolve("index"));
     var layout = manager.initializeOrLoad();
     var otherOwner = new IndexGenerationManager(layout.basePath());
-    CompletableFuture<IndexGenerationManager.State> start = null;
-    try (var lease = admit(manager, layout.activeGenerationPath())) {
+    CompletableFuture<IndexGenerationManager.State> start;
+    try (var ignoredLease = admit(manager, layout.activeGenerationPath())) {
       var attempted = new CountDownLatch(1);
       start = CompletableFuture.supplyAsync(() -> {
         attempted.countDown();

@@ -40,7 +40,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
@@ -117,7 +116,7 @@ final class EngineForgetMovePublicationTest {
         assertTrue(f.loop.fileMutationFence().isHeldByCurrentThread());
         insideFence.countDown(); assertTrue(finishPublisher.await(10, TimeUnit.SECONDS));
         return invocation.callRealMethod();
-      }).when(identities).rekey(any(String.class), any(String.class), org.mockito.ArgumentMatchers.anyLong());
+      }).when(identities).rekey(any(String.class), any(String.class), anyLong());
       held.setDocumentIdentityStore(identities);
       doAnswer(invocation -> {
         try { var result = (UpdatePathsResponse) invocation.callRealMethod(); response.complete(result); return result; }
@@ -173,10 +172,8 @@ final class EngineForgetMovePublicationTest {
     var callerCompleted = new CountDownLatch(1);
     var signalRelease = new CountDownLatch(1);
     var response = new CompletableFuture<UpdatePathsResponse>();
-    var callContext = new AtomicReference<CallContext>();
     Thread termination = null;
-    try (var f = new EngineForgetInProcessTest.Fixture(directory.resolve("process"), List.of(a, b),
-            cancelled ? 60_000 : 1_000);
+    try (var f = new EngineForgetInProcessTest.Fixture(directory.resolve("process"), List.of(a, b), 60_000);
         var work = f.root.admission().admit(interactive(), false)) {
       f.seed(original, "old indexed original content");
       var tool = new FileOperationsTool(context -> f.authority.roots().watchedPaths(),
@@ -211,7 +208,6 @@ final class EngineForgetMovePublicationTest {
       var observingIngest = spy(actualIngest);
       set(observingIngest, WorkerIngestService.class, "indexingLoop", heldLoop);
       doAnswer(invocation -> {
-        callContext.set(invocation.getArgument(1));
         try {
           var result = (UpdatePathsResponse) invocation.callRealMethod(); response.complete(result); return result;
         } catch (Throwable failure) { response.completeExceptionally(failure); throw failure; }
@@ -219,7 +215,7 @@ final class EngineForgetMovePublicationTest {
       set(actualServices, DefaultWorkerAppServices.class, "ingestService", observingIngest);
       var alarm = new CompletableFuture<Runnable>();
       var timer = mock(ScheduledExecutorService.class);
-      when(timer.schedule(any(Runnable.class), org.mockito.ArgumentMatchers.anyLong(), any())).thenAnswer(invocation -> {
+      when(timer.schedule(any(Runnable.class), anyLong(), any())).thenAnswer(invocation -> {
         alarm.complete(invocation.getArgument(0)); return mock(ScheduledFuture.class);
       });
       set(f.client, EngineKnowledgeClient.class, "deadlines", timer);
@@ -243,10 +239,9 @@ final class EngineForgetMovePublicationTest {
           try { assertTrue(signalRelease.await(20, TimeUnit.SECONDS)); }
           catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
         });
-        if (!cancelled) {
-          long deadline = callContext.get().deadlineNanos();
-          while (deadline - System.nanoTime() > 0) Thread.sleep(1);
-        }
+        // Fire the controlled timer before the caller's independent wall-clock wait expires.
+        // Otherwise that caller can win expiry and block in the deliberately held signal gap.
+        // MD55ExplicitElapsedRequestDeadlineWithoutCancellation covers the elapsed-clock guard.
         termination = Thread.ofVirtual().start(() -> {
           if (cancelled) work.cancel("user_stop"); else expire.run();
         });

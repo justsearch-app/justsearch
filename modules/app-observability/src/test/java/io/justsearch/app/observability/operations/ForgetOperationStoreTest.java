@@ -123,7 +123,7 @@ class ForgetOperationStoreTest {
       var attempt = runner.accept(request(kind, OPERATION));
       var outer = new java.util.concurrent.locks.ReentrantLock();
       var observed = new AtomicInteger();
-      try (var subscription = store.subscribeCompletions(row -> {
+      try (var ignoredSubscription = store.subscribeCompletions(row -> {
         assertFalse(outer.isHeldByCurrentThread(), "completion cannot acquire arbitrary owners inside the physical fence");
         observed.incrementAndGet();
       })) {

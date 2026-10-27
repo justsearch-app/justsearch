@@ -397,7 +397,7 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
 
   @Test
   void unknownRecordedVolumeNeverCreatesReplacementOrAdoptsARecord() throws Exception {
-    try (var f = new Fixture(); var unavailable = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
+    try (var f = new Fixture(); var ignoredUnavailable = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
       Path file = f.source("private.txt"); var old = f.skipped(file);
       var ledger = RootVolumeLedger.under(f.base);
       var recorded = ledger.recordedFor(f.root);
@@ -450,7 +450,7 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
           () -> f.publicSave(store, identical ? List.of("private.txt") : List.of()), () -> {},
           new java.util.concurrent.atomic.AtomicInteger()));
       assertNotSame(previous, store.currentSnapshot());
-      assertEquals(identical ? "[\"private.txt\"]" : "[]", store.currentSnapshot().ui().excludePatterns());
+      assertEquals(identical ? "[\"private.txt\"]" : "", store.currentSnapshot().ui().excludePatterns());
       assertEquals(journal, f.queue.listSwitchBufferOpsStrict());
       assertEquals("DONE", f.queue.watcherReconciliationRow(file.toString()).get("state"));
       assertEquals(0, f.runtime.indexCountOps().countByIdAndChunksStrict(file.toString()));
@@ -473,7 +473,7 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       var store = f.configuration("[\"private.txt\"]");
       assertTrue(f.settleWithDecision(route, store, f.policy(store, true), () -> {},
           () -> f.publicSave(store, List.of()), new java.util.concurrent.atomic.AtomicInteger()));
-      assertEquals("[]", store.currentSnapshot().ui().excludePatterns());
+      assertEquals("", store.currentSnapshot().ui().excludePatterns());
       assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty(), "only the earlier exact decision was acknowledged");
       // Real ordinary boot discovery/admission runs after the final decision/ACK owners exit.
       // This component's loop is a double: full extractor/writer boot convergence is a separate gate.
@@ -1067,7 +1067,7 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
           assertTrue(publisher.ownsForgetQueue(queue));
           assertSame(publication, store.publicationLock());
           accepted = withOwnership(policy, () -> {
-          try (var state = manager.beginForgetNoCandidate(runtime.openedIndexPath())) {
+          try (var ignoredState = manager.beginForgetNoCandidate(runtime.openedIndexPath())) {
             System.out.println("Caller no-candidate guard acquired for=" + runtime.openedIndexPath());
             store.publicationLock().writeLock().lock();
             try {

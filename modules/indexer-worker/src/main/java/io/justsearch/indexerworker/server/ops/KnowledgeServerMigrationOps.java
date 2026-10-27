@@ -910,12 +910,6 @@ public final class KnowledgeServerMigrationOps {
 
   private static boolean certifyCommittedSurvivor(SwitchBufferCapableQueue queue,
       RunningRuntime active, List<CommittedNativeEffect> effects, List<Integer> deleteIndexes,
-      int index) throws IOException {
-    return certifyCommittedSurvivor(queue, active, effects, deleteIndexes, index, null);
-  }
-
-  private static boolean certifyCommittedSurvivor(SwitchBufferCapableQueue queue,
-      RunningRuntime active, List<CommittedNativeEffect> effects, List<Integer> deleteIndexes,
       int index, io.justsearch.indexerworker.services.NativePolicyReplay policy) throws IOException {
     var effect = effects.get(index);
     if (effect.file() != null && policy != null && policy.certify(effect.op())) return true;
@@ -1976,7 +1970,7 @@ public final class KnowledgeServerMigrationOps {
 
   private static String normalizeReplayCollection(String collection) {
     return collection == null || collection.isBlank()
-        || io.justsearch.app.api.knowledge.IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collection)
+        || IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collection)
         ? null : collection;
   }
 
@@ -2697,7 +2691,7 @@ public final class KnowledgeServerMigrationOps {
   }
 
   public static List<ResolvedConfig.FileSource> loadMigrationRootDeclarations(Path dataDir,
-      ResolvedConfig.Collections collections, ObjectMapper json, List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> official)
+      ResolvedConfig.Collections collections, ObjectMapper json, List<IngestCollectionPolicy.RootBinding> official)
       throws IOException {
     return withMigrationHelpRoot(readMigrationRootDeclarations(dataDir, collections, json, Objects.requireNonNull(official)), collections);
   }
@@ -2709,7 +2703,7 @@ public final class KnowledgeServerMigrationOps {
 
   private static Map<Path, ResolvedConfig.FileSource> readMigrationRootDeclarations(
       Path dataDir, ResolvedConfig.Collections collections, ObjectMapper json,
-      List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> official) throws IOException {
+      List<IngestCollectionPolicy.RootBinding> official) throws IOException {
     Map<Path, ResolvedConfig.FileSource> roots = new LinkedHashMap<>();
     Path rootsFile = dataDir.resolve("watched_roots.json");
     String content;

@@ -75,7 +75,7 @@ final class ForgetCoordinator implements ForgetService {
     if (!root.forgetQueueEntryAllowed()) {
       throw new IllegalStateException("Forget cannot reenter from a queue owner or callback");
     }
-    try (var work = admission.attach(context)) {
+    try (var ignoredWork = admission.attach(context)) {
       return OperationExecution.finished(runSegment(handle));
     }
   }

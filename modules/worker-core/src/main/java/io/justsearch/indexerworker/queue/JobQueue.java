@@ -1159,7 +1159,7 @@ public interface JobQueue extends Closeable {
   }
 
   /** Nonblocking acquisition after the file fence. No new feed buffer or dispatcher. */
-  default java.util.Optional<ForgetQueueFence> tryForgetQueueFence() { return java.util.Optional.empty(); }
+  default Optional<ForgetQueueFence> tryForgetQueueFence() { return Optional.empty(); }
 
   /** Exact/prefix absence over all saved jobs; unknown inspection throws rather than inventing zero. */
   default boolean forgetJobsAbsent(String path, boolean folder) {

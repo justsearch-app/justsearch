@@ -33,7 +33,7 @@ class SqliteOperationStoreTest {
   @Test
   void RF55V5SemanticMigrationAdvancesVersionAndPreservesExistingRowsAndSequence() throws Exception {
     Path path = temp.resolve("v5.db");
-    try (var store = new SqliteOperationStore(path, CLOCK, step -> {});
+    try (var ignoredStore = new SqliteOperationStore(path, CLOCK, step -> {});
         Connection db = connect(path); Statement statement = db.createStatement()) {
       statement.execute("INSERT INTO operations(operation_key,kind,survival,urgency,state,identity_json,accepted_at,updated_at) "
           + "VALUES ('v5-preserved','operation','interactive','foreground','ACCEPTED','{}',1,1)");

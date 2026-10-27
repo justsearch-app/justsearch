@@ -16,17 +16,16 @@ import io.justsearch.core.context.EngineContext;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectReader;
 
 /** Explicit bounded retry or withdrawal of one original intent; caller arguments cannot retarget it. */
 public final class ForgetDecisionHandler implements OperationHandler {
   private static final String SCHEMA = "forget-decision.v1";
-  private static final tools.jackson.databind.json.JsonMapper JSON = tools.jackson.databind.json.JsonMapper.builder()
-      .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-      .enable(tools.jackson.databind.cfg.EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
-      .disable(tools.jackson.databind.MapperFeature.ALLOW_COERCION_OF_SCALARS)
-      .enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-      .enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
-      .enable(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
+  private static final ObjectReader JSON = HandlerJson.MAPPER.reader()
+      .with(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+      .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
   private record Target(String forgetKey, String path, io.justsearch.configuration.excludes.LiteralExclusion.Scope scope) {
     Target {
       OperationKeys.timestampMillis(forgetKey);
@@ -45,7 +44,7 @@ public final class ForgetDecisionHandler implements OperationHandler {
 
   private static String key(String argumentsJson) {
     var node = JSON.readTree(argumentsJson);
-    if (!node.isObject() || node.size() != 1 || !node.path("forgetKey").isString()) {
+    if (node == null || !node.isObject() || node.size() != 1 || !node.path("forgetKey").isString()) {
       throw new IllegalArgumentException("Exactly one forget key is required");
     }
     String key = node.path("forgetKey").asString();
@@ -61,7 +60,7 @@ public final class ForgetDecisionHandler implements OperationHandler {
       var actual = owner.get().observe(key, context).orElseThrow();
       if (actual.path() == null || actual.scope() == null) throw new IllegalStateException("Forget target is unknown");
       var prepared = new OperationPreparation(argumentsJson, SCHEMA,
-          JSON.writeValueAsString(new Target(key, actual.path(), actual.scope())));
+          HandlerJson.MAPPER.writeValueAsString(new Target(key, actual.path(), actual.scope())));
       approvalPreview(prepared);
       return prepared;
     }
@@ -75,7 +74,13 @@ public final class ForgetDecisionHandler implements OperationHandler {
     if (!SCHEMA.equals(prepared.replaySchema()) || prepared.content() != OperationPreparation.Content.METADATA) {
       throw new IllegalArgumentException("Forget decision requires its frozen exact target");
     }
-    var target = JSON.readValue(prepared.replayPayloadJson(), Target.class);
+    var node = JSON.readTree(prepared.replayPayloadJson());
+    if (node == null || !node.isObject() || node.size() != 3 || !node.path("forgetKey").isString()
+        || !node.path("path").isString() || !node.path("scope").isString()) {
+      throw new IllegalArgumentException("Exactly one frozen forget target is required");
+    }
+    var target = new Target(node.path("forgetKey").asString(), node.path("path").asString(),
+        io.justsearch.configuration.excludes.LiteralExclusion.Scope.valueOf(node.path("scope").asString()));
     if (!key(prepared.argumentsJson()).equals(target.forgetKey())) throw new IllegalArgumentException("Forget decision changed");
     return target;
   }

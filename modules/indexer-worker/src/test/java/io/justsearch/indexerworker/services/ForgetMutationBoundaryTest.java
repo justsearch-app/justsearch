@@ -82,7 +82,7 @@ final class ForgetMutationBoundaryTest extends LuceneExecutorTestBase {
       try {
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(5), () -> {
           publication.writeLock().lock();
-          try (var outer = admission.enter(owner)) { assertTrue(tryMutation(service).isEmpty()); }
+          try (var ignoredOuter = admission.enter(owner)) { assertTrue(tryMutation(service).isEmpty()); }
           finally { publication.writeLock().unlock(); }
         });
         assertTrue(publication.writeLock().tryLock(), "a refused inner acquisition released configuration ownership");
@@ -153,7 +153,7 @@ final class ForgetMutationBoundaryTest extends LuceneExecutorTestBase {
         Runnable segment = () -> {
           try {
             publication.writeLock().lock();
-            try (var outer = admission.enter(owner)) {
+            try (var ignoredOuter = admission.enter(owner)) {
               mutation[0] = tryMutation(service).orElseThrow();
               try {
                 assertTrue((Boolean) call(mutation[0], mutation[0].getClass(), "removeAndVerify", new Class<?>[] {planType}, accepted));

@@ -64,7 +64,7 @@ final class ForgetQueueFenceTest {
       });
       try (display; walks) {
         AutoCloseable lease = null;
-        CompletableFuture<Integer> otherWriter = null;
+        CompletableFuture<Integer> otherWriter;
         outer.lock();
         try {
           lease = fence(queue);
@@ -101,14 +101,14 @@ final class ForgetQueueFenceTest {
       var held = new CountDownLatch(1);
       var release = new CountDownLatch(1);
       var writer = CompletableFuture.runAsync(() -> {
-        try (var lease = fence(queue)) { held.countDown(); assertTrue(release.await(5, TimeUnit.SECONDS)); }
+        try (var ignoredLease = fence(queue)) { held.countDown(); assertTrue(release.await(5, TimeUnit.SECONDS)); }
         catch (Exception failure) { throw new AssertionError(failure); }
       });
       try {
         assertTrue(held.await(2, TimeUnit.SECONDS));
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(1), () -> assertTrue(tryFence(queue).isEmpty()));
       } finally { release.countDown(); writer.get(2, TimeUnit.SECONDS); }
-      try (var lease = fence(queue)) { assertFalse(entryAllowed(queue)); assertTrue(tryFence(queue).isEmpty()); }
+      try (var ignoredLease = fence(queue)) { assertFalse(entryAllowed(queue)); assertTrue(tryFence(queue).isEmpty()); }
     }
   }
 
@@ -123,8 +123,8 @@ final class ForgetQueueFenceTest {
         events.add(delta);
         if (first.compareAndSet(true, false)) queue.enqueue(List.of(directory.resolve("reentrant.txt")));
       });
-      try (var subscription = snapshot.subscription()) {
-        try (var lease = fence(queue)) { queue.enqueue(List.of(directory.resolve("original.txt"))); assertTrue(events.isEmpty()); }
+      try (var ignoredSubscription = snapshot.subscription()) {
+        try (var ignoredLease = fence(queue)) { queue.enqueue(List.of(directory.resolve("original.txt"))); assertTrue(events.isEmpty()); }
         assertEquals(2, events.size());
         assertInstanceOf(IndexingJobChangeFeed.Delta.Insert.class, events.getFirst());
         assertTrue(entryAllowed(queue));
@@ -146,7 +146,7 @@ final class ForgetQueueFenceTest {
       var intercepted = org.mockito.Mockito.mock(Connection.class, org.mockito.AdditionalAnswers.delegatesTo(original));
       org.mockito.Mockito.doThrow(new java.sql.SQLException("private restore failure")).when(intercepted).setAutoCommit(true);
       field.set(queue, intercepted);
-      try (var lease = fence(queue)) {
+      try (var ignoredLease = fence(queue)) {
         assertThrows(IllegalStateException.class, () -> queue.closeRecordedWalkEnumeration(
             key, opened.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE));
         org.mockito.Mockito.verify(intercepted).commit();
@@ -165,12 +165,12 @@ final class ForgetQueueFenceTest {
       retired.open(); current.open();
       var callbacks = new java.util.concurrent.atomic.AtomicInteger();
       AtomicReference<Throwable> failure = new AtomicReference<>();
-      try (var display = retired.changeStream().subscribe(delta -> {
+      try (var ignoredDisplay = retired.changeStream().subscribe(delta -> {
         try {
           assertFalse(entryAllowed(current), "retired-queue display callbacks cannot reenter a different current queue");
           assertTrue(tryFence(current).isEmpty()); callbacks.incrementAndGet();
         } catch (Throwable assertion) { failure.compareAndSet(null, assertion); }
-      }); var walk = retired.subscribeRecordedWalks(key -> {
+      }); var ignoredWalk = retired.subscribeRecordedWalks(key -> {
         try {
           assertFalse(entryAllowed(current), "retired-queue walk callbacks cannot reenter a different current queue");
           assertTrue(tryFence(current).isEmpty()); callbacks.incrementAndGet();

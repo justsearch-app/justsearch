@@ -237,7 +237,8 @@ final class NativePolicyAdmissionTest {
       assertFalse(queue.tryMatchesNativePolicySkippedAdmission(CANDIDATE, journal, p.op(), p.row()));
     }
   }
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(
+      name = "postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement({0})")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"witness", "projection", "feed"})
   void postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement(String cut) throws Exception {
     Path db = directory.resolve("postcommit-" + cut + ".db");

@@ -7911,7 +7911,7 @@ public final class KnowledgeServer implements Closeable {
     if (declarations == null || nativePolicyRootBindings == null || nativePolicyConfiguration == null
         || !runtimeSwapLock.isHeldByCurrentThread() || !committedNativeOwnerCurrent(expectedActive, expectedRuntime, expectedProducer)) return false;
     var exact = List.copyOf(selected);
-    try (var generation = indexGenerationManager.beginForgetNoCandidate(activeIndexPath)) {
+    try (var ignoredGeneration = indexGenerationManager.beginForgetNoCandidate(activeIndexPath)) {
       publicationLock.writeLock().lock();
       try {
         if (!committedNativeOwnerCurrent(expectedActive, expectedRuntime, expectedProducer)) return false;
@@ -10446,8 +10446,8 @@ public final class KnowledgeServer implements Closeable {
           || !services.recordedWriterReady() || !services.ingestService().ownsForgetQueue(jobQueue)) {
         throw new IllegalStateException("Forget is unavailable while the serving index is not writable or is changing");
       }
-      try (var mutation = services.mutationAdmission().enter(services.mutationOwnerToken());
-          var generation = indexGenerationManager.beginForgetNoCandidate(activeIndexPath)) {
+      try (var ignoredMutation = services.mutationAdmission().enter(services.mutationOwnerToken());
+          var ignoredGeneration = indexGenerationManager.beginForgetNoCandidate(activeIndexPath)) {
         publicationLock.writeLock().lock();
         try {
           return action.apply(services.ingestService());
