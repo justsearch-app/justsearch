@@ -1,0 +1,218 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T11:17:24.686Z",
+  "revision": "653f049ae3abb0b00b604e407c0a1e377deaee35",
+  "tree": "98cb3d24e17f0d4c1d5c1615c4a3fc75f4b4938e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.worker.RemoteDocumentServiceSliceFailureTest.otherFailuresStayWrappedAndReleaseCapturedClient\" --tests \"io.justsearch.app.services.worker.RemoteDocumentServiceSliceFailureTest.lazyDelegationAndSelectionProbeKeepLeadingSupplementaryContent\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3694
+    },
+    {
+      "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.tools.AgentToolInvalidSliceTest.surrogateMessageDoesNotClassifyAnInternalFailureAsInvalidRequest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1949
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.PreviewSliceHttpTest.pagingDefaultsCapsAndEndOffsetsKeepUtf16Semantics\" --tests \"io.justsearch.ui.api.PreviewSliceHttpTest.missingUnknownAndEmptyDocumentsRetainTheirResponses\" --tests \"io.justsearch.ui.api.PreviewSliceHttpTest.otherWorkerFailuresStay503RegardlessOfMessage\" --tests \"io.justsearch.ui.api.PreviewSliceHttpTest.genuinelyUnavailableWorkerRemainsRetryable503\" --tests \"io.justsearch.ui.api.PreviewSliceHttpTest.admissionAndExecutorRefusalsKeepExistingControllerStatuses\" --tests \"io.justsearch.ui.api.PreviewSliceHttpTest.controllersOwnWaitTimeoutRemains504\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5813
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceSliceFailureTest.java#otherFailuresStayWrappedAndReleaseCapturedClient",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceSliceFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:26ac14671a43cea9b9845cb4e55733f8fb89337f1dc9ed3cc9ba96aa4a98be59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(1)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(2)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(3)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(4)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(5)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(6)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(7)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(8)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(9)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(10)",
+          "status": "passed"
+        },
+        {
+          "name": "otherFailuresStayWrappedAndReleaseCapturedClient(11)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceSliceFailureTest.java#lazyDelegationAndSelectionProbeKeepLeadingSupplementaryContent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceSliceFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:26ac14671a43cea9b9845cb4e55733f8fb89337f1dc9ed3cc9ba96aa4a98be59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lazyDelegationAndSelectionProbeKeepLeadingSupplementaryContent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/tools/AgentToolInvalidSliceTest.java#surrogateMessageDoesNotClassifyAnInternalFailureAsInvalidRequest",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/tools/AgentToolInvalidSliceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:073820b8e2d44ed02d4cc73391c3f410cfc3b9048a181d72b2c9bd7c8319506a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "surrogateMessageDoesNotClassifyAnInternalFailureAsInvalidRequest()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java#pagingDefaultsCapsAndEndOffsetsKeepUtf16Semantics",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:190a196ca5fd95cf5585656b429f9524492c54f18a2b204e9f56d2f757c0625e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pagingDefaultsCapsAndEndOffsetsKeepUtf16Semantics()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java#missingUnknownAndEmptyDocumentsRetainTheirResponses",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:190a196ca5fd95cf5585656b429f9524492c54f18a2b204e9f56d2f757c0625e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingUnknownAndEmptyDocumentsRetainTheirResponses()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java#otherWorkerFailuresStay503RegardlessOfMessage",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:190a196ca5fd95cf5585656b429f9524492c54f18a2b204e9f56d2f757c0625e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "otherWorkerFailuresStay503RegardlessOfMessage()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java#genuinelyUnavailableWorkerRemainsRetryable503",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:190a196ca5fd95cf5585656b429f9524492c54f18a2b204e9f56d2f757c0625e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "genuinelyUnavailableWorkerRemainsRetryable503()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java#admissionAndExecutorRefusalsKeepExistingControllerStatuses",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:190a196ca5fd95cf5585656b429f9524492c54f18a2b204e9f56d2f757c0625e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admissionAndExecutorRefusalsKeepExistingControllerStatuses()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java#controllersOwnWaitTimeoutRemains504",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PreviewSliceHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:190a196ca5fd95cf5585656b429f9524492c54f18a2b204e9f56d2f757c0625e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "controllersOwnWaitTimeoutRemains504()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:879b46c8c5f864b61986313dd960a422199a4b401e5f6e157ca5df3c778232c6"
+}

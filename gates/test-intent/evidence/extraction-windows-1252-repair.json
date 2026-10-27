@@ -1,0 +1,407 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T12:07:46.209Z",
+  "revision": "a694565d5610c51b4d9ff624272f58074877ddf0",
+  "tree": "dd2f4e10871c7beee67899bdb52d22eb454d08be",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.Windows1252ExtractionTest\" --tests \"io.justsearch.indexerworker.loop.IndexingWindows1252ExtractionTest\" --tests \"io.justsearch.indexerworker.extract.ExtractionRoutingTest.modeSwitchSelectsTheSandbox\" --tests \"io.justsearch.indexerworker.extract.PersistentExtractionSandboxTest.realChildExtractsFileContent\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 21244
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Windows1252ExtractionTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Windows1252ExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92ddd091ee8b570888e2d772f35904fb54dc72af90b0388fb718d1ea3903d0c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "en1SandboxRepeatedRequestsAndChildReplacement()",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 meta",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 http-equiv",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 utf16le-bom-wins",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 utf16be-bom-wins",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 latin2",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 bom-wins",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 utf8",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 latin9",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 unsupported",
+          "status": "passed"
+        },
+        {
+          "name": "EN2 undeclared",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 UTF-8 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 UTF-8 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 UTF-8 bom=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 UTF-8 bom=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 UTF-16LE bom=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 UTF-16LE bom=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 UTF-16BE bom=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 UTF-16BE bom=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 ISO-8859-1 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 ISO-8859-1 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 ISO-8859-15 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 ISO-8859-15 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 ISO-8859-2 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 ISO-8859-2 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 Shift_JIS bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 Shift_JIS bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 GB18030 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 GB18030 bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 EUC-KR bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 EUC-KR bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 KOI8-R bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN-N1 KOI8-R bom=false",
+          "status": "passed"
+        },
+        {
+          "name": "en1StructuredFailureUsesConfiguredFlatFallback()",
+          "status": "passed"
+        },
+        {
+          "name": "enN2PdfAndDocxTextStayUnchanged()",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 txt large=false eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 txt large=false eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 txt large=true eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 txt large=true eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 md large=false eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 md large=false eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 md large=true eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 md large=true eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 csv large=false eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 csv large=false eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 csv large=true eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 csv large=true eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 json large=false eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 json large=false eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 json large=true eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 json large=true eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 java large=false eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 java large=false eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 java large=true eol=&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 java large=true eol=&#13;&#10;",
+          "status": "passed"
+        },
+        {
+          "name": "enN1LiteralMetaExamplesStayUtf8OutsideHtml()",
+          "status": "passed"
+        },
+        {
+          "name": "EN3 plain.eml",
+          "status": "passed"
+        },
+        {
+          "name": "EN3 html.eml",
+          "status": "passed"
+        },
+        {
+          "name": "enN2EpubUsesItsXmlDeclarationWithoutTheTextDetector()",
+          "status": "passed"
+        },
+        {
+          "name": "enN2XmlDeclarationKeepsItsEncoding()",
+          "status": "passed"
+        },
+        {
+          "name": "enN2OfficeAndContainerTextStayUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingWindows1252ExtractionTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingWindows1252ExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:56df6e2fb36fafb5bea59deb7875a7b9bc3090c4f92e01505576be81aa257df4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "EN1 indexed txt large=false structured=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 indexed md large=false structured=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 indexed csv large=false structured=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 indexed json large=false structured=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 indexed java large=false structured=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 indexed txt large=true structured=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 indexed md large=true structured=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 indexed csv large=true structured=false",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 indexed json large=true structured=true",
+          "status": "passed"
+        },
+        {
+          "name": "EN1 indexed java large=true structured=false",
+          "status": "passed"
+        },
+        {
+          "name": "enN3IndexFingerprintStillMatchesTheUnchangedCatalogBaseline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java#modeSwitchSelectsTheSandbox",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2d62e8fb1b287bfafb0aa7bb9d947147db9bc842313e7b857d0e45d3a43fc0da",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "modeSwitchSelectsTheSandbox()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java#realChildExtractsFileContent",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a481a54482b325167337e60b2bc445cbd1ddb11b381e5730fc7dce4213ac707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realChildExtractsFileContent()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "372b812bf1",
+    "revision": "372b812bf1377eedf6b2c87efbd12f7d04ee281d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.Windows1252ExtractionTest\" --tests \"io.justsearch.indexerworker.loop.IndexingWindows1252ExtractionTest\" --tests \"io.justsearch.indexerworker.extract.ExtractionRoutingTest.modeSwitchSelectsTheSandbox\" --tests \"io.justsearch.indexerworker.extract.PersistentExtractionSandboxTest.realChildExtractsFileContent\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 17880,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:worker-services:test --tests io.justsearch.indexerworker.extract.Windows1252ExtractionTest --tests io.justsearch.indexerworker.loop.IndexingWindows1252ExtractionTest --tests io.justsearch.indexerworker.extract.ExtractionRoutingTest.modeSwitchSelectsTheSandbox --tests io.justsearch.indexerworker.extract.PersistentExtractionSandboxTest.realChildExtractsFileContent --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin FROM-CACHE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors\n> Task :build-logic:processResources\n> Task :build-logic:classes\n> Task :build-logic:jar\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:174)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:49)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:89)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$13$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:102)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:168)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:215)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:201)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:222)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:230)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:245)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:270)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:319)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:350)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:371)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:476)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:493)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:548)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:630)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:695)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:746)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:844)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:885)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:958)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:977)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1041)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1094)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1160)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1215)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1281)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1368)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1429)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1553)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1578)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:127)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:191)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractProto\n> Task :modules:extension-substrate:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos\n> Task :modules:configuration:processResources\n> Task :modules:core-contracts:compileJava FROM-CACHE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:extractProto\n> Task :modules:api-contract-projection-java:processProtoResources\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:worker-services:processTestFixturesResources NO-SOURCE\n> Task :modules:api-contract-projection-java:processResources\n> Task :modules:adapters-lucene:processTestFixturesResources NO-SOURCE\n> Task :modules:adapters-lucene:syncSsotCatalogs\n> Task :modules:ai-backend:processResources\n> Task :modules:adapters-lucene:processResources\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:core:compileJava FROM-CACHE\n> Task :modules:extension-substrate:jar\n> Task :modules:core-contracts:jar\n> Task :modules:api-contract-projection-java:extractIncludeProto\n> Task :modules:configuration:compileJava FROM-CACHE\n> Task :modules:indexing:compileJava FROM-CACHE\n> Task :modules:telemetry:compileJava FROM-CACHE\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:configuration:classes\n> Task :modules:app-agent-api:compileJava FROM-CACHE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:generateProto FROM-CACHE\n> Task :modules:configuration:jar\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:core:jar\n> Task :modules:ort-common:compileJava FROM-CACHE\n> Task :modules:app-api:buildLinuxBoundExec\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:app-agent-api:jar\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:core:testFixturesJar\n> Task :modules:app-api:processResources\n> Task :modules:ipc-common:processProtoResources\n> Task :modules:indexing:jar\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:ipc-common:processResources\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:adapters-lucene:compileJava FROM-CACHE\n> Task :modules:adapters-lucene:classes\n> Task :modules:telemetry:jar\n> Task :modules:ort-common:jar\n> Task :modules:telemetry:compileTestFixturesJava FROM-CACHE\n> Task :modules:telemetry:processTestFixturesResources NO-SOURCE\n> Task :modules:telemetry:testFixturesClasses UP-TO-DATE\n> Task :modules:reranker:compileJava FROM-CACHE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:telemetry:testFixturesJar\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:reranker:jar\n> Task :modules:worker-services:processTestResources\n> Task :modules:adapters-lucene:jar\n> Task :modules:adapters-lucene:compileTestFixturesJava FROM-CACHE\n> Task :modules:adapters-lucene:testFixturesClasses UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesJar\n> Task :modules:ipc-common:extractIncludeProto\n> Task :modules:ipc-common:generateProto FROM-CACHE\n> Task :modules:api-contract-projection-java:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:classes\n> Task :modules:api-contract-projection-java:jar\n> Task :modules:app-api:compileJava FROM-CACHE\n> Task :modules:app-api:classes\n> Task :modules:ai-backend:compileJava FROM-CACHE\n> Task :modules:ai-backend:classes\n> Task :modules:ai-backend:jar\n> Task :modules:app-api:jar\n> Task :modules:worker-core:compileJava FROM-CACHE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:worker-core:jar\n> Task :modules:ipc-common:compileJava FROM-CACHE\n> Task :modules:ipc-common:classes\n> Task :modules:ipc-common:jar\n> Task :modules:worker-services:compileJava FROM-CACHE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:compileTestFixturesJava FROM-CACHE\n> Task :modules:worker-services:testFixturesClasses UP-TO-DATE\n> Task :modules:worker-services:testFixturesJar\n> Task :modules:worker-services:jar\n\n> Task :modules:worker-services:compileTestJava\n\n> Task :modules:worker-services:testClasses\n\n> Task :modules:worker-services:test\n\nExtractionRoutingTest > modeSwitchSelectsTheSandbox() FAILED\n    org.opentest4j.AssertionFailedError at ExtractionRoutingTest.java:136\n\nPersistentExtractionSandboxTest > realChildExtractsFileContent() FAILED\n    org.opentest4j.AssertionFailedError at PersistentExtractionSandboxTest.java:418\n\nWindows1252ExtractionTest > en1SandboxRepeatedRequestsAndChildReplacement() FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:132\n\nWindows1252ExtractionTest > en2HtmlDeclarationsAndBom(String, String, String, boolean, String) > EN2 meta FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:100\n\nWindows1252ExtractionTest > en2HtmlDeclarationsAndBom(String, String, String, boolean, String) > EN2 http-equiv FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:100\n\nWindows1252ExtractionTest > en2HtmlDeclarationsAndBom(String, String, String, boolean, String) > EN2 latin2 FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:100\n\nWindows1252ExtractionTest > en2HtmlDeclarationsAndBom(String, String, String, boolean, String) > EN2 unsupported FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:100\n\nWindows1252ExtractionTest > en2HtmlDeclarationsAndBom(String, String, String, boolean, String) > EN2 undeclared FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:100\n\n\n> Task :modules:worker-services:test\n\nWindows1252ExtractionTest > en1StructuredFailureUsesConfiguredFlatFallback() FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:117\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed txt large=false structured=false FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed md large=false structured=true FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed csv large=false structured=true FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\nWindows1252ExtractionTest > enN2PdfAndDocxTextStayUnchanged() FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:280\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 txt large=false eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed json large=false structured=false FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 txt large=true eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 txt large=true eol=\r\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 md large=false eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 md large=true eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed java large=false structured=true FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 csv large=false eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 csv large=true eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 csv large=true eol=\r\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 json large=false eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 json large=true eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 java large=false eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 java large=true eol=\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed txt large=true structured=true FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\nWindows1252ExtractionTest > en1Windows1252TextAcrossProductionPaths(String, boolean, String) > EN1 java large=true eol=\r\n FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:36\n\nWindows1252ExtractionTest > en3EmbeddedTextAndHtml(String) > EN3 plain.eml FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:185\n\nWindows1252ExtractionTest > en3EmbeddedTextAndHtml(String) > EN3 html.eml FAILED\n    org.opentest4j.AssertionFailedError at Windows1252ExtractionTest.java:185\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed md large=true structured=false FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed csv large=true structured=false FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed json large=true structured=true FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\nIndexingWindows1252ExtractionTest > en1IndexedContentAndFrontmatterSurviveReopen(String, boolean, boolean) > EN1 indexed java large=true structured=false FAILED\n    org.opentest4j.AssertionFailedError at IndexingWindows1252ExtractionTest.java:101\n\n> Task :modules:worker-services:test FAILED\n> Task :modules:worker-services:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/.cache/am/2oafn8pf/tmp/test-intent-before-u4n70I/build/reports/problems/problems-report.html\n64 actionable tasks: 41 executed, 23 from cache\nConfiguration cache entry stored.\n\n/home/elias/.cache/am/2oafn8pf/tmp/test-intent-before-u4n70I/modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java:16: warning: [removal] ThreadDeath in java.lang has been deprecated and marked for removal\n        new AssertionError(\"broken health check\"), new ThreadDeath(),\n                                                       ^\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\nNote: /home/elias/.cache/am/2oafn8pf/tmp/test-intent-before-u4n70I/modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopCutoverPauseTest.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n1 warning\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n74 tests completed, 35 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:worker-services:test'.\n> There were failing tests. See the report at: file:///home/elias/.cache/am/2oafn8pf/tmp/test-intent-before-u4n70I/modules/worker-services/build/reports/tests/test/index.html\n\nBUILD FAILED in 17s\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Windows1252ExtractionTest.java",
+        "classification": "assertion",
+        "detail": "en1SandboxRepeatedRequestsAndChildReplacement(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <European writing costs €: ‚ „ “ ” ‘ ’ – — … ™ œ Š Ž café déjà vu.> but was: <European writing costs �: � � � � � � � � � � � � � café déjà vu.> | EN2 meta: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <European writing costs €: ‚ „ “ ” ‘ ’ – — … ™ œ Š Ž café déjà vu. ¤&#10;&#10;European writing costs €: ‚ „ “ ” ‘ ’ – — … ™ œ Š "
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingWindows1252ExtractionTest.java",
+        "classification": "assertion",
+        "detail": "EN1 indexed txt large=false structured=false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: stored content must match every source character ==> expected: <true> but was: <false> | EN1 indexed md large=false structured=true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: stored content must match every source character ==> expected: <true> but was: <false> | EN1 indexed csv large=false structured=true: org.opentest4j.AssertionFailedError org.o"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java#modeSwitchSelectsTheSandbox",
+        "classification": "assertion",
+        "detail": "modeSwitchSelectsTheSandbox(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <tika-default-v2> but was: <tika-default-v1>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java#realChildExtractsFileContent",
+        "classification": "assertion",
+        "detail": "realChildExtractsFileContent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <tika-default-v2> but was: <tika-default-v1>"
+      }
+    ]
+  },
+  "digest": "sha256:9355f25e3d7f2119430b57af9ff899a0b95371c269cbb6f82e38ff5cac198dde"
+}

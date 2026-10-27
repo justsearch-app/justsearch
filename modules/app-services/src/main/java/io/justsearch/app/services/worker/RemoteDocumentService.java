@@ -5,6 +5,7 @@ import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.EngineFutures;
 
 import io.justsearch.app.api.DocumentService;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.ContextChunk;
 import io.justsearch.ipc.FetchDocumentsResponse;
@@ -301,6 +302,10 @@ public final class RemoteDocumentService implements DocumentService {
 
           } catch (Exception e) {
             EngineRefusals.rethrow(e);
+            if (e instanceof KnowledgeClientException failure
+                && failure.status() == KnowledgeClientException.Status.INVALID_ARGUMENT) {
+              throw failure;
+            }
             log.error("Failed to fetch document slice from the index half", e);
             throw new UnavailableException("Failed to fetch document slice via Worker: " + e.getMessage(), e);
           }
