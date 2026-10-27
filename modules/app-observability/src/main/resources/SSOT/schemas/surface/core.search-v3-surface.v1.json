@@ -1,0 +1,6 @@
+{
+  "type": "object",
+  "properties": {
+    "conversationId": { "type": "string" }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T11:16:11.891Z",
+  "revision": "653f049ae3abb0b00b604e407c0a1e377deaee35",
+  "tree": "98cb3d24e17f0d4c1d5c1615c4a3fc75f4b4938e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.FieldMapperTest.invalidDoubleIsOmittedWithoutLosingOtherFields\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2869
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/FieldMapperTest.java#invalidDoubleIsOmittedWithoutLosingOtherFields",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/FieldMapperTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:76129110e02626cdb01cfbfd9485356e2292b5f0f57cf007a4b0b42b8a22eb2f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidDoubleIsOmittedWithoutLosingOtherFields()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f5c66d79fb0019f0c9312816687f78be4678aff4cb0d03c210e7911decbc7716"
+}

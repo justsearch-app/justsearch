@@ -1,0 +1,384 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T02:20:00.129Z",
+  "revision": "f17b988e2fe64dea04cbc7ec2f82f297dd89f4ab",
+  "tree": "4a54b21965aab78006a3eb97144ecca14adc9bfd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/co7vs_gn/tmp/test-intent-vitest-3-1793067597658.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2469
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range undefined to undefined without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range undefined to undefined without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range 6 to undefined without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 6 to undefined without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range undefined to 8 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range undefined to 8 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range -1 to 8 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range -1 to 8 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range 8 to 6 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 8 to 6 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range 1.5 to 8 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 1.5 to 8 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range 6 to 8.5 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 6 to 8.5 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range NaN to 8 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range NaN to 8 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range 6 to NaN without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 6 to NaN without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range Infinity to 8 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range Infinity to 8 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range 6 to Infinity without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 6 to Infinity without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range 6 to 8 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 6 to 8 without error or a stale highlight",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 6 to 8 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range 6 to 8 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 6 to 8 without error or a stale highlight",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range 6 to 8 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector passage validation ignores the whole invalid range null to 8 without error or a stale highlight",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector passage validation ignores the whole invalid range null to 8 without error or a stale highlight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 900 paints valid range -1 to 1 only",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector at width 900 paints valid range -1 to 1 only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts#C9 A3 public inspector at width 1568 paints valid range -1 to 1 only",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/HostApiInspectorHighlight.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b5690c907f02d0b583ce5d55aac06bd855e9f7ab3334d64201296ddddb7a870f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C9 A3 public inspector at width 1568 paints valid range -1 to 1 only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C2 A7 preservation address core.unified-chat-surface keeps its exact chosen scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C2 A7 preservation address core.unified-chat-surface keeps its exact chosen scope",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C2 A7 preservation address core.search-surface keeps its exact chosen scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C2 A7 preservation address core.search-surface keeps its exact chosen scope",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C2 A7 preservation address core.agent-surface keeps its exact chosen scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C2 A7 preservation address core.agent-surface keeps its exact chosen scope",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C2 A7 preservation address core.search-v3-surface keeps its exact chosen scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C2 A7 preservation address core.search-v3-surface keeps its exact chosen scope",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A2 an invalid file scope through core.search-v3-surface keeps text and refuses Send",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 A2 an invalid file scope through core.search-v3-surface keeps text and refuses Send",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A7 file link through core.search-v3-surface with missing file refuses without widening scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 A7 file link through core.search-v3-surface with missing file refuses without widening scope",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts#C8 A7 file link through core.search-v3-surface with unreadable file refuses without widening scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.compatLinks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8c63a1925de21923d9b96f21a425c8311dfba2725eddbd638b19aa8a0055260b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 A7 file link through core.search-v3-surface with unreadable file refuses without widening scope",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b950c05c7ccda59c97c33bd226ed983af0a827685e653de25e1f645d9c36ac8c"
+}

@@ -247,10 +247,8 @@ import {
 } from '../components/chat/recordEvidence.js';
 import type { CitationSelectDetail, SourceCoverage } from '../components/chat/citationTypes.js';
 // Tempdoc 561 surface tier: the one window is the view for EVERY interaction shape.
-import { registerViewFactory, getViewFactory } from '../router/viewFactoryRegistry.js';
 import {
   CORE_INTERACTION_SHAPES,
-  ONE_WINDOW_MOUNT_TAG,
   type CoreInteractionShapeId,
 } from '../plugin-api/coreInteractionShapes.js';
 
@@ -2511,6 +2509,7 @@ export class UnifiedChatView extends JfElement {
         <div>
           <strong>Search</strong> — ask anything
           <jf-conversation-history
+            .apiBase=${this.apiBase}
             @conversation-select=${(e: CustomEvent) => this.onConversationSelect(e)}
           ></jf-conversation-history>
           ${/* Search Thread S5b — the affordance-bar row retired; Activity (the retrospective drawer:
@@ -6863,30 +6862,4 @@ if (
   !customElements.get('jf-unified-chat-view')
 ) {
   customElements.define('jf-unified-chat-view', UnifiedChatView);
-}
-
-// Tempdoc 561 surface tier: the one window is the canonical view for EVERY direct-LLM interaction
-// shape. Every deeplink / resume path resolves here (with the shape-id presetting the mode),
-// instead of mounting a separate per-shape view — and check-shape-view-coverage stays green.
-// These literal registrations are the per-shape coverage the shape-view-coverage gate greps for;
-// the interaction-surface gate cross-checks that every CORE_INTERACTION_SHAPE registers to
-// ONE_WINDOW_MOUNT_TAG here and to no other tag (no second interaction view).
-registerViewFactory('core.rag-ask', ONE_WINDOW_MOUNT_TAG);
-registerViewFactory('core.free-chat', ONE_WINDOW_MOUNT_TAG);
-registerViewFactory('core.extract', ONE_WINDOW_MOUNT_TAG);
-registerViewFactory('core.agent-run', ONE_WINDOW_MOUNT_TAG);
-// Tempdoc 565 §15.C — the workflow run is a MODE of the one window, not a bespoke surface; the
-// retired WorkflowSurface/WorkflowView fork registered 'jf-workflow-surface' here.
-registerViewFactory('core.workflow-run', ONE_WINDOW_MOUNT_TAG);
-// Load-time exhaustiveness guard: every interaction mode in the FE mirror of the Java authority
-// must have registered the one-window view above (and to no other tag). A mode added to
-// CORE_INTERACTION_SHAPES without a registration line throws here at import — the runtime
-// counterpart of the interaction-surface gate, and a real consumer of the mirror value.
-for (const shape of CORE_INTERACTION_SHAPES) {
-  if (getViewFactory(shape) === undefined) {
-    throw new Error(
-      `[one-window] interaction mode '${shape}' is declared in CORE_INTERACTION_SHAPES but has ` +
-        `no registered view factory — register it to ${ONE_WINDOW_MOUNT_TAG}.`,
-    );
-  }
 }

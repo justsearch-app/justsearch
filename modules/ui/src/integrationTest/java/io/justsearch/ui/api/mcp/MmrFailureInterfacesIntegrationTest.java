@@ -103,8 +103,7 @@ final class MmrFailureInterfacesIntegrationTest extends MmrEngineFixture {
         + " message=" + failure.getMessage() + " passageCalls=" + provider.passages.get());
 
     // Signal injection at the existing worker port, while all other client calls delegate to
-    // the real Engine. This pins RemoteDocumentService's known cancellation-to-fallback contract;
-    // it is NOT an HTTP disconnect/Engine work-handle cancellation repair.
+    // the real Engine. Cancellation must survive the optional whole-document fallback.
     KnowledgeClient adapter = mock(KnowledgeClient.class, delegatesTo(client));
     doAnswer(ignored -> {
       cancelled.set(false);
@@ -113,13 +112,11 @@ final class MmrFailureInterfacesIntegrationTest extends MmrEngineFixture {
     try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
       var remote = new RemoteDocumentService(executor, executor, () -> adapter);
       var outward = remote.retrieveContext(params(), TestRequestContexts.browser())
-          .toCompletableFuture().join();
-      assertEquals(0, outward.chunksUsed(), "known outward fallback stays uncited");
-      assertTrue(outward.citations().isEmpty(), "never assume a cited cancellation success");
-      assertFalse(outward.context().contains(OUTSIDE));
-      System.out.println("MMR_CANCEL_REMOTE mode=" + outward.retrievalMode()
-          + " reason=" + outward.retrievalModeReason() + " chunks=" + outward.chunksUsed()
-          + " citations=" + outward.citations().size() + " chars=" + outward.context().length());
+          .handle((result, error) -> error).toCompletableFuture().join();
+      assertNotNull(outward, "cancellation must not become a successful fallback");
+      while (outward instanceof java.util.concurrent.CompletionException
+          || outward instanceof java.util.concurrent.ExecutionException) outward = outward.getCause();
+      assertInstanceOf(CancellationException.class, outward);
     }
   }
 

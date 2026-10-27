@@ -1,0 +1,227 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T03:40:58.322Z",
+  "revision": "b8312014746ce698335d8cceedee15ddaaf18636",
+  "tree": "a101624c1c52dbc66a82d05deb6698c23502a784",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5j29v6lc/tmp/test-intent-vitest-5-1793072447083.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3279
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 cold core.ask-surface arrival replaces one retained preparation without losing either draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 cold core.ask-surface arrival replaces one retained preparation without losing either draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 cold core.search-v3-surface arrival replaces one retained preparation without losing either draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 cold core.search-v3-surface arrival replaces one retained preparation without losing either draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 cold core.free-chat-surface arrival replaces one retained preparation without losing either draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 cold core.free-chat-surface arrival replaces one retained preparation without losing either draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 cold core.extract-surface arrival replaces one retained preparation without losing either draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 cold core.extract-surface arrival replaces one retained preparation without losing either draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 core.ask-surface genuine capacity refusal retains the incoming address and both existing drafts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 core.ask-surface genuine capacity refusal retains the incoming address and both existing drafts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 core.search-v3-surface genuine capacity refusal retains the incoming address and both existing drafts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 core.search-v3-surface genuine capacity refusal retains the incoming address and both existing drafts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 text limit refusal retains the incoming address and the earlier draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 text limit refusal retains the incoming address and the earlier draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 file limit refusal retains incoming text in the address with the real reason: file count",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 file limit refusal retains incoming text in the address with the real reason: file count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 file limit refusal retains incoming text in the address with the real reason: path bytes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f9effd1be3160dbb546e534b7947ee6f73339ba8cf34eb93374402bad299916",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S67 file limit refusal retains incoming text in the address with the real reason: path bytes",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b831201474",
+    "revision": "b8312014746ce698335d8cceedee15ddaaf18636",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5j29v6lc/tmp/test-intent-vitest-5-1793072454261.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3437,
+        "output": "JSON report written to /home/elias/.cache/am/5j29v6lc/tmp/test-intent-vitest-5-1793072454261.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 cold core.ask-surface arrival replaces one retained preparation without losing either draft",
+        "classification": "assertion",
+        "detail": "S67 cold core.ask-surface arrival replaces one retained preparation without losing either draft:  AssertionError: expected 'Old task on unrelated decoy' to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/5j29v6lc/tmp/test-intent-before-C9azJt/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts:139:37\n    at file:///home/elias/.cache"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 cold core.search-v3-surface arrival replaces one retained preparation without losing either draft",
+        "classification": "assertion",
+        "detail": "S67 cold core.search-v3-surface arrival replaces one retained preparation without losing either draft:  AssertionError: expected 'Old task on unrelated decoy' to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/5j29v6lc/tmp/test-intent-before-C9azJt/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts:139:37\n    at file:///home/elias/.cache"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 cold core.free-chat-surface arrival replaces one retained preparation without losing either draft",
+        "classification": "assertion",
+        "detail": "S67 cold core.free-chat-surface arrival replaces one retained preparation without losing either draft:  AssertionError: expected 'Old task on unrelated decoy' to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/5j29v6lc/tmp/test-intent-before-C9azJt/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts:139:37\n    at file:///home/elias/.cache"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 cold core.extract-surface arrival replaces one retained preparation without losing either draft",
+        "classification": "assertion",
+        "detail": "S67 cold core.extract-surface arrival replaces one retained preparation without losing either draft:  AssertionError: expected 'Old task on unrelated decoy' to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/5j29v6lc/tmp/test-intent-before-C9azJt/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts:139:37\n    at file:///home/elias/.cache"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 core.ask-surface genuine capacity refusal retains the incoming address and both existing drafts",
+        "classification": "assertion",
+        "detail": "S67 core.ask-surface genuine capacity refusal retains the incoming address and both existing drafts:  AssertionError: expected null to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/5j29v6lc/tmp/test-intent-before-C9azJt/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts:165:82\n    at file:///home/elias/.cache/am/5j29v6lc/tmp/test-int"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 core.search-v3-surface genuine capacity refusal retains the incoming address and both existing drafts",
+        "classification": "assertion",
+        "detail": "S67 core.search-v3-surface genuine capacity refusal retains the incoming address and both existing drafts:  AssertionError: expected null to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/5j29v6lc/tmp/test-intent-before-C9azJt/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts:165:82\n    at file:///home/elias/.cache/am/5j29v6lc/tmp/test-int"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 text limit refusal retains the incoming address and the earlier draft",
+        "classification": "assertion",
+        "detail": "S67 text limit refusal retains the incoming address and the earlier draft:  AssertionError: expected null to be '界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…' // Object.is equality\n    at /home/elias/.cache/am/5j29v6lc/tmp/test-intent-before-C9azJt/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts:178:80\n    at file:///home/elias/.cache/am/5j29v6lc/tmp/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 file limit refusal retains incoming text in the address with the real reason: file count",
+        "classification": "assertion",
+        "detail": "S67 file limit refusal retains incoming text in the address with the real reason: file count:  AssertionError: expected null to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/5j29v6lc/tmp/test-intent-before-C9azJt/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts:222:80\n    at file:///home/elias/.cache/am/5j29v6lc/tmp/test-int"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts#S67 file limit refusal retains incoming text in the address with the real reason: path bytes",
+        "classification": "assertion",
+        "detail": "S67 file limit refusal retains incoming text in the address with the real reason: path bytes:  AssertionError: expected null to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/5j29v6lc/tmp/test-intent-before-C9azJt/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.coldArrival.test.ts:222:80\n    at file:///home/elias/.cache/am/5j29v6lc/tmp/test-int"
+      }
+    ]
+  },
+  "digest": "sha256:08c318da9fb69655b22947282910525aad3e1b7be11686d8bcc12919add60c2f"
+}

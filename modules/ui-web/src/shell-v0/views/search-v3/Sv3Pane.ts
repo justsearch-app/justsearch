@@ -36,7 +36,7 @@ import { sv3Shared } from './sv3-shared-styles.js';
 // another window having been mounted first — a surface that leaned on a sibling window's
 // registration would render an unknown element whenever it was reached first.
 import '../../components/documentPane/DocumentPane.js';
-import type { DocumentCitationAnchor } from '../../components/documentPane/DocumentPane.js';
+import type { DocumentCitationAnchor, DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
 import type { CitationHeader } from '../../components/chat/evidenceProjection.js';
 import { PANE_LABEL } from './fixtures.js';
 
@@ -167,6 +167,7 @@ export class Sv3Pane extends JfElement {
   static properties = {
     docPath: { attribute: false },
     citation: { attribute: false },
+    highlightRange: { attribute: false },
     citationHeader: { attribute: false },
     apiBase: { type: String, attribute: 'api-base' },
     overlay: { type: Boolean, reflect: true },
@@ -184,6 +185,7 @@ export class Sv3Pane extends JfElement {
    * would be exactly the extra hop the char anchor exists to remove.
    */
   declare citation: DocumentCitationAnchor | null;
+  declare highlightRange: DocumentLineRange | null;
   /**
    * Tempdoc 849 §7 — the citation header, forwarded VERBATIM. This region derives no part of it: the
    * facts are joined from the turn's own evidence record in `SearchV3View` and worded by
@@ -203,6 +205,7 @@ export class Sv3Pane extends JfElement {
   constructor() {
     super();
     this.docPath = null;
+    this.highlightRange = null;
     this.citation = null;
     this.citationHeader = null;
     this.apiBase = '';
@@ -228,6 +231,7 @@ export class Sv3Pane extends JfElement {
         <jf-document-pane
           data-testid="sv3-pane-document"
           .docPath=${this.docPath}
+          .highlightRange=${this.highlightRange}
           .citation=${this.citation}
           .citationHeader=${this.citationHeader}
           api-base=${this.apiBase}

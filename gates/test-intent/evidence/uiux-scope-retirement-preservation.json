@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T09:40:35.812Z",
+  "revision": "887587e2c3a996f78b5ea80d64b1c94e95848221",
+  "tree": "91e4ec84345ed6d953319b8c2418374fa661592d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/qffrcyie/tmp/test-intent-vitest-201-1793094032784.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3027
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 replacing returned text sends an ordinary all-files Ask",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO9 replacing returned text sends an ordinary all-files Ask",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 choosing a mode after return permits ordinary sending",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO9 choosing a mode after return permits ordinary sending",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 a layout reparent keeps the exact prepared hand-off",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5bfd88e482950cfa2e54e7489daa30e6ec712b26749b00ca4589dcd835eee829",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO9 a layout reparent keeps the exact prepared hand-off",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:84a3d08b3d9fbe22e2f0a6a7d8ff0041389fca03f4a8c1f77fbde91207062f65"
+}

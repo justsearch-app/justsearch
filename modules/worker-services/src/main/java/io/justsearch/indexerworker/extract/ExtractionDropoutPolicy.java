@@ -77,10 +77,12 @@ public final class ExtractionDropoutPolicy {
   /** Counts letters/digits, stopping once {@code limit} is reached (documents can be huge). */
   private static int alphanumericCount(String content, int limit) {
     int count = 0;
-    for (int i = 0; i < content.length() && count < limit; i++) {
-      if (Character.isLetterOrDigit(content.charAt(i))) {
+    for (int i = 0; i < content.length() && count < limit; ) {
+      int codePoint = content.codePointAt(i);
+      if (Character.isLetterOrDigit(codePoint)) {
         count++;
       }
+      i += Character.charCount(codePoint);
     }
     return count;
   }

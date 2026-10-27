@@ -90,6 +90,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
      */
     private final WorkerHost workerHost;
 
+    /** The Engine's Retry-After for a capture refused while no verified client can serve. */
+    private final int retryAfterSeconds;
+
     /**
      * The Engine admission owner's activity source, shared with VDU idle checks across bootstrap
      * reconnects. The Worker still paces on its own foreground RPCs rather than this idle signal.
@@ -221,6 +224,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         this.userActivity = java.util.Objects.requireNonNullElseGet(
             workerHost.userActivity(), io.justsearch.core.scheduling.UserActivity::new);
         this.energyPoller = new io.justsearch.app.services.power.EnergyStatePoller(executors, gpuScheduling);
+        this.retryAfterSeconds = executors.retryAfterSeconds();
         this.energyPoller.mirrorEnergyTo(bulkWork);
         this.config = config;
         this.bootFaultsRemaining = new java.util.concurrent.atomic.AtomicInteger(config.bootFaultInjectAttempts());
@@ -652,7 +656,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
         synchronized (clientLeaseMonitor) {
             KnowledgeClient captured = client;
             if (clientRetiring || !clientVerified || captured == null) {
-                throw new IllegalStateException("Knowledge Server client is unavailable");
+                // Refused before the request ran; the API front answers it as retryable 503.
+                throw new io.justsearch.app.api.ServingUnavailableException(
+                    "Knowledge Server client is unavailable", retryAfterSeconds);
             }
             WorkerHost.ServingLease serving =
                 java.util.Objects.requireNonNull(workerHost.captureServingView(), "serving lease");

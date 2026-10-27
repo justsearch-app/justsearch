@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T05:13:34.522Z",
+  "revision": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+  "tree": "b8faddc3496cae4e693be27b3c410826d0fc8866",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/r50zwz6b/tmp/test-intent-vitest-5-1793077995654.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4730
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a two hand-offs keep the running Ask one sidebar navigation away",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:392e1ef7dc39aa77c9e03fde56d0a365e45c44d200a789ff07d26e855cb53b17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO8a two hand-offs keep the running Ask one sidebar navigation away",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a two hand-offs keep the running Ask one Back navigation away",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:392e1ef7dc39aa77c9e03fde56d0a365e45c44d200a789ff07d26e855cb53b17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO8a two hand-offs keep the running Ask one Back navigation away",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ec41e49283",
+    "revision": "ec41e49283798ae393f93b3aea708a7d7dd9fbdd",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/r50zwz6b/tmp/test-intent-vitest-5-1793078008283.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5297,
+        "output": "JSON report written to /home/elias/.cache/am/r50zwz6b/tmp/test-intent-vitest-5-1793078008283.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a two hand-offs keep the running Ask one sidebar navigation away",
+        "classification": "assertion",
+        "detail": "HO8a two hand-offs keep the running Ask one sidebar navigation away:  AssertionError: expected null to be 'uc-1bc3dcaa-66ff-4be3-921f-e0e90f2202…' // Object.is equality\n    at /home/elias/.cache/am/r50zwz6b/tmp/test-intent-before-On8zcn/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts:134:34\n    at file:///home/elias/.cache/am/r50zwz6b/tmp"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a two hand-offs keep the running Ask one Back navigation away",
+        "classification": "assertion",
+        "detail": "HO8a two hand-offs keep the running Ask one Back navigation away:  AssertionError: expected null to be 'uc-c9c8046e-3778-42bb-b09f-3baf905a9a…' // Object.is equality\n    at /home/elias/.cache/am/r50zwz6b/tmp/test-intent-before-On8zcn/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts:134:34\n    at file:///home/elias/.cache/am/r50zwz6b/tmp"
+      }
+    ]
+  },
+  "digest": "sha256:c30ea36a0ad14cd5fabc738f84d7bc0c4787ad56a49d7da22fd9ddb01c00ebd9"
+}

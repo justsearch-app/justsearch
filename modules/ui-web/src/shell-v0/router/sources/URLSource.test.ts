@@ -51,7 +51,7 @@ describe('URLSource — boot read', () => {
       expect(first.intent.address.target).toBe('core.search-surface');
       expect(first.intent.address.state).toEqual({ query: 'hello' });
     }
-    expect(first.options).toEqual({ pushHistory: true });
+    expect(first.options).toEqual({ pushHistory: true, taskOrigin: 'restore' });
   });
 
   it('emits nothing when no hash is present', () => {
@@ -88,7 +88,7 @@ describe('URLSource — popstate', () => {
     window.dispatchEvent(new PopStateEvent('popstate'));
     expect(calls.length).toBeGreaterThan(0);
     const last = calls[calls.length - 1]!;
-    expect(last.options).toEqual({ pushHistory: false });
+    expect(last.options).toEqual({ pushHistory: false, taskOrigin: 'restore' });
     expect(last.intent.address.kind).toBe('navigate');
     if (typeof teardown === 'function') teardown();
   });
@@ -116,3 +116,68 @@ describe('URLSource — SSR safety', () => {
     if (typeof teardown === 'function') teardown();
   });
 });
+
+
+describe('DS1 native URL provenance is bounded and conservative', () => {
+  function nativeSource() {
+    const listeners = new Map<string, EventListener>();
+    const navigation = {
+      addEventListener: (name: string, callback: EventListener) => listeners.set(name, callback),
+      removeEventListener: (name: string) => listeners.delete(name),
+    };
+    const win = {
+      location: { hash: '', href: 'https://local.test/' }, navigation,
+      addEventListener: (name: string, callback: EventListener) => listeners.set(name, callback),
+      removeEventListener: (name: string) => listeners.delete(name),
+    } as unknown as Window;
+    const { dispatch, calls } = makeDispatch();
+    const teardown = createURLSource({ windowImpl: win }).start(dispatch);
+    const stop = () => { if (typeof teardown === 'function') teardown(); };
+    const url = 'https://local.test/#justsearch://surface/core.search-v3-surface?query=needle';
+    const observe = (type = 'push', destination = url, extra = {}) => listeners.get('navigate')?.({
+      isTrusted: true, defaultPrevented: false, navigationType: type, signal: new AbortController().signal,
+      destination: { url: destination }, ...extra,
+    } as unknown as Event);
+    const pop = () => {
+      win.location.hash = '#justsearch://surface/core.search-v3-surface?query=needle'; win.location.href = url;
+      listeners.get('popstate')?.({ isTrusted: true } as unknown as Event);
+    };
+    return { calls, observe, pop, stop, listeners };
+  }
+  it('consumes a matching native push once; traversal/reload and missing metadata restore', () => {
+    const fixture = nativeSource();
+    fixture.observe(); fixture.pop();
+    expect(fixture.calls.at(-1)?.options?.taskOrigin).toBe('fresh');
+    fixture.pop(); expect(fixture.calls.at(-1)?.options?.taskOrigin).toBe('restore');
+    for (const type of ['traverse', 'reload']) {
+      fixture.observe(type); fixture.pop(); expect(fixture.calls.at(-1)?.options?.taskOrigin).toBe('restore');
+    }
+    fixture.stop();
+  });
+  it('cancellation, stale/unmatched destinations, untrusted events and stop cannot authorize a push', () => {
+    const fixture = nativeSource(); const controller = new AbortController();
+    fixture.observe('push', undefined, { signal: controller.signal }); controller.abort();
+    fixture.pop(); expect(fixture.calls.at(-1)?.options?.taskOrigin).toBe('restore');
+    fixture.observe('push', 'https://local.test/#unmatched'); fixture.pop();
+    expect(fixture.calls.at(-1)?.options?.taskOrigin).toBe('restore');
+    for (const extra of [{ defaultPrevented: true }, { isTrusted: false }, { navigationType: undefined }, { signal: undefined }]) {
+      fixture.observe(); fixture.observe('push', undefined, extra); fixture.pop();
+      expect(fixture.calls.at(-1)?.options?.taskOrigin).toBe('restore');
+    }
+    fixture.observe(); fixture.stop(); expect(fixture.listeners.size).toBe(0);
+  });
+});
+
+it.each(['navigate', 'reload', 'back_forward', undefined, 'unusable'] as const)(
+  'DS1 boot NavigationTiming %s distinguishes fresh URL from automatic or unknown restoration', type => {
+    const win = {
+      location: { hash: '#justsearch://surface/core.search-v3-surface?query=old', href: 'https://local.test/#justsearch://surface/core.search-v3-surface?query=old' },
+      performance: { getEntriesByType: () => type === undefined ? [] : [{ type }] },
+      addEventListener: () => {}, removeEventListener: () => {},
+    } as unknown as Window;
+    const { dispatch, calls } = makeDispatch(); const teardown = createURLSource({ windowImpl: win }).start(dispatch);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.options?.taskOrigin ?? 'fresh').toBe(type === 'navigate' ? 'fresh' : 'restore');
+    if (typeof teardown === 'function') teardown();
+  },
+);

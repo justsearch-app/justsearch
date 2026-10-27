@@ -1,0 +1,226 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T14:52:03.246Z",
+  "revision": "be44f3686f87033952456513e33bcdcd421791c4",
+  "tree": "33515cbbf305d353a5c1c0f2d9e68b9037578a41",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/conversationDeleteRetention.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-vitest-336-1793112715605.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7640
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts#S53.6 refusal authorizes no browser title or recent discard",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:da8c89a871184e175526f8275a5b3c574019ecbee1a3df537af6e6a8c9435314",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S53.6 refusal authorizes no browser title or recent discard",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 a recovered draft remains ambiguous even beside a matching restore pointer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 a recovered draft remains ambiguous even beside a matching restore pointer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 an identical-text handoff during deletion retains the new place draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 an identical-text handoff during deletion retains the new place draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 another window storage write during discovery makes draft ownership ambiguous",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 another window storage write during discovery makes draft ownership ambiguous",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 cancel cannot lend draft-discard authority to another deletion",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 cancel cannot lend draft-discard authority to another deletion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 different tree cannot lend draft-discard authority to another deletion",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 different tree cannot lend draft-discard authority to another deletion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 draft protection begins before the discovery read",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 draft protection begins before the discovery read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 draft protection begins before the memory read",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 draft protection begins before the memory read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 identical programmatic replacement before Remove has no provable live owner",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 identical programmatic replacement before Remove has no provable live owner",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 preserves IME replacement after original Remove activation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 preserves IME replacement after original Remove activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 preserves edit away and back replacement after original Remove activation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 preserves edit away and back replacement after original Remove activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 preserves identical programmatic replacement after original Remove activation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 preserves identical programmatic replacement after original Remove activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 refusal cannot lend draft-discard authority to another deletion",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 refusal cannot lend draft-discard authority to another deletion",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:8f007d36cd084b2681aee8352751767b4a8f1921334f97c798c4709072d5f011"
+}

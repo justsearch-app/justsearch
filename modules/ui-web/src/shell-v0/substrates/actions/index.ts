@@ -789,9 +789,9 @@ export function registerShellActions(deps: ShellActionDeps): void {
     });
 
   // Tempdoc 923 / Search Thread S5b — the standalone Search rail surface is retired; its retrieve
-  // tier folded into the one window (core.unified-chat-surface). Search is the place; Ask and
+  // tier folded into the one window (core.search-v3-surface). Search is the place; Ask and
   // Delegate are consequences inside it, so there is exactly one palette destination for the place.
-  navigateAction('core.action.shell.go-to-search', 'Go to Search', 'core.unified-chat-surface');
+  navigateAction('core.action.shell.go-to-search', 'Go to Search', 'core.search-v3-surface');
   navigateAction('core.action.shell.go-to-library', 'Go to Library', 'core.library-surface');
   navigateAction('core.action.shell.go-to-settings', 'Go to Settings', 'core.settings-surface');
   navigateAction('core.action.shell.go-to-health', 'Go to System Health', 'core.health-surface');

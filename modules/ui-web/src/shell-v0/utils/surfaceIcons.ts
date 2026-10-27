@@ -10,7 +10,7 @@ import type { IconName } from '../components/Icon.js';
 
 const SURFACE_ICONS: Record<string, IconName> = {
   // Search Thread S5b — the standalone `core.search-surface` is retired (folded into
-  // `core.unified-chat-surface` below); a historical NavigationJournal entry recorded with the old
+  // `core.search-v3-surface` below); a historical NavigationJournal entry recorded with the old
   // id falls back to the generic 'hard-drive' icon, matching the established pattern for other
   // retired surface ids (core.agent-surface, core.system-self-view) — none get a dedicated entry.
   'core.library-surface': 'folder-plus',
@@ -19,7 +19,7 @@ const SURFACE_ICONS: Record<string, IconName> = {
   'core.ask-surface': 'database',
   'core.free-chat-surface': 'layers',
   'core.extract-surface': 'list',
-  'core.unified-chat-surface': 'message-square',
+  'core.search-v3-surface': 'message-square',
   'core.health-surface': 'server',
   'core.help-surface': 'help-circle',
   'core.settings-surface': 'settings',

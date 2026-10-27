@@ -62,6 +62,13 @@ export function createUiApi(tier: PluginTrustTier, deps: UiDeps): PluginUi {
         path: item.path ?? '',
         kind: item.kind,
       };
+      const start = item.highlightStartLine;
+      const end = item.highlightEndLine;
+      if (typeof start === 'number' && typeof end === 'number' &&
+          Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end >= start) {
+        selected.highlightStartLine = start;
+        selected.highlightEndLine = end;
+      }
       setSelected(selected);
     },
     // Tempdoc 508-followup §ε1 — best-effort scroll for a mounted surface.

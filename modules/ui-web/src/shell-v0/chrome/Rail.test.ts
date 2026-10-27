@@ -31,7 +31,7 @@ describe('Rail — altitude-projected homing (tempdoc 571)', () => {
   it('bands DIAGNOSTIC surfaces (Logs + Health) together, below the product surfaces', async () => {
     const el = document.createElement('jf-rail') as Rail;
     el.surfaces = [
-      surface('core.unified-chat-surface'), // PRODUCT (default)
+      surface('core.search-v3-surface'), // PRODUCT (default)
       surface('core.activity-surface', 'TRUST'),
       surface('core.health-surface', 'DIAGNOSTIC'),
       surface('core.logs-surface', 'DIAGNOSTIC'),
@@ -51,7 +51,7 @@ describe('Rail — altitude-projected homing (tempdoc 571)', () => {
   it('keeps the TRUST Activity surface first-class in the product band (NOT in diagnostics)', async () => {
     const el = document.createElement('jf-rail') as Rail;
     el.surfaces = [
-      surface('core.unified-chat-surface'),
+      surface('core.search-v3-surface'),
       surface('core.activity-surface', 'TRUST'),
       surface('core.logs-surface', 'DIAGNOSTIC'),
     ];
@@ -69,7 +69,7 @@ describe('Rail — altitude-projected homing (tempdoc 571)', () => {
 
   it('renders no diagnostics band when no surface is DIAGNOSTIC altitude', async () => {
     const el = document.createElement('jf-rail') as Rail;
-    el.surfaces = [surface('core.unified-chat-surface'), surface('core.search-surface')];
+    el.surfaces = [surface('core.search-v3-surface'), surface('core.search-surface')];
     document.body.appendChild(el);
     await el.updateComplete;
 
@@ -82,7 +82,7 @@ describe('Rail — altitude-projected homing (tempdoc 571)', () => {
     // interaction surface by construction (derived from altitude), regardless of incoming order.
     el.surfaces = [
       surface('core.library-surface'), // PRODUCT
-      surface('core.unified-chat-surface'), // the interaction surface
+      surface('core.search-v3-surface'), // the interaction surface
       surface('core.browse-surface'), // PRODUCT
       surface('core.search-surface'), // PRODUCT
       surface('core.activity-surface', 'TRUST'), // declared last
@@ -95,7 +95,7 @@ describe('Rail — altitude-projected homing (tempdoc 571)', () => {
         (b) => !el.shadowRoot!.querySelector('[data-testid="rail-band-diagnostics"]')?.contains(b),
       ),
     );
-    const chatIdx = productIds.indexOf('core.unified-chat-surface');
+    const chatIdx = productIds.indexOf('core.search-v3-surface');
     // Activity is rendered IMMEDIATELY after the interaction surface, derived from TRUST altitude.
     expect(productIds[chatIdx + 1]).toBe('core.activity-surface');
   });
@@ -108,7 +108,7 @@ describe('Rail — collapsed/expanded chrome (Search Thread S5b)', () => {
 
   function mount(expanded: boolean): Rail {
     const el = document.createElement('jf-rail') as Rail;
-    el.surfaces = [surface('core.unified-chat-surface'), surface('core.library-surface')];
+    el.surfaces = [surface('core.search-v3-surface'), surface('core.library-surface')];
     el.expanded = expanded;
     document.body.appendChild(el);
     return el;
@@ -116,7 +116,7 @@ describe('Rail — collapsed/expanded chrome (Search Thread S5b)', () => {
 
   it('defaults to collapsed (icon-only, no visible labels)', async () => {
     const el = document.createElement('jf-rail') as Rail;
-    el.surfaces = [surface('core.unified-chat-surface')];
+    el.surfaces = [surface('core.search-v3-surface')];
     document.body.appendChild(el);
     await el.updateComplete;
 

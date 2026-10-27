@@ -196,22 +196,22 @@ function savedBackend(historyOverrides: Record<string, unknown> = {}): void {
   setLastViewedConversation('saved');
 }
 
-it.each(['retry', 'edit', 'branch'])('XT8 reloaded %s forks and preserves Structured without sending', async action => {
+it.each(['retry', 'edit', 'branch'])('DS1 XT8 restored Structured %s preserves B and requires exact own inputs', async action => {
   savedBackend();
   const view = await mount();
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView; await main.updateComplete;
   expect(q(main, 'sv3-turn-json')?.textContent).toBe(answer);
-  expect(main.shadowRoot!.textContent).toContain('current composer schema');
+  expect(main.shadowRoot!.textContent).toContain('Original Structured inputs are unavailable');
+  const c = await composer(view); const field = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!;
+  field.value = 'unrelated B'; field.dispatchEvent(new Event('input')); await drain(view);
   const turnId = (q(main, 'sv3-turn-question')!.getAttribute('data-item-id') ?? '').replace(/:q$/, '');
   main.dispatchEvent(new CustomEvent('sv3-branch-action', { bubbles: true, composed: true,
     detail: { action, turnId, ...(action === 'edit' ? { text: 'edited extraction' } : {}) } }));
   await drain(view);
-  expect(fetchMock.mock.calls.some(c => String(c[0]).includes('/branch?'))).toBe(true);
+  expect(fetchMock.mock.calls.some(c => String(c[0]).includes('/branch?'))).toBe(action === 'branch');
   expect(dispatches()).toHaveLength(0);
-  const c = await composer(view);
-  expect(c.getAttribute('tier')).toBe('structured');
-  if (action !== 'branch') expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value)
-    .toBe(action === 'edit' ? 'edited extraction' : 'saved extraction');
+  if (action === 'branch') expect(c.getAttribute('tier')).toBe('structured');
+  else expect(field.value).toBe('unrelated B');
 });
 
 it('XT4 retains instruction schema and files when the chosen file count is refused', async () => {

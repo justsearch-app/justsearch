@@ -20,6 +20,7 @@ const MAX_STATE_CHARS = 30;
 const STATE_KEY_BY_SURFACE: Record<string, string> = {
   'core.ask-surface': 'query',
   'core.unified-chat-surface': 'query',
+  'core.search-v3-surface': 'query',
 };
 
 export function deriveTitleFromSurfaceId(surfaceId: string): string {

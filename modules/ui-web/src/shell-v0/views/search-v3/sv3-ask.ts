@@ -44,7 +44,8 @@ import {
 } from '../../../api/streams.js';
 import type { CoreRagAskHandlers } from '../../../api/generated/shape-handlers/core-rag-ask.js';
 import type { SelectionPayload } from '../../../api/types/selection.js';
-import { buildRequestBody, type ShapeId } from '../unifiedChatRequest.js';
+import { buildRequestBody, withHumanLoad, type ShapeId } from '../unifiedChatRequest.js';
+import { chatRefusalOf, type ChatRefusalDetail } from '../../state/chatResidency.js';
 import { authorizedFetch } from '../../api/authorizedFetch.js';
 // The ONE stream-error vocabulary (slice 497; inventory E9). A technical code becomes the same
 // sentence here as it does in the shipped window; an abort never reaches it (see the catch below).
@@ -275,7 +276,7 @@ export interface Sv3AskSink {
    * saved.
    */
   onLeft(): void;
-  onFailed(message: string, code?: string): void;
+  onFailed(message: string, code?: string, refusal?: ChatRefusalDetail | null): void;
 }
 
 /**
@@ -383,12 +384,13 @@ function claimsOf(acc: Map<number, ClaimAcc>, scorer: string | null): Claim[] {
  * An Ask carries its chosen files and the effective follow-up context.
  */
 export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void> {
-  const body = buildRequestBody(req.modelAnswer ? SV3_MODEL_SHAPE_ID : req.shapeId ?? (req.schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract'), req.question, req.conversationId, req.schema ?? '', [
-    ...(req.modelAnswer ? [] : req.docIds ?? []),
-  ], req.modelAnswer ? undefined : req.selection);
+  const modelOnly = req.modelAnswer === true || req.shapeId === SV3_MODEL_SHAPE_ID;
+  const body = buildRequestBody(modelOnly ? SV3_MODEL_SHAPE_ID : req.shapeId ?? (req.schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract'), req.question, req.conversationId, req.schema ?? '', [
+    ...(modelOnly ? [] : req.docIds ?? []),
+  ], modelOnly ? undefined : req.selection);
   // The turn is recorded against THIS window's session, exactly as the shipped window stamps it.
   body.conversationId = req.conversationId;
-  if (!req.modelAnswer && req.schema !== undefined && req.selection == null && (req.docIds?.length ?? 0) > 0) {
+  if (!modelOnly && req.schema !== undefined && req.selection == null && (req.docIds?.length ?? 0) > 0) {
     body.selection = { kind: 'result-set', items: [...new Set(req.docIds)].map(id => ({ id, kind: 'search-hit' })) };
   }
   // The effort rung's parameters, added AFTER the shared builder rather than inside it: the builder
@@ -397,7 +399,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   Object.assign(body, sv3EffortParams(req.effort ?? SV3_EFFORT_DEFAULT));
   // The follow-up's conversation, read by `ExternalContextInjector` (into the prompt) and
   // `QueryRewriteInjector` (to rewrite the question). Same late-add as the fields above.
-  if (!req.modelAnswer && req.context !== undefined && req.context.length > 0) {
+  if (!modelOnly && req.context !== undefined && req.context.length > 0) {
     body.context = req.context.map((m) => ({ role: m.role, content: m.content }));
   }
   if (req.turnId !== undefined) body.turnId = req.turnId;
@@ -442,7 +444,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   };
   const handlers: CoreRagAskHandlers = {
     onRagCitationChecking() {
-      if (!req.modelAnswer && req.schema === undefined) setChecking(true);
+      if (!modelOnly && req.schema === undefined) setChecking(true);
     },
     onDone(payload: unknown) {
       setChecking(false);
@@ -539,6 +541,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   };
 
   try {
+    withHumanLoad(body);
     await consumeShapeStream(
       `${req.apiBase}/api/chat/dispatch`,
       body,
@@ -570,7 +573,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     // The shared mapping, reached only AFTER the abort and the refusal have been ruled out above —
     // which is exactly the shipped window's ordering (`views/UnifiedChatView.ts:6019-6024`) and the
     // reason a reader's own Stop is never worded as a failure (inventory E9).
-    sink.onFailed(friendlyStreamError(err), (err as Error & { code?: string }).code);
+    sink.onFailed(friendlyStreamError(err), (err as Error & { code?: string }).code, chatRefusalOf(err));
     return;
   } finally {
     setChecking(false);

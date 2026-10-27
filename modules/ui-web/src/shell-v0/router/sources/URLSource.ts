@@ -52,6 +52,33 @@ export function createURLSource(config: URLSourceConfig = {}): IntentSource {
         };
       }
 
+      // Native hash pushes also emit popstate. Only the browser's actual navigation
+      // metadata distinguishes those fresh URLs from Back/Forward to the same URL.
+      // No entry/history record is introduced; one matching observation is consumed once.
+      const navigation = (win as Window & { navigation?: EventTarget }).navigation;
+      let pending: { url: string; origin: 'fresh' | 'restore' } | null = null;
+      let stopPendingAbort: (() => void) | null = null;
+      const clearPending = (): void => {
+        pending = null;
+        stopPendingAbort?.(); stopPendingAbort = null;
+      };
+      const onNavigate = (event: Event): void => {
+        clearPending();
+        if (!event.isTrusted || event.defaultPrevented) return;
+        const observed = event as Event & {
+          navigationType?: string; destination?: { url?: string }; signal?: AbortSignal;
+        };
+        const url = observed.destination?.url;
+        if (typeof url !== 'string' || !['push', 'traverse', 'reload'].includes(observed.navigationType ?? '')
+          || observed.signal?.aborted !== false || typeof observed.signal.addEventListener !== 'function') return;
+        const next = { url, origin: observed.navigationType === 'push' ? 'fresh' as const : 'restore' as const };
+        pending = next;
+        const abort = (): void => { if (pending === next) clearPending(); };
+        observed.signal?.addEventListener('abort', abort, { once: true });
+        stopPendingAbort = () => observed.signal?.removeEventListener('abort', abort);
+      };
+      navigation?.addEventListener('navigate', onNavigate);
+
       // 1. Boot read — refresh-restore. Dispatches with default pushHistory:
       //    true so the URL is canonicalized (replaceState by projector or
       //    pushState by handler — handler decides; projector handles the
@@ -65,19 +92,25 @@ export function createURLSource(config: URLSourceConfig = {}): IntentSource {
       // fixed by construction.
       const intent = parseHash(win);
       if (intent) {
-        dispatch(intent, { pushHistory: true });
+        const navigation = win.performance?.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined;
+        const restored = navigation?.type !== 'navigate';
+        dispatch(intent, { pushHistory: true, ...(restored ? { taskOrigin: 'restore' as const } : {}) });
       }
 
       // 2. Popstate listener — browser back/forward. The browser has already
       //    moved history; the handler must NOT push again. pushHistory: false.
-      const handler = () => {
+      const handler = (event: PopStateEvent) => {
+        const origin = event.isTrusted && pending?.url === win.location.href ? pending.origin : 'restore';
+        clearPending();
         const popped = parseHash(win);
         if (popped) {
-          dispatch(popped, { pushHistory: false });
+          dispatch(popped, { pushHistory: false, taskOrigin: origin });
         }
       };
       win.addEventListener('popstate', handler);
       return () => {
+        clearPending();
+        navigation?.removeEventListener('navigate', onNavigate);
         win.removeEventListener('popstate', handler);
       };
     },

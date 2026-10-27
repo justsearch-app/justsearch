@@ -746,6 +746,11 @@ export interface InspectorItem {
   path?: string;
   kind?: string;
   snippet?: string;
+  /** Optional 0-based, inclusive passage start, as in the shared inspector selection.
+   * Supply both bounds as finite integers with 0 <= start <= end; otherwise neither is used. */
+  highlightStartLine?: number;
+  /** Optional 0-based, inclusive passage end; used only with a valid highlightStartLine. */
+  highlightEndLine?: number;
   [key: string]: unknown;
 }
 

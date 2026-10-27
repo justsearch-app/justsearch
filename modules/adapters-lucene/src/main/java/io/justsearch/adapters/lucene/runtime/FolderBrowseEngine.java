@@ -475,10 +475,12 @@ public final class FolderBrowseEngine {
             }
           }
         }
-        case "long", "boolean" -> {
+        case "long", "boolean", "double" -> {
           NumericDocValues dv = getNumericDocValues(leaf, def.id);
           if (dv != null && dv.advanceExact(docInLeaf)) {
-            out.put(def.id, Long.toString(dv.longValue()));
+            out.put(def.id, "double".equals(def.type)
+                ? Double.toString(Double.longBitsToDouble(dv.longValue()))
+                : Long.toString(dv.longValue()));
           }
         }
         default -> { /* unsupported type for projection */ }

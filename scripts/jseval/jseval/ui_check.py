@@ -45,8 +45,12 @@ async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
     AppNotMountedError with the best-available reason (Vite stderr tail / error-overlay
     text / failed resource status / honest fallback). ONE gate, reused by every capture path."""
     try:
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=timeout_ms)
+        # WP1.5a promotes Search v3; retain the older main rail as a known-good control.
+        # Only an actually visible Search rail button establishes shell readiness.
+        await page.locator(
+            f'{S.rail_css("core.search-v3-surface")}:visible, '
+            f'{S.rail_css(S.RAIL_SURFACE_SEARCH)}:visible'
+        ).first.wait_for(state="visible", timeout=timeout_ms)
         return
     except Exception:
         pass  # fall through to assemble the reason — never let the bare timeout escape
@@ -307,6 +311,55 @@ async def _type_and_search(page, query: str = "justsearch") -> None:
     async with page.expect_response("**/api/knowledge/search", timeout=30_000):
         await inp.press("Enter")
     await page.locator(S.CSS_SV3_RESULT_ROW).first.wait_for(state="visible", timeout=30_000)
+
+
+async def _open_compatibility_chat(page) -> None:
+    """Mount the retained builtin through ordinary untrusted-plugin Settings installation.
+
+    These cameras measure a compatibility component, not its former CORE main composition.
+    Each isolated capture gets a fresh session registry; no override or private mount is used.
+    """
+    origin = urlparse(page.url)
+    source_url = f"{origin.scheme}://{origin.netloc}/capture-compat.js"
+
+    async def source(route):
+        await route.fulfill(status=200, content_type="text/javascript",
+                            body=ui_fixtures.COMPAT_CHAT_PLUGIN_SOURCE)
+
+    async def verify(route):
+        await route.fulfill(status=200, content_type="application/json",
+                            body=ui_fixtures.COMPAT_CHAT_VERIFY_BODY)
+
+    await page.route(source_url, source)
+    await page.route(lambda url: urlparse(url).path == "/api/plugins/verify", verify)
+    await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).click()
+    settings = page.locator(S.CSS_SETTINGS_WINDOW_CONTENT)
+    await page.locator(S.CSS_SETTINGS_WINDOW_DIALOG).wait_for(state="visible", timeout=10_000)
+    await settings.first.wait_for(state="attached", timeout=10_000)
+    await settings.locator('[data-settings-category="plugins"]').click()
+    await settings.get_by_placeholder("Plugin URL (e.g., http://localhost:3000/plugin.js)").fill(source_url)
+    async with page.expect_response(
+        lambda response: urlparse(response.url).path == "/api/plugins/verify", timeout=15_000,
+    ) as response_info:
+        await settings.get_by_role("button", name="Load", exact=True).click()
+    response = await response_info.value
+    if response.status != 200 or (await response.json()).get("verified") is not False:
+        raise AssertionError("compatibility capture requires the explicit negative trust verdict")
+    row = settings.locator(".plugin-row").filter(has_text="capture-compat")
+    await row.locator("jf-status-badge").get_by_text("untrusted", exact=True).wait_for(
+        state="visible", timeout=15_000)
+    await page.get_by_test_id("settings-window-close").click()
+    await page.locator(S.CSS_SETTINGS_WINDOW_DIALOG).wait_for(state="hidden", timeout=10_000)
+    await page.evaluate("(id) => { location.hash = `justsearch://surface/${id}`; }",
+                        ui_fixtures.COMPAT_CHAT_SURFACE_ID)
+    # Observe genuine browser traversal, rather than emitting a synthetic router event.
+    await page.go_back(wait_until="domcontentloaded")
+    await page.go_forward(wait_until="domcontentloaded")
+    root = page.locator("jf-unified-chat-view:visible")
+    await root.first.wait_for(state="visible", timeout=15_000)
+    if await root.count() != 1 or await page.locator("jf-sv3-window:visible").count() != 0:
+        raise AssertionError("compatibility capture requires exactly one visible legacy root")
+    await root.locator("jf-composer textarea").wait_for(state="visible", timeout=10_000)
 
 
 async def _set_density_in_settings(page, label: str) -> None:
@@ -1116,15 +1169,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # the rail nav directly and locates the composer via `S.CSS_COMPOSER_TEXTAREA`
         # (`jf-composer textarea`), confirmed live to resolve to exactly one element and to
         # drive a real search (fixture rows rendered).
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=15_000
-        )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
+        await _open_compatibility_chat(page)
         ta = page.locator(S.CSS_COMPOSER_TEXTAREA)
         await ta.wait_for(state="visible", timeout=10_000)
         await ta.click()
@@ -1172,15 +1217,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # Same rail-click + composer path `setup_chat_proportion` uses, and for the same
         # reason: `_type_and_search` / `S.SEARCH_INPUT` target a searchbox role + testid
         # that tempdoc 687 retired (see the ui_selectors.py note).
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=15_000
-        )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
+        await _open_compatibility_chat(page)
         ta = page.locator(S.CSS_COMPOSER_TEXTAREA)
         await ta.wait_for(state="visible", timeout=10_000)
         await ta.click()
@@ -1189,7 +1226,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # A row click emits `card-open`, which funnels through the shared inspectorState
         # store; UnifiedChatView's ONE subscription derives `readingDocPath` from it and
         # mounts `<jf-document-pane class="document-pane">` in grid column 5.
-        await page.locator(S.CSS_SEARCH_RESULT_ROW).first.click(force=True)
+        await page.locator(S.CSS_SEARCH_RESULT_ROW).first.click()
         await page.locator(S.CSS_DOCUMENT_PANE).first.wait_for(state="visible", timeout=15_000)
         # A toast burst through the one client-originated message channel (the
         # `jf-advisory-ephemeral` document event AdvisoryStore consumes — emitEphemeralToast's
@@ -1205,6 +1242,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # dock reverted and an 8-toast burst the residual intersection was 1px, inside
         # tolerance, so the gate reported clean). Stack BOUNDING is asserted at the unit
         # level (AdvisoryToastHost.test.ts); this capture asserts the OCCLUSION relation.
+        if await page.locator(S.CSS_TOAST + ":visible").count() != 0:
+            raise AssertionError("chat-occlusion: ambient toasts invalidate the exact cap witness")
         await page.evaluate(
             """(n) => {
                 for (let i = 0; i < n; i += 1) {
@@ -1222,6 +1261,15 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         )
         await page.locator(S.CSS_TOAST).first.wait_for(state="visible", timeout=10_000)
         await asyncio.sleep(0.3)  # let the toast enter-animation settle before measuring
+        toasts = page.locator(S.CSS_TOAST + ":visible")
+        if await toasts.count() != 3:
+            raise AssertionError("chat-occlusion: expected exactly three intended error toasts")
+        if await page.get_by_test_id("toast-more").is_visible():
+            raise AssertionError("chat-occlusion: overflow summary invalidates the exact cap witness")
+        texts = [await toasts.nth(index).inner_text() for index in range(3)]
+        for index in range(3):
+            if sum(f"Occlusion probe toast {index + 1}" in text for text in texts) != 1:
+                raise AssertionError("chat-occlusion: unexpected toast displaced the cap witness")
 
     async def setup_sv3_composer_occlusion(page):
         # Tempdoc 859 §B — the measured half of "the composer floats over the transcript".
@@ -1259,14 +1307,13 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # Measure at MAX SCROLL. At rest the last element is nowhere near the dock and the overlap
         # row would pass for a reason unrelated to the defect; the assertion only means something
         # where "scrolled to the end" is claimed to mean "the last line is above the glass".
-        await page.evaluate(
-            """() => {
-                const w = document.querySelector('jf-sv3-window');
-                const m = w && w.shadowRoot && w.shadowRoot.querySelector('jf-sv3-main');
-                const s = m && m.shadowRoot && m.shadowRoot.querySelector('.scroller');
-                if (s) s.scrollTop = s.scrollHeight;
-            }"""
+        scroller = page.locator('jf-sv3-window [data-testid="sv3-main-scroller"]').first
+        at_end = await scroller.evaluate(
+            "(s) => { s.scrollTop = s.scrollHeight;"
+            " return s.scrollHeight - s.scrollTop - s.clientHeight <= 1 && s.scrollTop > 0; }"
         )
+        if not at_end:
+            raise AssertionError("sv3-composer-occlusion: the transcript did not overflow and scroll to its end")
         if cooldown_ms > 0:
             await asyncio.sleep(cooldown_ms / 1000)
 
@@ -1493,15 +1540,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # anticipated, and a 40px ceiling (this step's baseline registration) is
         # generous for a collapsed `<details><summary>` alone.
         await page.set_viewport_size({"width": 1366, "height": 768})
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=15_000
-        )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
+        await _open_compatibility_chat(page)
         ta = page.locator(S.CSS_COMPOSER_TEXTAREA)
         await ta.wait_for(state="visible", timeout=10_000)
         await ta.click()
@@ -1517,7 +1556,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # reachability finding above) — a plain affordance toggle, availability-gated on
         # `aiState.capabilities.chat` (true under the `degraded` fixtures variant's
         # `_inference_body` transform, same as the ask escalation just above).
-        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click(force=True)
+        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click()
         await page.locator(S.CSS_ACTIVITY_RAIL).first.wait_for(state="visible", timeout=10_000)
         await asyncio.sleep(0.2)
 
@@ -1562,15 +1601,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # authority for the same fact to the capture; the settings seed is the one the app
         # actually boots from.
         await page.set_viewport_size({"width": 1366, "height": 900})
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=15_000
-        )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
+        await _open_compatibility_chat(page)
         ta = page.locator(S.CSS_COMPOSER_TEXTAREA)
         await ta.wait_for(state="visible", timeout=10_000)
         await ta.click()
@@ -1591,7 +1622,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.locator(S.CSS_DEGRADATION_CAUSES).first.wait_for(
             state="visible", timeout=10_000
         )
-        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click(force=True)
+        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click()
         await page.locator(S.CSS_ACTIVITY_RAIL).first.wait_for(state="visible", timeout=10_000)
         # EVIDENCE-RAIL REACHABILITY (audit finding C.3, investigated and NOT faked): the docked
         # `.evidence-rail` needs `agentCtrl.answerSources.length > 0` (UnifiedChatView.
@@ -1618,21 +1649,13 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # a short window and the composer, bottom of the flex column, paid). D6 closes
         # it: the pane's floor yields below the height breakpoint.
         await page.set_viewport_size({"width": 1366, "height": 768})
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=15_000
-        )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
+        await _open_compatibility_chat(page)
         ta = page.locator(S.CSS_COMPOSER_TEXTAREA)
         await ta.wait_for(state="visible", timeout=10_000)
         await ta.click()
         await ta.type("justsearch", delay=20)
         await page.locator(S.CSS_SEARCH_RESULT_ROW).first.wait_for(state="visible", timeout=30_000)
-        await page.locator(S.CSS_SEARCH_RESULT_ROW).first.click(force=True)
+        await page.locator(S.CSS_SEARCH_RESULT_ROW).first.click()
         await page.locator(S.CSS_DOCUMENT_PANE).first.wait_for(state="visible", timeout=15_000)
         # tempdoc 734's F5 repro: clear the draft (and therefore the results — every
         # keystroke feeds `setSearchQuery` via `@composer-input`, UnifiedChatView.ts
@@ -1663,15 +1686,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # DOCKED state was actually reached: a rendered user turn (the composer only docks once
         # the landing is gone) and the banner whose content box this step bounds.
         await page.set_viewport_size({"width": 1920, "height": 900})
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=15_000
-        )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
+        await _open_compatibility_chat(page)
         ta = page.locator(S.CSS_COMPOSER_TEXTAREA)
         await ta.wait_for(state="visible", timeout=10_000)
         await ta.click()
@@ -1699,22 +1714,16 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # `verdictHeadline(degraded)` back in the bar (1 render, gate red).
         #
         # NON-VACUITY: the assertion is only meaningful while the BANNER owns the fact, so
-        # the step also registers `requiredSelectors: [".degradation-banner-collapsed"]` —
+        # the step also registers `requiredSelectors: [Search compact degradation]` —
         # otherwise a capture that failed to render the surface at all would show neither
         # string and read as a pass.
         await page.set_viewport_size({"width": 1366, "height": 768})
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
+        await _open_sv3_window(page)
+        await page.locator(S.CSS_SV3_DEGRADATION_COMPACT).first.wait_for(
             state="visible", timeout=15_000
         )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
-        await page.locator(S.CSS_DEGRADATION_BANNER_COLLAPSED).first.wait_for(
-            state="visible", timeout=15_000
-        )
+        await page.get_by_test_id("sv3-degradation-headline").wait_for(state="visible")
+        await page.get_by_test_id("sv3-degradation-remedy").wait_for(state="visible")
         await asyncio.sleep(0.3)
 
     async def setup_chat_spine_multi(page):
@@ -1742,15 +1751,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # "Marker count == segment count" stays UNIT-tier (adaptiveSpacing / UnifiedChatView
         # tests): it needs the segmented nodeIds only a real agent SSE run produces.
         await page.set_viewport_size({"width": 1366, "height": 768})
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=15_000
-        )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
+        await _open_compatibility_chat(page)
         # `affordance = 'agent'` FIRST, and not only because it is the spine's first gate: the
         # base `retrieve` tier renders the ephemeral hit-list in the conversation column and
         # owns no thread history (renderAnswerPlane ~2590), so the record's turns are not on
@@ -1759,7 +1760,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.locator(S.CSS_ESCALATION_DELEGATE).first.wait_for(
             state="visible", timeout=15_000
         )
-        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click(force=True)
+        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click()
         # The record's two turns must be ON SCREEN before the capture — an observed condition,
         # not a sleep, so a half-loaded timeline cannot be photographed as a full one.
         await _await_turn_count(page, 2)
@@ -1784,15 +1785,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # `chat-bands` found unreachable under --fixtures; left to integration once
         # another worker's DOM changes land, not attempted here.
         await page.set_viewport_size({"width": 1366, "height": 768})
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=15_000
-        )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
+        await _open_compatibility_chat(page)
         ta = page.locator(S.CSS_COMPOSER_TEXTAREA)
         await ta.wait_for(state="visible", timeout=10_000)
         await ta.click()
@@ -1801,7 +1794,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await ta.fill("?? What is this file about")
         await ta.press("Enter")
         await page.locator(S.CSS_MESSAGE_USER).first.wait_for(state="visible", timeout=15_000)
-        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click(force=True)
+        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click()
         # No wait_for on `.run-spine` — its absence IS the assertion this step exists to
         # capture. A short settle instead, so the affordance flip's re-render has landed.
         await asyncio.sleep(0.3)
@@ -1826,17 +1819,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         #     `hydrateAnswerEvidenceFromRecord`, which is what sets `answerSources` (the DONE frame
         #     deliberately carries none — see agent_stream_fixture.DONE_RUN). Waiting on the rail
         #     therefore witnesses the full record round-trip, not just a rendered frame.
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
-            state="visible", timeout=15_000
-        )
-        try:
-            await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-        except Exception:
-            await page.evaluate(
-                "() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }"
-            )
+        await _open_compatibility_chat(page)
         await page.locator(S.CSS_ESCALATION_DELEGATE).first.wait_for(state="visible", timeout=15_000)
-        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click(force=True)
+        await page.locator(S.CSS_ESCALATION_DELEGATE).first.click()
         await page.locator(S.CSS_ACTIVITY_RAIL).first.wait_for(state="visible", timeout=10_000)
         ta = page.locator(S.CSS_COMPOSER_TEXTAREA)
         await ta.wait_for(state="visible", timeout=10_000)

@@ -47,7 +47,7 @@ public final class FormatCapabilityExpectedState {
       Set<FailureClass> failureClasses,
       String exactAnnotatedText) {}
 
-  private static final String DEFAULT_POLICY = "tika-default-v1";
+  private static final String DEFAULT_POLICY = "tika-default-v3";
   private static final String STRUCTURED_ADAPTER = "tika-policy-structured";
 
   private static final Map<FormatId, ExpectedState> EXPECTED =

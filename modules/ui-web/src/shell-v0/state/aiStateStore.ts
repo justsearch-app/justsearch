@@ -273,6 +273,8 @@ export interface AiState {
    * anyway". Optional so hand-built fixtures without it read as "not unloaded".
    */
   chatUnloadedReason?: string | null;
+  /** Explicit chat configuration off; absent backend configuration retains legacy behavior. */
+  chatDisabledBySpec?: boolean;
   /**
    * Spec A step 7 (F1) — the AI readiness reason that says why chat failed, as the chat controller
    * classified it (`inference.model_load_failed`, `inference.out_of_memory`, ...), else null. The
@@ -457,13 +459,12 @@ export function unknownDocumentCountLabel(
     : 'Unknown';
 }
 
-function computeCapabilities(): AiCapabilities {
+function computeCapabilities(chatDisabledBySpec: boolean): AiCapabilities {
   const inference = inferenceSig.get();
   const status = statusSig.get();
   // Tempdoc 737 §12b/§15 soft-off: a background procedure may hold the engine 'online' while the user
   // has DISABLED chat (chatEnabledSpec=false) — chat is NOT available then, even though mode==='online'.
   // `chatEnabledSpec` undefined (older backend) leaves the legacy behaviour unchanged.
-  const chatDisabledBySpec = status?.inference?.chatEnabledSpec === false;
   const chatState = status?.operating?.chat?.state;
   const chat = !chatDisabledBySpec && (chatState !== undefined
     ? chatState === 'READY'
@@ -896,7 +897,8 @@ function computeReadiness(): Maybe<ReadinessView> {
 function buildSnapshot(): AiState {
   const phase = computePhase();
   const readiness = computeReadiness();
-  const capabilities = computeCapabilities();
+  const chatDisabledBySpec = statusSig.get()?.inference?.chatEnabledSpec === false;
+  const capabilities = computeCapabilities(chatDisabledBySpec);
   const connection = computeConnection();
   const runtime = computeRuntime();
   const index = computeIndex();
@@ -989,6 +991,7 @@ function buildSnapshot(): AiState {
     runtimeStatus,
     packStatus: packStatusSig.get(),
     aiEngine,
+    chatDisabledBySpec,
     chatUnloadedReason: chatUnloadedReason(
       readiness.known ? readiness.value.reasonCodes : [],
       status?.inference?.chatEnabledSpec,

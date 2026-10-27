@@ -120,4 +120,74 @@ final class VisualRoutingDecisionTest {
     assertEquals(SchemaFields.VDU_STATUS_PENDING, decision.status());
     assertEquals(SchemaFields.VDU_DEMAND_KIND_BASELINE_TEXT, decision.demandKind());
   }
+
+  @Test
+  void correctedOcrEvidenceCreatesVisualEnrichmentDemand() throws Exception {
+    assertOcrEvidenceAndMarkers("AA" + "\uD840\uDC00".repeat(33) + "!".repeat(65),
+        0.35, 0.56, SchemaFields.VDU_STATUS_PENDING,
+        SchemaFields.VDU_DEMAND_KIND_VISUAL_ENRICHMENT, false);
+  }
+
+  @Test
+  void correctedSupplementaryOcrRemovesFalseBaselineDemand() throws Exception {
+    assertOcrEvidenceAndMarkers("\uD840\uDC00".repeat(100),
+        1.0, 1.0, SchemaFields.VDU_STATUS_NOT_NEEDED, null, false);
+  }
+
+  @Test
+  void correctedEmojiDenominatorRemovesOldEnrichmentDemand() throws Exception {
+    assertOcrEvidenceAndMarkers("A".repeat(40) + "\uD83D\uDE00".repeat(20) + "!".repeat(20),
+        0.5, 0.8, SchemaFields.VDU_STATUS_NOT_NEEDED, null, false);
+  }
+
+  @Test
+  void independentMixedPdfSignalStillQueuesEnrichment() throws Exception {
+    assertOcrEvidenceAndMarkers("A".repeat(200),
+        1.0, 1.0, SchemaFields.VDU_STATUS_PENDING,
+        SchemaFields.VDU_DEMAND_KIND_VISUAL_ENRICHMENT, true);
+  }
+
+  private static void assertOcrEvidenceAndMarkers(
+      String text, double ratio, double score, String status, String demand, boolean mixedPdf)
+      throws Exception {
+    var summary = new io.justsearch.indexerworker.extract.StructuredDocumentSummary(
+        1, text.length(), 1, 0, 0, 1, 0, 0, 0);
+    var evidence = io.justsearch.indexerworker.extract.VisualExtractionEvidence.from(
+        text, summary, "ocr", io.justsearch.indexerworker.extract.OcrRoutingConfig.disabled(),
+        true, null, mixedPdf);
+    var parsed = VisualRoutingDecision.parseEvidence(evidence.toJson());
+    var result = new ExtractionResult(text, null, "application/pdf");
+    var decision = VisualRoutingDecision.decide(Path.of("unicode.pdf"), result,
+        SchemaFields.EXTRACTION_METHOD_OCR_TIKA, evidence.toJson(), 0.3);
+    var policy = io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults();
+    var artifact = io.justsearch.indexerworker.extract.ExtractionArtifact.full(result, policy,
+        io.justsearch.indexerworker.extract.OcrRoutingConfig.PARSER_ID, false)
+        .withVisualExtractionEvidence(evidence).validate(policy, null);
+    var doc = IndexingDocumentOps.buildDocument(Path.of("unicode.pdf"), artifact,
+        null, null, null, false, null, null, (stage, elapsed, reason) -> {},
+        org.slf4j.LoggerFactory.getLogger(VisualRoutingDecisionTest.class), null, null,
+        "unicode-ocr-test");
+    System.out.println("OCR unicode evidence=" + evidence.toJson() + " decision=" + decision
+        + " method=" + doc.fields().get(SchemaFields.EXTRACTION_METHOD)
+        + " marker=" + doc.fields().get(SchemaFields.EXTRACTION_REASON_CODE));
+    org.junit.jupiter.api.Assertions.assertAll(
+        () -> assertEquals(ratio, evidence.alphanumericRatio()),
+        () -> assertEquals(score, evidence.textQualityScore()),
+        () -> assertEquals(1, evidence.schemaVersion()),
+        () -> assertEquals(text.length(), evidence.textCharCount()),
+        () -> assertEquals((double) text.length(), evidence.charsPerPage()),
+        () -> assertEquals(score, ((Number) parsed.get("textQualityScore")).doubleValue()),
+        () -> assertEquals(ratio, ((Number) parsed.get("alphanumericRatio")).doubleValue()),
+        () -> assertEquals(status, decision.status()),
+        () -> assertEquals(demand, decision.demandKind()),
+        () -> assertEquals(status, doc.fields().get(SchemaFields.VDU_STATUS)),
+        () -> assertEquals(demand, doc.fields().get(SchemaFields.VDU_DEMAND_KIND)),
+        () -> assertEquals(SchemaFields.EXTRACTION_METHOD_OCR_TIKA,
+            doc.fields().get(SchemaFields.EXTRACTION_METHOD)),
+        () -> assertNull(doc.fields().get(SchemaFields.EXTRACTION_REASON_CODE)),
+        () -> assertEquals(text, doc.fields().get(SchemaFields.CONTENT)),
+        () -> assertEquals(evidence.toJson(), doc.fields().get(SchemaFields.VISUAL_EXTRACTION_EVIDENCE)));
+
+  }
+
 }

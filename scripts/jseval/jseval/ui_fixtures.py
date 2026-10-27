@@ -29,6 +29,35 @@ from urllib.parse import urlparse
 
 from .agent_stream_fixture import DONE_RUN_BODY
 
+
+# Retained compatibility-component cameras use the real public plugin construction path.
+# This inert declaration ignores its registration host; it defines no elements or executable UI.
+COMPAT_CHAT_SURFACE_ID = "vendor.capture-compat.legacy-main"
+_COMPAT_CHAT_CONTRIBUTION = {
+    "id": COMPAT_CHAT_SURFACE_ID,
+    "mountTag": "jf-unified-chat-view",
+    "labelKey": "capture-compat.surface.label",
+    "descriptionKey": "capture-compat.surface.description",
+    "audience": "USER",
+    "placement": "DEEPLINK",
+}
+_COMPAT_CHAT_MANIFEST = {
+    "id": "capture-compat", "version": "1.0.0",
+    "displayName": "Capture compatibility fixture", "contractVersion": "1.1",
+    "tagNamespace": "capture-compat",
+    "capabilities": {"surfaces": [_COMPAT_CHAT_CONTRIBUTION]},
+}
+COMPAT_CHAT_PLUGIN_SOURCE = (
+    "(" + json.dumps(_COMPAT_CHAT_MANIFEST)[:-1]
+    + ", register: function() { return {surfaceContributions: [{contribution: "
+    + json.dumps(_COMPAT_CHAT_CONTRIBUTION) + "}]}; }})"
+)
+COMPAT_CHAT_VERIFY_BODY = json.dumps({
+    "verified": False, "identity": None,
+    "reason": "Untrusted inert compatibility capture fixture; no approval granted",
+})
+
+
 def _find_fixtures_dir() -> Path:
     """Locate `modules/ui-web/src/api/__fixtures__` by walking up to the repo root
     (robust to the file's nesting depth — mirrors ui_measure._find_axe)."""

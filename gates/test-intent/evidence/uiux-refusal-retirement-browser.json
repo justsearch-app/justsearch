@@ -1,0 +1,1052 @@
+{
+  "schema": "builder-browser-evidence.v1",
+  "recordedAt": "2026-10-27T08:00:30.810398+00:00",
+  "role": "builder; not independent acceptance",
+  "base": "bd558647f6115e8e92c7cc2501880745573ae4bc",
+  "candidateFileDigests": {
+    "modules/ui-web/src/shell-v0/router/navigationHandler.ts": "sha256:c6911ee7840783e36130828bdb011fd6c2d7b19051d10ee509555405171ba2f2",
+    "modules/ui-web/src/shell-v0/utils/compose.ts": "sha256:25b0a5d604b826dd301483fbbebece1249d9f4421811a47fbc9e5d25754bb824",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts": "sha256:7ca4de79dcd16b2b40d638693209c6bb0aa939efa46369a12259a2f173516bf9"
+  },
+  "reportFolder": "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement",
+  "contract": "Agent-adopted, delegated-choice: accepted navigation away retires a refusal notice and its recovery alert; inputs remain retained and later genuine capacity refusal remains visible where attempted.",
+  "counts": {
+    "beforeProbe": {
+      "passed": 0,
+      "failed": 2
+    },
+    "finalRequestedBrowser": {
+      "passed": 8,
+      "failed": 0,
+      "unverified": 0
+    },
+    "recordAuthoring": {
+      "passed": 1,
+      "completedHumanSends": 2
+    },
+    "pairedComponent": {
+      "beforePassed": 14,
+      "beforeFailedAssertions": 3,
+      "afterPassed": 17,
+      "afterFailed": 0
+    }
+  },
+  "before": [
+    {
+      "case": "own-refusal-retirement-probe-bare-address",
+      "status": "fail",
+      "resultDigest": "sha256:5ede1dc1314e15d8adb3182818ec41628272d2f90bd37133da24b4df9084789d",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "failure.png": "sha256:f192e732d08fa288aff43a0718c80301206fe2086407bc4bee1f2ceebc7f52e5",
+        "after-other-navigation.png": "sha256:dc9241f97c4b86e00daeb403f8ca2b1a797cba54992b35ba4841eb3d17ab7be7",
+        "capacity-refusal.png": "sha256:dc9241f97c4b86e00daeb403f8ca2b1a797cba54992b35ba4841eb3d17ab7be7",
+        "after-discard.png": "sha256:f192e732d08fa288aff43a0718c80301206fe2086407bc4bee1f2ceebc7f52e5"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: {\"navigationRetiresRefusal\":false,\"noStaleTaskAfterDiscard\":true,\"noModelWork\":true}",
+      "checks": {
+        "navigationRetiresRefusal": false,
+        "noStaleTaskAfterDiscard": true,
+        "noModelWork": true
+      },
+      "observationsDigest": "sha256:32f81fcb81b4cddc3f746f577b25300470ecdcb5aeb15360caa254b836061d37",
+      "before": {
+        "url": "http://127.0.0.1:36905/?api_port=40889#justsearch://surface/core.search-v3-surface?query=THIRD+refused+%26+%23&mode=ask&docIds=%2Ftmp%2Fjsv-eng-uy6vyqfp%2Fcorpus%2Fchosen-alpha.txt",
+        "value": "SECOND current 日本",
+        "history": 5,
+        "refused": 1,
+        "capacityAlert": true
+      },
+      "navigated": {
+        "url": "http://127.0.0.1:36905/?api_port=40889#justsearch://surface/core.search-v3-surface",
+        "value": "SECOND current 日本",
+        "history": 6,
+        "refused": 1,
+        "capacityAlert": true
+      },
+      "discarded": {
+        "url": "http://127.0.0.1:36905/?api_port=40889#justsearch://surface/core.search-v3-surface",
+        "value": "SECOND current 日本",
+        "history": 6,
+        "refused": 1,
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 40,
+        "chatDispatches": 0,
+        "knowledgeSearches": 0,
+        "digest": "sha256:6da6e279ce619b7bafd25d82f649c33acf2a3fe7ac9f6b026be537f0a433a0f8"
+      }
+    },
+    {
+      "case": "own-refusal-retirement-probe-rail-pointer",
+      "status": "fail",
+      "resultDigest": "sha256:d3a9e67f9eecd7a2a430a4bc892c6d18776ed843f9123d9e6051b7f9074c3c47",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "failure.png": "sha256:71497f8780b7e9397c1bf9b1ae574b5215bf3f643cce9a02e3222f0dd85680c6",
+        "after-other-navigation.png": "sha256:c2789c874af68c5734930662e324a71dee804fe689d6d09557b5f73eff52038d",
+        "capacity-refusal.png": "sha256:81725efce04f672c3552035730bcbcb8fc1bacc0a7054ce55ffe85a22f0d756a",
+        "after-discard.png": "sha256:71497f8780b7e9397c1bf9b1ae574b5215bf3f643cce9a02e3222f0dd85680c6"
+      },
+      "error": "AssertionError [ERR_ASSERTION]: {\"navigationRetiresRefusal\":false,\"noStaleTaskAfterDiscard\":true,\"noModelWork\":true}",
+      "checks": {
+        "navigationRetiresRefusal": false,
+        "noStaleTaskAfterDiscard": true,
+        "noModelWork": true
+      },
+      "observationsDigest": "sha256:3b58881329807483b0b7dbd8138abbbdbe27f3984d8c2148a513cbab5d7a900b",
+      "before": {
+        "url": "http://127.0.0.1:36905/?api_port=40889#justsearch://surface/core.search-v3-surface?query=THIRD+refused+%26+%23&mode=ask&docIds=%2Ftmp%2Fjsv-eng-uy6vyqfp%2Fcorpus%2Fchosen-alpha.txt",
+        "value": "SECOND current 日本",
+        "history": 5,
+        "refused": 1,
+        "capacityAlert": true
+      },
+      "navigated": {
+        "url": "http://127.0.0.1:36905/?api_port=40889#justsearch://surface/core.search-v3-surface",
+        "value": "SECOND current 日本",
+        "history": 6,
+        "refused": 1,
+        "capacityAlert": true
+      },
+      "discarded": {
+        "url": "http://127.0.0.1:36905/?api_port=40889#justsearch://surface/core.search-v3-surface",
+        "value": "SECOND current 日本",
+        "history": 6,
+        "refused": 1,
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 40,
+        "chatDispatches": 0,
+        "knowledgeSearches": 0,
+        "digest": "sha256:f6167bc8a2c3b6bb49c88570ca509f06286c39aad48375c856f1d7a021f8a792"
+      }
+    }
+  ],
+  "after": [
+    {
+      "case": "own-refusal-retirement-probe-bare-address",
+      "status": "pass",
+      "resultDigest": "sha256:f2c987f6781914a6f402f1395597241c5e4bd454981203939ae85ca44cfe1118",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "after-other-navigation.png": "sha256:8b26ac54f7764ef2ed34ec77bc2b986306581b8037fb99ab107e6583761a26f8",
+        "capacity-refusal.png": "sha256:b49627a0b9ad514bf3b621ef2dcbf26ccacefd62fd69ca8f0f87a1db8206c217",
+        "after-discard.png": "sha256:27fa39ff1fcbd28a8dad26ea2aa552876e1fdc8db5d066a6dd9b8bd9d1306d6f"
+      },
+      "checks": {
+        "navigationRetiresRefusal": true,
+        "noStaleTaskAfterDiscard": true,
+        "noModelWork": true
+      },
+      "observationsDigest": "sha256:e614ca89a5b6a5ad8977dd29184ce60c6028d88f0eb8a90108b282ea07f1ceda",
+      "before": {
+        "url": "http://127.0.0.1:40455/?api_port=35495#justsearch://surface/core.search-v3-surface?query=THIRD+refused+%26+%23&mode=ask&docIds=%2Ftmp%2Fjsv-eng-h2loyq4o%2Fcorpus%2Fchosen-alpha.txt",
+        "value": "SECOND current 日本",
+        "history": 5,
+        "refused": 1,
+        "capacityAlert": true
+      },
+      "navigated": {
+        "url": "http://127.0.0.1:40455/?api_port=35495#justsearch://surface/core.search-v3-surface",
+        "value": "SECOND current 日本",
+        "history": 6,
+        "refused": 0,
+        "capacityAlert": false
+      },
+      "discarded": {
+        "url": "http://127.0.0.1:40455/?api_port=35495#justsearch://surface/core.search-v3-surface",
+        "value": "SECOND current 日本",
+        "history": 6,
+        "refused": 0,
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 41,
+        "chatDispatches": 0,
+        "knowledgeSearches": 0,
+        "digest": "sha256:ba5a4101e066e22ce27af49490bd0669dac993d06fc4e910d2f47fd475cdba98"
+      }
+    },
+    {
+      "case": "own-refusal-retirement-probe-rail-pointer",
+      "status": "pass",
+      "resultDigest": "sha256:aeffd4fe27749b11a41df0cab8af499cdb43e71807b59ebe8611138d2a1601ba",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "after-other-navigation.png": "sha256:41c4acbf4e38faaaedf8b0fc0ab2102abaa4fddc6a976392b1c4c3aa17674a11",
+        "capacity-refusal.png": "sha256:1c0a9997e2baaa24bc6e63433279ece96ecd9f44283eb2fea6546111b0317910",
+        "after-discard.png": "sha256:6ec5e281443ba2a98a5cb4f6c9e933c14af3bcab14e9999f32376feff20e3b9b"
+      },
+      "checks": {
+        "navigationRetiresRefusal": true,
+        "noStaleTaskAfterDiscard": true,
+        "noModelWork": true
+      },
+      "observationsDigest": "sha256:c82411d945d5462bc9d3b933c705d22e39466bfbded1eb83e195c6d03bf931cd",
+      "before": {
+        "url": "http://127.0.0.1:40455/?api_port=35495#justsearch://surface/core.search-v3-surface?query=THIRD+refused+%26+%23&mode=ask&docIds=%2Ftmp%2Fjsv-eng-h2loyq4o%2Fcorpus%2Fchosen-alpha.txt",
+        "value": "SECOND current 日本",
+        "history": 5,
+        "refused": 1,
+        "capacityAlert": true
+      },
+      "navigated": {
+        "url": "http://127.0.0.1:40455/?api_port=35495#justsearch://surface/core.search-v3-surface",
+        "value": "SECOND current 日本",
+        "history": 6,
+        "refused": 0,
+        "capacityAlert": false
+      },
+      "discarded": {
+        "url": "http://127.0.0.1:40455/?api_port=35495#justsearch://surface/core.search-v3-surface",
+        "value": "SECOND current 日本",
+        "history": 6,
+        "refused": 0,
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 40,
+        "chatDispatches": 0,
+        "knowledgeSearches": 0,
+        "digest": "sha256:df16e73a2e33f8e645a2accbf39fce1c9f9b0062d611d0b7016304b9bf4478b4"
+      }
+    },
+    {
+      "case": "capacity-refusal-reload",
+      "status": "pass",
+      "resultDigest": "sha256:62ca2527d90513b222e611645b3622104029301282fdf8dc77680ff2959b70c0",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "freed-capacity.png": "sha256:098330d9b4557008499f3f0536261b4a767d96069a436ca5733d89bd412bc38a",
+        "recovered.png": "sha256:588a14f338a7c7712623daeed4b2f9d22b8025e567d90d56e550c89f762df247",
+        "refused.png": "sha256:bb3b3fb865f4b6f4418c864604e35129f793be43c2283f5c8f1ea49b49aca6be"
+      },
+      "checks": {
+        "secondAccepted": true,
+        "genuineReason": true,
+        "refusedTextKept": true,
+        "oldCurrentKept": true,
+        "reloadAccepts": true,
+        "retainedSecond": true,
+        "noFalseRefusalAfter": true,
+        "noAuto": true
+      },
+      "observationsDigest": "sha256:252de08fca758c4ae904f2f5d4d87894bf315172f4799c2fff05f1ea2e2ad3d5",
+      "accepted": {
+        "value": "Second unsent draft",
+        "capacityAlert": false
+      },
+      "refused": {
+        "url": "http://127.0.0.1:42879/?api_port=33547#justsearch://surface/core.search-v3-surface?query=Third+task+to+recover+after+freeing+capacity&mode=ask&docIds=%2Ftmp%2Fjsv-eng-h_5nl5k3%2Fcorpus%2Fchosen-alpha.txt",
+        "value": "Second unsent draft",
+        "capacityAlert": true
+      },
+      "recovered": {
+        "url": "http://127.0.0.1:42879/?api_port=33547#justsearch://surface/core.search-v3-surface",
+        "value": "Third task to recover after freeing capacity",
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 73,
+        "chatDispatches": 0,
+        "knowledgeSearches": 0,
+        "digest": "sha256:720b3b7dd264c686385c1092a57eed9f9ed369d04beaf63a090837733931e500"
+      }
+    },
+    {
+      "case": "cold-replacement",
+      "status": "pass",
+      "resultDigest": "sha256:0d92c18da2a778c87a7ceecb5fbe15bd24921f4464d8f92638f84d53ad8577da",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "first.png": "sha256:d149b415711c43aa0d8fef3a23cd81c7591cb4ca9e5b6dd7af6427795847a7b1",
+        "second.png": "sha256:a2ca39fd64a979bb4a0013e2bdb0a13ed36e441a6c6b2b5ceacb284add4c3902"
+      },
+      "checks": {
+        "text": true,
+        "noAutomaticModelWork": true,
+        "chosen": true
+      },
+      "observationsDigest": "sha256:46a687fac8840dc93061d7fbfe9529031a3d75c322cce57f6b5334256e42ed9f",
+      "first": {
+        "url": "http://127.0.0.1:38135/?api_port=35109#justsearch://surface/core.search-v3-surface",
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 67,
+        "chatDispatches": 0,
+        "knowledgeSearches": 0,
+        "digest": "sha256:378d3f5166d6e90dd5204f16c1fa54e8d796155e7cac468a428d9daf70fb5590"
+      }
+    },
+    {
+      "case": "refusal-search-probe-v2",
+      "status": "pass",
+      "resultDigest": "sha256:6145e5f68656a964f1e20f5d824ebaf3dafbf726518a98263f27c900bdc9f063",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "searched.png": "sha256:6177126cd52cf9be3803a19bf19546ff44e5a467602bf61f232c88c44314d39d",
+        "refused.png": "sha256:f9f6d65821c80991468ad8807f4ecbec834ce907975c3ddda7ba9fb501b8949a"
+      },
+      "checks": {
+        "searchMode": true,
+        "searchText": true,
+        "realSearch": true,
+        "addressFollows": true,
+        "noModelWork": true
+      },
+      "observationsDigest": "sha256:2a4abed6e3562ff272ef6b98241c699bf2fa757a4f06c98f92358f71e62ce3aa",
+      "refused": {
+        "url": "http://127.0.0.1:59927/?api_port=39049#justsearch://surface/core.search-v3-surface?query=Incoming+refused+task+for+file-count+check&mode=ask&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-0.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-1.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-2.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-3.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-4.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-5.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-6.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-7.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-8.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-9.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-10.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-11.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-12.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-13.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-14.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-15.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-16.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-17.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-18.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-19.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-20.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-21.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-22.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-23.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-24.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-25.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-26.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-27.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-28.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-29.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-30.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-31.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-32.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-33.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-34.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-35.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-36.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-37.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-38.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-39.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-40.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-41.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-42.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-43.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-44.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-45.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-46.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-47.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-48.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-49.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-50.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-51.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-52.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-53.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-54.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-55.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-56.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-57.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-58.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-59.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-60.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-61.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-62.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-63.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-64.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-65.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-66.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-67.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-68.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-69.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-70.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-71.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-72.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-73.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-74.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-75.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-76.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-77.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-78.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-79.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-80.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-81.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-82.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-83.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-84.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-85.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-86.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-87.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-88.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-89.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-90.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-91.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-92.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-93.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-94.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-95.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-96.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-97.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-98.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-99.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-100.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-101.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-102.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-103.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-104.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-105.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-106.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-107.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-108.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-109.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-110.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-111.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-112.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-113.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-114.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-115.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-116.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-117.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-118.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-119.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-120.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-121.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-122.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-123.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-124.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-125.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-126.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-127.txt&docIds=%2Ftmp%2Fjsv-eng-dpo0k3tg%2Fcorpus%2Fscope-128.txt",
+        "value": "Existing small draft",
+        "capacityAlert": false
+      },
+      "searched": {
+        "url": "http://127.0.0.1:59927/?api_port=39049#justsearch://surface/core.search-v3-surface",
+        "value": "Cedar",
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 38,
+        "chatDispatches": 0,
+        "knowledgeSearches": 2,
+        "digest": "sha256:d82c8db4cc86782a22d2ae53e60b72b134078815441a7c6eb74d1c7383d80da4"
+      }
+    },
+    {
+      "case": "accepted-handoff-history",
+      "status": "pass",
+      "resultDigest": "sha256:bcffe5c19679b92d532ec1db5db887cbdd8b1f7e48bb304b43a8343f33fab9c5",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "accepted.png": "sha256:ad32b157786eafec217f07c4bd231d40b90062190084c0583958ecf109e7c08b",
+        "reload.png": "sha256:8ec8e22289e1730429176eb0a3109b9eca4d399230c776c4834bae03e39c06e0",
+        "back.png": "sha256:a22871ffe3be9eea50263d086d9f8120dcd97107e068db10c8f9c05de8e71e29"
+      },
+      "checks": {
+        "acceptedExact": true,
+        "acceptedCanonical": true,
+        "backKeepsEdits": true,
+        "forwardLibrary": true,
+        "backAgainKeepsEdits": true,
+        "reloadKeepsEdits": true,
+        "noDuplicatedTasks": true,
+        "noAuto": true
+      },
+      "observationsDigest": "sha256:f9018330530ef374d4888924734a520adf4a4e7ce8ba6c0b636c97ad5761ca0c",
+      "accepted": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface",
+        "composer": "Accepted incoming task",
+        "copies": 0,
+        "capacityAlert": false
+      },
+      "back": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface",
+        "composer": "Human edits after accepting the incoming task",
+        "copies": 0,
+        "capacityAlert": false
+      },
+      "forward": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.library-surface",
+        "capacityAlert": false
+      },
+      "reload": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface",
+        "composer": "Human edits after accepting the incoming task",
+        "copies": 1,
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 87,
+        "chatDispatches": 0,
+        "knowledgeSearches": 0,
+        "digest": "sha256:601e218150979e8365d03ed5f6267d1ffc0019bd269b5b8d740ace12bd27b031"
+      }
+    },
+    {
+      "case": "create-two-real-records",
+      "status": "pass",
+      "resultDigest": "sha256:09e83840008c40a8ca213b1aba57d7bdddcc8f3a376eab4611c7c802e2f8e8f0",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "two-real-records.png": "sha256:c9818733dcf0e03e6a6a3b229d019b98e9f594895705f2b4d3f97d410b42aeda"
+      },
+      "requests": {
+        "total": 71,
+        "chatDispatches": 2,
+        "knowledgeSearches": 0,
+        "digest": "sha256:af5577581fb6317d68eed5b61578992da997c8e7d3c3f70a67424c14848f1e94"
+      }
+    },
+    {
+      "case": "refused-handoff-navigation",
+      "status": "pass",
+      "resultDigest": "sha256:feab9a03501e6be69bf70fe945b6167f3dba506de8ec4bbdbadd479c711507a3",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "conversation-a.png": "sha256:fe23561e082efb345c17b836568c0d31c3491cfe9fcd48b0d4e7607819e53711",
+        "forward.png": "sha256:5d35b266e0ff4c216b0b3f01b9e8eca4c19b9d3c6519029cdc104e2386b6d5bb",
+        "conversation-b.png": "sha256:fcd93e49583532d11116f35230f79ee84050608232b1bcb204e11e204183d2f7",
+        "back.png": "sha256:b445f4732f3e7a48d3cb319c926e4463f69803b25e676ce259805c07a16770b4",
+        "refused.png": "sha256:d6e1de7b2cbecceef2d4ad577b38e6dc65ca092cb245cd41e51b329da3b00738",
+        "later-valid.png": "sha256:06ba7e28dabd711d380a74e938622990d0e8e436f04cd80094adda83f66d9067"
+      },
+      "checks": {
+        "realRefusal": true,
+        "incomingRetained": true,
+        "conversationAAddress": true,
+        "conversationBAddress": true,
+        "backAddress": true,
+        "forwardAddress": true,
+        "laterValid": true,
+        "noAuto": true
+      },
+      "observationsDigest": "sha256:4d16bb7c1eccd25ebdeb568b03d0b6a7e00d270fab461776cf8aadc0f6e25e8d",
+      "refused": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface?query=Incoming+text+parked+after+genuine+file-count+refusal&mode=ask&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-0.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-1.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-2.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-3.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-4.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-5.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-6.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-7.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-8.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-9.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-10.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-11.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-12.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-13.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-14.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-15.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-16.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-17.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-18.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-19.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-20.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-21.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-22.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-23.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-24.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-25.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-26.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-27.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-28.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-29.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-30.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-31.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-32.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-33.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-34.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-35.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-36.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-37.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-38.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-39.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-40.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-41.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-42.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-43.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-44.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-45.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-46.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-47.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-48.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-49.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-50.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-51.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-52.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-53.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-54.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-55.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-56.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-57.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-58.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-59.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-60.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-61.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-62.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-63.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-64.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-65.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-66.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-67.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-68.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-69.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-70.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-71.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-72.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-73.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-74.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-75.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-76.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-77.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-78.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-79.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-80.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-81.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-82.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-83.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-84.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-85.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-86.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-87.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-88.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-89.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-90.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-91.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-92.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-93.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-94.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-95.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-96.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-97.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-98.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-99.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-100.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-101.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-102.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-103.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-104.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-105.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-106.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-107.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-108.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-109.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-110.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-111.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-112.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-113.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-114.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-115.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-116.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-117.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-118.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-119.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-120.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-121.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-122.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-123.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-124.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-125.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-126.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-127.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Ftoo-many-128.txt",
+        "composer": "Small existing draft",
+        "copies": 0,
+        "capacityAlert": false
+      },
+      "first": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface?conversationId=uc-d0d3c209-20f8-415b-8706-6382cb2a714e",
+        "composer": "",
+        "copies": 1,
+        "capacityAlert": false
+      },
+      "second": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface?conversationId=uc-98a9a172-14a7-4b2a-9649-60febad43572",
+        "composer": "",
+        "copies": 1,
+        "capacityAlert": false
+      },
+      "back": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface?conversationId=uc-d0d3c209-20f8-415b-8706-6382cb2a714e",
+        "composer": "",
+        "copies": 1,
+        "capacityAlert": false
+      },
+      "forward": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface?conversationId=uc-98a9a172-14a7-4b2a-9649-60febad43572",
+        "composer": "",
+        "copies": 1,
+        "capacityAlert": false
+      },
+      "laterState": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface",
+        "composer": "Later valid task is accepted",
+        "copies": 0,
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 63,
+        "chatDispatches": 0,
+        "knowledgeSearches": 0,
+        "digest": "sha256:b9e4971ba838e803eda039f05f33dfb44809c065ee08bfbad059c067bfbaafc2"
+      }
+    },
+    {
+      "case": "refused-handoff-search-and-retry",
+      "status": "pass",
+      "resultDigest": "sha256:1bad030b9a91f252e41d4c9c5dfe360969bc8e7867ac60ae719d1156bd60dde3",
+      "profileRemoved": true,
+      "sandbox": false,
+      "screenshots": {
+        "searched.png": "sha256:b883941cc537a7b10962042280802b1a2e9c8680638f0f82cdf91c485246e9c2",
+        "incoming-recovered.png": "sha256:5673c7eefef1993f4a7da4e67f392cae928a0aadd0be5ffcb056703a64e6a34b"
+      },
+      "checks": {
+        "realRefusal": true,
+        "searchAddress": true,
+        "incomingCanBeEntered": true,
+        "laterAddressCanonical": true,
+        "noAuto": true
+      },
+      "observationsDigest": "sha256:1fb6d9f8601256bd1770d825cd1e254457e62387863323d32c1c7f11b3002483",
+      "refused": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface?query=Incoming+oversized-scope+task+can+be+entered+later&mode=ask&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-0.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-1.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-2.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-3.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-4.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-5.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-6.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-7.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-8.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-9.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-10.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-11.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-12.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-13.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-14.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-15.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-16.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-17.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-18.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-19.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-20.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-21.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-22.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-23.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-24.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-25.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-26.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-27.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-28.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-29.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-30.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-31.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-32.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-33.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-34.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-35.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-36.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-37.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-38.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-39.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-40.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-41.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-42.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-43.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-44.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-45.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-46.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-47.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-48.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-49.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-50.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-51.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-52.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-53.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-54.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-55.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-56.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-57.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-58.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-59.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-60.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-61.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-62.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-63.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-64.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-65.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-66.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-67.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-68.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-69.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-70.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-71.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-72.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-73.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-74.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-75.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-76.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-77.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-78.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-79.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-80.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-81.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-82.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-83.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-84.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-85.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-86.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-87.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-88.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-89.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-90.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-91.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-92.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-93.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-94.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-95.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-96.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-97.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-98.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-99.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-100.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-101.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-102.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-103.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-104.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-105.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-106.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-107.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-108.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-109.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-110.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-111.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-112.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-113.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-114.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-115.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-116.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-117.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-118.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-119.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-120.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-121.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-122.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-123.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-124.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-125.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-126.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-127.txt&docIds=%2Ftmp%2Fjsv-eng-0_pibdi0%2Fcorpus%2Flimit-128.txt",
+        "composer": "Earlier ordinary draft",
+        "copies": 0,
+        "capacityAlert": false
+      },
+      "recovered": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface",
+        "composer": "Incoming oversized-scope task can be entered later",
+        "copies": 1,
+        "capacityAlert": false
+      },
+      "searched": {
+        "url": "http://127.0.0.1:44947/?api_port=37159#justsearch://surface/core.search-v3-surface",
+        "composer": "Cedar",
+        "copies": 0,
+        "capacityAlert": false
+      },
+      "requests": {
+        "total": 40,
+        "chatDispatches": 0,
+        "knowledgeSearches": 2,
+        "digest": "sha256:10c0c28ebff60f31a9ad8be6a0d49f0e4a214e7c625e71f67fec7243c8af41dc"
+      }
+    }
+  ],
+  "earlierAttempts": {
+    "history": [
+      {
+        "case": "accepted-handoff-history",
+        "status": "pass",
+        "resultDigest": "sha256:9ff4a1e7b126615968dc15c622b5e0cbac4fea9019bbd2167c3562b46de42f62",
+        "profileRemoved": true,
+        "sandbox": false,
+        "screenshots": {
+          "accepted.png": "sha256:a4a523ec650481cd7459f9c6a1dcfb1aafd8a6ead632e3eee87962b4c0bee41f",
+          "reload.png": "sha256:32607c2d3387e9d49342faa93953d19060cad9c244fa43c83e7f061a5a2a7841",
+          "back.png": "sha256:5cdd5dac0fa7deaced906dfe11ec519dfada6a94c40e95be11e6019d4c091508"
+        },
+        "checks": {
+          "acceptedExact": true,
+          "acceptedCanonical": true,
+          "backKeepsEdits": true,
+          "forwardLibrary": true,
+          "backAgainKeepsEdits": true,
+          "reloadKeepsEdits": true,
+          "noDuplicatedTasks": true,
+          "noAuto": true
+        },
+        "observationsDigest": "sha256:394fc242c42598c3679d65284d6994c9797925b4d10762d8bafc58df4543d076",
+        "accepted": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface",
+          "composer": "Accepted incoming task",
+          "copies": 0,
+          "capacityAlert": false
+        },
+        "back": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface",
+          "composer": "Human edits after accepting the incoming task",
+          "copies": 0,
+          "capacityAlert": false
+        },
+        "forward": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.library-surface",
+          "capacityAlert": false
+        },
+        "reload": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface",
+          "composer": "Human edits after accepting the incoming task",
+          "copies": 1,
+          "capacityAlert": false
+        },
+        "requests": {
+          "total": 88,
+          "chatDispatches": 0,
+          "knowledgeSearches": 0,
+          "digest": "sha256:f9dbedb01c09e699b201702a19444e8c644bc1dd7b5f8cfc56984c03fbc98daf"
+        }
+      },
+      {
+        "case": "create-two-real-records",
+        "status": "pass",
+        "resultDigest": "sha256:09e83840008c40a8ca213b1aba57d7bdddcc8f3a376eab4611c7c802e2f8e8f0",
+        "profileRemoved": true,
+        "sandbox": false,
+        "screenshots": {
+          "two-real-records.png": "sha256:6cfa858ec5035e51ece6db76bde16489276b2c9531290b1088b7b574eeb6b745"
+        },
+        "requests": {
+          "total": 71,
+          "chatDispatches": 2,
+          "knowledgeSearches": 0,
+          "digest": "sha256:0553df7975cb6d00822137ad70b219a3d21f4b73b2d0131b0b04513b13701bd0"
+        }
+      },
+      {
+        "case": "refused-handoff-navigation",
+        "status": "fail",
+        "resultDigest": "sha256:173f05443ab1695eadbfe1313565c972f05ce0f3a340bc5e5926f423fc4fbc44",
+        "profileRemoved": true,
+        "sandbox": false,
+        "screenshots": {
+          "conversation-a.png": "sha256:59eb021cc8f166d2e108da86a8c917e562aebe30cbbb4b57513a330bd06688c6",
+          "forward.png": "sha256:a3f7002847b1af1e6451982ef22d4a4f5a1a3a79806e1c936ca829cf18c0ab44",
+          "conversation-b.png": "sha256:3d7949fe76be70bb14b24a6fb4051232e67f49e99842fc43a53caddeebc0debf",
+          "failure.png": "sha256:b172968733710edc763d9b4517ee0ab9f6fd095528712d1c3c3a3faea6fafbb6",
+          "back.png": "sha256:a1877aa1245260314dd451869a728e75cb246e7ebea75284e9d33341689e0cb3",
+          "refused.png": "sha256:fe176e8f8e82de5684bd645cc0070d063e196af18163e536a87cd521cede55c1",
+          "later-valid.png": "sha256:b172968733710edc763d9b4517ee0ab9f6fd095528712d1c3c3a3faea6fafbb6"
+        },
+        "error": "AssertionError [ERR_ASSERTION]: {\"realRefusal\":true,\"incomingRetained\":true,\"conversationAAddress\":true,\"conversationBAddress\":true,\"backAddress\":true,\"forwardAddress\":true,\"laterValid\":false,\"noAuto\":true}",
+        "checks": {
+          "realRefusal": true,
+          "incomingRetained": true,
+          "conversationAAddress": true,
+          "conversationBAddress": true,
+          "backAddress": true,
+          "forwardAddress": true,
+          "laterValid": false,
+          "noAuto": true
+        },
+        "observationsDigest": "sha256:295d8d5fb6b8be417e898a34269f05b9870e01002a89822f91f75606309622c5",
+        "refused": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface?query=Incoming+text+parked+after+genuine+file-count+refusal&mode=ask&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-0.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-1.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-2.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-3.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-4.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-5.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-6.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-7.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-8.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-9.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-10.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-11.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-12.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-13.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-14.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-15.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-16.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-17.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-18.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-19.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-20.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-21.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-22.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-23.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-24.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-25.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-26.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-27.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-28.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-29.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-30.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-31.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-32.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-33.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-34.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-35.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-36.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-37.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-38.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-39.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-40.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-41.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-42.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-43.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-44.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-45.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-46.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-47.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-48.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-49.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-50.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-51.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-52.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-53.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-54.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-55.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-56.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-57.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-58.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-59.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-60.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-61.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-62.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-63.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-64.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-65.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-66.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-67.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-68.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-69.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-70.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-71.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-72.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-73.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-74.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-75.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-76.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-77.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-78.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-79.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-80.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-81.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-82.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-83.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-84.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-85.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-86.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-87.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-88.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-89.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-90.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-91.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-92.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-93.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-94.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-95.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-96.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-97.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-98.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-99.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-100.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-101.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-102.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-103.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-104.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-105.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-106.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-107.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-108.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-109.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-110.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-111.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-112.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-113.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-114.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-115.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-116.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-117.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-118.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-119.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-120.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-121.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-122.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-123.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-124.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-125.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-126.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-127.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Ftoo-many-128.txt",
+          "composer": "Small existing draft",
+          "copies": 0,
+          "capacityAlert": false
+        },
+        "first": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface?conversationId=uc-ab4650d3-6075-49ef-bdf8-f2222fb5b337",
+          "composer": "",
+          "copies": 1,
+          "capacityAlert": false
+        },
+        "second": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface?conversationId=uc-a3d8bd0c-801b-4150-9e0f-8e5ce2f8a4a7",
+          "composer": "",
+          "copies": 1,
+          "capacityAlert": false
+        },
+        "back": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface?conversationId=uc-ab4650d3-6075-49ef-bdf8-f2222fb5b337",
+          "composer": "",
+          "copies": 1,
+          "capacityAlert": false
+        },
+        "forward": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface?conversationId=uc-a3d8bd0c-801b-4150-9e0f-8e5ce2f8a4a7",
+          "composer": "",
+          "copies": 1,
+          "capacityAlert": false
+        },
+        "laterState": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface",
+          "composer": "",
+          "copies": 0,
+          "capacityAlert": false
+        },
+        "requests": {
+          "total": 97,
+          "chatDispatches": 0,
+          "knowledgeSearches": 0,
+          "digest": "sha256:b3da119324517f94f553a804f415e9ae240e3e7115eb260c3632df0f8b7974ae"
+        }
+      },
+      {
+        "case": "refused-handoff-search-and-retry",
+        "status": "pass",
+        "resultDigest": "sha256:a53d257ed1e5e89cf884665c71e9affe90b2294b8ad4184b02691189078e11be",
+        "profileRemoved": true,
+        "sandbox": false,
+        "screenshots": {
+          "searched.png": "sha256:a7355a66fd8e7e0df515f949c158064a704459695ac1a6b8ef56f7e7d38c3bd9",
+          "incoming-recovered.png": "sha256:d4251896856854b0128d6df53271b237c1480daf0a62c5dced99b18f3c230a23"
+        },
+        "checks": {
+          "realRefusal": true,
+          "searchAddress": true,
+          "incomingCanBeEntered": true,
+          "laterAddressCanonical": true,
+          "noAuto": true
+        },
+        "observationsDigest": "sha256:f9b0c309b2e413d422f2549e2fbda74e914886201133c4dd053a95fde710469b",
+        "refused": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface?query=Incoming+oversized-scope+task+can+be+entered+later&mode=ask&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-0.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-1.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-2.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-3.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-4.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-5.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-6.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-7.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-8.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-9.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-10.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-11.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-12.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-13.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-14.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-15.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-16.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-17.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-18.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-19.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-20.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-21.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-22.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-23.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-24.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-25.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-26.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-27.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-28.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-29.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-30.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-31.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-32.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-33.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-34.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-35.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-36.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-37.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-38.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-39.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-40.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-41.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-42.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-43.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-44.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-45.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-46.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-47.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-48.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-49.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-50.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-51.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-52.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-53.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-54.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-55.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-56.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-57.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-58.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-59.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-60.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-61.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-62.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-63.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-64.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-65.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-66.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-67.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-68.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-69.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-70.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-71.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-72.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-73.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-74.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-75.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-76.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-77.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-78.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-79.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-80.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-81.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-82.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-83.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-84.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-85.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-86.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-87.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-88.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-89.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-90.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-91.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-92.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-93.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-94.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-95.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-96.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-97.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-98.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-99.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-100.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-101.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-102.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-103.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-104.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-105.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-106.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-107.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-108.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-109.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-110.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-111.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-112.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-113.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-114.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-115.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-116.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-117.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-118.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-119.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-120.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-121.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-122.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-123.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-124.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-125.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-126.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-127.txt&docIds=%2Ftmp%2Fjsv-eng-h9hypd6o%2Fcorpus%2Flimit-128.txt",
+          "composer": "Earlier ordinary draft",
+          "copies": 0,
+          "capacityAlert": false
+        },
+        "recovered": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface",
+          "composer": "Incoming oversized-scope task can be entered later",
+          "copies": 1,
+          "capacityAlert": false
+        },
+        "searched": {
+          "url": "http://127.0.0.1:49291/?api_port=42433#justsearch://surface/core.search-v3-surface",
+          "composer": "Cedar",
+          "copies": 0,
+          "capacityAlert": false
+        },
+        "requests": {
+          "total": 41,
+          "chatDispatches": 0,
+          "knowledgeSearches": 2,
+          "digest": "sha256:c0608a8ca12f8efdd242a3c3827105d6249e860770a0424611f024b373819eed"
+        }
+      }
+    ],
+    "interpretation": "First S79 later-valid assertion failed while Vite reloaded during concurrent production edits; its S79 history-address assertions passed. This is retained as a failed/unverified attempt. Final matrix on frozen production source passes unchanged scripts.",
+    "typecheckLint": "Initial checks rejected one unused copied test constant; removed it, no scenario/assertion weakened.",
+    "producer": "Initial private-object adapter incorrectly assumed .git is a directory; fixed alternate path with git rev-parse --git-path objects, unchanged official producer then passed.",
+    "fixture": "Initial fresh-address/traversal component fixture did not move the address before push:false. Corrected fixture models actual browser address movement; final baseline rail/fresh/modal fail at the stale-notice assertion, traversal passes."
+  },
+  "commands": [
+    {
+      "command": "npm ci",
+      "cwd": ".",
+      "exit": 0,
+      "log": "npm-ci-root.log",
+      "logDigests": {
+        "npm-ci-root.log": "sha256:88d03f6fccd0ee62a0fce9135569d1e388966bfa59a29f77885988bb64452c6f"
+      }
+    },
+    {
+      "command": "npm ci",
+      "cwd": "modules/ui-web (source / shared-clone baseline independently)",
+      "exit": 0,
+      "logs": [
+        "npm-ci-source.log",
+        "npm-ci-before.log"
+      ],
+      "logDigests": {
+        "npm-ci-source.log": "sha256:6294f536b255b125497da24732049636d008ec852f2f4ad1d81ca66499779e48",
+        "npm-ci-before.log": "sha256:6294f536b255b125497da24732049636d008ec852f2f4ad1d81ca66499779e48"
+      }
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "modules/ui-web",
+      "log": "typecheck-complete.log",
+      "logDigests": {
+        "typecheck-complete.log": "sha256:c8d2e1bbc6c37e08225a662df8d8fc9af17316c77b6aafc9b776350e0f188ab3"
+      },
+      "exit": 0
+    },
+    {
+      "command": "npm run lint",
+      "cwd": "modules/ui-web",
+      "exit": 0,
+      "log": "lint-complete.log",
+      "logDigests": {
+        "lint-complete.log": "sha256:901a6221b089f44724e9d7454a1a8547652691fe55522109007a8e9f755ce437"
+      }
+    },
+    {
+      "command": "npm run test:unit:run -- --configLoader runner --maxWorkers=4",
+      "cwd": "modules/ui-web",
+      "exit": 0,
+      "files": 648,
+      "tests": 8258,
+      "skipped": 0,
+      "log": "unit-full-final.log",
+      "logDigests": {
+        "unit-full-final.log": "sha256:d270f3dc63ac2f4b8b3163e28a80e353d0fbc07170dd00511beb13cb1c2c0373"
+      }
+    },
+    {
+      "command": "node scripts/ci/run-ui-web-gates.mjs",
+      "exit": 0,
+      "passed": 28,
+      "total": 28,
+      "log": "ui-gates-final.log",
+      "logDigests": {
+        "ui-gates-final.log": "sha256:0d9de61819a29928bf6d1e00ac63750c27b4707b88aee8e313a633234b3f9793"
+      }
+    },
+    {
+      "command": "node scripts/governance/gates/test-intent/cli.mjs check --base origin/main",
+      "exit": 1,
+      "base": "a9a5928a92cc847ee55d812d42e7c4fca3c53608",
+      "log": "test-intent-final.log",
+      "errors": [
+        "Three unrelated uncovered JVM tests (same on bd558647f6 against exact base)",
+        "Missing independent acceptance"
+      ],
+      "logDigests": {
+        "test-intent-final.log": "sha256:896be38c4fed8d6b4a6501c47ed3691063150b4c495c88989e5ef7136172fead"
+      }
+    },
+    {
+      "command": "node scripts/governance/gates/test-intent/cli.mjs check --base a9a5928a92cc",
+      "cwd": "shared-clone baseline bd558647f6",
+      "exit": 1,
+      "log": "test-intent-before-matched.log",
+      "errors": "Same three uncovered JVM tests and missing independent acceptance",
+      "logDigests": {
+        "test-intent-before-matched.log": "sha256:2435d297a4e561d2cb2c95fd9014d06cad0fae7bd22e5919b7c3d16c6e0c02a0"
+      }
+    },
+    {
+      "command": "npm run test:unit:run -- src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts --configLoader runner --maxWorkers=4 --reporter=json --outputFile=<private report>",
+      "before": {
+        "pass": 14,
+        "fail": 3,
+        "report": "before-unit-complete.json",
+        "digest": "sha256:0f174a4a9293cce4dd621993963cb28234c3ef04bda6e3754132f39c18b7500e"
+      },
+      "after": {
+        "pass": 17,
+        "fail": 0,
+        "report": "after-unit-complete.json",
+        "digest": "sha256:ea9aec4a176fe20a10c5ac62f7364e9beecec191e3970444cbb5c43db08576c0"
+      }
+    },
+    {
+      "command": [
+        "node",
+        "scripts/governance/gates/test-intent/run-evidence.mjs",
+        "--out",
+        "gates/test-intent/evidence/uiux-refusal-retirement-repair.json",
+        "--before",
+        "bd558647f6",
+        "--before-root",
+        "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 rail to bare Search retires refusal notice and its alert without changing drafts",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 fresh address to bare Search retires refusal notice and its alert without changing drafts",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 accepted modal navigation retires refusal while keeping the underlying preparation"
+      ],
+      "exit": 0,
+      "log": "repair-producer.log",
+      "logDigests": {
+        "repair-producer.log": "sha256:4ae992bc2c1897023afc090a878de5b68f32da87a5c9eae2d66316cfa000cb69"
+      }
+    },
+    {
+      "command": [
+        "node",
+        "scripts/governance/gates/test-intent/run-evidence.mjs",
+        "--out",
+        "gates/test-intent/evidence/uiux-refusal-retirement-preservation.json",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 traversal to bare Search retires refusal notice and its alert without changing drafts",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 preservation another proposal still reports the genuine capacity limit after retirement",
+        "--check",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 preservation rejected unknown navigation keeps refusal available for explicit discard"
+      ],
+      "exit": 0,
+      "log": "preservation-producer.log",
+      "logDigests": {
+        "preservation-producer.log": "sha256:5f906cd49c41affc3f7492cd9bcdbcb4487404553f7217ec0d1630bba31169f3"
+      }
+    }
+  ],
+  "runtimeGroups": [
+    {
+      "label": "before-probe",
+      "frontendPort": 36905,
+      "enginePort": 40889,
+      "profileRemoved": true,
+      "processesDigest": "sha256:2ced25c33af54d9b3b29acf8f95e8a9d6689e27c50ae574e978b59b084733013",
+      "cleanupDigest": "sha256:dbe8d2e5ede643d1071126b33689f2a8fde07179f2c3a32814b34e26ff85d943",
+      "jobs": [
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/refusal-retirement-probe.mjs"
+          ],
+          "exit": 1
+        }
+      ],
+      "modelProcesses": []
+    },
+    {
+      "label": "final-probe",
+      "frontendPort": 40455,
+      "enginePort": 35495,
+      "profileRemoved": true,
+      "processesDigest": "sha256:41eddd72907f8b9dbe018efbe521c47cd759fa8dd9a3ffbc74c0979d599d229c",
+      "cleanupDigest": "sha256:a18c2c7e0ffabeda64dc51f27a63beca3b15447e653b398b87b000777fcf29ae",
+      "jobs": [
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/refusal-retirement-probe.mjs"
+          ],
+          "exit": 0
+        }
+      ],
+      "modelProcesses": []
+    },
+    {
+      "label": "final-capacity",
+      "frontendPort": 42879,
+      "enginePort": 33547,
+      "profileRemoved": true,
+      "processesDigest": "sha256:6ae6822804dac08205a9a46f9baf04c2562d5304ff833471e6c951cf6a7fa75c",
+      "cleanupDigest": "sha256:7212d4753b34c3b5d3d2e22263a9f357833a35cf09819921dd475bb77c4e3aa7",
+      "jobs": [
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/capacity-extra.mjs"
+          ],
+          "exit": 0
+        }
+      ],
+      "modelProcesses": []
+    },
+    {
+      "label": "final-cold",
+      "frontendPort": 38135,
+      "enginePort": 35109,
+      "profileRemoved": true,
+      "processesDigest": "sha256:9ca0e8aca1fa011d7ede85a93881ce3ef932019604fdc5d9d4d8ac5ae4d6bf19",
+      "cleanupDigest": "sha256:974b1b55f749a5135b39b399da195a6c42148aa31320d616504e98ad760f8ed7",
+      "jobs": [
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/cold-case.mjs"
+          ],
+          "exit": 0
+        }
+      ],
+      "modelProcesses": []
+    },
+    {
+      "label": "final-search",
+      "frontendPort": 59927,
+      "enginePort": 39049,
+      "profileRemoved": true,
+      "processesDigest": "sha256:cd01fbcf9989ca1bf9ec1bc77973a0424629d34dfda561f253ab92ab2cf2328b",
+      "cleanupDigest": "sha256:2b0a84325eac9a84daf98007ce04f8ea107722cb12bfcdd7a9aa23f594f01925",
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/prerequisites.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/refusal-search-probe-v2.mjs"
+          ],
+          "exit": 0
+        }
+      ],
+      "modelProcesses": []
+    },
+    {
+      "label": "final-history",
+      "frontendPort": 44947,
+      "enginePort": 37159,
+      "profileRemoved": true,
+      "processesDigest": "sha256:a545da128ee6e798bb344979128c2de2df8041cfa404d95f62552d24559d1000",
+      "cleanupDigest": "sha256:6543a441695bb3af19f7e47aaf28c51aa7ea7cebb9f5ddf672b64044dee96c1a",
+      "jobs": [
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/prerequisites.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "python3",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/cpu-settings.py"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/create-records.mjs"
+          ],
+          "exit": 0
+        },
+        {
+          "command": [
+            "node",
+            "/home/elias/.cache/am/43e7ujly/tmp/refusal-retirement/scripts/history-extra.mjs"
+          ],
+          "exit": 0
+        }
+      ],
+      "modelProcesses": [
+        {
+          "pid": 5196,
+          "startticks": "16346364",
+          "argv": [
+            "/home/elias/dev/llama.cpp-b8571/build/bin/llama-server",
+            "-m",
+            "/home/elias/dev/justsearch/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "--cache-ram",
+            "1024",
+            "--jinja",
+            "--reasoning-format",
+            "deepseek",
+            "--reasoning-budget",
+            "0",
+            "--host",
+            "127.0.0.1",
+            "--metrics",
+            "--port",
+            "32799",
+            "-c",
+            "16384",
+            "-ngl",
+            "0",
+            "--device",
+            "none",
+            "-np",
+            "2",
+            "-kvu",
+            "-ctk",
+            "q8_0",
+            "-ctv",
+            "q8_0",
+            "-fa",
+            "on",
+            "-fit",
+            "off",
+            ""
+          ],
+          "CUDA_VISIBLE_DEVICES": "-1"
+        }
+      ]
+    }
+  ],
+  "harnessDigests": {
+    "browser-lib.mjs": "sha256:d13ca44b3acdc13ef1023bae31e5a30c45679d7535b99b254c162ba18dfeb7e4",
+    "cold-case.mjs": "sha256:33d1ef7fa7af0f8d55ce338e98bcaf4ecab1a7754ea74ded96c5c028f455eb0c",
+    "groups.py": "sha256:078059e2a4719a749a305034d75423528e156a2c112cab60d94e1dc55f715e88",
+    "history-extra.mjs": "sha256:f6cc180354cabdcefc486cc1c0f746d36b370ad150d3fd97bb0075bca7cb8924",
+    "produce-evidence.py": "sha256:f1a205e63fe7c32116d387ea5b117d2242eefe8b43c583fb70807a0725243384",
+    "create-records.mjs": "sha256:22f356b124e653d529ac750b86c20a1a45a41f0b904c5ba3723a34ef70524bf2",
+    "clean-exec.py": "sha256:87839accc808ec7b7850f0f4ac2eb41e98ecb22558c3471d35a642aa2f0b8b80",
+    "refusal-retirement-probe.mjs": "sha256:eb74658212036c2fe83902e76aee72045eb3a07abee325b62f2770cb387ad1d4",
+    "runtime.py": "sha256:48f0f0ef46fa55903324783255ae363ea7d8b1f7f4b178535523b25495746740",
+    "prerequisites.py": "sha256:69025adec9f23d17a6ea5e87d009c39a673c50b4a5a1ad03c51ec1d1999a4340",
+    "cpu-settings.py": "sha256:af054fd465fb1969220634c2ccfae0ff0f572fd7192491b0578dc3278709faa8",
+    "capacity-extra.mjs": "sha256:7e307cb69853b7a9f6e34676f3f0fcf7f8a97ba12b7ef90819a21a3a6245ed7b",
+    "groups-final.py": "sha256:8346124e9b914ebf399b6cd39157f8b979f77dac3adca10bed3da43ba14c53ab",
+    "sandbox-probe.mjs": "sha256:1b288fa25d56f40fff85ad0bb5a9d19d9a6f892160410d9939e500a7554c5d6d",
+    "refusal-search-probe-v2.mjs": "sha256:a09e021742586ed1f9d56e3176e4e2ca1962c12d19ecf22783567b1a5f31db01"
+  },
+  "environment": {
+    "launches": "CUDA_VISIBLE_DEVICES=-1; inherited JUSTSEARCH_* and JVM option variables stripped; GRADLE_OPTS retained. Own private HOME/data/index/corpus/loopback. One Engine at a time; fresh Engine between groups.",
+    "frontend": "Private Vite source server; native catalog validated. Installed unchanged Engine used read-only; no Gradle/build pass claimed.",
+    "browser": "Own headless Chromium only. Native sandbox probe failed; --no-sandbox only to own loopback services. Short /tmp/jsv- profiles removed.",
+    "sandboxProbeDigest": "sha256:cb85d91fb7839cfdc00fc141fe85d18bb170dcd8c6084a39122a80597ef04f2b",
+    "sharedResources": [
+      "CPU",
+      "npm cache",
+      "installed Engine and Chromium executables (read only)",
+      "permitted local llama-server and compact Qwen GGUF (read only)"
+    ],
+    "excluded": "No owner apps/data/display, dev stack, GPU, downloads, source commit, push, publication, GitHub mutations or logs under /tmp/js-linux-port."
+  },
+  "preservedExistingTestFiles": {
+    "refusalNavigationByteIdenticalToHEAD": true
+  },
+  "cleanupAudit": {
+    "ownedLiveProcessIdentities": []
+  }
+}

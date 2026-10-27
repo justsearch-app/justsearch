@@ -1,0 +1,187 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-26T12:00:48.232Z",
+  "revision": "5b8ec276a0c71138b8c99f9aa94b95e439eedf7b",
+  "tree": "17b62ab5b3cb626d1124a026935bdb5fc1612fde",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/controllers/draftPersistence.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.structured.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3808056-1793016036851.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4945
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not issue an unscoped Enter from restored search-v3.composer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 ambiguous restored draft ownership does not issue an unscoped Enter from restored search-v3.composer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not issue an unscoped Enter from restored unified-chat.composer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 ambiguous restored draft ownership does not issue an unscoped Enter from restored unified-chat.composer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not stage an edited restored draft through the typing debounce",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6bd2d4c60e6d782781e8b12b34a744b27f47a19f0f289ca62ae16d667b2b68ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 ambiguous restored draft ownership does not stage an edited restored draft through the typing debounce",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts#DS1 a failed raw read never authorizes overwriting an unread sole copy on disconnect",
+      "file": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3a95afd4c7f8d6efd8ecf015b60334f044412ec945470941ff9fe10fac6f3be4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 a failed raw read never authorizes overwriting an unread sole copy on disconnect",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts#DS1 failed destination re-read during adoption preserves another tab sole successor before disconnect",
+      "file": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3a95afd4c7f8d6efd8ecf015b60334f044412ec945470941ff9fe10fac6f3be4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 failed destination re-read during adoption preserves another tab sole successor before disconnect",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts#XT5 XD1 keeps undelivered extraction drafts and drops the unrecorded failed turn on reload",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:13107cc2d3c1265b526a879127dd1a0a5b3f5bbeb7c469b856d163d1ba8bbfb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XT5 XD1 keeps undelivered extraction drafts and drops the unrecorded failed turn on reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts#XT4 sends deduplicated chosen files as selection inputs",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:13107cc2d3c1265b526a879127dd1a0a5b3f5bbeb7c469b856d163d1ba8bbfb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XT4 sends deduplicated chosen files as selection inputs",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7b2692fffe97de58780bc7a12f76d69c422e3158",
+    "revision": "7b2692fffe97de58780bc7a12f76d69c422e3158",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/controllers/draftPersistence.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.structured.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3808056-1793016043506.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4398,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-vitest-3808056-1793016043506.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not issue an unscoped Enter from restored search-v3.composer",
+        "classification": "assertion",
+        "detail": "DS1 ambiguous restored draft ownership does not issue an unscoped Enter from restored search-v3.composer:  AssertionError: expected [ { query: 'Boundary needle', …(3) } ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-6O37yr/modules/ui-web/node_modules/@vitest/expect/dist/index.js:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not issue an unscoped Enter from restored unified-chat.composer",
+        "classification": "assertion",
+        "detail": "DS1 ambiguous restored draft ownership does not issue an unscoped Enter from restored unified-chat.composer:  AssertionError: expected [ { query: 'Boundary needle', …(3) } ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-6O37yr/modules/ui-web/node_modules/@vitest/expect/dist/index.js:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#does not stage an edited restored draft through the typing debounce",
+        "classification": "assertion",
+        "detail": "DS1 ambiguous restored draft ownership does not stage an edited restored draft through the typing debounce:  AssertionError: expected [ { …(4) }, { …(4) } ] to have a length of +0 but got 2\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-6O37yr/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts#DS1 a failed raw read never authorizes overwriting an unread sole copy on disconnect",
+        "classification": "assertion",
+        "detail": "DS1 a failed raw read never authorizes overwriting an unread sole copy on disconnect:  AssertionError: expected 'new live B' to be 'unread original A' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-6O37yr/modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts:86:27\n    at file:///home/eli"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts#DS1 failed destination re-read during adoption preserves another tab sole successor before disconnect",
+        "classification": "assertion",
+        "detail": "DS1 failed destination re-read during adoption preserves another tab sole successor before disconnect:  AssertionError: expected 'new live B' to be 'unread original A' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-cutover/tmp/wp1.5a/intent-17/scratch/test-intent-before-6O37yr/modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts:109:27\n    at file:///home/el"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts#XT5 XD1 keeps undelivered extraction drafts and drops the unrecorded failed turn on reload",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts#XT4 sends deduplicated chosen files as selection inputs",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:b36dd49134b9479f8e7fe394793322cd88f865781318b3e382e12f03ec449fc9"
+}

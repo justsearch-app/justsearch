@@ -107,6 +107,18 @@ ok(
   ) === 'DEVELOPER',
 );
 
+ok(
+  'split pairing before the real registration is not mistaken for the surface id',
+  registeredAudience(`const library = { id: 'core.library-surface', audience: 'USER',
+    splitPairing: { secondary: 'core.search-v3-surface' },
+  };\n${plugin('DEVELOPER')}`, 'core.search-v3-surface') === 'DEVELOPER',
+);
+ok(
+  'a bare string mention without any registration remains unreadable',
+  registeredAudience(`const target = 'core.search-v3-surface';\n${plugin('USER').replace('core.search-v3-surface', 'core.other-surface')}`,
+    'core.search-v3-surface') === null,
+);
+
 // --- promotion and hard guards, including the actual CLI at every date ------
 const cases = [
   { label: 'neither completion condition', options: {}, warnings: 1,

@@ -21,6 +21,7 @@ import {
   __tickClockForTest,
   type AiState,
 } from './aiStateStore.js';
+import { projectAvailability } from './availability.js';
 import type { StatusSnapshot } from '../utils/statusPoll.js';
 import type { InferenceSnapshot } from '../utils/inferencePoll.js';
 import { known, UNKNOWN } from './known.js';
@@ -822,5 +823,60 @@ describe('aiStateStore — derived context window (tempdoc 883 decision 1 / ADR-
     // through would put a rung of zero on the Brain/Settings readout as if it were a real launch.
     feedInference({ mode: 'online', available: true, llmContextTokens: 8192, contextWindow: { rung: 0 } });
     expect(getAiState().runtime.contextWindowDerived).toBeNull();
+  });
+});
+
+// GA15 preservation: exercise the real store → availability seam, including legacy config.
+describe('human residency availability from observed AI state', () => {
+  beforeEach(() => __resetAiStateForTest());
+  afterEach(() => { vi.useRealTimers(); __resetAiStateForTest(); });
+
+  function feed(enabled: boolean | undefined, state: string, reason = 'inference.unloaded_gpu_pressure', docs = 42): void {
+    __feedForTest({ inference: { mode: state === 'LOADING' ? 'transitioning' : 'online', starting: state === 'LOADING', available: true } as InferenceSnapshot,
+      status: { inference: { chatEnabledSpec: enabled }, worker: { core: { indexedDocuments: docs, indexState: 'IDLE', indexHealthy: true } },
+        operating: { chat: { state } },
+        readiness: { composites: { aiFeatures: { state: 'DEGRADED', reasonCodes: [reason] } } },
+      } as unknown as StatusSnapshot });
+    __feedContactForTest();
+  }
+
+  it.each([true, undefined])('permits unloaded human admission with config %s, retaining agent and document gates', (enabled) => {
+    feed(enabled, 'UNLOADED', 'inference.unloaded_gpu_pressure', 0);
+    expect(projectAvailability('extract', getAiState(), true).kind).toBe('available');
+    expect(projectAvailability('agent', getAiState()).kind).toBe('unavailable');
+    expect(projectAvailability('documents', getAiState(), true).kind).toBe('unavailable');
+  });
+
+  it.each([true, undefined])('permits only captured human load continuation through LOADING with config %s', (enabled) => {
+    feed(enabled, 'LOADING');
+    expect(getAiState().runtime.mode).toBe('starting');
+    expect(projectAvailability('extract', getAiState(), true, true).kind).toBe('available');
+    expect(projectAvailability('extract', getAiState(), true).kind).toBe('unavailable');
+    expect(projectAvailability('agent', getAiState(), false, true).kind).toBe('unavailable');
+  });
+
+  it.each(['UNLOADED', 'LOADING', 'READY'])('explicit off blocks human continuation in %s', (state) => {
+    feed(false, state);
+    expect(projectAvailability('extract', getAiState(), true).kind).toBe('unavailable');
+    expect(projectAvailability('extract', getAiState(), true, true).kind).toBe('unavailable');
+  });
+
+  it.each(['UNLOADED', 'LOADING'])('classified failure blocks human continuation in %s', (state) => {
+    feed(true, state, 'inference.model_load_failed');
+    expect(projectAvailability('extract', getAiState(), true, true).kind).toBe('unavailable');
+  });
+
+  it('READY remains available when a retained classified failure no longer owns admission', () => {
+    feed(true, 'READY', 'inference.model_load_failed');
+    expect(projectAvailability('extract', getAiState(), true, true).kind).toBe('available');
+  });
+
+  it('contact loss outranks retained unloaded/load-continuation state', () => {
+    vi.useFakeTimers();
+    feed(true, 'UNLOADED');
+    vi.advanceTimersByTime(60_000);
+    __tickClockForTest();
+    expect(getAiState().snapshotLive).toBe(false);
+    expect(projectAvailability('extract', getAiState(), true, true)).toMatchObject({ kind: 'unavailable', transient: false });
   });
 });

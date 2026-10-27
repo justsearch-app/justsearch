@@ -218,8 +218,8 @@ export function compose(args: ComposeArgs): boolean {
   // fork (§6) by routing through the resolver instead of affordanceToShape.
   setPendingForceShape(forceShapeId);
   const detail = {
-    target: 'core.unified-chat-surface',
-    state: { query, affordance, docIds, forceShapeId },
+    target: 'core.search-v3-surface',
+    state: { query, affordance, ...(args.docIds !== undefined ? { docIds } : {}), forceShapeId },
   };
   const event = new CustomEvent('navigate-with-context', {
     bubbles: true,
@@ -244,12 +244,12 @@ function resolveQuery(args: ComposeArgs): string {
 }
 
 /** Navigation delivers transient state before mounting; the receiving window owns it thereafter. */
-let searchV3Handoff: { state: Record<string, unknown>; selection: SelectionPayload | null } | null = null;
+let searchV3Handoff: { state: Record<string, unknown>; selection: SelectionPayload | null; origin: 'fresh' | 'restore'; refused?: boolean } | null = null;
 
-export function parkSearchV3Handoff(state: Record<string, unknown>): void {
+export function parkSearchV3Handoff(state: Record<string, unknown>, origin: 'fresh' | 'restore' = 'fresh'): void {
   const selection = takePendingSelection();
   takePendingForceShape();
-  searchV3Handoff = { state, selection: typeof state.forceShapeId === 'string' ? selection : null };
+  searchV3Handoff = { state, selection: typeof state.forceShapeId === 'string' ? selection : null, origin };
   takePendingAutoRun(); // Search v3 always waits for a person's send, including answer links.
   window.dispatchEvent(new Event('sv3-handoff'));
 }
@@ -257,5 +257,12 @@ export function parkSearchV3Handoff(state: Record<string, unknown>): void {
 export function takeSearchV3Handoff(): typeof searchV3Handoff {
   const value = searchV3Handoff;
   searchV3Handoff = null;
+  // Navigation can retire a refusal without changing any store or remounting the view.
+  if (value?.refused) window.dispatchEvent(new Event('sv3-handoff'));
   return value;
+}
+
+/** Keep fresh address inputs available until the receiving view has retained them safely. */
+export function peekSearchV3Handoff(): typeof searchV3Handoff {
+  return searchV3Handoff;
 }

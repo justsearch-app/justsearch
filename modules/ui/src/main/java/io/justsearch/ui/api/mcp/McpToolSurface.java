@@ -720,6 +720,14 @@ public final class McpToolSurface {
     } catch (Exception e) {
       rethrowRefusal(e);
       log.warn("MCP answer failed", e);
+      var cancelled = io.justsearch.app.services.worker.EngineRequestEnds.cancellation(e);
+      if (cancelled != null) {
+        var failure = ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE, cancelled);
+        if (cancelled instanceof io.justsearch.app.api.EngineWorkCancelledException reason) {
+          failure.put("reasonCode", reason.reasonCode());
+        }
+        return errorContent(failure);
+      }
       return toolFailureContent("Answer", e);
     }
   }

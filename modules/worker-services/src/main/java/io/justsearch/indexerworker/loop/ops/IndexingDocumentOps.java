@@ -321,7 +321,7 @@ public final class IndexingDocumentOps {
     // Extraction provenance (tempdoc 252 Tier 1+2).
     fields.put(SchemaFields.EXTRACTION_METHOD, extractionMethod);
     double qualityScore = TextQualityAnalyzer.computeQualityScore(extraction.content());
-    fields.put(SchemaFields.EXTRACTION_QUALITY_SCORE, (float) qualityScore);
+    fields.put(SchemaFields.EXTRACTION_QUALITY_SCORE, qualityScore);
 
     // Tempdoc 410 §11 — search-time honesty fields. Written from the validated artifact when one
     // is available (production path); skipped on the legacy/test path where sourceMetadata is null
@@ -582,7 +582,7 @@ public final class IndexingDocumentOps {
    * chunk-merge on a short corpus is hybrid-neutral, F-036; skipping it on a long one halves
    * quality). The exact SPLADE count is still used whenever the encoder is ready.
    */
-  static long estimateTokenCount(String content) {
+  public static long estimateTokenCount(String content) {
     if (content == null || content.isBlank()) {
       return 0L;
     }

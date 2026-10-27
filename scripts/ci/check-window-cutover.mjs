@@ -76,7 +76,8 @@ export function stripComments(source) {
  */
 export function registeredAudience(pluginSource, surfaceId) {
   const source = stripComments(pluginSource);
-  const idIndex = source.indexOf(`'${surfaceId}'`);
+  const escapedId = surfaceId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const idIndex = source.search(new RegExp(`\\bid:\\s*'${escapedId}'`));
   if (idIndex === -1) return null;
   const rest = source.slice(idIndex);
   const end = /\n\s*\},/.exec(rest);
