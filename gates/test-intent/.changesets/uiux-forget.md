@@ -10,8 +10,8 @@ author-session: codex-uiux-forget-builder
 These choices are agent-adopted under the owner's design delegation, not owner-authored scenarios.
 The quoted delegation and its exact scope are reproduced separately in every warrant. The settled
 WP5.5/WP5.6 scenarios include RF55/DF55/WD55/Q55/MD55 and the honest-incomplete amendment.
-No acceptance record is authored here. Evidence paths below are populated only by the unchanged
-formal producer; pending paths are not execution claims.
+No acceptance record is authored here. Evidence paths below are populated by the official formal producer, using the recorded
+machine-rules adapter where indicated; pending paths are not execution claims.
 
 Existing v0–v5 compatibility cases are retained. The final builder report separately inventories
 unchanged-before preservation, version-6 current-writer assertions, and the Library fixture adaptation.
@@ -297,7 +297,7 @@ Isolated new files remain subject to independent scenario and execution review e
       ],
       "evidence": "gates/test-intent/evidence/uiux-forget-existing-repairs.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java#RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence"
       ],
       "repaired": true
     },
