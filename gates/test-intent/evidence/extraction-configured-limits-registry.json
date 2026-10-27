@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-27T13:42:00.390Z",
-  "revision": "88397ebd44c9dd7f726478b4d4997cf27d7a5cb8",
-  "tree": "84fae5683f8b996b7d099bb2754e6f644251b95e",
+  "createdAt": "2026-10-27T13:50:08.946Z",
+  "revision": "1a8ba9833bc8dfb14f035c34d11bc0821d40e464",
+  "tree": "2ade8284abf38841c2447e5421db2776842aeae3",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.ordinaryContributionUsesConfiguredRegistryPolicyAndValidatesArtifact\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.closeRetainsConfiguredCoreTikaPolicy\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.uninstallCoreTikaRestoresDefaultPolicy\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.ordinaryContributionUsesConfiguredRegistryPolicyAndValidatesArtifact\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.closeRetainsConfiguredCoreTikaPolicy\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.uninstallCoreTikaRestoresDefaultPolicy\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.installRejectsConfiguredCoreAfterDefaultPolicyDrivenContribution\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.installRejectsMismatchedPolicyDrivenContributionAndAcceptsMatchingPolicy\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.collidingCoreInstallRetainsConfiguredPolicy\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.ordinaryCoreAfterUninstallReportsDefaultPolicy\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.ordinaryCoreBeforeConfiguredVendorUsesSharedPolicyAndValidatesArtifact\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.ordinaryCoreAfterConfiguredVendorUsesSharedPolicyAndValidatesArtifact\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.uninstallCoreTikaRetainsConfiguredVendorPolicy\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.uninstallLastPolicyDrivenContributionRestoresDefaultPolicy\" --tests \"io.justsearch.indexerworker.extract.ExtractorContributionRegistryTest.closeRetainsConfiguredVendorPolicy\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2924
+      "durationMs": 3069
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#ordinaryContributionUsesConfiguredRegistryPolicyAndValidatesArtifact",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1b854157e3cab91c60bb3099a849a30bb8b05d143234076dd08a5e32d930c81f",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#closeRetainsConfiguredCoreTikaPolicy",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1b854157e3cab91c60bb3099a849a30bb8b05d143234076dd08a5e32d930c81f",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#uninstallCoreTikaRestoresDefaultPolicy",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1b854157e3cab91c60bb3099a849a30bb8b05d143234076dd08a5e32d930c81f",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -69,8 +69,143 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#installRejectsConfiguredCoreAfterDefaultPolicyDrivenContribution",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installRejectsConfiguredCoreAfterDefaultPolicyDrivenContribution()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#installRejectsMismatchedPolicyDrivenContributionAndAcceptsMatchingPolicy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installRejectsMismatchedPolicyDrivenContributionAndAcceptsMatchingPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#collidingCoreInstallRetainsConfiguredPolicy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "collidingCoreInstallRetainsConfiguredPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#ordinaryCoreAfterUninstallReportsDefaultPolicy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryCoreAfterUninstallReportsDefaultPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#ordinaryCoreBeforeConfiguredVendorUsesSharedPolicyAndValidatesArtifact",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryCoreBeforeConfiguredVendorUsesSharedPolicyAndValidatesArtifact()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#ordinaryCoreAfterConfiguredVendorUsesSharedPolicyAndValidatesArtifact",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryCoreAfterConfiguredVendorUsesSharedPolicyAndValidatesArtifact()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#uninstallCoreTikaRetainsConfiguredVendorPolicy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "uninstallCoreTikaRetainsConfiguredVendorPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#uninstallLastPolicyDrivenContributionRestoresDefaultPolicy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "uninstallLastPolicyDrivenContributionRestoresDefaultPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#closeRetainsConfiguredVendorPolicy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6528c93ac8c43712133601779d35e14ecde6c24c90114b2c9863316e95ccfe94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closeRetainsConfiguredVendorPolicy()",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:dec9e0b82cba94fb9c82dc810398d33ec0f80da7729add40d1475f305630aa3b"
+  "digest": "sha256:e166a15795ffa306449cef01c139b65a99aa3f6b13d4882689e556d2005588d6"
 }
