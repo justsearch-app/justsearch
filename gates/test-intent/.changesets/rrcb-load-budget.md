@@ -51,3 +51,14 @@ unchanged.
   "digest": "sha256:32f8ce7aada8d0cfaf35297d8a03fa7073154c05d6727697ccba09db313d47c6"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a17d9e-dc0b-7db0-929f-ce2c247bea82",
+  "verdict": "accept",
+  "digest": "sha256:32f8ce7aada8d0cfaf35297d8a03fa7073154c05d6727697ccba09db313d47c6",
+  "note": "The change preserves every case's oracle and the timeout-dependent refusal budget while allowing successful settlement more time under load."
+}
+```
