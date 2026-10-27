@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-27T16:20:21.273Z",
-  "revision": "481d8c121cede60f987024466b12557df9dea247",
-  "tree": "8800e85137b039dcdea9239f0ce5951d7a271409",
+  "createdAt": "2026-10-27T16:25:21.826Z",
+  "revision": "eb34f1195dbd5e286beccece84520bd7d097b303",
+  "tree": "0828da3e4e3df602675e184855a40d4cc0d19e48",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.highSurrogateEndingFileUsesDefault\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf8WithoutBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf8WithBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf16LeWithBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf16BeWithBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.asciiKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.windows1252KeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.shiftJisKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.gb18030KeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.eucKrKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.koi8RKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.interiorByteOrderMarkKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.htmlWithDeclarationKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.htmlWithoutDeclarationKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.xmlWithDeclarationKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.largeUtf16KeepsFinalMarker\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.oneTrailingNulKeepsExistingReplacement\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.sparseNulsKeepExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulPaddingAfterUtf8KeepsExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulPaddingAfterWindows1252KeepsExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf32LeKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulPairsKeepExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulsOnlyAfterWindowKeepExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.shortCjkWithoutEnoughNulsKeepsExistingText\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.sparseNulsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.oppositeLaneNulsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.nulUnitsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.disallowedC0ControlsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.malformedSurrogatesDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.byteOrderMarksStayWithDefaultDetectors\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.unsupportedMarkSkipsRuleWithoutReading\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3689
+      "durationMs": 2980
     }
   ],
   "checks": [
@@ -491,6 +491,176 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:956ea874b79871a723634486018358ef149733f9b791465669ad6c2475aa9160"
+  "failBefore": {
+    "ref": "bfd625c7ee",
+    "revision": "bfd625c7eea6591250e5a3d231c25e7884aa4312",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.highSurrogateEndingFileUsesDefault\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf8WithoutBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf8WithBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf16LeWithBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf16BeWithBomKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.asciiKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.windows1252KeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.shiftJisKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.gb18030KeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.eucKrKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.koi8RKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.interiorByteOrderMarkKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.htmlWithDeclarationKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.htmlWithoutDeclarationKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.xmlWithDeclarationKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.largeUtf16KeepsFinalMarker\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.oneTrailingNulKeepsExistingReplacement\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.sparseNulsKeepExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulPaddingAfterUtf8KeepsExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulPaddingAfterWindows1252KeepsExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.utf32LeKeepsText\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulPairsKeepExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.nulsOnlyAfterWindowKeepExistingReplacements\" --tests \"io.justsearch.indexerworker.extract.Utf16WithoutBomExtractionTest.shortCjkWithoutEnoughNulsKeepsExistingText\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.sparseNulsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.oppositeLaneNulsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.nulUnitsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.disallowedC0ControlsDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.malformedSurrogatesDoNotOverrideDefault\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.byteOrderMarksStayWithDefaultDetectors\" --tests \"io.justsearch.indexerworker.extract.OwnedTextEncodingDetectorTest.unsupportedMarkSkipsRuleWithoutReading\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 5141
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#highSurrogateEndingFileUsesDefault",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf8WithoutBomKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf8WithBomKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf16LeWithBomKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf16BeWithBomKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#asciiKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#windows1252KeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#shiftJisKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#gb18030KeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#eucKrKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#koi8RKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#interiorByteOrderMarkKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#htmlWithDeclarationKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#htmlWithoutDeclarationKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#xmlWithDeclarationKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#largeUtf16KeepsFinalMarker",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#oneTrailingNulKeepsExistingReplacement",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#sparseNulsKeepExistingReplacements",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#nulPaddingAfterUtf8KeepsExistingReplacements",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#nulPaddingAfterWindows1252KeepsExistingReplacements",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#utf32LeKeepsText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#nulPairsKeepExistingReplacements",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#nulsOnlyAfterWindowKeepExistingReplacements",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#shortCjkWithoutEnoughNulsKeepsExistingText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#sparseNulsDoNotOverrideDefault",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#oppositeLaneNulsDoNotOverrideDefault",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#nulUnitsDoNotOverrideDefault",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#disallowedC0ControlsDoNotOverrideDefault",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#malformedSurrogatesDoNotOverrideDefault",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#byteOrderMarksStayWithDefaultDetectors",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextEncodingDetectorTest.java#unsupportedMarkSkipsRuleWithoutReading",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:97e61045338804c54c008789bc63842e449d735b6bb9c75a3d4a604cf60efade"
 }

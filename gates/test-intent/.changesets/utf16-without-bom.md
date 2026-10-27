@@ -122,7 +122,7 @@ CJK result; they do not extend the UTF-16 heuristic.
         "modules/worker-services/src/testFixtures/java/io/justsearch/indexerworker/fixtures/FormatCapabilityExpectedState.java"
       ],
       "class": "New",
-      "behaviour": "Default and blank-id fallback read tika-default-v3; configured limits read tika-config-v3-<chars>-<bytes>. Existing policy expectations change only from v2 to v3, preserving content, limits, routing and sandbox assertions.",
+      "behaviour": "Default and blank-id fallback read tika-default-v3; configured limits read tika-config-v3-<chars>-<bytes>. Existing policy expectations change only from v2 to v3, preserving content, limits, routing and sandbox assertions; routing through the in-process sandbox and a real extraction child process stamps artifacts with the v3 identity. The changed TikaExtractionPolicyWorkerLimitsTest methods (display-named) and the parameterized format-capability oracle consumers cannot be selected by method id; their only change is the same v2-to-v3 string, and the three identity checks here cover the same three id forms.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -135,6 +135,8 @@ CJK result; they do not extend the UTF-16 heuristic.
       ],
       "evidence": "gates/test-intent/evidence/utf16-without-bom-policy-id.json",
       "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java#modeSwitchSelectsTheSandbox",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java#realChildExtractsFileContent",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#defaultPolicyIdentityIsV3",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#blankPolicyIdentityFallsBackToV3",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#configuredPolicyIdentityIsV3"
