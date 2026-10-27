@@ -124,6 +124,8 @@ class StatusIsolationHttpTest {
       catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
       try { if (components != null) components.close(); }
       catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      try { if (work != null) work.release(); }
+      catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
     }
   }
   tools.jackson.databind.JsonNode get(Fixture f, String query) throws Exception {

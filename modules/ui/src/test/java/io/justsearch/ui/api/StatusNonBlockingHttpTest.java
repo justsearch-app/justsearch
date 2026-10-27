@@ -686,7 +686,7 @@ final class StatusNonBlockingHttpTest {
         }
         case "bulk-gate" -> {
           assertTrue(body.path("operating").path("indexing").path("reasons").isArray());
-          assertEquals(!after, body.path("operating").path("indexing").path("reasons").toString().contains("GAME_MODE"));
+          assertEquals(!after, body.path("operating").path("indexing").path("reasons").toString().contains("\"game_mode\""));
         }
         case "worker" -> {
           assertEquals(after ? 11L : 10L, body.path("worker").path("core").path("indexedDocuments").asLong());
@@ -755,7 +755,7 @@ final class StatusNonBlockingHttpTest {
           assertTrue(body.path("power").path("energyReduced").isBoolean());
           assertEquals(after, body.path("power").path("energyReduced").asBoolean());
           assertTrue(body.path("operating").path("indexing").path("reasons").isArray());
-          assertEquals(after, body.path("operating").path("indexing").path("reasons").toString().contains("ENERGY_SAVER"));
+          assertEquals(after, body.path("operating").path("indexing").path("reasons").toString().contains("\"energy_saver\""));
         }
         case "resume" -> {
           assertTrue(body.path("catchingUp").isBoolean());
@@ -824,7 +824,7 @@ final class StatusNonBlockingHttpTest {
         case "vdu-processing" -> assertTrue(body.path("worker").path("visualExtraction").path("vduProcessing").asBoolean());
         case "vision" -> assertTrue(body.path("worker").path("core").path("vduAvailable").asBoolean());
         case "device-plan" -> assertEquals("P12", body.path("operating").path("gpu").path("profile").asText());
-        case "bulk-gate" -> assertTrue(body.path("operating").path("indexing").path("reasons").toString().contains("GAME_MODE"));
+        case "bulk-gate" -> assertTrue(body.path("operating").path("indexing").path("reasons").toString().contains("\"game_mode\""));
         case "registry" -> {
           assertEquals("READY", body.path("components").path("generative").path("state").asText());
           assertEquals("READY", body.path("readiness").path("components").path("ai").path("state").asText());
@@ -1202,6 +1202,8 @@ final class StatusNonBlockingHttpTest {
           java.nio.file.Files.deleteIfExists(modelHome);
         } catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
       }
+      try { if (work != null) work.release(); }
+      catch (Throwable cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
     }
   }
 }

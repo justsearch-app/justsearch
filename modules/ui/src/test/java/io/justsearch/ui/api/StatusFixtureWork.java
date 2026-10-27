@@ -21,6 +21,7 @@ final class StatusFixtureWork {
       "gpu", "gpu-memory", "at-rest", "conversation", "models", "agent", "telemetry",
       "device-plan", "bulk-gate", "indexing-hold", "vdu", "vdu-processing", "vision");
   private final Map<String, Queue<CompletableFuture<Void>>> handles = new ConcurrentHashMap<>();
+  private final Queue<Object> instrumentation = new ConcurrentLinkedQueue<>();
   private final Queue<CompletableFuture<Void>> samplers = new ConcurrentLinkedQueue<>();
   private final Set<Thread> dispatches = ConcurrentHashMap.newKeySet();
   private final Set<Thread> sourceThreads = ConcurrentHashMap.newKeySet();
@@ -37,13 +38,17 @@ final class StatusFixtureWork {
 
   @SuppressWarnings("unchecked")
   StatusFixtureWork(StatusLifecycleHandler original) {
-    handler = spy(original);
+    // These mocks instrument ownership; no test verifies their invocation history.
+    handler = mock(StatusLifecycleHandler.class,
+        withSettings().spiedInstance(original).defaultAnswer(CALLS_REAL_METHODS).stubOnly());
+    instrumentation.add(handler);
     try {
       var field = StatusLifecycleHandler.class.getDeclaredField("observations");
       field.setAccessible(true);
       var realLanes = (ConcurrentHashMap<String, StatusObservation<?>>) field.get(handler);
       var lanes = (ConcurrentHashMap<String, StatusObservation<?>>) mock(ConcurrentHashMap.class,
-          org.mockito.AdditionalAnswers.delegatesTo(realLanes));
+          withSettings().defaultAnswer(org.mockito.AdditionalAnswers.delegatesTo(realLanes)).stubOnly());
+      instrumentation.add(lanes);
       doAnswer(call -> {
         String name = call.getArgument(0);
         java.util.function.Function<String, StatusObservation<?>> factory = call.getArgument(1);
@@ -104,7 +109,8 @@ final class StatusFixtureWork {
     var source = (StatusObservation<Object>) real;
     sources.put(name, source);
     var lane = (StatusObservation<Object>) mock(StatusObservation.class,
-        org.mockito.AdditionalAnswers.delegatesTo(source));
+        withSettings().defaultAnswer(org.mockito.AdditionalAnswers.delegatesTo(source)).stubOnly());
+    instrumentation.add(lane);
     var returned = new ConcurrentLinkedQueue<CompletableFuture<Void>>();
     handles.put(name, returned);
     org.mockito.stubbing.Answer<CompletableFuture<Void>> capture = call -> {
@@ -241,6 +247,21 @@ final class StatusFixtureWork {
     if (thread == Thread.currentThread()) return;
     thread.join(Math.max(1L, TimeUnit.NANOSECONDS.toMillis(remaining(deadline))));
     assertFalse(thread.isAlive(), "owned status thread must finish: " + thread.getName());
+  }
+
+  void release() {
+    if (!quiescent) return;
+    // Inline Mockito registrations hold our answers, which capture this helper and its mocks.
+    // Clear only this fixture's instrumentation, after its work and resource cleanup have ended.
+    instrumentation.forEach(mock -> framework().clearInlineMock(mock));
+    instrumentation.clear();
+    handles.clear();
+    samplers.clear();
+    threads.clear();
+    gates.clear();
+    dispatches.clear();
+    sourceThreads.clear();
+    sources.clear();
   }
 
   void assertNoErrors() {

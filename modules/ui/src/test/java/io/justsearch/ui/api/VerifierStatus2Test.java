@@ -332,7 +332,7 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
       }
       case "knowledgeServerLifecycleSupplier" -> {
         assertTrue(body.path("operating").path("indexing").path("reasons").isArray());
-        assertEquals(!after, body.path("operating").path("indexing").path("reasons").toString().contains("GAME_MODE"));
+        assertEquals(!after, body.path("operating").path("indexing").path("reasons").toString().contains("\"game_mode\""));
       }
       case "gpuCapabilitiesSupplier", "rrdStoreSupplier" -> {
         assertTrue(body.path("gpu").path("available").asBoolean());
@@ -386,7 +386,7 @@ class VerifierStatus2Test extends VerifierStatusIsolationTest {
           body.path("worker").path("visualExtraction").path("vduBlockedReason").asText());
       case "vduProcessingSupplier" -> assertTrue(body.path("worker").path("visualExtraction").path("vduProcessing").asBoolean());
       case "devicePlanSupplier" -> assertEquals("P12", body.path("operating").path("gpu").path("profile").asText());
-      case "knowledgeServerLifecycleSupplier" -> assertTrue(body.path("operating").path("indexing").path("reasons").toString().contains("GAME_MODE"));
+      case "knowledgeServerLifecycleSupplier" -> assertTrue(body.path("operating").path("indexing").path("reasons").toString().contains("\"game_mode\""));
       default -> { } // Sentinels and the blocked GPL companion are checked separately.
     }
   }
