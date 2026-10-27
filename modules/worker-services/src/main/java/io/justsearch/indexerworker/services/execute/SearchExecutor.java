@@ -438,7 +438,8 @@ public final class SearchExecutor {
             case LegSet.Bm25Only b ->
                 HitProvenanceProjector.attachSingleLeg(
                     textQueryOps.searchText(
-                        queryString, b.retrievalLimit(), runtimeFilters, boostRuntimeFilters, syntax),
+                        queryString, b.retrievalLimit(), runtimeFilters, boostRuntimeFilters, syntax,
+                        request.getCursor()),
                     HitProvenanceProjector.LegKind.BM25);
           };
       retrievalMs = (System.nanoTime() - retrievalStartNs) / 1_000_000;
