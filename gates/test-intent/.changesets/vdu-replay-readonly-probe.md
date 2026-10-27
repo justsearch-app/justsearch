@@ -37,3 +37,13 @@ The existing replay oracle is preserved. This author records no acceptance.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "cc6d91b2-5314-42fd-867b-dbc2d8a68699",
+  "verdict": "accept",
+  "digest": "sha256:c74d2b485891d60c2bfa65974eb1dd0dea97a021852b17d7fd952830f295d5d2"
+}
+```
