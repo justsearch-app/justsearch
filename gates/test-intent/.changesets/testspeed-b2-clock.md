@@ -144,3 +144,13 @@ this changeset does not claim to accept its persistence proof or broader B2 acce
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17b3c-b881-7571-9787-aaa4ceb74f93",
+  "verdict": "accept",
+  "digest": "sha256:856079c86d032c67c01a864c7f091d1bbd2741d725e5f9a38feb9a77ef575108"
+}
+```
