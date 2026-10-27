@@ -333,6 +333,7 @@ final class Release030RootRecoveryIsolationTest {
             java.util.Map.of("schemaVersion", 1, "roots", declarations)));
     var server = org.mockito.Mockito.spy(new KnowledgeServer(executors,
         WorkerBootFixture.workerConfig(root.resolve("data")), null));
+    shortenRecoveryWaits(server);
     org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
     server.bindBootRootBindings(roots.stream().map(path -> new RootBinding(path, null)).toList());
     server.bindExclusionRoots(membership);

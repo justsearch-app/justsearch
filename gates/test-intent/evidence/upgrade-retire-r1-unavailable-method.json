@@ -1,0 +1,227 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a.mjs",
+        "sha256": "sha256:39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a",
+        "bytes": 7360
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T19:17:00.342Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementSafetyTest.unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:09b67a9fe2e28e9787a10d558c29ca14ee427afac9ab11156ab771b2f518f9e3",
+          "bytes": 514764
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/command.json",
+          "sha256": "sha256:e968eed60b0518b4922cb479c0bc8635211036150608c70b18df0c770b0a95b7",
+          "bytes": 1700573
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:998578d1bcc4f7c443dfa29a95dffdd4c03bde685c4de749387f446ed62e09f1",
+          "bytes": 14760
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "[1] migrating",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] migrating",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[2] switching",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: returned root resolves its durable obligation and permits B retirement ==> expected: <true> but was: <false>",
+          "xmlName": "[2] switching",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[1] migrating",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] migrating",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[2] switching",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: returned root resolves its durable obligation and permits B retirement ==> expected: <true> but was: <false>",
+          "xmlName": "[2] switching",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[1] migrating",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] migrating",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[2] switching",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: returned root resolves its durable obligation and permits B retirement ==> expected: <true> but was: <false>",
+          "xmlName": "[2] switching",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:09b67a9fe2e28e9787a10d558c29ca14ee427afac9ab11156ab771b2f518f9e3",
+          "bytes": 514764
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/command.json",
+          "sha256": "sha256:e968eed60b0518b4922cb479c0bc8635211036150608c70b18df0c770b0a95b7",
+          "bytes": 1700573
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:998578d1bcc4f7c443dfa29a95dffdd4c03bde685c4de749387f446ed62e09f1",
+          "bytes": 14760
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING> | unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING> | unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]: org.opentest4j.AssertionFail",
+        "cases": [
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "xmlName": "[1] migrating",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 0,
+            "binaryOffset": 11
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "xmlName": "[1] migrating",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 2,
+            "binaryOffset": 8518
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "xmlName": "[1] migrating",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 4,
+            "binaryOffset": 17025
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "xmlName": "[2] switching",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 1,
+            "binaryOffset": 4081
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "xmlName": "[2] switching",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 3,
+            "binaryOffset": 12588
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "xmlName": "[2] switching",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 5,
+            "binaryOffset": 21095
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/safety-before-unavailable/migrating.json",
+            "sha256": "sha256:c53e81ef43dfa079d23ddd6911cce8fc4bb030368b703112db7748664710ea33",
+            "bytes": 12397
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/safety-before-unavailable/switching.json",
+            "sha256": "sha256:2324cb5a53425954da3febf1ef77133ed869b4482f1101915df67588dbcde21e",
+            "bytes": 12400
+          }
+        ],
+        "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+        "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16"
+      }
+    ]
+  },
+  "scope": "Two genuine before METHOD runs are reused without repetition; this unavailable method has both phases. Candidate MIGRATING passes, SWITCHING has three real 100-second retirement assertion failures. No acceptance or all-pass claim. Its nine whole check/helper and five fixture-source bytes match the completed before packet.",
+  "digest": "sha256:f75888b6c92db8a02784998540d4536e808ef08dd9dde44dfd625a3f46a64445"
+}

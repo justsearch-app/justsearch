@@ -1,0 +1,689 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:96e5f6ef0499c63a0387e5d20351c36f9f6cf7f6421a3cd6dbd0563b21d0d952",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/96e5f6ef0499c63a0387e5d20351c36f9f6cf7f6421a3cd6dbd0563b21d0d952.mjs",
+        "sha256": "sha256:96e5f6ef0499c63a0387e5d20351c36f9f6cf7f6421a3cd6dbd0563b21d0d952",
+        "bytes": 10402
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T19:37:11.445Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.xml",
+          "sha256": "sha256:6c569aa7f832d2a2b154f1c7e0d25bd89f0c52501b774a61280a0d015b10ac6c",
+          "bytes": 41945
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -PtestParallelism=1 --init-script tmp/orchestrator/intent-before/probe.init.gradle --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/r26-intent-before",
+      "raw": [
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/test/TEST-io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.xml",
+          "sha256": "sha256:36de5bb33d634909773c76fa6de9f7e5e55f863813ee80527e610b1e9846d15c",
+          "bytes": 199741
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/producer.json",
+          "sha256": "sha256:9ad7291560bc13d4566cf5b9846d7c05f288560b330d5d9878c00d674262417f",
+          "bytes": 2106
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/source-sha256.txt",
+          "sha256": "sha256:a60a1eac68ae846933d779c0733e617a5e22bf1fa95a9908a0381f33b6d20943",
+          "bytes": 1168000
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/input-sha256.txt",
+          "sha256": "sha256:7d20684c6fb94130cf1b9f650c069638e289e8383a3beeab7b205620c3a32d51",
+          "bytes": 268
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/Release030DurableIntentCancellationTest.java",
+          "sha256": "sha256:185fb5af832d052e46e19df4b1ee809d95644e93de2e33e7708fa810de55461c",
+          "bytes": 8448
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/baseline.txt",
+          "sha256": "sha256:af15e8828fcfcc66cc7075f3df76319f9b8f469c4b4e74c3b8e517d5ed937c32",
+          "bytes": 41
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/intent-before-identities.json",
+          "sha256": "sha256:4b23b8261223ba303ddafa6f7c7b729835febcf7d39f7049154d47dbf391ba6d",
+          "bytes": 3730
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/test/binary/results-generic.bin",
+          "sha256": "sha256:90fc7d6fcc257aac1cc5caeb05ad3f48e188e1d0c6e50fa96b1380ac27510015",
+          "bytes": 77580
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/listener.txt",
+          "sha256": "sha256:b1a2ba57fafec671faec32021d06103bafd23b54fdec80ba786832fea10d36ff",
+          "bytes": 5103
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.xml",
+          "sha256": "sha256:6c569aa7f832d2a2b154f1c7e0d25bd89f0c52501b774a61280a0d015b10ac6c",
+          "bytes": 41945
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -PtestParallelism=1 --init-script tmp/orchestrator/intent-before/probe.init.gradle --console=plain",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/r26-intent-before",
+      "raw": [
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/test/TEST-io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.xml",
+          "sha256": "sha256:36de5bb33d634909773c76fa6de9f7e5e55f863813ee80527e610b1e9846d15c",
+          "bytes": 199741
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/producer.json",
+          "sha256": "sha256:9ad7291560bc13d4566cf5b9846d7c05f288560b330d5d9878c00d674262417f",
+          "bytes": 2106
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/source-sha256.txt",
+          "sha256": "sha256:a60a1eac68ae846933d779c0733e617a5e22bf1fa95a9908a0381f33b6d20943",
+          "bytes": 1168000
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/input-sha256.txt",
+          "sha256": "sha256:7d20684c6fb94130cf1b9f650c069638e289e8383a3beeab7b205620c3a32d51",
+          "bytes": 268
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/Release030DurableIntentCancellationTest.java",
+          "sha256": "sha256:185fb5af832d052e46e19df4b1ee809d95644e93de2e33e7708fa810de55461c",
+          "bytes": 8448
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/baseline.txt",
+          "sha256": "sha256:af15e8828fcfcc66cc7075f3df76319f9b8f469c4b4e74c3b8e517d5ed937c32",
+          "bytes": 41
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/intent-before-identities.json",
+          "sha256": "sha256:4b23b8261223ba303ddafa6f7c7b729835febcf7d39f7049154d47dbf391ba6d",
+          "bytes": 3730
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/test/binary/results-generic.bin",
+          "sha256": "sha256:90fc7d6fcc257aac1cc5caeb05ad3f48e188e1d0c6e50fa96b1380ac27510015",
+          "bytes": 77580
+        },
+        {
+          "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/listener.txt",
+          "sha256": "sha256:b1a2ba57fafec671faec32021d06103bafd23b54fdec80ba786832fea10d36ff",
+          "bytes": 5103
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesBeneathPreservingRoot",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:185fb5af832d052e46e19df4b1ee809d95644e93de2e33e7708fa810de55461c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "durableIntentResumesBeneathPreservingRoot(String)[1]",
+          "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] ROOT",
+          "method": "durableIntentResumesBeneathPreservingRoot"
+        },
+        {
+          "name": "durableIntentResumesBeneathPreservingRoot(String)[2]",
+          "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[2] FILE",
+          "method": "durableIntentResumesBeneathPreservingRoot"
+        },
+        {
+          "name": "durableIntentResumesBeneathPreservingRoot(String)[3]",
+          "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[3] DELETE",
+          "method": "durableIntentResumesBeneathPreservingRoot"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.xml",
+          "sha256": "sha256:6c569aa7f832d2a2b154f1c7e0d25bd89f0c52501b774a61280a0d015b10ac6c",
+          "bytes": 41945
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesWithSameMutableRetry",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:185fb5af832d052e46e19df4b1ee809d95644e93de2e33e7708fa810de55461c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "durableIntentResumesWithSameMutableRetry(String)[1]",
+          "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] ROOT",
+          "method": "durableIntentResumesWithSameMutableRetry"
+        },
+        {
+          "name": "durableIntentResumesWithSameMutableRetry(String)[2]",
+          "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[2] FILE",
+          "method": "durableIntentResumesWithSameMutableRetry"
+        },
+        {
+          "name": "durableIntentResumesWithSameMutableRetry(String)[3]",
+          "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[3] DELETE",
+          "method": "durableIntentResumesWithSameMutableRetry"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.xml",
+          "sha256": "sha256:6c569aa7f832d2a2b154f1c7e0d25bd89f0c52501b774a61280a0d015b10ac6c",
+          "bytes": 41945
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesBeneathPreservingRoot",
+        "contentDigest": "sha256:185fb5af832d052e46e19df4b1ee809d95644e93de2e33e7708fa810de55461c",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "durableIntentResumesBeneathPreservingRoot(String)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]> | durableIntentResumesBeneathPreservingRoot(String)[2]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]> | durableIntentResumesBeneathPreservingRoot(St",
+        "cases": [
+          {
+            "name": "durableIntentResumesBeneathPreservingRoot(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[1] ROOT",
+            "method": "durableIntentResumesBeneathPreservingRoot"
+          },
+          {
+            "name": "durableIntentResumesBeneathPreservingRoot(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[2] FILE",
+            "method": "durableIntentResumesBeneathPreservingRoot"
+          },
+          {
+            "name": "durableIntentResumesBeneathPreservingRoot(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[3] DELETE",
+            "method": "durableIntentResumesBeneathPreservingRoot"
+          },
+          {
+            "name": "durableIntentResumesBeneathPreservingRoot(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[1] ROOT",
+            "method": "durableIntentResumesBeneathPreservingRoot"
+          },
+          {
+            "name": "durableIntentResumesBeneathPreservingRoot(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[2] FILE",
+            "method": "durableIntentResumesBeneathPreservingRoot"
+          },
+          {
+            "name": "durableIntentResumesBeneathPreservingRoot(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[3] DELETE",
+            "method": "durableIntentResumesBeneathPreservingRoot"
+          },
+          {
+            "name": "durableIntentResumesBeneathPreservingRoot(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[1] ROOT",
+            "method": "durableIntentResumesBeneathPreservingRoot"
+          },
+          {
+            "name": "durableIntentResumesBeneathPreservingRoot(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[2] FILE",
+            "method": "durableIntentResumesBeneathPreservingRoot"
+          },
+          {
+            "name": "durableIntentResumesBeneathPreservingRoot(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[3] DELETE",
+            "method": "durableIntentResumesBeneathPreservingRoot"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/test/TEST-io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.xml",
+            "sha256": "sha256:36de5bb33d634909773c76fa6de9f7e5e55f863813ee80527e610b1e9846d15c",
+            "bytes": 199741
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/producer.json",
+            "sha256": "sha256:9ad7291560bc13d4566cf5b9846d7c05f288560b330d5d9878c00d674262417f",
+            "bytes": 2106
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/source-sha256.txt",
+            "sha256": "sha256:a60a1eac68ae846933d779c0733e617a5e22bf1fa95a9908a0381f33b6d20943",
+            "bytes": 1168000
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/input-sha256.txt",
+            "sha256": "sha256:7d20684c6fb94130cf1b9f650c069638e289e8383a3beeab7b205620c3a32d51",
+            "bytes": 268
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/Release030DurableIntentCancellationTest.java",
+            "sha256": "sha256:185fb5af832d052e46e19df4b1ee809d95644e93de2e33e7708fa810de55461c",
+            "bytes": 8448
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/baseline.txt",
+            "sha256": "sha256:af15e8828fcfcc66cc7075f3df76319f9b8f469c4b4e74c3b8e517d5ed937c32",
+            "bytes": 41
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/intent-before-identities.json",
+            "sha256": "sha256:4b23b8261223ba303ddafa6f7c7b729835febcf7d39f7049154d47dbf391ba6d",
+            "bytes": 3730
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/test/binary/results-generic.bin",
+            "sha256": "sha256:90fc7d6fcc257aac1cc5caeb05ad3f48e188e1d0c6e50fa96b1380ac27510015",
+            "bytes": 77580
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/listener.txt",
+            "sha256": "sha256:b1a2ba57fafec671faec32021d06103bafd23b54fdec80ba786832fea10d36ff",
+            "bytes": 5103
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+            "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+            "bytes": 1795
+          },
+          {
+            "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+            "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+            "bytes": 2002
+          }
+        ],
+        "revision": "ea61c685cf6d4338697ee65c2160b824339bbf03"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesWithSameMutableRetry",
+        "contentDigest": "sha256:185fb5af832d052e46e19df4b1ee809d95644e93de2e33e7708fa810de55461c",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "durableIntentResumesWithSameMutableRetry(String)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]> | durableIntentResumesWithSameMutableRetry(String)[2]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]> | durableIntentResumesWithSameMutableRetry(Strin",
+        "cases": [
+          {
+            "name": "durableIntentResumesWithSameMutableRetry(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[1] ROOT",
+            "method": "durableIntentResumesWithSameMutableRetry"
+          },
+          {
+            "name": "durableIntentResumesWithSameMutableRetry(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[2] FILE",
+            "method": "durableIntentResumesWithSameMutableRetry"
+          },
+          {
+            "name": "durableIntentResumesWithSameMutableRetry(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[3] DELETE",
+            "method": "durableIntentResumesWithSameMutableRetry"
+          },
+          {
+            "name": "durableIntentResumesWithSameMutableRetry(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[1] ROOT",
+            "method": "durableIntentResumesWithSameMutableRetry"
+          },
+          {
+            "name": "durableIntentResumesWithSameMutableRetry(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[2] FILE",
+            "method": "durableIntentResumesWithSameMutableRetry"
+          },
+          {
+            "name": "durableIntentResumesWithSameMutableRetry(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[3] DELETE",
+            "method": "durableIntentResumesWithSameMutableRetry"
+          },
+          {
+            "name": "durableIntentResumesWithSameMutableRetry(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[1] ROOT",
+            "method": "durableIntentResumesWithSameMutableRetry"
+          },
+          {
+            "name": "durableIntentResumesWithSameMutableRetry(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[2] FILE",
+            "method": "durableIntentResumesWithSameMutableRetry"
+          },
+          {
+            "name": "durableIntentResumesWithSameMutableRetry(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: retained intent must resume beneath preserving force-false ROOT ==> expected: <[1]> but was: <[0]>",
+            "xmlName": "[3] DELETE",
+            "method": "durableIntentResumesWithSameMutableRetry"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/test/TEST-io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.xml",
+            "sha256": "sha256:36de5bb33d634909773c76fa6de9f7e5e55f863813ee80527e610b1e9846d15c",
+            "bytes": 199741
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/producer.json",
+            "sha256": "sha256:9ad7291560bc13d4566cf5b9846d7c05f288560b330d5d9878c00d674262417f",
+            "bytes": 2106
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/source-sha256.txt",
+            "sha256": "sha256:a60a1eac68ae846933d779c0733e617a5e22bf1fa95a9908a0381f33b6d20943",
+            "bytes": 1168000
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/input-sha256.txt",
+            "sha256": "sha256:7d20684c6fb94130cf1b9f650c069638e289e8383a3beeab7b205620c3a32d51",
+            "bytes": 268
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/Release030DurableIntentCancellationTest.java",
+            "sha256": "sha256:185fb5af832d052e46e19df4b1ee809d95644e93de2e33e7708fa810de55461c",
+            "bytes": 8448
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/baseline.txt",
+            "sha256": "sha256:af15e8828fcfcc66cc7075f3df76319f9b8f469c4b4e74c3b8e517d5ed937c32",
+            "bytes": 41
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/intent-before-identities.json",
+            "sha256": "sha256:4b23b8261223ba303ddafa6f7c7b729835febcf7d39f7049154d47dbf391ba6d",
+            "bytes": 3730
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/test/binary/results-generic.bin",
+            "sha256": "sha256:90fc7d6fcc257aac1cc5caeb05ad3f48e188e1d0c6e50fa96b1380ac27510015",
+            "bytes": 77580
+          },
+          {
+            "path": "tmp/orchestrator/verifier-retire-R2-repair-raw/r26-before-raw/evidence/listener.txt",
+            "sha256": "sha256:b1a2ba57fafec671faec32021d06103bafd23b54fdec80ba786832fea10d36ff",
+            "bytes": 5103
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+            "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+            "bytes": 1795
+          },
+          {
+            "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+            "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+            "bytes": 2002
+          }
+        ],
+        "revision": "ea61c685cf6d4338697ee65c2160b824339bbf03"
+      }
+    ]
+  },
+  "scope": "Six ROOT/FILE/DELETE by mutable-wait cases retain durable intent and exact Q at cancellation before SQL, resume the same intent with actual mutable state, and preserve later winner/delete controls. Exact ea61 whole-source before has eighteen configured intended assertion failures; it is reused without rerun. Builder execution only, no independent acceptance.",
+  "digest": "sha256:daba5fe921864693c886ed7989b08d8e5f164206e631e836d7beda5f5d26c4a7"
+}

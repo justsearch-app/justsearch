@@ -33,6 +33,8 @@ final class LiveMigrationCutoverTest {
     String green = manager.startMigration("manual").building_generation();
     manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
     var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.jobStateCountsStrict())
+        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
     org.mockito.Mockito.when(queue.failureSummary())
         .thenReturn(new JobQueue.FailureSummary(1, "missing.txt", "failed", null, null));
     var drained = new AtomicBoolean();
@@ -70,6 +72,8 @@ final class LiveMigrationCutoverTest {
     String green = manager.startMigration("manual").building_generation();
     manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
     var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.jobStateCountsStrict())
+        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
     org.mockito.Mockito.when(queue.failureSummary())
         .thenReturn(new JobQueue.FailureSummary(0, null, null, null, null));
     var drainChecks = new java.util.concurrent.atomic.AtomicInteger();
@@ -97,6 +101,8 @@ final class LiveMigrationCutoverTest {
     String green = manager.startMigration("manual").building_generation();
     manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
     var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.jobStateCountsStrict())
+        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
     org.mockito.Mockito.when(queue.failureSummary())
         .thenReturn(new JobQueue.FailureSummary(0, null, null, null, null));
     var runtime = mock(RunningRuntime.class);
@@ -138,6 +144,8 @@ final class LiveMigrationCutoverTest {
     String green = manager.startMigration("recorded").building_generation();
     manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
     var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.jobStateCountsStrict())
+        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
     org.mockito.Mockito.when(queue.failureSummary())
         .thenThrow(new IllegalStateException("recorded operation owns exact gap settlement"));
     var decisions = new java.util.concurrent.atomic.AtomicInteger();
@@ -298,6 +306,8 @@ final class LiveMigrationCutoverTest {
     manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
 
     var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.jobStateCountsStrict())
+        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
     org.mockito.Mockito.when(queue.queueDepth()).thenReturn(0L);
     org.mockito.Mockito.when(queue.failureSummary())
         .thenThrow(new IllegalStateException("failed jobs table is unreadable"));

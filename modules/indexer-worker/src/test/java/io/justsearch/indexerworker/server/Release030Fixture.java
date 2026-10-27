@@ -72,6 +72,25 @@ public final class Release030Fixture {
     return root;
   }
 
+  /** Keep native-path preservation scenarios native: A has a genuine analyzer mismatch. */
+  static Path unpackNativeMigration(String name, Path destination) throws Exception {
+    Path root = unpack(name, destination);
+    Path active = Release030CompatibilityTest.generation(root);
+    var metadata = new HashMap<>(Release030CompatibilityTest.readMetadata(active));
+    var inputs = (tools.jackson.databind.node.ObjectNode) JSON.readTree(metadata.get("index_fingerprint_inputs"));
+    inputs.put("analyzer_fp", "b".repeat(64));
+    metadata.put("index_fingerprint_inputs", JSON.writeValueAsString(inputs));
+    metadata.remove("index_fingerprint");
+    try (var directory = FSDirectory.open(active);
+        var writer = new org.apache.lucene.index.IndexWriter(directory,
+            new org.apache.lucene.index.IndexWriterConfig().setOpenMode(
+                org.apache.lucene.index.IndexWriterConfig.OpenMode.APPEND))) {
+      writer.setLiveCommitData(metadata.entrySet());
+      writer.commit();
+    }
+    return root;
+  }
+
   private static boolean hasCommit(Path generation) throws IOException {
     try (var files = Files.list(generation)) {
       return files.anyMatch(p -> p.getFileName().toString().startsWith("segments_"));

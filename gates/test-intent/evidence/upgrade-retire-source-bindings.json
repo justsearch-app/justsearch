@@ -1,0 +1,607 @@
+{
+  "schema": "upgrade-retire-source-bindings.v1",
+  "executionRevision": "8292c62e381684eb506c96f50990b212ea1fb879",
+  "executionWorkingTree": "uncommitted final candidate; original final-candidate-files.json and patch are immutable inputs",
+  "laterExactSourceMaterialization": "d9663d16d721ca4ea75d403785f2e6d0843d9b27",
+  "frozenSourceGitTree": "44f1a35bc5cccf0ce1a80d5108747f91f3340f85",
+  "collectorRevision": "1bb20567032b5f2af0700b9f04013b79f0aa132f",
+  "checkAndHelperSources": {
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java": {
+      "executionContentDigest": "sha256:97fda6942f044f18d59671288086fc90f98fa0891df05920f50b5f0c36f0204f",
+      "currentContentDigest": "sha256:97fda6942f044f18d59671288086fc90f98fa0891df05920f50b5f0c36f0204f",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java": {
+      "executionContentDigest": "sha256:da3229434896c84aa066207e1b779027c73862207eb0f3b3b8c0650ba75da59c",
+      "currentContentDigest": "sha256:da3229434896c84aa066207e1b779027c73862207eb0f3b3b8c0650ba75da59c",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java": {
+      "executionContentDigest": "sha256:e9a966de96b4679b285eb7664e0ed59f6d04f8df1c7dff346e8bf610b0499862",
+      "currentContentDigest": "sha256:e9a966de96b4679b285eb7664e0ed59f6d04f8df1c7dff346e8bf610b0499862",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java": {
+      "executionContentDigest": "sha256:5fb623e6c1ce9ea29d6d13ed9733f3d46651345bb637fd082de1f18cb53ee21e",
+      "currentContentDigest": "sha256:5fb623e6c1ce9ea29d6d13ed9733f3d46651345bb637fd082de1f18cb53ee21e",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java": {
+      "executionContentDigest": "sha256:507250dc3604313918184b8aac43b6faef3352adbe7cf41f055198e46626a5db",
+      "currentContentDigest": "sha256:507250dc3604313918184b8aac43b6faef3352adbe7cf41f055198e46626a5db",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java": {
+      "executionContentDigest": "sha256:fd0a71bfda8b564c0ed056e59ec6cb34a7eef6d6895e42a387b94771d0a46689",
+      "currentContentDigest": "sha256:fd0a71bfda8b564c0ed056e59ec6cb34a7eef6d6895e42a387b94771d0a46689",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java": {
+      "executionContentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "currentContentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java": {
+      "executionContentDigest": "sha256:81cd02f7190a9084c48b0b50f215665982735caf62b2da3a27b39cb0200d79b8",
+      "currentContentDigest": "sha256:81cd02f7190a9084c48b0b50f215665982735caf62b2da3a27b39cb0200d79b8",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java": {
+      "executionContentDigest": "sha256:5b667e4985704ebc3e0b2099ca7332b42e5c203a32baf19d7595c3dc399d7501",
+      "currentContentDigest": "sha256:5b667e4985704ebc3e0b2099ca7332b42e5c203a32baf19d7595c3dc399d7501",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java": {
+      "executionContentDigest": "sha256:b2bf6f70aac2470d7eebf4ad280838c4fcf832fa0d02a376ee12046c3305e699",
+      "currentContentDigest": "sha256:b2bf6f70aac2470d7eebf4ad280838c4fcf832fa0d02a376ee12046c3305e699",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementHttpTest.java": {
+      "executionContentDigest": "sha256:57dde3d255d6d697e45262aec9514a250d5067f698b786a12b44616d136130bf",
+      "currentContentDigest": "sha256:57dde3d255d6d697e45262aec9514a250d5067f698b786a12b44616d136130bf",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java": {
+      "executionContentDigest": "sha256:4fda66daa8d6c3cf1b5fff7e88807a0e3af8cb6874a4f4715f9ecbed62922fc3",
+      "currentContentDigest": "sha256:4fda66daa8d6c3cf1b5fff7e88807a0e3af8cb6874a4f4715f9ecbed62922fc3",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java": {
+      "executionContentDigest": "sha256:fffef0a47a649eaff02604b2342b50b49697c729422d17fc47cdcb42ca89fa58",
+      "currentContentDigest": "sha256:fffef0a47a649eaff02604b2342b50b49697c729422d17fc47cdcb42ca89fa58",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java": {
+      "executionContentDigest": "sha256:f64d466c1e3f0829ecd586b02cb8e9593017cf7d357e4307d17cc4514b4957cb",
+      "currentContentDigest": "sha256:f64d466c1e3f0829ecd586b02cb8e9593017cf7d357e4307d17cc4514b4957cb",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerProducerOwnershipTest.java": {
+      "executionContentDigest": "sha256:37bc4d154d2d16cb067772328a70db03821fa7d59745dd9365d7ae0e15545937",
+      "currentContentDigest": "sha256:37bc4d154d2d16cb067772328a70db03821fa7d59745dd9365d7ae0e15545937",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java": {
+      "executionContentDigest": "sha256:4cf6fc4fe3206db49750b0b2ebc6312d5d0bfb08f3c160c75e3b67b02b97d9c3",
+      "currentContentDigest": "sha256:4cf6fc4fe3206db49750b0b2ebc6312d5d0bfb08f3c160c75e3b67b02b97d9c3",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java": {
+      "executionContentDigest": "sha256:32a1b804d12f8928a5383969be74efd50536feeca8487bd5d9cfebc4e49cd38b",
+      "currentContentDigest": "sha256:32a1b804d12f8928a5383969be74efd50536feeca8487bd5d9cfebc4e49cd38b",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java": {
+      "executionContentDigest": "sha256:0224afdbbbaca5931fc5964741679db52da70cb014c0f96ae65b40dbce8cdb65",
+      "currentContentDigest": "sha256:0224afdbbbaca5931fc5964741679db52da70cb014c0f96ae65b40dbce8cdb65",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    },
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LiveMigrationCutoverTest.java": {
+      "executionContentDigest": "sha256:9a912f3f3721d834c51d92398fc3d7073a50bb8f9abd0095a30ccd82bce222e6",
+      "currentContentDigest": "sha256:9a912f3f3721d834c51d92398fc3d7073a50bb8f9abd0095a30ccd82bce222e6",
+      "materializedSnapshot": "d9663d16d721ca4ea75d403785f2e6d0843d9b27"
+    }
+  },
+  "changedProductionOrBuildDependencies": [
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/CommitOps.java",
+      "executionContentDigest": "sha256:1ebfe8d7b8eb18c1ac2ff18a9b0a1e1b635f7534e1a675219e89aec2dfc3c75f",
+      "integratedContentDigest": "sha256:52c1b956f5250b6e8f3b79be54110d1e0a972b145c285de9c65999eea2ce9d67"
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/Components.java",
+      "executionContentDigest": "sha256:7e59b42e5db40a5f0ee4a644938947255a88d8face0b3223b227df50e8023507",
+      "integratedContentDigest": "sha256:eb0ff10be6b03b8ff21d043c893b1ee46f17fd50cddcc1d441f662ef11a2ddc3"
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/ComponentsFactory.java",
+      "executionContentDigest": "sha256:5ec8ab6ac550ccaa9754af58caf043eac2b4ab9e0f27bfa09fc5e97e1bafa3f5",
+      "integratedContentDigest": "sha256:f7777621de1e461886f0991fcac7e7cd03dca454d7860789e5f79ed18c8d0d1d"
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/FieldMapper.java",
+      "executionContentDigest": "sha256:10710aa9600e8050c19318438ceea2292933f8ec0b973e6fad7b048f4404b244",
+      "integratedContentDigest": "sha256:537131224e46d334bfc32d6d2780ea9ece2416ef72692e85ad7087e93aee914f"
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexRuntimeIOException.java",
+      "executionContentDigest": "sha256:f653c9d5594c2e14de207f525084be71e602791162dd821f9991034c96e1432a",
+      "integratedContentDigest": "sha256:e2b716208cc8080bd6ad6d7cbf1616cb9194c9f67e29661f867c1ada41aa92f7"
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexWriterUnavailableException.java",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:c5935f129a486531ae7e163ab715f7dd115cbf7154bf8e8cf886af7570396eca"
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java",
+      "executionContentDigest": "sha256:334564520ab72d32be744e02302915898d750bc8c22baeee302901d009b002b6",
+      "integratedContentDigest": "sha256:19456561d5cc8f81c3966135372bf19472efc9730606003998840c496a5a2bf6"
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/RunningRuntime.java",
+      "executionContentDigest": "sha256:435dfa34de367f575b094c81975ecbe6df09d1d7b1bbdab7701e5ebbe5bb6519",
+      "integratedContentDigest": "sha256:5c58ecaf59f0478f4d119d4cedf787aae41f1860cf3266fe8676736868daecaf"
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/RuntimeSession.java",
+      "executionContentDigest": "sha256:f12819093ff2002b435272875a04c8f329f790223ea0d7f8400e1f67281589ee",
+      "integratedContentDigest": "sha256:41925a94f8b0ee6c44d9cf5392eb2a570cc041cb344fece54078417650a2e0c0"
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/WritePathOps.java",
+      "executionContentDigest": "sha256:596776736c0c8d36c0da2094313566f1d1437c9a6034c44c71cc2ef115dc6392",
+      "integratedContentDigest": "sha256:36e39cf2a3ecb144e7604bf387ea503cdd36bb41c87efbbac55d874cf0b1a0a5"
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/conversation/ConversationStore.java",
+      "executionContentDigest": "sha256:e240a82e67d09a2451325c143f38108b304323c2b87593ea96744577d4b64689",
+      "integratedContentDigest": "sha256:199c4d88ac2d3a23393fbf8e45ee6f1b9d5fbcd3e9757e8d088c36a86b90d267"
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/conversation/ConversationWork.java",
+      "executionContentDigest": "sha256:2dc6a3fd0edb870045aed0810f13ba127335ea51b44c3d0cec476db0ed9e9d47",
+      "integratedContentDigest": "sha256:2627592812896bcc4cc729bcf915197d0a25daa594745dd6413a1e6d4a4c8784"
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/memory/MemoryStore.java",
+      "executionContentDigest": "sha256:fe8b7c8a7820af251995d0b83b7b4c94be7e60110b6fcee5222c2b9b3d649b21",
+      "integratedContentDigest": "sha256:8d821bde8cd31d9814c9a4cdad194407e085fcb966fa2f12a5b15b9e6cff52b7"
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/memory/NoOpMemoryStore.java",
+      "executionContentDigest": "sha256:9514219c30776876b634fabcc4f9d5b7b57db866ec287bd2dd317e656a728ebe",
+      "integratedContentDigest": "sha256:3f0c52b1493de605d1849a115b7712260175ed0cdba11e165a6dbaaed6392167"
+    },
+    {
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/FileMemoryStore.java",
+      "executionContentDigest": "sha256:082cfeb208fbe64f73b7aa95e9b2db7d9d515ed720f23d1e5b4a3421a1a3064f",
+      "integratedContentDigest": "sha256:88a58b51c1c5ddc4474e98a3822e8ff02619a7af6e3a87079cbd2fb0d7ad20cd"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationDeletion.java",
+      "executionContentDigest": "sha256:49fba71140cfdbf9d98b157572ea09123b328dc7d6b7d365df8e6d18aa705382",
+      "integratedContentDigest": "sha256:ffa5f90fa5a062f229314eb295066088b80f8023ada9f0ebf6fa21fbacc30d7e"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/FileConversationStore.java",
+      "executionContentDigest": "sha256:3ce9b17f4fe33c39b0db832dc68f617792b84a76148a66943a69a769fc7cac4c",
+      "integratedContentDigest": "sha256:8a54c2bbf30dae4ca54cac33f801ae242ff951f1c70df1d3d189e7f090a35589"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java",
+      "executionContentDigest": "sha256:49f161ed6dc7d7a402f60274e1a9620804a692970916ff8c769145f6cd4461ce",
+      "integratedContentDigest": "sha256:5d3b94fa6078a2997031e9c7ce7a0d7a9bd3d51f6dd43a6966a0d05079183f1f"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java",
+      "executionContentDigest": "sha256:3581a85437bd9c580b3dd7cfcbb44219c26fd184742b3536e11753f742e96c61",
+      "integratedContentDigest": "sha256:c4f8838dacc961ef85888d2357f2314c835527b78349cc14394425190015ff90"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteDocumentIdentityStore.java",
+      "executionContentDigest": "sha256:c3384f2449c92fdf17ba0d2f1eabfc9758cfc3b86f1d4185f90d8ee4c8665a3b",
+      "integratedContentDigest": "sha256:1f41a1f7e9b42a08a2f11d42904fb18a072ebccd86e097cd579352e14c3eb449"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java",
+      "executionContentDigest": "sha256:36ccd9dd8631847a5db3051d7620887f70e193dbb27f229a8d3c477ed694f76d",
+      "integratedContentDigest": "sha256:1a2feb0cd6fb2532a33c09fc3f8ebb9c4e1d4030a339877c9d0d52b91c7de408"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStore.java",
+      "executionContentDigest": "sha256:b92793db4e15bc748608100f95d635e6eacfddda5dad6983c3a29e96becabc88",
+      "integratedContentDigest": "sha256:cf4d4f7b394d340078b4cb1396edca712396b5dd79ab36eb2732dc943b48f320"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteServiceAvailability.java",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:cb8468ff5b78dc3caa4bd45064ec636b57c80099988b43e92035843f2d154cec"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/InferenceCompositionRoot.java",
+      "executionContentDigest": "sha256:64d15cad4711128ab8264457c3d3b343973ae2207811448b71085a10251057cd",
+      "integratedContentDigest": "sha256:d8be08bd67fa720c5e6c3edb633fd251c72b7b27d57d211918c7b3cc2e17c127"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/InferenceSurface.java",
+      "executionContentDigest": "sha256:c47c0fc4e5cfc17b49dbd148a0405995848d20053d3a2607ed7d6b65c92b3255",
+      "integratedContentDigest": "sha256:bca2171f3822365dfdac6ebfc49f74d1ca80e9458f1dfbba79a60985918dd255"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+      "executionContentDigest": "sha256:7e011b1211fccfaabff90a02f85d9b4750f18e34bf8e6eec2d2d83bb16bff982",
+      "integratedContentDigest": "sha256:3b48aaacb0db7cc076b66339b83ac4ac1a72811ef6e13050d2bef0e5ecb1942a"
+    },
+    {
+      "path": "modules/reranker/src/main/java/io/justsearch/reranker/AssemblyBuildFailure.java",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:0800a57a534ee25a8216ea20f4e221f8deffe29f1de9ebaa6d4acab073206589"
+    },
+    {
+      "path": "modules/reranker/src/main/java/io/justsearch/reranker/CitationScorer.java",
+      "executionContentDigest": "sha256:458511cd4ed11a743cb3c5ddc19d73510127df8b097681edd8e87cc64c71c44f",
+      "integratedContentDigest": "sha256:c677ec2bebed1aea520b263e7da31e8562134b998b34dd8291798f084e99fe06"
+    },
+    {
+      "path": "modules/reranker/src/main/java/io/justsearch/reranker/CrossEncoderReranker.java",
+      "executionContentDigest": "sha256:fbbed395b294dc91ca2915114f2cf512d86002ea60eeb133120bad40a4555e32",
+      "integratedContentDigest": "sha256:7cc3bb14eddd5dad7e5168d9c8bec16346bbdfeab00b4e3bc78de5002e87e9f0"
+    },
+    {
+      "path": "modules/reranker/src/main/java/io/justsearch/reranker/RerankerAssembly.java",
+      "executionContentDigest": "sha256:82f27e81c4839db6aa7a2e58541884196dda75cbc5ae93dcd137a7320749a6f9",
+      "integratedContentDigest": "sha256:82597e603268f9401b4f60dfc22b6ea4a56fa659517d9ab2f095cb48aa8b2112"
+    },
+    {
+      "path": "modules/ui-web/e2e/memory-conditional-replay.mjs",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:ce0127abe8213b6867e7e3604ea514dab92be0755b6da8b9b828ac74afc35b87"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/ConfirmDialog.ts",
+      "executionContentDigest": "sha256:75dd18fcb2d2234b52b032a4e14f0fd5e49263b81dd145f763974fe8ccf7fa91",
+      "integratedContentDigest": "sha256:d8863ffddc82c8cdc23d132c05febb4d7ce401606596d10e29c15c641b39994b"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/chat/ConversationHistory.delete.test.ts",
+      "executionContentDigest": "sha256:812aea13f4fbf70aee5754b96c9f7d4ee0b6f7c138994287d113dc7af3652b32",
+      "integratedContentDigest": "sha256:57d87b708be10ad6b9e68292e82c61df793cfb3568514d4f2210ee8cadbbd563"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/chat/ConversationHistory.ts",
+      "executionContentDigest": "sha256:6dc91d274a82deb661f82c4ce2e489a16ae6e23f242430ab5781b993a8292844",
+      "integratedContentDigest": "sha256:73fb70ea03dfc3dd7578b8cb16f4c5a3ad8cc4e8e7a8d4f6614da64151f20ee6"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.caseParent.test.ts",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:ad55d6ada2c868ca935c7a27e3a0cc46521d3b41b2c8d4f602cb3f14e6da9b0a"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.ts",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:577974f2c814b827c909e967bce89f476ae66e76e3ec81230a845e3181f6f4f7"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/conversationDelete.test.ts",
+      "executionContentDigest": "sha256:359f1edf4c82e91f0663892f63d6e8b6276e720c7c2cf1c0eb54586d54074b3c",
+      "integratedContentDigest": "sha256:adaad030a9ab923df0d86808d0fbd940aeac5e2f5b679bb33eef2dfdfa3071f9"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/conversationDeleteCaseParent.test.ts",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:75fc2ceb8de9d3a01f2f9a3401366f4a3d7eadf5b3b1d33f2369caf58e3ab156"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/conversationDeleteReconnect.test.ts",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:50c26ae10d5adfc99c988bbaadd5ee60a5d2d1614bab35fbe0f5c566e7ceff53"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
+      "executionContentDigest": "sha256:323d7e3b5e6842c00268df2b3f0508b0af2f8eca262cb751d247c16d621425a9",
+      "integratedContentDigest": "sha256:3bf3c99f5e63770ff3201770d4764d4e58248b1f55f8321cb5495c9bdc251b72"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/conversationListStore.ts",
+      "executionContentDigest": "sha256:b4baddb1873e32d672dadbcf50859661d711c2325bb6f1e38c35f8129fc2228f",
+      "integratedContentDigest": "sha256:a97f15cb12e6f73650cb6a26791c0e1db659e3b38d02bf4baeecdfe716766c62"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/conversationTreeDelete.test.ts",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:92af16f12c63a6c73e833474293587d8d2a394fb530b1e7bd069318d527b6e47"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/folderRemovalStatus.test.ts",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:bdd0d67986be1c2df1bd8922a402ab00ef3301f93cdb0ef222be097a58649c3d"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/folderStatus.ts",
+      "executionContentDigest": "sha256:b169d63b0350beed0b545286bc3eff23e65b0545853cc0eeefccd9bd95e676d0",
+      "integratedContentDigest": "sha256:58e2daa9210042eb15e142807d9e39d3d975413cad87a6a0b57893c09b188276"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/MemorySurface.admission.test.ts",
+      "executionContentDigest": "sha256:7e972f6f07d8dc4bfd388c1372f8b35cff9fdbafa65a54f6b48fed45f9394655",
+      "integratedContentDigest": "sha256:121f2b0f0e718f8052b247008cb8c0f6815e68a21c7a221a99dec9d82e0dc84e"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/MemorySurface.conditional.test.ts",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:bcaeaa5dd98658141b6f7255806d319617714e76c8444bb0f42f24695aa54c82"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/MemorySurface.forget.test.ts",
+      "executionContentDigest": "sha256:1eef878abe8f52b9523706fd16ce39f57b4843e74717bc08900853dda544f2a6",
+      "integratedContentDigest": "sha256:ed967a1735efb56f068e66b8238281dfe64593d0f6947d066fada77bda474891"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/MemorySurface.lock-metadata.test.ts",
+      "executionContentDigest": "sha256:c5a8f2e5ad03e81fe35a69f38f06dc4078dc33927ca30f99b0f7d51e7f988666",
+      "integratedContentDigest": "sha256:a322e710ddb11385cdd8247987aec5715c1ac6d17c70bf2cd87f72cb8a180682"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts",
+      "executionContentDigest": "sha256:ec5fa29d87bab154393a281a5f4512577d2b7b11fd8af53b222b361020ec192f",
+      "integratedContentDigest": "sha256:b03b640d0a6a502ab18e9c9ac6c73b2ed8f88dc254db53e447eb4f5909ded1d1"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/MemorySurface.retention.test.ts",
+      "executionContentDigest": "sha256:e2f221abfb750376325517abff24c876af3870018bee75841eb64f665097b217",
+      "integratedContentDigest": "sha256:060052fb5d41e40f8c7062ba81b1770f0fb2f54e73a0fb3f7d9140ca1e9624b0"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/MemorySurface.safety.test.ts",
+      "executionContentDigest": "sha256:6c20ccecd2419993de9a3fe09fbe3ef09c217b2c13fa1b93a536f776ffbe5940",
+      "integratedContentDigest": "sha256:f660db4bd1ed102b9afa6cec69f6529c23264827cf972c9094fcab19905310ba"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/MemorySurface.ts",
+      "executionContentDigest": "sha256:41251c36b2fbdd3f912cf5e5538605681177bcc43e7dc8c45cdd68b86468722a",
+      "integratedContentDigest": "sha256:2e0c30f524805860070d75599b6b26d9a8db53678f8a435b128bf3c70ee6b567"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "executionContentDigest": "sha256:a92e5114a41a8052cf8ed4230489461263ea3a32a6db92b19a9c04007d3db72c",
+      "integratedContentDigest": "sha256:9531e6aeb2a6f3c9715929645c78042c9b29988eabd295473c871b1808951c7c"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:82249eeb720c6315c3fac90e32b68093a74dc458e1b9860565afa456f722e4fb"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
+      "executionContentDigest": "sha256:d979d2ed345e458ca1a1aa330e19f4c132078a1cd62d2b9c6793e7373c866789",
+      "integratedContentDigest": "sha256:758ca05f7bdf826cfb2b4e7af86b7783a7000f4eb869ce27419a6db7f90794c2"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts",
+      "executionContentDigest": "sha256:a4e7c452892aab36b5c48b72517551b68809c5c6ed971fe21a69af8f9f9389f6",
+      "integratedContentDigest": "sha256:cb0c9975f3a1cba23c088ebc0543ef6b35a5dcf1ed5b225792d108044661e260"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.removalFocus.test.ts",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:e87cabb464cacbd86f6664e4a7e0768e0caffd2a6103ed0a8c77a9f614d1abcf"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Sidebar.ts",
+      "executionContentDigest": "sha256:417bba24d6f024c60a01e52d9ba0ff84150bc9e78e067c9b5dd01d956b8daff8",
+      "integratedContentDigest": "sha256:07fe1e52ff344af0b0b1d302d3d55e5b9f5414aafcc1b78ec6f16166a4d89b64"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/fixtures.ts",
+      "executionContentDigest": "sha256:59f45598cf2440331f67f86e67a2eb49a37d48fa5c83097d1c458d3814e106c5",
+      "integratedContentDigest": "sha256:1aa5eebaa0ab267fcd3f141c6b25114b383da14571b6e1f98a124ce89b4f7ad8"
+    },
+    {
+      "path": "modules/ui/build.gradle.kts",
+      "executionContentDigest": "sha256:056f49d41fe2aad864078f91d6cc9aedd57dc1f2be8beccc615ad34dcdf6ed4b",
+      "integratedContentDigest": "sha256:4dce0f385b5e80bc26a4a8991db3de19fb87d6a0c4a07916ba8f2f7f1ee982ff"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ChatController.java",
+      "executionContentDigest": "sha256:5947fa9bae01706b72a9b430637202199c7bc23315fc8a8c814c6d299bc83df8",
+      "integratedContentDigest": "sha256:7bb1555a48b12eeadda4d6cb9dfa86aac36208c820375a5c361b83526b40676f"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/MemoryController.java",
+      "executionContentDigest": "sha256:f79c380be61ed7807e3252e60f66fe36371d54c56f8150e9be4bd3358d6ef073",
+      "integratedContentDigest": "sha256:c2dddb326d678f506e4b9d6a17defc439af709c1a79645c905010f7489998d0a"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/bgem3/BgeM3Assembly.java",
+      "executionContentDigest": "sha256:20dd5d3cc062b2b6b4f3605d014766960fb5c8f900803e06d0a2f04e376d6780",
+      "integratedContentDigest": "sha256:d8ba650c201f9d760f0d788f114d259096d9b613b004d3eb8f8ad67fad8a5982"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/bgem3/BgeM3Encoder.java",
+      "executionContentDigest": "sha256:d0ed76adbbcf06cab2b717a4c1b4f83de184b5f09768d12ba431de92b3a7133d",
+      "integratedContentDigest": "sha256:5cbe637f663d164b9e74b6721e6782d713b20915fb3935db892de1ae60cd9a41"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingService.java",
+      "executionContentDigest": "sha256:bd79dfb1f8272d1bd459a2aa59379d81b0b91eef2389af9abfc7dc2f7d3615ad",
+      "integratedContentDigest": "sha256:8bc0f1582a1d3d99a77613cacf52f423f4bcc4491df437dde3f3e458d3425b61"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/onnx/EmbeddingAssembly.java",
+      "executionContentDigest": "sha256:8ad483d79ec3508fdeddc405a3bb6a709cf3c3c7c65e81f5302a446247201c9c",
+      "integratedContentDigest": "sha256:0830b1d93fbcdd262dd67faa973305c9517d350a653520120c547234e2f2d258"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/onnx/OnnxEmbeddingEncoder.java",
+      "executionContentDigest": "sha256:4ebae57d971e5b2ac198ff5547420c49fcd25a9ffea197b9a6c252e4f0780cf9",
+      "integratedContentDigest": "sha256:2d898bcd73a2392525651423bcbbd593a8bb0a1c51e30c69313ef698ecc63dcb"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/identity/DocumentIdentityStore.java",
+      "executionContentDigest": "sha256:b9d445c5497b2cb8da01b440286ca3252ccc9880f78d57a66324e874c039293e",
+      "integratedContentDigest": "sha256:b0e2397dab28aeca970d82e3247d0436110fd2ab2332fcb3656f9ae8cb9f538e"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java",
+      "executionContentDigest": "sha256:1ce141a7a90e09b2d61557ac59a32fac36482548a2f2e3c6656441e7df31208a",
+      "integratedContentDigest": "sha256:a400790d6361a2950d41bddb872ea45d259a9cf800d65aad2c85e254e779b849"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/ingest/IngestionServiceUnavailableException.java",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:0531d63d0631e86ba97e82d96566224b962de36d7c548304fc68b1fc81c83a60"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/ner/BertNerInference.java",
+      "executionContentDigest": "sha256:0c6902fe1a51bc951430271ad5ec67c4263fad87597a123faa18ec759310373c",
+      "integratedContentDigest": "sha256:580d9e678334ae5909ff9c8554289f7ca21fb96620ae092bbd9ce785cbfb22ea"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/ner/NerAssembly.java",
+      "executionContentDigest": "sha256:68e1109d7da8fc0b1086f91de528c3fd7d1790d14666f857c5a389630ccf4429",
+      "integratedContentDigest": "sha256:004ba9e3a02bbbb4d96b84736fb6f296c1115b74f3e1a20d634cd90dfb6f7ce5"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/ner/NerService.java",
+      "executionContentDigest": "sha256:6d935cde3140d079c993c129507d23d2dbdc13f546beb90bfedf1ae11016d3aa",
+      "integratedContentDigest": "sha256:0e54f241b5bcf0558c15ea1705a633b7c00d625697271bb2e2666ad485a739a6"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/path/PathResolutionStore.java",
+      "executionContentDigest": "sha256:517d58eb9b127f50448561b854e3826dd589bf74c2dd11a5fecff4b343dde97f",
+      "integratedContentDigest": "sha256:1772e586de35cfe16dd17abb42844adb8984203702fbc664b8a8f0c62721a02d"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java",
+      "executionContentDigest": "sha256:f1070ba42d5acb082971225e9c2b558fb584b9f350dd12dd458a0abbc34c8ab1",
+      "integratedContentDigest": "sha256:aed8243b9eb8c7867b5ed7fe8a5734f576a8299193db9dfc2ce1cd153336d35b"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/splade/SpladeAssembly.java",
+      "executionContentDigest": "sha256:b255e86a1dff11174e1672650de9fbcfd92b0bed28635ae3fc7bc43a0428f702",
+      "integratedContentDigest": "sha256:2e4d9a56024baa179ae3527adece93ad6e4516c052bc9e3e6d6ac818117559bf"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/splade/SpladeEncoder.java",
+      "executionContentDigest": "sha256:c9c1b9433b9e992d7bc136f41147935d582eff765cd0790f8755bccaea6afe6d",
+      "integratedContentDigest": "sha256:774478191a68d2e897f2672c07315fa658435bf42d3eb817c78f86e13c9c7e4d"
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/tokenizer/AssemblyBuildFailure.java",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:58a0bbe3a7ea09d4d3df86bbc0b2f3c6d835503485a0ec6b828a22921088e659"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionSandboxChild.java",
+      "executionContentDigest": "sha256:fdcbdf398e1ae99c6b9bb1615d942f7dceccf4fec7a4803987cb3fc7b5b53bd1",
+      "integratedContentDigest": "sha256:f8fa737d4ffbf9ad01e5a3fd99b3d6f55c7f5b76b8358b33c75e0b6d0da59b45"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistry.java",
+      "executionContentDigest": "sha256:9027251098969cb2ce9658ae1b74d7dd5740a8fabd00ab60d0de5d511f0850a5",
+      "integratedContentDigest": "sha256:b8f7fb623817707917272b64de5013734471bf64a5894e80a77dc9a0154a80aa"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/PersistentExtractionSandbox.java",
+      "executionContentDigest": "sha256:2489e378489e2281e104e0487636232ef9fa56678ce6d83647385b2ee5d92cf2",
+      "integratedContentDigest": "sha256:1bc364c0f929f0c5ceb91fdc2857d75c0aa1c70040534744ce99b2790f6a8174"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/PreparedExtractionInput.java",
+      "executionContentDigest": "sha256:be1a1ea28285ba9384d6e3449ed9c1442c5d36f79e00866dba111350310b7910",
+      "integratedContentDigest": "sha256:d27d1316f31bb7f2cb0779926c904b0866070f15281aa1ba0b925e241f5b7b8a"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/SandboxExtractionException.java",
+      "executionContentDigest": "sha256:f44b5759818a1a5298cfff36450bc6367aba2e88173fce84382b341287e2e146",
+      "integratedContentDigest": "sha256:006997df383b37caec00a1cd28c1596acd56295af459bc495e5c4765409cacb3"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/SandboxExtractionResponse.java",
+      "executionContentDigest": "sha256:64858b70d487470037dd3b3da163377fe6950b2152427eaa88cb8b32b8667e2b",
+      "integratedContentDigest": "sha256:d0f3797c011d16504be43ca853d25dd82f2faffa8116d4ca1edfa1e2ddb1e7a1"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/SandboxServiceUnavailableException.java",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:b82f0e2f2f10f5a5fa302a937750102662aca984a6bb0e1f825485e8a2f1a8f7"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/TimeboxedContentExtractor.java",
+      "executionContentDigest": "sha256:43f3f6886e0bf44ad8136eb9170f43c55004c9be8789ed587a04a4d74d3e1c30",
+      "integratedContentDigest": "sha256:5fb407987006c90708dd42ff51d6255aee9d3fcc0391418944098b4180c9bef8"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/BatchServiceFailures.java",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:a629bb5d8eeab1aaf10d97006ff968c0e46a5ca1371bd2b4d5c0b7fb9a608bbe"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ExtractedJob.java",
+      "executionContentDigest": "sha256:78326ef0f3d16aacdbefbce56e8301b41ea042f768d58565bdd0586247d5f0df",
+      "integratedContentDigest": "sha256:be488206fb465ed2705ccd1dd0f51aa9eed586939cd1e16bcebacfd1355ea2c1"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java",
+      "executionContentDigest": "sha256:47472b7551c382de1e0e0db6d2ce8877b89c3acb988bec81c2d266dfd6cf04bb",
+      "integratedContentDigest": "sha256:7aa499b659c9ab233a3c3e4ec245b02e636bb72bc9c2efb7525d1a6e25fb36ba"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionOutcomeJournal.java",
+      "executionContentDigest": "sha256:688e24e6285fd7aa6c5aa52e3ab37481764bf4784da3eb0692725985b696cfde",
+      "integratedContentDigest": "sha256:bfcc5ab2b7a1bdd2a9dbe0800f8d16503428a9b8b325bcb038a76a5619c27ce3"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchExtractor.java",
+      "executionContentDigest": "sha256:cb53767944c99ac056026eaefb50b4ba9b3cab43807bd17029fd63c0804f4d00",
+      "integratedContentDigest": "sha256:f81e8ee9c401fd7fc045c33513a510074bf1cd69195c066c77c642e35e0d5fb1"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java",
+      "executionContentDigest": "sha256:3621b665f52ccfbb98333b1b9200c4fc69fc2f7d4718a4c3f44f5a2ce9750911",
+      "integratedContentDigest": "sha256:35426e12b60f9f7078a9f9282f387a5a485576b846a019b7d0e99fa1b4a08ebd"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/PipelineCanary.java",
+      "executionContentDigest": null,
+      "integratedContentDigest": "sha256:6a28bcd351f9e56fc995223e947a5a03f789b0f6a3f91a0717407aa4e1696be0"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/IndexStatusOps.java",
+      "executionContentDigest": "sha256:81658ee045f6cd96380a2b5b98d1810dfe403857a720f540af807d87b3659fb6",
+      "integratedContentDigest": "sha256:d19288f1a6223eeaa811c9b72c2a9941d1527f45c739232d2c5caa13dc3af7ab"
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java",
+      "executionContentDigest": "sha256:db914cb1b1c8692d8cac3fe4584258193154140601546d2a134ab181952151c3",
+      "integratedContentDigest": "sha256:b520bd0421da981ee697b80421079d6bb206151e741882302d816c12312f3fd1"
+    }
+  ],
+  "originalManifests": [
+    {
+      "path": "tmp/builder/evidence/final-candidate-files.json",
+      "sha256": "sha256:c5f9f7f54369feccb73ca5933d3afb4f8f3072331c76eac44b3e0eb433840b7d",
+      "bytes": 6996
+    },
+    {
+      "path": "tmp/builder/evidence/final-candidate.patch",
+      "sha256": "sha256:75ec70d51cf57846c903f3eb05b81ccd765eddb872ad96714753081ba207c754",
+      "bytes": 220563
+    },
+    {
+      "path": "tmp/builder/evidence/baseline-current-test-files.json",
+      "sha256": "sha256:bcda5a94c2856e6c6f16aa61fd815fe00a297e014f2d333d876b0a24c2b99889",
+      "bytes": 5722
+    }
+  ],
+  "freshBeforeManifest": {
+    "path": "tmp/builder/step7/before-inputs.json",
+    "sha256": "sha256:73082b43a31e24d195f59af454f0bcb292cf50387886cc3b80ad5acf9b7484b3",
+    "bytes": 3823
+  },
+  "sameSourceOverlayPatch": "gates/test-intent/evidence/upgrade-retire-frozen-tests.patch",
+  "overlayApplication": "git apply --cached --unidiff-zero with an owned temporary index initialized to execution revision; no worktree reversal",
+  "scope": "Frozen-code after evidence only. Same check/helper inputs remain current, but integrated production/build dependencies differ. No fresh integrated recovery behavior or independent acceptance is claimed."
+}

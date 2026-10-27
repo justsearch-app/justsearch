@@ -1,0 +1,1947 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T20:29:55.859Z",
+  "revision": "97309cf3860059f6c55da653cefa7f7fe65b82df",
+  "tree": "a0726f188def5580782ed78357a1a2addd34ccdc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest.completeDigestCertifiesKnownAbsentModelsWithOrWithoutDiagnosticInputs\" --tests \"io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest.completeNotConfiguredIdentityBecomingPresentIsAGenuineChange\" --tests \"io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest.currentUncertaintyCannotBorrowACompleteStoredIdentity\" --tests \"io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest.resolvedInputsWithoutDigestCertifyCompatibility\" --tests \"io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest.unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14184
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.changedNativeConditionalClaimsItsExactPathWithoutAnotherAck\" --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.changedNativePredecessorIsHeld\" --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.checkpointWithoutOriginalCohortHoldsChangedSource\" --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.failedNativeMigrationRetainsCapturedCohortForRetry\" --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.freshlyObservedUnprovenRowIsHeld\" --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.installedCorrectionNeedsOriginalCohortAtActualClaim\" --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.intentSurvivesSqlCancellationAndReopen\" --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.laterAuthorityHoldsTheInstalledConditionalCorrection\" --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.originalCohortSurvivesCurrentDatabasePreparation\" --tests \"io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.restoredConflictingV13CohortHoldsWithoutOverwritingCheckpoint\" --tests \"io.justsearch.indexerworker.queue.Release030CorrectionHistoryTest.explicitCollectionRootRetainsInheritedAttributionDuringSourceCorrection\" --tests \"io.justsearch.indexerworker.queue.Release030CorrectionHistoryTest.laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims\" --tests \"io.justsearch.indexerworker.queue.Release030CorrectionHistoryTest.sameIntentResumesAfterRollbackWithActualMutableRetryPreserved\" --tests \"io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.durableIntentResumesBeneathPreservingRoot\" --tests \"io.justsearch.indexerworker.queue.Release030DurableIntentCancellationTest.durableIntentResumesWithSameMutableRetry\" --tests \"io.justsearch.indexerworker.queue.Release030LiveSyncAdmissionTest.automaticReplayKeepsTheExactRetryAndMintsNoAcknowledgement\" --tests \"io.justsearch.indexerworker.queue.Release030LiveSyncAdmissionTest.cancellationDuringExactHashLeavesItsPriorAdmissionIntact\" --tests \"io.justsearch.indexerworker.queue.Release030LiveSyncAdmissionTest.liveRootRefreshRetainsOriginalRawReceiptAcrossCoalescingAndRestart\" --tests \"io.justsearch.indexerworker.queue.Release030LiveSyncAdmissionTest.rawCheckpointSaveFailureRollsBackSqlAndAllowsRetry\" --tests \"io.justsearch.indexerworker.queue.Release030LiveSyncAdmissionTest.rawHashCancellationPreservesTheOriginalReceiptAndRetry\" --tests \"io.justsearch.indexerworker.queue.Release030LiveSyncAdmissionTest.unreadableExactSourceRollsBackTheWholeAdmissionBatch\" --tests \"io.justsearch.indexerworker.queue.Release030RetirementClaimOwnershipTest.changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims\" --tests \"io.justsearch.indexerworker.queue.Release030RetirementClaimOwnershipTest.historicalReconciliationRetainsRecordedCoverageAndUnacknowledgedSeal\" --tests \"io.justsearch.indexerworker.queue.Release030RetirementClaimOwnershipTest.historicalScopesPreserveLaterPendingOwnersAcrossReopen\" --tests \"io.justsearch.indexerworker.queue.Release030RetirementClaimOwnershipTest.nonhistoricalDeleteCannotAcquireHistoricalQueueProof\" --tests \"io.justsearch.indexerworker.queue.Release030RetirementClaimOwnershipTest.obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased\" --tests \"io.justsearch.indexerworker.queue.Release030RetirementClaimOwnershipTest.rootIdentityCannotAuthorizeOutsideItsScopeOrExclusions\" --tests \"io.justsearch.indexerworker.queue.Release030RootIntentTest.freshAutomaticCreatorCollectionIsFrozenWithoutBackfillingExistingRoot\" --tests \"io.justsearch.indexerworker.queue.Release030RootIntentTest.freshCreatorCollectionIsFrozenAndClaimable\" --tests \"io.justsearch.indexerworker.queue.Release030RootIntentTest.freshDefaultCannotBeReinterpreted\" --tests \"io.justsearch.indexerworker.queue.Release030RootIntentTest.historicalMissingNamespaceCannotBeBackfilled\" --tests \"io.justsearch.indexerworker.queue.Release030RootIntentTest.ordinaryRootInheritsEarlierAttributionAndClearsPlan\" --tests \"io.justsearch.indexerworker.queue.Release030RootIntentTest.orphanNamespaceSlotDoesNotAuthorizeAnUnretainedReceipt\" --tests \"io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest.inheritedMembersRemainDistinctAndMetadataEditsStayHeld\" --tests \"io.justsearch.indexerworker.server.Release030AdmissionDebtTest.actualDeadlineFailureRestartsWithIndependentExhaustedDebt\" --tests \"io.justsearch.indexerworker.server.Release030AdmissionDebtTest.indexedExhaustedExactContentIsNotDiscardedAtCutover\" --tests \"io.justsearch.indexerworker.server.Release030AdmissionDebtTest.neverIndexedExhaustedDebtDoesNotHoldNativeCutover\" --tests \"io.justsearch.indexerworker.server.Release030ChallengerRecoveryTest.includedUnreadableFileKeepsDebtWithoutRepeatedWalksAcrossRestart\" --tests \"io.justsearch.indexerworker.server.Release030ChallengerRecoveryTest.interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover\" --tests \"io.justsearch.indexerworker.server.Release030CommittedCertificateTest.changedCommittedModelKeepsNativeMigration\" --tests \"io.justsearch.indexerworker.server.Release030CommittedCertificateTest.completeCommittedEvidenceRetiresAcrossRestart\" --tests \"io.justsearch.indexerworker.server.Release030CommittedCertificateTest.unknownStoredModelCannotCertifyRetirement\" --tests \"io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest.nativeCutoverKeepsUnavailableExactOldContentUntilItReturns\" --tests \"io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest.nativeInterruptedMigrationCompletesWithoutStateEdits\" --tests \"io.justsearch.indexerworker.server.Release030RecoveryShutdownTest.closeDrainsMaintenanceWithoutInterruptingTheServingWriter\" --tests \"io.justsearch.indexerworker.server.Release030ReplayRetentionTest.committedNativeFileRecoveredAsUnchangedKeepsItsAdmission\" --tests \"io.justsearch.indexerworker.server.Release030ReplayRetentionTest.completedLegacyEffectIsSettledThroughNativeReplay\" --tests \"io.justsearch.indexerworker.server.Release030ReplayRetentionTest.routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes\" --tests \"io.justsearch.indexerworker.server.Release030RetirementAckRecoveryTest.acknowledgedHeadResumes\" --tests \"io.justsearch.indexerworker.server.Release030RetirementAckRecoveryTest.committedBeforeAckResumes\" --tests \"io.justsearch.indexerworker.server.Release030RetirementBudgetTest.nativeFailureBudgetAndForceSwitchingKeepTheirMeaning\" --tests \"io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest.completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild\" --tests \"io.justsearch.indexerworker.server.Release030RetirementContinuationTest.laterAdmissionsAfterEmptySqlAckKeepTheirOwnersAcrossRestart\" --tests \"io.justsearch.indexerworker.server.Release030RetirementCrashTest.cancellationDrainsOwnedCallbackAndSubmittedFailurePropagates\" --tests \"io.justsearch.indexerworker.server.Release030RetirementCrashTest.defaultSchedulerRecoversAcrossStartupAndRestart\" --tests \"io.justsearch.indexerworker.server.Release030RetirementCrashTest.killedRetirementResumesAndBackupCannotReviveBuild\" --tests \"io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete\" --tests \"io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.logicalDefaultOlderRootSurvivesLaterForceFalseCollectionAndChangedSource\" --tests \"io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts\" --tests \"io.justsearch.indexerworker.server.Release030RetirementInheritedPolicyTest.nullRootPreservesExistingCollectionAndAttributionAcrossLateRegistration\" --tests \"io.justsearch.indexerworker.server.Release030RetirementLegacyMetadataTest.missingOriginalQueueNamespaceStaysHeldAcrossChangedConfig\" --tests \"io.justsearch.indexerworker.server.Release030RetirementLegacyMetadataTest.namedDoneRawReceiptKeepsCollectionAndExactBoundary\" --tests \"io.justsearch.indexerworker.server.Release030RetirementOrderingTest.newerAcknowledgementWinsPausedReplayAndRestart\" --tests \"io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart\" --tests \"io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.partialWalkRetainsReceiptAndBuildUntilACompleteWalk\" --tests \"io.justsearch.indexerworker.server.Release030RetirementPrefixRestoreTest.restoredRawPrefixReusesTheExactFrozenSuccessor\" --tests \"io.justsearch.indexerworker.server.Release030RetirementPublicSyncTest.laterPublicSyncMaySupersedeAnEarlierExactAdmission\" --tests \"io.justsearch.indexerworker.server.Release030RetirementRootImageTest.acknowledgedImageSurvivesUncertaintyThenConverges\" --tests \"io.justsearch.indexerworker.server.Release030RetirementRootImageTest.sameStampedPublicSyncTargetsOnlyChangedMember\" --tests \"io.justsearch.indexerworker.server.Release030RetirementRootProgressTest.uncertainEarlierAlphaDoesNotStarveUnqueuedBetaOrAcknowledgedMutation\" --tests \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring\" --tests \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.modernUnownedAdmissionCannotBorrowRetiredBuildAuthority\" --tests \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement\" --tests \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed\" --tests \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.uncertifiedServingGenerationKeepsOriginalMigration\" --tests \"io.justsearch.indexerworker.server.Release030RetirementSyncPolicyTest.legacyHashEntryStillReadsOnAnInterruptedThread\" --tests \"io.justsearch.indexerworker.server.Release030RetirementSyncPolicyTest.liveSyncKeepsItsOrdinaryRetryPolicy\" --tests \"io.justsearch.indexerworker.server.Release030RetirementTransitiveOrderTest.transitiveDeferredCollectionCannotEraseLaterBetaSync\" --tests \"io.justsearch.indexerworker.server.Release030RetirementWalkCrashTest.completedWalkSurvivesAnActualKillAndRestart\" --tests \"io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry\" --tests \"io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.newerDeleteUsingTheSameKeyCannotBorrowTheOldReceiptProof\" --tests \"io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.ordinaryOrderedPrefixThenSyncSurvivesRetryAndRestart\" --tests \"io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.overlappingScopesKeepTheirAcceptedOrderAcrossRestart\" --tests \"io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.repeatedFaultsRetainDebtAndDeletionProofAcrossRestart\" --tests \"io.justsearch.indexerworker.server.Release030UpgradeProbeTest.interruptedMigrationFixturesKeepTheirServingIndexAndJobs\" --tests \"io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.changedRevisionCannotReuseApproval\" --tests \"io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.exactApprovedMalformedRootPreservesUnrelatedDelete\" --tests \"io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.unapprovedMalformedRootIsHeld\" --tests \"io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 348194
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#completeDigestCertifiesKnownAbsentModelsWithOrWithoutDiagnosticInputs",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:415e3a884237005eb56cdb469663694471f20a366fc4e5f15630c8786d60b2ad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completeDigestCertifiesKnownAbsentModelsWithOrWithoutDiagnosticInputs(boolean, Path) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "completeDigestCertifiesKnownAbsentModelsWithOrWithoutDiagnosticInputs(boolean, Path) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#completeNotConfiguredIdentityBecomingPresentIsAGenuineChange",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:415e3a884237005eb56cdb469663694471f20a366fc4e5f15630c8786d60b2ad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completeNotConfiguredIdentityBecomingPresentIsAGenuineChange(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#currentUncertaintyCannotBorrowACompleteStoredIdentity",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:415e3a884237005eb56cdb469663694471f20a366fc4e5f15630c8786d60b2ad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "currentUncertaintyCannotBorrowACompleteStoredIdentity(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#resolvedInputsWithoutDigestCertifyCompatibility",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:415e3a884237005eb56cdb469663694471f20a366fc4e5f15630c8786d60b2ad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resolvedInputsWithoutDigestCertifyCompatibility(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:415e3a884237005eb56cdb469663694471f20a366fc4e5f15630c8786d60b2ad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement(String, Path) [1] null",
+          "status": "passed"
+        },
+        {
+          "name": "unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement(String, Path) [2] absent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#changedNativeConditionalClaimsItsExactPathWithoutAnotherAck",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "changedNativeConditionalClaimsItsExactPathWithoutAnotherAck()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#changedNativePredecessorIsHeld",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "changedNativePredecessorIsHeld(String) [1] collection",
+          "status": "passed"
+        },
+        {
+          "name": "changedNativePredecessorIsHeld(String) [2] unit_revision",
+          "status": "passed"
+        },
+        {
+          "name": "changedNativePredecessorIsHeld(String) [3] ingestion_root",
+          "status": "passed"
+        },
+        {
+          "name": "changedNativePredecessorIsHeld(String) [4] retry_after",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#checkpointWithoutOriginalCohortHoldsChangedSource",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "checkpointWithoutOriginalCohortHoldsChangedSource(String) [1] missing",
+          "status": "passed"
+        },
+        {
+          "name": "checkpointWithoutOriginalCohortHoldsChangedSource(String) [2] wrong",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#failedNativeMigrationRetainsCapturedCohortForRetry",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedNativeMigrationRetainsCapturedCohortForRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#freshlyObservedUnprovenRowIsHeld",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "freshlyObservedUnprovenRowIsHeld(String) [1] unknown-namespace",
+          "status": "passed"
+        },
+        {
+          "name": "freshlyObservedUnprovenRowIsHeld(String) [2] modern-unowned",
+          "status": "passed"
+        },
+        {
+          "name": "freshlyObservedUnprovenRowIsHeld(String) [3] forged-cohort",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#installedCorrectionNeedsOriginalCohortAtActualClaim",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installedCorrectionNeedsOriginalCohortAtActualClaim(String) [1] missing",
+          "status": "passed"
+        },
+        {
+          "name": "installedCorrectionNeedsOriginalCohortAtActualClaim(String) [2] wrong",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#intentSurvivesSqlCancellationAndReopen",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "intentSurvivesSqlCancellationAndReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#laterAuthorityHoldsTheInstalledConditionalCorrection",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "laterAuthorityHoldsTheInstalledConditionalCorrection(String) [1] ROOT",
+          "status": "passed"
+        },
+        {
+          "name": "laterAuthorityHoldsTheInstalledConditionalCorrection(String) [2] FILE",
+          "status": "passed"
+        },
+        {
+          "name": "laterAuthorityHoldsTheInstalledConditionalCorrection(String) [3] DELETE",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#originalCohortSurvivesCurrentDatabasePreparation",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "originalCohortSurvivesCurrentDatabasePreparation(String) [1] restart",
+          "status": "passed"
+        },
+        {
+          "name": "originalCohortSurvivesCurrentDatabasePreparation(String) [2] copy",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#restoredConflictingV13CohortHoldsWithoutOverwritingCheckpoint",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3bfccc92ff639c5c752056bf6a3cd708c4fa42959c8f8af74fb9faea8ebd4e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "restoredConflictingV13CohortHoldsWithoutOverwritingCheckpoint()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java#explicitCollectionRootRetainsInheritedAttributionDuringSourceCorrection",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9585265c44cd3435bb03a552ff3d0f1119ab7fd9189e430d567a63f3ca336293",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitCollectionRootRetainsInheritedAttributionDuringSourceCorrection()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java#laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9585265c44cd3435bb03a552ff3d0f1119ab7fd9189e430d567a63f3ca336293",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java#sameIntentResumesAfterRollbackWithActualMutableRetryPreserved",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9585265c44cd3435bb03a552ff3d0f1119ab7fd9189e430d567a63f3ca336293",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sameIntentResumesAfterRollbackWithActualMutableRetryPreserved()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesBeneathPreservingRoot",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9aa44c8c12c061539a12ce27f5bd73d66912d37ec3edfd44392ca52d216498da",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "durableIntentResumesBeneathPreservingRoot(String) [1] ROOT",
+          "status": "passed"
+        },
+        {
+          "name": "durableIntentResumesBeneathPreservingRoot(String) [2] FILE",
+          "status": "passed"
+        },
+        {
+          "name": "durableIntentResumesBeneathPreservingRoot(String) [3] DELETE",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesWithSameMutableRetry",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9aa44c8c12c061539a12ce27f5bd73d66912d37ec3edfd44392ca52d216498da",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "durableIntentResumesWithSameMutableRetry(String) [1] ROOT",
+          "status": "passed"
+        },
+        {
+          "name": "durableIntentResumesWithSameMutableRetry(String) [2] FILE",
+          "status": "passed"
+        },
+        {
+          "name": "durableIntentResumesWithSameMutableRetry(String) [3] DELETE",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java#automaticReplayKeepsTheExactRetryAndMintsNoAcknowledgement",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:94706a5e20034481b77d3ff25591b5feea1725e4d51fd05aed4a5b605927042d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "automaticReplayKeepsTheExactRetryAndMintsNoAcknowledgement()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java#cancellationDuringExactHashLeavesItsPriorAdmissionIntact",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:94706a5e20034481b77d3ff25591b5feea1725e4d51fd05aed4a5b605927042d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancellationDuringExactHashLeavesItsPriorAdmissionIntact()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java#liveRootRefreshRetainsOriginalRawReceiptAcrossCoalescingAndRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:94706a5e20034481b77d3ff25591b5feea1725e4d51fd05aed4a5b605927042d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "liveRootRefreshRetainsOriginalRawReceiptAcrossCoalescingAndRestart(String) [1] ",
+          "status": "passed"
+        },
+        {
+          "name": "liveRootRefreshRetainsOriginalRawReceiptAcrossCoalescingAndRestart(String) [2] building",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java#rawCheckpointSaveFailureRollsBackSqlAndAllowsRetry",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:94706a5e20034481b77d3ff25591b5feea1725e4d51fd05aed4a5b605927042d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rawCheckpointSaveFailureRollsBackSqlAndAllowsRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java#rawHashCancellationPreservesTheOriginalReceiptAndRetry",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:94706a5e20034481b77d3ff25591b5feea1725e4d51fd05aed4a5b605927042d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rawHashCancellationPreservesTheOriginalReceiptAndRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java#unreadableExactSourceRollsBackTheWholeAdmissionBatch",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:94706a5e20034481b77d3ff25591b5feea1725e4d51fd05aed4a5b605927042d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unreadableExactSourceRollsBackTheWholeAdmissionBatch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java#changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9811cf7bacba2e12baf2a6b3f31e295d452626294366d0265d1b1d3260a3f397",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) exact owner / changed planned_source_sha256",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) exact owner / changed collection",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) exact owner / changed originator",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) exact owner / changed transport",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) exact owner / changed ingestion_root",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) root owner / changed planned_source_sha256",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) root owner / changed collection",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) root owner / changed originator",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) root owner / changed transport",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) root owner / changed ingestion_root",
+          "status": "passed"
+        },
+        {
+          "name": "changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String, String) unknown owner / changed unit_revision",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java#historicalReconciliationRetainsRecordedCoverageAndUnacknowledgedSeal",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9811cf7bacba2e12baf2a6b3f31e295d452626294366d0265d1b1d3260a3f397",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "historicalReconciliationRetainsRecordedCoverageAndUnacknowledgedSeal(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "historicalReconciliationRetainsRecordedCoverageAndUnacknowledgedSeal(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java#historicalScopesPreserveLaterPendingOwnersAcrossReopen",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9811cf7bacba2e12baf2a6b3f31e295d452626294366d0265d1b1d3260a3f397",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "historicalScopesPreserveLaterPendingOwnersAcrossReopen(String, String) historical exact / later root owner",
+          "status": "passed"
+        },
+        {
+          "name": "historicalScopesPreserveLaterPendingOwnersAcrossReopen(String, String) historical exact / later exact owner",
+          "status": "passed"
+        },
+        {
+          "name": "historicalScopesPreserveLaterPendingOwnersAcrossReopen(String, String) historical prefix / later root owner",
+          "status": "passed"
+        },
+        {
+          "name": "historicalScopesPreserveLaterPendingOwnersAcrossReopen(String, String) historical prefix / later exact owner",
+          "status": "passed"
+        },
+        {
+          "name": "historicalScopesPreserveLaterPendingOwnersAcrossReopen(String, String) historical collection / later root owner",
+          "status": "passed"
+        },
+        {
+          "name": "historicalScopesPreserveLaterPendingOwnersAcrossReopen(String, String) historical collection / later exact owner",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java#nonhistoricalDeleteCannotAcquireHistoricalQueueProof",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9811cf7bacba2e12baf2a6b3f31e295d452626294366d0265d1b1d3260a3f397",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nonhistoricalDeleteCannotAcquireHistoricalQueueProof()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java#obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9811cf7bacba2e12baf2a6b3f31e295d452626294366d0265d1b1d3260a3f397",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete exact owner / changed planned_source_sha256",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete exact owner / changed collection",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete exact owner / changed originator",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete exact owner / changed transport",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete exact owner / changed ingestion_root",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete root owner / changed planned_source_sha256",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete root owner / changed collection",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete root owner / changed originator",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete root owner / changed transport",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete root owner / changed ingestion_root",
+          "status": "passed"
+        },
+        {
+          "name": "obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String, String) obsolete legacy owner / changed unit_revision",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java#rootIdentityCannotAuthorizeOutsideItsScopeOrExclusions",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9811cf7bacba2e12baf2a6b3f31e295d452626294366d0265d1b1d3260a3f397",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rootIdentityCannotAuthorizeOutsideItsScopeOrExclusions(String) [1] outside",
+          "status": "passed"
+        },
+        {
+          "name": "rootIdentityCannotAuthorizeOutsideItsScopeOrExclusions(String) [2] excluded",
+          "status": "passed"
+        },
+        {
+          "name": "rootIdentityCannotAuthorizeOutsideItsScopeOrExclusions(String) [3] policy",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java#freshAutomaticCreatorCollectionIsFrozenWithoutBackfillingExistingRoot",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:66a0498c3e24db4c8ac101d3353ce69b6cda7228e21fff521fa2d34d532a1115",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "freshAutomaticCreatorCollectionIsFrozenWithoutBackfillingExistingRoot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java#freshCreatorCollectionIsFrozenAndClaimable",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:66a0498c3e24db4c8ac101d3353ce69b6cda7228e21fff521fa2d34d532a1115",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "freshCreatorCollectionIsFrozenAndClaimable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java#freshDefaultCannotBeReinterpreted",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:66a0498c3e24db4c8ac101d3353ce69b6cda7228e21fff521fa2d34d532a1115",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "freshDefaultCannotBeReinterpreted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java#historicalMissingNamespaceCannotBeBackfilled",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:66a0498c3e24db4c8ac101d3353ce69b6cda7228e21fff521fa2d34d532a1115",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "historicalMissingNamespaceCannotBeBackfilled()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java#ordinaryRootInheritsEarlierAttributionAndClearsPlan",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:66a0498c3e24db4c8ac101d3353ce69b6cda7228e21fff521fa2d34d532a1115",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryRootInheritsEarlierAttributionAndClearsPlan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java#orphanNamespaceSlotDoesNotAuthorizeAnUnretainedReceipt",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:66a0498c3e24db4c8ac101d3353ce69b6cda7228e21fff521fa2d34d532a1115",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "orphanNamespaceSlotDoesNotAuthorizeAnUnretainedReceipt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootMemberIdentityTest.java#inheritedMembersRemainDistinctAndMetadataEditsStayHeld",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootMemberIdentityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2afde76fd37bde979bd84f4813e8d5a0aedfcbcbff3516bfcbd13db2ae571ecc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String) [1] collection",
+          "status": "passed"
+        },
+        {
+          "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String) [2] provenance",
+          "status": "passed"
+        },
+        {
+          "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String) [3] ingestion_root",
+          "status": "passed"
+        },
+        {
+          "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String) [4] planned_source_sha256",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#actualDeadlineFailureRestartsWithIndependentExhaustedDebt",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e9a966de96b4679b285eb7664e0ed59f6d04f8df1c7dff346e8bf610b0499862",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#indexedExhaustedExactContentIsNotDiscardedAtCutover",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e9a966de96b4679b285eb7664e0ed59f6d04f8df1c7dff346e8bf610b0499862",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexedExhaustedExactContentIsNotDiscardedAtCutover(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#neverIndexedExhaustedDebtDoesNotHoldNativeCutover",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e9a966de96b4679b285eb7664e0ed59f6d04f8df1c7dff346e8bf610b0499862",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path) [1] migrating",
+          "status": "passed"
+        },
+        {
+          "name": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path) [2] switching",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java#includedUnreadableFileKeepsDebtWithoutRepeatedWalksAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f6ed8422a8c923277f2fdcec007bf728f5b47c8d400c85089d8d025a4bce59b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "includedUnreadableFileKeepsDebtWithoutRepeatedWalksAcrossRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java#interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f6ed8422a8c923277f2fdcec007bf728f5b47c8d400c85089d8d025a4bce59b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String, Path) [1] migrating",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String, Path) [2] switching",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java#changedCommittedModelKeepsNativeMigration",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ccccbecdfc66c9a50ec3a510c5e603ca68220449a4ecb6fe13e0144b8eff675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "changedCommittedModelKeepsNativeMigration(String, Path) migrating / genuinely changed model",
+          "status": "passed"
+        },
+        {
+          "name": "changedCommittedModelKeepsNativeMigration(String, Path) switching / genuinely changed model",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java#completeCommittedEvidenceRetiresAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ccccbecdfc66c9a50ec3a510c5e603ca68220449a4ecb6fe13e0144b8eff675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completeCommittedEvidenceRetiresAcrossRestart(String, String, Path) migrating / complete digest-only",
+          "status": "passed"
+        },
+        {
+          "name": "completeCommittedEvidenceRetiresAcrossRestart(String, String, Path) switching / complete digest-only",
+          "status": "passed"
+        },
+        {
+          "name": "completeCommittedEvidenceRetiresAcrossRestart(String, String, Path) migrating / complete inputs-only",
+          "status": "passed"
+        },
+        {
+          "name": "completeCommittedEvidenceRetiresAcrossRestart(String, String, Path) switching / complete inputs-only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java#unknownStoredModelCannotCertifyRetirement",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ccccbecdfc66c9a50ec3a510c5e603ca68220449a4ecb6fe13e0144b8eff675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownStoredModelCannotCertifyRetirement(String, String, Path) migrating / stored null",
+          "status": "passed"
+        },
+        {
+          "name": "unknownStoredModelCannotCertifyRetirement(String, String, Path) migrating / stored absent",
+          "status": "passed"
+        },
+        {
+          "name": "unknownStoredModelCannotCertifyRetirement(String, String, Path) switching / stored null",
+          "status": "passed"
+        },
+        {
+          "name": "unknownStoredModelCannotCertifyRetirement(String, String, Path) switching / stored absent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java#nativeCutoverKeepsUnavailableExactOldContentUntilItReturns",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5ec1dcac4a73f582f78b315640f161ec9c78b420f0e192eaa320052e61781fe1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeCutoverKeepsUnavailableExactOldContentUntilItReturns(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java#nativeInterruptedMigrationCompletesWithoutStateEdits",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5ec1dcac4a73f582f78b315640f161ec9c78b420f0e192eaa320052e61781fe1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeInterruptedMigrationCompletesWithoutStateEdits(String, Path) [1] migrating",
+          "status": "passed"
+        },
+        {
+          "name": "nativeInterruptedMigrationCompletesWithoutStateEdits(String, Path) [2] switching",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java#closeDrainsMaintenanceWithoutInterruptingTheServingWriter",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fffef0a47a649eaff02604b2342b50b49697c729422d17fc47cdcb42ca89fa58",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closeDrainsMaintenanceWithoutInterruptingTheServingWriter(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#committedNativeFileRecoveredAsUnchangedKeepsItsAdmission",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ee5e3128bde0c6f2d19183ea2ff6cbd5b984ddcccfb38fa6ea8dab4fbdb740a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission(boolean, Path) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission(boolean, Path) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#completedLegacyEffectIsSettledThroughNativeReplay",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ee5e3128bde0c6f2d19183ea2ff6cbd5b984ddcccfb38fa6ea8dab4fbdb740a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path) [1] migrating, false, false",
+          "status": "passed"
+        },
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path) [2] switching, false, false",
+          "status": "passed"
+        },
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path) [3] migrating, true, false",
+          "status": "passed"
+        },
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path) [4] switching, true, false",
+          "status": "passed"
+        },
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path) [5] migrating, false, true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ee5e3128bde0c6f2d19183ea2ff6cbd5b984ddcccfb38fa6ea8dab4fbdb740a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementAckRecoveryTest.java#acknowledgedHeadResumes",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementAckRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a151c0d197c71cfaec9f8066c29df7780f4d65f7611b57972d0a0dc751362fe5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acknowledgedHeadResumes(migrating)",
+          "status": "passed"
+        },
+        {
+          "name": "acknowledgedHeadResumes(switching)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementAckRecoveryTest.java#committedBeforeAckResumes",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementAckRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a151c0d197c71cfaec9f8066c29df7780f4d65f7611b57972d0a0dc751362fe5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "committedBeforeAckResumes(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java#nativeFailureBudgetAndForceSwitchingKeepTheirMeaning",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a782fbe919258ee36f7fecf320a0483fdf3f8a7d716ed35cbdc37b8ffc15e539",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path) [1] 1, 2, false, false",
+          "status": "passed"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path) [2] 1, 2, true, false",
+          "status": "passed"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path) [3] 1, 1, false, true",
+          "status": "passed"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path) [4] 1, 1, true, true",
+          "status": "passed"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path) [5] -1, 2, false, true",
+          "status": "passed"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path) [6] -1, 2, true, true",
+          "status": "passed"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path) [7] 0, 0, false, true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java#completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cdaaa5644041c5127c7490b7ce45c08c15c91090aee6780948447ac319d3911f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path) [1] migrating, false",
+          "status": "passed"
+        },
+        {
+          "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path) [2] switching, false",
+          "status": "passed"
+        },
+        {
+          "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path) [3] migrating, true",
+          "status": "passed"
+        },
+        {
+          "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path) [4] switching, true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementContinuationTest.java#laterAdmissionsAfterEmptySqlAckKeepTheirOwnersAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementContinuationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a3717cbf8df0aa1014d0205611aded3381d55d53422a83b792a3769f7aa6fba2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "laterAdmissionsAfterEmptySqlAckKeepTheirOwnersAcrossRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#cancellationDrainsOwnedCallbackAndSubmittedFailurePropagates",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c306c97d9f3a052a40aa248197f4be9acbbfadf1b551ba4cd8363c04b1672e9f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancellationDrainsOwnedCallbackAndSubmittedFailurePropagates(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#defaultSchedulerRecoversAcrossStartupAndRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c306c97d9f3a052a40aa248197f4be9acbbfadf1b551ba4cd8363c04b1672e9f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "defaultSchedulerRecoversAcrossStartupAndRestart(String, Path) [1] migrating",
+          "status": "passed"
+        },
+        {
+          "name": "defaultSchedulerRecoversAcrossStartupAndRestart(String, Path) [2] switching",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#killedRetirementResumesAndBackupCannotReviveBuild",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c306c97d9f3a052a40aa248197f4be9acbbfadf1b551ba4cd8363c04b1672e9f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [1] release030-checkpointed, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [2] release030-checkpointed, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [3] release030-cancelled, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [4] release030-cancelled, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [5] release030-queue-prepared, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [6] release030-queue-prepared, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [7] release030-preparation-published, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [8] release030-preparation-published, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [9] release030-roots-journaled, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [10] release030-roots-journaled, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [11] release030-root-admitted, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [12] release030-root-admitted, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [13] release030-root-walked, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [14] release030-root-walked, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [15] release030-differences-committed, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [16] release030-differences-committed, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [17] release030-replay-before-commit, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [18] release030-replay-before-commit, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [19] release030-replay-committed, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [20] release030-replay-committed, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [21] release030-journal-acknowledged, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [22] release030-journal-acknowledged, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [23] release030-replay-complete, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [24] release030-replay-complete, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [25] during-deletion, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [26] during-deletion, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [27] release030-building-retired, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [28] release030-building-retired, switching",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [29] release030-retirement-complete, migrating",
+          "status": "passed"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path) [30] release030-retirement-complete, switching",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1c0a66b932fa5d36b93a14cfce7a46ba96dca48f4f01db21453c13a90fe1c2f4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#logicalDefaultOlderRootSurvivesLaterForceFalseCollectionAndChangedSource",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1c0a66b932fa5d36b93a14cfce7a46ba96dca48f4f01db21453c13a90fe1c2f4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "logicalDefaultOlderRootSurvivesLaterForceFalseCollectionAndChangedSource(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1c0a66b932fa5d36b93a14cfce7a46ba96dca48f4f01db21453c13a90fe1c2f4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementInheritedPolicyTest.java#nullRootPreservesExistingCollectionAndAttributionAcrossLateRegistration",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementInheritedPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ec5cff16714791311629210c13d619c9446b862a6fa6a31b866a112073ac0705",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nullRootPreservesExistingCollectionAndAttributionAcrossLateRegistration(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java#missingOriginalQueueNamespaceStaysHeldAcrossChangedConfig",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9b0f75de3e29f3ee71c4359388edec4b9ebf1a4778dcfd2fd593b33bd9580b06",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingOriginalQueueNamespaceStaysHeldAcrossChangedConfig(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java#namedDoneRawReceiptKeepsCollectionAndExactBoundary",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9b0f75de3e29f3ee71c4359388edec4b9ebf1a4778dcfd2fd593b33bd9580b06",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "namedDoneRawReceiptKeepsCollectionAndExactBoundary(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java#newerAcknowledgementWinsPausedReplayAndRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c7eb0a5e309d8d3874a3f849fd5c2501fd2f56dbe5f570af4b5df2d441d6e2f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path) [1] update",
+          "status": "passed"
+        },
+        {
+          "name": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path) [2] delete",
+          "status": "passed"
+        },
+        {
+          "name": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path) [3] prefix",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:29a1e357bdeee0c0f1d614d979666c451a2b4c057660c386038ca3c7916f74b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#partialWalkRetainsReceiptAndBuildUntilACompleteWalk",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:29a1e357bdeee0c0f1d614d979666c451a2b4c057660c386038ca3c7916f74b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPrefixRestoreTest.java#restoredRawPrefixReusesTheExactFrozenSuccessor",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPrefixRestoreTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eb5fa06168560f88c6c60c2043f1befd21fb817b6f9f0eea46dbbda9fe2628f1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "restoredRawPrefixReusesTheExactFrozenSuccessor(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPublicSyncTest.java#laterPublicSyncMaySupersedeAnEarlierExactAdmission",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPublicSyncTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be3921b056ce608c127b59023a7ece1206a99f2360328e5c0a1be7cecb33c4ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "laterPublicSyncMaySupersedeAnEarlierExactAdmission(boolean, boolean, Path) [1] true, false",
+          "status": "passed"
+        },
+        {
+          "name": "laterPublicSyncMaySupersedeAnEarlierExactAdmission(boolean, boolean, Path) [2] false, false",
+          "status": "passed"
+        },
+        {
+          "name": "laterPublicSyncMaySupersedeAnEarlierExactAdmission(boolean, boolean, Path) [3] true, true",
+          "status": "passed"
+        },
+        {
+          "name": "laterPublicSyncMaySupersedeAnEarlierExactAdmission(boolean, boolean, Path) [4] false, true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java#acknowledgedImageSurvivesUncertaintyThenConverges",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:84fb359a2ff4cb42a635471e2a3e53d23a2c00bff1283ad7acc1df58d6962244",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acknowledgedImageSurvivesUncertaintyThenConverges(boolean, Path) ordinaryRootImage / live named collection=false",
+          "status": "passed"
+        },
+        {
+          "name": "acknowledgedImageSurvivesUncertaintyThenConverges(boolean, Path) ordinaryRootImage / live named collection=true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java#sameStampedPublicSyncTargetsOnlyChangedMember",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:84fb359a2ff4cb42a635471e2a3e53d23a2c00bff1283ad7acc1df58d6962244",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sameStampedPublicSyncTargetsOnlyChangedMember(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootProgressTest.java#uncertainEarlierAlphaDoesNotStarveUnqueuedBetaOrAcknowledgedMutation",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootProgressTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e87ed6640b7eb7a9d116b87c07fb4665ab5702e650661466639ea8e148af0124",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "uncertainEarlierAlphaDoesNotStarveUnqueuedBetaOrAcknowledgedMutation(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#corruptCommitKeepsNativeRecoveryInsteadOfRetiring",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f0ac1352fd963df42b4bbc7f54e8a2502433307cb323190877bee844bf741e2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String, Path) [1] migrating",
+          "status": "passed"
+        },
+        {
+          "name": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String, Path) [2] switching",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#modernUnownedAdmissionCannotBorrowRetiredBuildAuthority",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f0ac1352fd963df42b4bbc7f54e8a2502433307cb323190877bee844bf741e2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "modernUnownedAdmissionCannotBorrowRetiredBuildAuthority(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f0ac1352fd963df42b4bbc7f54e8a2502433307cb323190877bee844bf741e2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f0ac1352fd963df42b4bbc7f54e8a2502433307cb323190877bee844bf741e2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path) [1] migrating",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path) [2] switching",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#uncertifiedServingGenerationKeepsOriginalMigration",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f0ac1352fd963df42b4bbc7f54e8a2502433307cb323190877bee844bf741e2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "uncertifiedServingGenerationKeepsOriginalMigration(String, Path) [1] analyzer_fp",
+          "status": "passed"
+        },
+        {
+          "name": "uncertifiedServingGenerationKeepsOriginalMigration(String, Path) [2] vector_format",
+          "status": "passed"
+        },
+        {
+          "name": "uncertifiedServingGenerationKeepsOriginalMigration(String, Path) [3] unresolved-model",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSyncPolicyTest.java#legacyHashEntryStillReadsOnAnInterruptedThread",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSyncPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25a236acd16c8d6ea1c9ef1be60a49c892a66e389a2e8af8ac33547fb953aa7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyHashEntryStillReadsOnAnInterruptedThread(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSyncPolicyTest.java#liveSyncKeepsItsOrdinaryRetryPolicy",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSyncPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25a236acd16c8d6ea1c9ef1be60a49c892a66e389a2e8af8ac33547fb953aa7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "liveSyncKeepsItsOrdinaryRetryPolicy(boolean, Path) [1] true",
+          "status": "passed"
+        },
+        {
+          "name": "liveSyncKeepsItsOrdinaryRetryPolicy(boolean, Path) [2] false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementTransitiveOrderTest.java#transitiveDeferredCollectionCannotEraseLaterBetaSync",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementTransitiveOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74c7401671145c052bf30df71021395a91598761a0c7ce82749a7bc24702b60c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "transitiveDeferredCollectionCannotEraseLaterBetaSync(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkCrashTest.java#completedWalkSurvivesAnActualKillAndRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkCrashTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cde4f174516af0d7ed940476bbcc1538b1e2aca382ec8ec9f991b48e9212fc24",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedWalkSurvivesAnActualKillAndRestart(String, Path) migrating completed walk with pending writer",
+          "status": "passed"
+        },
+        {
+          "name": "completedWalkSurvivesAnActualKillAndRestart(String, Path) switching completed walk with pending writer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:63476fbb5cc92760e12addad8216cbed621273f67a5d2f2c31c2dfbc8d7e6bd4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry(String, String, Path) migrating delete then later root owner",
+          "status": "passed"
+        },
+        {
+          "name": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry(String, String, Path) migrating delete then later exact owner",
+          "status": "passed"
+        },
+        {
+          "name": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry(String, String, Path) switching delete then later root owner",
+          "status": "passed"
+        },
+        {
+          "name": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry(String, String, Path) switching delete then later exact owner",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#newerDeleteUsingTheSameKeyCannotBorrowTheOldReceiptProof",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:63476fbb5cc92760e12addad8216cbed621273f67a5d2f2c31c2dfbc8d7e6bd4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "newerDeleteUsingTheSameKeyCannotBorrowTheOldReceiptProof(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#ordinaryOrderedPrefixThenSyncSurvivesRetryAndRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:63476fbb5cc92760e12addad8216cbed621273f67a5d2f2c31c2dfbc8d7e6bd4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryOrderedPrefixThenSyncSurvivesRetryAndRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#overlappingScopesKeepTheirAcceptedOrderAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:63476fbb5cc92760e12addad8216cbed621273f67a5d2f2c31c2dfbc8d7e6bd4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path) sync then exact",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path) sync then prefix",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path) sync then collection",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path) prefix then sync",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path) collection then sync",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path) prefix then explicit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#repeatedFaultsRetainDebtAndDeletionProofAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:63476fbb5cc92760e12addad8216cbed621273f67a5d2f2c31c2dfbc8d7e6bd4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeatedFaultsRetainDebtAndDeletionProofAcrossRestart(boolean, Path) repeated target faults / restore earlier DB=false",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedFaultsRetainDebtAndDeletionProofAcrossRestart(boolean, Path) repeated target faults / restore earlier DB=true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java#interruptedMigrationFixturesKeepTheirServingIndexAndJobs",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:507250dc3604313918184b8aac43b6faef3352adbe7cf41f055198e46626a5db",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedMigrationFixturesKeepTheirServingIndexAndJobs(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#changedRevisionCannotReuseApproval",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "changedRevisionCannotReuseApproval()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#exactApprovedMalformedRootPreservesUnrelatedDelete",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exactApprovedMalformedRootPreservesUnrelatedDelete()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#unapprovedMalformedRootIsHeld",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unapprovedMalformedRootIsHeld()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:54c92647fd4786da017ab836ef4b25faa89ca0236af44b33c59201a09d5dc3d0"
+}
