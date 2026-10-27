@@ -337,6 +337,11 @@
               "name": "reopensAfterContentionWhenWriterRotatesThePathBeforePublishingReplacement()",
               "messageIncludes": "",
               "reason": "@EnabledOnOs(OS.LINUX): this rotation case runs only on Linux; Gradle records an empty <skipped/> on Windows (run 39334194117)."
+            },
+            {
+              "name": "permissionDenialRetriesUntilBudgetIsSpent()",
+              "messageIncludes": "",
+              "reason": "@DisabledOnOs(OS.WINDOWS): the denial fixture removes POSIX permissions, which Windows does not have; Gradle records an empty <skipped/> on Windows (run 40485394296)."
             }
           ]
         },
