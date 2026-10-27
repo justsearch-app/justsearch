@@ -55,3 +55,15 @@ author-session: 01a17caf-83af-7ad2-aef6-cf23215ede0d
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17ccd-538b-7741-af1c-a8a78d4d7c50",
+  "verdict": "accept",
+  "digest": "sha256:72974669b74217cd36ef620649a9828376b3ccde3352c999f05bb3df1e4d7739"
+}
+```
