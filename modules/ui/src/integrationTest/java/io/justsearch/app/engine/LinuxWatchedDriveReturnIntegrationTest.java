@@ -551,6 +551,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     host.directory = directory;
     var f = host.new Fixture();
     CompletableFuture<?> closing = null;
+    CompletableFuture<?> exchange = null;
     boolean withinBudget = false;
     boolean ownersRetained = false;
     boolean independentTransport = false;
@@ -570,7 +571,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
           if (interrupted) Thread.currentThread().interrupt();
         }
       });
-      f.transport.sendAsync(HttpRequest.newBuilder(
+      exchange = f.transport.sendAsync(HttpRequest.newBuilder(
           URI.create("http://127.0.0.1:" + f.http.port() + "/fixture-stalled")).GET().build(),
           HttpResponse.BodyHandlers.ofString());
       assertTrue(entered.await(5, TimeUnit.SECONDS), "the real HTTP handler must be outstanding");
@@ -593,14 +594,18 @@ final class LinuxWatchedDriveReturnIntegrationTest {
       bodyFailure = failure;
       throw failure;
     } finally {
+      // HttpClient.close() is graceful: it waits for outstanding sends instead of cancelling
+      // them. Retire this test's send explicitly before retrying physical cleanup; handler exit
+      // alone does not mean the client has observed a response (or finished a retry).
+      if (exchange != null) exchange.cancel(true);
       finishOutstandingHttpExchange(f, entered, release, exited, closing, bodyFailure);
     }
     assertTrue(withinBudget, "HTTP/transport cleanup must return within the caller's shared allowance");
     assertTrue(ownersRetained, "incomplete HTTP cleanup must retain stateful owners and private configuration");
     assertTrue(independentTransport, "transport cancellation must start independently of blocked HTTP stop");
     assertTrue(f.closed, "a released exchange must permit retry to physically drain and close owners");
-    assertFalse(Thread.getAllStackTraces().keySet().stream().anyMatch(thread -> thread.isAlive()
-        && (thread.getName().equals("fixture-http-stop") || thread.getName().equals("fixture-transport-close"))));
+    assertFalse(f.httpCloser.isAlive(), "this fixture's HTTP stop must physically exit");
+    assertFalse(f.transportCloser.isAlive(), "this fixture's transport close must physically exit");
   }
 
   /** Only the outstanding-exchange control owns these signals and this fixture. */

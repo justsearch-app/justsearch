@@ -38,13 +38,6 @@ public final class MmrSelector {
     double lam = clamp01(lambda);
     int target = Math.min(k, n);
 
-    // Fast path: no novelty term
-    if (lam >= 0.999) {
-      List<Integer> out = new ArrayList<>(target);
-      for (int i = 0; i < target; i++) out.add(i);
-      return out;
-    }
-
     boolean[] chosen = new boolean[n];
     List<Integer> selected = new ArrayList<>(target);
 
@@ -57,7 +50,7 @@ public final class MmrSelector {
 
         double rel = safe(relevance.get(i));
         double noveltyPenalty = 0.0;
-        if (!selected.isEmpty()) {
+        if (lam < 1.0 && !selected.isEmpty()) {
           float[] v = vectors.get(i);
           double maxSim = 0.0;
           for (int j : selected) {
@@ -100,7 +93,7 @@ public final class MmrSelector {
     if (na <= 0.0 || nb <= 0.0) {
       return 0.0;
     }
-    return dot / (Math.sqrt(na) * Math.sqrt(nb));
+    return Math.max(-1.0, Math.min(1.0, dot / (Math.sqrt(na) * Math.sqrt(nb))));
   }
 
   private static double safe(Double v) {

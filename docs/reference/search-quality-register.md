@@ -3,7 +3,7 @@ title: Search Quality Register
 type: reference
 status: stable
 created: 2026-03-19
-updated: 2026-09-06
+updated: 2026-10-26
 description: "Shared decision register for search quality. Read before starting search work. Update before finishing."
 ---
 
@@ -3526,6 +3526,29 @@ above)*
   compressed restatements, exactly the shape F-050 found starves per-sentence matching.
 
 ---
+
+### MMR passage selection: correctness evidence and open calibration
+
+Local candidate correctness: stable greedy selection at high lambda; full usable positional
+fallback for partial/invalid semantic pools; invalid queries rejected before passage inference.
+Worker quality aggregates finite scores over actually appended passages, retaining cross-encoder
+(CE) identity. Empty Unicode prefixes create no phantom section, citation or count.
+See the [quality contract](contracts/search-and-rag-reason-codes.md) and
+[D4 evidence](../../gates/test-intent/evidence/mmr-selection-repairs.json).
+
+Native-host original/candidate runs cover controlled Engine/REST/MCP/conversation failures and
+[standard CPU](../../modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrStandardModelInterfacesIntegrationTest.java)
+BM25, doc-first HYBRID and CHUNK_HYBRID, without skips. Genuine READY 768-dimensional CPU runs
+retain FINGERPRINT_MATCH and current/stored/committed metadata agreement, completing MMR on
+direct/outward/conversation paths; controlled providers establish failure policy separately.
+This is local correctness/preservation evidence, not ranking-quality, latency, calibration or
+GPU/LLM evidence. Defaults, caps, native ownership and stored formats are unchanged; old score
+histories are not rewritten.
+
+Open: outward cancellation propagation remains held with the caller/control owner; current
+uncited fallback is preserved, not repaired. Future MMR policy, lambda, novelty, default
+enablement, ranking utility and latency require qualified paired passage-level on-demand
+measurements; parent-only ranking or gold-context RAG evaluation cannot certify MMR.
 
 ## Future Work
 
