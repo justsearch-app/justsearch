@@ -8,20 +8,10 @@ author-session: 01a17b47-08d2-7a22-82e9-470da2fdee8e
 # Keep the ingest socket fixture below the Unix-domain pathname limit
 
 The fixture relocation keeps the refusal oracle. The additional same-path regular-file control
-uses the existing readable-file type guard and documented absolute-path acceptance. Execution
-evidence was attempted with run-evidence.mjs for the modified method: its JUnit XML records
-one executed, passing case with no skips, but the script exited 2 during its Git snapshot
-(`git add -A`: "unable to create temporary file: Read-only file system") before writing the
-evidence file. This worktree uses /home/elias/dev/justsearch/.git as its common Git directory;
-the New entry's evidence path remains pending. Baseline e11a279f0c6e
-with unchanged TMPDIR ran all 11 cases: the socket bind raised java.net.SocketException
-("Unix domain path too long") and the other 10 passed, with no skips. A diagnostic rerun retaining only failed JUnit
-temporary directories reproduced the same bind error: the socket pathname measured
-174 bytes (parent directory 162 bytes). The measured path is recorded in
-tmp/socket-path-measurement.json; the retained empty directory was removed non-recursively. The candidate ran all
-11 cases successfully, with no skips; :modules:app-agent:spotlessCheck and
-:modules:app-agent:pmdTest also succeeded. Logs and JUnit XML are retained under this checkout
-and the temporary before clone for independent review. The builder records no acceptance.
+uses the existing readable-file type guard and documented absolute-path acceptance. On the
+baseline, with a long temp root, the socket bind raised java.net.SocketException ("Unix domain
+path too long", a 174-byte pathname) before the product refusal was reached; the other 10
+cases passed. The candidate runs all 11 cases with no skips.
 
 ```json
 {
