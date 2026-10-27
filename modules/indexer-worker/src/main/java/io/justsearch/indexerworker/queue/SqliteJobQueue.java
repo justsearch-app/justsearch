@@ -1287,6 +1287,22 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     finally{unlockAfterChanges();}
   }
 
+  /** Only the actual retained FILE and its unchanged complete row may vouch for a conditional event. */
+  public boolean retirementFileOwnsCurrentRow(SwitchBufferOp receipt) {
+    lockTimed();try {
+      ensureOpen();
+      if (releaseRecovery == null || !releaseRecovery.retiringBuild() || !"UPSERT".equals(receipt.op())) return false;
+      var orders = retirementOrders(retirementReplayOps());
+      if (!receipt.equals(orders.receipts().get(receipt.retirementUuid()))) return false;
+      var file = SwitchBufferUpsert.decode(receipt.payload());
+      var row = watcherRowLocked(file.path());
+      return file.unitRevision() != null && receipt.key().equals("path:"+file.path()) && row != null
+          && file.unitRevision().equals(row.get("unit_revision"))
+          && validatedUnitOrder(correctionCandidate(row),orders) == receipt.acceptedOrder();
+    } catch (IOException | SQLException invalid) { throw new IllegalStateException("Current FILE ownership unavailable",invalid); }
+    finally { unlockAfterChanges(); }
+  }
+
   /** Read-only settlement of a conditional event's freshly observed native projection. */
   public boolean matchesRetirementConditionalDelete(SwitchBufferOp receipt,Map<String,String> observedRow,
       String collection) {
@@ -1558,9 +1574,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           || !Objects.equals(frozen,scope)) return -1;
       return owner.acceptedOrder();
     }
-    return Path.of(scope.path()).equals(scope.ingestionRoot())
-        && Objects.equals(releaseRecovery.retirementPaths().get(Path.of(scope.path())),scope.collection())
-        && scope.provenance() == null ? 0 : -1;
+    String collection = releaseRecovery.retirementPaths().get(Path.of(scope.path()));
+    return collection != null && Path.of(scope.path()).equals(scope.ingestionRoot())
+        && Objects.equals(normalizedRetirementCollection(collection),normalizedRetirementCollection(scope.collection()))
+        && (scope.provenance() == null
+            || matchesIndependentRetirementScope(scope,watcherReconciliationRow(scope.path()))
+            || orders.corrections().values().stream().anyMatch(version -> version.owner() == null
+                && version.scope().equals(scope)
+                && matchesIndependentRetirementScope(scope,version.predecessor()))) ? 0 : -1;
+  }
+
+  /** An unjournalled B difference retains its exact bounded Q attribution, never a ROOT role. */
+  private static boolean matchesIndependentRetirementScope(SwitchBufferUpsert scope,Map<String,String> row) {
+    var provenance = scope.provenance();
+    return row != null && scope.path().equals(row.get("path"))
+        && scope.path().equals(row.get("ingestion_root"))
+        && isAdmissionRevision(row.get("unit_revision"))
+        && Objects.equals(normalizedRetirementCollection(scope.collection()),normalizedRetirementCollection(row.get("collection")))
+        && Objects.equals(provenance == null ? null : provenance.originator(),row.get("originator"))
+        && Objects.equals(provenance == null ? null : provenance.transport(),row.get("transport"));
   }
 
   /** A native conditional event owns present-file reconciliation, never a historical ROOT role. */
@@ -1616,7 +1648,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     for (var root : orders.rootIntents().entrySet())
       if (root.getValue().scope().contains(scope.path()) && orders.roots().get(root.getKey()) > order
           && !orders.receipts().get(root.getKey()).key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX)
-          && !(owner!=null && "DELETE".equals(owner.op()) && root.getValue().policy()!=null
+          // A force-false declaration does not create ownership of independent B differences.
+          // Their current Q row still has to pass the complete correction/claim checks.
+          && !((owner==null || "DELETE".equals(owner.op())) && root.getValue().policy()!=null
               && !SwitchBufferSyncRoot.decode(orders.receipts().get(root.getKey()).payload()).force())) return false;
     return true;
   }
@@ -1946,7 +1980,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     var sourceSha256 = observation.sourceSha256();
     long size = observation.size();
     boolean targetMatches = observation.targetMatches();
-    if (sourceState == null || !targetMatches && !JobQueue.IngestionLedgerTransition.isSha256(sourceSha256)) return 0;
+    boolean removal = sourceSha256 == null && sourceState != null
+        && (sourceState.equals("gone") || sourceState.startsWith("directory/")
+            || sourceState.startsWith("link/") || sourceState.startsWith("other/"));
+    if (sourceState == null || !targetMatches && !removal
+        && !JobQueue.IngestionLedgerTransition.isSha256(sourceSha256)) return 0;
     if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new IllegalStateException("Correction cancelled");
     var row = watcherRowLocked(scope.path());
     if (!Objects.equals(row,observedRow) || activeClaims.containsKey(scope.path())
@@ -1971,6 +2009,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     boolean retainedPredecessor = retained != null;
     if (row != null && installed == null && !retainedPredecessor) {
       if (!STATE_DONE.equals(row.get("state"))) return 0;
+      String unit = row.get("unit_revision");
+      String cohort = releaseRecovery.nativeCohort();
+      boolean nativeRow = cohort != null && unit != null
+          && unit.matches("release030/(job|debt)/"+cohort+"/[0-9a-f]{32}");
+      if (owner == null && !nativeRow && !matchesIndependentRetirementScope(scope,row)) return 0;
       var provenance = scope.provenance();
       if (!Objects.equals(normalizedRetirementCollection(row.get("collection")),normalizedRetirementCollection(scope.collection()))
           || !Objects.equals(row.get("originator"),provenance == null ? null : provenance.originator())
@@ -1983,7 +2026,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             || !scope.path().equals(boundary) || hasUnownedModernAdmission(Path.of(scope.path()))
             || !releaseRecovery.preparedFor(release030RecoveryIdentity())) return 0;
       }
-      if (row.get("planned_source_sha256") != null) return 0;
+      // A completed exact B row can outlive its FILE receipt. Its retained difference
+      // and exact Q boundary still own the source; ROOT rows keep their separate proof.
+      if (row.get("planned_source_sha256") != null
+          && (owner != null || !matchesIndependentRetirementScope(scope,row)
+              || !JobQueue.IngestionLedgerTransition.isSha256(row.get("planned_source_sha256")))) return 0;
       if (owner != null && "SYNC_ROOT".equals(owner.op())) {
         var origin = RootOrigin.fromUnit(row.get("unit_revision"));
         boolean administrative = owner.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX);
@@ -1994,6 +2041,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
     }
     if (targetMatches) return 2;
+    // Permission is not settlement: the caller must recheck absence, remove A's image,
+    // commit it, then bring a fresh target proof. No fictitious UPSERT hash is admitted.
+    if (removal) return row == null || STATE_DONE.equals(row.get("state")) ? 3 : 0;
     if (installed != null && sourceState.equals(installed.sourceState())) return 0;
     Release030RecoveryState.Correction version = versions.stream()
         .filter(v -> Objects.equals(v.owner(),owner) && v.scope().equals(scope)

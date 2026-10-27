@@ -635,8 +635,17 @@ public final class KnowledgeServerMigrationOps {
     var queue=(SwitchBufferCapableQueue)context.jobQueue();
     String key=io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
     var owner = applicableReleaseRoot(context,roots,key,0,rootFiles);
-    var upsert = owner == null ? new SwitchBufferUpsert(key,collection,
+    var upsert = owner == null ? new SwitchBufferUpsert(key,releaseCollection(collection),
         null,null,null,file) : releaseRootScope(queue,owner,key,rootFiles);
+    if (owner == null) {
+      var row = queue.watcherReconciliationRow(key);
+      if (row != null && key.equals(row.get("ingestion_root"))
+          && releaseCollection(collection).equals(releaseCollection(row.get("collection")))) {
+        var provenance = row.get("originator") == null && row.get("transport") == null ? null
+            : new JobQueue.EnqueueProvenance(row.get("originator"),row.get("transport"));
+        upsert = new SwitchBufferUpsert(key,row.get("collection"),provenance,null,null,file);
+      }
+    }
     return sourceHoldsAdmission(context, queue, owner, upsert,
         context.ingestLifecycle().documentFieldOps().getDocumentFieldOrThrow(
             key, SchemaFields.SOURCE_SHA256));
@@ -667,8 +676,14 @@ public final class KnowledgeServerMigrationOps {
         && deletion.path().equals(fields.getDocumentFieldOrThrow(deletion.path(),SchemaFields.PATH))) {
       // The native conditional operation owns only reconciliation of its exact current path.
       var scope=new SwitchBufferUpsert(deletion.path(),knownCollection,null,null,null,file);
-      return sourceHoldsAdmission(context,queue,receipt,scope,indexed);
+      if (sourceHoldsAdmission(context,queue,receipt,scope,indexed)) return true;
     }
+    var fileOwner = order.positions().keySet().stream()
+        .filter(op -> "UPSERT".equals(op.op()) && op.key().equals("path:"+deletion.path())
+            && !context.approvedGapVersions().contains(op))
+        .max(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder)).orElse(null);
+    if (fileOwner != null && queue.retirementFileOwnsCurrentRow(fileOwner)
+        && sourceHoldsAdmission(context,queue,fileOwner,SwitchBufferUpsert.decode(fileOwner.payload()),indexed)) return true;
     return reconcileRelease030Path(context,file,Objects.toString(collection,""),order.rootIntents(),order.rootFiles());
   }
 
@@ -711,7 +726,7 @@ public final class KnowledgeServerMigrationOps {
     if (result!=null && !roots.get(result).force()
         && context.jobQueue() instanceof SwitchBufferCapableQueue queue) {
       var member=rootFiles.apply(path);var actual=member==null?null:member.owner();
-      if(actual!=null && actual.acceptedOrder()<result.acceptedOrder())return actual;
+      if(actual==null || actual.acceptedOrder()<result.acceptedOrder())return actual;
     }
     return result;
   }
@@ -1257,7 +1272,7 @@ public final class KnowledgeServerMigrationOps {
     boolean deferredVdu = !allowVdu && allOps.stream().anyMatch(op -> isVduBufferKind(op.op()));
     List<SwitchBufferCapableQueue.SwitchBufferOp> ops = allOps.stream()
         .filter(op -> allowVdu || !isVduBufferKind(op.op())).toList();
-    if (ops.isEmpty()) {
+    if (ops.isEmpty() && recoveryRoots == null) {
       return new ReplayOutcome(!deferredVdu, List.of());
     }
     context.log().info("Draining {} buffered ops from durable switch buffer...", ops.size());
@@ -2482,7 +2497,8 @@ public final class KnowledgeServerMigrationOps {
       }
       if (!sourceObservations.isEmpty()) {
         var results = queue.correctRetirementSources(sourceObservations,()->Thread.currentThread().isInterrupted());
-        for (int result : results) if (result == 2) awaited--;
+        for (int i = 0; i < results.size(); i++)
+          if (applyRetirementSourceResult(context,sourceObservations.get(i),results.get(i))) awaited--;
       }
       if (awaited != 0) {
         context.log().warn("Refused candidate awaits A's effect on {} accepted file(s), first: {}",
@@ -2605,8 +2621,9 @@ public final class KnowledgeServerMigrationOps {
     if (source.kind() == CleanupPathKind.REGULAR) {
       var fields = context.ingestLifecycle().documentFieldOps();
       String namespace=fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.COLLECTION);
-      boolean knownNamespace=scope.collection()!=null && !scope.collection().isBlank()
-          || owner!=null && "SYNC_ROOT".equals(owner.op());
+      boolean knownNamespace=scope.collection()!=null
+          || owner!=null && "SYNC_ROOT".equals(owner.op())
+          || owner==null && observedRow!=null && scope.path().equals(observedRow.get("ingestion_root"));
       indexedParentMatches = knownNamespace
           && scope.path().equals(fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.DOC_ID))
           && scope.path().equals(fields.getDocumentFieldOrThrow(scope.path(),SchemaFields.PATH))
@@ -2623,6 +2640,22 @@ public final class KnowledgeServerMigrationOps {
     }
     int result = sqlite.correctRetirementSources(List.of(observation),
         () -> Thread.currentThread().isInterrupted()).getFirst();
+    return applyRetirementSourceResult(context,observation,result);
+  }
+
+  private static boolean applyRetirementSourceResult(DrainSwitchBufferContext context,
+      SwitchBufferCapableQueue.RetirementSourceObservation observation,int result) throws IOException {
+    if (result == 3) {
+      if (Thread.currentThread().isInterrupted()) throw new IOException("Retirement removal cancelled");
+      var scope = observation.scope();
+      var current = observeForCleanup(context.publisher(),Path.of(scope.path()),scope.ingestionRoot());
+      if (Thread.currentThread().isInterrupted()) throw new IOException("Retirement removal cancelled");
+      if (current.kind() != CleanupPathKind.UNCERTAIN && current.kind() != CleanupPathKind.REGULAR
+          && observation.sourceState().equals(current.fileState()))
+        context.ingestLifecycle().indexingCoordinator().deleteByIdAndChunks(scope.path());
+      // Retirement replay commits A even with an empty journal. Only the next committed,
+      // freshly observed absence can settle this obligation.
+    }
     return result == 2;
   }
 

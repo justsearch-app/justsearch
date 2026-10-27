@@ -121,7 +121,11 @@ public interface SwitchBufferCapableQueue extends JobQueue {
     }
   }
 
-  /** Targeted recovery only; source and complete rows are observed before Q's batch reservation. */
+  /**
+   * Targeted recovery only; source and complete rows are observed before Q's batch reservation.
+   * Results: 0 unsettled, 1 corrective admission, 2 verified, 3 removal authorized but unsettled.
+   * A removal still needs a fresh non-regular-source check, A's commit and a new target proof.
+   */
   default List<Integer> correctRetirementSources(List<RetirementSourceObservation> observations,
       java.util.function.BooleanSupplier cancelled) {
     throw new UnsupportedOperationException("Conditional retirement source correction unavailable");
