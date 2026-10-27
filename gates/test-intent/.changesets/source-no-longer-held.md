@@ -302,3 +302,14 @@ longer sufficient evidence that the index has no record.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17f4c-65c1-73f3-9ace-10e79b97c743",
+  "verdict": "accept",
+  "digest": "sha256:7030ee6e114bbd5a3a52128955ea1705fa36f715f13a2a38af32627d2627e0c0",
+  "note": "Codex recheck-1 (separate session) on eea6f7cb96: focus repair before 4 fail / after 16 pass, merge integrity, full checks; accepts sha256:7030ee6e…e0c0"
+}
+```
