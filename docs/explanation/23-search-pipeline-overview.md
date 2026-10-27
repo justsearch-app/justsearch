@@ -149,11 +149,14 @@ and [`EngineFutures`](../../modules/core/src/main/java/io/justsearch/core/execut
 
 The original expansion completion is bounded at submission by
 `min(search start + 1500 ms, D - 500 ms)`, even while QU or base retrieval is
-pending. The JDK delayed executor arms `cancel(true)` at that cutoff: queued work
-is abandoned before dispatch, and running producers are interrupted while retaining
-ownership until actual exit. Cutoff cancellation during the collector wait returns
-base results with `TIMEOUT`; caller cancellation still propagates. The collector
-retains `cancel(true)` and final cleanup. The branch for two
+pending. The submitted expansion has exactly one owner. If the cutoff arrives
+before the collector claims it, a JDK delayed-executor task cancels it with
+`cancel(true)`: queued work is abandoned before dispatch, running producers are
+interrupted while retaining ownership until actual exit, and the collector skips
+with `TIMEOUT`. Once the collector owns it, the timer does nothing; the collector's
+timed wait ends at the same cutoff and cancels with `cancel(true)`. A cancellation
+seen during that wait always comes from elsewhere and still propagates. Final
+cleanup cancels expansion that nobody else owns. The branch for two
 or more known sources never launches expansion it cannot consume;
 `PER_SOURCE_RETRIEVAL` is diagnostic, not a degradation warning. A successful
 expanded re-search retains its independent `min(now + 1500 ms, D)` deadline and
