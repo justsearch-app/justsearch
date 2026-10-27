@@ -257,8 +257,10 @@ public final class BackfillScheduler {
             bulkHeld && sparseOrNerOnGpu(),
             embeddingLifecycle.embeddingProvider());
     if (runBackfill) {
+      var batchCommitCounter = new int[] {0};
       CombinedEnrichmentBackfillOps.CombinedOutcome outcome =
-          processCombinedBackfillIfApplicable(cycleDeadlineNanos, embedShareDeadlineNanos);
+          processCombinedBackfillIfApplicable(
+              null, null, batchCommitCounter, cycleDeadlineNanos, embedShareDeadlineNanos);
       recordCombinedOutcome(outcome);
       // The mode-selection probe is the batch that re-selects the head of the pending queue each
       // cycle — the one whose signature repeated byte-identically for 12+ minutes in the field.
@@ -275,7 +277,6 @@ public final class BackfillScheduler {
         // 334 Phase 8/10: tight loop with persistent pending-ID caches across iterations.
         var parentIdCache = new ArrayDeque<String>();
         var chunkIdCache = new ArrayDeque<String>();
-        var batchCommitCounter = new int[] {0};
         backfillDidWork = true;
         // Tempdoc 809 finding 3: an aborted probe means a stop condition came up DURING that batch
         // — pending ingest, the cycle budget, or a bulk deletion that invalidated the documents it
@@ -630,12 +631,6 @@ public final class BackfillScheduler {
   }
 
   // ==================== Backfill delegates ====================
-
-  private CombinedEnrichmentBackfillOps.CombinedOutcome processCombinedBackfillIfApplicable(
-      long cycleDeadlineNanos, long embedShareDeadlineNanos) {
-    return processCombinedBackfillIfApplicable(
-        null, null, null, cycleDeadlineNanos, embedShareDeadlineNanos);
-  }
 
   /**
    * Non-termination detector (round-15 post-round finding): WARNs when the combined backfill keeps

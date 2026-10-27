@@ -137,7 +137,7 @@ final class JobBatchExtractorForcedPathTest {
             () -> identityStore,
             mock(IndexingDocumentOps.StageRecorder.class),
             () -> false,
-            delta -> {});
+            delta -> {}, new FileMutationFence());
     return new Harness(
         extractor,
         documentFieldOps,

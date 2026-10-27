@@ -436,7 +436,8 @@ public class IndexingLoop implements Closeable {
             journal,
             jobQueue,
             this.contentExtractor,
-            (long delta) -> indexedSinceCommit += delta);
+            (long delta) -> indexedSinceCommit += delta,
+            fileMutationFence);
     this.writer =
         new JobBatchWriter(
             ingestionAuthority,
@@ -478,7 +479,8 @@ public class IndexingLoop implements Closeable {
             () -> documentIdentityStore,
             this::recordStageMs,
             () -> detailedTracing,
-            (long delta) -> indexedSinceCommit += delta);
+            (long delta) -> indexedSinceCommit += delta,
+            fileMutationFence);
 
     // Tempdoc 516 Slice 4d (W6): construct the scheduler. Encoder/service suppliers read
     // IndexingLoop's volatile fields so the async-load swap-on-the-fly semantics persist.
