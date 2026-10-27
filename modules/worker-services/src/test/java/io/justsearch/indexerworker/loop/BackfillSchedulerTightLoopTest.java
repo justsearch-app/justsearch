@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,7 +61,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  *   <li>{@link #nonProgressingBatch_tightLoopStopsImmediately()} — the loop terminates on PROGRESS
  *       ({@code progressed}), not activity. Its bounds (one tight-loop batch, well under a second)
  *       are far tighter than {@code CYCLE_BUDGET_MS}, so the budget CANNOT satisfy it.
- *   <li>{@link #advancingButNeverDrainingPopulation_budgetReturnsControl()} — the wall-clock budget
+ *   <li>{@link #advancingButNeverDrainingPopulation_budgetReturnsControl()} — the monotonic budget
  *       returns control even when every batch genuinely advances documents, so progress-termination
  *       cannot satisfy it either.
  *   <li>{@link #pendingIngest_yieldsAfterOneBatch()} — pending ingest work breaks the loop, so
@@ -90,6 +91,7 @@ class BackfillSchedulerTightLoopTest {
 
   /** Counts combined batches so "at most one batch" is assertable. */
   private final AtomicInteger batchWrites = new AtomicInteger();
+  private final AtomicLong monotonicNanos = new AtomicLong();
 
   @BeforeEach
   void wirePathologicalState() {
@@ -146,6 +148,7 @@ class BackfillSchedulerTightLoopTest {
         .thenAnswer(
             inv -> {
               batchWrites.incrementAndGet();
+              monotonicNanos.addAndGet(100_000_000L); // completed write consumes 100 ms of work
               List<?> batch = inv.getArgument(0);
               return new LuceneRuntimeTypes.BatchUpdateResult(batch.size(), 0);
             });
@@ -168,7 +171,8 @@ class BackfillSchedulerTightLoopTest {
         () -> spladeEncoder,
         () -> null,
         () -> nerService,
-        () -> null);
+        () -> null,
+        monotonicNanos::get);
   }
 
   private ResolvedConfig resolvedConfig() {
@@ -223,7 +227,7 @@ class BackfillSchedulerTightLoopTest {
   }
 
   /**
-   * PINS: the wall-clock budget, and nothing else.
+   * PINS: the monotonic budget, and nothing else.
    *
    * <p>Here every batch DOES advance documents — SPLADE encodes successfully for both docs, so
    * {@code progressed()} is true forever — while the pending-id query never drains (the exact
@@ -238,15 +242,14 @@ class BackfillSchedulerTightLoopTest {
     wireAdvancingButNeverDraining();
     BackfillScheduler scheduler = scheduler();
 
-    long startNanos = System.nanoTime();
-    // 20s, four times the 5s budget: a real margin, not the ~0 the pre-review 5s ceiling had
-    // (tempdoc 798 review TQ1 — that timeout raced the budget it was meant to observe).
+    long startNanos = monotonicNanos.get();
+    // Wall-clock watchdog only; completed writes, never clock reads, spend the modeled budget.
     assertTimeoutPreemptively(
         Duration.ofSeconds(20),
         scheduler::runIdleCycle,
         "runIdleCycle() must return even when every batch reports progress — the cycle budget is"
             + " the containment of last resort (tempdoc 798)");
-    long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+    long elapsedMs = (monotonicNanos.get() - startNanos) / 1_000_000;
 
     assertTrue(
         elapsedMs >= 4_000,
