@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T13:30:48.895Z",
+  "revision": "c29c1b3c781f5b931cca26535d0d43700fea3e61",
+  "tree": "eae69e6116ef0c120071f6c043b727b91ae6383d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.ExtractionSandboxFactoryTest.defaultCompositionsReportDefaultPolicyAndValidateArtifacts\" --tests \"io.justsearch.indexerworker.extract.ExtractionSandboxFactoryTest.directTikaDelegateReportsConfiguredPolicyAndValidatesArtifact\" --tests \"io.justsearch.indexerworker.extract.ExtractionSandboxFactoryTest.ordinaryProvidersReportDefaultPolicyAndValidateArtifacts\" --tests \"io.justsearch.indexerworker.extract.ExtractionSandboxFactoryTest.mismatchedArtifactPolicyIsStillRejected\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3291
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#defaultCompositionsReportDefaultPolicyAndValidateArtifacts",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13ea6652d6ddb087a10e1f1d1d5614cc7906bbda3c4fae0b44f60940b9a64626",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "defaultCompositionsReportDefaultPolicyAndValidateArtifacts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#directTikaDelegateReportsConfiguredPolicyAndValidatesArtifact",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13ea6652d6ddb087a10e1f1d1d5614cc7906bbda3c4fae0b44f60940b9a64626",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "directTikaDelegateReportsConfiguredPolicyAndValidatesArtifact()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#ordinaryProvidersReportDefaultPolicyAndValidateArtifacts",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13ea6652d6ddb087a10e1f1d1d5614cc7906bbda3c4fae0b44f60940b9a64626",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryProvidersReportDefaultPolicyAndValidateArtifacts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#mismatchedArtifactPolicyIsStillRejected",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13ea6652d6ddb087a10e1f1d1d5614cc7906bbda3c4fae0b44f60940b9a64626",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mismatchedArtifactPolicyIsStillRejected()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2e72bb003684c8635bec2f533289a4c347025b753f089cca0a506af33dae4a4c"
+}
