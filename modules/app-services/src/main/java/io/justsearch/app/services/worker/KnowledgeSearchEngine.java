@@ -88,6 +88,9 @@ final class KnowledgeSearchEngine {
   /** Hard budget (ms) for LLM expansion before falling back to base search results. */
   private static final long EXPANSION_BUDGET_MS = 1500L;
 
+  /** Provisional base-retrieval reserve after QU; real-profile calibration is still required. */
+  private static final long QU_BASE_RESERVE_MS = 1500L;
+
   /**
    * Time (ms) the head keeps after the rerank stage, inside the request deadline {@code D}, to trim,
    * map and return the response (Spec D §1.2). The rerank runs until {@code D - RERANK_MARGIN_MS}
@@ -815,231 +818,250 @@ final class KnowledgeSearchEngine {
     // 256-I4: structured skip reason tracking for pipeline execution report.
     // Fires before base search so LLM latency overlaps with index operation.
     CompletableFuture<String> expansionFuture = null;
+    CompletableFuture<QueryUnderstandingService.QuResult> quFuture = null;
+    QueryUnderstandingService.QuResult quResultForResponse = null;
+    FilterNormalizationService.NormResult normResultForResponse = null;
+    SearchResponse resp;
     boolean expansionApplied = false;
     String expansionSkipReason = null;
     long searchStartNs = System.nanoTime();
-    if (isExpansionEligible(
-        pipelineConfig, querySyntax, queryText, req.cursor(), onlineAiService.isAvailable(),
-        effectiveQueryType)) {
-      try {
-        expansionFuture = startExpansionAsync(queryText, engineContext);
-      } catch (GenerationUnavailableException refused) {
-        // Chat is draining, starting or stopping: the same outcome as AI being off.
-        expansionSkipReason = "AI_UNAVAILABLE";
-        log.debug("LLM expansion skipped, generation unavailable: {}", refused.getMessage());
-      }
-    } else if (effectiveQueryType == QueryType.NAVIGATIONAL || effectiveQueryType == QueryType.EXACT_MATCH) {
-      expansionSkipReason = "QUERY_TYPE_" + effectiveQueryType.name();
-    } else if (!pipelineConfig.expansionEnabled()) {
-      expansionSkipReason = "DISABLED";
-    } else if (!onlineAiService.isAvailable()) {
-      expansionSkipReason = "AI_UNAVAILABLE";
-    } else if (querySyntax != SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE) {
-      expansionSkipReason = "LUCENE_SYNTAX";
-    } else if (queryText.isBlank()) {
-      expansionSkipReason = "BLANK_QUERY";
-    } else {
-      expansionSkipReason = "PAGINATED";
-    }
-
-    // 363: Query Understanding — fire async LLM extraction for boost filters.
-    // Bypass when: explicit filters/boostFilters present, blank query, paginated, AI unavailable,
-    // or navigational/exact-match queries (which skip the full pipeline anyway).
-    CompletableFuture<QueryUnderstandingService.QuResult> quFuture = null;
-    boolean hasExplicitFilters = req.filters() != null || req.boostFilters() != null;
-    if (!hasExplicitFilters
-        && !queryText.isBlank()
-        && (req.cursor() == null || req.cursor().isBlank())
-        && effectiveQueryType != QueryType.NAVIGATIONAL
-        && effectiveQueryType != QueryType.EXACT_MATCH) {
-      quFuture = quService.extractIfAvailable(queryText, statusCache.getCachedFacetSnapshot(),
-          engineContext, capturedConfig.search().queryUnderstandingEnabled());
-    }
-
-    // 366: Fire filter normalization async when explicit filters are present (mutually exclusive with QU)
-    CompletableFuture<FilterNormalizationService.NormResult> normFuture = null;
-    if (hasExplicitFilters) {
-      normFuture = normService.normalizeIfAvailable(req.filters(), statusCache.getCachedFacetSnapshot(),
-          engineContext, capturedConfig.search().filterNormalizationEnabled());
-    }
-
-    // 256-G3: PipelineConfig is the sole pipeline control on wire. Deprecated mode field no longer set.
-    SearchRequest.Builder b =
-        SearchRequest.newBuilder()
-            .setQuery(queryText)
-            .setLimit(searchLimit)
-            // Tempdoc 549 Phase D2: the REST `debug` flag requests the numeric per-hit detail
-            // tier — map it to include_detail (the deprecated gRPC debug field retires in E1).
-            .setIncludeDetail(Boolean.TRUE.equals(req.debug()))
-            .setSort(searchSort)
-            .setQuerySyntax(querySyntax)
-            .setIncludeExcerpts(Boolean.TRUE.equals(req.includeExcerpts()))
-            .setPipeline(SearchPipelinePresets.toProtoPipelineConfig(pipelineConfig, denseAuto));
-
-    if (req.cursor() != null && !req.cursor().isBlank()) {
-      b.setCursor(req.cursor());
-    }
-
-    for (String p : req.projection()) {
-      if (p != null && !p.isBlank()) {
-        b.addProjection(p);
-      }
-    }
-
-    // 366: Collect filter normalization result (if pending)
-    KnowledgeSearchRequest.Filters filters = req.filters();
-    FilterNormalizationService.NormResult normResultForResponse = null;
-    if (normFuture != null) {
-      try {
-        FilterNormalizationService.NormResult normResult = normFuture.get();
-        if (normResult != null && normResult.normalizedFilters() != null) {
-          filters = normResult.normalizedFilters();
-          normResultForResponse = normResult;
-          log.debug("Filter normalization applied (source={}, latency={}ms)",
-              normResult.source(), normResult.latencyMs());
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      } catch (ExecutionException e) {
-          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
-        log.debug("Filter normalization failed: {}", e.getCause().getMessage());
-      }
-    }
-
-    if (filters != null) {
-      SearchRequestMapper.applyFilters(b, filters);
-    }
-
-    // Soft-boost filters (363): explicit boostFilters from request, OR QU-extracted boostFilters.
-    KnowledgeSearchRequest.Filters boost = req.boostFilters();
-    QueryUnderstandingService.QuResult quResultForResponse = null;  // 366 §3a: surface in response
-    if (boost == null && quFuture != null) {
-      // Collect QU result — blocks up to the QU deadline (2s), but the LLM call was
-      // already running in parallel with filter/facet setup above.
-      try {
-        QueryUnderstandingService.QuResult quResult = quFuture.get();
-        if (quResult != null && quResult.boostFilters() != null) {
-          boost = quResult.boostFilters();
-          quResultForResponse = quResult;
-          log.debug("QU applied boost filters in {}ms", quResult.latencyMs());
-        } else if (quResult != null) {
-          log.debug("QU passthrough (no filters extracted) in {}ms", quResult.latencyMs());
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        log.debug("QU interrupted");
-      } catch (ExecutionException e) {
-          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
-        log.debug("QU extraction failed: {}", e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
-      }
-    }
-    if (boost != null) {
-      SearchRequestMapper.applyBoostFilters(b, boost, temporalExtraction);
-    }
-
-    // 385: Temporal range injection when no QU boost is active (#9)
-    if (boost == null && !hasExplicitFilters) {
-      SearchRequestMapper.applyTemporalOnlyBoost(b, temporalExtraction);
-    }
-
-    KnowledgeSearchRequest.Facets facets = req.facets();
-    if (facets != null) {
-      SearchRequestMapper.applyFacets(b, facets);
-    }
-
-    SearchRequest baseReq = b.build();
-
-    // 385: Per-source retrieval for queries with 2+ detected sources (#6 + #1).
-    // Gate: any query mentioning 2+ sources benefits from balanced per-source retrieval,
-    // not just COMPARISON queries (FeB4RAG research). Answer type remains a separate hint.
-    SearchResponse resp;
-    boolean perSourceRetrieval = false;
-    if (structuredAnalysis.detectedSources().size() >= 2) {
-      resp = withinHead(head, () -> perSourceSearch.execute(
-          client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext));
-      perSourceRetrieval = true;
-    } else {
-      // Single-source: inject detected sources as boost if no boost already set
-      if (!structuredAnalysis.detectedSources().isEmpty() && !b.hasBoostFilters()) {
-        SearchFilters.Builder srcBoost = SearchFilters.newBuilder();
-        for (String src : structuredAnalysis.detectedSources()) {
-          srcBoost.addMetaSource(src.toLowerCase(Locale.ROOT));
-        }
-        SearchRequest boosted = baseReq.toBuilder().setBoostFilters(srcBoost.build()).build();
-        resp = withinHead(head, () -> client.search(boosted, engineContext));
-      } else {
-        resp = withinHead(head, () -> client.search(baseReq, engineContext));
-      }
-    }
-
-    // If LLM expansion is in flight, wait remaining budget then re-search with expanded terms.
-    // Falls back to base results on timeout or error — user always gets a result.
-    // 385: Skip expansion re-search when per-source retrieval was used — the topic remainder
-    // already strips source name noise, and re-searching would discard the interleaved result.
-    if (expansionFuture != null && !perSourceRetrieval) {
-      long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - searchStartNs);
-      long remainingMs = EXPANSION_BUDGET_MS - elapsedMs;
-      if (remainingMs > 0) {
-        try {
-          String expansionText = expansionFuture.get(remainingMs, TimeUnit.MILLISECONDS);
-          String expandedQuery = mergeExpansion(queryText, expansionText);
-          if (expandedQuery != null) {
-            // LUCENE syntax for expanded search: avoids withPrefixExpansion() applying to the
-            // LLM-appended last token instead of the user's actual last word.
-            SearchRequest expandedReq =
-                baseReq.toBuilder()
-                    .setQuery(expandedQuery)
-                    .setQuerySyntax(SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE)
-                    .build();
-            // Spec D §1.6: the re-search gets min(EXPANSION_BUDGET_MS, D - now), not a fresh
-            // category budget, so base search plus re-search stay inside D.
-            long reSearchDeadline = expansionDeadline(System.nanoTime(), head);
-            if (reSearchDeadline - System.nanoTime() <= 0) {
-              expansionSkipReason = "TIMEOUT";
-            } else {
-              SearchResponse expanded = HeadSearchDeadline.within(
-                  reSearchDeadline, () -> client.search(expandedReq, engineContext));
-              if (newSemanticBudgetMiss(resp, expanded)) {
-                // The shorter budget cost the re-search a semantic leg the base search had: the
-                // expansion did not fit, so the base results stand.
-                expansionSkipReason = "TIMEOUT";
-                log.debug("LLM expansion re-search missed its semantic budget; using base results");
-              } else {
-                resp = expanded;
-                expansionApplied = true;
-                log.debug("LLM expansion applied to query");
-              }
-            }
-          }
-        } catch (TimeoutException e) {
-          expansionFuture.cancel(true);
+    // Completion keeps the existing response margin; a successful re-search still uses D.
+    long expansionCompletionBy = expansionDeadline(searchStartNs, rerankDeadline(head));
+    try {
+      if (isExpansionEligible(
+          pipelineConfig, querySyntax, queryText, req.cursor(), onlineAiService.isAvailable(),
+          effectiveQueryType)) {
+        if (structuredAnalysis.detectedSources().size() >= 2) {
+          expansionSkipReason = "PER_SOURCE_RETRIEVAL";
+        } else if (expansionCompletionBy - System.nanoTime() <= 0) {
           expansionSkipReason = "TIMEOUT";
-          log.debug(
-              "LLM expansion timed out ({}ms budget), using base results", EXPANSION_BUDGET_MS);
+        } else {
+          try {
+            expansionFuture = startExpansionAsync(queryText, engineContext);
+          } catch (GenerationUnavailableException refused) {
+            // Chat is draining, starting or stopping: the same outcome as AI being off.
+            expansionSkipReason = "AI_UNAVAILABLE";
+            log.debug("LLM expansion skipped, generation unavailable: {}", refused.getMessage());
+          }
+        }
+      } else if (effectiveQueryType == QueryType.NAVIGATIONAL || effectiveQueryType == QueryType.EXACT_MATCH) {
+        expansionSkipReason = "QUERY_TYPE_" + effectiveQueryType.name();
+      } else if (!pipelineConfig.expansionEnabled()) {
+        expansionSkipReason = "DISABLED";
+      } else if (!onlineAiService.isAvailable()) {
+        expansionSkipReason = "AI_UNAVAILABLE";
+      } else if (querySyntax != SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE) {
+        expansionSkipReason = "LUCENE_SYNTAX";
+      } else if (queryText.isBlank()) {
+        expansionSkipReason = "BLANK_QUERY";
+      } else {
+        expansionSkipReason = "PAGINATED";
+      }
+
+      // 363: Query Understanding — fire async LLM extraction for boost filters.
+      // Bypass when: explicit filters/boostFilters present, blank query, paginated, AI unavailable,
+      // or navigational/exact-match queries (which skip the full pipeline anyway).
+      boolean hasExplicitFilters = req.filters() != null || req.boostFilters() != null;
+      if (!hasExplicitFilters
+          && !queryText.isBlank()
+          && (req.cursor() == null || req.cursor().isBlank())
+          && effectiveQueryType != QueryType.NAVIGATIONAL
+          && effectiveQueryType != QueryType.EXACT_MATCH) {
+        quFuture = quService.extractIfAvailable(queryText, statusCache.getCachedFacetSnapshot(),
+            engineContext, capturedConfig.search().queryUnderstandingEnabled(),
+            head.isPresent() ? OptionalLong.of(head.getAsLong()
+                - TimeUnit.MILLISECONDS.toNanos(QU_BASE_RESERVE_MS + RERANK_MARGIN_MS)) : head);
+      }
+
+      // 366: Fire filter normalization async when explicit filters are present (mutually exclusive with QU)
+      CompletableFuture<FilterNormalizationService.NormResult> normFuture = null;
+      if (hasExplicitFilters) {
+        normFuture = normService.normalizeIfAvailable(req.filters(), statusCache.getCachedFacetSnapshot(),
+            engineContext, capturedConfig.search().filterNormalizationEnabled());
+      }
+
+      // 256-G3: PipelineConfig is the sole pipeline control on wire. Deprecated mode field no longer set.
+      SearchRequest.Builder b =
+          SearchRequest.newBuilder()
+              .setQuery(queryText)
+              .setLimit(searchLimit)
+              // Tempdoc 549 Phase D2: the REST `debug` flag requests the numeric per-hit detail
+              // tier — map it to include_detail (the deprecated gRPC debug field retires in E1).
+              .setIncludeDetail(Boolean.TRUE.equals(req.debug()))
+              .setSort(searchSort)
+              .setQuerySyntax(querySyntax)
+              .setIncludeExcerpts(Boolean.TRUE.equals(req.includeExcerpts()))
+              .setPipeline(SearchPipelinePresets.toProtoPipelineConfig(pipelineConfig, denseAuto));
+
+      if (req.cursor() != null && !req.cursor().isBlank()) {
+        b.setCursor(req.cursor());
+      }
+
+      for (String p : req.projection()) {
+        if (p != null && !p.isBlank()) {
+          b.addProjection(p);
+        }
+      }
+
+      // 366: Collect filter normalization result (if pending)
+      KnowledgeSearchRequest.Filters filters = req.filters();
+      if (normFuture != null) {
+        try {
+          FilterNormalizationService.NormResult normResult = normFuture.get();
+          if (normResult != null && normResult.normalizedFilters() != null) {
+            filters = normResult.normalizedFilters();
+            normResultForResponse = normResult;
+            log.debug("Filter normalization applied (source={}, latency={}ms)",
+                normResult.source(), normResult.latencyMs());
+          }
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
-          expansionSkipReason = "FAILED";
+        } catch (ExecutionException e) {
+            io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
+          log.debug("Filter normalization failed: {}", e.getCause().getMessage());
+        }
+      }
+
+      if (filters != null) {
+        SearchRequestMapper.applyFilters(b, filters);
+      }
+
+      // Soft-boost filters (363): explicit boostFilters from request, OR QU-extracted boostFilters.
+      KnowledgeSearchRequest.Filters boost = req.boostFilters();
+      if (boost == null && quFuture != null) {
+        // The original QU completion is bounded by its operation deadline, reserving base
+        // retrieval and response time inside D while setup overlaps with the LLM call.
+        try {
+          QueryUnderstandingService.QuResult quResult = quFuture.get();
+          if (quResult != null && quResult.boostFilters() != null) {
+            boost = quResult.boostFilters();
+            quResultForResponse = quResult;
+            log.debug("QU applied boost filters in {}ms", quResult.latencyMs());
+          } else if (quResult != null) {
+            log.debug("QU passthrough (no filters extracted) in {}ms", quResult.latencyMs());
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new java.util.concurrent.CompletionException(e);
         } catch (ExecutionException e) {
           io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
-          expansionSkipReason =
-              GenerationUnavailableException.causedBy(e) ? "AI_UNAVAILABLE" : "FAILED";
-          log.debug("LLM expansion failed: {}", e.getCause().getMessage());
-        } catch (RuntimeException e) {
-          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
-          // The expansion re-search is an OPTIONAL enhancement over an answer we already hold, and
-          // this block's contract (line 779) is "falls back to base results on timeout or error".
-          // Only the checked failures were caught, so a failing re-search took the whole search
-          // down with it. Reachable since tempdoc 821 §P: the multi-leg path now honours this
-          // request's LUCENE syntax and rejects a malformed parse with INVALID_ARGUMENT (as the
-          // sparse-only path always did) — and `expandedQuery` embeds the RAW user query text, so
-          // any Lucene metacharacter the user typed can produce one. `resp` still holds the base
-          // response here, so the fallback is simply not overwriting it.
-          expansionSkipReason = "FAILED";
-          log.warn("LLM expansion re-search failed, using base results: {}", e.getMessage());
+          io.justsearch.core.execution.EngineFutures.rethrowCancellation(e);
+          log.debug("QU extraction failed: {}", e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
         }
+      }
+      if (boost != null) {
+        SearchRequestMapper.applyBoostFilters(b, boost, temporalExtraction);
+      }
+
+      // 385: Temporal range injection when no QU boost is active (#9)
+      if (boost == null && !hasExplicitFilters) {
+        SearchRequestMapper.applyTemporalOnlyBoost(b, temporalExtraction);
+      }
+
+      KnowledgeSearchRequest.Facets facets = req.facets();
+      if (facets != null) {
+        SearchRequestMapper.applyFacets(b, facets);
+      }
+
+      SearchRequest baseReq = b.build();
+
+      // 385: Per-source retrieval for queries with 2+ detected sources (#6 + #1).
+      // Gate: any query mentioning 2+ sources benefits from balanced per-source retrieval,
+      // not just COMPARISON queries (FeB4RAG research). Answer type remains a separate hint.
+      if (structuredAnalysis.detectedSources().size() >= 2) {
+        resp = withinHead(head, () -> perSourceSearch.execute(
+            client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext));
       } else {
-        expansionFuture.cancel(true);
-        expansionSkipReason = "TIMEOUT";
+        // Single-source: inject detected sources as boost if no boost already set
+        if (!structuredAnalysis.detectedSources().isEmpty() && !b.hasBoostFilters()) {
+          SearchFilters.Builder srcBoost = SearchFilters.newBuilder();
+          for (String src : structuredAnalysis.detectedSources()) {
+            srcBoost.addMetaSource(src.toLowerCase(Locale.ROOT));
+          }
+          SearchRequest boosted = baseReq.toBuilder().setBoostFilters(srcBoost.build()).build();
+          resp = withinHead(head, () -> client.search(boosted, engineContext));
+        } else {
+          resp = withinHead(head, () -> client.search(baseReq, engineContext));
+        }
+      }
+
+      // If LLM expansion is in flight, wait remaining budget then re-search with expanded terms.
+      // Falls back to base results on timeout or error — user always gets a result.
+      // Per-source retrieval declines expansion before submission because it cannot consume it.
+      if (expansionFuture != null) {
+        long remainingNs = expansionCompletionBy - System.nanoTime();
+        if (remainingNs > 0) {
+          try {
+            String expansionText = expansionFuture.get(remainingNs, TimeUnit.NANOSECONDS);
+            String expandedQuery = mergeExpansion(queryText, expansionText);
+            if (expandedQuery != null) {
+              // LUCENE syntax for expanded search: avoids withPrefixExpansion() applying to the
+              // LLM-appended last token instead of the user's actual last word.
+              SearchRequest expandedReq =
+                  baseReq.toBuilder()
+                      .setQuery(expandedQuery)
+                      .setQuerySyntax(SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE)
+                      .build();
+              // Spec D §1.6: the re-search gets min(EXPANSION_BUDGET_MS, D - now), not a fresh
+              // category budget, so base search plus re-search stay inside D.
+              long reSearchDeadline = expansionDeadline(System.nanoTime(), head);
+              if (reSearchDeadline - System.nanoTime() <= 0) {
+                expansionSkipReason = "TIMEOUT";
+              } else {
+                SearchResponse expanded = HeadSearchDeadline.within(
+                    reSearchDeadline, () -> client.search(expandedReq, engineContext));
+                if (newSemanticBudgetMiss(resp, expanded)) {
+                  // The shorter budget cost the re-search a semantic leg the base search had: the
+                  // expansion did not fit, so the base results stand.
+                  expansionSkipReason = "TIMEOUT";
+                  log.debug("LLM expansion re-search missed its semantic budget; using base results");
+                } else {
+                  resp = expanded;
+                  expansionApplied = true;
+                  log.debug("LLM expansion applied to query");
+                }
+              }
+            }
+          } catch (TimeoutException e) {
+            expansionFuture.cancel(true);
+            expansionSkipReason = "TIMEOUT";
+            log.debug(
+                "LLM expansion timed out ({}ms budget), using base results", EXPANSION_BUDGET_MS);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new java.util.concurrent.CompletionException(e);
+          } catch (ExecutionException e) {
+            io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
+            io.justsearch.core.execution.EngineFutures.rethrowCancellation(e);
+            expansionSkipReason =
+                GenerationUnavailableException.causedBy(e) ? "AI_UNAVAILABLE" : "FAILED";
+            log.debug("LLM expansion failed: {}", e.getCause().getMessage());
+          } catch (RuntimeException e) {
+            io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
+            io.justsearch.core.execution.EngineFutures.rethrowCancellation(e);
+            // The expansion re-search is an OPTIONAL enhancement over an answer we already hold, and
+            // this block's contract (line 779) is "falls back to base results on timeout or error".
+            // Only the checked failures were caught, so a failing re-search took the whole search
+            // down with it. Reachable since tempdoc 821 §P: the multi-leg path now honours this
+            // request's LUCENE syntax and rejects a malformed parse with INVALID_ARGUMENT (as the
+            // sparse-only path always did) — and `expandedQuery` embeds the RAW user query text, so
+            // any Lucene metacharacter the user typed can produce one. `resp` still holds the base
+            // response here, so the fallback is simply not overwriting it.
+            expansionSkipReason = "FAILED";
+            log.warn("LLM expansion re-search failed, using base results: {}", e.getMessage());
+          }
+        } else {
+          expansionFuture.cancel(true);
+          expansionSkipReason = "TIMEOUT";
+        }
+      }
+    } finally {
+      // Completion/caller abandonment is distinct from producer exit: the existing producer
+      // owner retains running work until actual exit, and prevents abandoned queued dispatch.
+      try {
+        if (quFuture != null && !quFuture.isDone()) quFuture.cancel(false);
+      } finally {
+        if (expansionFuture != null && !expansionFuture.isDone()) expansionFuture.cancel(true);
       }
     }
 
