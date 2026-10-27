@@ -29,6 +29,7 @@ import { canonicalize, parseUrl } from './parser.js';
 import { getStore } from './storeRegistry.js';
 import { getJournalState, recordNavigation } from '../state/NavigationJournal.js';
 import { present } from '../display/present.js';
+import { peekSearchV3Handoff } from '../utils/compose.js';
 import type { ShellAddressNavigation, StateSnapshot } from './types.js';
 import {
   getSurfaceStateSchema,
@@ -151,6 +152,13 @@ export function deactivateProjection(): void {
   active = null;
 }
 
+/** Replace accepted transient address inputs with the current durable navigation state. */
+export function refreshProjection(): void {
+  if (active === null) return;
+  clearPendingWrite();
+  writeUrl(active.surfaceId, active.schema);
+}
+
 function scheduleWrite(surfaceId: string, schema: ResolvedSchema): void {
   // A navigational change anywhere in a coalesced burst makes the trailing write a push: the
   // burst's net effect is that the reader is somewhere else, and that is one entry, not none.
@@ -254,6 +262,9 @@ export function currentAddress(): ShellAddressNavigation | null {
 // ----- helpers -----
 
 function writeUrl(surfaceId: string, schema: ResolvedSchema, push = false): void {
+  // Refused or not-yet-mounted intake still owns its address inputs. Project again
+  // after acceptance; an ordinary store refresh must not erase the only incoming copy.
+  if (surfaceId === 'core.search-v3-surface' && peekSearchV3Handoff()?.origin === 'fresh') return;
   const state = collectState(schema);
   const addr: ShellAddressNavigation = {
     kind: 'navigate',

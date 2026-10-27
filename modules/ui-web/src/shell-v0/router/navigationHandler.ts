@@ -44,7 +44,7 @@
  * checkpoint that actually does something.
  */
 
-import { parkSearchV3Handoff, takeSearchV3Handoff, takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../utils/compose.js';
+import { parkSearchV3Handoff, peekSearchV3Handoff, takeSearchV3Handoff, takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../utils/compose.js';
 import { coerceAndValidate } from './stateValidator.js';
 import { getSurfaceStateSchema, resolveSurfaceStateSchema } from './surfaceSchemas.js';
 import type { StoreAdapter } from './storeRegistry.js';
@@ -204,7 +204,8 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
         return;
       }
 
-      // A hand-off is read once, never URL-projected. Its verb's task outranks a conversation id.
+      // A hand-off is consumed only after safe intake. Its verb's task outranks a conversation id.
+      const incomingState = addr.state;
       if (addr.target === 'core.search-v3-surface' &&
           ['query', 'docIds', 'forceShapeId', 'mode', 'affordance', 'selection'].some(key => Object.hasOwn(addr.state, key))) {
         parkSearchV3Handoff(addr.state, options?.taskOrigin ?? (traversal ? 'restore' : 'fresh'));
@@ -236,10 +237,11 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       // because Navigation realization moved to the handler.
       const push = options?.push !== false;
       if (push) {
+        const pending = addr.target === 'core.search-v3-surface' ? peekSearchV3Handoff() : null;
         pushAddress({
           kind: 'navigate',
           target: addr.target,
-          state: addr.state,
+          state: pending?.origin === 'fresh' ? incomingState : addr.state,
         });
       }
 

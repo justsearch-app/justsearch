@@ -244,7 +244,7 @@ function resolveQuery(args: ComposeArgs): string {
 }
 
 /** Navigation delivers transient state before mounting; the receiving window owns it thereafter. */
-let searchV3Handoff: { state: Record<string, unknown>; selection: SelectionPayload | null; origin: 'fresh' | 'restore' } | null = null;
+let searchV3Handoff: { state: Record<string, unknown>; selection: SelectionPayload | null; origin: 'fresh' | 'restore'; refused?: boolean } | null = null;
 
 export function parkSearchV3Handoff(state: Record<string, unknown>, origin: 'fresh' | 'restore' = 'fresh'): void {
   const selection = takePendingSelection();
@@ -258,4 +258,9 @@ export function takeSearchV3Handoff(): typeof searchV3Handoff {
   const value = searchV3Handoff;
   searchV3Handoff = null;
   return value;
+}
+
+/** Keep fresh address inputs available until the receiving view has retained them safely. */
+export function peekSearchV3Handoff(): typeof searchV3Handoff {
+  return searchV3Handoff;
 }

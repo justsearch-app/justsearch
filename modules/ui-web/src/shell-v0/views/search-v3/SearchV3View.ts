@@ -45,12 +45,12 @@
  *
  * Side-effect registers <jf-sv3-window> and its four regions.
  */
-import { flushPendingNavigationWrite } from '../../router/URLProjector.js';
+import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
 import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
 import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/coreInteractionShapes.js';
 import { subscribeInspector, setOpen as setInspectorOpen } from '../../state/inspectorState.js';
 import type { DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
-import { takeSearchV3Handoff } from '../../utils/compose.js';
+import { peekSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js';
 import type { SelectionPayload } from '../../../api/types/selection.js';
 import type { ShapeId } from '../unifiedChatRequest.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
@@ -1125,7 +1125,8 @@ export class SearchV3View extends JfElement {
     const previous = this.recoveryPayload();
     const retained = keepCurrent ? [leaving ?? previous.drafts[0]!, ...previous.drafts.slice(1)] : previous.drafts.slice(1);
     const drafts = [next];
-    for (const snapshot of retained) {
+    for (const draft of retained) {
+      const snapshot = { ...draft, preparation: draft.preparation ?? null };
       if (this.draftHasInputs(snapshot) && !(retired && this.sameDraft(snapshot, retired))
         && !drafts.some(d => this.sameDraft(d, snapshot))) drafts.push(snapshot);
     }
@@ -1233,8 +1234,22 @@ export class SearchV3View extends JfElement {
 
   private saveRecoveryPayload(payload: Sv3Recovery): boolean {
     this.recoveryWriteUnconfirmed = false;
+    const drafts = payload.drafts;
     if (!isSv3Recovery(payload)) {
-      this.recoveryError ||= 'Recovery could not be saved safely: this preparation does not fit the limits. Review or discard retained drafts, or reduce the text/settings, before continuing. Existing copies are kept.';
+      const preparations = drafts.map(d => d.preparation);
+      let reason = 'This preparation contains invalid or over-limit settings. Review the mode, files and schema before continuing.';
+      if (drafts.length > 2) reason = 'Only two draft preparations can be retained. Review or discard a retained draft before continuing.';
+      else if (drafts.some(d => new TextEncoder().encode(d.text).length > 65536)) {
+        reason = 'Draft text exceeds the 65536-byte recovery limit. Reduce the text before continuing.';
+      } else if (preparations.some(p => p != null && 'scope' in p && 'paths' in p.scope && p.scope.paths.length > 128)) {
+        reason = 'Chosen files exceed the 128-file recovery limit. Reduce the file selection before continuing.';
+      } else if (preparations.some(p => p != null && 'scope' in p && 'paths' in p.scope
+        && p.scope.paths.some(path => new TextEncoder().encode(path).length > 4096))) {
+        reason = 'A chosen file path exceeds the 4096-byte recovery limit. Review the file selection before continuing.';
+      } else if (preparations.some(p => p?.kind === 'structured' && new TextEncoder().encode(p.schema).length > 16384)) {
+        reason = 'Structured schema exceeds the 16384-byte recovery limit. Reduce the schema before continuing.';
+      }
+      this.recoveryError = `Recovery could not be saved safely: ${reason} Existing copies are kept.`;
       this.requestUpdate();
       return false;
     }
@@ -3980,9 +3995,11 @@ export class SearchV3View extends JfElement {
 
   private receiveHandoff = (): boolean => {
     if (this.shapeId) return false;
-    const incoming = takeSearchV3Handoff();
+    const incoming = peekSearchV3Handoff();
     if (incoming === null) return false;
+    if (incoming.refused) return true;
     if (incoming.origin === 'restore') {
+      takeSearchV3Handoff();
       this.revokeHumanTask(true);
       // A journal/traversal entry describes old navigation, not the current raw draft.
       // Never reapply its original query, clear newer B, or resurrect consumed work.
@@ -4049,7 +4066,17 @@ export class SearchV3View extends JfElement {
     const preparation = this.livePreparation(tier, shape === null ? null : shapeId, paths, selection, blocked);
     // Intake is synchronous: reserve the incoming current snapshot plus necessary outgoing
     // copies before changing place, text, schema or scope. Capacity/readback failure rejects it.
-    if (!this.persistDraft({ place: null, text: this.recoveryText(query, selection), preparation }, true)) return true;
+    // Cold raw restoration has no settings authority. When an existing proposal already
+    // retains exactly that text at that place, keep the proposal for review rather than
+    // reserving another slot for its raw bytes. Never apply its settings to the live draft.
+    const leaving = this.mountDraftPending && this.draftReview && this.draftProposal === null
+      ? this.recoveryDrafts.find(d => d.place === this.humanPlace() && d.text === this.recoveryText(this.currentDraft()))
+      : undefined;
+    if (!this.persistDraft({ place: null, text: this.recoveryText(query, selection), preparation }, true, leaving)) {
+      incoming.refused = true;
+      return true;
+    }
+    takeSearchV3Handoff();
     this.revokeHumanTask(true);
     const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
     const restoredDraftOwner = from === null ? readLastViewedConversation() : null;
@@ -4071,6 +4098,7 @@ export class SearchV3View extends JfElement {
     this.sessions = startNewSession(this.sessions);
     this.search.hide(); this.search.clearScope(); this.closePane();
     setActiveConversation(null); clearLastViewedConversation();
+    refreshProjection();
     this.preparedHandoff = shape === 'core.workflow-run' ? null : { shapeId: shape === null ? null : shapeId,
       selection: shape === null ? null : selection ?? (paths.length > 0 ? { kind: 'result-set', items: paths.map(id => ({ id, kind: 'doc' as const })) } : null) };
     this.handoffNotice = notice; this.handoffBlocked = blocked;
