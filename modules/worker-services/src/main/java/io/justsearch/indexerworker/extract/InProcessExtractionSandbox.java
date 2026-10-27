@@ -30,6 +30,9 @@ public final class InProcessExtractionSandbox implements ExtractionSandbox {
 
   @Override
   public TikaExtractionPolicy policy() {
+    if (delegate instanceof ExtractorContributionRegistry registry) {
+      return registry.policy();
+    }
     return delegate instanceof PolicyDrivenTikaExtractor policyDriven
         ? policyDriven.policy()
         : TikaExtractionPolicy.defaults();
