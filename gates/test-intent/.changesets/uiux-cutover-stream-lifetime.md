@@ -163,3 +163,16 @@ One fixed per-concrete-server daemon platform release worker is an explicitly ad
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "8c330fb4-0ab8-439d-8de2-6a42f0669e2b",
+  "verdict": "accept",
+  "digest": "sha256:fe06aee1a1a655d5449561cc47937429335a037b57b73caf207cadb9ab207cd9",
+  "note": "Two independent verifiers on fee60d6075 (main a23a9186ea merged), separate sessions with no builder context. Codex verifier: SL1-SL8, SL10-SL15, SL17-SL19 pass on the real interface (installed Engines, real Vite dev and preview proxies, headless Chromium); 19 meaningful repair failures and 3 preservation passes on main; 7,277 Java and 7,897 web tests pass. Claude security verifier: SL9 145 cases identical on both, refused credentials take no admission, SL13 isolation under 900 hostile resets, SL19 fails closed, proxy filtering unchanged, 16 of 16 abrupt SSE departures release within 2 s versus 0 of 16 on main; 119 existing security tests pass on both. SL18 adjacent tracing gap stays deferred; Windows and native Tauri unverified."
+}
+```
