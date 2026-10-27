@@ -80,9 +80,16 @@ Stopped-run resource measurements are saved in `evidence/resources.jsonl`.
 Evidence and installation logs live in the data directory. Acceptance results,
 including the two Ubuntu session types and the visible check, are recorded there.
 
-On-machine validation (2026-10-27): Ubuntu passed the requested checks, including
-Wayland/Xorg, reset and a brief visible window. Windows installed unattended and
-passed initial SSH readiness, but its subsequent boot without installer media
-failed the ten-minute SSH readiness check. No Windows base was sealed; its
-remaining overlay/reset/visible checks are unverified. Full results and PNGs:
+On-machine validation (2026-10-27): both bases built unattended and passed the
+requested SSH, desktop/input, copy-in, reset and CPU-cap checks. Ubuntu's original
+Wayland/Xorg and visible checks remain recorded; its fresh-overlay SSH and desktop
+were checked again. Windows' fresh build took 1142.7 seconds and produced a
+22,015,508,480-byte qcow2. Its visible window was confirmed on `DISPLAY=:0` and
+closed within 0.366 seconds.
+
+An earlier Windows installed-disk boot stalled. The preserved image subsequently
+booted with the original CPU/disk settings, including after clean shutdown and
+installer-media removal; a new build also passed its first installed-disk boot.
+The stall's cause remains unconfirmed. No CPU flags, topology or disk-bus changes
+were made. Full results, logs and PNGs:
 `/home/elias/dev/justsearch-qual/evidence/results.md`.
