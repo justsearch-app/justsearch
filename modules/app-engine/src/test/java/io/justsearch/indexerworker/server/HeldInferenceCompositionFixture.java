@@ -51,8 +51,9 @@ public final class HeldInferenceCompositionFixture {
     return server;
   }
 
+  /** The product's witness latch opens inside the callback, before this fixture's latch does. */
   public boolean witnessPublished() throws InterruptedException {
-    return witnessPublished.await(0, TimeUnit.MILLISECONDS);
+    return witnessPublished.await(5, TimeUnit.SECONDS);
   }
 
   public void releaseComposition() {
