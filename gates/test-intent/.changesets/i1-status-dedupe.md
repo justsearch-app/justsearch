@@ -67,3 +67,14 @@ author-session: 01a17caf-83af-7ad2-aef6-cf23215ede0d
   "digest": "sha256:72974669b74217cd36ef620649a9828376b3ccde3352c999f05bb3df1e4d7739"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a17d1d-e169-7fc3-93c2-6414f1b21d46",
+  "verdict": "accept",
+  "digest": "sha256:72974669b74217cd36ef620649a9828376b3ccde3352c999f05bb3df1e4d7739",
+  "note": "The source comparison confirms that only the approved 45 duplicate executions disappear, with all declared tests and fixture behavior preserved."
+}
+```
