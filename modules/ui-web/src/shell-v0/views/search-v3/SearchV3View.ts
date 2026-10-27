@@ -4524,8 +4524,10 @@ export class SearchV3View extends JfElement {
    * through to `runAsk` and silently ask when the reader chose to delegate.
    */
   private onTierChange(event: Event): void {
-    this.revokeHumanTask();
     const tier = (event as CustomEvent<Sv3TierChange>).detail?.tier;
+    // Choosing the shown mode only changes intent when retired hand-off text needs review.
+    if (tier === this.tier && this.retiredHandoffText === null) return;
+    this.revokeHumanTask();
     if (!isSv3Tier(tier)) return;
     const paths = this.preparedHandoff !== null || tier === 'search' || tier === 'delegate' ? []
       : [...(this.search.pendingScope?.paths ?? [])];

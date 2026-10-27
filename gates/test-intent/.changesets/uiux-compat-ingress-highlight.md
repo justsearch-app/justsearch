@@ -281,7 +281,7 @@ worktree registration, shared node_modules or source object writes are needed.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts"
       ],
       "class": "New",
-      "behaviour": "Agent-adopted F1/F3 and rules 2–3: conversation URL/traversal, real Search URL, visible exact incoming text/file count, immediate retry after discard, and retirement on navigation. Isolated unaccepted-input reload uses the brief-authorized rule-4 fallback; not claimed repaired.",
+      "behaviour": "Agent-adopted F1/F3 and rules 2\u20133: conversation URL/traversal, real Search URL, visible exact incoming text/file count, immediate retry after discard, and retirement on navigation. Isolated unaccepted-input reload uses the brief-authorized rule-4 fallback; not claimed repaired.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -425,6 +425,58 @@ worktree registration, shared node_modules or source object writes are needed.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 replacing returned text sends an ordinary all-files Ask",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 choosing a mode after return permits ordinary sending",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 a layout reparent keeps the exact prepared hand-off"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Shown-mode Load anyway regression: held 202 response still leads to exactly one follow-up with the original question; pointer and keyboard use the composer Mode menu.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md",
+          "delegationScope": "Design and implement the Search v3 cutover; preserve the owner-agreed HO9 retirement contract in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.3b.md:33.",
+          "choice": "Agent-adopted preservation row 4: selecting the shown mode leaves an ordinary pending Load anyway continuation and ordinary text/files/schema unchanged. R3 still permits choosing the shown mode to acknowledge retired hand-off inputs and end the block, without sending by itself. Exact orchestrator repair in current builder brief: same tier and retiredHandoffText === null returns before revokeHumanTask.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/uiux-same-mode-load-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#pending Load anyway survives shown Ask choice by pointer",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#pending Load anyway survives shown Ask choice by keyboard"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Shown-mode Ordinary text, chosen-file scope and Structured schema stay intact; shown Ask still ends retired hand-off block. No automatic send.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md",
+          "delegationScope": "Design and implement the Search v3 cutover; preserve the owner-agreed HO9 retirement contract in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.3b.md:33.",
+          "choice": "Agent-adopted preservation row 4: selecting the shown mode leaves an ordinary pending Load anyway continuation and ordinary text/files/schema unchanged. R3 still permits choosing the shown mode to acknowledge retired hand-off inputs and end the block, without sending by itself. Exact orchestrator repair in current builder brief: same tier and retiredHandoffText === null returns before revokeHumanTask.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-same-mode-load-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary text by pointer",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary text by keyboard",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary files by pointer",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary files by keyboard",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary schema by pointer",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#shown mode preserves ordinary schema by keyboard",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#R3 shown Ask choice still ends retired hand-off block by pointer",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sameModeLoad.test.ts#R3 shown Ask choice still ends retired hand-off block by keyboard"
       ]
     }
   ]
@@ -995,3 +1047,52 @@ assertions and six final passes; the three preservation checks still pass on bot
 Final browser assertions above refer to final-scope. The planned final-conversation
 group was not launched after the unexpected Engine exit; earlier after/after-online/
 after-conversation runs are retained as intermediate evidence.
+
+
+Shown-mode Load anyway repair, 2026-10-27 (agent-adopted, delegated-choice):
+
+`SearchV3View.onTierChange` returns before revoking the human task when the selected
+tier is already shown and no retired hand-off text is held. Its one-line comment explains
+the exception. `Sv3Composer.chooseTier` stays unchanged, so R3's explicit same-mode
+acknowledgement still ends the retired hand-off block. No other production code changes.
+
+New `SearchV3View.sameModeLoad.test.ts` exercises the actual composer Mode menu. Two
+Load anyway checks fail on 42f911cdba with one dispatch instead of two; all eight
+preservation checks pass there. The candidate passes all ten. HTTP refusal and held
+202 are controlled fixtures. The DOM keyboard fixture supplies happy-dom's absent native
+Enter click; the real browser script separately uses trusted pointer and Enter activation.
+Ordinary text, chosen-file scope and Structured schema remain unchanged; R3's shown Ask
+choice clears the notice without sending, then explicit Send issues an unscoped Ask.
+No previously accepted test file was edited. The unchanged official producer generated
+repair and preservation evidence using the existing documented shared-clone/private-npm
+Git adapter, private object directory and temporary index; no commits or worktree registration.
+
+Typecheck and lint pass. Full unit suite: 650 files / 8,277 tests pass, zero skips
+(116.96 s). UI gates: 28/28 pass. Against origin/main 372b812bf137 the governance
+check reports missing independent acceptance plus nine unrelated uncovered tests; all nine
+also occur on 42f911cdba against that exact base. They are listed in the compact browser
+evidence and were not edited. No evidence-invalid or source/digest problem is reported
+for this candidate. Independent verification/acceptance remains with the orchestrator.
+
+Browser completion and exact commands: [uiux-same-mode-load-browser.json](../evidence/uiux-same-mode-load-browser.json).
+
+Final real-browser results: baseline 42f911cdba has the untouched control pass and both
+same-mode pointer/keyboard cases fail at the missing retry. The candidate passes all
+three, with dispatch HTTP statuses 503/200 in each case and the exact original question
+in its sole follow-up. Pressure refusal and held 202 are injected exactly as the verifier
+did; successful follow-up Engine/model responses are real. R3 pointer and keyboard both
+pass on another fresh private Engine: retirement blocks unchanged text, choosing shown
+Ask itself sends nothing, then deliberate Enter sends one ordinary Ask. Four additional
+real chosen-file/schema preservation controls pass. The R3 seed is a real selected-file
+answer saved through UI and checked through native history. There are no blocked cases.
+
+All three Engine groups shut down successfully, with no overlap between groups; only
+owned services were stopped. Headless Chromium short profiles were removed. Native
+sandbox startup failed; the permitted --no-sandbox fallback used only own loopback
+services. CPU argv/CUDA evidence is captured on the final fresh group. The unchanged
+installed backend was reused; no Gradle build, GPU use or download is claimed. Shared
+resources touched: CPU, npm cache, preinstalled Engine/Chromium and permitted read-only
+llama executable/model. Compact browser evidence stays under 200 KB. Against this task's
+42f911cdba baseline governance has only the missing independent acceptance. Against
+origin/main the nine unrelated uncovered items remain; each was reproduced on baseline
+against the same exact main commit. All work stays uncommitted.
