@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T23:37:01.064Z",
+  "revision": "a4d125258aef7ca678749397aa382f30d389f002",
+  "tree": "e42d37958577ae0c9e95864e0fcb692ae1436ef1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::reconciliation_tests::reconciliation_refusal_requires_repair_without_retry\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 404
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater_reconciliation_tests.rs#updater::reconciliation_tests::reconciliation_refusal_requires_repair_without_retry",
+      "file": "modules/shell/src-tauri/src/updater_reconciliation_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e5c78d7b99b6750564cab05385b32fb9ee3fe2e8f35288cf44b55903c20794a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::reconciliation_tests::reconciliation_refusal_requires_repair_without_retry",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f431ef4a2b8f4d82245ea92ba8497ca76cd00254456ce0c44b5c846e4e0b193c"
+}
