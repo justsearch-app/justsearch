@@ -51,7 +51,7 @@ final class OwnedTikaParsers {
       String xml = """
           <properties>
           <encodingDetectors>
-            <encodingDetector class="io.justsearch.indexerworker.extract.OwnedTextEncodingDetector">
+            <encodingDetector class="%s">
               <encodingDetector class="org.apache.tika.parser.html.charsetdetector.StandardHtmlEncodingDetector"/>
               <encodingDetector class="org.apache.tika.detect.DefaultEncodingDetector"/>
             </encodingDetector>
@@ -59,7 +59,7 @@ final class OwnedTikaParsers {
           <parsers><parser class="org.apache.tika.parser.DefaultParser">
           <parser-exclude class="org.apache.tika.parser.ocr.TesseractOCRParser"/>
           </parser></parsers></properties>
-          """;
+          """.formatted(OwnedTextEncodingDetector.class.getName());
       try {
         TikaConfig config = new TikaConfig(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
         configureHtmlParsers(config.getParser(), config.getEncodingDetector());
