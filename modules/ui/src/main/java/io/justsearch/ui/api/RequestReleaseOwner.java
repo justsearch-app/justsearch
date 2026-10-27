@@ -53,7 +53,6 @@ final class RequestReleaseOwner {
     EngineWorkHandle work;
     boolean operationResponse;
     OpLeaseOutcome outcome;
-    Throwable failure;
 
     Registration(RequestReleaseOwner owner, Context context) {
       this.owner = owner;
@@ -160,7 +159,6 @@ final class RequestReleaseOwner {
       synchronized (monitor) {
         registration.creatingContext = null;
         registration.state = State.FAILED;
-        registration.failure = failure;
         if (unavailable == null) unavailable = failure;
         monitor.notifyAll();
       }
