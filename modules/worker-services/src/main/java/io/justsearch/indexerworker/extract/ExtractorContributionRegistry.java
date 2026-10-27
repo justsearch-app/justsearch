@@ -85,11 +85,21 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
    * tiers at registry level (Boundary) — process isolation is applied later by the
    * {@code ExtractionSandboxFactory}, not at install time — so {@code boundaryAdmissible} is true.
    *
-   * @throws IllegalStateException on id collision or a {@code core.*} mint by a non-core contributor
+   * @throws IllegalStateException on id collision, a {@code core.*} mint by a non-core contributor,
+   *     or a conflicting policy-driven contribution
    */
   public synchronized void install(ExtractorContribution contribution) {
     if (closed) throw new IngestionServiceUnavailableException("Extractor registry is closed");
     Objects.requireNonNull(contribution, "contribution");
+    if (contribution.provider() instanceof PolicyDrivenTikaExtractor policyDriven) {
+      for (ExtractorContribution installed : composer.values()) {
+        if (installed.provider() instanceof PolicyDrivenTikaExtractor existing
+            && !Objects.equals(policyDriven.policy(), existing.policy())) {
+          throw new IllegalStateException(
+              "Extractor policy conflicts with installed contribution: " + installed.id());
+        }
+      }
+    }
     composer.install(
         new ContributionComposer.Installation<>(
             contribution.id(),
@@ -98,21 +108,25 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
             true,
             null,
             Map.of(contribution.id(), contribution)));
-    if ("core.tika".equals(contribution.id())) {
-      effectivePolicy = contribution.provider() instanceof PolicyDrivenTikaExtractor policyDriven
-          ? policyDriven.policy()
-          : TikaExtractionPolicy.defaults();
-    }
+    recomputePolicy();
   }
 
   /** Lifecycle substrate: revoke a contribution by id. Returns false if it was not installed. */
   public synchronized boolean uninstall(String id) {
     if (closed) throw new IngestionServiceUnavailableException("Extractor registry is closed");
     boolean wasInstalled = composer.uninstall(id).wasInstalled();
-    if (wasInstalled && "core.tika".equals(id)) {
-      effectivePolicy = TikaExtractionPolicy.defaults();
-    }
+    recomputePolicy();
     return wasInstalled;
+  }
+
+  private void recomputePolicy() {
+    for (ExtractorContribution installed : composer.values()) {
+      if (installed.provider() instanceof PolicyDrivenTikaExtractor policyDriven) {
+        effectivePolicy = policyDriven.policy();
+        return;
+      }
+    }
+    effectivePolicy = TikaExtractionPolicy.defaults();
   }
 
   /** The installed contribution ids, in install order. */
@@ -120,7 +134,7 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
     return composer.keys();
   }
 
-  /** The core Tika contribution's artifact policy, retained after close, or the default otherwise. */
+  /** The shared policy of policy-driven contributions, or defaults; retained after close. */
   public synchronized TikaExtractionPolicy policy() {
     return effectivePolicy;
   }

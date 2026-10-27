@@ -78,7 +78,7 @@ configuration precedence, recovery and ledger rows were verified separately on r
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java"
       ],
       "class": "New",
-      "behaviour": "An ordinary contribution dispatched ahead of a configured core Tika extractor stamps and bounds its artifacts with the registry's configured policy, and those artifacts validate against it; a closed registry still reports the configured policy; explicitly uninstalling core Tika restores the default registry policy. The registry's reported policy is new in this change (the in-process sandbox reported defaults before), so these checks pin new behaviour rather than a repair of the before-state.",
+      "behaviour": "All installed policy-driven contributions share one policy regardless of their ids, and conflicting installs are rejected before any state changes. The registry recomputes that policy on install and public uninstall (defaults when none remain), retains its value across close, and stamps and bounds ordinary-provider artifacts with it while policy-driven artifacts retain their equal policy and validation remains enforced.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -93,7 +93,16 @@ configuration precedence, recovery and ledger rows were verified separately on r
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#ordinaryContributionUsesConfiguredRegistryPolicyAndValidatesArtifact",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#closeRetainsConfiguredCoreTikaPolicy",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#uninstallCoreTikaRestoresDefaultPolicy"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#uninstallCoreTikaRestoresDefaultPolicy",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#installRejectsConfiguredCoreAfterDefaultPolicyDrivenContribution",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#installRejectsMismatchedPolicyDrivenContributionAndAcceptsMatchingPolicy",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#collidingCoreInstallRetainsConfiguredPolicy",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#ordinaryCoreAfterUninstallReportsDefaultPolicy",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#ordinaryCoreBeforeConfiguredVendorUsesSharedPolicyAndValidatesArtifact",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#ordinaryCoreAfterConfiguredVendorUsesSharedPolicyAndValidatesArtifact",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#uninstallCoreTikaRetainsConfiguredVendorPolicy",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#uninstallLastPolicyDrivenContributionRestoresDefaultPolicy",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#closeRetainsConfiguredVendorPolicy"
       ]
     }
   ]
