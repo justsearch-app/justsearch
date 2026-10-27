@@ -1297,3 +1297,13 @@ R40 builder checkpoint: comparisons and executions are retained in tmp/builder/r
   "digest": "sha256:fb7986e218bf52de715d2f0fe37516efeed4144fde52604947a30ea71fc5012d"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17f1b-0eff-7653-8a78-15b3358f571f",
+  "verdict": "accept",
+  "digest": "sha256:e1c1f59d53f3e0ecd54b25eddc42bfad9de4b9f22b0471c68e3263ae072d9c8d"
+}
+```
