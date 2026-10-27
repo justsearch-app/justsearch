@@ -275,6 +275,59 @@ worktree registration, shared node_modules or source object writes are needed.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a preservation a third unretained edited draft still blocks departure without losing inputs",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.streamReturn.test.ts#HO8a preservation an empty destination still requires an acknowledged recovery write"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Agent-adopted F1/F3 and rules 2–3: conversation URL/traversal, real Search URL, visible exact incoming text/file count, immediate retry after discard, and retirement on navigation. Isolated unaccepted-input reload uses the brief-authorized rule-4 fallback; not claimed repaired.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md (WP1.5 source and W3/C8/A3/A7 amendments); orchestrator builder-6 brief, 2026-10-27",
+          "delegationScope": "Design and implement the JustSearch UI/UX Search v3 cutover, preserving supported hand-offs, human Send and document reading.",
+          "choice": "Agent-adopted refusal navigation: never freeze later addresses; show exact refused text and file count; acknowledged discard retries the parked task immediately without sending; acceptance or departure retires it. Use the explicit rule-4 fallback: preserve reload restoration without new stored state because accepted pre-boot input entries and fresh refused native hash entries both lack ownership metadata. Preserve S67, genuine limits, DS1, A6 and HO8a.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/uiux-refusal-navigation-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S79 refusal allows conversation addresses and subsequent traversal",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S80 S81 Search after refusal projects its current address",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S82 refusal notice shows exact incoming text and file count",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S77 discard prepares parked hand-off immediately with mode and files",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S83 navigation retires refusal so later discard cannot resurrect it"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve accepted tasks and human edits through Library/Back/Forward/reload; canonical accepted reload, original pre-boot input entries and owned history traversal never re-deliver. Preserve S67 cold intake and the real 128-file limit refusal.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md (WP1.5 source and W3/C8/A3/A7 amendments); orchestrator builder-6 brief, 2026-10-27",
+          "delegationScope": "Design and implement the JustSearch UI/UX Search v3 cutover, preserving supported hand-offs, human Send and document reading.",
+          "choice": "Agent-adopted refusal navigation: never freeze later addresses; show exact refused text and file count; acknowledged discard retries the parked task immediately without sending; acceptance or departure retires it. Use the explicit rule-4 fallback: preserve reload restoration without new stored state because accepted pre-boot input entries and fresh refused native hash entries both lack ownership metadata. Preserve S67, genuine limits, DS1, A6 and HO8a.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/uiux-refusal-navigation-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 accepted address and edited text survive Library traversal and reload without delivery",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S67 preservation cold valid arrival retains earlier draft without a false refusal",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S76 preservation genuine refusal names the file limit and keeps existing draft",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation canonical accepted reload keeps human edits without delivering old inputs",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation original pre-boot input entry keeps human edits without delivering old inputs",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S78 preservation owned input history traversal keeps human edits without delivering old inputs"
+      ]
     }
   ]
 }
@@ -614,3 +667,58 @@ build pass is claimed in this continuation; the unchanged preinstalled backend s
 frontend versions. All test/service launchers strip inherited JUSTSEARCH/JVM option variables
 and set CUDA_VISIBLE_DEVICES=-1. Actual model argv records CPU flags; a late /proc probe
 found no live model and is explicitly not positive process-environment evidence.
+
+
+Refusal navigation repair, 2026-10-27 (agent-adopted, delegated-choice):
+
+`URLProjector.writeUrl` no longer suppresses writes while a fresh hand-off is parked.
+Only initial projection activation preserves an arrival awaiting intake or just refused;
+subsequent navigation projects normally. The refusal notice in `SearchV3View` shows the
+exact incoming text and distinct file count. An acknowledged companion-copy discard
+retries the existing synchronous intake immediately; acceptance or successful navigation
+retires the parked hand-off and its notice. No task sends automatically. Storage,
+validator, limits, recovery format and draft ownership are unchanged.
+
+Rule 4 takes the brief-authorized fallback: reload remains restoration and the isolated
+unaccepted-input reload behavior is unverified, not claimed repaired. A real browser
+probe showed a fresh refused native hash entry has `history.state === null`, just like
+an accepted original pre-boot input address. The attempted ownership check missed that
+fresh refusal; inputs alone cannot distinguish it from accepted work without new stored
+state. That optional implementation and its new optional repair check were withdrawn;
+`router/sources/URLSource.ts` stays byte-identical to cbde03ed95. Public discard now
+prepares the task immediately, rewrites its address normally, and the S77 script's
+subsequent reload keeps it. Five new repair assertions fail on cbde03ed95 and pass after;
+six new preservation checks pass on both. With unchanged S67/DS1/A6/HO8a/URLSource
+controls, paired runs are before 109 pass / 5 intended failures, after 114 pass / 0
+failures, no skips.
+
+Every previously accepted test file stays byte-identical to cbde03ed95.
+`SearchV3View.coldArrival.test.ts` checks retention of the arrival address at refusal;
+it does not assert freezing subsequent navigation, and still passes unchanged.
+Only new `SearchV3View.refusalNavigation.test.ts` contains these regression checks.
+The unchanged official producer records assertions and content digests in
+`uiux-refusal-navigation-{repair,preservation}.json`; its temporary Git adapter uses
+shared clones, detached baseline checkouts and plain npm ci, with private temporary
+Git objects/index. No commit, source Git object write, registered worktree or shared
+node_modules is needed. Browser outcomes and exact commands are recorded in
+`gates/test-intent/evidence/uiux-refusal-navigation-browser.json`; full dumps and harness
+sources stay in the builder report folder rather than gates. This is builder evidence;
+independent acceptance remains for the orchestrator.
+
+Final observed validation: typecheck and lint exit 0; full unit suite 647/647 files,
+8,252/8,252 tests, zero skips; UI gates 28/28. Official producer: 5/5 repairs pass
+with 5 assertion failures before, and 6/6 preservation checks pass. Test-intent has
+only the missing independent acceptance. Requested real-browser matrix on final code:
+S77, S79, S80, S81, S78 and S67 all pass (6/6); baseline cbde03ed95 has S78/S67 pass
+and the four repair cases fail at the reported behavior. Native saved records were
+authored by two completed UI Sends per saved-conversation group on the permitted
+compact Qwen CPU. No incoming task sent automatically; no HTTP 429 blocked a case.
+The additional isolated unaccepted-reload fixture still fails to prepare after reload
+on both revisions; it is the explicitly unverified rule-4 fallback, not a seventh pass.
+Before/after visible snapshots also show incoming text plus 129 files in the refusal
+notice, and Third immediately in the composer after public discard only after repair.
+Every group uses fresh own HOME/data/index/corpus and cleans up its recorded processes
+and short headless Chromium profile; no owner apps/data/display, dev stack, GPU or model
+download. Full logs/screenshots stay outside gates; the compact browser evidence is
+under 200 KB. No Gradle build is claimed; the unchanged preinstalled Engine serves
+the corresponding private frontend. All changes remain uncommitted.

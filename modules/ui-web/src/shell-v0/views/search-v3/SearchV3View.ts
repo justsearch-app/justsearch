@@ -1018,6 +1018,16 @@ export class SearchV3View extends JfElement {
   private recoveryOpened = false;
   private recoveryDrafts: Sv3Recovery['drafts'] = [];
   private recoveryError = '';
+  private refusedHandoff: { text: string; files: number } | null = null;
+
+  /** A later accepted navigation leaves this refusal, rather than retrying it elsewhere. */
+  private retireRefusedHandoff(): boolean {
+    if (this.refusedHandoff === null) return false;
+    if (peekSearchV3Handoff()?.refused) takeSearchV3Handoff();
+    this.refusedHandoff = null;
+    this.recoveryError = '';
+    return true;
+  }
   /** Diagnostic phase of the synchronous session write, never issuance authority. */
   private recoveryWriteUnconfirmed = false;
   /** Address/store moved, but this view could not safely leave its retained work. */
@@ -1418,12 +1428,18 @@ export class SearchV3View extends JfElement {
     const saved = draft.place === null ? undefined : this.placeDrafts.get(draft.place);
     if (saved && this.sameDraft({ place: draft.place, ...saved }, draft)) this.placeDrafts.delete(draft.place!);
     this.recoveryError = '';
+    const pending = peekSearchV3Handoff();
+    if (pending?.refused) {
+      pending.refused = false;
+      this.receiveHandoff();
+    }
     this.requestUpdate();
   }
 
   private reviewRecoveryDraft(draft: Sv3RecoveryDraft): void {
     const next = { ...draft, place: this.humanPlace(), preparation: draft.preparation ?? null };
     if (!this.persistDraft(next, true, undefined, draft)) return;
+    if (this.retireRefusedHandoff()) refreshProjection();
     this.revokeHumanTask();
     this.markDraftReview(next.preparation);
     this.reviewConfigured = next.preparation !== null;
@@ -1484,10 +1500,14 @@ export class SearchV3View extends JfElement {
     const task = this.humanTask;
     const current = { place: this.humanPlace(), text: this.currentDraft(), preparation: this.currentPreparation() };
     const companions = this.recoveryDrafts.filter(d => this.draftHasInputs(d) && !this.sameDraft(d, current));
-    if (!this.departureBlocked && !this.draftPersistence.restoreUnavailable && !this.draftReview && task === null && !this.recoveryError && companions.length === 0 && this.aiSnapshot?.chatUnloadedReason == null) return nothing;
+    if (!this.departureBlocked && !this.draftPersistence.restoreUnavailable && !this.draftReview && task === null && !this.recoveryError && this.refusedHandoff === null && companions.length === 0 && this.aiSnapshot?.chatUnloadedReason == null) return nothing;
     const eligible = task !== null && this.humanOwned(task) && task.saved.delivery === 'unaccepted' && task.refusal !== null;
     return html`<div class="notice recovery-notice" role="status" data-testid="sv3-residency-notice">
       ${this.recoveryError ? html`<p role="alert">${this.recoveryError}</p>` : nothing}
+      ${this.refusedHandoff === null ? nothing : html`<section data-testid="sv3-refused-handoff" aria-label="Incoming task not prepared">
+        <p>Incoming task not prepared (${this.refusedHandoff.files} files). Nothing sent.</p>
+        <pre>${this.refusedHandoff.text}</pre>
+      </section>`}
       ${this.departureBlocked ? html`<p role="alert" data-testid="sv3-departure-notice">The address has moved, but this view did not leave safely. Text and settings are kept here. Use Forward or select this conversation to return before sending; no new task will be issued from this mismatched view.</p>` : nothing}
       ${this.draftPersistence.restoreUnavailable ? html`<p role="alert">A raw draft could not be read or safely retired. Saved text may remain; raw draft saving is unavailable in this view. Keep or copy current text and settings before closing.</p>` : nothing}
       ${this.draftReview ? html`<section data-testid="sv3-draft-review" aria-label="Review restored draft">
@@ -1822,6 +1842,7 @@ export class SearchV3View extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.retireRefusedHandoff();
     this.revokeHumanTask(true);
     this.saveRecovery();
     document.removeEventListener('visibilitychange', this.hideHumanTask);
@@ -2127,6 +2148,7 @@ export class SearchV3View extends JfElement {
    */
   private followStoreConversation(storeActiveId: string | null): void {
     if (storeActiveId === this.sessions.activeId) {
+      if (peekSearchV3Handoff()?.origin !== 'fresh') this.retireRefusedHandoff();
       this.departureBlocked = false; return;
     }
     if (storeActiveId === null && this.draftReview && this.currentDraft().trim()) {
@@ -3739,6 +3761,10 @@ export class SearchV3View extends JfElement {
       this.closePane();
       this.search.show();
     }
+    if (this.retireRefusedHandoff()) {
+      flushPendingNavigationWrite();
+      refreshProjection();
+    }
     void this.setComposerState('docked');
     return true;
   }
@@ -3753,6 +3779,7 @@ export class SearchV3View extends JfElement {
     const retired = saved?.review === false && saved.preparation?.kind === 'search'
       ? { place: RESULTS_PLACE, text: saved.text, preparation: saved.preparation } : undefined;
     if (!this.persistDraft({ place: RESULTS_PLACE, text, preparation }, true, undefined, retired)) return false;
+    this.retireRefusedHandoff();
     const leaving = this.sessions.activeId;
     if (leaving !== null) this.rememberPlace(leaving, this.currentDraft());
     this.renamingId = null; this.recordNotice = false; this.closePane();
@@ -3785,6 +3812,7 @@ export class SearchV3View extends JfElement {
       : carry ? carried : saved?.preparation ?? null;
     const review = restoringRaw || (carry ? this.draftReview : saved?.review ?? false);
     if (!this.mountDraftPending && !this.persistDraft({ place: to, text: this.recoveryText(text), preparation }, !carry)) return false;
+    this.retireRefusedHandoff();
     const leavingHandoff = this.preparedHandoff !== null;
     if (from !== null) this.rememberPlace(from, this.currentDraft());
     if (from === RESULTS_PLACE) this.resultsTier = this.tier;
@@ -4008,6 +4036,7 @@ export class SearchV3View extends JfElement {
     if (incoming.refused) return true;
     if (incoming.origin === 'restore') {
       takeSearchV3Handoff();
+      this.retireRefusedHandoff();
       this.revokeHumanTask(true);
       // A journal/traversal entry describes old navigation, not the current raw draft.
       // Never reapply its original query, clear newer B, or resurrect consumed work.
@@ -4082,9 +4111,12 @@ export class SearchV3View extends JfElement {
       : undefined;
     if (!this.persistDraft({ place: null, text: this.recoveryText(query, selection), preparation }, true, leaving)) {
       incoming.refused = true;
+      this.refusedHandoff = { text: query, files: paths.length };
+      this.requestUpdate();
       return true;
     }
     takeSearchV3Handoff();
+    this.retireRefusedHandoff();
     this.revokeHumanTask(true);
     const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
     const restoredDraftOwner = from === null ? readLastViewedConversation() : null;
@@ -4465,6 +4497,10 @@ export class SearchV3View extends JfElement {
       : [...(this.search.pendingScope?.paths ?? [])];
     if (tier === 'structured' && this.search.showing && paths.length === 0) paths.push(...(this.search.scopeFromSelection()?.paths ?? []));
     if (!this.acknowledgePreparation(this.livePreparation(tier, this.shapeId, paths, null, false))) return;
+    if (this.retireRefusedHandoff()) {
+      flushPendingNavigationWrite();
+      refreshProjection();
+    }
     if (this.preparedHandoff !== null || tier === 'search' || tier === 'delegate') this.search.clearScope();
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
@@ -5292,6 +5328,7 @@ export class SearchV3View extends JfElement {
       this.revealRecoveryOutcome();
       return false;
     }
+    this.retireRefusedHandoff();
     if (leaving !== null) {
       if (retainLeaving) this.rememberPlace(leaving, this.currentDraft());
       else if (clearDraft) {

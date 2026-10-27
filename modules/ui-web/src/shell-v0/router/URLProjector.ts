@@ -135,7 +135,11 @@ export function activateProjection(surfaceId: string): void {
   clearPendingWrite();
   // Initial write — make sure the URL reflects the current store state at
   // activation time.
-  writeUrl(surfaceId, resolved);
+  // Intake may still be waiting for the view to mount, or have just been refused.
+  // Keep the arrival address here only; later store/navigation writes project normally.
+  if (surfaceId !== 'core.search-v3-surface' || peekSearchV3Handoff()?.origin !== 'fresh') {
+    writeUrl(surfaceId, resolved);
+  }
 }
 
 /** Tear down all store subscriptions. Safe to call when no projection is active. */
@@ -262,9 +266,6 @@ export function currentAddress(): ShellAddressNavigation | null {
 // ----- helpers -----
 
 function writeUrl(surfaceId: string, schema: ResolvedSchema, push = false): void {
-  // Refused or not-yet-mounted intake still owns its address inputs. Project again
-  // after acceptance; an ordinary store refresh must not erase the only incoming copy.
-  if (surfaceId === 'core.search-v3-surface' && peekSearchV3Handoff()?.origin === 'fresh') return;
   const state = collectState(schema);
   const addr: ShellAddressNavigation = {
     kind: 'navigate',

@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T06:06:55.857Z",
+  "revision": "cbde03ed952807b8ae1749707678b6f1eaf306b6",
+  "tree": "4caa4211b2fbf2803df7849a6191c0786d765109",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_xy5z8ko/tmp/test-intent-vitest-4-1793081203361.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3693
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S79 refusal allows conversation addresses and subsequent traversal",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S79 refusal allows conversation addresses and subsequent traversal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S80 S81 Search after refusal projects its current address",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S80 S81 Search after refusal projects its current address",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S82 refusal notice shows exact incoming text and file count",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S82 refusal notice shows exact incoming text and file count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S77 discard prepares parked hand-off immediately with mode and files",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S77 discard prepares parked hand-off immediately with mode and files",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S83 navigation retires refusal so later discard cannot resurrect it",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180c29a756e5d9e207390394786293d7e02bd7b357a2935f23cb8e8d849858e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S83 navigation retires refusal so later discard cannot resurrect it",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "cbde03ed95",
+    "revision": "cbde03ed952807b8ae1749707678b6f1eaf306b6",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_xy5z8ko/tmp/test-intent-vitest-4-1793081211003.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4209,
+        "output": "JSON report written to /home/elias/.cache/am/_xy5z8ko/tmp/test-intent-vitest-4-1793081211003.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S79 refusal allows conversation addresses and subsequent traversal",
+        "classification": "assertion",
+        "detail": "S79 refusal allows conversation addresses and subsequent traversal:  AssertionError: expected null to be 'a' // Object.is equality\n    at /home/elias/.cache/am/_xy5z8ko/tmp/test-intent-before-oDoahO/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts:165:91\n    at file:///home/elias/.cache/am/_xy5z8ko/tmp/test-intent-before-oDoahO/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S80 S81 Search after refusal projects its current address",
+        "classification": "assertion",
+        "detail": "S80 S81 Search after refusal projects its current address:  AssertionError: expected '#justsearch://surface/core.search-v3-…' not to contain 'query='\n    at /home/elias/.cache/am/_xy5z8ko/tmp/test-intent-before-oDoahO/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts:179:36\n    at file:///home/elias/.cache/am/_xy5z8ko/tmp/tes"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S82 refusal notice shows exact incoming text and file count",
+        "classification": "assertion",
+        "detail": "S82 refusal notice shows exact incoming text and file count:  AssertionError: expected undefined to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/_xy5z8ko/tmp/test-intent-before-oDoahO/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts:185:52\n    at file:///home/elias/.cache/am/_xy5z8ko/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S77 discard prepares parked hand-off immediately with mode and files",
+        "classification": "assertion",
+        "detail": "S77 discard prepares parked hand-off immediately with mode and files:  AssertionError: expected 'Second draft' to be '  Explain # & % 日本語\\nexactly  ' // Object.is equality\n    at /home/elias/.cache/am/_xy5z8ko/tmp/test-intent-before-oDoahO/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts:192:37\n    at file:///home/elias/.cache/am/_xy5z"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts#S83 navigation retires refusal so later discard cannot resurrect it",
+        "classification": "assertion",
+        "detail": "S83 navigation retires refusal so later discard cannot resurrect it:  AssertionError: expected { state: { …(3) }, …(3) } to be null\n    at /home/elias/.cache/am/_xy5z8ko/tmp/test-intent-before-oDoahO/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalNavigation.test.ts:204:33\n    at file:///home/elias/.cache/am/_xy5z8ko/tmp/test-intent-before-oDoahO/modul"
+      }
+    ]
+  },
+  "digest": "sha256:273fdb7a494da17dfa9a18ae601cd3e0f64c44075fc524ef82cd815a760979a4"
+}
