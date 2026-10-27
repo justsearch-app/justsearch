@@ -212,7 +212,6 @@ final class RequestReleaseOwner {
 
   private void captureFailed(Registration registration, Throwable failure) {
     registration.creatingContext = null;
-    registration.failure = failure;
     registration.state = State.FAILED;
     if (unavailable == null) unavailable = failure;
     monitor.notifyAll();
@@ -250,7 +249,6 @@ final class RequestReleaseOwner {
       }
     } finally {
       synchronized (monitor) {
-        registration.failure = failure;
         registration.state = failure == null ? State.ACKED : State.FAILED;
         if (failure == null) requests.remove(registration);
         else if (unavailable == null) unavailable = failure;
