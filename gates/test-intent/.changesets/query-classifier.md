@@ -53,3 +53,14 @@ The preservation evidence is the JUnit run on the final source.
 ## Acceptance records
 
 Pending independent acceptance of the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "qc-final-verifier-kuq66jbr-20261027",
+  "verdict": "accept",
+  "digest": "sha256:2997099cefefada65e59e897f3ec801f01a86dc7f8036fa5419676b0e49a7e9f",
+  "note": "Delegated baseline preservation is within scope. Production classifier and original nested tests are unchanged from 5cad18c873; the frozen table executes on baseline and candidate. No rule repair or ranking-quality claim is accepted."
+}
+```

@@ -142,3 +142,14 @@ Classifier policy and QU behavior are preserved. No independent acceptance is cl
 ## Acceptance records
 
 Pending independent acceptance of the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "qc-final-verifier-kuq66jbr-20261027",
+  "verdict": "accept",
+  "digest": "sha256:269fc59a7e053b6974c39db40d8a96400157ec90bce04663b01b47d18c0e350e",
+  "note": "Delegated deadline and owner-lifetime choices are within scope. Independent checks reproduce E1 on 8afa15d777 (five assertion failures), E4/E5 on c24cb38cb9 (four assertion failures), and 99 preservation cases on both. All settled candidate cases pass, including queued/running ownership and real Engine wire smoke. Acceptance covers the stated collector-wait cancellation contract; the pre-existing before-collection TIMEOUT fallback is separately reported. No reserve calibration or native-exit bound is claimed."
+}
+```

@@ -194,3 +194,14 @@ no-daemon constraints; `prepare-producer.py` and the adapted bytes remain alongs
 ## Acceptance records
 
 Pending independent acceptance of the final candidate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "qc-final-verifier-kuq66jbr-20261027",
+  "verdict": "accept",
+  "digest": "sha256:fc5f48d56f240f5dcd043aabdd01365c1fee00e03a178fbade7e9ed3898b30e4",
+  "note": "Delegated policy and diagnostic choices match the scenarios and ADR-0016. Independent baseline/candidate checks reproduce the repairs and preserve SIMPLE dispatch and caller authorities. Actual private Engine REST/MCP captures verify wire reasons and disabled precedence. Mapper signature and fixture adaptations retain their old oracles; obsolete keyword-only timeout copy contradicts preserved HYBRID results. Renderer is tested directly and remains unmounted."
+}
+```
