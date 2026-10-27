@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-27T21:29:21.929Z",
-  "revision": "64af7c4a286d7b54e23c90e4fee673f51a2fef29",
-  "tree": "6b8c2c618de254ee4fb345679d87f09eaa8ee4fb",
+  "createdAt": "2026-10-27T21:36:14.361Z",
+  "revision": "f35cbec2eff2f2e4cdfecd621c9d1645b40f53fc",
+  "tree": "00271f0119f408dc880f7247db5ec3ddd21c1450",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/components/chat/CitationsPanel.availability.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/mnnedt0c/tmp/wp58-r2-aSu92c/test-intent-vitest-12-1793136556431.json\"",
+      "command": "npx vitest run \"src/shell-v0/components/chat/CitationsPanel.availability.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1595026-1793136961682.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2249
+      "durationMs": 3856
     }
   ],
   "checks": [
@@ -96,20 +96,20 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/components/chat/CitationsPanel.availability.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/mnnedt0c/tmp/wp58-r2-aSu92c/test-intent-vitest-12-1793136561043.json\"",
+        "command": "npx vitest run \"src/shell-v0/components/chat/CitationsPanel.availability.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1595026-1793136969886.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 282,
-        "output": "\nnode:internal/modules/esm/resolve:272\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '/home/elias/.cache/am/mnnedt0c/tmp/wp58-r2-aSu92c/test-intent-before-AbBjd2/modules/ui-web/node_modules/.bin/dist/cli.js' imported from /home/elias/.cache/am/mnnedt0c/tmp/wp58-r2-aSu92c/test-intent-before-AbBjd2/modules/ui-web/node_modules/.bin/vitest\n    at finalizeResolution (node:internal/modules/esm/resolve:272:11)\n    at moduleResolve (node:internal/modules/esm/resolve:879:10)\n    at defaultResolve (node:internal/modules/esm/resolve:1006:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:705:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:725:38)\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:763:56)\n    at #resolve (node:internal/modules/esm/loader:687:17)\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:607:35)\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:276:33)\n    at ModuleJob.link (node:internal/modules/esm/module_job:381:17) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///home/elias/.cache/am/mnnedt0c/tmp/wp58-r2-aSu92c/test-intent-before-AbBjd2/modules/ui-web/node_modules/.bin/dist/cli.js'\n}\n\nNode.js v24.22.0\n"
+        "durationMs": 4045,
+        "output": "JSON report written to /tmp/test-intent-vitest-1595026-1793136969886.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability.test.ts",
-        "classification": "environment",
-        "detail": "the check produced no result on the before-state"
+        "classification": "assertion",
+        "detail": "WP5.8 source availability includes only confirmed absence in the source button description (absent):  AssertionError: expected null to be 'No longer available' // Object.is equality\n    at /tmp/test-intent-before-XnQRi5/modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability.test.ts:42:53\n    at file:///home/elias/dev/js-uiux-source-gone/modules/ui-web/node_modules/@vitest/runner/dis"
       }
     ]
   },
-  "digest": "sha256:7aa1ff9dbde96a59a798e41faa2a0a3a9cb51f7b4c4c48a27bb6262fd961dffd"
+  "digest": "sha256:46b8173a21089fc90260f447151fe3afb86bbb7dad98abe65432b1fdd45619b8"
 }

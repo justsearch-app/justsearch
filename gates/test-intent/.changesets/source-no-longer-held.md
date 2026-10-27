@@ -68,7 +68,7 @@ Line numbers above refer to `bfd625c7eea6591250e5a3d231c25e7884aa4312`.
 | N58.3 | Existing old-window panel/pane checks pass before and after. Explicit opt-out check sends no presence request and passes both. |
 | N58.4 | Real route activity, route-contract/schema and inventory checks exercise the registered route; inventories were adapted as documented above. Full Java/UI and governance outcomes are recorded below. |
 
-The browser fixture uses private HOME/data/loopback services, a real indexed folder and real saved Ask/Delegate records citing it. It uses the allowed saved-conversation alternative; no model inference or llama-server was started. The web bundle is served by an owned Vite preview proxying the installed Engine because the Engine API does not serve `/`. The final installed run passed all 10 checks and produced 12 screenshots: [browser-evidence.json](../evidence/source-no-longer-held/browser-evidence.json), [browser-final.log](../evidence/source-no-longer-held/commands/browser-final.log), [light pane](../evidence/source-no-longer-held/wp58-ask-absent-light.png), [dark pane](../evidence/source-no-longer-held/wp58-delegate-absent-dark.png), [forced-colors narrow pane](../evidence/source-no-longer-held/wp58-ask-absent-forced-narrow.png), [narrow source card](../evidence/source-no-longer-held/wp58-delegate-source-forced-narrow.png), [Engine stopped](../evidence/source-no-longer-held/wp58-ask-engine-stopped-unknown.png). Candidate source/bundle hashes and saved before/after hashes are machine-recorded. Visual inspection confirmed the candidate path and controls fit and remain readable in the selected theme/width captures.
+The browser fixture uses private HOME/data/loopback services, a real indexed folder and real saved Ask/Delegate records citing it. It uses the allowed saved-conversation alternative; no model inference or llama-server was started. The web bundle is served by an owned Vite preview proxying the installed Engine because the Engine API does not serve `/`. The final installed run passed all 10 checks: [browser-evidence.json](../evidence/source-no-longer-held/browser-evidence.json), [browser-final.log](../evidence/source-no-longer-held/commands/browser-final.log). Its 12 screenshots (light, dark, forced-colors narrow, Engine stopped) were reviewed but are not kept in the repository. Candidate source/bundle hashes and saved before/after hashes are machine-recorded.
 
 ## Commands and results
 
@@ -143,22 +143,16 @@ the changed source-panel check.
   unverified.
 - Typecheck and lint exit **0**. Whole unit suite: **655 files / 8,319 tests
   passed**, exit **0**. Lockdown: **2 files passed / 1 failed; 17 tests passed /
-  1 failed**, exit **1**. The unchanged
-  `ConfirmDialog.viewport-lockdown.test.ts` test
-  `fits narrow viewports with a side gap in every theme (S53.7)` exceeded its
-  existing 5,000 ms timeout. No timeout or test was changed or retried.
+  1 failed**, exit **1** in the builder's run (the unchanged
+  `ConfirmDialog.viewport-lockdown.test.ts` S53.7 case exceeded its 5,000 ms timeout; see the
+  re-run below).
   [Validation output](../evidence/source-no-longer-held/accessibility-validation.txt)
   retains all four commands' output and the producer's diagnostic.
-- The stock producer ran in a private shared clone, with
-  `--before 64af7c4a286d7b54e23c90e4fee673f51a2fef29 --copy-node-modules`.
-  [Generated evidence](../evidence/source-no-longer-held/ui-accessibility.json)
-  records all **13 candidate passes**, but its before run is **environment**, not
-  assertion: dereferencing the copied `.bin/vitest` launcher makes its relative
-  `dist/cli.js` import resolve under `.bin`, where it does not exist. The producer
-  exits **1**. This evidence does **not** satisfy the fail-before gate; the direct
-  shared-clone unit comparison above supplies the observed regression, but is not
-  substituted for valid stock-producer evidence. The builder returns these two
-  check blockers to the orchestrator instead of changing unrelated tooling/tests.
+- [Generated evidence](../evidence/source-no-longer-held/ui-accessibility.json):
+  `run-evidence.mjs --before 64af7c4a286d7b54e23c90e4fee673f51a2fef29` (orchestrator, no copied
+  dependencies) records the candidate passing and the before failing by assertion (the absent
+  button's description is null). The lockdown suite, re-run by the orchestrator on the same tree,
+  passed 3 files / 18 tests; the earlier ConfirmDialog viewport timeout did not recur.
 
 `.agents/preflight` is absent. Both production builds pass. The new browser check
 used private loopback ports, fresh profiles and short `/tmp/jsv-*` TMPDIRs, with
