@@ -56,6 +56,13 @@ import {
   pushAddress,
 } from './URLProjector.js';
 
+// Compatibility addresses name a mode of Search, not a separate state consumer.
+const COMPATIBILITY_SHAPES: Readonly<Record<string, string>> = {
+  'core.ask-surface': 'core.rag-ask',
+  'core.free-chat-surface': 'core.free-chat',
+  'core.extract-surface': 'core.extract',
+};
+
 /** Callback the Shell exposes for setting its active surface. */
 export type SetActiveSurfaceFn = (surfaceId: string) => void;
 
@@ -136,6 +143,14 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       if (!config.isKnownSurface(addr.target)) {
         onUnknown(addr.target);
         return;
+      }
+
+      // Lower before schema hydration: the legacy Ask store is not read by Search v3.
+      // Retain the raw task so the existing hand-off validation can refuse invalid scope.
+      const compatibilityShape = Object.hasOwn(COMPATIBILITY_SHAPES, addr.target) ? COMPATIBILITY_SHAPES[addr.target] : undefined;
+      if (compatibilityShape) {
+        addr = { ...addr, target: 'core.search-v3-surface',
+          state: { forceShapeId: compatibilityShape, ...addr.state } };
       }
 
       // 0. MODAL placement (tempdoc 855 §11.1) — the target opens as a window
