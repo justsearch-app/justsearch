@@ -99,3 +99,15 @@ All listed checks are durable. Existing expectation replacements in StructuredCo
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17d59-afbd-7b73-ba56-4fcf5711fa43",
+  "verdict": "accept",
+  "digest": "sha256:8e3e0693565263a3727cc7993c0fe5ef2d366d173236d9e9eba5f516e21cb4b6"
+}
+```

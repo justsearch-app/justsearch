@@ -101,3 +101,15 @@ author-session: uq-vdu-builder
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17d59-afbd-7b73-ba56-4fcf5711fa43",
+  "verdict": "accept",
+  "digest": "sha256:59343210284b0544795b20306b5b10554358b3edc9200df595c8bc454689f709"
+}
+```

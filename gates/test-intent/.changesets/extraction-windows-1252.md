@@ -124,3 +124,15 @@ Scope: Windows-1252 text and HTML decode without loss. Existing expectations cha
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17d59-afbd-7b73-ba56-4fcf5711fa43",
+  "verdict": "accept",
+  "digest": "sha256:2b27a3ecd84652ccc79d7b1f6a5414a0ea36604a024faa9127fa58e2bc445b14"
+}
+```

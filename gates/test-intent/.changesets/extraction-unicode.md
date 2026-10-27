@@ -273,3 +273,13 @@ is distinct from the absent scalar. Existing PDF phantom-page behavior also rema
   "note": "Accept declared test-intent/component expectations and stock proof only. Full UQ6 FAIL: stored scalar absent (d0f5c2). Retain PDF no-demand limit 43e7a2, split-offset503 6aa9d4, unverified positive chunk/embedding proof, model availability-only/incomplete historical exit census, and all three original unit failures. No full-scenario or publication approval."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17d59-afbd-7b73-ba56-4fcf5711fa43",
+  "verdict": "accept",
+  "digest": "sha256:f97ef009a6fb32bde298de3249af0f94c3b5c1857ebdc1cc32abd553e139caaf"
+}
+```

@@ -164,3 +164,15 @@ uses the identical `tmp/runner-scaffolding.patch`). The repository's producer is
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17d59-afbd-7b73-ba56-4fcf5711fa43",
+  "verdict": "accept",
+  "digest": "sha256:e8029809c9fd637d36097de16be1346fad8c08ddca2cf80a2f55d846bd2e0048"
+}
+```

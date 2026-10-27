@@ -172,3 +172,15 @@ All added tests and the two numeric-type expectation corrections are durable. Th
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17d59-afbd-7b73-ba56-4fcf5711fa43",
+  "verdict": "accept",
+  "digest": "sha256:ff3507223700eca4d02be9b4a0fb3d4bfb013ef1527cd001ad80c6e31c5f261a"
+}
+```
