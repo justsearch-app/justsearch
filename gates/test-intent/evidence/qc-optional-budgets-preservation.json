@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+    "scriptDigest": "sha256:99e5af5803d9c574b8cd5168a7d314dedf271e5293720500d3caf21bb6975bff"
   },
-  "createdAt": "2026-10-26T15:49:43.326Z",
-  "revision": "b1462152fbf317526e7bff86dbe72605a5da94d4",
-  "tree": "1587a5960a4cb8df00935bb5448b9b9c5ab63e31",
+  "createdAt": "2026-10-26T23:35:46.665Z",
+  "revision": "c4ca2dcaf6a7a3bac50eddc47113c19e16087b26",
+  "tree": "583b31ea57deb34a933fb80a871570500edaafb0",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.worker.QueryUnderstandingServiceTest.executorRefusalKeepsItsIdentityThroughProjection\" --tests \"io.justsearch.app.services.worker.QueryUnderstandingServiceTest.noHeadEntrypointKeepsEightSecondRootBudgetAndSuccessfulProjection\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceCursorKeepsPaginationReasonPrecedence\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceFilenameKeepsNavigationalReasonPrecedence\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.fastCompletionMayUseExistingReSearchBudgetBeyondCompletionCutoffWithBaseFallback\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "command": "./gradlew --no-daemon :modules:app-services:test --tests \"io.justsearch.app.services.worker.QueryUnderstandingServiceTest.executorRefusalKeepsItsIdentityThroughProjection\" --tests \"io.justsearch.app.services.worker.QueryUnderstandingServiceTest.noHeadEntrypointKeepsEightSecondRootBudgetAndSuccessfulProjection\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceCursorKeepsPaginationReasonPrecedence\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.perSourceQuotedExactKeepsQueryTypeReasonPrecedence\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.fastCompletionMayUseExistingReSearchBudgetBeyondCompletionCutoffWithBaseFallback\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4543
+      "durationMs": 13846
     }
   ],
   "checks": [
@@ -59,7 +59,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceCursorKeepsPaginationReasonPrecedence",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6b81d95e59ef74dab70ad769ac15bfbb441a1ed4171641e0d53c85f4d9d14992",
+      "contentDigest": "sha256:17818f0134d757064e0000c4d01bf2e279e98d02e37f0277f11535b2688b188c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -71,16 +71,16 @@
       ]
     },
     {
-      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceFilenameKeepsNavigationalReasonPrecedence",
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceQuotedExactKeepsQueryTypeReasonPrecedence",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6b81d95e59ef74dab70ad769ac15bfbb441a1ed4171641e0d53c85f4d9d14992",
+      "contentDigest": "sha256:17818f0134d757064e0000c4d01bf2e279e98d02e37f0277f11535b2688b188c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "perSourceFilenameKeepsNavigationalReasonPrecedence()",
+          "name": "perSourceQuotedExactKeepsQueryTypeReasonPrecedence()",
           "status": "passed"
         }
       ]
@@ -89,7 +89,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#fastCompletionMayUseExistingReSearchBudgetBeyondCompletionCutoffWithBaseFallback",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6b81d95e59ef74dab70ad769ac15bfbb441a1ed4171641e0d53c85f4d9d14992",
+      "contentDigest": "sha256:17818f0134d757064e0000c4d01bf2e279e98d02e37f0277f11535b2688b188c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -102,5 +102,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:35ff685458694d1f52bd433c18d30ade769c85daf69ef25aab163795a233f5a2"
+  "digest": "sha256:ad5b1df5257abf3c1b331029df6f3c5c61e7c74ab2f8964264f7257be4d92951"
 }

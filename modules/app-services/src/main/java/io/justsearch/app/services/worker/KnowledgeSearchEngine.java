@@ -787,13 +787,17 @@ final class KnowledgeSearchEngine {
                 : SearchPipelinePresets.expandPreset(searchMode, rerankConfig);
 
     // 306: Pre-retrieval query classification for CE/expansion gating.
-    // Gated by config for A/B eval. When disabled, all queries are INFORMATIONAL (full pipeline).
-    // Only apply query-type gating for preset pipelines — explicit PipelineConfig bypasses gating.
+    // Keep raw diagnostics separate from policy. Disabled classification has no detected type;
+    // explicit pipelines and Lucene syntax bypass classifier policy using INFORMATIONAL.
     boolean classificationEnabled = capturedConfig.search().queryClassificationEnabled();
     boolean explicitPipeline = req.pipeline() != null;
     QueryType queryType = classificationEnabled
-        ? QueryClassifier.classify(queryText) : QueryType.INFORMATIONAL;
-    QueryType effectiveQueryType = explicitPipeline ? QueryType.INFORMATIONAL : queryType;
+        ? QueryClassifier.classify(queryText) : null;
+    String classificationBypassReason = !classificationEnabled ? "DISABLED"
+        : explicitPipeline ? "EXPLICIT_PIPELINE"
+        : querySyntax == SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE ? "LUCENE_SYNTAX" : null;
+    QueryType effectiveQueryType = classificationBypassReason != null
+        ? QueryType.INFORMATIONAL : queryType;
 
     // 385: Deterministic source extraction for structured queries (#10).
     // Synchronous (~0ms, regex against cached vocabulary). Results used by Phase 2/3 items.
@@ -859,10 +863,11 @@ final class KnowledgeSearchEngine {
       }
 
       // 363: Query Understanding — fire async LLM extraction for boost filters.
-      // Bypass when: explicit filters/boostFilters present, blank query, paginated, AI unavailable,
+      // Bypass when: Lucene syntax, explicit filters/boostFilters, blank query, paginated, AI unavailable,
       // or navigational/exact-match queries (which skip the full pipeline anyway).
       boolean hasExplicitFilters = req.filters() != null || req.boostFilters() != null;
-      if (!hasExplicitFilters
+      if (querySyntax == SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE
+          && !hasExplicitFilters
           && !queryText.isBlank()
           && (req.cursor() == null || req.cursor().isBlank())
           && effectiveQueryType != QueryType.NAVIGATIONAL
@@ -1427,7 +1432,8 @@ final class KnowledgeSearchEngine {
                     crossEncoderSkipReason,
                     expansionApplied,
                     expansionSkipReason,
-                    queryType)))
+                    queryType,
+                    classificationBypassReason)))
         // Tempdoc 366 §1b: echo the filters the request carried, so a client can tell a scoped
         // search from one whose scope was dropped without inferring it from the rows.
         .appliedFilters(

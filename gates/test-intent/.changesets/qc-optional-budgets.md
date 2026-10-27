@@ -2,21 +2,20 @@
 schema: test-intent.v1
 task: t-20261026-query-classification-budget
 author-role: builder
-author-session: codex-builder-20261026T150105Z
+author-session: codex-rescope-builder-20261026
 ---
 
 # Test-intent entries
 
-Unaccepted builder checkpoint. Owner delegation is quoted separately from agent technical choices.
-Existing tests are preserved. Every added check is durable; temporary producer controls and the
-shared before clone are execution scaffolding, not product options or quality/calibration evidence.
+These tests and production budget behavior were already present on the rescope baseline d036a07a9b9.
+The rescope preserves the original optional-budget and cancellation assertions. Only preset inputs
+that depended on rejected classifier rules are replaced with baseline-INFORMATIONAL questions.
+The mixed-filename NAVIGATIONAL reason-precedence test is restored, alongside the additional quoted
+EXACT_MATCH control. This is preservation of the prior budget repair, not a new budget change.
 
-Official evidence is produced by the unchanged scoped runner. Its child-only HOME/profile
-isolation and automatically managed before worktree are expressly authorized for this evidence.
-Earlier raw command/output/JUnit XML and snapshots remain under `tmp/qc-builder-budget/evidence`.
-The expansion cancellation check asserts CancellationException and the original cause in its chain;
-it does not require the JDK's propagated exception to be the same object. No independent acceptance
-is claimed.
+Evidence files are refreshed for the changed test-source digest. Their historical fail-before ref
+b1462152 remains the pre-budget implementation, not the rescope baseline. The provisional reserve
+is not calibrated by these controlled-completion tests. No independent acceptance is claimed.
 
 ```json
 {
@@ -27,14 +26,14 @@ is claimed.
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "Q7/Q8: skip unconsumed per-source expansion with PER_SOURCE_RETRIEVAL, bound original QU completion and forward projection cancellation, apply absolute Head completion budgets before/after setup, keep queued work from dispatching after abandonment, retain running work until one actual-exit release, abandon pending expansion on base failure/interruption, and propagate cancellation/interruption/refusal rather than ordinary fallback. All tests are durable.",
+      "behaviour": "Historical budget repair preserved by R4/R6: skip unconsumed per-source expansion with PER_SOURCE_RETRIEVAL, bound original QU completion and forward projection cancellation, apply absolute Head completion budgets before/after setup, keep queued work from dispatching after abandonment, retain running work until one actual-exit release, abandon pending expansion on base failure/interruption, and propagate cancellation/interruption/refusal rather than ordinary fallback. All tests are durable.",
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "proceed accordingly, only use codex agents",
-          "delegationLocation": "task query-classification user turn (owner delegation quoted verbatim in builder assignment, 2026-10-26)",
-          "delegationScope": "Proceed with the settled query-classification outcome using only Codex agents; this first local slice repairs existing optional assistance budgets/abandonment before any classifier broadening. No publication/global changes; separate author and checker. Scenarios and numeric budget policy are agent-settled technical choices, not owner-authored scenario words.",
-          "choice": "Implement the settled Q7/Q8 deadline and abandonment design in the two existing services, and preserve P3/P4/P5 stage/caller/config authority. QU ends by min(start+8000ms,D-1500ms provisional base reserve-500ms response margin); expansion completion ends by min(searchStart+1500ms,D-500ms), preserving cancel(true), per-source skip precedence, and the independent successful re-search budget. The 1500ms base reserve remains uncalibrated for real profiles.",
+          "delegationQuote": "open a task register accordingly for query classification, consider that you will be the orchestrator for this task. firstly proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
+          "delegationLocation": "task query-classification user turn owner-delegation (quoted verbatim in the rescope builder assignment, 2026-10-26); follow-up: proceed accordingly",
+          "delegationScope": "Investigate, design and implement query-classification improvements autonomously within the assigned baseline-preservation and policy/diagnostics scope. Technical scenarios, fixtures and test oracles are delegated agent choices; independent acceptance remains pending.",
+          "choice": "Preserve the optional-assistance budget and abandonment behavior already present at d036a07a9b9. QU remains bounded by min(start+8000ms,D-1500ms provisional base reserve-500ms response margin); expansion completion by min(searchStart+1500ms,D-500ms), with existing cancellation and successful re-search ownership. The 1500ms reserve remains uncalibrated for real profiles. Restore the mixed-filename NAVIGATIONAL precedence oracle; retain the additional quoted EXACT_MATCH control.",
           "label": "agent choice"
         }
       ],
@@ -67,14 +66,14 @@ is claimed.
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "P3/P4/P5 and Q8 preservation: no-Head QU retains its 8000ms root bound and successful boost projection; executor refusal identity survives; cursor and filename reasons keep precedence; a fast expansion can use the existing independent D-bound re-search beyond the completion cutoff, retaining base fallback. Existing tests remain unchanged. All added tests are durable.",
+      "behaviour": "R6 preservation: no-Head QU retains its 8000ms root bound and successful boost projection; executor refusal identity survives; cursor and whole-quoted exact-match reasons keep precedence; a fast expansion can use the existing independent D-bound re-search beyond the completion cutoff, retaining base fallback. Original budget/cancellation assertions remain; the mixed filename NAVIGATIONAL control is restored and the additional quoted EXACT_MATCH control remains. All added tests are durable.",
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "proceed accordingly, only use codex agents",
-          "delegationLocation": "task query-classification user turn (owner delegation quoted verbatim in builder assignment, 2026-10-26)",
-          "delegationScope": "Proceed with the settled query-classification outcome using only Codex agents; this first local slice repairs existing optional assistance budgets/abandonment before any classifier broadening. No publication/global changes; separate author and checker. Scenarios and numeric budget policy are agent-settled technical choices, not owner-authored scenario words.",
-          "choice": "Implement the settled Q7/Q8 deadline and abandonment design in the two existing services, and preserve P3/P4/P5 stage/caller/config authority. QU ends by min(start+8000ms,D-1500ms provisional base reserve-500ms response margin); expansion completion ends by min(searchStart+1500ms,D-500ms), preserving cancel(true), per-source skip precedence, and the independent successful re-search budget. The 1500ms base reserve remains uncalibrated for real profiles.",
+          "delegationQuote": "open a task register accordingly for query classification, consider that you will be the orchestrator for this task. firstly proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
+          "delegationLocation": "task query-classification user turn owner-delegation (quoted verbatim in the rescope builder assignment, 2026-10-26); follow-up: proceed accordingly",
+          "delegationScope": "Investigate, design and implement query-classification improvements autonomously within the assigned baseline-preservation and policy/diagnostics scope. Technical scenarios, fixtures and test oracles are delegated agent choices; independent acceptance remains pending.",
+          "choice": "Preserve the optional-assistance budget and abandonment behavior already present at d036a07a9b9. QU remains bounded by min(start+8000ms,D-1500ms provisional base reserve-500ms response margin); expansion completion by min(searchStart+1500ms,D-500ms), with existing cancellation and successful re-search ownership. The 1500ms reserve remains uncalibrated for real profiles. Restore the mixed-filename NAVIGATIONAL precedence oracle; retain the additional quoted EXACT_MATCH control.",
           "label": "agent choice"
         }
       ],
@@ -83,7 +82,7 @@ is claimed.
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryUnderstandingServiceTest.java#executorRefusalKeepsItsIdentityThroughProjection",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryUnderstandingServiceTest.java#noHeadEntrypointKeepsEightSecondRootBudgetAndSuccessfulProjection",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceCursorKeepsPaginationReasonPrecedence",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceFilenameKeepsNavigationalReasonPrecedence",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#perSourceQuotedExactKeepsQueryTypeReasonPrecedence",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#fastCompletionMayUseExistingReSearchBudgetBeyondCompletionCutoffWithBaseFallback"
       ]
     }
@@ -92,3 +91,5 @@ is claimed.
 ```
 
 ## Acceptance records
+
+Pending independent acceptance of the final candidate.

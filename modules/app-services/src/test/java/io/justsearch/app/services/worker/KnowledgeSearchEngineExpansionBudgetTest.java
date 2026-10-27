@@ -121,6 +121,10 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
   }
 
   private void checkQuDeadline(boolean running) throws Exception {
+    checkQuDeadline(running, optionalRequest(false));
+  }
+
+  private void checkQuDeadline(boolean running, KnowledgeSearchRequest request) throws Exception {
     optionalConfig(true);
     try (var completion = new OwnedCompletion(running)) {
       OnlineAiService ai = aiReturning(completion.root);
@@ -130,7 +134,7 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
       assertEquals(QueryType.INFORMATIONAL, QueryClassifier.classify("climate policy"));
       long d = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(3200);
       var response = HeadSearchDeadline.within(d,
-          () -> engine.search(optionalRequest(false), TestEngineContexts.internal()));
+          () -> engine.search(request, TestEngineContexts.internal()));
 
       assertEquals(List.of("/base.txt"), ids(response));
       org.mockito.Mockito.verify(ai).chatCompletion(any(), anyInt(), any(), any());
@@ -152,6 +156,10 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
   }
 
   private void checkExpansionDeadline(boolean running) throws Exception {
+    checkExpansionDeadline(running, optionalRequest(true));
+  }
+
+  private void checkExpansionDeadline(boolean running, KnowledgeSearchRequest request) throws Exception {
     optionalConfig(false);
     try (var completion = new OwnedCompletion(running)) {
       OnlineAiService ai = aiReturning(completion.root);
@@ -160,7 +168,7 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
       var engine = engineOver(client, ai, mock(SearchPerSourceExecutor.class));
       long d = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1100);
       var response = HeadSearchDeadline.within(d,
-          () -> engine.search(optionalRequest(true), TestEngineContexts.internal()));
+          () -> engine.search(request, TestEngineContexts.internal()));
 
       assertEquals(List.of("/base.txt"), ids(response));
       org.mockito.Mockito.verify(ai).chatCompletion(any(), anyInt(), any(), any());
@@ -169,6 +177,24 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
           "completion wait ends at D minus 500ms, allowing 100ms for response mapping/scheduling");
       assertEquals("TIMEOUT", expansionReason(response));
       completion.assertAbandoned(running, true);
+    }
+  }
+
+  @ParameterizedTest(name = "presetQuBudgetAndOwnershipMatchControl({0})")
+  @ValueSource(strings = {"climate policy", "why does search return zero", "how to configure search", "what is search used for"})
+  void presetQuBudgetAndOwnershipMatchControl(String query) throws Exception {
+    assertEquals(QueryType.INFORMATIONAL, QueryClassifier.classify(query));
+    for (boolean running : new boolean[] {false, true}) {
+      checkQuDeadline(running, presetOptionalRequest(query, false));
+    }
+  }
+
+  @ParameterizedTest(name = "presetExpansionBudgetAndOwnershipMatchControl({0})")
+  @ValueSource(strings = {"climate policy", "why does search return zero", "how to configure search", "what is search used for"})
+  void presetExpansionBudgetAndOwnershipMatchControl(String query) throws Exception {
+    assertEquals(QueryType.INFORMATIONAL, QueryClassifier.classify(query));
+    for (boolean running : new boolean[] {false, true}) {
+      checkExpansionDeadline(running, presetOptionalRequest(query, true));
     }
   }
 
@@ -343,6 +369,18 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
   @ValueSource(strings = {"qu-cancel", "qu-interrupt", "qu-refusal",
       "expansion-cancel", "expansion-interrupt", "expansion-refusal"})
   void optionalCallerTerminationAndExecutorRefusalNeverBecomeOrdinaryFallback(String termination) {
+    checkOptionalTermination(termination, optionalRequest(!termination.startsWith("qu-")));
+  }
+
+  @ParameterizedTest(name = "presetTerminationMatchesControl({0})")
+  @ValueSource(strings = {"qu-cancel", "qu-interrupt", "qu-refusal", "expansion-cancel", "expansion-interrupt", "expansion-refusal"})
+  void presetTerminationMatchesControl(String termination) {
+    for (String query : List.of("climate policy", "why does search return zero")) {
+      checkOptionalTermination(termination, presetOptionalRequest(query, !termination.startsWith("qu-")));
+    }
+  }
+
+  private void checkOptionalTermination(String termination, KnowledgeSearchRequest request) {
     boolean qu = termination.startsWith("qu-");
     optionalConfig(qu);
     Throwable cause = switch (termination.substring(termination.indexOf('-') + 1)) {
@@ -358,7 +396,7 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
     var engine = engineOver(responsiveClient(searches, 0), ai, mock(SearchPerSourceExecutor.class));
     try {
       RuntimeException failure = assertThrows(RuntimeException.class,
-          () -> engine.search(optionalRequest(!qu), TestEngineContexts.internal()));
+          () -> engine.search(request, TestEngineContexts.internal()));
       if (cause instanceof InterruptedException) {
         assertInstanceOf(java.util.concurrent.CompletionException.class, failure);
         assertSame(cause, failure.getCause());
@@ -384,6 +422,13 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
   }
 
   @Test
+  void perSourceInformationalQuestionSkipsUnconsumedExpansion() throws Exception {
+    assertEquals(QueryType.INFORMATIONAL,
+        QueryClassifier.classify("why compare financial times sky news"));
+    checkPerSource(null, "why compare financial times sky news", "PER_SOURCE_RETRIEVAL");
+  }
+
+  @Test
   void perSourceCursorKeepsPaginationReasonPrecedence() throws Exception {
     checkPerSource("controlled-cursor", "compare financial times sky news", "PAGINATED");
   }
@@ -391,6 +436,11 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
   @Test
   void perSourceFilenameKeepsNavigationalReasonPrecedence() throws Exception {
     checkPerSource(null, "compare financial times sky news report.pdf", "QUERY_TYPE_NAVIGATIONAL");
+  }
+
+  @Test
+  void perSourceQuotedExactKeepsQueryTypeReasonPrecedence() throws Exception {
+    checkPerSource(null, "\"compare financial times sky news report.pdf\"", "QUERY_TYPE_EXACT_MATCH");
   }
 
   private void checkPerSource(String cursor, String query, String reason) throws Exception {
@@ -445,6 +495,13 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
         "justsearch.models.dir", modelsDir.toString(),
         "justsearch.search.query_classification.enabled", "true",
         "justsearch.qu.enabled", Boolean.toString(qu)))));
+  }
+
+  private static KnowledgeSearchRequest presetOptionalRequest(String query, boolean expansion) {
+    // Both paths exercise classifier policy, not explicit-pipeline bypass. HYBRID disables
+    // expansion for the QU schedule; TEXT permits it with QU off for the expansion schedule.
+    return new KnowledgeSearchRequest(query, 10, expansion ? "text" : "hybrid", null, null,
+        List.of(), null, null, null, null, false, true, null);
   }
 
   private static KnowledgeSearchRequest optionalRequest(boolean expansion) {
