@@ -1962,20 +1962,50 @@ async fn post_head<T: for<'de> Deserialize<'de>>(
     path: &str,
     body: Option<serde_json::Value>,
 ) -> Result<T, String> {
-    let host = backend.host.clone();
-    let path = path.to_owned();
-    let response = tokio::task::spawn_blocking(move || {
-        crate::shell_actuator::post(
-            &host,
-            &path,
-            &body.unwrap_or_else(|| serde_json::json!({})),
-            HEAD_TIMEOUT.as_millis() as u64,
-        )
-    })
-    .await
-    .map_err(|error| format!("Backend upgrade task failed: {error}"))??;
-    serde_json::from_value(response)
-        .map_err(|error| format!("Backend upgrade response was invalid: {error}"))
+    // The authenticated Head can accept requests before its durable owners/worker are ready.
+    // UpgradeReconciliationProbe uses 503 only for this condition; configuration/identity
+    // refusals use 409. Keep every other error terminal, including an invalid 2xx attestation.
+    let reconciling = path == "/api/upgrade/reconcile";
+    let deadline = tokio::time::Instant::now() + BACKEND_READY_TIMEOUT;
+    loop {
+        if reconciling && tokio::time::Instant::now() >= deadline {
+            return Err("Target Head reconciliation did not become ready before timeout".into());
+        }
+        let host = backend.host.clone();
+        let request_path = path.to_owned();
+        let body = body.clone().unwrap_or_else(|| serde_json::json!({}));
+        let task = tokio::task::spawn_blocking(move || {
+            crate::shell_actuator::post(
+                &host,
+                &request_path,
+                &body,
+                HEAD_TIMEOUT.as_millis() as u64,
+            )
+        });
+        let response = if reconciling {
+            tokio::time::timeout_at(deadline, task)
+                .await
+                .map_err(|_| {
+                    "Target Head reconciliation did not become ready before timeout".to_string()
+                })?
+        } else {
+            task.await
+        }
+        .map_err(|error| format!("Backend upgrade task failed: {error}"))?;
+        match response {
+            // The existing actor transport reports HTTP status errors in this exact form.
+            Err(error) if reconciling && error == "Engine request rejected (503)" => {
+                tokio::time::sleep_until(
+                    deadline.min(tokio::time::Instant::now() + Duration::from_millis(250)),
+                )
+                .await;
+            }
+            response => {
+                return serde_json::from_value(response?)
+                    .map_err(|error| format!("Backend upgrade response was invalid: {error}"));
+            }
+        }
+    }
 }
 
 async fn fetch_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, String> {
@@ -3778,3 +3808,7 @@ fn fixture_installer_bytes() -> &'static [u8] {
 #[cfg(test)]
 #[path = "updater_v2_tests.rs"]
 mod v2_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "updater_reconciliation_tests.rs"]
+mod reconciliation_tests;
