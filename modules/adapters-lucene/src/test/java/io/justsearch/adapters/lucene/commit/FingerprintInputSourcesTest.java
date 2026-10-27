@@ -15,6 +15,21 @@ import org.junit.jupiter.api.Test;
  */
 final class FingerprintInputSourcesTest {
 
+  @Test
+  void canonicalInputsAndDigestRetainTheCompatibleV1ChunkAlgorithm() throws Exception {
+    var absent = IndexFingerprint.ModelFingerprint.notConfigured();
+    var meta = new SsotCommitMetadataSource(ResolvedConfig.builder().contributeBaseSources().build(),
+        new SsotCommitMetadataSource.RuntimeFingerprintInputs(null, absent, absent, absent)).build();
+    String inputs = meta.get(IndexFingerprint.COMMIT_META_INPUTS_KEY).toString();
+    assertTrue(inputs.contains("\"algorithm_version\":\"v1\""), inputs);
+    assertNotNull(meta.get(IndexFingerprint.COMMIT_META_KEY));
+    assertEquals(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+        .digest(inputs.getBytes(java.nio.charset.StandardCharsets.UTF_8))), meta.get(IndexFingerprint.COMMIT_META_KEY));
+    String v2 = inputs.replace("\"algorithm_version\":\"v1\"", "\"algorithm_version\":\"v2\"");
+    assertNotEquals(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+        .digest(v2.getBytes(java.nio.charset.StandardCharsets.UTF_8))), meta.get(IndexFingerprint.COMMIT_META_KEY));
+  }
+
   /**
    * Writing a default out explicitly is a no-op edit. If the fingerprint hashed the raw nullable
    * config it would move, and every user would pay a rebuild for a comment-grade config change.

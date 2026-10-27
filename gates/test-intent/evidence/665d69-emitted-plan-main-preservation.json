@@ -1,0 +1,160 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:099675065bc74e7e12d2f24c312edb2901acadfc1d7f701ba22e97d1886eac63"
+  },
+  "createdAt": "2026-10-26T01:39:26.153Z",
+  "revision": "bad38888a592631fd6ed7d20b9b901bec9bc8bea",
+  "tree": "c1a0173b3ef24e5e8edf8eac50c638e14c177727",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexing:test --tests \"io.justsearch.indexing.chunking.EmittedPlanCompatibilityTest.discardedCsvWindowCannotChangeAnAlreadySafeEmittedPlan\" --tests \"io.justsearch.indexing.chunking.EmittedPlanCompatibilityTest.originalMalformedAndReturnMutabilityContractsRemain\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 73095
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.commit.FingerprintInputSourcesTest.canonicalInputsAndDigestRetainTheCompatibleV1ChunkAlgorithm\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2839
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.PreOpenSchemaMismatchBootTest.compatibleV1ReleaseDoesNotStartChunkRepairMigration\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18954
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/EmittedPlanCompatibilityTest.java#discardedCsvWindowCannotChangeAnAlreadySafeEmittedPlan",
+      "file": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/EmittedPlanCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cc40383edb7648819e8ed07fc280166a68d4d63bcc0e80ed8089daf08ce717a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "discardedCsvWindowCannotChangeAnAlreadySafeEmittedPlan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/EmittedPlanCompatibilityTest.java#originalMalformedAndReturnMutabilityContractsRemain",
+      "file": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/EmittedPlanCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cc40383edb7648819e8ed07fc280166a68d4d63bcc0e80ed8089daf08ce717a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "originalMalformedAndReturnMutabilityContractsRemain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/commit/FingerprintInputSourcesTest.java#canonicalInputsAndDigestRetainTheCompatibleV1ChunkAlgorithm",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/commit/FingerprintInputSourcesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f49a39fc1da37859a0a8bdbeda86a1a99fd83171d5645fd09eab52a29e3c8f27",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "canonicalInputsAndDigestRetainTheCompatibleV1ChunkAlgorithm()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java#compatibleV1ReleaseDoesNotStartChunkRepairMigration",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74c58a73eca5ba87af60f4bfed7574765c8fbabc743226a8f64357c32659d7cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "compatibleV1ReleaseDoesNotStartChunkRepairMigration(BLUE_GREEN_MIGRATE)",
+          "status": "passed"
+        },
+        {
+          "name": "compatibleV1ReleaseDoesNotStartChunkRepairMigration(FAIL_CLOSED)",
+          "status": "passed"
+        },
+        {
+          "name": "compatibleV1ReleaseDoesNotStartChunkRepairMigration(REBUILD_BACKUP_FIRST)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "aef2254050da17ab4427ff13454c120963629e22",
+    "revision": "aef2254050da17ab4427ff13454c120963629e22",
+    "overlays": [
+      "modules/indexing/src/test/resources/chunking/v1-emitted-plans.bin.gz"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexing:test --tests \"io.justsearch.indexing.chunking.EmittedPlanCompatibilityTest.discardedCsvWindowCannotChangeAnAlreadySafeEmittedPlan\" --tests \"io.justsearch.indexing.chunking.EmittedPlanCompatibilityTest.originalMalformedAndReturnMutabilityContractsRemain\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 2942
+      },
+      {
+        "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.commit.FingerprintInputSourcesTest.canonicalInputsAndDigestRetainTheCompatibleV1ChunkAlgorithm\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 3561
+      },
+      {
+        "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.PreOpenSchemaMismatchBootTest.compatibleV1ReleaseDoesNotStartChunkRepairMigration\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 13885
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/EmittedPlanCompatibilityTest.java#discardedCsvWindowCannotChangeAnAlreadySafeEmittedPlan",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexing/src/test/java/io/justsearch/indexing/chunking/EmittedPlanCompatibilityTest.java#originalMalformedAndReturnMutabilityContractsRemain",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/commit/FingerprintInputSourcesTest.java#canonicalInputsAndDigestRetainTheCompatibleV1ChunkAlgorithm",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java#compatibleV1ReleaseDoesNotStartChunkRepairMigration",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:cebce985ed51a20df7dab3f7b4f111c5a1af64b5fef85a5607783b7d684f0cef"
+}

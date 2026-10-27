@@ -10,16 +10,11 @@ import io.justsearch.configuration.model.DownloadProfile;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.InstallContract;
 import io.justsearch.configuration.model.InstallContractIO;
-import io.justsearch.configuration.resolved.ConfigStore;
-import io.justsearch.configuration.resolved.ResolvedConfig;
-import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
-import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -46,7 +41,6 @@ class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTest
   private static final String VARIANT_ID =
       io.justsearch.configuration.PlatformPaths.isWindows() ? "cuda12" : "default";
 
-  private ConfigStore previousConfigStore;
   private Path chatModel;
 
   @Override
@@ -61,14 +55,6 @@ class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTest
     assertFalse(
         Files.exists(aiHome.resolve("ui").resolve("settings.json")),
         "precondition: the seeded data dir has no ui settings file");
-
-    // The prod trust boundary itself is read from the resolved config, so build one the way the
-    // launcher does (it picks up justsearch.prod from the sysprop set above).
-    previousConfigStore = ConfigStore.globalOrNull();
-    new io.justsearch.app.services.policy.EnterprisePolicyServiceImpl().snapshot();
-    ResolvedConfigBuilder rc = ResolvedConfig.builder();
-    rc.contributeBaseSources();
-    ConfigStore.setGlobal(new ConfigStore(rc.build()));
   }
 
   @Override
@@ -76,11 +62,6 @@ class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTest
     // Prod mode without a session token is REFUSED at startup (tempdoc 884 item 23), exactly as the
     // shipped app is configured — it always mints one.
     return builder.sessionToken(SESSION_TOKEN);
-  }
-
-  @AfterEach
-  void restoreConfigStore() {
-    TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
   }
 
   @Test

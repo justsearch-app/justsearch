@@ -183,7 +183,7 @@ final class UnreadableAndReplacedSourceQueueTest {
         mock(BatchStats.class), mock(StaleSnapshotResolver.class), staleSourceHandler,
         IndexingPacing.unthrottled(), new AtomicBoolean(true), new java.util.HashSet<>(),
         () -> mock(PathResolutionStore.class), () -> identity,
-        mock(IndexingDocumentOps.StageRecorder.class), () -> false, ignored -> {});
+        mock(IndexingDocumentOps.StageRecorder.class), () -> false, ignored -> {}, new FileMutationFence());
     return new Harness(extractor, staleSourceHandler);
   }
 
