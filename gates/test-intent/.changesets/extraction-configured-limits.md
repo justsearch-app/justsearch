@@ -110,3 +110,13 @@ configuration precedence, recovery and ledger rows were verified separately on r
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17da7-84ad-7fe2-ad58-f461f9ae4bce",
+  "verdict": "accept",
+  "digest": "sha256:d8a7b823c5181bc86a64bad699920d295909258f84befee61780f1ffd36ba39c"
+}
+```
