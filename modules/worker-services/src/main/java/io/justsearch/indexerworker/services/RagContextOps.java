@@ -130,6 +130,16 @@ final class RagContextOps {
     boolean wasReranked() {
       return !ceScores.isEmpty();
     }
+
+    float scoreFor(LuceneRuntimeTypes.SearchHit hit) {
+      if (!wasReranked()) return hit.score();
+      // Selection and assembly retain the original objects. Parent/doc IDs are not unique:
+      // distinct synthetic passages of one parent deliberately share them.
+      for (int i = 0; i < hits.size(); i++) {
+        if (hits.get(i) == hit) return ceScores.get(i);
+      }
+      throw new IllegalArgumentException("Included hit was not scored by this rerank");
+    }
   }
 
   /** Quality signals computed during retrieval for CRAG-style confidence assessment. */
@@ -667,13 +677,13 @@ final class RagContextOps {
     // CPU path: Diversify first (bounds work) -> then rerank bounded set
     List<LuceneRuntimeTypes.SearchHit> finalHits;
     int chunksConsidered = candidateHits.size();
-    List<Float> ceScores = List.of();
+    ChunkRerankResult scoredHits = ChunkRerankResult.unchanged(candidateHits);
     if (shouldRerankChunks(effectiveMode)) {
       boolean rerankBeforeDiversify = determineRerankOrder();
       if (rerankBeforeDiversify) {
         // GPU path: rerank full set, then diversify
         var rerankResult = rerankChunks(question, candidateHits, acquisition);
-        ceScores = rerankResult.ceScores();
+        scoredHits = rerankResult;
         finalHits =
             diversifyChunks(question, queryVector, rerankResult.hits(), topK, allowQueryEmbeddings,
                 semanticRequest);
@@ -687,7 +697,7 @@ final class RagContextOps {
             diversifyChunks(question, queryVector, candidateHits, topK, allowQueryEmbeddings,
                 semanticRequest);
         var rerankResult = rerankChunks(question, diversifiedHits, acquisition);
-        ceScores = rerankResult.ceScores();
+        scoredHits = rerankResult;
         finalHits = rerankResult.hits();
         log.debug(
             "Chunk retrieval: diversify->rerank (CPU path), {} diversified -> {} final",
@@ -726,7 +736,7 @@ final class RagContextOps {
       float coverage = maxContextTokens > 0
           ? (float) tokenBudgeter.estimatedTokens() / maxContextTokens : 0f;
       var quality = computeQualitySignals(
-          ceScores, finalHits, chunksConsidered, used.size(), coverage);
+          scoredHits, used, chunksConsidered, coverage);
       log.info(
           "RAG context assembly (token-aware): ~{}/{} tokens, {} sections, mode={}, bestScore={}",
           tokenBudgeter.estimatedTokens(),
@@ -754,7 +764,7 @@ final class RagContextOps {
         (label, content) -> mapAppendResult(budgeter.appendSection(label, content)));
 
     var quality = computeQualitySignals(
-        ceScores, finalHits, chunksConsidered, used.size(), 0f);
+        scoredHits, used, chunksConsidered, 0f);
     log.info(
         "RAG context assembly (char-based): {} sections, {} hits, mode={}, bestScore={}",
         budgeter.sections().size(),
@@ -773,30 +783,35 @@ final class RagContextOps {
         quality);
   }
 
-  /** Compute quality signals from CE scores (if reranked) or fusion scores. */
+  /**
+   * Project finite scores of passages actually appended, independent of selection/assembly order.
+   * CE scores stay in their own domain; otherwise retain native retrieval scores (the union may
+   * mix chunk and parent-document raw scores). Neither domain is calibrated confidence.
+   */
   private static RagQualitySignals computeQualitySignals(
-      List<Float> ceScores,
-      List<LuceneRuntimeTypes.SearchHit> finalHits,
+      ChunkRerankResult scoredHits,
+      List<LuceneRuntimeTypes.SearchHit> usedHits,
       int chunksConsidered,
-      int chunksIncluded,
       float retrievalCoverage) {
-    float bestScore;
-    float scoreGap;
-    if (!ceScores.isEmpty()) {
-      // CE scores are already sorted (highest first from rerankChunks)
-      bestScore = ceScores.getFirst();
-      scoreGap = ceScores.size() >= 2 ? ceScores.get(0) - ceScores.get(1) : bestScore;
-    } else if (!finalHits.isEmpty()) {
-      // Fall back to fusion/BM25 scores from hits
-      bestScore = finalHits.getFirst().score();
-      scoreGap = finalHits.size() >= 2
-          ? finalHits.get(0).score() - finalHits.get(1).score() : bestScore;
-    } else {
-      bestScore = 0f;
-      scoreGap = 0f;
+    float bestScore = Float.NEGATIVE_INFINITY;
+    float secondScore = Float.NEGATIVE_INFINITY;
+    int finiteScores = 0;
+    for (var hit : usedHits) {
+      float score = scoredHits.scoreFor(hit);
+      if (!Float.isFinite(score)) continue;
+      finiteScores++;
+      if (score > bestScore) {
+        secondScore = bestScore;
+        bestScore = score;
+      } else if (score > secondScore) {
+        secondScore = score;
+      }
     }
+    if (finiteScores == 0) bestScore = 0f;
+    // Keep the legacy singleton gap=best, including negative scores.
+    float scoreGap = finiteScores >= 2 ? bestScore - secondScore : bestScore;
     return new RagQualitySignals(bestScore, scoreGap, retrievalCoverage,
-        chunksConsidered, chunksIncluded);
+        chunksConsidered, usedHits.size());
   }
 
   // ==================== Doc-level union leg (tempdoc 749, option B) ====================
@@ -1577,8 +1592,17 @@ final class RagContextOps {
       int targetK, boolean allowQueryEmbeddings,
       InferenceRequest acquisition) {
 
-    if (hits.size() <= targetK) {
-      return hits;
+    if (targetK <= 0 || hits.isEmpty()) {
+      return List.of();
+    }
+
+    List<LuceneRuntimeTypes.SearchHit> usableHits = new ArrayList<>(hits.size());
+    for (var hit : hits) {
+      String content = excerptTextFor(hit);
+      if (content != null && !content.isBlank()) usableHits.add(hit);
+    }
+    if (usableHits.size() <= targetK) {
+      return usableHits;
     }
 
     if (!switch (embeddingProvider.availability().state()) {
@@ -1588,102 +1612,96 @@ final class RagContextOps {
       log.debug(
           "MMR diversification requested but embeddings are unavailable;"
               + " using position diversification");
-      return diversifyByPosition(hits, targetK);
+      return diversifyByPosition(usableHits, targetK);
     }
 
-    int maxCandidates = Math.max(targetK, resolvedConfigSupplier.get().rag().mmrMaxCandidates());
-    List<LuceneRuntimeTypes.SearchHit> candidates = hits;
-    if (hits.size() > maxCandidates) {
-      candidates = hits.subList(0, maxCandidates);
+    if (acquisition.semanticBudget() == InferenceRequest.SemanticBudget.FALLBACK
+        && acquisition.deadlinePassed()) {
+      return mmrSkippedAtSemanticDeadline(usableHits, targetK);
     }
 
+    int dimension = embeddingProvider.dimension();
     float[] qv = queryVector;
     if (qv == null || qv.length == 0) {
       try {
         qv = embeddingProvider.embedQuery(question, acquisition);
       } catch (RuntimeException e) {
-        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(hits, targetK);
+        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(usableHits, targetK);
         log.debug("MMR query embedding failed: {}", e.getMessage());
-        qv = null;
+        return diversifyByPosition(usableHits, targetK);
       }
     }
+    if (!validMmrVector(qv, dimension)) {
+      return diversifyByPosition(usableHits, targetK);
+    }
 
-    List<LuceneRuntimeTypes.SearchHit> embeddedHits = new ArrayList<>(candidates.size());
+    int maxCandidates = Math.max(targetK, resolvedConfigSupplier.get().rag().mmrMaxCandidates());
+    List<LuceneRuntimeTypes.SearchHit> candidates =
+        usableHits.subList(0, Math.min(usableHits.size(), maxCandidates));
     List<float[]> vectors = new ArrayList<>(candidates.size());
     for (var hit : candidates) {
-      String content = excerptTextFor(hit);
-      if (content == null || content.isBlank()) continue;
+      if (acquisition.semanticBudget() == InferenceRequest.SemanticBudget.FALLBACK
+          && acquisition.deadlinePassed()) {
+        return mmrSkippedAtSemanticDeadline(usableHits, targetK);
+      }
       try {
-        float[] v = embeddingProvider.embedDocument(content, acquisition);
-        if (v == null || v.length == 0) continue;
-        embeddedHits.add(hit);
+        float[] v = embeddingProvider.embedDocument(excerptTextFor(hit), acquisition);
+        if (!validMmrVector(v, qv.length)) {
+          return diversifyByPosition(usableHits, targetK);
+        }
         vectors.add(v);
       } catch (RuntimeException e) {
-        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(hits, targetK);
+        if (semanticBudgetSpent(acquisition)) return mmrSkippedAtSemanticDeadline(usableHits, targetK);
         log.debug("MMR chunk embedding failed: {}", e.getMessage());
+        return diversifyByPosition(usableHits, targetK);
       }
     }
-
-    if (embeddedHits.size() <= targetK) {
-      if (!embeddedHits.isEmpty()) {
-        return embeddedHits;
-      }
-      return diversifyByPosition(hits, targetK);
+    if (acquisition.semanticBudget() == InferenceRequest.SemanticBudget.FALLBACK
+        && acquisition.deadlinePassed()) {
+      return mmrSkippedAtSemanticDeadline(usableHits, targetK);
     }
 
-    // Use cosine(query, chunk) as relevance when we have a query vector; otherwise fall back to
-    // rank.
-    List<Double> relevance = new ArrayList<>(embeddedHits.size());
-    boolean canUseQuerySim = qv != null && qv.length == vectors.get(0).length;
-    if (canUseQuerySim) {
-      for (float[] v : vectors) {
-        relevance.add(VectorUtils.cosine(qv, v));
-      }
-    } else {
-      for (int i = 0; i < embeddedHits.size(); i++) {
-        relevance.add((double) (embeddedHits.size() - i));
-      }
+    List<Double> relevance = new ArrayList<>(vectors.size());
+    for (float[] v : vectors) {
+      relevance.add(Math.max(-1.0, Math.min(1.0, VectorUtils.cosine(qv, v))));
     }
 
     double lambda = resolvedConfigSupplier.get().rag().mmrLambda();
     List<Integer> selectedIdx = MmrSelector.select(lambda, relevance, vectors, targetK);
-    if (selectedIdx.isEmpty()) {
-      return diversifyByPosition(hits, targetK);
+    if (selectedIdx.size() != targetK) {
+      return diversifyByPosition(usableHits, targetK);
     }
 
-    boolean[] chosen = new boolean[embeddedHits.size()];
+    boolean[] chosen = new boolean[candidates.size()];
     List<LuceneRuntimeTypes.SearchHit> selected = new ArrayList<>(targetK);
     for (int idx : selectedIdx) {
-      if (idx < 0 || idx >= embeddedHits.size()) continue;
+      if (idx < 0 || idx >= candidates.size() || chosen[idx]) {
+        return diversifyByPosition(usableHits, targetK);
+      }
       chosen[idx] = true;
-      selected.add(embeddedHits.get(idx));
-    }
-
-    // Fill any remaining slots from embedded candidates, then from full candidate list.
-    if (selected.size() < targetK) {
-      for (int i = 0; i < embeddedHits.size() && selected.size() < targetK; i++) {
-        if (!chosen[i]) {
-          selected.add(embeddedHits.get(i));
-        }
-      }
-    }
-    if (selected.size() < targetK) {
-      for (var hit : candidates) {
-        if (selected.size() >= targetK) break;
-        if (!selected.contains(hit)) {
-          selected.add(hit);
-        }
-      }
+      selected.add(candidates.get(idx));
     }
 
     log.debug(
-        "MMR diversification: {} candidates (embedded {}), selected {} (lambda={})",
+        "MMR diversification: {} candidates, selected {} (lambda={})",
         candidates.size(),
-        embeddedHits.size(),
         selected.size(),
         String.format("%.2f", lambda));
 
     return selected;
+  }
+
+  /** Validates model output before using it as query relevance or candidate novelty. */
+  private static boolean validMmrVector(float[] vector, int dimension) {
+    if (vector == null || vector.length == 0 || (dimension > 0 && vector.length != dimension)) {
+      return false;
+    }
+    double norm = 0.0;
+    for (float component : vector) {
+      if (!Float.isFinite(component)) return false;
+      norm += (double) component * component;
+    }
+    return norm > 0.0;
   }
 
   /**

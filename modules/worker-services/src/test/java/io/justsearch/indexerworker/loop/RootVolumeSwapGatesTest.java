@@ -121,6 +121,7 @@ final class RootVolumeSwapGatesTest {
     remapLetterTo(otherVolume);
     StaleSourceHandler handler = mock(StaleSourceHandler.class);
     JobQueue jobQueue = mock(JobQueue.class);
+    org.mockito.Mockito.doCallRealMethod().when(jobQueue).ownsClaimForPublication(any());
     StaleSnapshotResolver resolver = resolver(authority, handler, jobQueue);
 
     boolean handled = resolver.tryHandleStale(
@@ -190,7 +191,7 @@ final class RootVolumeSwapGatesTest {
         .recordOutcomeSafely(any(), anyString(), any());
     TimeboxedContentExtractor extractor = mock(TimeboxedContentExtractor.class);
     when(extractor.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
-    return new StaleSnapshotResolver(authority, handler, journal, jobQueue, extractor, delta -> {});
+    return new StaleSnapshotResolver(authority, handler, journal, jobQueue, extractor, delta -> {}, new FileMutationFence());
   }
 
   private static long calls(Object mock, String method) {
