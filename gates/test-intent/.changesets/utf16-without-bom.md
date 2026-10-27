@@ -132,7 +132,7 @@ CJK result; they do not extend the UTF-16 heuristic.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/utf16-without-bom-repair.json",
+      "evidence": "gates/test-intent/evidence/utf16-without-bom-policy-id.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#defaultPolicyIdentityIsV3",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#blankPolicyIdentityFallsBackToV3",
