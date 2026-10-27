@@ -1,0 +1,667 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:946f0c815895ef666ae4a4cca61d70f491ab76c772fa3e704c460fe85dd7cfcb"
+  },
+  "createdAt": "2026-10-26T23:03:59.543Z",
+  "revision": "c4ca2dcaf6a7a3bac50eddc47113c19e16087b26",
+  "tree": "14bc0eae925deb013d815f8a05ccc222edc8b166",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew --no-daemon :modules:app-services:test --tests \"io.justsearch.app.services.worker.QueryClassifierTest.baselineClassificationTable\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14313
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryClassifierTest.java#baselineClassificationTable",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryClassifierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5415e8af65c1ed24ad23d71f53bf6289d0ed7a63065c351bfafc2d8dffa4f86f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "baselineClassificationTable(1)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(2)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(3)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(4)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(5)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(6)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(7)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(8)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(9)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(10)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(11)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(12)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(13)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(14)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(15)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(16)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(17)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(18)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(19)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(20)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(21)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(22)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(23)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(24)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(25)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(26)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(27)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(28)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(29)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(30)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(31)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(32)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(33)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(34)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(35)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(36)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(37)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(38)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(39)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(40)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(41)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(42)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(43)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(44)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(45)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(46)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(47)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(48)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(49)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(50)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(51)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(52)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(53)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(54)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(55)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(56)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(57)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(58)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(59)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(60)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(61)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(62)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(63)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(64)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(65)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(66)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(67)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(68)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(69)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(70)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(71)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(72)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(73)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(74)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(75)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(76)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(77)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(78)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(79)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(80)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(81)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(82)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(83)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(84)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(85)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(86)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(87)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(88)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(89)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(90)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(91)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(92)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(93)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(94)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(95)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(96)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(97)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(98)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(99)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(100)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(101)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(102)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(103)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(104)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(105)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(106)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(107)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(108)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(109)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(110)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(111)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(112)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(113)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(114)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(115)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(116)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(117)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(118)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(119)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(120)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(121)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(122)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(123)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(124)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(125)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(126)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(127)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(128)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(129)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(130)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(131)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(132)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(133)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(134)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(135)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(136)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(137)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(138)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(139)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(140)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(141)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(142)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(143)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(144)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(145)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(146)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(147)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(148)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(149)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(150)",
+          "status": "passed"
+        },
+        {
+          "name": "baselineClassificationTable(151)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c4ca2dcaf6a7a3bac50eddc47113c19e16087b26",
+    "revision": "c4ca2dcaf6a7a3bac50eddc47113c19e16087b26",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew --no-daemon :modules:app-services:test --tests \"io.justsearch.app.services.worker.QueryClassifierTest.baselineClassificationTable\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 27581,
+        "output": "To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.\nDaemon will be stopped at the end of the build \nCalculating task graph as no cached configuration is available for tasks: :modules:app-services:test --tests io.justsearch.app.services.worker.QueryClassifierTest.baselineClassificationTable --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin FROM-CACHE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors\n> Task :build-logic:processResources\n> Task :build-logic:classes\n> Task :build-logic:jar\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:174)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:49)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:89)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$13$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:102)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:168)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:215)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:201)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:222)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:230)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:245)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:270)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:319)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:350)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:371)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:476)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:493)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:548)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:630)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:695)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:746)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:844)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:885)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:958)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:977)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1041)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1094)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1160)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1215)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1281)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1368)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1429)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1553)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1578)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:127)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:191)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:extension-substrate:compileJava FROM-CACHE\n> Task :modules:infra-core:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:extractProto\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:configuration:processResources\n> Task :modules:core:compileJava FROM-CACHE\n> Task :modules:core-contracts:compileJava FROM-CACHE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos\n> Task :modules:api-contract-projection-java:processProtoResources\n> Task :modules:app-api:buildLinuxBoundExec\n> Task :modules:api-contract-projection-java:processResources\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractIncludeProto\n> Task :modules:ipc-common:extractProto\n> Task :modules:app-api:processResources\n> Task :modules:prompt-support:compileJava FROM-CACHE\n> Task :modules:configuration:compileJava FROM-CACHE\n> Task :modules:indexing:compileJava FROM-CACHE\n> Task :modules:telemetry:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:generateProto FROM-CACHE\n> Task :modules:ipc-common:extractIncludeProto\n> Task :modules:app-util:compileJava FROM-CACHE\n> Task :modules:app-config:compileJava FROM-CACHE\n> Task :modules:ort-common:compileJava FROM-CACHE\n> Task :modules:app-agent-api:compileJava FROM-CACHE\n> Task :modules:ai-backend:processResources\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:app-services:processResources\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:app-config:jar\n> Task :modules:ipc-common:generateProto FROM-CACHE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:app-engine:processResources\n> Task :modules:app-observability:processResources\n> Task :modules:configuration:compileTestFixturesJava FROM-CACHE\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:app-agent-api:jar\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:app-services:processTestResources\n> Task :modules:app-util:jar\n> Task :modules:configuration:classes\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:telemetry:compileTestFixturesJava FROM-CACHE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:configuration:testFixturesJar\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core:jar\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:reranker:compileJava FROM-CACHE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:core-contracts:jar\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:core:testFixturesJar\n> Task :modules:configuration:jar\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:extension-substrate:jar\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:ipc-common:processProtoResources\n> Task :modules:indexing:jar\n> Task :modules:infra-core:jar\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:ipc-common:processResources\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:prompt-support:jar\n> Task :modules:reranker:jar\n> Task :modules:telemetry:processTestFixturesResources NO-SOURCE\n> Task :modules:telemetry:testFixturesClasses UP-TO-DATE\n> Task :modules:ort-common:jar\n> Task :modules:telemetry:testFixturesJar\n> Task :modules:telemetry:jar\n> Task :modules:adapters-lucene:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:classes\n> Task :modules:api-contract-projection-java:jar\n> Task :modules:app-api:compileJava FROM-CACHE\n> Task :modules:app-api:classes\n> Task :modules:app-api:jar\n> Task :modules:gpu-bridge:compileJava FROM-CACHE\n> Task :modules:ai-backend:compileJava FROM-CACHE\n> Task :modules:ai-backend:classes\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:app-agent:compileJava FROM-CACHE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:gpu-bridge:jar\n> Task :modules:ai-backend:jar\n> Task :modules:app-agent:jar\n> Task :modules:ipc-common:compileJava FROM-CACHE\n> Task :modules:ipc-common:classes\n> Task :modules:app-inference:compileJava FROM-CACHE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:worker-core:compileJava FROM-CACHE\n> Task :modules:app-inference:jar\n> Task :modules:ipc-common:jar\n> Task :modules:app-observability:compileJava FROM-CACHE\n> Task :modules:app-observability:classes\n> Task :modules:app-observability:jar\n> Task :modules:worker-services:compileJava FROM-CACHE\n> Task :modules:indexer-worker:compileJava FROM-CACHE\n> Task :modules:app-services:compileJava FROM-CACHE\n> Task :modules:app-services:classes\n> Task :modules:app-engine:compileJava FROM-CACHE\n> Task :modules:app-engine:classes\n> Task :modules:app-services:jar\n> Task :modules:app-engine:jar\n\n> Task :modules:app-services:compileTestJava\n\n> Task :modules:app-services:testClasses\n\n> Task :modules:app-services:test FAILED\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(1) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(42) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(43) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(44) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(45) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(46) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(47) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(48) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(49) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(50) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(51) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(52) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(53) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(54) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(55) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(56) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(57) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(58) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(59) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(60) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(65) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(66) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(67) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(68) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(69) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(70) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(71) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(72) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(73) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(74) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(75) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(76) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(77) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(78) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(79) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(80) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(81) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(82) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(83) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(84) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(85) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(110) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(111) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(112) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(113) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(114) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(115) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\nQueryClassifier — rule-based pre-retrieval query classification (306) > baselineClassificationTable(String, QueryType) > baselineClassificationTable(116) FAILED\n    org.opentest4j.AssertionFailedError at QueryClassifierTest.java:25\n\n> Task :modules:app-services:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/qc-rescope/tmp/agent-tmp/rescope-builder/test-intent-before-jSmlpQ/build/reports/problems/problems-report.html\n81 actionable tasks: 48 executed, 33 from cache\nConfiguration cache entry stored.\n\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\nNote: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n\n151 tests completed, 48 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:app-services:test'.\n> There were failing tests. See the report at: file:///home/elias/dev/justsearch/.claude/worktrees/qc-rescope/tmp/agent-tmp/rescope-builder/test-intent-before-jSmlpQ/modules/app-services/build/reports/tests/test/index.html\n\nBUILD FAILED in 27s\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryClassifierTest.java#baselineClassificationTable",
+        "classification": "assertion",
+        "detail": "baselineClassificationTable(1): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <NAVIGATIONAL> but was: <INFORMATIONAL> | baselineClassificationTable(42): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <NAVIGATIONAL> but was: <INFORMATIONAL> | baselineClassificationTable(43): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <NAVIGATIONAL> but was: <INFORMATIONAL> | baselineClassificationTable"
+      }
+    ]
+  },
+  "digest": "sha256:f636d33b02c7a595659b99f02d592686fb060c5d37e65888444c3451dee2ab52"
+}
