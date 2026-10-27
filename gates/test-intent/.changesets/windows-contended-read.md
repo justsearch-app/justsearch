@@ -99,3 +99,13 @@ running on Windows CI as the real-system check.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17ccf-d705-7281-83f2-8017b86a682a",
+  "verdict": "accept",
+  "digest": "sha256:6262ec5d6065eabb57530e8ca9895fe632c94f40db920f6cc962a83e80f05307"
+}
+```
