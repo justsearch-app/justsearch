@@ -326,17 +326,17 @@ Two staged tools make rounds repeatable and make coverage fail closed:
   snapshots the harness also writes there.
   **The match is a literal substring of the filename against a per-surface
   `evidenceToken`, not a semantic check** — for the chat/search escalation-ladder
-  surface (`core.unified-chat-surface`), the required token is `unified-chat`
-  (derived mechanically from the surface id: strip `core.` and `-surface`).
-  Round 15 screenshotted that surface heavily under names like `09-tour-step2.png`
-  and never once used the literal substring `unified-chat`, so a genuinely
-  well-covered surface read as uncovered at finalize. **Every chat-surface capture's
-  filename must contain `unified-chat`** (e.g. `12-unified-chat-search.png`,
-  `13-unified-chat-rag-ask-answer.png`) — do not rely on a looser word like "chat" or
+  surface (`core.search-v3-surface`, which replaced `core.unified-chat-surface`), the
+  required token is `search-v3` (derived mechanically from the surface id: strip
+  `core.` and `-surface`). Round 15 screenshotted the then chat surface heavily under
+  names like `09-tour-step2.png` and never once used its literal token, so a genuinely
+  well-covered surface read as uncovered at finalize. **Every Search-window capture's
+  filename must contain `search-v3`** (e.g. `12-search-v3-search.png`,
+  `13-search-v3-rag-ask-answer.png`) — do not rely on a looser word like "chat" or
   "search" alone to satisfy this token. The `shape` items carry a SECOND token of
   their own (`core.rag-ask` → `rag-ask`, `core.extract` → `extract`, `core.agent-run`
   → `agent-run`): the Documents-rung answer capture must carry `rag-ask` as well as
-  `unified-chat`, in ONE filename — one file naming both tokens is the sanctioned way
+  `search-v3`, in ONE filename — one file naming both tokens is the sanctioned way
   to credit both (round 18 named its Documents-rung answer `…-unified-chat-ask-answer.png`
   and the shape read as uncovered at finalize).
 - **At finalize (host-side)**, the round's coverage is asserted by diffing the
