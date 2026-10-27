@@ -32,7 +32,15 @@ public final class ForgetIndexedPathHandler implements OperationHandler {
     requireWebview(context);
     try {
       var request = ForgetPlan.request(argumentsJson);
-      var prepared = owner.get().prepare(request.path(), request.scope(), context).prepare(argumentsJson);
+      final ForgetPlan plan;
+      try { plan = owner.get().prepare(request.path(), request.scope(), context); }
+      catch (IllegalArgumentException refused) {
+        // The public request has already passed strict validation. This reason belongs to
+        // the trusted target owner, rather than a parser error or caller-supplied preview.
+        throw new OperationPreparationRefused(OperationResult.failure(refused.getMessage(),
+            "FORGET_PREPARATION_REFUSED", Map.of(), false));
+      }
+      var prepared = plan.prepare(argumentsJson);
       approvalPreview(prepared); // Downstream approval envelope must fit before acceptance/effects.
       return prepared;
     } catch (SettingsCommitOwner.Refused refused) {

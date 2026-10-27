@@ -62,7 +62,7 @@ final class ForgetCoordinator implements ForgetService {
           covering, ForgetPlan.Source.FILE_SYSTEM);
     }); } catch (io.justsearch.indexerworker.services.WorkerServiceException unavailable) {
       if (unavailable.status() == io.justsearch.indexerworker.services.WorkerServiceException.Status.INVALID_ARGUMENT) {
-        throw new IllegalArgumentException("This target belongs to protected data controls");
+        throw new IllegalArgumentException(unavailable.getMessage());
       }
       throw new IllegalStateException("The indexed target's ownership could not be verified");
     }
@@ -318,7 +318,7 @@ final class ForgetCoordinator implements ForgetService {
         && "forget_complete".equals(row.receipt().code())) {
       return outcome(row, plan, ForgetOutcome.Status.COMPLETE, ForgetOutcome.Removal.CONFIRMED,
           keepOut(row, plan), ForgetOutcome.Reason.NONE,
-          "Removal from the search index completed. Original files and retained answers, logs and backups were not erased.");
+          "The target is no longer in the search index. Original files and retained answers, logs and backups were not erased.");
     }
     if (row.state() == OperationState.CANCELLED && row.receipt() != null) {
       boolean withdrawn = "forget_withdrawn".equals(row.receipt().code());
@@ -419,7 +419,7 @@ final class ForgetCoordinator implements ForgetService {
     if (target.getParent() == null || bindings.stream().anyMatch(binding -> binding.path().equals(target))
         || scope == LiteralExclusion.Scope.FOLDER
         && bindings.stream().anyMatch(binding -> binding.path().startsWith(target))) {
-      throw new IllegalArgumentException("A watched root or its containing folder must use root removal controls");
+      throw new IllegalArgumentException("A watched folder or a folder containing one cannot be forgotten. Remove the folder in Library instead.");
     }
   }
   private static void validateAcceptedScope(ForgetPlan plan, List<RootBinding> bindings) {

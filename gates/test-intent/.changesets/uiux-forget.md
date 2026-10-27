@@ -95,7 +95,7 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsCurrentEnvelopeTest.java"
       ],
       "class": "New",
-      "behaviour": "The current operations/settings envelope is semantic version 6. Existing migration, contention, preservation, recovery, context-length and revision assertions remain, including legacy v0\u2013v5 fixtures. A new actual v5 operations reopen asserts row and sqlite_sequence preservation across the semantic migration. Only current-writer version expectations advance from 5 to 6. The nested fresh-writer/current-version/reopen assertion executes unchanged through UiSettingsCurrentEnvelopeTest, which supplies the same fresh @TempDir input and invokes the original method. This gives the unchanged producer a standalone XML identity without editing the existing main test, duplicating its assertions, changing its conditions or synthesizing XML. The complete original nested suite remains part of the full module checks.",
+      "behaviour": "The current operations/settings envelope is semantic version 6. Existing migration, contention, preservation, recovery, context-length and revision assertions remain, including legacy v0–v5 fixtures. A new actual v5 operations reopen asserts row and sqlite_sequence preservation across the semantic migration. Only current-writer version expectations advance from 5 to 6. The nested fresh-writer/current-version/reopen assertion executes unchanged through UiSettingsCurrentEnvelopeTest, which supplies the same fresh @TempDir input and invokes the original method. This gives the unchanged producer a standalone XML identity without editing the existing main test, duplicating its assertions, changing its conditions or synthesizing XML. The complete original nested suite remains part of the full module checks.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -153,7 +153,7 @@ Isolated new files remain subject to independent scenario and execution review e
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
           "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
           "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
-          "choice": "S55.1\u2013S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled. The independently challenged integration probe uses the mechanical Forget+main baseline, existing real owners and explicit setup assertions; the root-only control converged, so no failure or production repair is claimed for that case. R2 and N55.3, adopted after independent receipt challenge PASS1/PASS2: keep-out safety and native migration convergence both matter, with matching real control and specific admitted-target proof; R7/R6/R5 qualifications remain bounded as agreed. Adopted contract4 and implementation clarifications5: distinguish strict UI omission from current-policy normal readmission, retain exact queue/root/physical ownership and publication versions; real R2 is the repair discriminator while root-only R1 stays preservation.",
+          "choice": "S55.1–S55.5, DF55 and WD55: exact removal uses the real owners, keeps original files, applies the outside-root FILE exception, and never overwrites completed work as cancelled. The independently challenged integration probe uses the mechanical Forget+main baseline, existing real owners and explicit setup assertions; the root-only control converged, so no failure or production repair is claimed for that case. R2 and N55.3, adopted after independent receipt challenge PASS1/PASS2: keep-out safety and native migration convergence both matter, with matching real control and specific admitted-target proof; R7/R6/R5 qualifications remain bounded as agreed. Adopted contract4 and implementation clarifications5: distinguish strict UI omission from current-policy normal readmission, retain exact queue/root/physical ownership and publication versions; real R2 is the repair discriminator while root-only R1 stays preservation.",
           "label": "agent choice"
         }
       ],
@@ -441,6 +441,76 @@ Isolated new files remain subject to independent scenario and execution review e
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Round 6 F1/F4, S56.2/S56.4/S56.5: the user-only Forget/Retry/Withdraw ceremony alone owns consent in either broadcast/428 order. Cancel and Escape execute nothing and return focus after busy controls are enabled; exact server preview excludes raw arguments. Engine refusal reasons are announced without a dialog and completed absent targets make no removal claim. Unrelated pending gates retain main behaviour.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "Round 6 F1/F4, S56.2/S56.4/S56.5: the user-only Forget/Retry/Withdraw ceremony alone owns consent in either broadcast/428 order. Cancel and Escape execute nothing and return focus after busy controls are enabled; exact server preview excludes raw arguments. Engine refusal reasons are announced without a dialog and completed absent targets make no removal claim. Unrelated pending gates retain main behaviour.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-round6-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/ForgetPreparationGateTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 6 F1 folder/F3, S55.6/S55.11: strict public argument validation remains; trusted watched-folder/containing-folder/help/history refusal reasons cross the actual handler and dispatcher before consent or operational admission.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "Round 6 F1 folder/F3, S55.6/S55.11: strict public argument validation remains; trusted watched-folder/containing-folder/help/history refusal reasons cross the actual handler and dispatcher before consent or operational admission.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-round6-refusal.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/ForgetPreparationGateTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetHonestyTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 6 F4, S55.10/RF55: actual completed never-indexed and repeated Forget describe indexed absence, retain disk bytes and leave one exact-target policy entry. Removing it through public Settings save releases effective policy. The actual Force Reindex path admits an allowed sibling while the target is kept out, then admits the target after removal; no final extraction or native migration is inferred from queue admission.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "Round 6 F4, S55.10/RF55: actual completed never-indexed and repeated Forget describe indexed absence, retain disk bytes and leave one exact-target policy entry. Removing it through public Settings save releases effective policy. The actual Force Reindex path admits an allowed sibling while the target is kept out, then admits the target after removal; no final extraction or native migration is inferred from queue admission.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-round6-honesty.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetHonestyTest.java"
+      ],
+      "repaired": true
     }
   ]
 }

@@ -1,0 +1,83 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T19:00:44.944Z",
+  "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+  "tree": "1960b33252a8adf25c19bd236f5223450cd7bf37",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.NativeOwnershipInspectionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 829632,
+      "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/evidence-inspection/run-2.log",
+      "outputDigest": "sha256:477b464c0af19883d80d0aaf77834d56734eb0ea4578e42d26a788dce3c904cf"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/NativeOwnershipInspectionTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/NativeOwnershipInspectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2558d3f3f298cab28b6f0a12c31ae510afa8b4e36e85ffc0db75a32cd37ecc26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "writerExclusionWaitIsBoundedAndInterruptionFailsClosed()",
+          "status": "passed"
+        },
+        {
+          "name": "subsequentWritesAndReentrantOwnerWritesStillInvalidateTheProof()",
+          "status": "passed"
+        },
+        {
+          "name": "bufferedWriteDuringEveryInspectionCannotStarveOwnershipPreparation()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+    "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.NativeOwnershipInspectionTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 39619,
+        "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/evidence-inspection/run-1.log",
+        "outputDigest": "sha256:aacf4027a1e7ec9b93ed1dd1fb882eb8333d8cafb34ee2558dce6e5f3e29e132"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/NativeOwnershipInspectionTest.java",
+        "classification": "assertion",
+        "detail": "bufferedWriteDuringEveryInspectionCannotStarveOwnershipPreparation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: ongoing buffered writes must not invalidate every inspection ==> Unexpected exception thrown: java.io.IOException: Native ownership changed during inspection"
+      }
+    ]
+  },
+  "digest": "sha256:d249fba26ed16d5f3e25c200b8bda5dd8e5550f4227f7c5be67a0bf52e0ef93a"
+}

@@ -70,6 +70,28 @@ Agent-adopted under the owner’s design delegation. Named portable component ev
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/NativeOwnershipInspectionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 6 F2, N55.3/NP5: bounded inspection under the existing writer dispatch exclusion converges despite a write attempted during each scan. The refresh precedes the sequence witness; completed later and reentrant owner writes invalidate it. Exclusion waiting has a deadline and interruption fails closed. Real-volume Engine R2 remains for the orchestrator on this environment without /dev/disk/by-uuid.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "choice": "Round 6 F2, N55.3/NP5: bounded inspection under the existing writer dispatch exclusion converges despite a write attempted during each scan. The refresh precedes the sequence witness; completed later and reentrant owner writes invalidate it. Exclusion waiting has a deadline and interruption fails closed. Real-volume Engine R2 remains for the orchestrator on this environment without /dev/disk/by-uuid.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-forget-round6-inspection.json",
+      "newChecks": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/NativeOwnershipInspectionTest.java"
+      ],
+      "repaired": true
     }
   ]
 }

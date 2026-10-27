@@ -74,6 +74,11 @@ public final class ReadPathOps {
    * Stored-only ownership markers and legal lexical PATH aliases cannot be selected by postings.
    */
   public NativeOwnership inspectNativeOwnership(Set<String> paths, java.util.function.Predicate<String> reservedIdentity, long deadlineNanos) throws IOException {
+    return session.indexingCoordinator.inspectNativeOwnership(paths, reservedIdentity, deadlineNanos);
+  }
+
+  NativeOwnership inspectNativeOwnershipUnderWriterExclusion(Set<String> paths,
+      java.util.function.Predicate<String> reservedIdentity, long deadlineNanos) throws IOException {
     var lifecycle = session.snapshot;
     if (lifecycle == null || lifecycle.searcherManager() == null
         || lifecycle.writer() != null && !lifecycle.writer().isOpen()) {
@@ -82,10 +87,10 @@ public final class ReadPathOps {
     var writer = lifecycle.writer();
     // Read-only A has no in-process writer. An upgrade replaces the lifecycle snapshot and
     // invalidates this proof; writable A/B additionally reject every completed owner write.
-    Long sequence = writer == null ? null : writer.getMaxCompletedSequenceNumber();
     lifecycle.searcherManager().maybeRefreshBlocking();
+    Long sequence = writer == null ? null : writer.getMaxCompletedSequenceNumber();
     Set<String> selected = Set.copyOf(paths);
-    NativeMembership membership = withSearcher(searcher -> {
+    NativeMembership membership = new SearcherBridge(session).withSearcherNoRefresh(searcher -> {
       Set<String> blocked = new HashSet<>();
       Set<String> fields = Set.of(idField, SchemaFields.PATH, SchemaFields.COLLECTION,
           SchemaFields.PARENT_DOC_ID, SchemaFields.PROJECTION_SOURCE_ID);

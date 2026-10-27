@@ -341,7 +341,7 @@ import { completedForget, createForgetAttempt, executeForget, forgetContainsPath
   forgetParentFolder, publishForgetCompletion, readUnfinishedForgets,
   type IndexedForgetCompletion } from '../../../api/domains/forget.js';
 import { confirmForget } from '../../components/searchResults/forgetConsent.js';
-import type { CardForgetDetail } from '../../components/searchResults/ResultsCard.js';
+import type { CardForgetDetail, ResultsCard } from '../../components/searchResults/ResultsCard.js';
 import { describeExactPath } from '../../../api/exclusionPolicy.js';
 import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js';
 import {
@@ -4073,7 +4073,17 @@ export class SearchV3View extends JfElement {
         return;
       }
       if (outcome === null) {
-        this.forgetNotice = 'Forget cancelled before approval.';
+        this.forgetNotice = 'Forget cancelled before approval. This request changed nothing.';
+        this.forgetBusy = false;
+        await this.updateComplete;
+        // Busy temporarily removes the row's tabindex. Restore it before returning focus.
+        const main = this.shadowRoot?.querySelector('jf-sv3-main');
+        await main?.updateComplete;
+        const results = main?.shadowRoot?.querySelector('jf-sv3-results');
+        await results?.updateComplete;
+        const card = (detail.invoker?.getRootNode() as ShadowRoot | undefined)?.host as ResultsCard | undefined;
+        await card?.updateComplete;
+        if (!current()) return;
         if (detail.invoker?.isConnected) detail.invoker.focus();
         else this.composer?.focusField();
         return;

@@ -5,6 +5,11 @@ import './LibrarySurface.js';
 import type { ConfirmDialog } from '../components/ConfirmDialog.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
+import { startPendingAuthorizationBridge } from '../operations/pendingAuthorizationBridge.js';
+import '../components/AuthorizationHost.js';
+import type { AuthorizationHost } from '../components/AuthorizationHost.js';
+import { MultiplexedStream } from '../streaming/MultiplexedStream.js';
+import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
 type Mounted = HTMLElement & { updateComplete: Promise<unknown> };
 interface Library extends Mounted {
   host_: PluginHostApi; apiBase: string; activeTab: string; excludesText: string;
@@ -20,7 +25,31 @@ let hostFetch: ReturnType<typeof vi.fn<PluginHostApi['data']['fetch']>>;
 let fetchMock: ReturnType<typeof vi.fn>;
 let page: unknown; let readStatus: number; let requests: Record<string, unknown>[];
 let effects: number; let receipt: ReturnType<typeof item>; let hold: boolean; let finish: (() => void) | null;
+let broadcastFirst: boolean | null;
+let emitPending: (operationId: string) => void;
+let stopBridge: () => void;
+let authorizationHost: AuthorizationHost;
+class FakeEventSource extends EventTarget {
+  readyState = 1;
+  close() { this.readyState = 2; }
+}
 beforeEach(() => {
+  broadcastFirst = null;
+  authorizationHost = document.createElement('jf-authorization-host') as AuthorizationHost;
+  document.body.append(authorizationHost);
+  const events = new FakeEventSource();
+  const multiplex = new MultiplexedStream({ url: 'http://test/stream', eventSourceFactory: () => events as unknown as EventSource });
+  stopBridge = startPendingAuthorizationBridge('', { multiplex });
+  multiplex.start(); events.dispatchEvent(new Event('open'));
+  let seq = 0;
+  emitPending = operationId => events.dispatchEvent(new MessageEvent('frame', { data: JSON.stringify({
+    streamId: SHELL_EVENT_STREAM_IDS.PENDING_AUTHORIZATIONS, frameKind: 'UPDATE', seq: ++seq,
+    ts: '2026-10-27T18:32:50Z', resumeToken: `forget-${seq}`, payload: {
+      pendingId: 'owned-forget-pending', operationId, sourceTier: 'TRUSTED', riskTier: 'HIGH', gateBehavior: 'TYPED_CONFIRM',
+    },
+  }) }));
+  const stop = stopBridge; stopBridge = () => { stop(); multiplex.stop(); };
+
   page = { items: [item()], complete: true, nextId: null }; readStatus = 200;
   requests = []; effects = 0; receipt = item(); hold = false; finish = null;
   hostFetch = vi.fn(async path => {
@@ -34,6 +63,7 @@ beforeEach(() => {
     const url = String(input);
     if (url.includes('/api/operations/')) {
       const request = JSON.parse(String(init?.body)) as Record<string, unknown>; requests.push(request);
+      if (!request.confirmationToken && broadcastFirst === true) emitPending(url.includes('withdraw') ? 'core.withdraw-forget' : 'core.retry-forget');
       if (!request.confirmationToken) return json({ success: false, errorClass: 'CONFIRMATION_REQUIRED',
         pendingId: 'saved-decision', gateBehavior: 'TYPED_CONFIRM', riskTier: 'HIGH',
         operationKey: request.idempotencyKey, preparationNonce: 'frozen-target',
@@ -43,6 +73,8 @@ beforeEach(() => {
       if (hold) return new Promise<Response>(resolve => { finish = () => resolve(response()); });
       return response();
     }
+    if (url.includes('/api/authorizations/pending/')) return json({ pendingId: 'owned-forget-pending',
+      operationId: 'core.forget-indexed-path', argsSummary: 'Exact target', gateBehavior: 'TYPED_CONFIRM' });
     if (url.endsWith('/api/authorizations/approve')) return json({ capsule: 'one-use',
       operationKey: requests[0]?.idempotencyKey, preparationNonce: 'frozen-target' });
     if (url.includes('/api/indexing/forgets/')) return json(receipt);
@@ -50,6 +82,7 @@ beforeEach(() => {
   }); vi.stubGlobal('fetch', fetchMock);
 });
 afterEach(async () => {
+  stopBridge(); authorizationHost.remove();
   finish?.(); document.body.replaceChildren(); await new Promise(resolve => setTimeout(resolve, 220));
   vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
@@ -113,7 +146,8 @@ it('WD55 unresolved withdrawal disables destructive Retry and names retry of wit
   button(el, 'Retry forget for').onActivate(); await pump(el); expect(requests).toHaveLength(0);
   expect(button(el, 'Retry withdrawal of forget for').disabled).toBe(false);
   await openDecision(el, 'Retry withdrawal of forget for');
-  expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/core.withdraw-forget/invoke');
+  expect(String(fetchMock.mock.calls.find(call => String(call[0]).includes('/api/operations/'))?.[0]))
+    .toContain('/core.withdraw-forget/invoke');
 });
 it('S56 explicit pagination and failed refresh cannot claim an empty successful observation', async () => {
   page = { items: [item()], complete: false, nextId: 23 }; const el = await mount();
@@ -138,4 +172,37 @@ it('WD55 late withdrawal preserves a new draft after leaving this Library placem
   el.activeTab = 'other'; await pump(el); el.excludesText = '*.log\nmy-new-draft'; finish!(); await pump(el);
   expect(el.excludesText).toBe('*.log\nmy-new-draft');
   expect(el.shadowRoot?.querySelector('[data-testid="forget-decision-result"]')?.textContent?.trim()).toBe('');
+});
+
+it.each(['Retry', 'Withdraw'])('F1 %s has one owned ceremony in both broadcast orders; Cancel preserves focus and state', async action => {
+  const el = await mount();
+  for (const first of [true, false]) {
+    broadcastFirst = first;
+    const invoker = button(el, `${action} forget for`); await invoker.updateComplete;
+    invoker.focus();
+    expect((invoker.shadowRoot!.querySelector('jf-control') as Mounted).shadowRoot!.activeElement).not.toBeNull();
+    const dialog = await openDecision(el, `${action} forget for`);
+    if (!first) { emitPending(`core.${action.toLowerCase()}-forget`); await pump(el); }
+    await authorizationHost.updateComplete;
+    expect(authorizationHost.shadowRoot!.querySelector('dialog')?.open).toBe(false);
+    expect(document.querySelectorAll('jf-confirm-dialog[open]')).toHaveLength(1);
+    expect(dialog.shadowRoot!.textContent).toContain(JSON.stringify(exact));
+    await press(dialog, false); await pump(el);
+    expect(effects).toBe(0);
+    expect((invoker.shadowRoot!.querySelector('jf-control') as Mounted).shadowRoot!.activeElement).not.toBeNull();
+    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith('/api/authorizations/approve'))).toBe(false);
+    expect(section(el)?.textContent).toContain('Decision cancelled before approval.');
+    await new Promise(resolve => setTimeout(resolve, 220));
+  }
+});
+
+it('F1 Library Cancel returns focus to its enabled originating control without a broadcast', async () => {
+  const el = await mount();
+  const invoker = button(el, 'Retry forget for'); await invoker.updateComplete; invoker.focus();
+  const dialog = await openDecision(el, 'Retry forget for');
+  await press(dialog, false); await pump(el);
+  expect(invoker.disabled).toBe(false);
+  expect((invoker.shadowRoot!.querySelector('jf-control') as Mounted).shadowRoot!.activeElement).not.toBeNull();
+  expect(effects).toBe(0);
+  expect(section(el)?.textContent).toContain('This decision changed nothing.');
 });

@@ -19,6 +19,7 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { describeExactPath, type ExactPathExclusion } from '../../api/exclusionPolicy.js';
 import { decideForget, forgetObservationText, parseForgetPage, publishForgetCompletion } from '../../api/domains/forget.js';
+import { deepActiveElement } from '../utils/keyboardHandler.js';
 import type { ForgetPage, ForgetOutcome } from '../../api/generated/schema-types/index.js';
 import { confirmForget } from '../components/searchResults/forgetConsent.js';
 import { JfElement } from '../primitives/JfElement.js';
@@ -848,6 +849,11 @@ export class LibrarySurface extends JfElement {
     const current = () => this.isConnected && this.apiBase === base && this.activeTab === 'folders'
       && this.forgetPlacement === placement;
     const consent = new AbortController();
+    const focused = deepActiveElement();
+    // jf-control replaces its disabled native button. Retain the enclosing jf-button, whose
+    // focus() delegates to the current native control once the decision controls are enabled.
+    const invoker = focused instanceof HTMLElement
+      ? ((focused.getRootNode() as ShadowRoot).host?.getRootNode() as ShadowRoot)?.host : null;
     this.forgetConsent = consent;
     this.forgetDecisionKey = key;
     this.forgetMessage = 'Preparing the exact saved target…';
@@ -859,8 +865,14 @@ export class LibrarySurface extends JfElement {
       // the departed Library, and carries the exact API owner captured before the request.
       if (decision === 'retry' && outcome !== null) publishForgetCompletion(this, base, outcome, completionOwner);
       if (!current()) return;
-      this.forgetMessage = outcome === null ? 'Decision cancelled before approval.'
+      this.forgetMessage = outcome === null ? 'Decision cancelled before approval. This decision changed nothing.'
         : `${describeExactPath(item.path)}: ${forgetObservationText(outcome)}`;
+      if (outcome === null) {
+        this.forgetDecisionKey = null;
+        await this.updateComplete;
+        await (invoker as HTMLElement & { updateComplete?: Promise<unknown> } | null)?.updateComplete;
+        if (invoker instanceof HTMLElement && invoker.isConnected) invoker.focus();
+      }
       if (outcome !== null) {
         await this.loadUnfinishedForgets(this.forgetAfterId);
         if (outcome.status === 'WITHDRAWN' && !this.excludesDirty) void this.loadExcludes();

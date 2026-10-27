@@ -598,7 +598,7 @@ export class ResultsCard extends JfElement {
                 @click=${(e: MouseEvent) => {
                   e.stopPropagation();
                   const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  void this.openResultMenu(hit, { x: r.left, y: r.bottom });
+                  void this.openResultMenu(hit, { x: r.left, y: r.bottom }, e.currentTarget as HTMLElement);
                 }}
               >⋯</button>`
             : nothing}

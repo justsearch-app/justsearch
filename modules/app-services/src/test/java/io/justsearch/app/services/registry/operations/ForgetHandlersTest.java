@@ -35,6 +35,7 @@ final class ForgetHandlersTest {
   private final AtomicInteger effects = new AtomicInteger();
   private String savedPath;
   private String decidedKey;
+  private String preparationRefusal;
 
   private EngineContext context(EngineContext.ClientKind kind) {
     return EngineProvenance.context(kind, "forget-handler-test", Optional.empty(), Optional.empty(),
@@ -47,6 +48,7 @@ final class ForgetHandlersTest {
       return switch (method.getName()) {
         case "prepare" -> {
           prepares.incrementAndGet();
+          if (preparationRefusal != null) throw new IllegalArgumentException(preparationRefusal);
           String path = (String) args[0]; String scope = args[1].toString();
           var plan = new LinkedHashMap<String, Object>();
           plan.put("version", 1); plan.put("path", path); plan.put("scope", scope);
@@ -86,6 +88,21 @@ final class ForgetHandlersTest {
       @Override public String key() { return KEY; }
       @Override public void checkpoint(String cursor, long completed, long failed) { fail("preparation tests perform no checkpoints"); }
     };
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {
+      "A watched folder or a folder containing one cannot be forgotten. Remove the folder in Library instead.",
+      "Help and agent-history content is managed by its own data controls"})
+  void preparationRefusalPreservesTheTrustedSpecificReason(String reason) {
+    preparationRefusal = reason;
+    var handler = handler(null);
+    var refusal = assertThrows(OperationPreparationRefused.class, () -> prepare(handler,
+        JSON.writeValueAsString(Map.of("path", directory.resolve("protected").toString(), "scope", "FOLDER")),
+        context(EngineContext.ClientKind.WEBVIEW)));
+    assertEquals(reason, refusal.refusal().message());
+    assertEquals("FORGET_PREPARATION_REFUSED", refusal.refusal().errorCode().orElseThrow());
+    assertEquals(0, effects.get());
   }
 
   @Test void S56ExactConsentFreezesEveryByteAndStatesOutsideFileException() {

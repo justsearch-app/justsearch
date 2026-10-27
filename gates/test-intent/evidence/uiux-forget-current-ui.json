@@ -2,13 +2,13 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
-    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
-    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
   },
-  "createdAt": "2026-10-27T15:34:49.404Z",
-  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
-  "tree": "6bfe7661b8393d2272ff8b4be6d4f1384fe62961",
+  "createdAt": "2026-10-27T19:06:02.975Z",
+  "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+  "tree": "9c9d94a65a6f09d33b0cfdbfc15aacbe7af91bb7",
   "environment": {
     "cudaVisibleDevices": "-1",
     "displayUnset": true,
@@ -23,12 +23,12 @@
   },
   "runs": [
     {
-      "command": "npx vitest run --configLoader runner \"src/api/domains/forget.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/ConfirmDialog.forget-abort.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-5249-1793115284572.json\"",
+      "command": "npx vitest run --configLoader runner \"src/api/domains/forget.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/ConfirmDialog.forget-abort.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/p76fs5wh/tmp/test-intent-vitest-182-1793127956256.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4831,
-      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-ui-refresh-8fa81c30/run-1.log",
-      "outputDigest": "sha256:d4ec70830a0d7cd6af7f6942f066f07de2ac198b269758693700b60e1c275eed"
+      "durationMs": 6717,
+      "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/uiux-forget-current-ui-complete/run-1.log",
+      "outputDigest": "sha256:670d384ff3037f568bb24c84ed98ade78a8f68b49cd6c4a9b2cd5297394cf391"
     }
   ],
   "checks": [
@@ -192,7 +192,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9290ef6a86b86f81b47b89737b4bc07fd47e336feda44d238ae56461ad2d45ce",
+      "contentDigest": "sha256:f1f8a6a0e46342ab5f4ecb4b38f8b52ad938cd51dbbb43921b176a6f0e902a64",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -227,6 +227,18 @@
         },
         {
           "name": "WD55 late withdrawal preserves a new draft after leaving this Library placement",
+          "status": "passed"
+        },
+        {
+          "name": "F1 Retry has one owned ceremony in both broadcast orders; Cancel preserves focus and state",
+          "status": "passed"
+        },
+        {
+          "name": "F1 Withdraw has one owned ceremony in both broadcast orders; Cancel preserves focus and state",
+          "status": "passed"
+        },
+        {
+          "name": "F1 Library Cancel returns focus to its enabled originating control without a broadcast",
           "status": "passed"
         }
       ]
@@ -310,7 +322,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87a8b564191f6ac063771f9bf04dff1a3a274a84d53ddcd91b986d34b3164fc6",
+      "contentDigest": "sha256:5f623191bc5c6b06aaf17a0a45e82e86123db0258516ff689091585952b316b6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -349,6 +361,26 @@
         },
         {
           "name": "S56 a host without the owner keeps forget unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "F1 a broadcast before the 428=true leaves one ceremony; Escape changes nothing and returns focus",
+          "status": "passed"
+        },
+        {
+          "name": "F1 a broadcast before the 428=false leaves one ceremony; Escape changes nothing and returns focus",
+          "status": "passed"
+        },
+        {
+          "name": "F3 refused preparation displays the specific Library pointer with no dialog or raw arguments",
+          "status": "passed"
+        },
+        {
+          "name": "F4 an already absent completed target is described without claiming a removal",
+          "status": "passed"
+        },
+        {
+          "name": "F1 cancellation restores a keyboard-focusable row before returning focus, without a broadcast",
           "status": "passed"
         }
       ]
@@ -477,5 +509,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:d42fa55e7a105e351b7d0dcf4c037c5ab727ca24c531f16e934e3369f1de32a2"
+  "digest": "sha256:5452d1a2addc98b46945c44b25bd2c9b29eb84b9ee8f3b82750879f73fa273ef"
 }

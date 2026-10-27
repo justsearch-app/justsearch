@@ -465,7 +465,10 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       var entries = new java.util.ArrayList<>(candidate.getExcludePatterns());
       if (withdrawing) entries.remove(plan.keepOut());
-      else entries.add(plan.keepOut());
+      else {
+        entries.removeIf(entry -> sameForgetTarget(entry, plan));
+        entries.add(plan.keepOut());
+      }
       io.justsearch.configuration.excludes.ExclusionPatterns.validateCapacity(entries);
       candidate.setExcludePatterns(entries);
       var successor = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
@@ -499,10 +502,20 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       if (plan.keepOutRequired()) {
         var entries = new java.util.ArrayList<>(snapshot.settings().getExcludePatterns());
+        entries.removeIf(entry -> sameForgetTarget(entry, plan));
         entries.add(plan.keepOut());
         io.justsearch.configuration.excludes.ExclusionPatterns.validateCapacity(entries);
       }
     } finally { mutex.unlock(); }
+  }
+
+  private static boolean sameForgetTarget(Object entry, io.justsearch.app.api.operations.ForgetPlan plan) {
+    if (entry instanceof String) return false;
+    var literal = io.justsearch.configuration.excludes.LiteralExclusion.fromEntry(entry);
+    boolean windows = io.justsearch.configuration.PlatformPaths.isWindows();
+    return literal.literal().scope() == plan.scope()
+        && literal.matches(Path.of(plan.path()), windows)
+        && plan.keepOut().matches(Path.of(literal.literal().path()), windows);
   }
 
   @Override public ForgetPolicy forgetPolicy(OperationRecord row, OperationStore.Preparation accepted) {

@@ -1,0 +1,187 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T19:05:49.889Z",
+  "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+  "tree": "fd912abd681ae678c5c257bf7ee4917695603291",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run --configLoader runner \"src/shell-v0/views/LibrarySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forget.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/p76fs5wh/tmp/test-intent-vitest-4-1793127935847.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7405,
+      "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/uiux-forget-round6-ui-complete/run-2.log",
+      "outputDigest": "sha256:887a821e8795c3d8bb52ae724c1403a95f327326bc03579359f97bbd4c9cb3ba"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f1f8a6a0e46342ab5f4ecb4b38f8b52ad938cd51dbbb43921b176a6f0e902a64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56 recovery remains available without the original result and remount never retries",
+          "status": "passed"
+        },
+        {
+          "name": "S56 Retry freezes exact saved target and sends only original key",
+          "status": "passed"
+        },
+        {
+          "name": "S56 Withdraw freezes exact saved target and sends only original key",
+          "status": "passed"
+        },
+        {
+          "name": "N56 cancellation and Library departure abort consent before approval or effects",
+          "status": "passed"
+        },
+        {
+          "name": "WD55 unresolved withdrawal disables destructive Retry and names retry of withdrawal",
+          "status": "passed"
+        },
+        {
+          "name": "S56 explicit pagination and failed refresh cannot claim an empty successful observation",
+          "status": "passed"
+        },
+        {
+          "name": "N56 unknown targets disable decisions and unsupported hosts hide recovery controls",
+          "status": "passed"
+        },
+        {
+          "name": "WD55 late withdrawal preserves a new draft after leaving this Library placement",
+          "status": "passed"
+        },
+        {
+          "name": "F1 Retry has one owned ceremony in both broadcast orders; Cancel preserves focus and state",
+          "status": "passed"
+        },
+        {
+          "name": "F1 Withdraw has one owned ceremony in both broadcast orders; Cancel preserves focus and state",
+          "status": "passed"
+        },
+        {
+          "name": "F1 Library Cancel returns focus to its enabled originating control without a broadcast",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f623191bc5c6b06aaf17a0a45e82e86123db0258516ff689091585952b316b6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56 confirmed success refreshes real current search counts, selection, pending Ask and the matching pane",
+          "status": "passed"
+        },
+        {
+          "name": "N56 cancellation and repeated activation create no second request or destructive effect",
+          "status": "passed"
+        },
+        {
+          "name": "S56 REFUSED never removes rows, selection, Ask scope or pane optimistically",
+          "status": "passed"
+        },
+        {
+          "name": "S56 INCOMPLETE never removes rows, selection, Ask scope or pane optimistically",
+          "status": "passed"
+        },
+        {
+          "name": "S56 UNKNOWN never removes rows, selection, Ask scope or pane optimistically",
+          "status": "passed"
+        },
+        {
+          "name": "S56 leaving a screen while consent is open aborts that dialog and a stale confirm cannot execute",
+          "status": "passed"
+        },
+        {
+          "name": "S56 a late completed response cannot close another conversation pane or rewrite its new draft",
+          "status": "passed"
+        },
+        {
+          "name": "S56 remounting during an accepted forget does not replay the destructive operation",
+          "status": "passed"
+        },
+        {
+          "name": "S56 a host without the owner keeps forget unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "F1 a broadcast before the 428=true leaves one ceremony; Escape changes nothing and returns focus",
+          "status": "passed"
+        },
+        {
+          "name": "F1 a broadcast before the 428=false leaves one ceremony; Escape changes nothing and returns focus",
+          "status": "passed"
+        },
+        {
+          "name": "F3 refused preparation displays the specific Library pointer with no dialog or raw arguments",
+          "status": "passed"
+        },
+        {
+          "name": "F4 an already absent completed target is described without claiming a removal",
+          "status": "passed"
+        },
+        {
+          "name": "F1 cancellation restores a keyboard-focusable row before returning focus, without a broadcast",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+    "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run --configLoader runner \"src/shell-v0/views/LibrarySurface.forget.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forget.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/p76fs5wh/tmp/test-intent-vitest-4-1793127943269.json\"",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 6613,
+        "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/uiux-forget-round6-ui-complete/run-1.log",
+        "outputDigest": "sha256:ba71e6df168c0c848fa1e340bdd62863e3f9a20d520bb538e169883ed17ebd11"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts",
+        "classification": "assertion",
+        "detail": "F1 Retry has one owned ceremony in both broadcast orders; Cancel preserves focus and state:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/p76fs5wh/tmp/before/modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts:187:73\n    at file:///home/elias/.cache/am/p76fs5wh/tmp/before/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifa | F1 Withdraw has one owned ceremony in both broadcast orders; Cancel preserves focus and state:  Assertio"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
+        "classification": "assertion",
+        "detail": "F1 a broadcast before the 428=true leaves one ceremony; Escape changes nothing and returns focus:  AssertionError: the shared host must not present the pending owned by Forget: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/p76fs5wh/tmp/before/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts:261:135\n    at file:///home/elias/.cache/am/p76fs5wh/ | F1 a broadcast before the 428=false leaves one ceremony; Escape changes nothing and returns focus:"
+      }
+    ]
+  },
+  "digest": "sha256:f98bc9a26e81c31f3302affea5a611a33f3e0929644dcd83c39175240a22eee4"
+}

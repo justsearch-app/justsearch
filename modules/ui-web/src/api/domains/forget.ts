@@ -133,7 +133,7 @@ async function invoke(base: string, operationId: string, args: Record<string, un
 }
 
 export function forgetObservationText(outcome: ForgetOutcome): string {
-  const removal = outcome.removal === 'CONFIRMED' ? 'Removal confirmed.'
+  const removal = outcome.removal === 'CONFIRMED' ? 'The target is no longer in the search index.'
     : outcome.removal === 'UNKNOWN' ? 'Removal outcome unknown.' : 'Removal not confirmed.';
   const keepOut = { INSTALLED: 'Exact keep-out installed.', NOT_REQUIRED: 'No permanent keep-out applies.',
     NOT_INSTALLED: 'Keep-out not installed.', RELEASED: 'This keep-out was released.', UNKNOWN: 'Keep-out outcome unknown.' }[outcome.keepOut];
