@@ -1240,14 +1240,13 @@ public final class CombinedEnrichmentBackfillOps {
       }
       writeMs = (System.nanoTime() - tWrite) / 1_000_000;
 
-      // Commit every 5 batches (334 Phase 10). Lucene 10.4 fixed the MMapDirectory
+      // Commit every 5 writing batches (334 Phase 10). Lucene 10.4 fixed the MMapDirectory
       // .si arena leak (issue #15068): confined arenas are closed immediately. This
       // should prevent the 24GB native memory growth that killed deferred commits in
       // Phase 8 (tested on Lucene 9.x). If OOM recurs, revert to per-batch commits.
       // NRT refresh is suspended during the tight loop (managed by caller) to prevent
       // mmap accumulation from ControlledRealTimeReopenThread reader snapshots.
-      context.batchesSinceCommit()[0]++;
-      if (written > 0 && context.batchesSinceCommit()[0] >= 5) {
+      if (written > 0 && ++context.batchesSinceCommit()[0] >= 5) {
         context
             .commitOps()
             .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_COMBINED);
