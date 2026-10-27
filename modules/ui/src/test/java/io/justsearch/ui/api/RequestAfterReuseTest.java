@@ -109,8 +109,8 @@ final class RequestAfterReuseTest {
         send(socket, app, "/api/test/new");
         assertTrue(handlerB.await(5, TimeUnit.SECONDS));
         assertNotSame(requestA.get(), requestB.get(), "each Context has its own Javalin request wrapper");
-        var baseA = org.eclipse.jetty.server.Request.getBaseRequest(requestA.get());
-        var baseB = org.eclipse.jetty.server.Request.getBaseRequest(requestB.get());
+        var baseA = Request.getBaseRequest(requestA.get());
+        var baseB = Request.getBaseRequest(requestB.get());
         assertNotNull(baseA);
         assertNotNull(baseB);
         assertSame(physicalA.get(), baseA, "A's base was captured before recycling");
@@ -119,7 +119,8 @@ final class RequestAfterReuseTest {
         assertTrue(beforeOldLookup.await(5, TimeUnit.SECONDS));
         allowOldLookup.countDown();
         assertTrue(afterOldLookup.await(5, TimeUnit.SECONDS));
-        try (var retained = frontB.get().retain()) {
+        try (var retained = assertDoesNotThrow(() -> frontB.get().retain(),
+            "old after must leave the newer request's front reference usable")) {
           assertEquals(frontB.get().context().workId(), retained.context().workId(),
               "old Context cannot close B's own front reference even though the servlet request is reused");
         }

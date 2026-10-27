@@ -75,6 +75,9 @@ final class RequestAdmissionCompletionTest {
       assertEquals(1, baseline);
       assertEquals(200, fixture.ordinary().statusCode());
       await(() -> fixture.admission.activeWorkCount() == baseline, "ordinary request leaves the shared lane intact");
+      shared.close();
+      await(() -> fixture.admission.activeWorkCount() == baseline - 1,
+          "only the shared reservation's actual owner releases its remaining slot");
     }
   }
 

@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -42,6 +43,8 @@ final class RequestReleaseTransportTest {
     var leases = spy(OperationLeaseServiceImpl.processLocal());
     var releaseEntered = new CountDownLatch(1);
     var releaseGate = new CountDownLatch(1);
+    var heldTerminalReturned = new CountDownLatch(1);
+    var heldCallbackSawBlockedProjection = new AtomicBoolean();
     var secondTerminalReturned = new CountDownLatch(1);
     var releaseThread = new AtomicReference<Thread>();
     var attempts = new AtomicInteger();
@@ -63,26 +66,44 @@ final class RequestReleaseTransportTest {
     var client = HttpClient.newHttpClient();
     try (var events = Executors.newSingleThreadExecutor()) {
       new ApiSecurityFilters(false, null, new EventBuffer(), events, null, leases, admission).install(app);
-      app.events(eventsConfig -> eventsConfig.serverStarting(() -> app.jettyServer().server().addBeanToAllConnectors(
-          new HttpChannel.Listener() {
-            @Override public void onComplete(Request request) {
-              if ("/api/test/second-terminal".equals(request.getRequestURI())) secondTerminalReturned.countDown();
-            }
-          })));
       io.javalin.http.Handler failed = ctx -> ctx.future(() -> CompletableFuture.failedFuture(
           new IllegalStateException("controlled user-future failure")));
       app.post("/api/test/held-release", failed);
       app.get("/api/test/second-terminal", failed);
       app.get("/api/test/ordinary", ctx -> ctx.result("ordinary"));
       app.start("127.0.0.1", 0);
+      // Startup has installed the owner's connector listener. Append this listener afterwards,
+      // before any exchange, so the held request itself proves the owner's callback returned.
+      app.jettyServer().server().addBeanToAllConnectors(new HttpChannel.Listener() {
+        @Override public void onComplete(Request request) {
+          if ("/api/test/held-release".equals(request.getRequestURI())) {
+            // This test-owned downstream observer runs after the owner's callback returned.
+            // Attest entry into the held release, rather than racing the worker's startup.
+            try {
+              heldCallbackSawBlockedProjection.set(releaseEntered.await(5, TimeUnit.SECONDS)
+                  && releaseGate.getCount() == 1);
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+            } finally {
+              heldTerminalReturned.countDown();
+            }
+          }
+          if ("/api/test/second-terminal".equals(request.getRequestURI())) secondTerminalReturned.countDown();
+        }
+      });
       assertEquals(500, send(client, app, "/api/test/held-release", true).statusCode());
       assertTrue(releaseEntered.await(5, TimeUnit.SECONDS));
+      assertTrue(heldTerminalReturned.await(5, TimeUnit.SECONDS),
+          "listener after the owner's callback on the held exchange runs while projection remains blocked");
+      assertTrue(heldCallbackSawBlockedProjection.get(),
+          "the held exchange's listener observes actual projection entry before its gate opens");
+      assertEquals(1, releaseGate.getCount());
       assertEquals(1, admission.activeWorkCount());
       assertEquals("http-request-release", releaseThread.get().getName());
       assertFalse(releaseThread.get().isVirtual());
       assertTrue(releaseThread.get().isDaemon());
       assertEquals(500, send(client, app, "/api/test/second-terminal", false).statusCode());
-      assertTrue(secondTerminalReturned.await(5, TimeUnit.SECONDS), "actual listener after the owner's callback returned while projection remains blocked");
+      assertTrue(secondTerminalReturned.await(5, TimeUnit.SECONDS), "another exchange's terminal callback also progresses");
       assertEquals(1, releaseGate.getCount());
       assertEquals(200, send(client, app, "/api/test/ordinary", false).statusCode(), "another normal after can finish while projection is blocked");
       assertEquals(2, admission.activeWorkCount(), "both exceptional fronts stay owned until real release fanout");
@@ -156,7 +177,9 @@ final class RequestReleaseTransportTest {
       });
       app.post("/api/test/live-body", ctx -> {
         // Real body ownership is retained before blocking, independently of the front/stop future.
-        try (var producer = RequestEngineWork.get(ctx).retain()) {
+        var front = RequestEngineWork.get(ctx);
+        try (var producer = front.retain()) {
+          assertEquals(front.context().workId(), producer.context().workId());
           bodyEntered.countDown();
           awaitIgnoringInterrupts(bodyGate);
           ctx.result("body actually exited");
@@ -243,7 +266,9 @@ final class RequestReleaseTransportTest {
         }
       });
       app.post("/api/test/interrupted-stop", ctx -> {
-        try (var producer = RequestEngineWork.get(ctx).retain()) {
+        var front = RequestEngineWork.get(ctx);
+        try (var producer = front.retain()) {
+          assertEquals(front.context().workId(), producer.context().workId());
           bodyEntered.countDown();
           awaitIgnoringInterrupts(bodyGate);
           ctx.result("body actually exited");

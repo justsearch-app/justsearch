@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T02:56:01.488Z",
+  "revision": "8451af1da417c8d13521bbeeab59562970ae9473",
+  "tree": "f0cc2f0e79e3b9cf08f3585818c34d19e152205c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/apiProxyLifetime.test.js\" --reporter=json --outputFile=\"/home/elias/.cache/am/lm17zlr_/tmp/test-intent-vitest-4-1793069759417.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2069
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/apiProxyLifetime.test.js#dev: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+      "file": "modules/ui-web/src/apiProxyLifetime.test.js",
+      "runner": "vitest",
+      "contentDigest": "sha256:141de6cc053d494c6978774925169d55f54d22cc98bfda1b55e63d51d603bac5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "dev: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/apiProxyLifetime.test.js#preview: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+      "file": "modules/ui-web/src/apiProxyLifetime.test.js",
+      "runner": "vitest",
+      "contentDigest": "sha256:141de6cc053d494c6978774925169d55f54d22cc98bfda1b55e63d51d603bac5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preview: actual API proxy owns only the departed exchange finite JSON/POST, Host rewrite, well-known forwarding and Host refusal stay exact",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:bbdcee94c88543daa6cf7d7491d6e5510bd85fbe19ca2d844f796ccaa76127d0"
+}
