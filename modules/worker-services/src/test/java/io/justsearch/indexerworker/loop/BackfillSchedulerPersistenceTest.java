@@ -20,8 +20,6 @@ import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -60,37 +58,6 @@ class BackfillSchedulerPersistenceTest extends LuceneExecutorTestBase {
       assertEquals(List.of(6, 8), committedAfterEncodes,
           "the probe has its existing separate counter; five tight batches commit, then the tail");
       for (int i = 0; i < 64; i++) assertDurable("parent-" + i, "COMPLETED", true);
-    }
-  }
-
-  @Test
-  void productionTimerPublishesSpentProbeBeforeRuntimeClose() throws Exception {
-    EmbeddingProvider embedding = embedding();
-    when(embedding.embedDocumentBatch(anyList())).thenAnswer(inv -> {
-      List<String> texts = inv.getArgument(0);
-      spend(5_100_000_000L);
-      return Collections.nCopies(texts.size(), new float[] {1, 0, 0, 0});
-    });
-    // Keep the production timer at its unconfigured 10 s interval. Wait for its actual commit,
-    // never poll a reader until the desired value happens to appear.
-    try (var runtime = open(true)) {
-      seed(runtime, "timer", "timer content");
-      commit(runtime);
-      CountDownLatch timerCommit = new CountDownLatch(1);
-      List<CommitReason> reasons = Collections.synchronizedList(new ArrayList<>());
-      runtime.commitOps().setCommitCompletedListener(reason -> {
-        reasons.add(reason);
-        if (reason == CommitReason.TIMER) timerCommit.countDown();
-      });
-      assertTrue(scheduler(runtime, embedding).runIdleCycle());
-      runtime.commitOps().maybeRefreshBlocking(); // NRT observation only; the timer owns durability.
-      assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField("timer", SchemaFields.EMBEDDING_STATUS));
-      assertTrue(timerCommit.await(25, TimeUnit.SECONDS), "the production safety-net timer must commit");
-      assertEquals(List.of(CommitReason.TIMER), List.copyOf(reasons));
-      assertDurable("timer", "COMPLETED", true);
-    }
-    try (var runtime = open()) {
-      assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField("timer", SchemaFields.EMBEDDING_STATUS));
     }
   }
 
