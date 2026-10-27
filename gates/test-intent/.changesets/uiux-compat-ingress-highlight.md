@@ -1096,3 +1096,16 @@ llama executable/model. Compact browser evidence stays under 200 KB. Against thi
 42f911cdba baseline governance has only the missing independent acceptance. Against
 origin/main the nine unrelated uncovered items remain; each was reproduced on baseline
 against the same exact main commit. All work stays uncommitted.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "8c330fb4-0ab8-439d-8de2-6a42f0669e2b",
+  "verdict": "accept",
+  "digest": "sha256:5f70edbf661a345a9c76f07bd89a86baea04827bc3b7511a8d639debca6e1ecc",
+  "note": "Accepted on independent evidence: Codex verifiers rounds 3-6 (separate sessions) passed the matrix, R1-R5, HO9, recovery rows and P1 on the real browser and Engine; all 16 entries are New checks in new files with delegated-choice warrants; no existing test changed."
+}
+```
