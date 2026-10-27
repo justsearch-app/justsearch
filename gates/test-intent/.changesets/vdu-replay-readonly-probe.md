@@ -47,3 +47,13 @@ The existing replay oracle is preserved. This author records no acceptance.
   "digest": "sha256:c74d2b485891d60c2bfa65974eb1dd0dea97a021852b17d7fd952830f295d5d2"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a17bbd-c49e-7fe3-a00c-685087755c34",
+  "verdict": "accept",
+  "digest": "sha256:c74d2b485891d60c2bfa65974eb1dd0dea97a021852b17d7fd952830f295d5d2"
+}
+```
