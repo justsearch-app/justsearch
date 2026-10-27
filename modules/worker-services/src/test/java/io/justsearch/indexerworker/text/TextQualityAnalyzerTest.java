@@ -159,4 +159,119 @@ class TextQualityAnalyzerTest {
       assertEquals(10.0 / 12.0, ratio, 0.001);
     }
   }
+
+  @ParameterizedTest(name = "supplementaryLettersAndDecimalDigitsUseWholeCodePoints({index})")
+  @ValueSource(strings = {"\uD840\uDC00", "\uD801\uDC00", "\uD835\uDFCE"})
+  void supplementaryLettersAndDecimalDigitsUseWholeCodePoints(String value) {
+    // Explicit UTF-16 pairs: Han U+20000, Deseret U+10400, decimal digit U+1D7CE.
+    String text = value.repeat(100);
+    assertEquals(200, text.length());
+    assertAll(
+        () -> assertEquals(1.0, TextQualityAnalyzer.getAlphanumericRatio(text)),
+        () -> assertFalse(TextQualityAnalyzer.isGarbageText(text)),
+        () -> assertEquals(1.0, TextQualityAnalyzer.computeQualityScore(text)),
+        () -> assertEquals(1.0, TextQualityAnalyzer.computeQualityScore(text, 1)));
+    assertEquals(value.repeat(100), text, "scoring must preserve the input");
+  }
+
+  @ParameterizedTest(name = "mixedCodePointRatiosStraddleQualityBoundaries({index})")
+  @ValueSource(ints = {29, 30, 31, 49, 50, 51})
+  void mixedCodePointRatiosStraddleQualityBoundaries(int letters) {
+    String han = "\uD840\uDC00";
+    String emoji = "\uD83D\uDE00";
+    // 100 values each; spaces and symbol emoji get denominator credit only.
+    String text = "A" + han.repeat(letters - 1) + emoji.repeat(10) + " ".repeat(90 - letters);
+    double expectedRatio = letters / 100.0;
+    double expectedScore = letters < 30 ? 0.0 : Math.min(1.0, expectedRatio / 0.5);
+    assertEquals(expectedRatio, TextQualityAnalyzer.getAlphanumericRatio(text), 1e-12);
+    assertEquals(letters < 30, TextQualityAnalyzer.isGarbageText(text));
+    assertEquals(expectedScore, TextQualityAnalyzer.computeQualityScore(text), 1e-12);
+    assertEquals(expectedScore * 0.8, TextQualityAnalyzer.computeQualityScore(text, 1), 1e-12);
+  }
+
+  @Test
+  void symbolEmojiAndDigitKeycapCategoryRulesRemainStable() {
+    assertEquals(0.0, TextQualityAnalyzer.getAlphanumericRatio("\uD83D\uDE00".repeat(100)));
+    assertEquals(1.0 / 3.0, TextQualityAnalyzer.getAlphanumericRatio("1\uFE0F\u20E3"), 1e-12);
+  }
+
+  @Test
+  void validPairsBesideLoneSurrogatesRemainTotal() {
+    String validAndLone = "\uD840\uDC00\uD840!\uDC00";
+    assertEquals(1.0 / 4.0, TextQualityAnalyzer.getAlphanumericRatio(validAndLone), 1e-12);
+    String mixed = "A" + validAndLone;
+    assertEquals(2.0 / 5.0, TextQualityAnalyzer.getAlphanumericRatio(mixed), 1e-12);
+    assertEquals(2.0 / 5.0, TextQualityAnalyzer.getAlphanumericRatio(mixed.repeat(100)), 1e-12);
+  }
+
+  @Test
+  void reversedSurrogateRepetitionCanCreateAValidPairAtTheBoundary() {
+    String reversed = "\uDC00\uD840";
+    assertEquals(0.0, TextQualityAnalyzer.getAlphanumericRatio(reversed));
+    // low, high+low, high: the middle pair is one Han letter among three values.
+    assertEquals(1.0 / 3.0, TextQualityAnalyzer.getAlphanumericRatio(reversed.repeat(2)), 1e-12);
+  }
+
+  @Test
+  void isolatedReversedAndSeparatedSurrogatesRemainTotal() {
+    // Reversed, separated, high-only and low-only units never acquire letter credit.
+    for (String invalid : new String[] {"\uDC00\uD840", "\uD840!\uDC00", "\uD840", "\uDC00"}) {
+      assertEquals(0.0, TextQualityAnalyzer.getAlphanumericRatio((invalid + "!").repeat(100)));
+      assertEquals(0.0, TextQualityAnalyzer.computeQualityScore((invalid + "!").repeat(100)));
+      assertTrue(TextQualityAnalyzer.isGarbageText((invalid + "!").repeat(100)));
+    }
+  }
+
+  @Test
+  void supplementaryQualityRetainsUtf16LengthAndDensityFloors() {
+    String han = "\uD840\uDC00";
+    assertTrue(TextQualityAnalyzer.isGarbageText("A" + han.repeat(49))); // 99 UTF-16 units
+    assertEquals(0.0, TextQualityAnalyzer.computeQualityScore("A" + han.repeat(49)));
+    assertEquals(1.0, TextQualityAnalyzer.computeQualityScore(han.repeat(50)));
+    assertEquals(1.0, TextQualityAnalyzer.computeQualityScore("A".repeat(90) + han.repeat(5)));
+    assertEquals(0.6, TextQualityAnalyzer.computeQualityScore(han.repeat(98), 4), 1e-12);
+    assertEquals(0.8, TextQualityAnalyzer.computeQualityScore(han.repeat(100), 4), 1e-12);
+  }
+
+  @Test
+  void bmpLengthAndDensityNeighborsRemainUnchanged() {
+    assertEquals(0.0, TextQualityAnalyzer.computeQualityScore("a".repeat(99)));
+    assertEquals(1.0, TextQualityAnalyzer.computeQualityScore("a".repeat(100)));
+    // UTF-16 density neighbors: 49/50 and 199/200 units per page.
+    assertEquals(0.6, TextQualityAnalyzer.computeQualityScore("a".repeat(196), 4), 1e-12);
+    assertEquals(0.8, TextQualityAnalyzer.computeQualityScore("a".repeat(200), 4), 1e-12);
+    assertEquals(0.8, TextQualityAnalyzer.computeQualityScore("a".repeat(199), 1), 1e-12);
+    assertEquals(1.0, TextQualityAnalyzer.computeQualityScore("a".repeat(200), 1));
+  }
+
+  @Test
+  void existingCategoriesMarkersAndDecompositionRulesRemainStable() {
+    for (String text : new String[] {"é漢가９", "A1", "\u00A0", " ", "\u0301\u200D\uFE0F", "²Ⅷ①"}) {
+      double expected = switch (text) {
+        case "é漢가９", "A1" -> 1.0;
+        default -> 0.0;
+      };
+      assertEquals(expected, TextQualityAnalyzer.getAlphanumericRatio(text));
+    }
+    assertEquals(1.0, TextQualityAnalyzer.getAlphanumericRatio("é"));
+    assertEquals(0.5, TextQualityAnalyzer.getAlphanumericRatio("e\u0301"));
+    assertEquals(1.0, TextQualityAnalyzer.getAlphanumericRatio("\u1100\u1161"));
+    for (String marker : new String[] {"(cid:", "\uFFFD"}) {
+      String text = "A".repeat(100) + marker;
+      assertTrue(TextQualityAnalyzer.isGarbageText(text));
+      assertEquals(0.0, TextQualityAnalyzer.computeQualityScore(text));
+      assertEquals(0.0, TextQualityAnalyzer.computeQualityScore(text, 1));
+    }
+    assertEquals(0.0, TextQualityAnalyzer.computeQualityScore(null));
+    assertEquals(0.0, TextQualityAnalyzer.computeQualityScore(""));
+    assertEquals(0.0, TextQualityAnalyzer.computeQualityScore(" ".repeat(100), 1));
+  }
+
+  @Test
+  void longSupplementaryAndInvalidInputsStayFiniteAndBounded() {
+    String text = "\uD840\uDC00\uD840!\uDC00".repeat(200_000);
+    assertEquals(0.25, TextQualityAnalyzer.getAlphanumericRatio(text));
+    double score = TextQualityAnalyzer.computeQualityScore(text, 2);
+    assertTrue(Double.isFinite(score) && score >= 0.0 && score <= 1.0);
+  }
 }

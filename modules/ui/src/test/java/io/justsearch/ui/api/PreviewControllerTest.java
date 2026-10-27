@@ -20,6 +20,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("PreviewController Tests")
 class PreviewControllerTest {
@@ -400,14 +402,15 @@ class PreviewControllerTest {
 
   // ========== VDU Provenance Tests ==========
 
-  @Test
+  @ParameterizedTest
+  @ValueSource(strings = {"true", "1"})
   @DisplayName("VDU COMPLETED status returns textProvenance='vdu'")
-  void vduCompletedReturnsVduProvenance() throws Exception {
+  void vduCompletedReturnsVduProvenance(String storedBoolean) throws Exception {
     String docId = "D:\\docs\\scanned.pdf";
     Map<String, Object> metadata = Map.of(
         "mime", "application/pdf",
         "vdu_status", "COMPLETED",
-        "vdu_processed", "true",
+        "vdu_processed", storedBoolean,
         "vdu_page_count", "3"
     );
     DocumentService docService = stubDocumentsWithContentAndMetadata(docId, "VDU extracted text", metadata);

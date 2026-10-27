@@ -31,6 +31,48 @@ import org.junit.jupiter.api.Test;
  */
 class FieldMapperTest {
 
+  @Test
+  void realCatalogDoubleUsesStoredRawNumericDocValuesAndPoints() {
+    var mapper = new FieldMapper(new io.justsearch.configuration.JustSearchConfigurationLoader().loadFieldCatalog());
+    String quality = SchemaFields.EXTRACTION_QUALITY_SCORE;
+    for (Object value : List.of(0.1, 0.0, 1.0, "0.1", 1L, new java.math.BigDecimal("0.1"))) {
+      var doc = mapper.toDocument(Map.of(SchemaFields.DOC_ID, "valid", quality, value), null);
+      double expected = Double.parseDouble(value.toString());
+      assertTrue(doc.getFields().stream().anyMatch(f -> f.name().equals(quality)
+          && f.fieldType().stored() && f.numericValue() instanceof Double
+          && f.numericValue().doubleValue() == expected));
+      assertTrue(doc.getFields().stream().anyMatch(f -> f.name().equals(quality)
+          && f.fieldType().docValuesType() == DocValuesType.NUMERIC
+          && Double.longBitsToDouble(f.numericValue().longValue()) == expected));
+      assertTrue(doc.getFields().stream().anyMatch(f -> f.name().equals(quality)
+          && f.fieldType().pointDimensionCount() == 1));
+    }
+  }
+
+  @Test
+  void invalidDoubleIsOmittedWithoutLosingOtherFields() {
+    var mapper = new FieldMapper(new io.justsearch.configuration.JustSearchConfigurationLoader().loadFieldCatalog());
+    for (Object value : Arrays.asList(null, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY,
+        "NaN", "Infinity", "nonsense", true, List.of(0.1))) {
+      Map<String, Object> fields = new HashMap<>();
+      fields.put(SchemaFields.DOC_ID, "kept");
+      fields.put(SchemaFields.EXTRACTION_QUALITY_SCORE, value);
+      var doc = mapper.toDocument(fields, null);
+      assertEquals("kept", doc.get(SchemaFields.DOC_ID));
+      assertEquals(0, doc.getFields(SchemaFields.EXTRACTION_QUALITY_SCORE).length, String.valueOf(value));
+    }
+  }
+
+  @Test
+  void ingestionCanaryExercisesRealCatalogDouble() {
+    var mapper = new FieldMapper(new io.justsearch.configuration.JustSearchConfigurationLoader().loadFieldCatalog());
+    var doc = mapper.ingestionCanaryDocument();
+    assertTrue(doc.getFields().stream().anyMatch(f -> f.name().equals(SchemaFields.EXTRACTION_QUALITY_SCORE)
+        && f.fieldType().stored() && f.numericValue().doubleValue() == 0.1));
+    assertTrue(doc.getFields().stream().anyMatch(f -> f.name().equals(SchemaFields.EXTRACTION_QUALITY_SCORE)
+        && f.fieldType().docValuesType() == DocValuesType.NUMERIC));
+  }
+
   /**
    * Creates a comprehensive test catalog with all commonly used fields.
    *
@@ -388,6 +430,21 @@ class FieldMapperTest {
     String stored = doc.get("vdu_processed");
     assertTrue("1".equals(stored) || "true".equals(stored),
         "vdu_processed should be stored as truthy value");
+  }
+
+  @Test
+  void storedNumericBooleanStringsKeepBooleanMeaningWithoutChangingOtherInputs() {
+    var mapper = new FieldMapper(createVduTestCatalog());
+    for (var entry : Map.<Object, String>ofEntries(
+        Map.entry("1", "1"), Map.entry("0", "0"), Map.entry("true", "1"),
+        Map.entry("false", "0"), Map.entry(true, "1"), Map.entry(false, "0"),
+        Map.entry(7, "1"), Map.entry(0, "0"), Map.entry("2", "0")).entrySet()) {
+      var document = mapper.toDocument(Map.of(SchemaFields.DOC_ID, "bool",
+          SchemaFields.DOC_UID, "bool", SchemaFields.VDU_PROCESSED, entry.getKey()), null);
+      assertEquals(entry.getValue(), document.get(SchemaFields.VDU_PROCESSED), entry.getKey().toString());
+    }
+    assertNull(mapper.toDocument(Map.of(SchemaFields.DOC_ID, "absent",
+        SchemaFields.DOC_UID, "absent"), null).get(SchemaFields.VDU_PROCESSED));
   }
 
   @Test

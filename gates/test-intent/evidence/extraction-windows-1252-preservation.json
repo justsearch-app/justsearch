@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T12:07:54.995Z",
+  "revision": "a694565d5610c51b4d9ff624272f58074877ddf0",
+  "tree": "515d42b49025b2728727291f3a8d43693b30929d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.Windows1252QueuedRestartTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6089
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Windows1252QueuedRestartTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Windows1252QueuedRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ca129d788eecca624a912f7d545eedb6d45ed5b6ce74c07c179493663d0a278f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "enN3QueuedRestartKeepsLegacyProvenanceUntilForcedReextraction()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5b8b58cd40e3a3542182bf0c306cc0cd46c6bac6c8dc88a5082e5286ea737c23"
+}
