@@ -549,6 +549,13 @@ public final class WritePathOps {
       }
     }
 
+    for (FieldMapper.FieldDef def : session.fieldMapper.fieldDefs().values()) {
+      if ("double".equals(def.type) && def.docValues) {
+        Long bits = readNumericDocValue(searcher, globalDocId, def.id);
+        if (bits != null) fields.put(def.id, Double.longBitsToDouble(bits));
+      }
+    }
+
     for (var expected : expectedFields.entrySet()) {
       if (!java.util.Objects.equals(fields.get(expected.getKey()), expected.getValue())) {
         return false;

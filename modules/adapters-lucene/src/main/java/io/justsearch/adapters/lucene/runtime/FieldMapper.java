@@ -21,6 +21,8 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.DoubleDocValuesField;
+import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.document.FeatureField;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.KnnFloatVectorField;
@@ -189,6 +191,7 @@ public final class FieldMapper {
         case "text" -> "JustSearch ingestion canary";
         case "keyword" -> def.multiValued ? List.of("canary", "probe") : "canary";
         case "long" -> 1L;
+        case "double" -> 0.1;
         case "boolean" -> true;
         case "splade" -> Map.of("canary", 1.0f);
         case "vector" -> {
@@ -557,6 +560,17 @@ public final class FieldMapper {
           count++;
         }
       }
+      case "double" -> {
+        Double v = asDouble(value);
+        if (v != null) {
+          if (def.stored) doc.add(new StoredField(def.id, v));
+          if (def.docValues) doc.add(new DoubleDocValuesField(def.id, v));
+          if (def.roles != null && def.roles.contains("filter")) {
+            doc.add(new DoublePoint(def.id, v));
+          }
+          count++;
+        }
+      }
       case "boolean" -> {
         Boolean b = asBoolean(value);
         if (b != null && def.docValues) {
@@ -675,10 +689,22 @@ public final class FieldMapper {
     try { return Long.parseLong(String.valueOf(v)); } catch (Exception ignored) { return null; }
   }
 
+  static Double asDouble(Object v) {
+    if (v == null) return null;
+    try {
+      double value = v instanceof Number n ? n.doubleValue() : Double.parseDouble(String.valueOf(v));
+      return Double.isFinite(value) ? value : null;
+    } catch (NumberFormatException ignored) {
+      return null;
+    }
+  }
+
   private static Boolean asBoolean(Object v) {
     if (v instanceof Boolean b) return b;
     if (v instanceof Number n) return n.longValue() != 0L;
-    if (v != null) return Boolean.parseBoolean(String.valueOf(v).toLowerCase(Locale.ROOT));
+    // Stored numeric booleans are reconstructed as strings during read-modify-write.
+    if (v != null) return "1".equals(String.valueOf(v))
+        || Boolean.parseBoolean(String.valueOf(v).toLowerCase(Locale.ROOT));
     return null;
   }
 

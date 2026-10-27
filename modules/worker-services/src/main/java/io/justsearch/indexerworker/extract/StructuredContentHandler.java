@@ -23,6 +23,7 @@ public final class StructuredContentHandler extends DefaultHandler {
   private final int maxContentLength;
   private final List<Element> elements = new ArrayList<>();
   private int currentPageIndex = 0;
+  private boolean hasPageWrappers = false;
   private int totalChars = 0;
   private boolean limitReached = false;
 
@@ -97,10 +98,13 @@ public final class StructuredContentHandler extends DefaultHandler {
       }
       case "div" -> {
         String cssClass = atts.getValue("class");
-        if (cssClass != null && cssClass.contains("page")) {
+        if (cssClass != null && List.of(cssClass.split("\\s+")).contains("page")) {
           flushTextBuffer();
-          addElement(new PageBreak(currentPageIndex));
-          currentPageIndex++;
+          if (hasPageWrappers) {
+            currentPageIndex++;
+            addElement(new PageBreak(currentPageIndex));
+          }
+          hasPageWrappers = true;
         }
       }
       case "ol" -> {
@@ -252,7 +256,7 @@ public final class StructuredContentHandler extends DefaultHandler {
   public StructuredDocument getDocument() {
     // Final flush — always emit remaining text even if limit was reached mid-buffer
     flushTextBufferFinal();
-    int pages = currentPageIndex > 0 ? currentPageIndex + 1 : (hasPageBreaks() ? 1 : 0);
+    int pages = hasPageWrappers ? currentPageIndex + 1 : 0;
     return new StructuredDocument(List.copyOf(elements), pages);
   }
 
@@ -281,7 +285,4 @@ public final class StructuredContentHandler extends DefaultHandler {
     }
   }
 
-  private boolean hasPageBreaks() {
-    return elements.stream().anyMatch(e -> e instanceof PageBreak);
-  }
 }

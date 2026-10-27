@@ -3,7 +3,9 @@ package io.justsearch.indexerworker.services;
 
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
+import io.justsearch.indexerworker.loop.ops.IndexingDocumentOps;
 import io.justsearch.indexerworker.rag.ChunkDocumentWriter;
+import io.justsearch.indexerworker.text.TextQualityAnalyzer;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import io.justsearch.ipc.UpdateVduResultRequest;
@@ -61,11 +63,18 @@ public final class VduResultWriter {
       }
       default -> {
         if (!request.getVduStatus().isBlank()) updates.put(SchemaFields.VDU_STATUS, request.getVduStatus());
+        else if (replaceContent) updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_COMPLETED);
       }
     }
     if (replaceContent) {
       String preview = LanguageUtils.contentPreview(content, ChunkDocumentWriter.CONTENT_PREVIEW_MAX_CHARS);
       updates.put(SchemaFields.CONTENT, content);
+      updates.put(SchemaFields.PARENT_TOKEN_COUNT, IndexingDocumentOps.estimateTokenCount(content));
+      String reason = runtime.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.EXTRACTION_REASON_CODE);
+      if (IngestionReasonCodes.EXTRACTION_DROPOUT_PENDING_FALLBACK.equals(reason)) {
+        updates.put(SchemaFields.EXTRACTION_REASON_CODE, null);
+      }
+      updates.put(SchemaFields.EXTRACTION_QUALITY_SCORE, TextQualityAnalyzer.computeQualityScore(content));
       updates.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(content));
       updates.put(SchemaFields.CONTENT_PREVIEW, preview);
       updates.put(SchemaFields.LANGUAGE, LanguageUtils.resolveLanguage(preview));
@@ -82,7 +91,8 @@ public final class VduResultWriter {
     // parent state until all replacement chunks exist, so PROCESSING remains recoverable.
     if (replaceContent) {
       ChunkDocumentWriter.regenerateChunksFromExistingParent(
-          runtime.documentFieldOps(), runtime.indexingCoordinator(), docId, content, chunkSpladeEnabled);
+          runtime.documentFieldOps(), runtime.indexingCoordinator(), docId, content, chunkSpladeEnabled,
+          (Long) updates.get(SchemaFields.PARENT_TOKEN_COUNT));
     }
     return runtime.indexingCoordinator().updateDocumentIf(docId, expectedRevision, updates);
   }
