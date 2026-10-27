@@ -111,6 +111,66 @@ A first owned Vite preview on loopback port 34385 survived its launcher session'
 
 ## Test-intent classifications
 
+### Round 2: focus announces confirmed absence
+
+The repair at baseline `64af7c4a286d7b54e23c90e4fee673f51a2fef29` adds a conditional
+`aria-description="No longer available"` to the existing source button. Its
+accessible name, existing polite status, presence observation and batching stay
+unchanged. Present, unknown and observation-disabled sources receive no description.
+The original package evidence above remains historical; this round refreshes only
+the changed source-panel check.
+
+- Focused unit comparison: **12 passed / 1 assertion failure before; 13 passed
+  after**, no skips. The failure is the absent button's missing description.
+  [Before](../evidence/source-no-longer-held/accessibility-unit-before.json) and
+  [after](../evidence/source-no-longer-held/accessibility-unit-after.json) are raw
+  Vitest reports. The three new parameterized cases preserve the existing name
+  attributes and description for present/unknown, and require the description for
+  absence while keeping the same single polite status node.
+- [Headless Chromium runner](../evidence/source-no-longer-held/accessibility-browser.mjs)
+  loads the production Search v3 bundle from its own `vite preview`, mounts real
+  Ask and Delegate source disclosures with fixture turns, and stubs only the
+  document fixture and presence route. It checks Chromium's computed accessibility
+  tree and Playwright's button role lookup after tabbing onto each source.
+  [Before](../evidence/source-no-longer-held/accessibility-browser-before.json):
+  four preservation checks pass; both absent-source checks fail because name and
+  description omit the state. [After](../evidence/source-no-longer-held/accessibility-browser-after.json):
+  all six pass, with `No longer available` in both absent buttons' descriptions.
+  Each panel has one meaningful polite-status mutation, including after an
+  unrelated rerender. An initial probe compared unfocused and focused names;
+  the final comparison uses keyboard focus in both states because the existing
+  hover/focus preview contributes to the name. Audible screen-reader output is
+  unverified.
+- Typecheck and lint exit **0**. Whole unit suite: **655 files / 8,319 tests
+  passed**, exit **0**. Lockdown: **2 files passed / 1 failed; 17 tests passed /
+  1 failed**, exit **1**. The unchanged
+  `ConfirmDialog.viewport-lockdown.test.ts` test
+  `fits narrow viewports with a side gap in every theme (S53.7)` exceeded its
+  existing 5,000 ms timeout. No timeout or test was changed or retried.
+  [Validation output](../evidence/source-no-longer-held/accessibility-validation.txt)
+  retains all four commands' output and the producer's diagnostic.
+- The stock producer ran in a private shared clone, with
+  `--before 64af7c4a286d7b54e23c90e4fee673f51a2fef29 --copy-node-modules`.
+  [Generated evidence](../evidence/source-no-longer-held/ui-accessibility.json)
+  records all **13 candidate passes**, but its before run is **environment**, not
+  assertion: dereferencing the copied `.bin/vitest` launcher makes its relative
+  `dist/cli.js` import resolve under `.bin`, where it does not exist. The producer
+  exits **1**. This evidence does **not** satisfy the fail-before gate; the direct
+  shared-clone unit comparison above supplies the observed regression, but is not
+  substituted for valid stock-producer evidence. The builder returns these two
+  check blockers to the orchestrator instead of changing unrelated tooling/tests.
+
+`.agents/preflight` is absent. Both production builds pass. The new browser check
+used private loopback ports, fresh profiles and short `/tmp/jsv-*` TMPDIRs, with
+displays removed and `CUDA_VISIBLE_DEVICES=-1`. Its owned previews and browsers
+exited and their profiles were removed. The required lockdown suite inherited the
+assigned task TMPDIR and ran its existing browser fixture unchanged. No Engine,
+model, desktop or owner data was used. The whole suite's existing proxy checks
+also logged refused connections to localhost:3000; no service answered there.
+Dependency copies were private; source Git
+metadata was not written. The builder leaves the repair uncommitted for independent
+verification. No known-good revision for this repair was supplied.
+
 The scenarios are agent-adopted under the owner's delegation, not owner-agreed.
 The bounded Worker count, Head preview and Search v3 panel implement DL1/DL2 and
 S58.1–S58.8 without changing saved evidence. New isolated tests are exempt from
@@ -124,6 +184,28 @@ longer sufficient evidence that the index has no record.
 ```json
 {
   "entries": [
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A focused confirmed-absent source button exposes No longer available in its accessible description and keeps one polite status node. Present and unknown sources keep the existing name attributes and description. All prior availability assertions remain intact.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task WP5.8 request",
+          "delegationScope": "Area-5 designs and settled WP5.8 scenarios S58.1–S58.8, N58.1–N58.4 and decisions DL1/DL2 from /home/elias/dev/justsearch/tmp/verify/agreed/area5.md lines 316–378",
+          "choice": "S58.1 round-2 orchestrator repair: a screen-reader user focusing a confirmed-absent source button hears No longer available through its name or description, while its appearance remains politely announced once. Present and unknown sources keep their current name and description.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/source-no-longer-held/ui-accessibility.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability.test.ts"
+      ]
+    },
     {
       "items": [
         "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts"

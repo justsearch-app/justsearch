@@ -26,6 +26,25 @@ const cards = (el: CitationsPanel) => [...el.renderRoot.querySelectorAll('.sourc
 const response = (states: Record<string, string>) => new Response(JSON.stringify({ states }));
 afterEach(() => { document.body.replaceChildren(); vi.resetAllMocks(); });
 describe('WP5.8 source availability', () => {
+  it.each(['present', 'unknown', 'absent'])('includes only confirmed absence in the source button description (%s)', async (state) => {
+    let release!: (value: Response) => void;
+    fetchPresence.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    const el = await mount(['/docs/source.md']);
+    const button = cards(el)[0]!.querySelector('button.source')!;
+    const originalName = button.getAttribute('aria-label');
+    const originalDescription = button.getAttribute('aria-description');
+    const originalDescribedBy = button.getAttribute('aria-describedby');
+    const status = button.querySelector('[role="status"]')!;
+    release(response({ '/docs/source.md': state }));
+    await settle(el);
+    expect(button.getAttribute('aria-label')).toBe(originalName);
+    expect(button.getAttribute('aria-describedby')).toBe(originalDescribedBy);
+    expect(button.getAttribute('aria-description')).toBe(state === 'absent' ? 'No longer available' : originalDescription);
+    expect(button.querySelectorAll('[role="status"]')).toHaveLength(1);
+    expect(button.querySelector('[role="status"]')).toBe(status);
+    expect(status.getAttribute('aria-live')).toBe('polite');
+    expect(status.textContent?.trim()).toBe(state === 'absent' ? 'No longer available' : '');
+  });
   it('announces only confirmed absence without changing recorded evidence', async () => {
     fetchPresence.mockResolvedValue(response({ '/docs/held.md': 'present', '/docs/gone.md': 'absent' }));
     const el = await mount();

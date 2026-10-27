@@ -611,6 +611,7 @@ export class CitationsPanel extends JfElement {
           data-cite-key=${sourceKey(s.parentDocId, s.startLine)}
           ?data-selected=${selected}
           aria-current=${selected ? 'true' : nothing}
+          aria-description=${this.observeAvailability && this.unavailable.has(s.parentDocId) ? 'No longer available' : nothing}
           @click=${(e: MouseEvent) => this.onSourceClick(s, e)}
         >
           ${this.observeAvailability ? html`<span class="source-availability" role="status" aria-live="polite"
