@@ -191,6 +191,7 @@ final class Release030RetirementCrashTest {
   private static KnowledgeServer createServer(Path root, TestEngineExecutors executors) {
     var server = org.mockito.Mockito.spy(new KnowledgeServer(executors,
         WorkerBootFixture.workerConfig(root.resolve("data")), null));
+    shortenRecoveryWaits(server);
     org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
     server.bindBootRootBindings(List.of(
         new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/alpha"), null),

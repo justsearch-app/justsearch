@@ -26,7 +26,7 @@ final class Release030RootIntentTest {
   private SqliteJobQueue queue() throws Exception {
     Path db=temporary.resolve("jobs.db");
     try(var q=new SqliteJobQueue(db)){q.open();}
-    Release030RecoveryState.capture(db);
+    Release030RecoveryStateFixture.capture(db);
     Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     var q=new SqliteJobQueue(db);q.open();q.inventoryRetirementRoots();
     q.retainRelease030Retirement("building",List.of(),Map.of());return q;
@@ -99,7 +99,7 @@ final class Release030RootIntentTest {
   @Test void freshAutomaticCreatorCollectionIsFrozenWithoutBackfillingExistingRoot() throws Exception {
     Path db=temporary.resolve("automatic.db"),root=Files.createDirectories(temporary.resolve("root"));
     try(var q=new SqliteJobQueue(db)){q.open();}
-    Release030RecoveryState.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
+    Release030RecoveryStateFixture.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.journalRelease030Roots("building",List.of(root),ignored->"C");q.inventoryRetirementRoots();
       var receipt=q.retirementReplayOps().getFirst();assertEquals("C",q.retirementRootCollection(receipt));

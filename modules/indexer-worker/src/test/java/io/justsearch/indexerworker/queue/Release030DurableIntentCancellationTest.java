@@ -40,7 +40,7 @@ final class Release030DurableIntentCancellationTest {
   private SqliteJobQueue queue() throws Exception {
     Path db=temporary.resolve("jobs.db");
     try(var q=new SqliteJobQueue(db)){q.open();}
-    Release030RecoveryState.capture(db);
+    Release030RecoveryStateFixture.capture(db);
     Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     var q=new SqliteJobQueue(db);q.open();q.inventoryRetirementRoots();
     q.retainRelease030Retirement("building",List.of(),Map.of());return q;

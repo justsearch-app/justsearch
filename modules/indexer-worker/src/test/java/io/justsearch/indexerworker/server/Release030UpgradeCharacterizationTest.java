@@ -159,8 +159,18 @@ final class Release030UpgradeCharacterizationTest {
   }
 
   static KnowledgeServer boot(Path root, Path sources, TestEngineExecutors executors) throws Exception {
+    return boot(root, sources, executors, true);
+  }
+
+  static KnowledgeServer bootWithProductionRetryTimings(Path root, TestEngineExecutors executors) throws Exception {
+    return boot(root, root, executors, false);
+  }
+
+  private static KnowledgeServer boot(Path root, Path sources, TestEngineExecutors executors,
+      boolean shortenRetries) throws Exception {
     var server = org.mockito.Mockito.spy(new KnowledgeServer(executors,
         WorkerBootFixture.workerConfig(root.resolve("data")), null));
+    if (shortenRetries) shortenRecoveryWaits(server);
     org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
     server.bindBootRootBindings(java.util.List.of(
         new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(sources.resolve("roots/alpha"), null),
@@ -170,6 +180,14 @@ final class Release030UpgradeCharacterizationTest {
     server.bindExclusionRoots(() -> java.util.List.of(sources.resolve("roots/alpha"), sources.resolve("roots/beta")));
     try { server.start(); } catch (Exception | Error failure) { server.close(); throw failure; }
     return server;
+  }
+
+  /** Keep durable positive waits and real scheduler ownership, without waiting production minutes. */
+  static void shortenRecoveryWaits(KnowledgeServer server) {
+    org.mockito.Mockito.doAnswer(call -> {
+      long delay = call.getArgument(0);
+      return delay == 10_000L ? 100L : Math.max(2_500L, delay / 60);
+    }).when(server).recoveryRetryDelayMillis(org.mockito.ArgumentMatchers.anyLong());
   }
 
   static void activate(KnowledgeServer server) throws Exception {
@@ -232,7 +250,9 @@ final class Release030UpgradeCharacterizationTest {
             "justsearch.ai.disabled", "true",
             "justsearch.ai.embed.enabled", "false",
             "justsearch.splade.enabled", "false",
-            "justsearch.ner.enabled", "false"));
+            "justsearch.ner.enabled", "false",
+            // These recovery scenarios use real text extraction; sandbox containment has its own tests.
+            "justsearch.extraction.sandbox.mode", "IN_PROCESS"));
     return ConfigStore.global();
   }
 
@@ -248,6 +268,7 @@ final class Release030UpgradeCharacterizationTest {
       Path generation = root.resolve("data/index/default/indices").resolve(state.get("active_generation").asText());
       try (var directory = org.apache.lucene.store.FSDirectory.open(generation);
           var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+        installIdleDelay();
         var inputs = json.readTree(reader.getIndexCommit().getUserData().get("index_fingerprint_inputs"));
         install(io.justsearch.indexerworker.embed.EmbeddingFingerprint.class,
             inputs.get("embedding_model_sha256").asText(), root);
@@ -276,6 +297,18 @@ final class Release030UpgradeCharacterizationTest {
         close();
         throw failure;
       }
+    }
+
+    private void installIdleDelay() throws ReflectiveOperationException {
+      var field = io.justsearch.indexerworker.loop.ops.LoopPacingPolicy.class
+          .getDeclaredField("idleSleepMillis");
+      field.setAccessible(true);
+      long previous = field.getLong(null);
+      field.setLong(null, 100L);
+      restorers.add(() -> {
+        try { field.setLong(null, previous); }
+        catch (IllegalAccessException failure) { throw new IllegalStateException(failure); }
+      });
     }
 
     @SuppressWarnings("unchecked")

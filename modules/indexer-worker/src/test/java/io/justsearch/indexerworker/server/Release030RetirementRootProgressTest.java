@@ -31,7 +31,7 @@ final class Release030RetirementRootProgressTest {
     activate(server);
     assertEquals(1,server.appServices().ingestService().submitBatch(BatchRequest.newBuilder().addFilePaths(acknowledged.toString()).setRootAdded(true).build(),CallContext.none()).getAcceptedCount());
     try {
-     await(()->attempts.get()>=2&&q.jobStateCountsStrict().pendingReadyCount()==0&&q.jobStateCountsStrict().processingCount()==0,"ordinary queued work drains and two recovery attempts run",90);
+     await(()->attempts.get()>=2&&q.jobStateCountsStrict().pendingReadyCount()==0&&q.jobStateCountsStrict().processingCount()==0&&search(server,"unqueuedbetaviolet").contains(key(betaOnly)),"ordinary queued work drains, two recovery attempts run and independent Beta becomes searchable",90);
      assertTrue(search(server,"acknowledgedbetaviolet").contains(key(acknowledged)),"unrelated acknowledged mutation proceeds");
      assertEquals(original.building_generation(),state(root).previous_generation());
      assertTrue(search(server,"nebula").contains(key(changed)),"uncertain alpha retains old searchable content");

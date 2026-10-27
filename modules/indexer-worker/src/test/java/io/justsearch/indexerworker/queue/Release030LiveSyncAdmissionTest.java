@@ -75,7 +75,7 @@ final class Release030LiveSyncAdmissionTest {
           ? q.putSwitchBuffer("path:"+file,"UPSERT",file.toString())
           : q.putSwitchBufferForGeneration(originalGeneration,"path:"+file,"UPSERT",file.toString()));
     }
-    Release030RecoveryState.capture(db);
+    Release030RecoveryStateFixture.capture(db);
     Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     SwitchBufferCapableQueue.SwitchBufferOp raw;
     SwitchBufferUpsert frozen;
@@ -115,7 +115,7 @@ final class Release030LiveSyncAdmissionTest {
       q.open();q.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file)),"original");
       assertTrue(q.putSwitchBufferForGeneration("building","path:"+file,"UPSERT",file.toString()));
     }
-    Release030RecoveryState.capture(db);
+    Release030RecoveryStateFixture.capture(db);
     Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.inventoryRetirementRoots();q.retainRelease030Retirement("building",List.of(),Map.of());
@@ -142,7 +142,7 @@ final class Release030LiveSyncAdmissionTest {
       q.open();q.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file)),"original");
       assertTrue(q.putSwitchBufferForGeneration("building","path:"+file,"UPSERT",file.toString()));
     }
-    Release030RecoveryState.capture(db);
+    Release030RecoveryStateFixture.capture(db);
     Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.inventoryRetirementRoots();q.retainRelease030Retirement("building",List.of(),Map.of());

@@ -25,7 +25,7 @@ final class Release030RetirementClaimOwnershipTest {
     Path target=Files.writeString(alpha.resolve("target.txt"),"target"), healthy=Files.writeString(beta.resolve("healthy.txt"),"healthy");
     Path db=temporary.resolve("jobs.db");
     try(var q=new SqliteJobQueue(db)){q.open();}
-    Release030RecoveryState.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
+    Release030RecoveryStateFixture.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.inventoryRetirementRoots();q.retainRelease030Retirement("building",List.of(),Map.of());
       assertTrue(q.putSwitchBufferForGeneration("building","delete-alpha","DELETE_PREFIX",new PathPrefixScope(alpha.toString(),List.of()).encode()));
@@ -59,7 +59,7 @@ final class Release030RetirementClaimOwnershipTest {
     Path alpha=Files.createDirectories(temporary.resolve("alpha")),beta=Files.createDirectories(temporary.resolve("beta"));
     Path target=Files.writeString(alpha.resolve("target.txt"),"target"),healthy=Files.writeString(beta.resolve("healthy.txt"),"healthy");
     Path db=temporary.resolve("jobs.db");try(var q=new SqliteJobQueue(db)){q.open();}
-    Release030RecoveryState.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
+    Release030RecoveryStateFixture.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.inventoryRetirementRoots();q.retainRelease030Retirement("building",List.of(),Map.of());
       admitRoot(q,alpha,target);
@@ -84,7 +84,7 @@ final class Release030RetirementClaimOwnershipTest {
   void historicalScopesPreserveLaterPendingOwnersAcrossReopen(String scope,String owner) throws Exception {
     Path alpha=Files.createDirectories(temporary.resolve("alpha")),target=Files.writeString(alpha.resolve("target.txt"),"target");
     Path db=temporary.resolve("jobs.db");try(var q=new SqliteJobQueue(db)){q.open();}
-    Release030RecoveryState.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
+    Release030RecoveryStateFixture.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     Map<String,String> admitted;SwitchBufferCapableQueue.SwitchBufferOp deletion;
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.inventoryRetirementRoots();q.retainRelease030Retirement("building",List.of(),Map.of());
@@ -115,7 +115,7 @@ final class Release030RetirementClaimOwnershipTest {
     Path target=Files.writeString((kind.equals("outside")?beta:kind.equals("excluded")?nested:hidden).resolve("target.txt"),"target");
     Path healthy=Files.writeString(beta.resolve("healthy.txt"),"healthy"),db=temporary.resolve("jobs.db");
     try(var q=new SqliteJobQueue(db)){q.open();}
-    Release030RecoveryState.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
+    Release030RecoveryStateFixture.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.journalRelease030Roots("building",List.of(alpha,beta,nested));q.inventoryRetirementRoots();
       q.retainRelease030Retirement("building",List.of(),Map.of());
@@ -136,7 +136,7 @@ final class Release030RetirementClaimOwnershipTest {
   @Test void nonhistoricalDeleteCannotAcquireHistoricalQueueProof() throws Exception {
     Path alpha=Files.createDirectories(temporary.resolve("alpha")),target=Files.writeString(alpha.resolve("target.txt"),"target");
     Path db=temporary.resolve("jobs.db");try(var q=new SqliteJobQueue(db)){q.open();}
-    Release030RecoveryState.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
+    Release030RecoveryStateFixture.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.inventoryRetirementRoots();q.retainRelease030Retirement("building",List.of(),Map.of());
       assertTrue(q.putSwitchBufferForGeneration("building","delete-alpha","DELETE_PREFIX",new PathPrefixScope(alpha.toString(),List.of()).encode()));
@@ -151,7 +151,7 @@ final class Release030RetirementClaimOwnershipTest {
   void historicalReconciliationRetainsRecordedCoverageAndUnacknowledgedSeal(boolean sealed) throws Exception {
     Path alpha=Files.createDirectories(temporary.resolve("alpha")),target=Files.writeString(alpha.resolve("recorded.txt"),"recorded");
     Path db=temporary.resolve("jobs.db");try(var q=new SqliteJobQueue(db)){q.open();}
-    Release030RecoveryState.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
+    Release030RecoveryStateFixture.capture(db);Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     String key="01994180-0000-7000-8000-000000000033";
     try(var q=new SqliteJobQueue(db,ignored->JobQueue.RecordedClaimDecision.ALLOW)) {
       q.open();q.inventoryRetirementRoots();q.retainRelease030Retirement("building",List.of(),Map.of());

@@ -38,7 +38,7 @@ final class Release030RetirementSurvivorProgressTest {
      System.out.println("PENDING_EXACT_ACCEPTED_ORDER "+queue(server).listSwitchBufferOpsStrict());
     } finally {release.countDown();}
     try {
-     await(()->attempts.get()>=2&&queue(server).jobStateCountsStrict().pendingReadyCount()==0&&queue(server).jobStateCountsStrict().processingCount()==0,"two replay attempts and normal queued writer settlement",90);
+     await(()->attempts.get()>=2&&queue(server).jobStateCountsStrict().pendingReadyCount()==0&&queue(server).jobStateCountsStrict().processingCount()==0&&search(server,"progressbetaviolet").contains(key(betaOnly)),"two replay attempts, normal queued writer settlement and independent Beta search visibility",90);
      assertTrue(search(server,"independentackviolet").contains(key(ack)));assertTrue(search(server,"nebula").contains(key(beta.resolve("file-00.txt"))));
      assertEquals(original.building_generation(),state(root).previous_generation());
      assertTrue(search(server,"progressbetaviolet").contains(key(betaOnly)),"unrelated root-only Beta work must progress despite unavailable exact survivor under Alpha broad delete");

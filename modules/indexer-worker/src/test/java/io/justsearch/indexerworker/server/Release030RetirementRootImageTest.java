@@ -115,7 +115,7 @@ final class Release030RetirementRootImageTest {
   }finally{release.countDown();try{if(Files.exists(held))Files.move(held,alpha);}finally{ConfigStore.restoreGlobal(installed,previous);}}
  }
  static KnowledgeServer boot(Path root,TestEngineExecutors ex,boolean named,MigrationTransitionBarrier.Hook hook)throws Exception {
-  var server=org.mockito.Mockito.spy(new KnowledgeServer(ex,WorkerBootFixture.workerConfig(root.resolve("data")),null));org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
+  var server=org.mockito.Mockito.spy(new KnowledgeServer(ex,WorkerBootFixture.workerConfig(root.resolve("data")),null));shortenRecoveryWaits(server);org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
   server.bindBootRootBindings(List.of(new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/alpha"),named?"live-order-c":null),new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/beta"),null)));
   server.bindExclusionRoots(()->List.of(root.resolve("roots/alpha"),root.resolve("roots/beta")));server.installMigrationBarrierForTests(hook);try{server.start();}catch(Exception|Error failed){server.close();throw failed;}return server;
  }

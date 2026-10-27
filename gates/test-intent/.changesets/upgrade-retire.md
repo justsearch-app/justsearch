@@ -100,14 +100,14 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java#interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java#includedUnreadableFileKeepsDebtWithoutRepeatedWalksAcrossRestart"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
       "classificationRationale": "New, not mechanical Adaptation or Obsolete: the actual diff changes authentic native-fixture inputs to a genuine analyzer incompatibility. U6 supersedes the former assumption that a compatible interrupted release must migrate. The same native recovery/retention obligations and assertions are exercised under a true native precondition, before and after; compatible retirement has separate checks. No guarded obligation is removed.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
       ],
-      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution."
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -138,14 +138,14 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java#interruptedMigrationFixturesKeepTheirServingIndexAndJobs"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
       "classificationRationale": "New preservation oracle, not mechanical Adaptation or Obsolete: the diff removes whole-fingerprint equality and explicitly retains A generation, analyzer and all three model identities plus every legacy queue row. U6 and amendment 2 permit additive optional-field restamping, so the full serialized fingerprint was a stronger input assumption than the adopted compatibility proposition. The retained proposition is established before and after, rather than treating code output as a source.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
       ],
-      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution."
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "Adaptation",
@@ -230,14 +230,14 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#defaultSchedulerRecoversAcrossStartupAndRestart",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#cancellationDrainsOwnedCallbackAndSubmittedFailurePropagates"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
       "classificationRationale": "Agent choice under task t-20261020-c2e24a request: Split: the U6 authentic MIGRATING/SWITCHING boot, U13 backoff-only promotion, and DONE explicit-file outside roots exercise existing main behavior; keep repaired only for those checks. Crash cuts, ordering, uncertainty, completed-build reconciliation and shutdown are new retirement-path checks. Historical runs and their original revision bindings remain unchanged.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
       ],
-      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution."
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -341,14 +341,14 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java#nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
       ],
       "repaired": false,
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
       "classificationRationale": "New preservation coverage: all 12 invocations pass before and on frozen code. Negative certificates and budget protections are not labelled repairs. Corrupt A keeps native backup-first behavior; restarted over-budget cases follow actual base MIGRATING while first-boot FAILED, exact/unlimited limits, overrides and completion protections remain asserted. Corrupt-commit attribution now uses a separate fresh method-only before/current entry; historical duplicate display names are retained without asserting unique binding.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
       ],
-      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution."
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -388,7 +388,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkCrashTest.java#completedWalkSurvivesAnActualKillAndRestart",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootProgressTest.java#uncertainEarlierAlphaDoesNotStarveUnqueuedBetaOrAcknowledgedMutation"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
       "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: committed retirement certificates and retirement walk ordering/progress are introduced by this PR. Historical runs and their original revision bindings remain unchanged.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
@@ -397,7 +397,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java"
       ],
-      "evidenceScope": "Versioned R35 import retains original model before assertions, all prior WalkOrder results and invalid-marker WalkCrash failure. Adds the actual bbdd RootProgress pass. All bbdd after records are historical production relative to applied repairs; missing final whole-source before assertions remain unverified."
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -437,7 +437,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#newerDeleteUsingTheSameKeyCannotBorrowTheOldReceiptProof"
       ],
       "repaired": false,
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
       "classificationRationale": "New preservation coverage:13 exact-source invocations must pass before and after. No blanket null rejection, native comparator change, model assets/inference, retry shortening or timeout change. Receipt revisions are fresh opaque UUID versions; accepted_order supplies ordering. The same-key check uses real admissions and restarts, never fabricated identities.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
@@ -446,7 +446,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java"
       ],
-      "evidenceScope": "Current exact R1 working source and actual command/input manifests, with b84 unchanged-production controls plus identical new test overlay. Historical frozen81 invocations remain frozen; no acceptance inferred."
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -476,14 +476,14 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
       "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: retaining retirement debt/B for an unavailable root is a new retirement path. Historical runs and their original revision bindings remain unchanged.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
       ],
-      "evidenceScope": "Method-only8292/current refresh remains pending; existing historical frozen81 results and missing historical argv are retained unchanged. No independent acceptance is claimed."
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -514,14 +514,14 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
       ],
       "repaired": false,
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
       "classificationRationale": "The existing check source/assertions are unchanged. Unique method-only8292/current preservation runs are required and remain pending; duplicate historical display names are never assigned by status.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
       ],
-      "evidenceScope": "Method-only8292/current refresh remains pending; existing historical frozen81 results and missing historical argv are retained unchanged. No independent acceptance is claimed."
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -541,13 +541,13 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         }
       ],
       "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: retirement SQL ACK, cleanup continuation and ownership mechanics do not exist on main. Historical runs and their original revision bindings remain unchanged.",
-      "evidenceScope": "Focused author evidence only; final source-bound envelopes are the separately pending D4 assignment.",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementAckRecoveryTest.java#acknowledgedHeadResumes",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementAckRecoveryTest.java#committedBeforeAckResumes",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementContinuationTest.java#laterAdmissionsAfterEmptySqlAckKeepTheirOwnersAcrossRestart"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json"
     },
     {
       "class": "New",
@@ -567,11 +567,11 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       ],
       "repaired": false,
       "classificationRationale": "New running-system/queue/Lucene regression coverage. Existing assertions, faults, deadlines and policy checks are retained; no historical duplicate XML is assigned by status. R12 raw commands/source manifests distinguish initial/intermediate/final source and setup failures; final D4 envelopes and independent acceptance remain pending.",
-      "evidenceScope": "Focused author evidence only; final source-bound envelopes are the separately pending D4 assignment.",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java#acknowledgedImageSurvivesUncertaintyThenConverges"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json"
     },
     {
       "class": "New",
@@ -591,12 +591,12 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         }
       ],
       "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: retirement root-image and frozen prefix-successor mechanics do not exist on main. Historical runs and their original revision bindings remain unchanged.",
-      "evidenceScope": "Focused author evidence only; final source-bound envelopes are the separately pending D4 assignment.",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java#sameStampedPublicSyncTargetsOnlyChangedMember",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPrefixRestoreTest.java#restoredRawPrefixReusesTheExactFrozenSuccessor"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json"
     },
     {
       "class": "Adaptation",
@@ -640,8 +640,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java#missingOriginalQueueNamespaceStaysHeldAcrossChangedConfig"
       ],
       "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: raw-receipt namespace attribution and recovery are new retirement mechanics; the existing DONE outside-root repair is separately pinned by entry 6. Historical runs and their original revision bindings remain unchanged.",
-      "evidenceScope": "Actual corrected-fixtures-after XML: two passes, with PMD-only exit 1 and the raw sourceStable=false flag retained. The only archived-manifest mismatch is the changeset; later PublicSync/RootProgress file changes are disclosed. This proves the captured bbdd production, not the applied parent.",
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real.",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json"
     },
     {
       "class": "New",
@@ -666,8 +666,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
       ],
       "classificationRationale": "New fixture preconditions via real public interfaces, not a product oracle waiver. The original wrong-namespace raw observations remain preserved. Current corrected results and any primary callback contradiction are recorded in the R14 handback.",
-      "evidenceScope": "Focused author diagnostics; preservation against the integrated base and final D4 envelopes remain pending.",
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real.",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json"
     },
     {
       "class": "New",
@@ -692,7 +692,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSyncPolicyTest.java#liveSyncKeepsItsOrdinaryRetryPolicy",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSyncPolicyTest.java#legacyHashEntryStillReadsOnAnInterruptedThread"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -716,7 +717,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -740,7 +742,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#logicalDefaultOlderRootSurvivesLaterForceFalseCollectionAndChangedSource"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -763,7 +766,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#exactApprovedMalformedRootPreservesUnrelatedDelete"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -789,7 +793,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#unapprovedMalformedRootIsHeld",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#changedRevisionCannotReuseApproval"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-gap-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -812,7 +817,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPublicSyncTest.java#laterPublicSyncMaySupersedeAnEarlierExactAdmission"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -835,7 +841,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootMemberIdentityTest.java#inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -859,7 +866,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesBeneathPreservingRoot",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesWithSameMutableRetry"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -888,7 +896,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java#freshAutomaticCreatorCollectionIsFrozenWithoutBackfillingExistingRoot",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootIntentTest.java#orphanNamespaceSlotDoesNotAuthorizeAnUnretainedReceipt"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -917,7 +926,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java#rawCheckpointSaveFailureRollsBackSqlAndAllowsRetry",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030LiveSyncAdmissionTest.java#rawHashCancellationPreservesTheOriginalReceiptAndRetry"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -946,7 +956,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java#nonhistoricalDeleteCannotAcquireHistoricalQueueProof",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RetirementClaimOwnershipTest.java#historicalReconciliationRetainsRecordedCoverageAndUnacknowledgedSeal"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -970,7 +981,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementInheritedPolicyTest.java#nullRootPreservesExistingCollectionAndAttributionAcrossLateRegistration"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -994,7 +1006,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java#sameIntentResumesAfterRollbackWithActualMutableRetryPreserved",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java#laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -1016,7 +1029,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java#explicitCollectionRootRetainsInheritedAttributionDuringSourceCorrection"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -1047,7 +1061,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#originalCohortSurvivesCurrentDatabasePreparation",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#failedNativeMigrationRetainsCapturedCohortForRetry"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -1069,7 +1084,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#freshlyObservedUnprovenRowIsHeld"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r41.json"
+      "evidence": "gates/test-intent/evidence/upgrade-retire-after-r42.json",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real."
     },
     {
       "class": "New",
@@ -1128,15 +1144,35 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#alreadyDoneExplicitFileOnServingGenerationSurvivesResume"
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-retire-main-repairs-r39.json",
+      "evidence": "gates/test-intent/evidence/upgrade-retire-repaired-r42.json",
       "classificationRationale": "New repaired existing-main behavior: U6 authentic MIGRATING/SWITCHING boot, U13 backoff-only promotion, and already-DONE explicit file outside roots. Requires actual assertion failures against merge base 4f9df2c1f8b3c5c0377508c1b9ea8ae97d01d227; intermediate PR runs are history only.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
       ],
-      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution.",
+      "evidenceScope": "R42 canonical runner on HEAD 97309cf38 plus the uncommitted CI runtime repairs. Check bytes bind this candidate; every original assertion and parameter variant remains. Real application crash and restart processes remain real. Fail-before uses 4f9df2c1f8b3c5c0377508c1b9ea8ae97d01d227 with fixture overlays and an unused identity timing method and the identity-default scoped idle-delay seam solely for fixture compatibility; no repaired retirement behavior is added to the before tree.",
       "repaired": true
+    },
+    {
+      "class": "Adaptation",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RecoveryStateFixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RootRecoveryIsolationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UnavailableRootTest.java"
+      ],
+      "moved": [
+        "split",
+        "instrumentation"
+      ],
+      "whatMoved": "Move the test-only one-argument checkpoint capture wrapper into the queue test fixture with the same exception translation. Use the shared shorter positive recovery timers in the isolated-root boot fixture. The denied-single-file check explicitly keeps production retry timings, including its one-minute-plus-jitter assertion. Every assertion, fault, process restart, scope and deadline bound stays in place. With faster scheduling, both independent-root progress waits also require actual Beta search visibility before the unchanged assertions; the attempt count and 90-second bound remain. The timing fixture uses a 2500 ms positive minimum delay and a 100 ms maintenance cadence. ReleasedModelIdentities also scopes the indexing loop idle sleep to 100 ms and restores its exact prior value with the existing fixture restorers. Production retains its 1000 ms default. Actual threads, owned shutdown drains and every assertion remain.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Never weaken or remove an assertion.",
+          "location": "task PR951-CI request"
+        }
+      ]
     }
   ]
 }

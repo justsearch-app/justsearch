@@ -31,7 +31,7 @@ final class Release030RootMemberIdentityTest {
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.enqueueEntries(List.of(new JobQueue.EnqueueEntry(old,3,provenance,null,alpha)),"C",scan);
     }
-    Release030RecoveryState.capture(db);
+    Release030RecoveryStateFixture.capture(db);
     Release030RecoveryState.load(db).beginRetirement("active","building",Map.of());
     try(var q=new SqliteJobQueue(db)) {
       q.open();q.inventoryRetirementRoots();q.retainRelease030Retirement("building",List.of(),Map.of());

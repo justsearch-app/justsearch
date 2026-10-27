@@ -34,21 +34,22 @@ public final class Release030RecoveryState {
   private static final String CORRECTION = RETIRE + "correction|";
   private String openedSession;
   private String admissionSet;
+  private final long retryDelayMs;
   private final Path file;
   private final Properties state;
 
   private Release030RecoveryState(Path file, Properties state) {
+    this(file, state, 60_000L);
+  }
+
+  private Release030RecoveryState(Path file, Properties state, long retryDelayMs) {
+    this.retryDelayMs = retryDelayMs;
     this.file = file;
     this.state = state;
     String proof = state.getProperty(RETIRE + "queue-session");
     if (proof != null && proof.contains(":")) {
       int split = proof.lastIndexOf(':'); openedSession = proof.substring(0,split); admissionSet = proof.substring(split+1);
     }
-  }
-
-  static void capture(Path database) throws IOException {
-    try { capture(database,null); }
-    catch (java.sql.SQLException impossible) { throw new IOException(impossible); }
   }
 
   static void capture(Path database, java.sql.Connection connection) throws IOException, java.sql.SQLException {
@@ -90,6 +91,10 @@ public final class Release030RecoveryState {
   }
 
   public static Release030RecoveryState load(Path database) throws IOException {
+    return load(database, 60_000L);
+  }
+
+  static Release030RecoveryState load(Path database, long retryDelayMs) throws IOException {
     Properties state = new Properties();
     Path file = path(database);
     try (var input = Files.newInputStream(file)) {
@@ -105,7 +110,7 @@ public final class Release030RecoveryState {
       state.setProperty("format", "1");
       state.setProperty("uncertain", "true");
     }
-    var recovery = new Release030RecoveryState(file, state);
+    var recovery = new Release030RecoveryState(file, state, retryDelayMs);
     int invalidKeys = 0;
     for (String key : List.copyOf(state.stringPropertyNames())) {
       if (!key.startsWith(ROOT)) continue;
@@ -571,7 +576,7 @@ public final class Release030RecoveryState {
     for (Path root : roots) {
       String key = PathNormalizer.normalizeKey(root);
       state.setProperty(ROOT + key, "pending");
-      if (uncertain) state.setProperty("retry|" + key, Long.toString(System.currentTimeMillis() + 60_000L));
+      if (uncertain) state.setProperty("retry|" + key, Long.toString(System.currentTimeMillis() + retryDelayMs));
     }
     state.setProperty("prepared", "true");
     save();
@@ -591,7 +596,7 @@ public final class Release030RecoveryState {
 
   /** Failed evidence is durable debt, with a cooldown across ticks and process restarts. */
   public synchronized void deferred(Path root, long now) throws IOException {
-    state.setProperty("retry|" + PathNormalizer.normalizeKey(root), Long.toString(now + 60_000L));
+    state.setProperty("retry|" + PathNormalizer.normalizeKey(root), Long.toString(now + retryDelayMs));
     save();
   }
 
@@ -604,7 +609,7 @@ public final class Release030RecoveryState {
     }
     try {
       long deadline = Long.parseLong(state.getProperty("retry|" + key, "0"));
-      if (deadline < 0 || deadline > now + 60_000L) throw new NumberFormatException("Invalid cooldown");
+      if (deadline < 0 || deadline > now + retryDelayMs) throw new NumberFormatException("Invalid cooldown");
       return now >= deadline;
     } catch (NumberFormatException invalid) {
       // Bad evidence never authorizes this root's prune, nor starves another root. Replace the

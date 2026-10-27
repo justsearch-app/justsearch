@@ -114,7 +114,7 @@ final class Release030RetirementForceFalseTest {
   Files.writeString(saved.resolve("capture.txt"),"Non-atomic live copy. Source: "+root+" UTC: "+java.time.Instant.now());
  }
  private static KnowledgeServer boot(Path root,TestEngineExecutors ex,String collection,MigrationTransitionBarrier.Hook hook)throws Exception {
-  var server=org.mockito.Mockito.spy(new KnowledgeServer(ex,WorkerBootFixture.workerConfig(root.resolve("data")),null));org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
+  var server=org.mockito.Mockito.spy(new KnowledgeServer(ex,WorkerBootFixture.workerConfig(root.resolve("data")),null));shortenRecoveryWaits(server);org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
   server.bindBootRootBindings(List.of(new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/alpha"),null),new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/beta"),collection)));
   server.bindExclusionRoots(()->List.of(root.resolve("roots/alpha"),root.resolve("roots/beta")));server.installMigrationBarrierForTests(hook);try{server.start();}catch(Exception|Error failed){server.close();throw failed;}return server;
  }

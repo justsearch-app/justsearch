@@ -277,6 +277,7 @@ final class Release030ExactFileRecoveryTest {
   private static KnowledgeServer bootWithoutRoots(Path root, TestEngineExecutors executors) throws Exception {
     var server = org.mockito.Mockito.spy(new KnowledgeServer(executors,
         WorkerBootFixture.workerConfig(root.resolve("data")), null));
+    shortenRecoveryWaits(server);
     org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
     server.bindBootRootBindings(List.of());
     server.bindExclusionRoots(List::of);

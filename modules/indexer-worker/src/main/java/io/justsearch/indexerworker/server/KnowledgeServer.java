@@ -1255,7 +1255,7 @@ public final class KnowledgeServer implements Closeable {
       // with SqliteJobQueue.DEFAULT_MAX_ATTEMPTS only by coincidence.
       SqliteJobQueue sqliteQueue =
           new SqliteJobQueue(dbPath, recordedIngestionLifecycle::recordedClaimDecision,
-              SqliteJobQueue.DEFAULT_MAX_ATTEMPTS, onSwitchBufferWriteFailure);
+              SqliteJobQueue.DEFAULT_MAX_ATTEMPTS, onSwitchBufferWriteFailure, this::recoveryRetryDelayMillis);
       // Tempdoc 885 item 21e: per-outcome counters. Late-bound like the write-failure callback
       // above — the catalog does not exist until registerTelemetryGauges runs.
       sqliteQueue.setOutcomeObserver(
@@ -1903,7 +1903,7 @@ public final class KnowledgeServer implements Closeable {
       startStuckJobReaper(jobQueue);
       if (release030Recovery != null) {
         release030RecoveryTask = stuckJobReaper.scheduleWithFixedDelay(
-            this::recoverRelease030RootsSafely, 1_000L, 10_000L, TimeUnit.MILLISECONDS);
+            this::recoverRelease030RootsSafely, 1_000L, recoveryRetryDelayMillis(10_000L), TimeUnit.MILLISECONDS);
       }
 
 
@@ -2139,6 +2139,9 @@ public final class KnowledgeServer implements Closeable {
   boolean recordedWorkerOnline() {
     return appServices != null && searchLifecycle != null && ingestLifecycle != null;
   }
+
+  /** Timing seam: production keeps its exact retry ladder, cooldown and maintenance cadence. */
+  protected long recoveryRetryDelayMillis(long delayMs) { return delayMs; }
 
   /** Opens the server-owned periodic queue producer on its registered background scheduler. */
   void startStuckJobReaper(JobQueue reaperQueue) {

@@ -80,7 +80,7 @@ final class Release030RetirementTransitiveOrderTest {
   } finally {release.countDown();try {if(Files.exists(held)&&!Files.exists(alpha))Files.move(held,alpha);capture(root,null,"transitive-final",List.of(target));System.out.println("BETA_TOKEN_BEFORE_DELETE="+tokenBeforeDelete.get());}finally{ConfigStore.restoreGlobal(installed,previous);}}
  }
  static KnowledgeServer bootRoots(Path root,TestEngineExecutors ex,boolean named,MigrationTransitionBarrier.Hook hook)throws Exception {
-  var server=org.mockito.Mockito.spy(new KnowledgeServer(ex,WorkerBootFixture.workerConfig(root.resolve("data")),null));org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
+  var server=org.mockito.Mockito.spy(new KnowledgeServer(ex,WorkerBootFixture.workerConfig(root.resolve("data")),null));shortenRecoveryWaits(server);org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
   server.bindBootRootBindings(List.of(new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/alpha"),named?C:null),new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/beta"),named?C:null)));
   server.bindExclusionRoots(()->List.of(root.resolve("roots/alpha"),root.resolve("roots/beta")));server.installMigrationBarrierForTests(hook);try{server.start();}catch(Exception|Error f){server.close();throw f;}return server;
  }

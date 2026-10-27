@@ -542,6 +542,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private final java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy;
   private final SqliteQueueSwitchBufferOps switchBufferOps;
 
+  private final java.util.function.LongUnaryOperator retryDelay;
+
   /** Tempdoc 885 item 21e — enqueue/dequeue rates and lock-wait, RISK-002's instrument. */
   private final QueueThroughputMeters meters = new QueueThroughputMeters();
 
@@ -606,8 +608,22 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     this(dbPath, maxAttempts, onSwitchBufferWriteFailure, null, recordedClaimPolicy);
   }
 
+  /** Timing seam for integration fixtures; ordinary constructors preserve the production ladder. */
+  public SqliteJobQueue(Path dbPath, java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy,
+      int maxAttempts, Runnable onSwitchBufferWriteFailure, java.util.function.LongUnaryOperator retryDelay) {
+    this(dbPath, maxAttempts, onSwitchBufferWriteFailure, null, recordedClaimPolicy, retryDelay);
+  }
+
   private SqliteJobQueue(Path dbPath, int maxAttempts, Runnable onSwitchBufferWriteFailure,
       MigrationStepHook migrationStepHook, java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy) {
+    this(dbPath, maxAttempts, onSwitchBufferWriteFailure, migrationStepHook, recordedClaimPolicy,
+        java.util.function.LongUnaryOperator.identity());
+  }
+
+  private SqliteJobQueue(Path dbPath, int maxAttempts, Runnable onSwitchBufferWriteFailure,
+      MigrationStepHook migrationStepHook, java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy,
+      java.util.function.LongUnaryOperator retryDelay) {
+    this.retryDelay = Objects.requireNonNull(retryDelay, "retryDelay");
     this.dbPath = dbPath;
     this.maxAttempts = maxAttempts;
     this.migrationStepHook = migrationStepHook;
@@ -1034,7 +1050,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
       Release030RecoveryState.capture(dbPath, connection);
     }
-    var recovery = Release030RecoveryState.load(dbPath);
+    var recovery = Release030RecoveryState.load(dbPath, retryDelay.applyAsLong(60_000L));
     releaseRecovery = recovery;
     requiresRelease030Boundary = recovery != null && !recovery.preparedFor(release030RecoveryIdentity());
     release030ExplicitFilesPrepared = recovery == null;
@@ -4679,6 +4695,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                           ? IngestionRetryLadder.nextRetryAtMs(
                               firstFailedAt, newAttempts, now, jitter)
                           : now + backoffMs + jitter;
+                  retryAfter = now + retryDelay.applyAsLong(retryAfter - now);
                 }
 
                 String updateSql = """
