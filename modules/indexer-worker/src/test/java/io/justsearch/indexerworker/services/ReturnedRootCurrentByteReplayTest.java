@@ -114,7 +114,9 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
       var before = f.row(file);
       var receipts = f.queue.listSwitchBufferOpsStrict();
       f.loop.start();
-      assertTrue(f.prepare().isEmpty(), "an unrelated replacement cannot be borrowed by root replay");
+      // The unrelated pending row never settles, so this refusal spends its whole budget.
+      assertTrue(f.prepare(System.nanoTime() + TimeUnit.SECONDS.toNanos(8)).isEmpty(),
+          "an unrelated replacement cannot be borrowed by root replay");
       assertEquals(before, f.row(file));
       assertEquals(receipts, f.queue.listSwitchBufferOpsStrict());
     }
@@ -280,8 +282,11 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
       }
       var receipts = f.queue.listSwitchBufferOpsStrict();
       f.loop.start();
+      long started = System.nanoTime();
       var replay = f.prepare();
-      assertTrue(replay.isPresent(), "current-byte prep must not move an admission after a final delete: " + order);
+      long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+      assertTrue(replay.isPresent(), "current-byte prep must not move an admission after a final delete: "
+          + order + " (prep took " + elapsedMs + " ms)");
       assertEquals(order.endsWith("before") ? SourceContentHash.sha256(file) : null, f.hash(file));
       assertEquals(receipts, f.queue.listSwitchBufferOpsStrict());
       assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(f.queue, replay.orElseThrow()));
@@ -684,7 +689,9 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
       return runtime.documentFieldOps().getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256);
     }
     java.util.Optional<KnowledgeServerMigrationOps.StrictReplay> prepare() throws Exception {
-      return prepare(System.nanoTime() + TimeUnit.SECONDS.toNanos(8));
+      // Preparation waits for the started loop to settle and returns as soon as it has; the budget
+      // only bounds a regression, inside JUnit's 30 s default. 8 s expired under load (2.5 s idle).
+      return prepare(System.nanoTime() + TimeUnit.SECONDS.toNanos(20));
     }
     java.util.Optional<KnowledgeServerMigrationOps.StrictReplay> prepare(long deadline) throws Exception {
       return KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(
