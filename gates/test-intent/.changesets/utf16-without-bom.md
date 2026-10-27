@@ -146,3 +146,15 @@ CJK result; they do not extend the UTF-16 heuristic.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17e30-6827-71a2-a6ef-07183b52f0b4",
+  "verdict": "accept",
+  "digest": "sha256:5e161013ca8864a6f573e233c1382510761041f20181e4082c3fe7c811904135"
+}
+```
