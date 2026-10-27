@@ -71,14 +71,15 @@ class Windows1252QueuedRestartTest extends LuceneExecutorTestBase {
       var authority = new WorkerIngestionAuthority();
       var stats = new BatchStats();
       var stale = mock(StaleSnapshotResolver.class);
+      var fence = new FileMutationFence();
       var extractor = new JobBatchExtractor(authority, journal, queue, timebox,
           runtime.documentFieldOps(), runtime.indexCountOps(), stats, stale,
           mock(StaleSourceHandler.class), IndexingPacing.unthrottled(), new AtomicBoolean(true), forced,
-          () -> mock(PathResolutionStore.class), () -> identity, (stage, ms, reason) -> {}, () -> false, delta -> {});
+          () -> mock(PathResolutionStore.class), () -> identity, (stage, ms, reason) -> {}, () -> false, delta -> {}, fence);
       var writer = new JobBatchWriter(authority, runtime.indexingCoordinator(), null,
           mock(EmbeddingProviderLifecycle.class), () -> null, journal, queue, timebox,
           mock(OperationalMetrics.class), stats, stale, delta -> {}, (stage, ms, reason) -> {},
-          () -> false, () -> false, () -> null, new FileMutationFence());
+          () -> false, () -> false, () -> null, fence);
 
       var claims = queue.pollPending(1);
       assertEquals(1, claims.size(), "queued work survives restart");
