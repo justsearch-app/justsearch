@@ -93,6 +93,24 @@ running on Windows CI as the real-system check.
         "modules/configuration/src/test/java/io/justsearch/configuration/persistence/ContendedFileReadsTest.java#otherOpenFailuresPropagateWithoutRetry",
         "modules/configuration/src/test/java/io/justsearch/configuration/persistence/ContendedFileReadsTest.java#channelLockReadAndCloseFailuresPropagateWithoutRetry"
       ]
+    },
+    {
+      "items": [
+        "scripts/ci/unit-test-shard-policy.v1.json"
+      ],
+      "class": "Structural rule kept",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18",
+          "delegationScope": "Repair durable-file open denial on every platform, matching AtomicFileWrites, while preserving callers, atomic writes, saved formats and all other retry boundaries.",
+          "choice": "List permissionDenialRetriesUntilBudgetIsSpent() as the one additional allowed Windows skip of ContendedFileReadsTest: it is @DisabledOnOs(OS.WINDOWS) because its fixture removes POSIX permissions, and Gradle records an empty <skipped/> for it on Windows (run 40485394296).",
+          "label": "agent choice"
+        }
+      ],
+      "rule": "The Windows contracts lane requires ContendedFileReadsTest to execute and rejects every skip of that class that the policy does not name.",
+      "whySurvives": "Only one exact test name is added to that class's allowedSkips; matching stays by exact name, so any other skipped case is still rejected, and the class still fails when no case executes. No lane, task selection, timeout or other class changes."
     }
   ]
 }
