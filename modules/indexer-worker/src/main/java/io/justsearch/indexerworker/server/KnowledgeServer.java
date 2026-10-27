@@ -1255,7 +1255,7 @@ public final class KnowledgeServer implements Closeable {
       // with SqliteJobQueue.DEFAULT_MAX_ATTEMPTS only by coincidence.
       SqliteJobQueue sqliteQueue =
           new SqliteJobQueue(dbPath, recordedIngestionLifecycle::recordedClaimDecision,
-              SqliteJobQueue.DEFAULT_MAX_ATTEMPTS, onSwitchBufferWriteFailure);
+              SqliteJobQueue.DEFAULT_MAX_ATTEMPTS, onSwitchBufferWriteFailure, this::recoveryRetryDelayMillis);
       // Tempdoc 885 item 21e: per-outcome counters. Late-bound like the write-failure callback
       // above — the catalog does not exist until registerTelemetryGauges runs.
       sqliteQueue.setOutcomeObserver(
@@ -1375,7 +1375,22 @@ public final class KnowledgeServer implements Closeable {
       this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
       this.persistedMigrationProgressSnapshot = this.migrationProgressStore.readBestEffort();
       IndexGenerationManager.State state = layout.state();
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
+          && jobQueue instanceof SqliteJobQueue) {
+        release030Recovery = ((SqliteJobQueue)jobQueue).release030RecoveryState();
+        if (release030Recovery != null) {
+          try {
+            var expected = expectedCommitMetadataSource(() -> embeddingFingerprintSupplier.get().get());
+            state = Release030MigrationRetirement.prepare(genManager, state, release030Recovery,
+                expected.build(), expected.indeterminateFingerprintInputs(), migrationTransitionHook);
+          } catch (IOException | RuntimeException unverified) {
+            if (release030Recovery.retiringBuild()) throw unverified;
+            log.warn("Release build is not certified redundant; preserving its migration", unverified);
+          }
+        }
+      }
       boolean committedPredecessorAtBoot = state != null
+          && !(release030Recovery != null && release030Recovery.retiringBuild())
           && state.previous_generation() != null
           && !state.previous_generation().isBlank()
           && !state.previous_generation().equals(state.active_generation());
@@ -1534,6 +1549,7 @@ public final class KnowledgeServer implements Closeable {
         // A committed successor must reconcile durable watched roots before publication. Keep
         // its writer on the synchronous boot path so no read-only deferred view escapes first.
         boolean useDeferredWriter = hasLuceneSegments(activeIndexPath) && !preOpenMismatch
+            && !(release030Recovery != null && release030Recovery.retiringBuild())
             && !committedPredecessorAtBoot;
         if (!backupFirstBrake.holds()) {
           LuceneRuntimeBuilder builder =
@@ -1887,7 +1903,7 @@ public final class KnowledgeServer implements Closeable {
       startStuckJobReaper(jobQueue);
       if (release030Recovery != null) {
         release030RecoveryTask = stuckJobReaper.scheduleWithFixedDelay(
-            this::recoverRelease030RootsSafely, 1_000L, 10_000L, TimeUnit.MILLISECONDS);
+            this::recoverRelease030RootsSafely, 1_000L, recoveryRetryDelayMillis(10_000L), TimeUnit.MILLISECONDS);
       }
 
 
@@ -2123,6 +2139,9 @@ public final class KnowledgeServer implements Closeable {
   boolean recordedWorkerOnline() {
     return appServices != null && searchLifecycle != null && ingestLifecycle != null;
   }
+
+  /** Timing seam: production keeps its exact retry ladder, cooldown and maintenance cadence. */
+  protected long recoveryRetryDelayMillis(long delayMs) { return delayMs; }
 
   /** Opens the server-owned periodic queue producer on its registered background scheduler. */
   void startStuckJobReaper(JobQueue reaperQueue) {
@@ -3498,6 +3517,7 @@ public final class KnowledgeServer implements Closeable {
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
     svc.ingestService().useExclusionRoots(() -> exclusionRoots.get());
+    svc.ingestService().useCreatorRootCollection(this::release030Collection);
     if (svc instanceof DefaultWorkerAppServices producer) {
       // Configured roots belong to every replacement producer, including the deferred writer.
       var configuration = producer.resolvedConfig();
@@ -7291,7 +7311,8 @@ public final class KnowledgeServer implements Closeable {
   private void prepareRelease030Recovery() throws IOException, SQLException {
     if (!bootRootBindingsBound || !(jobQueue instanceof SqliteJobQueue queue)
         || !(appServices instanceof DefaultWorkerAppServices)) return;
-    release030Recovery = Release030RecoveryState.load(dataDir.resolve("jobs.db"));
+    if (release030Recovery == null)
+      release030Recovery = ((SqliteJobQueue)jobQueue).release030RecoveryState();
     if (release030Recovery == null) return;
     // Boundaries and the selective jobs repair do not depend on the index migration phase.
     // Preparing before claims lets native cutover drain; directory recovery still waits for IDLE.
@@ -7315,9 +7336,21 @@ public final class KnowledgeServer implements Closeable {
           return false;
         }
       });
+      if (release030Recovery.retiringBuild()) release030RetirementCut("release030-queue-prepared");
       release030Recovery.prepared(roots, identity);
+      if (release030Recovery.retiringBuild()) release030RetirementCut("release030-preparation-published");
     }
     queue.prepareRelease030ExplicitFiles();
+    if (release030Recovery.retiringBuild()) {
+      if (!release030Recovery.rootsJournaled()) {
+        queue.journalRelease030Roots(release030Recovery.retiringBuilding(), release030Recovery.pendingRoots(), this::release030Collection);
+        release030RetirementCut("release030-roots-journaled");
+        queue.inventoryRetirementRoots();
+        release030Recovery.markRootsJournaled();
+      }
+      Release030MigrationRetirement.retainAuthority(queue, release030Recovery, release030RetirementRoots());
+      queue.prepareRetirementClaims();
+    }
   }
 
   private void recoverRelease030RootsSafely() {
@@ -7329,6 +7362,10 @@ public final class KnowledgeServer implements Closeable {
     try {
       if (!release030Recovery.preparedFor(queue.release030RecoveryIdentity())) prepareRelease030Recovery();
       if (!(ingestLifecycle instanceof RunningRuntime runtime) || !runtime.isAcceptingWrites()) return;
+      if (release030Recovery.retiringBuild()) {
+        recoverRetiringReleaseBuild(queue, services, runtime);
+        if (release030Recovery.retiringBuild()) return;
+      }
       boolean explicitReady = queue.prepareRelease030ExplicitFiles();
       for (Path root : release030Recovery.pendingRoots()) {
         if (closeStarted) return;
@@ -7357,6 +7394,120 @@ public final class KnowledgeServer implements Closeable {
       }
     } catch (IOException | SQLException | RuntimeException unavailable) {
       log.warn("0.3.0 queued-work recovery will resume: {}", unavailable.toString());
+    }
+  }
+
+  private void release030RetirementCut(String point) throws IOException {
+    try {
+      migrationTransitionHook.await(new MigrationTransitionBarrier.Transition(point,
+          release030Recovery.retiringActive(), release030Recovery.retiringBuilding()));
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Release retirement interrupted", interrupted);
+    }
+  }
+
+  private List<Path> release030RetirementRoots() {
+    var roots = new ArrayList<>(bootRootBindings.stream().map(RootBinding::path).toList());
+    roots.addAll(configuredRoots(startupConfiguration.collections()));
+    return roots.stream().map(path -> path.toAbsolutePath().normalize()).distinct().toList();
+  }
+
+  /** A replay attempt releases admission between retries; uncertain sources keep B. */
+  private void recoverRetiringReleaseBuild(SqliteJobQueue queue,
+      DefaultWorkerAppServices producer, RunningRuntime active) throws IOException {
+    release030RetirementCut("release030-before-replay");
+    runtimeSwapLock.lock();
+    try {
+      try (var fence = producer.mutationAdmission().beginFinalFence(producer.mutationOwnerToken(), 1_000)) {
+        if (fence == null) return;
+        try {
+          if (!producer.pauseProducerForCutover(1_000)) return;
+          try { queue.prepareRetirementClaims(); }
+          catch (SQLException invalid) { throw new IOException("Current retirement ownership cannot be reconciled", invalid); }
+          if (queue.jobStateCountsStrict().processingCount() != 0) return;
+          var checkpoint = release030Recovery;
+          if (!queue.retirementReplayComplete()) {
+            producer.commitActiveLexicalProjectionForCutover();
+            var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
+                queue, active, signalBus, indexingPacing, indexBasePath, activeIndexPath,
+                JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log,
+                System.nanoTime() + TimeUnit.SECONDS.toNanos(1), checkpoint.retiringBuilding(), ignored -> true)
+                .withPublisher(producer.ingestService());
+            var journal = queue.retirementReplayOps().stream()
+                .filter(op -> op.generation() == null || op.generation().isBlank()
+                    || checkpoint.retiringBuilding().equals(op.generation())).toList();
+            boolean reconciled = true;
+            var roots = release030RetirementRoots();
+            if (!checkpoint.differencesComplete()) {
+              for (var path : checkpoint.retirementPaths().entrySet()) {
+                if (Release030MigrationRetirement.covered(path.getKey(), path.getValue(), journal)) continue;
+                reconciled &= KnowledgeServerMigrationOps.reconcileRelease030Path(context, path.getKey(),
+                    Release030MigrationRetirement.boundary(path.getKey(), roots), path.getValue(), journal);
+              }
+              if (reconciled) {
+                checkpoint.markDifferencesComplete();
+                release030RetirementCut("release030-differences-committed");
+              }
+            }
+            var currentRoots = new ArrayList<>(exclusionRoots.get());
+            currentRoots.addAll(configuredRoots(startupConfiguration.collections()));
+            Map<Path, String> recoveryRoots = new HashMap<>();
+            for (Path root : currentRoots) recoveryRoots.put(root.toAbsolutePath().normalize(), release030Collection(root));
+            boolean replayed = KnowledgeServerMigrationOps.drainRelease030OnSource(context, reconciled,
+                () -> {
+                  try { release030RetirementCut("release030-replay-before-commit"); }
+                  catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                },
+                () -> {
+                  try {
+                    checkpoint.completeRetirementRoots();
+                    release030RetirementCut("release030-replay-committed");
+                  } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                }, new KnowledgeServerMigrationOps.Release030Roots(
+                    recoveryRoots, this::replayRelease030Root, () -> closeStarted, checkpoint));
+            if (!replayed) return;
+            release030RetirementCut("release030-journal-acknowledged");
+            checkpoint.markReplayComplete();
+            release030RetirementCut("release030-replay-complete");
+          }
+          indexGenerationManager.retirePreviousGeneration(checkpoint.retiringActive(), checkpoint.retiringBuilding());
+          release030RetirementCut("release030-building-retired");
+          Release030MigrationRetirement.finish(indexGenerationManager, checkpoint, indexBasePath);
+          release030RetirementCut("release030-retirement-complete");
+          queue.finishRelease030Retirement();
+        } finally {
+          producer.resumeProducerAfterCutover();
+        }
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  private io.justsearch.ipc.SyncDirectoryResponse replayRelease030Root(
+      SwitchBufferCapableQueue.SwitchBufferOp op,
+      java.util.function.Supplier<io.justsearch.ipc.SyncDirectoryResponse> walk) {
+    if (release030Recovery.rootWalked(op)) return io.justsearch.ipc.SyncDirectoryResponse.getDefaultInstance();
+    Path root = Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath())
+        .toAbsolutePath().normalize();
+    boolean checkpointedRoot = release030Recovery.pendingRoots().contains(root);
+    try {
+      if (checkpointedRoot && !release030Recovery.ready(root, System.currentTimeMillis()))
+        return io.justsearch.ipc.SyncDirectoryResponse.newBuilder().setError("Upgrade root recovery is deferred").build();
+      var result = walk.get();
+      if (result != null && result.getError().isBlank() && !result.getSkipped()
+          && !result.getDeleteDetectionUnverified()) {
+        boolean admitted = result.getFilesAdded() > 0 || result.getFilesDeleted() > 0;
+        if (admitted) release030RetirementCut("release030-root-admitted");
+        release030Recovery.markRootWalked(op);
+        release030RetirementCut("release030-root-walked");
+      } else if (checkpointedRoot) release030Recovery.deferred(root, System.currentTimeMillis());
+      return result;
+    } catch (IOException failure) {
+      throw new java.io.UncheckedIOException(failure);
     }
   }
 
@@ -7750,6 +7901,7 @@ public final class KnowledgeServer implements Closeable {
 
   /** Reclaim a committed predecessor only after replay and every old view have settled. */
   private void retryCommittedGenerationRetirement() {
+    if (release030Recovery != null && release030Recovery.retiringBuild()) return;
     runtimeSwapLock.lock();
     try {
     if (indexGenerationManager == null || closeStarted || encoderRecoveryReservation != null
@@ -8094,10 +8246,13 @@ public final class KnowledgeServer implements Closeable {
         // The reaper's maintenance tail enters runtimeSwapLock. Join that producer before taking
         // the lock ourselves, just as deferred model initialization is joined above; otherwise a
         // close can own runtimeSwapLock while waiting for a reaper already queued on the same lock.
-        if (stuckJobReapTask != null) stuckJobReapTask.cancel(true);
-        if (deferredBootRootTask != null) deferredBootRootTask.cancel(true);
+        // Interrupting a maintenance commit can close Lucene's shared native lock channel.
+        // Walks observe closeStarted; drain their current work before closing the writer.
+        if (stuckJobReapTask != null) stuckJobReapTask.cancel(false);
+        if (deferredBootRootTask != null) deferredBootRootTask.cancel(false);
+        if (release030RecoveryTask != null) release030RecoveryTask.cancel(false);
         if (stuckJobReaper != null) {
-          stuckJobReaper.shutdownNow();
+          stuckJobReaper.shutdown();
           stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.
         }
         // The prewarm runner encodes through the serving set's sessions; it leaves before the
@@ -10096,6 +10251,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   private void drainSwitchBufferBestEffort() {
+    if (release030Recovery != null && release030Recovery.retiringBuild()) return;
     // Drain only valid post-deferred-upgrade (writer is open). The boot path that
     // calls drain pre-upgrade does so only when ingest is not deferred (see boot logic).
     if (!(ingestLifecycle instanceof RunningRuntime running)) {

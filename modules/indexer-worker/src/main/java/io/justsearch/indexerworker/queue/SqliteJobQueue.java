@@ -397,38 +397,43 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   /** Administrative removal with exact normalized survivor paths excluded before row handling. */
   private int removeJobsAdministratively(String predicate, List<String> arguments,
       boolean sourceRemoved, Set<String> excludedPaths) throws SQLException {
-    return inTransaction(() -> {
-      List<String> paths = new ArrayList<>();
-      try (var query = connection.prepareStatement("SELECT path FROM jobs WHERE " + predicate)) {
-        for (int i = 0; i < arguments.size(); i++) query.setString(i + 1, arguments.get(i));
-        try (var rows = query.executeQuery()) { while (rows.next()) paths.add(rows.getString(1)); }
-      }
-      int affected = 0;
-      for (String path : paths) {
-        if (excludedPaths.contains(path)) continue;
-        boolean recorded;
-        WalkProgress progress = null;
-        try (var query = connection.prepareStatement("SELECT scan_id, walk_seen_epoch FROM jobs WHERE path = ?")) {
-          query.setString(1, path);
-          try (var row = query.executeQuery()) {
-            if (!row.next()) throw new SQLException("Administrative member disappeared");
-            row.getLong(2); recorded = !row.wasNull();
-            if (recorded) progress = SqliteIngestionWalkOps.find(connection, row.getString(1))
-                .orElseThrow(() -> new JobQueue.RecordedWalkGapException("Recorded unit state is unavailable"));
-          }
-        }
-        if (recorded && progress.sealedAt() == null) {
-          affected += skipRecordedMember(path,
-              sourceRemoved ? IngestionOutcomeClass.STALE_SOURCE : IngestionOutcomeClass.SKIPPED_POLICY,
-              sourceRemoved ? "SOURCE_REMOVED" : "ADMINISTRATIVE_CLEAR");
-        } else if (!recorded || progress.acknowledgedRevision() == progress.revision()) {
-          try (var delete = connection.prepareStatement("DELETE FROM jobs WHERE path = ?")) {
-            delete.setString(1, path); affected += executeMutation(delete::executeUpdate);
-          }
+    return connection.getAutoCommit()
+        ? inTransaction(() -> removeJobsAdministrativelyInTransaction(predicate, arguments, sourceRemoved, excludedPaths))
+        : removeJobsAdministrativelyInTransaction(predicate, arguments, sourceRemoved, excludedPaths);
+  }
+
+  private int removeJobsAdministrativelyInTransaction(String predicate, List<String> arguments,
+      boolean sourceRemoved, Set<String> excludedPaths) throws SQLException {
+    List<String> paths = new ArrayList<>();
+    try (var query = connection.prepareStatement("SELECT path FROM jobs WHERE " + predicate)) {
+      for (int i = 0; i < arguments.size(); i++) query.setString(i + 1, arguments.get(i));
+      try (var rows = query.executeQuery()) { while (rows.next()) paths.add(rows.getString(1)); }
+    }
+    int affected = 0;
+    for (String path : paths) {
+      if (excludedPaths.contains(path)) continue;
+      boolean recorded;
+      WalkProgress progress = null;
+      try (var query = connection.prepareStatement("SELECT scan_id, walk_seen_epoch FROM jobs WHERE path = ?")) {
+        query.setString(1, path);
+        try (var row = query.executeQuery()) {
+          if (!row.next()) throw new SQLException("Administrative member disappeared");
+          row.getLong(2); recorded = !row.wasNull();
+          if (recorded) progress = SqliteIngestionWalkOps.find(connection, row.getString(1))
+              .orElseThrow(() -> new JobQueue.RecordedWalkGapException("Recorded unit state is unavailable"));
         }
       }
-      return affected;
-    });
+      if (recorded && progress.sealedAt() == null) {
+        affected += skipRecordedMember(path,
+            sourceRemoved ? IngestionOutcomeClass.STALE_SOURCE : IngestionOutcomeClass.SKIPPED_POLICY,
+            sourceRemoved ? "SOURCE_REMOVED" : "ADMINISTRATIVE_CLEAR");
+      } else if (!recorded || progress.acknowledgedRevision() == progress.revision()) {
+        try (var delete = connection.prepareStatement("DELETE FROM jobs WHERE path = ?")) {
+          delete.setString(1, path); affected += executeMutation(delete::executeUpdate);
+        }
+      }
+    }
+    return affected;
   }
 
   @Override
@@ -537,6 +542,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private final java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy;
   private final SqliteQueueSwitchBufferOps switchBufferOps;
 
+  private final java.util.function.LongUnaryOperator retryDelay;
+
   /** Tempdoc 885 item 21e — enqueue/dequeue rates and lock-wait, RISK-002's instrument. */
   private final QueueThroughputMeters meters = new QueueThroughputMeters();
 
@@ -601,8 +608,22 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     this(dbPath, maxAttempts, onSwitchBufferWriteFailure, null, recordedClaimPolicy);
   }
 
+  /** Timing seam for integration fixtures; ordinary constructors preserve the production ladder. */
+  public SqliteJobQueue(Path dbPath, java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy,
+      int maxAttempts, Runnable onSwitchBufferWriteFailure, java.util.function.LongUnaryOperator retryDelay) {
+    this(dbPath, maxAttempts, onSwitchBufferWriteFailure, null, recordedClaimPolicy, retryDelay);
+  }
+
   private SqliteJobQueue(Path dbPath, int maxAttempts, Runnable onSwitchBufferWriteFailure,
       MigrationStepHook migrationStepHook, java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy) {
+    this(dbPath, maxAttempts, onSwitchBufferWriteFailure, migrationStepHook, recordedClaimPolicy,
+        java.util.function.LongUnaryOperator.identity());
+  }
+
+  private SqliteJobQueue(Path dbPath, int maxAttempts, Runnable onSwitchBufferWriteFailure,
+      MigrationStepHook migrationStepHook, java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy,
+      java.util.function.LongUnaryOperator retryDelay) {
+    this.retryDelay = Objects.requireNonNull(retryDelay, "retryDelay");
     this.dbPath = dbPath;
     this.maxAttempts = maxAttempts;
     this.migrationStepHook = migrationStepHook;
@@ -700,9 +721,45 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
 
       initSchema();
+      switchBufferOps.retirementAdmissions(() -> {
+        try { return releaseRecovery != null && releaseRecovery.retiringBuild() ? releaseRecovery.retainedOrderFloor() : 0; }
+        catch (IOException invalid) { throw new IllegalStateException("Retained admission order unavailable",invalid); }
+      }, () -> {
+        if (releaseRecovery != null && releaseRecovery.retiringBuild()) {
+          releaseRecovery.admissionsChanged();
+          rootClaimsPrepared = false;
+        }
+        claimCursor = null; claimOrderVersion++;
+      }, () -> {
+        try { return releaseRecovery != null && releaseRecovery.retiringBuild()
+            ? releaseRecovery.retirementReceipts(List.of()) : List.of(); }
+        catch (IOException invalid) { throw new IllegalStateException("Retained projection admission unavailable",invalid); }
+      }, predecessor -> {
+        if (releaseRecovery != null && releaseRecovery.retiringBuild()
+            && "UPSERT".equals(predecessor.op()) && !predecessor.payload().stripLeading().startsWith("{")) {
+          try { releaseRecovery.retainRawHistory(predecessor); }
+          catch (IOException invalid) { throw new IllegalStateException("Original raw receipt was not retained",invalid); }
+        }
+      });
 
       // Run integrity check on existing databases (throws SQLException on corruption)
       performIntegrityCheck();
+      openedQueueSession = UUID.randomUUID().toString();
+      rootClaimsPrepared = false;
+      retirementClaimsBinding = null;
+      if (releaseRecovery != null) {
+        releaseRecovery.openedSession(openedQueueSession);
+        if (releaseRecovery.retiringBuild() && releaseRecovery.rootsJournaled()) {
+          try {
+            releaseRecovery.validateRootHeads(switchBufferOps.listAllStrict().stream()
+                .filter(r -> "SYNC_ROOT".equals(r.op())).toList());
+            applyRetainedPrefixConversions();
+            releaseRecovery.bindAdmissions(releaseRecovery.retirementReceipts(switchBufferOps.listAllStrict()));
+          } catch (IOException invalid) {
+            throw new IOException(MigrationJournalWitness.REFUSAL + ": " + invalid.getMessage(), invalid);
+          }
+        }
+      }
 
       claimCursor = null;
       claimBudgetExhausted = false;
@@ -757,14 +814,132 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   /** Release-v13 claims remain queued until their policy boundaries have been prepared. */
   static final String RELEASE030 = "release030/";
+  private Release030RecoveryState releaseRecovery;
+  private String openedQueueSession;
+  private boolean rootClaimsPrepared;
+  private String retirementClaimsBinding;
+  public Release030RecoveryState release030RecoveryState() { return releaseRecovery; }
+  public String openedQueueSession() { return openedQueueSession; }
+
   private boolean requiresRelease030Boundary;
   private boolean release030ExplicitFilesPrepared = true;
   private final Set<Path> release030ExactFiles = java.util.concurrent.ConcurrentHashMap.newKeySet();
+  private final Set<Path> release030RetirementFiles = java.util.concurrent.ConcurrentHashMap.newKeySet();
+  private volatile String release030RetirementGeneration;
+  private Map<Path, String> release030RetirementCollections = Map.of();
+
+  /** Startup only: root recovery is older than every newly acknowledged mutation. */
+  public void journalRelease030Roots(String generation, List<Path> roots) throws SQLException {
+    journalRelease030Roots(generation, roots, root -> null);
+  }
+
+  public void journalRelease030Roots(String generation, List<Path> roots,
+      java.util.function.Function<Path,String> creatorCollection) throws SQLException {
+    lockTimed();
+    try {
+      ensureOpen();
+      inTransaction(() -> {
+        for (Path root : roots) {
+          String key = Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX + PathNormalizer.normalizeKey(root);
+          try (var query = connection.prepareStatement(
+              "SELECT op, payload FROM switch_buffer WHERE generation=? AND key=?")) {
+            query.setString(1, generation); query.setString(2, key);
+            try (var row = query.executeQuery()) {
+              if (row.next()) {
+                if (!"SYNC_ROOT".equals(row.getString(1))
+                    || !Path.of(SwitchBufferSyncRoot.decode(row.getString(2)).rootPath()).equals(root))
+                  throw new SQLException("Release root receipt has conflicting ownership");
+                continue; // A kill before sidecar publication must not renew accepted_order.
+              }
+            }
+          }
+          if (!switchBufferOps.putForGenerationInTransaction(connection, generation, key, "SYNC_ROOT",
+              new SwitchBufferSyncRoot(PathNormalizer.normalizeKey(root), false, null).encode()))
+            throw new SQLException("Release root recovery could not be journaled");
+          var accepted = switchBufferOps.listAllStrictForGeneration(generation).stream()
+              .filter(op -> op.key().equals(key)).findFirst().orElseThrow();
+          try {
+            releaseRecovery.captureFreshRootCollection(accepted, creatorCollection.apply(root));
+            releaseRecovery.captureRootScope(accepted,retirementScope(accepted,switchBufferOps.listAllStrict()));
+          }
+          catch (IOException invalid) { throw new SQLException("ROOT creator namespace was not retained", invalid); }
+        }
+        return null;
+      });
+    } finally { unlockAfterChanges(); }
+  }
+
+  public boolean hasUnfinishedFileJob(String path) {
+    lock.lock();
+    try {
+      ensureOpen();
+      try (var query = connection.prepareStatement(
+          "SELECT 1 FROM jobs WHERE path=? AND state IN ('PENDING','PROCESSING')")) {
+        query.setString(1, path);
+        try (var row = query.executeQuery()) { return row.next(); }
+      }
+    } catch (SQLException unreadable) {
+      throw new IllegalStateException("Release file retry cannot be confirmed", unreadable);
+    } finally { lock.unlock(); }
+  }
+
+  public String release030RetirementCollection(Path path) {
+    lock.lock();
+    try {
+      ensureOpen();
+      try (var query = connection.prepareStatement("SELECT collection FROM jobs WHERE path=?")) {
+        query.setString(1, PathNormalizer.normalizeKey(path));
+        try (var row = query.executeQuery()) {
+          if (row.next() && row.getString(1) != null) return row.getString(1);
+        }
+      }
+      String collection = release030RetirementCollections.get(path);
+      return collection == null || collection.isBlank() ? null : collection;
+    } catch (SQLException unreadable) {
+      throw new IllegalStateException("Release file collection cannot be confirmed", unreadable);
+    } finally { lock.unlock(); }
+  }
+
+  @Override
+  public String release030RetirementGeneration() { return release030RetirementGeneration; }
+
+  public void retainRelease030Retirement(String generation, java.util.Collection<Path> exactFiles, Map<Path, String> collections) {
+    release030RetirementCollections = Map.copyOf(collections);
+    release030RetirementFiles.addAll(exactFiles);
+    release030RetirementGeneration = generation;
+  }
+
+  public void finishRelease030Retirement() {
+    release030RetirementGeneration = null;
+    release030RetirementFiles.clear();
+    release030RetirementCollections = Map.of();
+  }
 
   private final Set<Path> release030IndependentDebt = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+  public boolean isRelease030RetirementFile(Path file) {
+    return file != null && release030RetirementFiles.contains(file.toAbsolutePath().normalize());
+  }
+
+  /** A historical index path cannot grant authority to a newer unowned admission. */
+  public boolean hasUnownedModernAdmission(Path file) {
+    lockTimed();
+    try {
+      ensureOpen();
+      try (var query = connection.prepareStatement(
+          "SELECT 1 FROM jobs WHERE path=? AND ingestion_root IS NULL "
+              + "AND (unit_revision IS NULL OR unit_revision NOT LIKE 'release030/%')")) {
+        query.setString(1, PathNormalizer.normalizeKey(file));
+        try (var row = query.executeQuery()) { return row.next(); }
+      }
+    } catch (SQLException unreadable) {
+      throw new IllegalStateException("Release exact-file admission cannot be confirmed", unreadable);
+    } finally { lock.unlock(); }
+  }
+
   @Override
   public boolean isRelease030ExactFile(Path file) {
+    if (isRelease030RetirementFile(file)) return !hasUnownedModernAdmission(file);
     if (file == null || (release030ExplicitFilesPrepared
         && !release030ExactFiles.contains(file.toAbsolutePath().normalize()))) return false;
     lockTimed();
@@ -861,7 +1036,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     // A kill after migration must not erase the fact that these were release-v13 jobs. Capture
     // before any DDL, leaving the migration itself lossless (including every saved retry field).
     if (SqliteQueueMigrationOps.getSchemaVersion(connection) == 13) {
-      Release030RecoveryState.capture(dbPath);
       // Mark a known v13 database before its existing atomic migration. Its new v17 unit
       // revisions carry this generation, including a backup or kill before queue repair.
       int generation;
@@ -874,8 +1048,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           update.execute("PRAGMA application_id=" + ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE));
         }
       }
+      Release030RecoveryState.capture(dbPath, connection);
     }
-    var recovery = Release030RecoveryState.load(dbPath);
+    var recovery = Release030RecoveryState.load(dbPath, retryDelay.applyAsLong(60_000L));
+    releaseRecovery = recovery;
     requiresRelease030Boundary = recovery != null && !recovery.preparedFor(release030RecoveryIdentity());
     release030ExplicitFilesPrepared = recovery == null;
     release030ExactFiles.clear();
@@ -959,22 +1135,24 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
       inTransaction(() -> {
+        try {
         for (var op : switchBufferOps.listAllStrict()) {
           if (!"DELETE_PREFIX".equals(op.op())
               || !PathPrefixScope.isLegacy(op.payload())) continue;
-          String payload = scope.apply(op.payload()).encode();
-          try (PreparedStatement update = connection.prepareStatement(
-              "UPDATE switch_buffer SET payload = ?, revision = ? "
-                  + "WHERE generation = ? AND key = ? AND revision = ?")) {
-            update.setString(1, payload);
-            update.setString(2, UUID.randomUUID().toString());
-            update.setString(3, op.generation());
-            update.setString(4, op.key());
-            update.setString(5, op.revision());
-            if (update.executeUpdate() != 1) throw new SQLException("Prefix receipt changed during conversion");
+          SwitchBufferOp converted = null;
+          if (releaseRecovery != null && releaseRecovery.retiringBuild()) {
+            converted = releaseRecovery.conversionSuccessor(op);
           }
+          if (converted == null) {
+            converted = new SwitchBufferOp(op.generation(),op.key(),op.op(),scope.apply(op.payload()).encode(),
+                op.lastUpdatedMs(),UUID.randomUUID().toString(),op.acceptedOrder());
+            if (releaseRecovery != null && releaseRecovery.retiringBuild())
+              releaseRecovery.retainPrefixConversion(op,converted);
+          }
+          replaceLegacyPrefix(op,converted);
         }
         return null;
+        } catch (IOException invalid) { throw new SQLException("Legacy conversion checkpoint failed",invalid); }
       });
     } catch (SQLException failure) {
       recordDbError();
@@ -992,7 +1170,984 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public boolean putSyncRootForGeneration(
       String generation, String key, SwitchBufferSyncRoot payload) {
-    return switchBufferOps.putSyncRootForGeneration(generation, key, payload);
+    return putSyncRootForGeneration(generation, key, payload, null);
+  }
+
+  @Override public boolean putSyncRootForGeneration(
+      String generation, String key, SwitchBufferSyncRoot payload, String collection) {
+    if (releaseRecovery == null || !releaseRecovery.retiringBuild())
+      return switchBufferOps.putSyncRootForGeneration(generation, key, payload);
+    lockTimed();
+    try {
+      ensureOpen();
+      if (!releaseRecovery.rootsInventoried()) throw new IOException("ROOT inventory was not published");
+      var previous = switchBufferOps.listAllStrictForGeneration(generation).stream().filter(op -> op.key().equals(key)).findFirst().orElse(null);
+      if (previous == null) previous = releaseRecovery.requiredRootHead(generation,key);
+      releaseRecovery.replacingRoot(generation,key,previous);
+      return inTransaction(() -> {
+        if (!switchBufferOps.putSyncRootForGeneration(generation,key,payload)) throw new SQLException("ROOT write failed");
+        var accepted = switchBufferOps.listAllStrictForGeneration(generation).stream().filter(op -> op.key().equals(key)).findFirst().orElse(null);
+        if (accepted == null) throw new SQLException("ROOT head unavailable");
+        try {
+          releaseRecovery.captureFreshRootCollection(accepted,collection);
+          releaseRecovery.captureRootScope(accepted,retirementScope(accepted,releaseRecovery.rootReceipts()));
+        } catch (IOException invalid) { throw new SQLException("ROOT policy not retained",invalid); }
+        return accepted;
+      }) != null && retainCommittedRoot(generation,key);
+    } catch (SQLException | IOException failure) {
+      throw new IllegalStateException("ROOT receipt was not retained; caller must not acknowledge",failure);
+    } finally { unlockAfterChanges(); }
+  }
+
+  private boolean retainCommittedRoot(String generation,String key) throws IOException {
+    var accepted = switchBufferOps.listAllStrictForGeneration(generation).stream()
+        .filter(op -> op.key().equals(key)).findFirst().orElseThrow();
+    releaseRecovery.retainRootHead(accepted);
+    return true;
+  }
+
+  @Override public SwitchBufferOp retirementRootReceipt(String generation,String key) {
+    lockTimed();try {
+      ensureOpen();var receipt = switchBufferOps.listAllStrictForGeneration(generation).stream().filter(op -> op.key().equals(key)).findFirst().orElse(null);
+      if (receipt == null || !"SYNC_ROOT".equals(receipt.op()) || releaseRecovery == null
+          || !releaseRecovery.rootReceipts().contains(receipt)) throw new IllegalStateException("Unretained ROOT head");
+      return receipt;
+    } catch (IOException failure) { throw new IllegalStateException("ROOT authority unavailable",failure); }
+    finally { unlockAfterChanges(); }
+  }
+  public void inventoryRetirementRoots() throws IOException,SQLException {
+    lockTimed();try {
+      var roots = switchBufferOps.listAllStrict().stream().filter(r -> "SYNC_ROOT".equals(r.op())).toList();
+      if (!releaseRecovery.rootsInventoried()) {
+        var legacyFiles = new HashMap<String,SwitchBufferUpsert>();
+        for (var op : switchBufferOps.listAllStrict()) if ("UPSERT".equals(op.op()) && !op.payload().stripLeading().startsWith("{")) {
+          var expectation = legacyQueueExpectation(op);
+          if (expectation != null) legacyFiles.put(op.retirementUuid(),expectation);
+        }
+        var scopes = new HashMap<String,PathPrefixScope>();
+        for (var root : roots) {
+          var retained = releaseRecovery.rootScope(root);
+          scopes.put(root.retirementUuid(),retained == null ? retirementScope(root,roots) : retained);
+        }
+        releaseRecovery.inventoryRoots(roots,legacyFiles,scopes);
+      }
+      else releaseRecovery.validateRootHeads(roots);
+    } finally { unlockAfterChanges(); }
+  }
+  /** Original Q metadata, never inferred from the A image being verified. */
+  public SwitchBufferUpsert legacyQueueExpectation(SwitchBufferOp op) throws SQLException {
+    lockTimed();
+    try {
+    ensureOpen();
+    var file = SwitchBufferUpsert.decode(op.payload());
+    try (var query = connection.prepareStatement("SELECT collection,ingestion_root,originator,transport FROM jobs WHERE path=?")) {
+      query.setString(1,file.path());
+      try (var row = query.executeQuery()) {
+        if (!row.next()) return null;
+        // A released DONE/FAILED row may predate ingestion_root. Its known namespace
+        // still belongs to this receipt; the raw path authorizes only that exact file.
+        String boundary = row.getString(2);
+        return new SwitchBufferUpsert(file.path(),Objects.toString(row.getString(1),"default"),
+            row.getString(3) == null && row.getString(4) == null ? null
+                : new JobQueue.EnqueueProvenance(row.getString(3),row.getString(4)),
+            null,null,Path.of(boundary == null ? file.path() : boundary));
+      }
+    }
+    } finally { unlockAfterChanges(); }
+  }
+
+  @Override public void retainRetirementRootCollection(SwitchBufferOp root,String collection) {
+    lockTimed();try { releaseRecovery.retainRootCollection(root,collection); }
+    catch(IOException invalid){throw new IllegalStateException("ROOT collection was not saved",invalid);}
+    finally{unlockAfterChanges();}
+  }
+  @Override public String retirementRootCollection(SwitchBufferOp root) {
+    return releaseRecovery==null?null:releaseRecovery.rootCollection(root);
+  }
+  @Override public boolean retirementRootPolicyKnown(SwitchBufferOp root) {
+    return releaseRecovery != null && releaseRecovery.rootPolicy(root) != null;
+  }
+  @Override public boolean retirementRootLegacyExecution(SwitchBufferOp root) {
+    return releaseRecovery != null && "LEGACY_EXECUTION".equals(releaseRecovery.rootPolicy(root));
+  }
+  @Override public SwitchBufferUpsert retirementRootFileScope(SwitchBufferOp root,String path) {
+    var member=retirementRootFiles().apply(path);
+    boolean administrative=root.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX);
+    if(member==null || !administrative && !root.equals(member.owner())
+        || administrative && member.owner().acceptedOrder()>root.acceptedOrder())
+      throw new IllegalStateException("ROOT member metadata is unavailable");
+    return member.scope();
+  }
+  @Override public SwitchBufferOp retirementSourceRoot(String path) {
+    var member=retirementRootFiles().apply(path);
+    return member==null?null:member.owner();
+  }
+  @Override public java.util.function.Function<String,RetirementRootFile> retirementRootFiles() {
+    lockTimed();try {
+      if(releaseRecovery==null)return path->null;
+      var orders=retirementOrders(retirementReplayOps());
+      return path->{
+        lockTimed();try {
+          var row=watcherRowLocked(path);if(row==null)return null;
+          var origin=RootOrigin.fromUnit(row.get("unit_revision"));
+          if(origin==null || validatedUnitOrder(correctionCandidate(row),orders)!=origin.acceptedOrder())return null;
+          var owner=orders.receipts().get(origin.uuid());if(owner==null)return null;
+          var provenance=row.get("originator")==null && row.get("transport")==null?null
+              :new JobQueue.EnqueueProvenance(row.get("originator"),row.get("transport"));
+          return new RetirementRootFile(owner,new SwitchBufferUpsert(path,row.get("collection"),provenance,
+              null,null,Path.of(row.get("ingestion_root"))));
+        }catch(IOException|SQLException invalid){throw new IllegalStateException("Current source ROOT unavailable",invalid);}
+        finally{unlockAfterChanges();}
+      };
+    }catch(IOException invalid){throw new IllegalStateException("Current ROOT history unavailable",invalid);}
+    finally{unlockAfterChanges();}
+  }
+
+  /** Only the actual retained FILE and its unchanged complete row may vouch for a conditional event. */
+  public boolean retirementFileOwnsCurrentRow(SwitchBufferOp receipt) {
+    lockTimed();try {
+      ensureOpen();
+      if (releaseRecovery == null || !releaseRecovery.retiringBuild() || !"UPSERT".equals(receipt.op())) return false;
+      var orders = retirementOrders(retirementReplayOps());
+      if (!receipt.equals(orders.receipts().get(receipt.retirementUuid()))) return false;
+      var file = SwitchBufferUpsert.decode(receipt.payload());
+      var row = watcherRowLocked(file.path());
+      return file.unitRevision() != null && receipt.key().equals("path:"+file.path()) && row != null
+          && file.unitRevision().equals(row.get("unit_revision"))
+          && validatedUnitOrder(correctionCandidate(row),orders) == receipt.acceptedOrder();
+    } catch (IOException | SQLException invalid) { throw new IllegalStateException("Current FILE ownership unavailable",invalid); }
+    finally { unlockAfterChanges(); }
+  }
+
+  /** Read-only settlement of a conditional event's freshly observed native projection. */
+  public boolean matchesRetirementConditionalDelete(SwitchBufferOp receipt,Map<String,String> observedRow,
+      String collection) {
+    lockTimed();try {
+      ensureOpen();
+      if(releaseRecovery==null || !releaseRecovery.retiringBuild() || collection==null || collection.isBlank()
+          || !"DELETE".equals(receipt.op()))return false;
+      boolean retained=releaseRecovery.retainsRemovalPacket(receipt) || releaseRecovery.deletionCommitted(receipt);
+      if(!retained) {
+        try(var query=connection.prepareStatement(
+            "SELECT op,payload,last_updated,revision,accepted_order FROM switch_buffer WHERE generation=? AND key=?")) {
+          query.setString(1,receipt.generation());query.setString(2,receipt.key());
+          try(var current=query.executeQuery()) {
+            if(!current.next() || !receipt.equals(new SwitchBufferOp(receipt.generation(),receipt.key(),
+                current.getString(1),current.getString(2),current.getLong(3),current.getString(4),current.getLong(5))))return false;
+          }
+        }
+      }
+      var deletion=SwitchBufferDelete.decode(receipt.payload());String path=deletion.path();
+      if(deletion.origin()==SwitchBufferDelete.Origin.EXPLICIT || !receipt.key().equals("path:"+path)
+          || activeClaims.containsKey(path) || hasUnownedModernAdmission(Path.of(path)))return false;
+      var row=watcherRowLocked(path);
+      if(!Objects.equals(row,observedRow) || correctionHasRecordedOwner(path,row))return false;
+      if(row==null) {
+        try(var query=connection.prepareStatement("SELECT 1 FROM ingestion_ledger WHERE path_hash=? AND operation_key IS NOT NULL LIMIT 1")) {
+          query.setString(1,sha256(path));try(var ledger=query.executeQuery()){return !ledger.next();}
+        }
+      }
+      if(!STATE_DONE.equals(row.get("state")) || row.get("retry_after")!=null
+          || !Objects.equals(collection,row.get("collection")))return false;
+      String unit=row.get("unit_revision");
+      return unit!=null && unit.startsWith("release030/job/") && row.get("ingestion_root")==null
+          && row.get("planned_source_sha256")==null && row.get("originator")==null && row.get("transport")==null
+          && releaseRecovery.preparedFor(release030RecoveryIdentity());
+    }catch(SQLException|IOException invalid){throw new IllegalStateException("Conditional DELETE proof unavailable",invalid);}
+    finally{unlockAfterChanges();}
+  }
+
+  public Set<String> retirementRootCollections(SwitchBufferOp op) {
+    lockTimed();try {
+      String declared=retirementRootCollection(op);
+      return declared == null ? Set.of() : Set.of(declared);
+    }
+    finally{unlockAfterChanges();}
+  }
+  private java.util.function.BiPredicate<String,String> retainedRootScopes(List<SwitchBufferOp> journal) throws IOException {
+    if (releaseRecovery == null || !releaseRecovery.retiringBuild()) return (path,unit) -> false;
+    var roots = new ArrayList<String>();
+    for (var root : releaseRecovery.rootReceipts())
+      roots.add(PathNormalizer.normalizePathPrefix(SwitchBufferSyncRoot.decode(root.payload()).rootPath()));
+    var exact = new HashSet<String>();
+    for (Path path : releaseRecovery.retirementPaths().keySet()) exact.add(PathNormalizer.normalizeKey(path));
+    for (Path path : release030ExactFiles) exact.add(PathNormalizer.normalizeKey(path));
+    for (Path path : release030IndependentDebt) exact.add(PathNormalizer.normalizeKey(path));
+    for (var receipt : journal) {
+      if ("UPSERT".equals(receipt.op())) exact.add(SwitchBufferUpsert.decode(receipt.payload()).path());
+      if ("DELETE".equals(receipt.op())) exact.add(SwitchBufferDelete.decode(receipt.payload()).path());
+    }
+    return (path,unit) -> unit != null && (unit.startsWith("root1:") || unit.startsWith("root2:")) || exact.contains(path)
+        || roots.stream().anyMatch(prefix -> path.equals(prefix.substring(0,prefix.length()-1)) || path.startsWith(prefix));
+  }
+  private record RetirementDelete(long order, String path,
+      PathPrefixScope prefix, String collection) {
+    boolean matches(String candidate, String owner) {
+      return path != null ? path.equals(candidate) : prefix != null ? prefix.contains(candidate)
+          : Objects.equals(collection, owner == null || owner.isBlank() ? "default" : owner);
+    }
+  }
+
+  private List<RetirementDelete> retirementDeletes(List<SwitchBufferOp> journal) throws IOException {
+    var byVersion = new java.util.LinkedHashMap<String,SwitchBufferOp>();
+    if (releaseRecovery != null) for (var r : releaseRecovery.committedDeletes()) byVersion.put(r.retirementUuid(), r);
+    for (var r : journal) if (List.of("DELETE","DELETE_PREFIX","DELETE_COLLECTION").contains(r.op()))
+      byVersion.put(r.retirementUuid(), r);
+    var result = new ArrayList<RetirementDelete>();
+    for (var receipt : byVersion.values()) {
+      switch (receipt.op()) {
+        case "DELETE" -> {
+          var deletion = SwitchBufferDelete.decode(receipt.payload());
+          if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT)
+            result.add(new RetirementDelete(receipt.acceptedOrder(), deletion.path(), null, null));
+        }
+        case "DELETE_PREFIX" -> result.add(new RetirementDelete(receipt.acceptedOrder(), null,
+            PathPrefixScope.decode(receipt.payload()), null));
+        case "DELETE_COLLECTION" -> result.add(new RetirementDelete(receipt.acceptedOrder(), null, null, receipt.payload()));
+        default -> throw new IOException("Invalid retained delete receipt");
+      }
+    }
+    return List.copyOf(result);
+  }
+
+  private long latestDelete(List<RetirementDelete> deletes, String path, String collection) {
+    return deletes.stream().filter(d -> d.matches(path,collection)).mapToLong(RetirementDelete::order).max().orElse(0);
+  }
+  private record RetirementRoot(PathPrefixScope scope,
+      JobQueue.EnqueueProvenance provenance, String collection, String policy) {}
+  private record RetirementOrders(Map<String,Long> roots, Map<String,Long> files, Map<String,Long> fileWinners,
+      Map<String,List<SwitchBufferUpsert>> filesByPath, Map<String,RetirementRoot> rootIntents,
+      Map<String,Release030RecoveryState.Correction> corrections,
+      Map<String,List<Release030RecoveryState.Correction>> predecessors, Map<String,SwitchBufferOp> receipts) {}
+
+  private PathPrefixScope retirementScope(SwitchBufferOp receipt,List<SwitchBufferOp> roots) throws IOException {
+    var declarations = new HashSet<>(
+        io.justsearch.configuration.persistence.WatchedRootsFormat.declaredPaths(dbPath.getParent()));
+    for (var root : roots) if (root.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX))
+      declarations.add(Path.of(SwitchBufferSyncRoot.decode(root.payload()).rootPath()).toAbsolutePath().normalize());
+    var intent=SwitchBufferSyncRoot.decode(receipt.payload());
+    Path boundary=Path.of(intent.rootPath()).toAbsolutePath().normalize();
+    return new PathPrefixScope(intent.rootPath(),declarations.stream()
+        .filter(root -> !root.equals(boundary) && root.startsWith(boundary)).map(Path::toString).toList());
+  }
+
+  private RetirementOrders retirementOrders(List<SwitchBufferOp> journal) throws IOException {
+    var roots = new HashMap<String,Long>();
+    var receipts = releaseRecovery.rootReceipts();
+    var intents = new HashMap<String,RetirementRoot>();
+    for (var receipt : receipts) {
+      var intent = SwitchBufferSyncRoot.decode(receipt.payload());
+      Path boundary = Path.of(intent.rootPath()).toAbsolutePath().normalize();
+      String canonical = PathNormalizer.normalizeKey(boundary);
+      if (!canonical.equals(intent.rootPath())
+          && !PathNormalizer.normalizePathPrefix(canonical).equals(intent.rootPath())) continue;
+      var scope = releaseRecovery.rootScope(receipt);
+      if (scope == null) scope = retirementScope(receipt,receipts); // Existing frozen root1 compatibility.
+      roots.put(receipt.retirementUuid(), receipt.acceptedOrder());
+      intents.put(receipt.retirementUuid(), new RetirementRoot(scope,
+          intent.provenance(), retirementRootCollection(receipt), releaseRecovery.rootPolicy(receipt)));
+    }
+    var files = new HashMap<String,Long>();
+    var winners = new HashMap<String,Long>();
+    var filesByPath = new HashMap<String,List<SwitchBufferUpsert>>();
+    for (var receipt : journal) if ("UPSERT".equals(receipt.op())) {
+      var file = SwitchBufferUpsert.decode(receipt.payload());
+      if (file.unitRevision() != null) {
+        files.put(file.path() + "\0" + file.unitRevision(), receipt.acceptedOrder());
+        winners.merge(file.path(),receipt.acceptedOrder(),Math::max);
+        filesByPath.computeIfAbsent(file.path(),ignored->new ArrayList<>()).add(file);
+      }
+    }
+    var corrections = new HashMap<String,Release030RecoveryState.Correction>();
+    var predecessors = new HashMap<String,List<Release030RecoveryState.Correction>>();
+    for (var version : releaseRecovery.corrections()) {
+      if (corrections.put(version.replacement().unitRevision(),version) != null)
+        throw new IOException("Duplicate correction identity");
+      if (version.predecessor() != null) predecessors.computeIfAbsent(
+          Objects.toString(version.predecessor().get("unit_revision"),""), ignored -> new ArrayList<>()).add(version);
+    }
+    var owners = new HashMap<String,SwitchBufferOp>();
+    for (var receipt : journal) owners.put(receipt.retirementUuid(),receipt);
+    for (var version : corrections.values()) if (version.owner() != null
+        && !Objects.equals(owners.get(version.owner().retirementUuid()),version.owner()))
+      throw new IOException("Correction lacks its actual original owner");
+    return new RetirementOrders(Map.copyOf(roots), Map.copyOf(files), Map.copyOf(winners), Map.copyOf(filesByPath), Map.copyOf(intents),
+        Map.copyOf(corrections), Map.copyOf(predecessors), Map.copyOf(owners));
+  }
+
+  private long actualUnitOrder(String path, String unit, RetirementOrders orders) throws IOException {
+    var origin = RootOrigin.fromUnit(unit);
+    if (origin != null) {
+      if (!Objects.equals(orders.roots().get(origin.uuid()), origin.acceptedOrder()))
+        throw new IOException("Unknown ROOT unit receipt");
+      return origin.acceptedOrder();
+    }
+    Long exact = orders.files().get(path + "\0" + unit);
+    return exact != null ? exact : unit != null && unit.startsWith("release030/") ? 0 : -1;
+  }
+  /** Receipt position alone never authorizes a changed row, even within one admission binding. */
+  private long validatedUnitOrder(ClaimCandidate row, RetirementOrders orders) throws IOException, SQLException {
+    return validatedUnitOrder(row,orders,false);
+  }
+  private long validatedUnitOrder(ClaimCandidate row, RetirementOrders orders, boolean retainedPredecessor)
+      throws IOException, SQLException {
+    String path = row.key().path();
+    if (!path.equals(PathNormalizer.normalizeKey(Path.of(path)))) return -1;
+    var correction = orders.corrections().get(row.revision());
+    if (correction != null) {
+      // Check the complete immutable packet before consulting its original owner. In particular,
+      // a planned-hash ROOT never falls back to the ordinary null-plan ROOT predicate.
+      if (!matchesCorrection(row,correction.replacement())) return -1;
+      return correctionOwnerOrder(correction.owner(),correction.scope(),orders);
+    }
+    if (!retainedPredecessor) for (var pending : orders.predecessors().getOrDefault(Objects.toString(row.revision(),""),List.of())) {
+      if (matchesPredecessor(row,pending.predecessor())) return -1;
+    }
+    long order = actualUnitOrder(path, row.revision(), orders);
+    var origin = RootOrigin.fromUnit(row.revision());
+    if (origin != null) {
+      var intent = orders.rootIntents().get(origin.uuid());
+      String boundary = PathNormalizer.normalizeKey(Path.of(intent.scope().prefix()));
+      var provenance = intent.provenance();
+      if (row.revision().startsWith("root2:")) {
+        if (intent.policy() == null
+            || !intent.scope().contains(path) || !Objects.equals(boundary,row.ingestionRoot())
+            || row.walkEpoch() != null || correctionHasRecordedOwner(path,watcherRowLocked(path))
+            || row.plannedHash() != null
+            || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path),Path.of(boundary))
+            || !row.revision().split(":",-1)[4].equals(SwitchBufferCapableQueue.rootMemberDigest(
+                path,row.collection(),row.originator(),row.transport(),row.ingestionRoot(),row.plannedHash()))) return -1;
+        return order;
+      }
+      if (intent.collection() == null || !intent.scope().contains(path) || !Objects.equals(boundary, row.ingestionRoot())
+          || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path), Path.of(boundary))
+          || !Objects.equals(provenance == null ? null : provenance.originator(), row.originator())
+          || !Objects.equals(provenance == null ? null : provenance.transport(), row.transport())
+          || !Objects.equals(normalizedRetirementCollection(intent.collection()), normalizedRetirementCollection(row.collection()))
+          || row.plannedHash() != null) return -1;
+      return order;
+    }
+    if (order > 0) {
+      for (var file : orders.filesByPath().getOrDefault(path, List.of())) {
+        if (!Objects.equals(file.unitRevision(), row.revision())) continue;
+        var provenance = file.provenance();
+        if (Objects.equals(file.sourceSha256(), row.plannedHash())
+            && Objects.equals(file.collection(), row.collection())
+            && Objects.equals(PathNormalizer.normalizeKey(file.ingestionRoot()), row.ingestionRoot())
+            && Objects.equals(provenance == null ? null : provenance.originator(), row.originator())
+            && Objects.equals(provenance == null ? null : provenance.transport(), row.transport())) return order;
+      }
+      return -1;
+    }
+    return order;
+  }
+
+  private static String normalizedRetirementCollection(String collection) {
+    return collection == null || collection.isBlank() ? "default" : collection;
+  }
+
+  private static boolean matchesCorrection(ClaimCandidate row, SwitchBufferUpsert file) {
+    var provenance = file.provenance();
+    return file.path().equals(row.key().path()) && Objects.equals(file.unitRevision(),row.revision())
+        && Objects.equals(file.sourceSha256(),row.plannedHash()) && Objects.equals(file.collection(),row.collection())
+        && Objects.equals(PathNormalizer.normalizeKey(file.ingestionRoot()),row.ingestionRoot())
+        && Objects.equals(provenance == null ? null : provenance.originator(),row.originator())
+        && Objects.equals(provenance == null ? null : provenance.transport(),row.transport())
+        && row.walkEpoch() == null;
+  }
+
+  private static boolean matchesPredecessor(ClaimCandidate row, Map<String,String> predecessor) {
+    return predecessor != null && row.key().path().equals(predecessor.get("path"))
+        && Objects.equals(row.revision(),predecessor.get("unit_revision"))
+        && Objects.equals(row.collection(),predecessor.get("collection"))
+        && Objects.equals(row.originator(),predecessor.get("originator"))
+        && Objects.equals(row.transport(),predecessor.get("transport"))
+        && Objects.equals(row.plannedHash(),predecessor.get("planned_source_sha256"))
+        && Objects.equals(row.ingestionRoot(),predecessor.get("ingestion_root"))
+        && Objects.equals(row.scanId(),predecessor.get("scan_id"))
+        && Objects.equals(row.walkEpoch() == null ? null : row.walkEpoch().toString(),predecessor.get("walk_seen_epoch"));
+  }
+
+  private long correctionOwnerOrder(SwitchBufferOp owner, SwitchBufferUpsert scope,
+      RetirementOrders orders) throws IOException {
+    if (owner != null && !Objects.equals(orders.receipts().get(owner.retirementUuid()),owner)) return -1;
+    if (owner != null && "SYNC_ROOT".equals(owner.op())) {
+      var intent = orders.rootIntents().get(owner.retirementUuid());
+      if (intent == null || intent.policy() == null || !intent.scope().contains(scope.path())
+          || intent.collection() != null && !Objects.equals(intent.collection(),scope.collection())
+          || intent.provenance() != null && !Objects.equals(intent.provenance(),scope.provenance())
+          || !Objects.equals(PathNormalizer.normalizeKey(Path.of(intent.scope().prefix())),
+              PathNormalizer.normalizeKey(scope.ingestionRoot()))
+          || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
+              Path.of(scope.path()),scope.ingestionRoot())) return -1;
+      return owner.acceptedOrder();
+    }
+    if (owner != null && "DELETE".equals(owner.op()))
+      return nativeConditionalCorrectionOwner(owner,scope,orders) ? owner.acceptedOrder() : -1;
+    if (owner != null) {
+      var frozen = releaseRecovery.legacyExpectation(owner);
+      if (!"UPSERT".equals(owner.op()) || owner.payload().stripLeading().startsWith("{")
+          || !Objects.equals(frozen,scope)) return -1;
+      return owner.acceptedOrder();
+    }
+    String collection = releaseRecovery.retirementPaths().get(Path.of(scope.path()));
+    return collection != null && Path.of(scope.path()).equals(scope.ingestionRoot())
+        && Objects.equals(normalizedRetirementCollection(collection),normalizedRetirementCollection(scope.collection()))
+        && (scope.provenance() == null
+            || matchesIndependentRetirementScope(scope,watcherReconciliationRow(scope.path()))
+            || orders.corrections().values().stream().anyMatch(version -> version.owner() == null
+                && version.scope().equals(scope)
+                && matchesIndependentRetirementScope(scope,version.predecessor()))) ? 0 : -1;
+  }
+
+  /** An unjournalled B difference retains its exact bounded Q attribution, never a ROOT role. */
+  private static boolean matchesIndependentRetirementScope(SwitchBufferUpsert scope,Map<String,String> row) {
+    var provenance = scope.provenance();
+    return row != null && scope.path().equals(row.get("path"))
+        && scope.path().equals(row.get("ingestion_root"))
+        && isAdmissionRevision(row.get("unit_revision"))
+        && Objects.equals(normalizedRetirementCollection(scope.collection()),normalizedRetirementCollection(row.get("collection")))
+        && Objects.equals(provenance == null ? null : provenance.originator(),row.get("originator"))
+        && Objects.equals(provenance == null ? null : provenance.transport(),row.get("transport"));
+  }
+
+  /** A native conditional event owns present-file reconciliation, never a historical ROOT role. */
+  private boolean nativeConditionalCorrectionOwner(SwitchBufferOp owner, SwitchBufferUpsert scope,
+      RetirementOrders orders) throws IOException {
+    var deletion=SwitchBufferDelete.decode(owner.payload());
+    if (deletion.origin()!=SwitchBufferDelete.Origin.LEGACY || !owner.generation().isBlank()
+        || !owner.key().equals("path:"+deletion.path()) || !deletion.path().equals(scope.path())
+        || !scope.path().equals(PathNormalizer.normalizeKey(scope.ingestionRoot()))
+        || scope.collection()==null || scope.collection().isBlank() || scope.provenance()!=null
+        || scope.unitRevision()!=null || scope.sourceSha256()!=null
+        || !orders.filesByPath().getOrDefault(scope.path(),List.of()).isEmpty()
+        || orders.rootIntents().values().stream().noneMatch(root -> "LEGACY_EXECUTION".equals(root.policy()))) return false;
+    try {
+      if (!releaseRecovery.preparedFor(release030RecoveryIdentity())
+          || hasUnownedModernAdmission(Path.of(scope.path()))) return false;
+      var row=watcherRowLocked(scope.path());
+      if (row==null || correctionHasRecordedOwner(scope.path(),row)) return false;
+      var seen=new HashSet<String>();
+      while (true) {
+        var version=orders.corrections().get(row.get("unit_revision"));
+        if (version==null) {
+          // A cancelled SQL transition may leave mutable retry fields on its original unit.
+          var predecessor=row;
+          version=orders.predecessors().getOrDefault(row.get("unit_revision"),List.of()).stream()
+              .filter(v -> Objects.equals(v.owner(),owner) && v.scope().equals(scope)
+                  && sameCorrectionPredecessor(v.predecessor(),predecessor)).findFirst().orElse(null);
+          if (version==null) break;
+        } else if (!matchesCorrection(correctionCandidate(row),version.replacement())) return false;
+        if (!Objects.equals(version.owner(),owner) || !version.scope().equals(scope)
+            || version.predecessor()==null || !seen.add(version.replacement().unitRevision())) return false;
+        row=version.predecessor();
+        // An intent whose SQL rolled back points to the same original unit.
+        if (row.get("unit_revision")==null) return false;
+        if (row.get("unit_revision").startsWith("release030/job/")) break;
+      }
+      String unit=row.get("unit_revision");
+      String cohort=releaseRecovery.nativeCohort();
+      return cohort!=null && unit!=null && unit.matches("release030/job/"+cohort+"/[0-9a-f]{32}")
+          && STATE_DONE.equals(row.get("state")) && row.get("retry_after")==null
+          && Objects.equals(scope.collection(),row.get("collection"))
+          && row.get("ingestion_root")==null && row.get("planned_source_sha256")==null
+          && row.get("originator")==null && row.get("transport")==null
+          && !correctionHasRecordedOwner(scope.path(),row);
+    } catch (SQLException invalid) { throw new IOException("Native conditional predecessor unavailable",invalid); }
+  }
+
+  private boolean currentCorrectionOwner(SwitchBufferOp owner, SwitchBufferUpsert scope,
+      RetirementOrders orders, List<RetirementDelete> deletes) throws IOException {
+    long order = correctionOwnerOrder(owner,scope,orders);
+    if (order < 0 || orders.fileWinners().getOrDefault(scope.path(),0L) > order
+        || latestDelete(deletes,scope.path(),scope.collection()) > order) return false;
+    for (var root : orders.rootIntents().entrySet())
+      if (root.getValue().scope().contains(scope.path()) && orders.roots().get(root.getKey()) > order
+          && !orders.receipts().get(root.getKey()).key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX)
+          // A force-false declaration does not create ownership of independent B differences.
+          // Their current Q row still has to pass the complete correction/claim checks.
+          && !((owner==null || "DELETE".equals(owner.op())) && root.getValue().policy()!=null
+              && !SwitchBufferSyncRoot.decode(orders.receipts().get(root.getKey()).payload()).force())) return false;
+    return true;
+  }
+
+  /** An actual ordinary indexed owner remains responsible when force=false did not admit it. */
+  private boolean preservedIndexedRootOwner(SwitchBufferOp owner,SwitchBufferUpsert scope,
+      Map<String,String> row,RetirementOrders orders,List<RetirementDelete> deletes) throws IOException,SQLException {
+    return preservedIndexedRootOwner(owner,scope,row,orders,deletes,false);
+  }
+  private boolean preservedIndexedRootOwner(SwitchBufferOp owner,SwitchBufferUpsert scope,
+      Map<String,String> row,RetirementOrders orders,List<RetirementDelete> deletes,boolean predecessor) throws IOException,SQLException {
+    if(owner==null || !"SYNC_ROOT".equals(owner.op())
+        || owner.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX)
+        || retirementRootLegacyExecution(owner) || row==null || !STATE_DONE.equals(row.get("state"))
+        || row.get("retry_after")!=null
+        || validatedUnitOrder(correctionCandidate(row),orders,predecessor)!=owner.acceptedOrder()
+        || correctionOwnerOrder(owner,scope,orders)!=owner.acceptedOrder()
+        || orders.fileWinners().getOrDefault(scope.path(),0L)>owner.acceptedOrder()
+        || latestDelete(deletes,scope.path(),scope.collection())>owner.acceptedOrder())return false;
+    for(var later:orders.rootIntents().entrySet()) {
+      if(!later.getValue().scope().contains(scope.path()) || orders.roots().get(later.getKey())<=owner.acceptedOrder())continue;
+      var receipt=orders.receipts().get(later.getKey());
+      if(receipt.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX))continue;
+      if(later.getValue().policy()==null || SwitchBufferSyncRoot.decode(receipt.payload()).force())return false;
+    }
+    return true;
+  }
+
+  private boolean preservedCorrectionOwner(Release030RecoveryState.Correction correction,
+      RetirementOrders orders,List<RetirementDelete> deletes) throws IOException,SQLException {
+    var seen=new HashSet<String>();var current=correction;
+    while(current.predecessor()!=null) {
+      var predecessor=current.predecessor();
+      var earlier=orders.corrections().get(predecessor.get("unit_revision"));
+      if(earlier==null)return preservedIndexedRootOwner(current.owner(),current.scope(),predecessor,orders,deletes,true);
+      if(!seen.add(earlier.replacement().unitRevision()) || !Objects.equals(earlier.owner(),correction.owner())
+          || !earlier.scope().equals(correction.scope())
+          || !matchesCorrection(correctionCandidate(predecessor),earlier.replacement()))return false;
+      current=earlier;
+    }
+    return false;
+  }
+
+  /** Current applicable retained ROOT, including a successor whose walk is still pending. */
+  public SwitchBufferOp retirementCorrectionRoot(String path) {
+    lockTimed();
+    try {
+      var orders = retirementOrders(retirementReplayOps());
+      return releaseRecovery.rootReceipts().stream().filter(root -> {
+        var intent = orders.rootIntents().get(root.retirementUuid());
+        return intent != null && intent.scope().contains(path)
+            && !root.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX);
+      }).max(java.util.Comparator.comparingLong(SwitchBufferOp::acceptedOrder)).orElse(null);
+    } catch (IOException invalid) { throw new IllegalStateException("Current ROOT ownership unavailable",invalid); }
+    finally { unlockAfterChanges(); }
+  }
+
+  public void removeRetirementCollection(String collection, List<String> survivors) {
+    lockTimed();
+    try {
+      ensureOpen();
+      var excluded = normalizeSurvivorPaths(survivors);
+      String cursor = "";
+      while (true) {
+        var page = new ArrayList<String>();
+        try (var query = connection.prepareStatement(
+            "SELECT path FROM jobs WHERE collection=? AND path>? ORDER BY path LIMIT 256")) {
+          query.setString(1, collection); query.setString(2, cursor);
+          try (var rows = query.executeQuery()) { while (rows.next()) page.add(rows.getString(1)); }
+        }
+        if (page.isEmpty()) break;
+        String last = page.getLast();
+        // The existing owner preserves recorded membership/ledger rules. Each transaction
+        // materializes at most this page; an interrupted removal retains its replay receipt.
+        removeJobsAdministratively("collection=? AND path>? AND path<=?",
+            List.of(collection, cursor, last), true, excluded);
+        cursor = last;
+      }
+    } catch (SQLException invalid) {
+      throw new IllegalStateException("Retirement Q collection removal failed", invalid);
+    } finally { unlockAfterChanges(); }
+  }
+
+  public record RootMember(String path,String unit,String collection,String boundary,String state,String hash,
+      SwitchBufferOp root) {}
+  /** Bounded pages of existing Q evidence; no independent membership census is persisted. */
+  public List<RootMember> rootMembersAfter(String cursor) {
+    lockTimed();try {
+      var result=new ArrayList<RootMember>();
+      var orders = retirementOrders(retirementReplayOps());
+      var roots = orders.receipts();
+      try(var q=connection.prepareStatement("SELECT path,unit_revision,collection,ingestion_root,state,content_hash,originator,transport,scan_id,walk_seen_epoch,planned_source_sha256 FROM jobs WHERE path>? AND (unit_revision LIKE 'root1:%' OR unit_revision LIKE 'root2:%') ORDER BY path LIMIT 256")) {
+        q.setString(1,cursor);try(var r=q.executeQuery()){while(r.next()){
+          var origin=RootOrigin.fromUnit(r.getString(2));
+          var receipt=roots.get(origin.uuid());
+          if (receipt == null || receipt.acceptedOrder()!=origin.acceptedOrder()) throw new IOException("Missing ROOT owner");
+          long epoch=r.getLong(10); Long walkEpoch=r.wasNull()?null:epoch;
+          var candidate = new ClaimCandidate(new ClaimKey(0,r.getString(1)),r.getString(3),r.getString(7),r.getString(8),
+              r.getString(9),r.getString(2),walkEpoch,r.getString(11),r.getString(4));
+          String memberState=validatedUnitOrder(candidate,orders)<0?"UNVERIFIED":r.getString(5);
+          result.add(new RootMember(r.getString(1),r.getString(2),r.getString(3),r.getString(4),memberState,r.getString(6),receipt));
+        }}
+      }return List.copyOf(result);
+    }catch(SQLException|IOException invalid){throw new IllegalStateException("ROOT member evidence unavailable",invalid);}
+    finally{unlockAfterChanges();}
+  }
+  public java.util.function.ToLongBiFunction<String,String> retirementDeleteOrders() {
+    lockTimed();
+    try {
+      var deletes = retirementDeletes(retirementReplayOps());
+      return (path,collection) -> latestDelete(deletes,path,collection);
+    } catch (IOException invalid) { throw new IllegalStateException("ROOT delete order unavailable",invalid); }
+    finally { unlockAfterChanges(); }
+  }
+
+  /** Reconcile each validated admission set once, before claims or ordinary writer waits. */
+  public void prepareRetirementClaims() throws SQLException, IOException {
+    lockTimed();
+    try {
+      if (releaseRecovery == null || !releaseRecovery.retiringBuild() || !releaseRecovery.rootsInventoried()) return;
+      var journal = retirementReplayOps();
+      String binding = releaseRecovery.admissionBinding();
+      if (rootClaimsPrepared && Objects.equals(retirementClaimsBinding, binding)) return;
+      var orders = retirementOrders(journal);
+      var deletes = retirementDeletes(journal);
+      var historical = releaseRecovery.committedDeletes();
+      var retained = retainedRootScopes(journal);
+      inTransaction(() -> {
+        reconcileRetirementClaimsInTransaction(orders, deletes, retained);
+        return null;
+      });
+      // The SQL owner has committed. A retained recorded row is either a later validated
+      // owner or is fenced by the same full-row predicate used at every actual claim.
+      if (!Objects.equals(binding, releaseRecovery.admissionBinding()))
+        throw new IOException("Retirement admissions changed during reconciliation");
+      releaseRecovery.queuePrepared();
+      for (var deletion : historical) releaseRecovery.markDeletionQueueComplete(deletion);
+      retirementClaimsBinding = binding;
+      rootClaimsPrepared = true;
+      claimCursor = null;
+      claimOrderVersion++;
+    } finally { unlockAfterChanges(); }
+  }
+
+  private List<ClaimCandidate> retirementRowsAfter(String cursor, String end) throws SQLException {
+    var page = new ArrayList<ClaimCandidate>();
+    try (var query = connection.prepareStatement(
+        "SELECT path,last_updated,collection,originator,transport,scan_id,unit_revision,"
+            + "walk_seen_epoch,planned_source_sha256,ingestion_root FROM jobs WHERE path>?"
+            + (end == null ? " ORDER BY path LIMIT 256" : " AND path<=? ORDER BY path"))) {
+      query.setString(1, cursor);
+      if (end != null) query.setString(2, end);
+      try (var row = query.executeQuery()) {
+        while (row.next()) {
+          long epoch = row.getLong(8); Long walkEpoch = row.wasNull() ? null : epoch;
+          page.add(new ClaimCandidate(new ClaimKey(row.getLong(2),row.getString(1)),
+              row.getString(3),row.getString(4),row.getString(5),row.getString(6),row.getString(7),
+              walkEpoch,row.getString(9),row.getString(10)));
+        }
+      }
+    }
+    return page;
+  }
+
+  private void reconcileRetirementClaimsInTransaction(RetirementOrders orders,
+      List<RetirementDelete> deletes, java.util.function.BiPredicate<String,String> retained) throws SQLException {
+    String cursor = "";
+    while (true) {
+      var page = retirementRowsAfter(cursor, null);
+      if (page.isEmpty()) return;
+      for (var row : page) {
+        long order;
+        try { order = validatedUnitOrder(row, orders); }
+        catch (IOException | RuntimeException unknown) { continue; } // Unknown ownership stays claim-held.
+        // A legacy cohort prefix establishes age, not its original full metadata. Without
+        // a validated exact/ROOT owner it remains claim-held under any overriding delete.
+        if (order > 0 && Math.max(latestDelete(deletes, row.key().path(), row.collection()),
+            orders.fileWinners().getOrDefault(row.key().path(), 0L)) > order) {
+          removeJobsAdministrativelyInTransaction("path=? AND unit_revision IS ? AND collection IS ?"
+                  + " AND originator IS ? AND transport IS ? AND planned_source_sha256 IS ? AND ingestion_root IS ?",
+              java.util.Arrays.asList(row.key().path(), row.revision(), row.collection(), row.originator(),
+                  row.transport(), row.plannedHash(), row.ingestionRoot()), true, Set.of());
+        }
+      }
+      String last = page.getLast().key().path();
+      // Administrative coverage can retain DONE members or sealed unacknowledged rows.
+      // Classify actual survivors, rather than treating affected-row counts as absence.
+      for (var row : retirementRowsAfter(cursor, last)) {
+        long deleted = latestDelete(deletes, row.key().path(), row.collection());
+        if (deleted == 0) continue;
+        try {
+          long order = validatedUnitOrder(row, orders);
+          if (order > deleted && order >= orders.fileWinners().getOrDefault(row.key().path(), 0L)) continue;
+        } catch (IOException | RuntimeException unknown) { /* Must be claim-held below. */ }
+        if (retirementAllowsClaim(row, orders, deletes, retained, true))
+          throw new SQLException("Unreconciled retirement member remains claimable");
+      }
+      cursor = last;
+    }
+  }
+  private boolean retirementAllowsClaim(ClaimCandidate row, RetirementOrders orders,
+      List<RetirementDelete> deletes, java.util.function.BiPredicate<String,String> retained) {
+    return retirementAllowsClaim(row, orders, deletes, retained, rootClaimsPrepared);
+  }
+  private boolean retirementAllowsClaim(ClaimCandidate row, RetirementOrders orders,
+      List<RetirementDelete> deletes, java.util.function.BiPredicate<String,String> retained, boolean prepared) {
+    if (orders == null) return true;
+    try {
+      long deleted = latestDelete(deletes, row.key().path(), row.collection());
+      long newerFile = orders.fileWinners().getOrDefault(row.key().path(),0L);
+      if (!retained.test(row.key().path(),row.revision()) && deleted == 0 && newerFile == 0) return true;
+      if (!prepared) return false;
+      var correction = orders.corrections().get(row.revision());
+      if (correction != null && !currentCorrectionOwner(correction.owner(),correction.scope(),orders,deletes)
+          && !preservedCorrectionOwner(correction,orders,deletes)) return false;
+      long order = validatedUnitOrder(row, orders);
+      return order >= 0 && (deleted == 0 || order > deleted) && (newerFile == 0 || order >= newerFile);
+    } catch (IOException | SQLException | RuntimeException unavailable) { return false; }
+  }
+
+  private void replaceLegacyPrefix(SwitchBufferOp before, SwitchBufferOp after) throws SQLException {
+    try (var update = connection.prepareStatement("UPDATE switch_buffer SET payload=?,revision=? WHERE generation=? AND key=? AND revision=? AND payload=? AND accepted_order=? AND last_updated=?")) {
+      update.setString(1,after.payload()); update.setString(2,after.revision()); update.setString(3,before.generation());
+      update.setString(4,before.key()); update.setString(5,before.revision()); update.setString(6,before.payload());
+      update.setLong(7,before.acceptedOrder()); update.setLong(8,before.lastUpdatedMs());
+      if (update.executeUpdate()!=1) throw new SQLException("Legacy prefix receipt changed during conversion");
+    }
+    if (releaseRecovery != null && releaseRecovery.retiringBuild()) releaseRecovery.admissionsChanged();
+  }
+
+  private void applyRetainedPrefixConversions() throws SQLException, IOException {
+    var pairs = releaseRecovery.prefixConversions();
+    inTransaction(() -> {
+      var current = switchBufferOps.listAllStrict();
+      for (var pair : pairs) if (current.contains(pair.predecessor())) replaceLegacyPrefix(pair.predecessor(),pair.successor());
+      return null;
+    });
+  }
+
+  /** Reconstruct a missing accepted exact unit from its receipt, never a fresh acknowledgement. */
+  public void recoverRetirementExact(SwitchBufferUpsert file) {
+    lockTimed();
+    try {
+      ensureOpen();
+      inTransaction(() -> {
+        var journal = retirementReplayOps();
+        var matching = journal.stream().filter(op -> "UPSERT".equals(op.op())
+            && SwitchBufferUpsert.decode(op.payload()).equals(file)).findFirst().orElseThrow(
+                () -> new IllegalStateException("Exact recovery lacks its original receipt"));
+        try {
+        var orders = retirementOrders(journal);
+        if (orders.fileWinners().getOrDefault(file.path(),0L)>matching.acceptedOrder()
+            || latestDelete(retirementDeletes(journal),file.path(),file.collection())>matching.acceptedOrder()) return null;
+        var row = watcherRowLocked(file.path());
+        if (row != null) {
+          long order = actualUnitOrder(file.path(),row.get("unit_revision"),orders);
+          if (order<0 || order>=matching.acceptedOrder()) return null;
+        }
+        if (enqueueEntriesInTransaction(List.of(file.entry()),file.collection(),null,System.currentTimeMillis(),
+            true,file.unitRevision())!=1) throw new SQLException("Short accepted exact recovery");
+        claimCursor=null;
+        return null;
+        } catch (IOException invalid) { throw new SQLException("Exact recovery evidence unavailable",invalid); }
+      });
+    } catch (SQLException invalid) { throw new IllegalStateException("Accepted exact recovery failed",invalid); }
+    finally { unlockAfterChanges(); }
+  }
+
+  private static final List<String> CORRECTION_PREDECESSOR_IDENTITY = List.of("path", "unit_revision",
+      "collection", "originator", "transport", "scan_id", "walk_seen_epoch", "planned_source_sha256",
+      "ingestion_root", "size_bytes");
+
+  private static boolean sameCorrectionPredecessor(Map<String,String> left, Map<String,String> right) {
+    if (left == null || right == null) return left == right;
+    return CORRECTION_PREDECESSOR_IDENTITY.stream().allMatch(key -> Objects.equals(left.get(key),right.get(key)));
+  }
+
+  private static ClaimCandidate correctionCandidate(Map<String,String> row) {
+    return new ClaimCandidate(new ClaimKey(Long.parseLong(row.get("last_updated")),row.get("path")),
+        row.get("collection"),row.get("originator"),row.get("transport"),row.get("scan_id"),row.get("unit_revision"),
+        row.get("walk_seen_epoch") == null ? null : Long.valueOf(row.get("walk_seen_epoch")),
+        row.get("planned_source_sha256"),row.get("ingestion_root"));
+  }
+
+  private boolean correctionHasRecordedOwner(String path, Map<String,String> row) throws SQLException {
+    if (row == null) return false;
+    if (row.get("walk_seen_epoch") != null) return true;
+    if (row.get("scan_id") != null && SqliteIngestionWalkOps.find(connection,row.get("scan_id")).isPresent()) return true;
+    try (var query = connection.prepareStatement(
+        "SELECT 1 FROM ingestion_ledger WHERE path_hash=? AND unit_revision=? AND operation_key IS NOT NULL LIMIT 1")) {
+      query.setString(1,sha256(path)); query.setString(2,row.get("unit_revision"));
+      try (var result = query.executeQuery()) { return result.next(); }
+    }
+  }
+
+  @Override public List<Integer> correctRetirementSources(List<RetirementSourceObservation> observations,
+      java.util.function.BooleanSupplier cancelled) {
+    if (observations.isEmpty()) return List.of();
+    lockTimed();
+    try {
+      ensureOpen();
+      if (releaseRecovery == null || !releaseRecovery.retiringBuild()
+          || !Objects.equals(release030RetirementGeneration(),releaseRecovery.retiringBuilding()))
+        return java.util.Collections.nCopies(observations.size(),0);
+      return inTransaction(() -> {
+        try {
+          var journal = retirementReplayOps();
+          var orders = retirementOrders(journal);
+          var deletes = retirementDeletes(journal);
+          var results = new ArrayList<Integer>();
+          for (var observation : observations)
+            results.add(correctRetirementSourceInTransaction(observation,journal,orders,deletes,cancelled));
+          return List.copyOf(results);
+        } catch (IOException invalid) { throw new SQLException("Correction ownership unavailable",invalid); }
+      });
+    } catch (SQLException invalid) { throw new IllegalStateException("Conditional retirement correction failed",invalid); }
+    finally { unlockAfterChanges(); }
+  }
+
+  private int correctRetirementSourceInTransaction(RetirementSourceObservation observation,
+      List<SwitchBufferOp> journal, RetirementOrders orders, List<RetirementDelete> deletes,
+      java.util.function.BooleanSupplier cancelled) throws SQLException, IOException {
+    var owner = observation.owner();
+    var scope = observation.scope();
+    var observedRow = observation.observedRow();
+    var sourceState = observation.sourceState();
+    var sourceSha256 = observation.sourceSha256();
+    long size = observation.size();
+    boolean targetMatches = observation.targetMatches();
+    boolean removal = sourceSha256 == null && sourceState != null
+        && (sourceState.equals("gone") || sourceState.startsWith("directory/")
+            || sourceState.startsWith("link/") || sourceState.startsWith("other/"));
+    if (sourceState == null || !targetMatches && !removal
+        && !JobQueue.IngestionLedgerTransition.isSha256(sourceSha256)) return 0;
+    if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new IllegalStateException("Correction cancelled");
+    var row = watcherRowLocked(scope.path());
+    if (!Objects.equals(row,observedRow) || activeClaims.containsKey(scope.path())
+        || row != null && STATE_PROCESSING.equals(row.get("state"))
+        || correctionHasRecordedOwner(scope.path(),row)) return 0;
+    Release030RecoveryState.Correction installed = row == null ? null : orders.corrections().get(row.get("unit_revision"));
+    var versions = orders.corrections().values();
+    var retained = versions.stream().filter(version -> Objects.equals(version.owner(),owner)
+        && version.scope().equals(scope) && sameCorrectionPredecessor(version.predecessor(),row))
+        .findFirst().orElse(null);
+    if (owner != null && "DELETE".equals(owner.op()) && !observation.indexedParentMatches()) return 0;
+    if (owner != null && !journal.contains(owner)
+        || !(currentCorrectionOwner(owner,scope,orders,deletes)
+            || (targetMatches || observation.indexedParentMatches())
+                && (preservedIndexedRootOwner(owner,scope,row,orders,deletes)
+                    || installed!=null && preservedCorrectionOwner(installed,orders,deletes)
+                    || retained!=null && preservedCorrectionOwner(retained,orders,deletes)))) return 0;
+    if (installed != null && (!Objects.equals(installed.owner(),owner) || !installed.scope().equals(scope)
+        || !matchesCorrection(correctionCandidate(row),installed.replacement()))) return 0;
+    // Stable source retries and terminal POLICY remain the same work. The packet does not
+    // prove which bytes the extractor observed before a policy skip.
+    boolean retainedPredecessor = retained != null;
+    if (row != null && installed == null && !retainedPredecessor) {
+      if (!STATE_DONE.equals(row.get("state"))) return 0;
+      String unit = row.get("unit_revision");
+      String cohort = releaseRecovery.nativeCohort();
+      boolean nativeRow = cohort != null && unit != null
+          && unit.matches("release030/(job|debt)/"+cohort+"/[0-9a-f]{32}");
+      if (owner == null && !nativeRow && !matchesIndependentRetirementScope(scope,row)) return 0;
+      var provenance = scope.provenance();
+      if (!Objects.equals(normalizedRetirementCollection(row.get("collection")),normalizedRetirementCollection(scope.collection()))
+          || !Objects.equals(row.get("originator"),provenance == null ? null : provenance.originator())
+          || !Objects.equals(row.get("transport"),provenance == null ? null : provenance.transport())) return 0;
+      String boundary = PathNormalizer.normalizeKey(scope.ingestionRoot());
+      if (!Objects.equals(boundary,row.get("ingestion_root"))) {
+        // A prefix alone cannot establish bootstrap provenance. Only this database's
+        // retained preparation receipt plus its actual v13 unit permits a missing FILE.
+        if (owner != null && "SYNC_ROOT".equals(owner.op()) || row.get("ingestion_root") != null
+            || !scope.path().equals(boundary) || hasUnownedModernAdmission(Path.of(scope.path()))
+            || !releaseRecovery.preparedFor(release030RecoveryIdentity())) return 0;
+      }
+      // A completed exact B row can outlive its FILE receipt. Its retained difference
+      // and exact Q boundary still own the source; ROOT rows keep their separate proof.
+      if (row.get("planned_source_sha256") != null
+          && (owner != null || !matchesIndependentRetirementScope(scope,row)
+              || !JobQueue.IngestionLedgerTransition.isSha256(row.get("planned_source_sha256")))) return 0;
+      if (owner != null && "SYNC_ROOT".equals(owner.op())) {
+        var origin = RootOrigin.fromUnit(row.get("unit_revision"));
+        boolean administrative = owner.key().startsWith(Release030RecoveryState.RETIREMENT_ROOT_KEY_PREFIX);
+        if (origin == null || (!administrative && !origin.uuid().equals(owner.retirementUuid()))
+            || (!administrative && origin.acceptedOrder() != owner.acceptedOrder())
+            || validatedUnitOrder(correctionCandidate(row),orders) != origin.acceptedOrder()
+            || origin.acceptedOrder()>owner.acceptedOrder()) return 0;
+      }
+    }
+    if (targetMatches) return 2;
+    // Permission is not settlement: the caller must recheck absence, remove A's image,
+    // commit it, then bring a fresh target proof. No fictitious UPSERT hash is admitted.
+    if (removal) return row == null || STATE_DONE.equals(row.get("state")) ? 3 : 0;
+    if (installed != null && sourceState.equals(installed.sourceState())) return 0;
+    Release030RecoveryState.Correction version = versions.stream()
+        .filter(v -> Objects.equals(v.owner(),owner) && v.scope().equals(scope)
+            && sameCorrectionPredecessor(v.predecessor(),row) && sourceState.equals(v.sourceState()))
+        .findFirst().orElse(null);
+    if (version == null) {
+      var provenance = scope.provenance();
+      String unit = owner != null && "SYNC_ROOT".equals(owner.op())
+          ? "root2:" + owner.retirementUuid() + ":" + owner.acceptedOrder() + ":"
+              + UUID.randomUUID().toString().replace("-", "") + ":"
+              + SwitchBufferCapableQueue.rootMemberDigest(scope.path(),scope.collection(),
+                  provenance == null ? null : provenance.originator(),provenance == null ? null : provenance.transport(),
+                  PathNormalizer.normalizeKey(scope.ingestionRoot()),sourceSha256)
+          : UUID.randomUUID().toString().replace("-", "");
+      var replacement = new SwitchBufferUpsert(scope.path(),scope.collection(),scope.provenance(),unit,
+          sourceSha256,scope.ingestionRoot());
+      version = new Release030RecoveryState.Correction(owner,releaseRecovery.retiringActive(),
+          releaseRecovery.retiringBuilding(),scope,row,sourceState,replacement);
+      releaseRecovery.retainCorrection(version); // Durable intent precedes SQL CAS.
+    }
+    if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new IllegalStateException("Correction cancelled");
+    var replacement = version.replacement();
+    if (row != null && !STATE_DONE.equals(row.get("state"))) {
+      String predicate = String.join(" AND ",row.keySet().stream().map(key -> key + " IS ?").toList());
+      try (var update = connection.prepareStatement("UPDATE jobs SET unit_revision=?,planned_source_sha256=? WHERE " + predicate)) {
+        update.setString(1,replacement.unitRevision()); update.setString(2,replacement.sourceSha256());
+        int parameter=3; for (String value : row.values()) update.setString(parameter++,value);
+        if (update.executeUpdate()!=1) throw new SQLException("Correction predecessor changed");
+      }
+    } else if (enqueueEntriesInTransaction(List.of(new JobQueue.EnqueueEntry(Path.of(scope.path()),size,
+        replacement.provenance(),replacement.sourceSha256(),replacement.ingestionRoot())),
+        replacement.collection(),null,System.currentTimeMillis(),true,replacement.unitRevision()) != 1)
+      throw new SQLException("Short corrective admission");
+    if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new IllegalStateException("Correction cancelled");
+    rootClaimsPrepared = false;
+    claimCursor = null;
+    claimOrderVersion++;
+    return 1;
+  }
+
+  /** Queue-owned union is validated before claims and every replay; no checkpoint leaf calls Q. */
+  public List<SwitchBufferOp> retirementReplayOps() {
+    lockTimed();
+    try {
+      ensureOpen();
+      var actual = switchBufferOps.listAllStrict();
+      if (releaseRecovery == null || !releaseRecovery.retiringBuild()) return actual;
+      var receipts = releaseRecovery.retirementReceipts(actual);
+      if (releaseRecovery.rootsInventoried()) releaseRecovery.validateRootHeads(actual.stream().filter(r -> "SYNC_ROOT".equals(r.op())).toList());
+      releaseRecovery.bindAdmissions(receipts);
+      return receipts;
+    } catch (IOException invalid) { throw new IllegalStateException(MigrationJournalWitness.REFUSAL + ": " + invalid.getMessage(),invalid); }
+    finally { unlockAfterChanges(); }
+  }
+
+  public boolean retirementReplayComplete() {
+    retirementReplayOps();
+    return releaseRecovery != null && releaseRecovery.replayComplete();
+  }
+
+  /** Authorization is durable first. Conditional SQL removal is never a current-Q proof. */
+  public boolean acknowledgeRetirementReplay(List<SwitchBufferOp> verified,
+      Map<String,SwitchBufferUpsert> legacyFiles) {
+    lockTimed();
+    try {
+      ensureOpen();
+      return inTransaction(() -> {
+        try {
+          var before = retirementReplayOps();
+          if (!before.equals(verified)) return false;
+          releaseRecovery.retainRemovalPackets(verified,legacyFiles);
+          var actual = switchBufferOps.listAllStrict();
+          var removable = new ArrayList<SwitchBufferOp>();
+          for (var expected : verified) {
+            for (var row : actual) if (row.retirementUuid().equals(expected.retirementUuid())) {
+              if (!row.equals(expected)) throw new SQLException("Retirement ACK receipt changed");
+              removable.add(row);
+            }
+          }
+          switchBufferOps.removeReplayedLocked(removable);
+          var surviving = switchBufferOps.listAllStrict();
+          if (surviving.stream().anyMatch(verified::contains)) return false;
+          var after = retirementReplayOps();
+          return after.equals(verified);
+        } catch (IOException invalid) { throw new SQLException("Retirement removal packet could not be saved",invalid); }
+      });
+    } catch (SQLException invalid) { throw new IllegalStateException("Retirement conditional ACK failed",invalid); }
+    finally { unlockAfterChanges(); }
   }
 
   /** Returns all buffered ops, sorted by last_updated ascending (best-effort). */
@@ -1489,6 +2644,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             WHERE jobs.state='DONE' AND jobs.walk_seen_epoch IS NULL
             """)) {
           for (var entry : entries) {
+            // This older discovery must not replace a later acknowledged exact file unit.
+            // Keep its boundary, attribution and retry/debt evidence intact; replay still proves
+            // the current source and committed projection before it may retire the receipt.
+            if (hasExactRecoveryAdmissionOwner(entry.path())) continue;
             insert.setString(1, PathNormalizer.normalizeKey(entry.path()));
             insert.setLong(2, System.currentTimeMillis());
             insert.setString(3, collection == null || collection.isBlank() ? null : collection);
@@ -1505,6 +2664,256 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw new IllegalStateException("Upgrade recovery admissions were not saved", failure);
     } finally {
       unlockAfterChanges();
+    }
+  }
+
+  @Override
+  public int enqueueRelease030LiveSyncEntries(List<JobQueue.EnqueueEntry> entries, String collection,
+      boolean maintenance, java.util.function.BooleanSupplier cancelled) {
+    if (entries.isEmpty()) return 0;
+    if (!hasSufficientDiskSpace()) throw new IllegalStateException("Insufficient sync disk space");
+    lockTimed();
+    try {
+      ensureOpen();
+      String generation = release030RetirementGeneration();
+      if (generation == null) throw new IllegalStateException("Retirement changed during sync");
+      return inTransaction(() -> {
+        var refreshable = refreshableRetirementFiles(retirementReplayOps(), generation, !maintenance);
+        int accepted = 0;
+        for (var entry : entries) {
+          if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) {
+            throw new IllegalStateException("Retirement sync cancelled");
+          }
+          if (maintenance && preservesMaintenanceRetryWait(entry.path(), System.currentTimeMillis())) {
+            accepted++; // Existing policy coverage, not a new admission or source witness.
+            continue;
+          }
+          boolean exact = refreshable.contains(PathNormalizer.normalizeKey(entry.path()));
+          JobQueue.EnqueueEntry admitted = entry;
+          if (exact) {
+            try {
+              admitted = new JobQueue.EnqueueEntry(entry.path(), entry.sizeBytes(), entry.provenance(),
+                  io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(), cancelled),
+                  entry.ingestionRoot());
+            } catch (IOException failure) {
+              throw new IllegalStateException("Retirement sync source witness unavailable", failure);
+            }
+          }
+          if (enqueueEntriesInTransaction(List.of(admitted), collection, null,
+              System.currentTimeMillis(), false, null) != 1) {
+            throw new SQLException("Retirement sync admission incomplete");
+          }
+          if (exact) bufferAdmittedFile(generation, admitted);
+          accepted++;
+        }
+        return accepted;
+      });
+    } catch (SQLException failure) {
+      throw new IllegalStateException("Retirement sync admissions were not saved", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  @Override
+  public int enqueueRetirementRootEntries(SwitchBufferOp root,List<JobQueue.EnqueueEntry> entries,
+      String collection,boolean maintenance,boolean replay,java.util.function.BooleanSupplier cancelled) {
+    return enqueueRetirementRootEntries(root,entries,collection,maintenance,replay,cancelled,Map.of());
+  }
+
+  @Override
+  public int enqueueRetirementRootEntries(SwitchBufferOp root,List<JobQueue.EnqueueEntry> entries,
+      String collection,boolean maintenance,boolean replay,java.util.function.BooleanSupplier cancelled,
+      Map<String,Map<String,String>> completedRows) {
+    lockTimed();try {
+      ensureOpen();
+      if(releaseRecovery==null || !releaseRecovery.rootReceipts().contains(root))
+        throw new IllegalStateException("ROOT intent is not retained");
+      String retainedCollection = retirementRootCollection(root);
+      if (!retirementRootPolicyKnown(root) || retainedCollection != null && !retainedCollection.equals(normalizedRetirementCollection(collection)))
+        throw new IllegalStateException("ROOT namespace is unknown or conflicts with creator intent");
+      return inTransaction(() -> {
+        try {
+          var journal = retirementReplayOps();
+          var orders = retirementOrders(journal);
+          var deletes=retirementDeletes(journal);int covered=0;
+          boolean live = !replay && !maintenance
+              && root.generation().equals(release030RetirementGeneration())
+              && root.key().equals("sync_root:" + PathNormalizer.normalizePathPrefix(
+                  SwitchBufferSyncRoot.decode(root.payload()).rootPath()));
+          var refreshable = refreshableRetirementFiles(journal, root.generation(), live);
+          for(var entry:entries) {
+            if(cancelled.getAsBoolean()||Thread.currentThread().isInterrupted())throw new IllegalStateException("ROOT admission cancelled");
+            String path=normalizePath(entry.path());String unit=null,oldCollection=null,state=null;
+            try(var q=connection.prepareStatement("SELECT unit_revision,collection,state,content_hash FROM jobs WHERE path=?")) {
+              q.setString(1,path);try(var r=q.executeQuery()){if(r.next()){unit=r.getString(1);oldCollection=r.getString(2);state=r.getString(3);r.getString(4);}}
+            }
+            if(maintenance && preservesMaintenanceRetryWait(entry.path(),System.currentTimeMillis())){covered++;continue;}
+            var current = watcherRowLocked(path);
+            var currentOrigin = RootOrigin.fromUnit(unit);
+            // The same receipt cannot renew or reinterpret an already admitted member. Its
+            // fresh source correction (if necessary) was observed outside this transaction.
+            if (replay && currentOrigin != null && currentOrigin.uuid().equals(root.retirementUuid())) {
+              covered++; continue;
+            }
+            if (current != null && correctionHasRecordedOwner(path,current)) {covered++;continue;}
+            String effective=collection == null || collection.isBlank() ? oldCollection : collection;
+            long order=unit==null?-1:actualUnitOrder(path,unit,orders);
+            if(latestDelete(deletes,path,effective)>root.acceptedOrder()) {covered++;continue;}
+            if(replay && (order>root.acceptedOrder() || hasExactRetirementAdmissionOwner(path,orders)
+                || state!=null && !"DONE".equals(state))) {covered++;continue;}
+            var completed = completedRows.get(path);
+            if (replay && completed != null && completed.equals(current)) {
+              if (validatedUnitOrder(correctionCandidate(completed),orders)==root.acceptedOrder()) {covered++;continue;}
+              var origin=RootOrigin.fromUnit(completed.get("unit_revision"));
+              var owner=origin==null?null:orders.receipts().get(origin.uuid());
+              var provenance=completed.get("originator")==null && completed.get("transport")==null ? null
+                  : new JobQueue.EnqueueProvenance(completed.get("originator"),completed.get("transport"));
+              var scope=new SwitchBufferUpsert(path,completed.get("collection"),provenance,null,null,Path.of(completed.get("ingestion_root")));
+              if (!SwitchBufferSyncRoot.decode(root.payload()).force()
+                  && preservedIndexedRootOwner(owner,scope,current,orders,deletes)) {covered++;continue;}
+            }
+            boolean exact=refreshable.contains(path);
+            JobQueue.EnqueueEntry admitted=entry;
+            if(exact&&!replay) {
+              String source=io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(),cancelled);
+              admitted=new JobQueue.EnqueueEntry(entry.path(),entry.sizeBytes(),entry.provenance(),source,entry.ingestionRoot());
+            }
+            String admittedUnit = exact && !replay ? null : root.retirementRootUnit();
+            if(enqueueEntriesInTransaction(List.of(admitted),collection,null,System.currentTimeMillis(),false,
+                admittedUnit)!=1)throw new SQLException("Short ROOT admission");
+            if (!(exact && !replay)) {
+              // Native enqueue has now resolved null collection/provenance inheritance. Bind
+              // the actual row inside this transaction; no root1 intermediate is published.
+              var resolved = watcherRowLocked(path);
+              String member = "root2:" + root.retirementUuid() + ":" + root.acceptedOrder() + ":"
+                  + UUID.randomUUID().toString().replace("-", "") + ":"
+                  + SwitchBufferCapableQueue.rootMemberDigest(path,resolved.get("collection"),
+                      resolved.get("originator"),resolved.get("transport"),resolved.get("ingestion_root"),
+                      resolved.get("planned_source_sha256"));
+              try (var update = connection.prepareStatement("UPDATE jobs SET unit_revision=? WHERE path=? AND unit_revision=?")) {
+                update.setString(1,member); update.setString(2,path); update.setString(3,admittedUnit);
+                if (update.executeUpdate()!=1) throw new SQLException("ROOT member changed during admission");
+              }
+            }
+            if(exact&&!replay)bufferAdmittedFile(root.generation(),admitted);
+            covered++;
+          }
+          claimCursor=null;return covered;
+        } catch(IOException invalid){throw new SQLException("ROOT admission authority unavailable",invalid);}
+      });
+    } catch(SQLException|IOException invalid){throw new IllegalStateException("ROOT admission incomplete",invalid);}
+    finally{unlockAfterChanges();}
+  }
+
+  private Set<String> refreshableRetirementFiles(List<SwitchBufferOp> journal,
+      String generation, boolean live) {
+    var seen = new HashSet<String>();
+    var result = new HashSet<String>();
+    for (var op : journal.reversed()) {
+      if (!"UPSERT".equals(op.op()) || op.generation() != null && !op.generation().isBlank()
+          && !generation.equals(op.generation())) continue;
+      var prior = SwitchBufferUpsert.decode(op.payload());
+      String path = PathNormalizer.normalizeKey(Path.of(prior.path()));
+      if (!seen.add(path)) continue;
+      if (generation.equals(op.generation()) && prior.unitRevision() != null) result.add(path);
+      else if (live && !op.payload().stripLeading().startsWith("{")) {
+        try { if (releaseRecovery != null && releaseRecovery.legacyExpectation(op) != null) result.add(path); }
+        catch (IOException invalid) { throw new IllegalStateException("Original raw expectation unavailable",invalid); }
+      }
+    }
+    return Set.copyOf(result);
+  }
+
+  private void bufferAdmittedFile(String generation, JobQueue.EnqueueEntry entry) throws SQLException {
+    String normalizedPath = normalizePath(entry.path());
+    String effectiveCollection;
+    String originator;
+    String transport;
+    String revision;
+    String sourceHash;
+    String ingestionRoot;
+    try (PreparedStatement query = connection.prepareStatement(
+        "SELECT collection, originator, transport, unit_revision, planned_source_sha256, ingestion_root "
+            + "FROM jobs WHERE path = ?")) {
+      query.setString(1, normalizedPath);
+      try (ResultSet row = query.executeQuery()) {
+        if (!row.next()) throw new SQLException("Atomic file batch lost an admitted row");
+        effectiveCollection = row.getString("collection");
+        originator = row.getString("originator");
+        transport = row.getString("transport");
+        revision = row.getString("unit_revision");
+        sourceHash = row.getString("planned_source_sha256");
+        ingestionRoot = row.getString("ingestion_root");
+      }
+    }
+    if (revision == null || sourceHash == null) {
+      throw new SQLException("Atomic file batch lost its exact source witness");
+    }
+    JobQueue.EnqueueProvenance effectiveProvenance = originator == null && transport == null
+        ? null : new JobQueue.EnqueueProvenance(originator, transport);
+    String payload = new SwitchBufferUpsert(
+        normalizedPath, effectiveCollection, effectiveProvenance,
+        revision, sourceHash, ingestionRoot == null ? null : Path.of(ingestionRoot)).encode();
+    if (!switchBufferOps.putForGenerationInTransaction(
+        connection, generation, "path:" + normalizedPath, "UPSERT", payload)) {
+      throw new SQLException("Generation-scoped switch-buffer admission was refused");
+    }
+
+  }
+
+  private boolean hasExactRetirementAdmissionOwner(String key,RetirementOrders orders) throws SQLException {
+    var row=watcherRowLocked(key);
+    if(row==null || !"DONE".equals(row.get("state"))) return false;
+    for(var accepted:orders.filesByPath().getOrDefault(key,List.of())) {
+      if(accepted.unitRevision().equals(row.get("unit_revision"))
+          && accepted.sourceSha256().equals(row.get("planned_source_sha256"))
+          && accepted.ingestionRoot()!=null && accepted.ingestionRoot().toString().equals(row.get("ingestion_root"))
+          && Objects.equals(Objects.toString(accepted.collection(),"default"),Objects.toString(row.get("collection"),"default"))) return true;
+    }
+    return false;
+  }
+
+  private boolean hasExactRecoveryAdmissionOwner(Path path) throws SQLException {
+    String key = PathNormalizer.normalizeKey(path);
+    if (releaseRecovery!=null && releaseRecovery.retiringBuild()) {
+      try { return hasExactRetirementAdmissionOwner(key,retirementOrders(retirementReplayOps())); }
+      catch(IOException invalid){throw new SQLException("Retained exact ownership unavailable",invalid);}
+    }
+    try (var query = connection.prepareStatement("""
+        SELECT j.unit_revision,j.planned_source_sha256,j.ingestion_root,j.collection,b.payload
+        FROM jobs j JOIN switch_buffer b ON b.key=? AND b.op='UPSERT'
+        WHERE j.path=? AND j.state='DONE'
+        """)) {
+      query.setString(1, "path:" + key);
+      query.setString(2, key);
+      try (var rows = query.executeQuery()) {
+        while (rows.next()) {
+          var accepted = SwitchBufferUpsert.decode(rows.getString("payload"));
+          if (key.equals(accepted.path()) && accepted.unitRevision() != null
+              && accepted.unitRevision().equals(rows.getString("unit_revision"))
+              && accepted.sourceSha256().equals(rows.getString("planned_source_sha256"))
+              && accepted.ingestionRoot() != null
+              && PathNormalizer.normalizeKey(accepted.ingestionRoot())
+                  .equals(rows.getString("ingestion_root"))
+              && Objects.equals(accepted.collection(), rows.getString("collection"))) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static final String MAINTENANCE_RETRY_WAIT =
+      "jobs.walk_seen_epoch IS NULL AND (jobs.state='FAILED' "
+          + "OR (jobs.state='PENDING' AND COALESCE(jobs.retry_after,0)>? "
+          + "AND COALESCE(jobs.last_outcome_class,'') IN ('PARSER_TIMEOUT','IO_FAILED')))";
+
+  private boolean preservesMaintenanceRetryWait(Path path, long now) throws SQLException {
+    try (var query = connection.prepareStatement(
+        "SELECT 1 FROM jobs WHERE path=? AND (" + MAINTENANCE_RETRY_WAIT + ")")) {
+      query.setString(1, normalizePath(path));
+      query.setLong(2, now);
+      try (var rows = query.executeQuery()) { return rows.next(); }
     }
   }
 
@@ -1537,9 +2946,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // failing parser/file before its deadline.
       // Recorded memberships retain their own existing mutation contract. An exhausted row is
       // still revived; explicit/forced scans, watcher events and ordinary sync are unchanged.
-      sql += " WHERE NOT (jobs.walk_seen_epoch IS NULL AND (jobs.state='FAILED' "
-          + "OR (jobs.state='PENDING' AND COALESCE(jobs.retry_after,0)>? "
-          + "AND COALESCE(jobs.last_outcome_class,'') IN ('PARSER_TIMEOUT','IO_FAILED'))))";
+      sql += " WHERE NOT (" + MAINTENANCE_RETRY_WAIT + ")";
     }
     int accepted = 0;
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -1668,39 +3075,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           throw new SQLException("Atomic file batch did not accept every entry");
         }
         for (JobQueue.EnqueueEntry entry : admitted) {
-          String normalizedPath = normalizePath(entry.path());
-          String effectiveCollection;
-          String originator;
-          String transport;
-          String revision;
-          String sourceHash;
-          String ingestionRoot;
-          try (PreparedStatement query = connection.prepareStatement(
-              "SELECT collection, originator, transport, unit_revision, planned_source_sha256, ingestion_root "
-                  + "FROM jobs WHERE path = ?")) {
-            query.setString(1, normalizedPath);
-            try (ResultSet row = query.executeQuery()) {
-              if (!row.next()) throw new SQLException("Atomic file batch lost an admitted row");
-              effectiveCollection = row.getString("collection");
-              originator = row.getString("originator");
-              transport = row.getString("transport");
-              revision = row.getString("unit_revision");
-              sourceHash = row.getString("planned_source_sha256");
-              ingestionRoot = row.getString("ingestion_root");
-            }
-          }
-          if (revision == null || sourceHash == null) {
-            throw new SQLException("Atomic file batch lost its exact source witness");
-          }
-          JobQueue.EnqueueProvenance effectiveProvenance = originator == null && transport == null
-              ? null : new JobQueue.EnqueueProvenance(originator, transport);
-          String payload = new SwitchBufferUpsert(
-              normalizedPath, effectiveCollection, effectiveProvenance,
-              revision, sourceHash, ingestionRoot == null ? null : Path.of(ingestionRoot)).encode();
-          if (!switchBufferOps.putForGenerationInTransaction(
-              connection, generation, "path:" + normalizedPath, "UPSERT", payload)) {
-            throw new SQLException("Generation-scoped switch-buffer admission was refused");
-          }
+          bufferAdmittedFile(generation, entry);
         }
         return new CandidateFileBatch(accepted + superseded, accepted);
       });
@@ -1896,7 +3271,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         freshProof.run();
         if (activeClaims.containsKey(file.path()) || row != null && STATE_PROCESSING.equals(row.get("state"))) return false;
         if (row != null && (row.get("walk_seen_epoch") != null
-            || row.get("unit_revision") != null && row.get("unit_revision").startsWith("release030")
+            || row.get("unit_revision") != null && (row.get("unit_revision").startsWith("release030") || releaseRecovery != null && releaseRecovery.retiringBuild() && (row.get("unit_revision").startsWith("root1:") || row.get("unit_revision").startsWith("root2:")))
             || release030ExactFiles.contains(path) || release030IndependentDebt.contains(path)
             || recordedWatcherRow(row))) return independentWatcherEffect(file, row, debt);
 
@@ -2449,6 +3824,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
 
+      if (releaseRecovery != null && releaseRecovery.retiringBuild()) {
+        try { prepareRetirementClaims(); }
+        catch (IOException invalid) { throw new SQLException("Current retirement claims cannot be prepared", invalid); }
+      }
       long now = System.currentTimeMillis();
       if (claimRetryDeadline != null && claimRetryDeadline <= now) claimCursor = null;
       try (var deadline = connection.prepareStatement(
@@ -2489,6 +3868,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       List<IndexJob> result =
           inTransaction(
               () -> {
+                RetirementOrders retirementOrders = null;
+                List<RetirementDelete> retirementDeletes = List.of();
+                java.util.function.BiPredicate<String,String> retained = (path,unit) -> false;
+                if (releaseRecovery != null && releaseRecovery.retiringBuild()) {
+                  try {
+                    var journal = retirementReplayOps();
+                    retirementOrders = retirementOrders(journal);
+                    retirementDeletes = retirementDeletes(journal);
+                    retained = retainedRootScopes(journal);
+                  } catch (IOException invalid) { throw new SQLException("Retirement claim evidence unavailable",invalid); }
+                }
                 int budget = (int) Math.min(Integer.MAX_VALUE - 1L, (long) limit + CLAIM_SKIP_BUDGET);
                 // The common case needs only the requested batch plus one lookahead row.
                 // Expand to the remaining skip budget only when a denied source runs out;
@@ -2530,6 +3920,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     claimableWalks.clear();
                     checkedWalkVersion=walkVersion;
                   }
+                  if (!retirementAllowsClaim(row,retirementOrders,retirementDeletes,retained)) continue;
                   if (requiresRelease030Boundary && row.ingestionRoot() == null) continue;
                   // All exact paths must have their no-deletion protection before any claim.
                   if (!release030ExplicitFilesPrepared && row.key().path().equals(row.ingestionRoot())) continue;
@@ -3304,6 +4695,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                           ? IngestionRetryLadder.nextRetryAtMs(
                               firstFailedAt, newAttempts, now, jitter)
                           : now + backoffMs + jitter;
+                  retryAfter = now + retryDelay.applyAsLong(retryAfter - now);
                 }
 
                 String updateSql = """
@@ -3885,6 +5277,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
 
+      var retained = retainedRootScopes(retirementReplayOps());
+      var retainedDeletes = releaseRecovery != null && releaseRecovery.retiringBuild()
+          ? retirementDeletes(retirementReplayOps()) : List.<RetirementDelete>of();
+      org.sqlite.Function.create(connection, "release_root_retained", new org.sqlite.Function() {
+        @Override protected void xFunc() throws SQLException {
+          result(retained.test(value_text(0),value_text(1))
+              || latestDelete(retainedDeletes,value_text(0),value_text(2)) > 0 ? 1 : 0);
+        }
+      });
       long cutoff = System.currentTimeMillis() - (retentionDays * 24L * 60L * 60L * 1000L);
 
       // Original exact receipts still settle native replay or authorize FAILED recovery.
@@ -3893,7 +5294,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           state IN ('DONE', 'FAILED', 'RETRY_EXHAUSTED') AND last_updated < ?
             AND (walk_seen_epoch IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress p
               WHERE p.operation_key = jobs.scan_id AND p.sealed_at IS NOT NULL AND p.acknowledged_revision = p.revision))
-          """ + (Files.notExists(Release030RecoveryState.path(dbPath), LinkOption.NOFOLLOW_LINKS)
+          """ + " AND release_root_retained(path,unit_revision,collection)=0" + (Files.notExists(Release030RecoveryState.path(dbPath), LinkOption.NOFOLLOW_LINKS)
               ? "" : " AND (unit_revision NOT LIKE 'release030/%' OR ingestion_root IS NOT path)");
 
       int deleted;
@@ -3912,7 +5313,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         checkAndVacuum();
       }
       return deleted;
-    } catch (SQLException e) {
+    } catch (SQLException | IOException e) {
       log.error("Failed to cleanup old jobs", e);
       return 0;
     } finally {

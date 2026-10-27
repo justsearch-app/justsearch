@@ -1,0 +1,415 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "adaptation": {
+      "actualProducer": "tmp/builder/step7/collect-upgrade-d4.mjs",
+      "actualProducerDigest": "sha256:d88f40f7fc0fa9d2505c5c5d7326435c9e0955f61f20c21b98c56eeb7d83c8ec",
+      "identityDecoder": "tmp/builder/step7/read-gradle-identities.py",
+      "identityDecoderDigest": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+      "mode": "Read actual completed preserved XML/binary executions. Canonical runner not invoked; this is an explicitly adapted collection envelope, not a claim that canonical run-evidence executed these tests."
+    }
+  },
+  "createdAt": "2026-10-25T21:43:28.153Z",
+  "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+  "tree": "44f1a35bc5cccf0ce1a80d5108747f91f3340f85",
+  "environment": {
+    "kind": "artifact-collection environment, not old execution JVM identity",
+    "platform": "linux",
+    "arch": "x64",
+    "node": "v24.22.0",
+    "originalExecutionEnvironment": {
+      "path": "tmp/builder/evidence/reproduction/environment.json",
+      "sha256": "sha256:a6d6ea40a1df8869bacedb98519ab3385b69e4ebb0a0d05c9974862f9a5d83fe",
+      "bytes": 604
+    },
+    "originalAfterHarness": {
+      "path": "tmp/builder/evidence/reproduction/test-jvm-after.gradle",
+      "sha256": "sha256:c2a592c5c0e0d35fa08d63d1cf1f10fd7c1fe47157fa7cdb90fd0e3e9d75a814",
+      "bytes": 760
+    }
+  },
+  "runs": [
+    {
+      "command": "\"env\" \"-u\" \"JAVA_TOOL_OPTIONS\" \"-u\" \"JUSTSEARCH_HOME\" \"-u\" \"JUSTSEARCH_DATA_DIR\" \"TMPDIR=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder\" \"JDK_JAVA_OPTIONS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"GRADLE_OPTS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"js-gradle-slot\" \"./gradlew\" \":modules:indexer-worker:test\" \":modules:adapters-lucene:test\" \":modules:adapters-lucene:integrationTest\" \":modules:worker-core:test\" \":modules:worker-services:test\" \":modules:indexing:test\" \":modules:indexing:integrationTest\" \":modules:benchmarks:test\" \":modules:app-engine:test\" \":modules:ui:test\" \":modules:ui:integrationTest\" \":modules:app-launcher:test\" \":modules:app-launcher:integrationTest\" \":modules:system-tests:test\" \":modules:indexer-worker:retirementHttpEvidence\" \":modules:indexer-worker:compileJava\" \":modules:adapters-lucene:compileJava\" \":modules:worker-core:compileJava\" \":modules:worker-services:compileJava\" \":modules:indexer-worker:pmdMain\" \":modules:indexer-worker:pmdTest\" \":modules:adapters-lucene:pmdMain\" \":modules:adapters-lucene:pmdTest\" \":modules:worker-core:pmdMain\" \":modules:worker-core:pmdTest\" \":modules:worker-services:pmdMain\" \":modules:worker-services:pmdTest\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/test-jvm-after.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/http-evidence.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/serial-tests.gradle\" \"-PskipWebBuild=true\" \"-PtestParallelism=1\" \"--max-workers=2\" \"--no-configuration-cache\" \"--continue\"",
+      "kind": "original frozen command",
+      "commandArtifact": {
+        "path": "tmp/builder/evidence/after-final-complete-verification-command.json",
+        "sha256": "sha256:7900a3af9c1c316b687da511d85741fdc04b007dc08b8d164786af8ff7e13968",
+        "bytes": 2066
+      },
+      "completion": "Named indexer-worker suites completed; outer program later interrupted inside downstream app-engine. Global exit is not relabelled passed."
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#uncertifiedServingGenerationKeepsOriginalMigration",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "uncertifiedServingGenerationKeepsOriginalMigration(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] analyzer_fp",
+          "method": "uncertifiedServingGenerationKeepsOriginalMigration"
+        },
+        {
+          "name": "uncertifiedServingGenerationKeepsOriginalMigration(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] vector_format",
+          "method": "uncertifiedServingGenerationKeepsOriginalMigration"
+        },
+        {
+          "name": "uncertifiedServingGenerationKeepsOriginalMigration(String, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[3] unresolved-model",
+          "method": "uncertifiedServingGenerationKeepsOriginalMigration"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+        "sha256": "sha256:2318e52f0c2362607a96486a3d788b6b113681eda78eb23e4bc5030a3c549c66",
+        "bytes": 812296
+      },
+      "suiteTimestamp": "2026-10-24T23:12:03.635Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java#nativeFailureBudgetAndForceSwitchingKeepTheirMeaning",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f64d466c1e3f0829ecd586b02cb8e9593017cf7d357e4307d17cc4514b4957cb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] 1, 2, false, false",
+          "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] 1, 2, true, false",
+          "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[3] 1, 1, false, true",
+          "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[4]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[4] 1, 1, true, true",
+          "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[5]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[5] -1, 2, false, true",
+          "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[6]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[6] -1, 2, true, true",
+          "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+        },
+        {
+          "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[7]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[7] 0, 0, false, true",
+          "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementBudgetTest.xml",
+        "sha256": "sha256:6c1db70c94018fdb765cf4e6c54dc26caf71c56f7803585d83888f385c12765c",
+        "bytes": 607782
+      },
+      "suiteTimestamp": "2026-10-24T22:58:20.787Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#corruptCommitKeepsNativeRecoveryInsteadOfRetiring",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] migrating",
+          "method": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
+        },
+        {
+          "name": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] switching",
+          "method": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+        "sha256": "sha256:2318e52f0c2362607a96486a3d788b6b113681eda78eb23e4bc5030a3c549c66",
+        "bytes": 812296
+      },
+      "suiteTimestamp": "2026-10-24T23:12:03.635Z"
+    }
+  ],
+  "failBefore": {
+    "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+    "purpose": "preservation before",
+    "runs": [
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:88ebfa76743930cda3cf005f3f16f906d15c4516265666a5e3ba51c0042fbcc3",
+          "bytes": 626962
+        },
+        "originalExecutionCommand": "\"env\" \"-u\" \"JAVA_TOOL_OPTIONS\" \"-u\" \"JUSTSEARCH_HOME\" \"-u\" \"JUSTSEARCH_DATA_DIR\" \"TMPDIR=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder\" \"JDK_JAVA_OPTIONS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before\" \"GRADLE_OPTS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before\" \"js-gradle-slot\" \"./gradlew\" \":modules:indexer-worker:test\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.alreadyDoneExplicitFileOnServingGenerationSurvivesResume\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.modernUnownedAdmissionCannotBorrowRetiredBuildAuthority\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.uncertifiedServingGenerationKeepsOriginalMigration\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring\" \"--tests\" \"io.justsearch.indexerworker.server.Release030UpgradeProbeTest.interruptedMigrationFixturesKeepTheirServingIndexAndJobs\" \":modules:indexer-worker:retirementHttpEvidence\" \"--continue\" \"-PskipWebBuild=true\" \"-PskipErrorProneTests=false\" \"-PtestParallelism=1\" \"--max-workers=2\" \"--no-configuration-cache\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/http-evidence-before.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/serial-tests.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/step7/before-temp.gradle\"",
+        "originalArgvProvenance": "before-command.json records exact fresh argv"
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-adapted-controls-results/TEST-io.justsearch.indexerworker.server.Release030RetirementBudgetTest.xml",
+          "sha256": "sha256:05798045f3431e3230268a804c75f18aec576618eb3981e34d3c3d04b62de8e9",
+          "bytes": 477969
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:88ebfa76743930cda3cf005f3f16f906d15c4516265666a5e3ba51c0042fbcc3",
+          "bytes": 626962
+        },
+        "originalExecutionCommand": "\"env\" \"-u\" \"JAVA_TOOL_OPTIONS\" \"-u\" \"JUSTSEARCH_HOME\" \"-u\" \"JUSTSEARCH_DATA_DIR\" \"TMPDIR=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder\" \"JDK_JAVA_OPTIONS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before\" \"GRADLE_OPTS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before\" \"js-gradle-slot\" \"./gradlew\" \":modules:indexer-worker:test\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.alreadyDoneExplicitFileOnServingGenerationSurvivesResume\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.modernUnownedAdmissionCannotBorrowRetiredBuildAuthority\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.uncertifiedServingGenerationKeepsOriginalMigration\" \"--tests\" \"io.justsearch.indexerworker.server.Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring\" \"--tests\" \"io.justsearch.indexerworker.server.Release030UpgradeProbeTest.interruptedMigrationFixturesKeepTheirServingIndexAndJobs\" \":modules:indexer-worker:retirementHttpEvidence\" \"--continue\" \"-PskipWebBuild=true\" \"-PskipErrorProneTests=false\" \"-PtestParallelism=1\" \"--max-workers=2\" \"--no-configuration-cache\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/http-evidence-before.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/serial-tests.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/step7/before-temp.gradle\"",
+        "originalArgvProvenance": "before-command.json records exact fresh argv"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#uncertifiedServingGenerationKeepsOriginalMigration",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "uncertifiedServingGenerationKeepsOriginalMigration(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[1] analyzer_fp",
+            "method": "uncertifiedServingGenerationKeepsOriginalMigration"
+          },
+          {
+            "name": "uncertifiedServingGenerationKeepsOriginalMigration(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[2] vector_format",
+            "method": "uncertifiedServingGenerationKeepsOriginalMigration"
+          },
+          {
+            "name": "uncertifiedServingGenerationKeepsOriginalMigration(String, Path)[3]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[3] unresolved-model",
+            "method": "uncertifiedServingGenerationKeepsOriginalMigration"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:88ebfa76743930cda3cf005f3f16f906d15c4516265666a5e3ba51c0042fbcc3",
+          "bytes": 626962
+        },
+        "suiteTimestamp": "2026-10-25T21:31:14.039Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java#nativeFailureBudgetAndForceSwitchingKeepTheirMeaning",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[1] 1, 2, false, false",
+            "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+          },
+          {
+            "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[2] 1, 2, true, false",
+            "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+          },
+          {
+            "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[3]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[3] 1, 1, false, true",
+            "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+          },
+          {
+            "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[4]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[4] 1, 1, true, true",
+            "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+          },
+          {
+            "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[5]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[5] -1, 2, false, true",
+            "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+          },
+          {
+            "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[6]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[6] -1, 2, true, true",
+            "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+          },
+          {
+            "name": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int, int, boolean, boolean, Path)[7]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementBudgetTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[7] 0, 0, false, true",
+            "method": "nativeFailureBudgetAndForceSwitchingKeepTheirMeaning"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-adapted-controls-results/TEST-io.justsearch.indexerworker.server.Release030RetirementBudgetTest.xml",
+          "sha256": "sha256:05798045f3431e3230268a804c75f18aec576618eb3981e34d3c3d04b62de8e9",
+          "bytes": 477969
+        },
+        "suiteTimestamp": "2026-10-24T20:46:03.287Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#corruptCommitKeepsNativeRecoveryInsteadOfRetiring",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[1] migrating",
+            "method": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
+          },
+          {
+            "name": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[2] switching",
+            "method": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:88ebfa76743930cda3cf005f3f16f906d15c4516265666a5e3ba51c0042fbcc3",
+          "bytes": 626962
+        },
+        "suiteTimestamp": "2026-10-25T21:31:14.039Z"
+      }
+    ]
+  },
+  "sourceBindings": {
+    "path": "gates/test-intent/evidence/upgrade-retire-source-bindings.json",
+    "sha256": "sha256:455717504ee117e7d2fea5e0b56b21be1e4f08f57c66cce929164017b98819b3"
+  },
+  "scope": {
+    "after": "immutable frozen code represented by d9663d16, executed with HEAD 8292 and original dirty manifest",
+    "currentCollector": "1bb20567032b5f2af0700b9f04013b79f0aa132f",
+    "integratedProductionChanges": 95,
+    "notFreshCurrentIntegratedBehavior": true,
+    "acceptanceAuthored": false
+  },
+  "digest": "sha256:53f520128bc2959e53298ff473759e6c53208028e4a7576644e274337031222d"
+}

@@ -1,0 +1,1561 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:1f81dbee5256b07d61e427f5b660c97ecfb12c9333573b61c1ae22d476197fc3",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/1f81dbee5256b07d61e427f5b660c97ecfb12c9333573b61c1ae22d476197fc3.mjs",
+        "sha256": "sha256:1f81dbee5256b07d61e427f5b660c97ecfb12c9333573b61c1ae22d476197fc3",
+        "bytes": 8636
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T19:27:37.000Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "\"env\" \"-u\" \"JAVA_TOOL_OPTIONS\" \"-u\" \"JUSTSEARCH_HOME\" \"-u\" \"JUSTSEARCH_DATA_DIR\" \"TMPDIR=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder\" \"JDK_JAVA_OPTIONS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"GRADLE_OPTS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"js-gradle-slot\" \"./gradlew\" \":modules:indexer-worker:test\" \":modules:adapters-lucene:test\" \":modules:adapters-lucene:integrationTest\" \":modules:worker-core:test\" \":modules:worker-services:test\" \":modules:indexing:test\" \":modules:indexing:integrationTest\" \":modules:benchmarks:test\" \":modules:app-engine:test\" \":modules:ui:test\" \":modules:ui:integrationTest\" \":modules:app-launcher:test\" \":modules:app-launcher:integrationTest\" \":modules:system-tests:test\" \":modules:indexer-worker:retirementHttpEvidence\" \":modules:indexer-worker:compileJava\" \":modules:adapters-lucene:compileJava\" \":modules:worker-core:compileJava\" \":modules:worker-services:compileJava\" \":modules:indexer-worker:pmdMain\" \":modules:indexer-worker:pmdTest\" \":modules:adapters-lucene:pmdMain\" \":modules:adapters-lucene:pmdTest\" \":modules:worker-core:pmdMain\" \":modules:worker-core:pmdTest\" \":modules:worker-services:pmdMain\" \":modules:worker-services:pmdTest\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/test-jvm-after.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/http-evidence.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/serial-tests.gradle\" \"-PskipWebBuild=true\" \"-PtestParallelism=1\" \"--max-workers=2\" \"--no-configuration-cache\" \"--continue\"",
+      "kind": "original frozen command",
+      "commandArtifact": {
+        "path": "tmp/builder/evidence/after-final-complete-verification-command.json",
+        "sha256": "sha256:7900a3af9c1c316b687da511d85741fdc04b007dc08b8d164786af8ff7e13968",
+        "bytes": 2066
+      },
+      "completion": "Named indexer-worker suites completed; outer program later interrupted inside downstream app-engine. Global exit is not relabelled passed."
+    },
+    {
+      "command": "\"env\" \"-u\" \"JAVA_TOOL_OPTIONS\" \"-u\" \"JUSTSEARCH_HOME\" \"-u\" \"JUSTSEARCH_DATA_DIR\" \"TMPDIR=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder\" \"JDK_JAVA_OPTIONS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"GRADLE_OPTS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"js-gradle-slot\" \"./gradlew\" \":modules:app-engine:test\" \":modules:ui:test\" \":modules:ui:integrationTest\" \":modules:app-launcher:test\" \":modules:app-launcher:integrationTest\" \":modules:system-tests:test\" \":modules:indexer-worker:retirementHttpEvidence\" \":modules:indexer-worker:compileJava\" \":modules:indexer-worker:pmdMain\" \":modules:indexer-worker:pmdTest\" \":modules:adapters-lucene:compileJava\" \":modules:adapters-lucene:pmdMain\" \":modules:adapters-lucene:pmdTest\" \":modules:worker-core:compileJava\" \":modules:worker-core:pmdMain\" \":modules:worker-core:pmdTest\" \":modules:worker-services:compileJava\" \":modules:worker-services:pmdMain\" \":modules:worker-services:pmdTest\" \":modules:app-engine:compileJava\" \":modules:app-engine:pmdMain\" \":modules:app-engine:pmdTest\" \":modules:ui:compileJava\" \":modules:ui:pmdMain\" \":modules:ui:pmdTest\" \":modules:app-launcher:compileJava\" \":modules:app-launcher:pmdMain\" \":modules:app-launcher:pmdTest\" \":modules:system-tests:compileJava\" \":modules:system-tests:pmdMain\" \":modules:system-tests:pmdTest\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/http-evidence.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/serial-tests.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/resume-20261025/frozen-verification.gradle\" \"-PskipWebBuild=true\" \"-PskipErrorProneTests=false\" \"-PtestParallelism=1\" \"--max-workers=2\" \"--no-configuration-cache\" \"--continue\"",
+      "kind": "original step6 exact frozen-package HTTP command",
+      "commandArtifact": {
+        "path": "tmp/builder/resume-20261025/remaining-command.json",
+        "sha256": "sha256:a48806528da2d9f9417e6146151f556541bb2e0cf2d0a8125b304153ebe84e98",
+        "bytes": 2764
+      },
+      "completion": "HTTP check completed; global build exit 1 was UI discovery failure"
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring --tests *LegacyApprovedGapReplayTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPartialWalkTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+          "sha256": "sha256:afa55713c486f8f37aab98a19f17a4f3f71299d5d4ca0f5d504e3d146b923d1f",
+          "bytes": 161655
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring --tests *LegacyApprovedGapReplayTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPartialWalkTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+          "sha256": "sha256:afa55713c486f8f37aab98a19f17a4f3f71299d5d4ca0f5d504e3d146b923d1f",
+          "bytes": 161655
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#replayRetiresObsoleteBuildAndKeepsServingIdentity",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fd0a71bfda8b564c0ed056e59ec6cb34a7eef6d6895e42a387b94771d0a46689",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "replayRetiresObsoleteBuildAndKeepsServingIdentity(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030MigrationRetirementTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] migrating",
+          "method": "replayRetiresObsoleteBuildAndKeepsServingIdentity"
+        },
+        {
+          "name": "replayRetiresObsoleteBuildAndKeepsServingIdentity(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030MigrationRetirementTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] switching",
+          "method": "replayRetiresObsoleteBuildAndKeepsServingIdentity"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030MigrationRetirementTest.xml",
+        "sha256": "sha256:bfe563bca4a30e73cd7cb73230276e57421b21253dee512549df7d54027c2b73",
+        "bytes": 360448
+      },
+      "suiteTimestamp": "2026-10-24T22:55:32.125Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fd0a71bfda8b564c0ed056e59ec6cb34a7eef6d6895e42a387b94771d0a46689",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover(boolean, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030MigrationRetirementTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] false",
+          "method": "backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover"
+        },
+        {
+          "name": "backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover(boolean, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030MigrationRetirementTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] true",
+          "method": "backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030MigrationRetirementTest.xml",
+        "sha256": "sha256:bfe563bca4a30e73cd7cb73230276e57421b21253dee512549df7d54027c2b73",
+        "bytes": 360448
+      },
+      "suiteTimestamp": "2026-10-24T22:55:32.125Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#alreadyDoneExplicitFileOnServingGenerationSurvivesResume",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "alreadyDoneExplicitFileOnServingGenerationSurvivesResume(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "alreadyDoneExplicitFileOnServingGenerationSurvivesResume(Path)",
+          "method": "alreadyDoneExplicitFileOnServingGenerationSurvivesResume"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+        "sha256": "sha256:2318e52f0c2362607a96486a3d788b6b113681eda78eb23e4bc5030a3c549c66",
+        "bytes": 812296
+      },
+      "suiteTimestamp": "2026-10-24T23:12:03.635Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] migrating",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] switching",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+        "sha256": "sha256:2318e52f0c2362607a96486a3d788b6b113681eda78eb23e4bc5030a3c549c66",
+        "bytes": 812296
+      },
+      "suiteTimestamp": "2026-10-24T23:12:03.635Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#killedRetirementResumesAndBackupCannotReviveBuild",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:81cd02f7190a9084c48b0b50f215665982735caf62b2da3a27b39cb0200d79b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] release030-checkpointed, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] release030-checkpointed, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[3] release030-cancelled, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[4]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[4] release030-cancelled, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[5]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[5] release030-queue-prepared, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[6]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[6] release030-queue-prepared, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[7]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[7] release030-preparation-published, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[8]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[8] release030-preparation-published, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[9]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[9] release030-roots-journaled, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[10]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[10] release030-roots-journaled, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[11]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[11] release030-root-admitted, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[12]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[12] release030-root-admitted, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[13]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[13] release030-root-walked, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[14]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[14] release030-root-walked, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[15]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[15] release030-differences-committed, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[16]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[16] release030-differences-committed, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[17]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[17] release030-replay-before-commit, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[18]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[18] release030-replay-before-commit, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[19]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[19] release030-replay-committed, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[20]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[20] release030-replay-committed, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[21]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[21] release030-journal-acknowledged, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[22]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[22] release030-journal-acknowledged, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[23]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[23] release030-replay-complete, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[24]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[24] release030-replay-complete, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[25]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[25] during-deletion, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[26]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[26] during-deletion, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[27]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[27] release030-building-retired, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[28]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[28] release030-building-retired, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[29]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[29] release030-retirement-complete, migrating",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        },
+        {
+          "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[30]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[30] release030-retirement-complete, switching",
+          "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementCrashTest.xml",
+        "sha256": "sha256:f36c6d6baf5e3c0fb3d968a9c2d0579c2a65bd9151dbe68f150c47efca4a7651",
+        "bytes": 1874569
+      },
+      "suiteTimestamp": "2026-10-24T23:00:35.204Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java#newerAcknowledgementWinsPausedReplayAndRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5b667e4985704ebc3e0b2099ca7332b42e5c203a32baf19d7595c3dc399d7501",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementOrderingTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] update",
+          "method": "newerAcknowledgementWinsPausedReplayAndRestart"
+        },
+        {
+          "name": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementOrderingTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] delete",
+          "method": "newerAcknowledgementWinsPausedReplayAndRestart"
+        },
+        {
+          "name": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementOrderingTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[3] prefix",
+          "method": "newerAcknowledgementWinsPausedReplayAndRestart"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementOrderingTest.xml",
+        "sha256": "sha256:1642828a52fff7c362f9c20211d8d397ac1955113971b6bce4d6f6b38bd98d7c",
+        "bytes": 231410
+      },
+      "suiteTimestamp": "2026-10-24T23:09:54.386Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementHttpTest.java#packagedSwitchingUpgradeAndRestartKeepReplayedSearch",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:57dde3d255d6d697e45262aec9514a250d5067f698b786a12b44616d136130bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "packagedSwitchingUpgradeAndRestartKeepReplayedSearch()",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementHttpTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "packagedSwitchingUpgradeAndRestartKeepReplayedSearch()",
+          "method": "packagedSwitchingUpgradeAndRestartKeepReplayedSearch"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/remaining-results/indexer-worker/retirementHttpEvidence/TEST-io.justsearch.indexerworker.server.Release030RetirementHttpTest.xml",
+        "sha256": "sha256:4f29ffd9c5277b8ce978dabb848a1276d8279d297a1ac95b8c3a1fccf5ad4d05",
+        "bytes": 35614
+      },
+      "suiteTimestamp": "2026-10-25T20:48:21.066Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java#completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4fda66daa8d6c3cf1b5fff7e88807a0e3af8cb6874a4f4715f9ecbed62922fc3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] migrating, false",
+          "method": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild"
+        },
+        {
+          "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] switching, false",
+          "method": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild"
+        },
+        {
+          "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[3] migrating, true",
+          "method": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild"
+        },
+        {
+          "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[4]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[4] switching, true",
+          "method": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest.xml",
+        "sha256": "sha256:30ef9c03f61d0b841f17a9ec29d6dc3400c404707937d25d0b5956d59c4dbb78",
+        "bytes": 474709
+      },
+      "suiteTimestamp": "2026-10-24T22:58:52.004Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#modernUnownedAdmissionCannotBorrowRetiredBuildAuthority",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "modernUnownedAdmissionCannotBorrowRetiredBuildAuthority(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "modernUnownedAdmissionCannotBorrowRetiredBuildAuthority(Path)",
+          "method": "modernUnownedAdmissionCannotBorrowRetiredBuildAuthority"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+        "sha256": "sha256:2318e52f0c2362607a96486a3d788b6b113681eda78eb23e4bc5030a3c549c66",
+        "bytes": 812296
+      },
+      "suiteTimestamp": "2026-10-24T23:12:03.635Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java#closeDrainsMaintenanceWithoutInterruptingTheServingWriter",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fffef0a47a649eaff02604b2342b50b49697c729422d17fc47cdcb42ca89fa58",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closeDrainsMaintenanceWithoutInterruptingTheServingWriter(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RecoveryShutdownTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "closeDrainsMaintenanceWithoutInterruptingTheServingWriter(Path)",
+          "method": "closeDrainsMaintenanceWithoutInterruptingTheServingWriter"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RecoveryShutdownTest.xml",
+        "sha256": "sha256:53698fa6bec0a8d783c872e1b317454eea059b73e9e5f2d388a1c1520cf54c11",
+        "bytes": 55530
+      },
+      "suiteTimestamp": "2026-10-24T22:56:13.279Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement(Path)",
+          "method": "reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+        "sha256": "sha256:2318e52f0c2362607a96486a3d788b6b113681eda78eb23e4bc5030a3c549c66",
+        "bytes": 812296
+      },
+      "suiteTimestamp": "2026-10-24T23:12:03.635Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#partialWalkRetainsReceiptAndBuildUntilACompleteWalk",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:29a1e357bdeee0c0f1d614d979666c451a2b4c057660c386038ca3c7916f74b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk(Path)",
+          "method": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+          "sha256": "sha256:afa55713c486f8f37aab98a19f17a4f3f71299d5d4ca0f5d504e3d146b923d1f",
+          "bytes": 161655
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:29a1e357bdeee0c0f1d614d979666c451a2b4c057660c386038ca3c7916f74b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(Path)",
+          "method": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+          "sha256": "sha256:afa55713c486f8f37aab98a19f17a4f3f71299d5d4ca0f5d504e3d146b923d1f",
+          "bytes": 161655
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#replayRetiresObsoleteBuildAndKeepsServingIdentity",
+        "classification": "assertion",
+        "detail": "replayRetiresObsoleteBuildAndKeepsServingIdentity(String, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: obsolete migration is cancelled at boot ==> expected: <IDLE> but was: <MIGRATING> | replayRetiresObsoleteBuildAndKeepsServingIdentity(String, Path)[2]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: obsolete migration is cancelled at boot ==> expected: <IDLE> but was: <SWITCHING>",
+        "cases": [
+          {
+            "name": "replayRetiresObsoleteBuildAndKeepsServingIdentity(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030MigrationRetirementTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: obsolete migration is cancelled at boot ==> expected: <IDLE> but was: <MIGRATING>",
+            "displayName": "[1] migrating",
+            "method": "replayRetiresObsoleteBuildAndKeepsServingIdentity"
+          },
+          {
+            "name": "replayRetiresObsoleteBuildAndKeepsServingIdentity(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030MigrationRetirementTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: obsolete migration is cancelled at boot ==> expected: <IDLE> but was: <SWITCHING>",
+            "displayName": "[2] switching",
+            "method": "replayRetiresObsoleteBuildAndKeepsServingIdentity"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-adapted-controls-results/TEST-io.justsearch.indexerworker.server.Release030MigrationRetirementTest.xml",
+          "sha256": "sha256:a88266803d1ac226ed908573df965947fab0b5052d5ed954b1578a7eb9b09bc7",
+          "bytes": 251544
+        },
+        "suiteTimestamp": "2026-10-24T20:45:46.254Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover",
+        "classification": "assertion",
+        "detail": "backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover(boolean, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: U13: backoff-only work must not invoke live promotion ==> expected: <0> but was: <2> | backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover(boolean, Path)[2]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: U13: backoff-only work must not invoke live promotion ==> expected: <0> but was: <2>",
+        "cases": [
+          {
+            "name": "backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover(boolean, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030MigrationRetirementTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: U13: backoff-only work must not invoke live promotion ==> expected: <0> but was: <2>",
+            "displayName": "[1] false",
+            "method": "backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover"
+          },
+          {
+            "name": "backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover(boolean, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030MigrationRetirementTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: U13: backoff-only work must not invoke live promotion ==> expected: <0> but was: <2>",
+            "displayName": "[2] true",
+            "method": "backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-adapted-controls-results/TEST-io.justsearch.indexerworker.server.Release030MigrationRetirementTest.xml",
+          "sha256": "sha256:a88266803d1ac226ed908573df965947fab0b5052d5ed954b1578a7eb9b09bc7",
+          "bytes": 251544
+        },
+        "suiteTimestamp": "2026-10-24T20:45:46.254Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#alreadyDoneExplicitFileOnServingGenerationSurvivesResume",
+        "classification": "assertion",
+        "detail": "alreadyDoneExplicitFileOnServingGenerationSurvivesResume(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: already-DONE explicit content outside every root must stay searchable ==> expected: <true> but was: <false>",
+        "cases": [
+          {
+            "name": "alreadyDoneExplicitFileOnServingGenerationSurvivesResume(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: already-DONE explicit content outside every root must stay searchable ==> expected: <true> but was: <false>",
+            "displayName": "alreadyDoneExplicitFileOnServingGenerationSurvivesResume(Path)",
+            "method": "alreadyDoneExplicitFileOnServingGenerationSurvivesResume"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:88ebfa76743930cda3cf005f3f16f906d15c4516265666a5e3ba51c0042fbcc3",
+          "bytes": 626962
+        },
+        "suiteTimestamp": "2026-10-25T21:31:14.039Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+        "classification": "assertion",
+        "detail": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING> | unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+        "cases": [
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "displayName": "[1] migrating",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "displayName": "[2] switching",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:88ebfa76743930cda3cf005f3f16f906d15c4516265666a5e3ba51c0042fbcc3",
+          "bytes": 626962
+        },
+        "suiteTimestamp": "2026-10-25T21:31:14.039Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#killedRetirementResumesAndBackupCannotReviveBuild",
+        "classification": "assertion",
+        "detail": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: child must reach release030-checkpointed: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:18:48.166 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from rep | killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[2]: org.opent",
+        "cases": [
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-checkpointed: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:18:48.166 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from rep",
+            "displayName": "[1] release030-checkpointed, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-checkpointed: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:18:51.179 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from rep",
+            "displayName": "[2] release030-checkpointed, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[3]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-cancelled: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:18:54.187 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo l",
+            "displayName": "[3] release030-cancelled, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[4]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-cancelled: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:18:57.250 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo l",
+            "displayName": "[4] release030-cancelled, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[5]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-queue-prepared: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:00.240 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from r",
+            "displayName": "[5] release030-queue-prepared, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[6]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-queue-prepared: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:03.287 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from r",
+            "displayName": "[6] release030-queue-prepared, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[7]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-preparation-published: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:06.280 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT",
+            "displayName": "[7] release030-preparation-published, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[8]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-preparation-published: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:09.363 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT",
+            "displayName": "[8] release030-preparation-published, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[9]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-roots-journaled: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:12.356 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from ",
+            "displayName": "[9] release030-roots-journaled, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[10]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-roots-journaled: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:15.394 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from ",
+            "displayName": "[10] release030-roots-journaled, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[11]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-root-admitted: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:18.318 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from re",
+            "displayName": "[11] release030-root-admitted, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[12]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-root-admitted: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:21.337 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from re",
+            "displayName": "[12] release030-root-admitted, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[13]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-root-walked: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:24.377 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo",
+            "displayName": "[13] release030-root-walked, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[14]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-root-walked: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:27.432 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo",
+            "displayName": "[14] release030-root-walked, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[15]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-differences-committed: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:30.431 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT",
+            "displayName": "[15] release030-differences-committed, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[16]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-differences-committed: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:33.471 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT",
+            "displayName": "[16] release030-differences-committed, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[17]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-replay-before-commit: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:36.530 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT ",
+            "displayName": "[17] release030-replay-before-commit, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[18]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-replay-before-commit: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:39.481 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT ",
+            "displayName": "[18] release030-replay-before-commit, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[19]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-replay-committed: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:42.443 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from",
+            "displayName": "[19] release030-replay-committed, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[20]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-replay-committed: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:45.485 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from",
+            "displayName": "[20] release030-replay-committed, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[21]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-journal-acknowledged: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:48.437 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT ",
+            "displayName": "[21] release030-journal-acknowledged, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[22]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-journal-acknowledged: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:51.464 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT ",
+            "displayName": "[22] release030-journal-acknowledged, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[23]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-replay-complete: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:54.422 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from ",
+            "displayName": "[23] release030-replay-complete, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[24]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-replay-complete: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:19:57.454 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from ",
+            "displayName": "[24] release030-replay-complete, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[25]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach during-deletion: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:20:00.415 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo layout",
+            "displayName": "[25] during-deletion, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[26]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach during-deletion: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:20:03.451 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo layout",
+            "displayName": "[26] during-deletion, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[27]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-building-retired: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:20:06.446 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from",
+            "displayName": "[27] release030-building-retired, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[28]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-building-retired: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:20:09.467 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from",
+            "displayName": "[28] release030-building-retired, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[29]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-retirement-complete: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:20:12.496 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT f",
+            "displayName": "[29] release030-retirement-complete, migrating",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          },
+          {
+            "name": "killedRetirementResumesAndBackupCannotReviveBuild(String, String, Path)[30]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCrashTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: child must reach release030-retirement-complete: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/before&#10;21:20:15.517 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT f",
+            "displayName": "[30] release030-retirement-complete, switching",
+            "method": "killedRetirementResumesAndBackupCannotReviveBuild"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-final-complete-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementCrashTest.xml",
+          "sha256": "sha256:8de79e3c6f84f918de7828727decd619272a22e0754e7b8aa5d440e7c7d60f02",
+          "bytes": 2783921
+        },
+        "suiteTimestamp": "2026-10-24T19:18:47.645Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java#newerAcknowledgementWinsPausedReplayAndRestart",
+        "classification": "assertion",
+        "detail": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING> | newerAcknowledgementWinsPausedReplayAndRestart(String, Path)[2]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING> | newerAcknowledgementWinsPausedReplayAndRestart(String, Path)[3]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expect",
+        "cases": [
+          {
+            "name": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementOrderingTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "displayName": "[1] update",
+            "method": "newerAcknowledgementWinsPausedReplayAndRestart"
+          },
+          {
+            "name": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementOrderingTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "displayName": "[2] delete",
+            "method": "newerAcknowledgementWinsPausedReplayAndRestart"
+          },
+          {
+            "name": "newerAcknowledgementWinsPausedReplayAndRestart(String, Path)[3]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementOrderingTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "displayName": "[3] prefix",
+            "method": "newerAcknowledgementWinsPausedReplayAndRestart"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-final-complete-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementOrderingTest.xml",
+          "sha256": "sha256:cbf4f8fc13431e18cd31f43c82b3d67305f0fac2d025bdc28381d48c22b14670",
+          "bytes": 202291
+        },
+        "suiteTimestamp": "2026-10-24T19:20:18.071Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#partialWalkRetainsReceiptAndBuildUntilACompleteWalk",
+        "classification": "assertion",
+        "detail": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+        "cases": [
+          {
+            "name": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "displayName": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk(Path)",
+            "method": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-final-complete-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+          "sha256": "sha256:c7f1c6d7b9aea2019df5a7a23734d4e03a9f563cb41102f731d26d8c9f053ed8",
+          "bytes": 110944
+        },
+        "suiteTimestamp": "2026-10-24T19:17:42.784Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementHttpTest.java#packagedSwitchingUpgradeAndRestartKeepReplayedSearch",
+        "classification": "assertion",
+        "detail": "packagedSwitchingUpgradeAndRestartKeepReplayedSearch(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: packaged HTTP exposes committed replay effects ==> expected: <true> but was: <false>",
+        "cases": [
+          {
+            "name": "packagedSwitchingUpgradeAndRestartKeepReplayedSearch()",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementHttpTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: packaged HTTP exposes committed replay effects ==> expected: <true> but was: <false>",
+            "displayName": "packagedSwitchingUpgradeAndRestartKeepReplayedSearch()",
+            "method": "packagedSwitchingUpgradeAndRestartKeepReplayedSearch"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/step7/before-results/retirementHttpEvidence/TEST-io.justsearch.indexerworker.server.Release030RetirementHttpTest.xml",
+          "sha256": "sha256:5876da737549e8d8255c6f1007a1447202b6a0bbe57913fd56f76f25dc30aed3",
+          "bytes": 1768
+        },
+        "suiteTimestamp": "2026-10-25T21:31:39.441Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java#completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild",
+        "classification": "assertion",
+        "detail": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING> | completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[2]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING> | completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[3]: org.opente",
+        "cases": [
+          {
+            "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "displayName": "[1] migrating, false",
+            "method": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild"
+          },
+          {
+            "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "displayName": "[2] switching, false",
+            "method": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild"
+          },
+          {
+            "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[3]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "displayName": "[3] migrating, true",
+            "method": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild"
+          },
+          {
+            "name": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String, boolean, Path)[4]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "displayName": "[4] switching, true",
+            "method": "completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-final-completed-markers-results/TEST-io.justsearch.indexerworker.server.Release030RetirementCompletedBuildTest.xml",
+          "sha256": "sha256:e4c482de5a6bf02a5aa4b58899f884dd9ecf82cf0fab56d417f189612ef4481b",
+          "bytes": 290542
+        },
+        "suiteTimestamp": "2026-10-24T20:59:20.801Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#modernUnownedAdmissionCannotBorrowRetiredBuildAuthority",
+        "classification": "assertion",
+        "detail": "modernUnownedAdmissionCannotBorrowRetiredBuildAuthority(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+        "cases": [
+          {
+            "name": "modernUnownedAdmissionCannotBorrowRetiredBuildAuthority(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "displayName": "modernUnownedAdmissionCannotBorrowRetiredBuildAuthority(Path)",
+            "method": "modernUnownedAdmissionCannotBorrowRetiredBuildAuthority"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:88ebfa76743930cda3cf005f3f16f906d15c4516265666a5e3ba51c0042fbcc3",
+          "bytes": 626962
+        },
+        "suiteTimestamp": "2026-10-25T21:31:14.039Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart",
+        "classification": "assertion",
+        "detail": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a partial ordinary walk cannot certify deletion ==> expected: <true> but was: <false>",
+        "cases": [
+          {
+            "name": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: a partial ordinary walk cannot certify deletion ==> expected: <true> but was: <false>",
+            "displayName": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(Path)",
+            "method": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-final-complete-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+          "sha256": "sha256:c7f1c6d7b9aea2019df5a7a23734d4e03a9f563cb41102f731d26d8c9f053ed8",
+          "bytes": 110944
+        },
+        "suiteTimestamp": "2026-10-24T19:17:42.784Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java#closeDrainsMaintenanceWithoutInterruptingTheServingWriter",
+        "classification": "assertion",
+        "detail": "closeDrainsMaintenanceWithoutInterruptingTheServingWriter(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: shutdown must drain maintenance without interrupting the shared writer ==> expected: <false> but was: <true>",
+        "cases": [
+          {
+            "name": "closeDrainsMaintenanceWithoutInterruptingTheServingWriter(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RecoveryShutdownTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: shutdown must drain maintenance without interrupting the shared writer ==> expected: <false> but was: <true>",
+            "displayName": "closeDrainsMaintenanceWithoutInterruptingTheServingWriter(Path)",
+            "method": "closeDrainsMaintenanceWithoutInterruptingTheServingWriter"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-shutdown-control-results/TEST-io.justsearch.indexerworker.server.Release030RecoveryShutdownTest.xml",
+          "sha256": "sha256:9f16cf102f086c91dcf49671e5013951a395712973c9164f54d844fafb5c7a2d",
+          "bytes": 98577
+        },
+        "suiteTimestamp": "2026-10-24T22:05:41.812Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement",
+        "classification": "assertion",
+        "detail": "reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+        "cases": [
+          {
+            "name": "reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "displayName": "reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement(Path)",
+            "method": "reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/step7/before-results/test/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:88ebfa76743930cda3cf005f3f16f906d15c4516265666a5e3ba51c0042fbcc3",
+          "bytes": 626962
+        },
+        "suiteTimestamp": "2026-10-25T21:31:14.039Z"
+      }
+    ],
+    "scope": "Original frozen before assertions remain unchanged on their original check/helper source. They are not identical-final-source assertions. Current API-adapted source has separate real preservation-before executions below."
+  },
+  "scope": "Mixed provenance explicitly retained: ten original frozen-source repair checks and original fail-before records are historical, not a fresh final production run. Two current PartialWalk records bind actual final check bytes and final bbdd production in focused-after. Actual identical current-source preservation before on f081 passes both; its boolean-to-session/set instrumentation adaptation does not constitute a new repair fail-before. No original input SHA/status or missing argv was rewritten; all old records/raw artifacts remain.",
+  "frozenBase": {
+    "artifact": {
+      "path": "gates/test-intent/evidence/upgrade-retire-recovery-repaired.json",
+      "sha256": "sha256:9ca6ddc189d2aa86da6e7f877c54c8fafbdf385ddc4131f0d0c4d77ae550ee90",
+      "bytes": 108057
+    },
+    "producer": {
+      "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+      "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+      "adaptation": {
+        "actualProducer": "tmp/builder/step7/collect-upgrade-d4.mjs",
+        "actualProducerDigest": "sha256:d88f40f7fc0fa9d2505c5c5d7326435c9e0955f61f20c21b98c56eeb7d83c8ec",
+        "identityDecoder": "tmp/builder/step7/read-gradle-identities.py",
+        "identityDecoderDigest": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+        "mode": "Read actual completed preserved XML/binary executions. Canonical runner not invoked; this is an explicitly adapted collection envelope, not a claim that canonical run-evidence executed these tests."
+      }
+    },
+    "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+    "scope": "Exact original frozen source execution history, not final current production"
+  },
+  "historicalOriginalChecks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#partialWalkRetainsReceiptAndBuildUntilACompleteWalk",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b2bf6f70aac2470d7eebf4ad280838c4fcf832fa0d02a376ee12046c3305e699",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk(Path)",
+          "method": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+        "sha256": "sha256:b416d910a6d209b0dfc3252163146fbb29036b7b0df26da8e09242d908dd7b49",
+        "bytes": 158572
+      },
+      "suiteTimestamp": "2026-10-24T23:10:42.459Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b2bf6f70aac2470d7eebf4ad280838c4fcf832fa0d02a376ee12046c3305e699",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(Path)",
+          "method": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+        "sha256": "sha256:b416d910a6d209b0dfc3252163146fbb29036b7b0df26da8e09242d908dd7b49",
+        "bytes": 158572
+      },
+      "suiteTimestamp": "2026-10-24T23:10:42.459Z"
+    }
+  ],
+  "currentSourcePreservationBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#partialWalkRetainsReceiptAndBuildUntilACompleteWalk",
+        "contentDigest": "sha256:29a1e357bdeee0c0f1d614d979666c451a2b4c057660c386038ca3c7916f74b7",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "method": "partialWalkRetainsReceiptAndBuildUntilACompleteWalk"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-R1-repair/resume-r12/partial-reader-before/xml/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+            "sha256": "sha256:4b4fffa351a90855c42ef78400cfa99d0a871e6c7bbfc23f430c4d2d29a17da1",
+            "bytes": 156621
+          },
+          {
+            "path": "tmp/builder/retire-R1-repair/resume-r12/partial-reader-before/command.json",
+            "sha256": "sha256:345bc2337403d09b7eeae3f6871888cec7b4c7efb20cb76bdd514cdcc6e778bb",
+            "bytes": 1696741
+          }
+        ],
+        "revision": "f081bfa9214ad2c91a027daa06efce25d47718c2"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart",
+        "contentDigest": "sha256:29a1e357bdeee0c0f1d614d979666c451a2b4c057660c386038ca3c7916f74b7",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "method": "ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-R1-repair/resume-r12/partial-reader-before/xml/TEST-io.justsearch.indexerworker.server.Release030RetirementPartialWalkTest.xml",
+            "sha256": "sha256:4b4fffa351a90855c42ef78400cfa99d0a871e6c7bbfc23f430c4d2d29a17da1",
+            "bytes": 156621
+          },
+          {
+            "path": "tmp/builder/retire-R1-repair/resume-r12/partial-reader-before/command.json",
+            "sha256": "sha256:345bc2337403d09b7eeae3f6871888cec7b4c7efb20cb76bdd514cdcc6e778bb",
+            "bytes": 1696741
+          }
+        ],
+        "revision": "f081bfa9214ad2c91a027daa06efce25d47718c2"
+      }
+    ]
+  },
+  "digest": "sha256:5111f69da6942bdaf813269ad824691060494ebc178ba20428824bef54211063"
+}

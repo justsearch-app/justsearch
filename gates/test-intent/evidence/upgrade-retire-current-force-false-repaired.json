@@ -1,0 +1,385 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952.mjs",
+        "sha256": "sha256:14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952",
+        "bytes": 10467
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T20:06:15.747Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.xml",
+          "sha256": "sha256:54be14772cb912195ba9b24d1b8d441209f6e7338fa77b38de9ae313d8c75efc",
+          "bytes": 841358
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementForceFalseTest.indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/.cache/am/fopeqp12/tmp/p4-evidence-before",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.xml",
+          "sha256": "sha256:d23448fa1c6ff92305d863ad86f883187b98073b34d7cc0204932c3c4a482837",
+          "bytes": 698449
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/command.json",
+          "sha256": "sha256:519ee7f2b31d4a6d839e065cbbbf89c515941402c683a4fc54890feaa14115c2",
+          "bytes": 1699651
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:3196220263bb9dafe73479a5834ddec7535a3d1ee378abb9499a714c9f6dd76f",
+          "bytes": 2310
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.xml",
+          "sha256": "sha256:54be14772cb912195ba9b24d1b8d441209f6e7338fa77b38de9ae313d8c75efc",
+          "bytes": 841358
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementForceFalseTest.readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/.cache/am/fopeqp12/tmp/p4-evidence-before",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/force-false-changed-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.xml",
+          "sha256": "sha256:cbb432b561a1d2f676ae3cc51fd8f04c9c58517111a179fce9f2ba2576ea3bd1",
+          "bytes": 1579729
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/force-false-changed-before/command.json",
+          "sha256": "sha256:9c9201bb6b8ed273b66f093dd999e681a798f19e0075be923bc6bfc5dbb10672",
+          "bytes": 1699595
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/force-false-changed-before/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:104814739565935d6b6d7f135bccd14e8c7f39f6e35ba7c4a05910281584577c",
+          "bytes": 2310
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b8884675eee65c7731a30b270d3ad1a9ec2260009deeae77590b3121898dbc0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementForceFalseTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path)",
+          "method": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.xml",
+          "sha256": "sha256:54be14772cb912195ba9b24d1b8d441209f6e7338fa77b38de9ae313d8c75efc",
+          "bytes": 841358
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b8884675eee65c7731a30b270d3ad1a9ec2260009deeae77590b3121898dbc0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementForceFalseTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path)",
+          "method": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.xml",
+          "sha256": "sha256:54be14772cb912195ba9b24d1b8d441209f6e7338fa77b38de9ae313d8c75efc",
+          "bytes": 841358
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete",
+        "contentDigest": "sha256:b8884675eee65c7731a30b270d3ad1a9ec2260009deeae77590b3121898dbc0c",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: replay preserves complete older D row, identity, boundary, attempts and outcome ==> expected: <{path=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/jvm/junit-526422647427 | indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path): org.opentest4j.",
+        "cases": [
+          {
+            "name": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementForceFalseTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: replay preserves complete older D row, identity, boundary, attempts and outcome ==> expected: <{path=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/jvm/junit-526422647427",
+            "xmlName": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path)",
+            "method": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete"
+          },
+          {
+            "name": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementForceFalseTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: replay preserves complete older D row, identity, boundary, attempts and outcome ==> expected: <{path=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/jvm/junit-140389957066",
+            "xmlName": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path)",
+            "method": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete"
+          },
+          {
+            "name": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementForceFalseTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: replay preserves complete older D row, identity, boundary, attempts and outcome ==> expected: <{path=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/jvm/junit-860827072218",
+            "xmlName": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete(Path)",
+            "method": "indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.xml",
+            "sha256": "sha256:d23448fa1c6ff92305d863ad86f883187b98073b34d7cc0204932c3c4a482837",
+            "bytes": 698449
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/command.json",
+            "sha256": "sha256:519ee7f2b31d4a6d839e065cbbbf89c515941402c683a4fc54890feaa14115c2",
+            "bytes": 1699651
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/force-false-original-before-fixed-helper/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:3196220263bb9dafe73479a5834ddec7535a3d1ee378abb9499a714c9f6dd76f",
+            "bytes": 2310
+          }
+        ],
+        "revision": "a53b93d3319befa6ed9b2f5b5b9eb298e6ca268b"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts",
+        "contentDigest": "sha256:b8884675eee65c7731a30b270d3ad1a9ec2260009deeae77590b3121898dbc0c",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: readable changed D source becomes claimable and completes beneath force-false C ==> expected: <true> but was: <false> | readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: readable changed D source becomes claimable and completes beneath force-false C ==> expe",
+        "cases": [
+          {
+            "name": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementForceFalseTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: readable changed D source becomes claimable and completes beneath force-false C ==> expected: <true> but was: <false>",
+            "xmlName": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path)",
+            "method": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts"
+          },
+          {
+            "name": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementForceFalseTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: readable changed D source becomes claimable and completes beneath force-false C ==> expected: <true> but was: <false>",
+            "xmlName": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path)",
+            "method": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts"
+          },
+          {
+            "name": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementForceFalseTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: readable changed D source becomes claimable and completes beneath force-false C ==> expected: <true> but was: <false>",
+            "xmlName": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts(Path)",
+            "method": "readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/force-false-changed-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementForceFalseTest.xml",
+            "sha256": "sha256:cbb432b561a1d2f676ae3cc51fd8f04c9c58517111a179fce9f2ba2576ea3bd1",
+            "bytes": 1579729
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/force-false-changed-before/command.json",
+            "sha256": "sha256:9c9201bb6b8ed273b66f093dd999e681a798f19e0075be923bc6bfc5dbb10672",
+            "bytes": 1699595
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/force-false-changed-before/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:104814739565935d6b6d7f135bccd14e8c7f39f6e35ba7c4a05910281584577c",
+            "bytes": 2310
+          }
+        ],
+        "revision": "5324c0714aadcdcf547c923c4290a294ef90ee57"
+      }
+    ]
+  },
+  "scope": "Original row preservation uses genuine a53 before; changed-source uses genuine 5324 before. Both execute the identical final whole three-method check file. Exact executed helper bodies and actual whole helper-file input manifests are bound; the unselected policy test boot-reference redirect is disclosed separately. Earlier one-method and models-resource two-method source bindings remain history. Missing known-good before for the logical Default combination is explicitly unverified; its real final after passes.",
+  "digest": "sha256:1578f1e180c8c59b6b16300b5fdcc9b5d9e4c2ddd42fa3044b0dc530fb8a4c7f"
+}

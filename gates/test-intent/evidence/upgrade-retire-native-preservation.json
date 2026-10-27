@@ -1,0 +1,787 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "adaptation": {
+      "actualProducer": "tmp/builder/step7/collect-upgrade-d4.mjs",
+      "actualProducerDigest": "sha256:d88f40f7fc0fa9d2505c5c5d7326435c9e0955f61f20c21b98c56eeb7d83c8ec",
+      "identityDecoder": "tmp/builder/step7/read-gradle-identities.py",
+      "identityDecoderDigest": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+      "mode": "Read actual completed preserved XML/binary executions. Canonical runner not invoked; this is an explicitly adapted collection envelope, not a claim that canonical run-evidence executed these tests."
+    }
+  },
+  "createdAt": "2026-10-25T21:43:28.101Z",
+  "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+  "tree": "44f1a35bc5cccf0ce1a80d5108747f91f3340f85",
+  "environment": {
+    "kind": "artifact-collection environment, not old execution JVM identity",
+    "platform": "linux",
+    "arch": "x64",
+    "node": "v24.22.0",
+    "originalExecutionEnvironment": {
+      "path": "tmp/builder/evidence/reproduction/environment.json",
+      "sha256": "sha256:a6d6ea40a1df8869bacedb98519ab3385b69e4ebb0a0d05c9974862f9a5d83fe",
+      "bytes": 604
+    },
+    "originalAfterHarness": {
+      "path": "tmp/builder/evidence/reproduction/test-jvm-after.gradle",
+      "sha256": "sha256:c2a592c5c0e0d35fa08d63d1cf1f10fd7c1fe47157fa7cdb90fd0e3e9d75a814",
+      "bytes": 760
+    }
+  },
+  "runs": [
+    {
+      "command": "\"env\" \"-u\" \"JAVA_TOOL_OPTIONS\" \"-u\" \"JUSTSEARCH_HOME\" \"-u\" \"JUSTSEARCH_DATA_DIR\" \"TMPDIR=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder\" \"JDK_JAVA_OPTIONS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"GRADLE_OPTS=-Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/jvm/after\" \"js-gradle-slot\" \"./gradlew\" \":modules:indexer-worker:test\" \":modules:adapters-lucene:test\" \":modules:adapters-lucene:integrationTest\" \":modules:worker-core:test\" \":modules:worker-services:test\" \":modules:indexing:test\" \":modules:indexing:integrationTest\" \":modules:benchmarks:test\" \":modules:app-engine:test\" \":modules:ui:test\" \":modules:ui:integrationTest\" \":modules:app-launcher:test\" \":modules:app-launcher:integrationTest\" \":modules:system-tests:test\" \":modules:indexer-worker:retirementHttpEvidence\" \":modules:indexer-worker:compileJava\" \":modules:adapters-lucene:compileJava\" \":modules:worker-core:compileJava\" \":modules:worker-services:compileJava\" \":modules:indexer-worker:pmdMain\" \":modules:indexer-worker:pmdTest\" \":modules:adapters-lucene:pmdMain\" \":modules:adapters-lucene:pmdTest\" \":modules:worker-core:pmdMain\" \":modules:worker-core:pmdTest\" \":modules:worker-services:pmdMain\" \":modules:worker-services:pmdTest\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/test-jvm-after.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/http-evidence.gradle\" \"-I\" \"/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/serial-tests.gradle\" \"-PskipWebBuild=true\" \"-PtestParallelism=1\" \"--max-workers=2\" \"--no-configuration-cache\" \"--continue\"",
+      "kind": "original frozen command",
+      "commandArtifact": {
+        "path": "tmp/builder/evidence/after-final-complete-verification-command.json",
+        "sha256": "sha256:7900a3af9c1c316b687da511d85741fdc04b007dc08b8d164786af8ff7e13968",
+        "bytes": 2066
+      },
+      "completion": "Named indexer-worker suites completed; outer program later interrupted inside downstream app-engine. Global exit is not relabelled passed."
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java#nativeInterruptedMigrationCompletesWithoutStateEdits",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:97fda6942f044f18d59671288086fc90f98fa0891df05920f50b5f0c36f0204f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeInterruptedMigrationCompletesWithoutStateEdits(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] migrating",
+          "method": "nativeInterruptedMigrationCompletesWithoutStateEdits"
+        },
+        {
+          "name": "nativeInterruptedMigrationCompletesWithoutStateEdits(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] switching",
+          "method": "nativeInterruptedMigrationCompletesWithoutStateEdits"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest.xml",
+        "sha256": "sha256:38f374ef43cb02908dbde9ad4e65179432452a7a7079a27ff8d0a4c35e8a6d91",
+        "bytes": 430827
+      },
+      "suiteTimestamp": "2026-10-24T22:53:02.602Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java#nativeCutoverKeepsUnavailableExactOldContentUntilItReturns",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:97fda6942f044f18d59671288086fc90f98fa0891df05920f50b5f0c36f0204f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeCutoverKeepsUnavailableExactOldContentUntilItReturns(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "nativeCutoverKeepsUnavailableExactOldContentUntilItReturns(Path)",
+          "method": "nativeCutoverKeepsUnavailableExactOldContentUntilItReturns"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest.xml",
+        "sha256": "sha256:38f374ef43cb02908dbde9ad4e65179432452a7a7079a27ff8d0a4c35e8a6d91",
+        "bytes": 430827
+      },
+      "suiteTimestamp": "2026-10-24T22:53:02.602Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#completedLegacyEffectIsSettledThroughNativeReplay",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:da3229434896c84aa066207e1b779027c73862207eb0f3b3b8c0650ba75da59c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] migrating, false, false",
+          "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+        },
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] switching, false, false",
+          "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+        },
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[3] migrating, true, false",
+          "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+        },
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[4]",
+          "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[4] switching, true, false",
+          "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+        },
+        {
+          "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[5]",
+          "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[5] migrating, false, true",
+          "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030ReplayRetentionTest.xml",
+        "sha256": "sha256:d7830696ffe6a74eafc7f6586cb0c71b30257d70a7335ec772bef6336a546bc6",
+        "bytes": 988138
+      },
+      "suiteTimestamp": "2026-10-24T22:56:18.169Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:da3229434896c84aa066207e1b779027c73862207eb0f3b3b8c0650ba75da59c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes(Path)",
+          "method": "routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030ReplayRetentionTest.xml",
+        "sha256": "sha256:d7830696ffe6a74eafc7f6586cb0c71b30257d70a7335ec772bef6336a546bc6",
+        "bytes": 988138
+      },
+      "suiteTimestamp": "2026-10-24T22:56:18.169Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#committedNativeFileRecoveredAsUnchangedKeepsItsAdmission",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:da3229434896c84aa066207e1b779027c73862207eb0f3b3b8c0650ba75da59c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission(boolean, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] false",
+          "method": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission"
+        },
+        {
+          "name": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission(boolean, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] true",
+          "method": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030ReplayRetentionTest.xml",
+        "sha256": "sha256:d7830696ffe6a74eafc7f6586cb0c71b30257d70a7335ec772bef6336a546bc6",
+        "bytes": 988138
+      },
+      "suiteTimestamp": "2026-10-24T22:56:18.169Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#neverIndexedExhaustedDebtDoesNotHoldNativeCutover",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e9a966de96b4679b285eb7664e0ed59f6d04f8df1c7dff346e8bf610b0499862",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path) [1] migrating",
+          "method": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover"
+        },
+        {
+          "name": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path) [2] switching",
+          "method": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030AdmissionDebtTest.xml",
+        "sha256": "sha256:51a0929569999221a07fba916cf827ba229ff552a3a9b0cbac3f0afa58e22b0e",
+        "bytes": 720822
+      },
+      "suiteTimestamp": "2026-10-24T22:44:18.385Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#actualDeadlineFailureRestartsWithIndependentExhaustedDebt",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e9a966de96b4679b285eb7664e0ed59f6d04f8df1c7dff346e8bf610b0499862",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path) [1] false",
+          "method": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt"
+        },
+        {
+          "name": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path) [2] true",
+          "method": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030AdmissionDebtTest.xml",
+        "sha256": "sha256:51a0929569999221a07fba916cf827ba229ff552a3a9b0cbac3f0afa58e22b0e",
+        "bytes": 720822
+      },
+      "suiteTimestamp": "2026-10-24T22:44:18.385Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#indexedExhaustedExactContentIsNotDiscardedAtCutover",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e9a966de96b4679b285eb7664e0ed59f6d04f8df1c7dff346e8bf610b0499862",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexedExhaustedExactContentIsNotDiscardedAtCutover(Path)",
+          "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "indexedExhaustedExactContentIsNotDiscardedAtCutover(Path)",
+          "method": "indexedExhaustedExactContentIsNotDiscardedAtCutover"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030AdmissionDebtTest.xml",
+        "sha256": "sha256:51a0929569999221a07fba916cf827ba229ff552a3a9b0cbac3f0afa58e22b0e",
+        "bytes": 720822
+      },
+      "suiteTimestamp": "2026-10-24T22:44:18.385Z"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java#interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5fb623e6c1ce9ea29d6d13ed9733f3d46651345bb637fd082de1f18cb53ee21e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030ChallengerRecoveryTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[1] migrating",
+          "method": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover"
+        },
+        {
+          "name": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030ChallengerRecoveryTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "displayName": "[2] switching",
+          "method": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover"
+        }
+      ],
+      "executionScope": "completed frozen-source execution, not current integrated behavior",
+      "rawXml": {
+        "path": "tmp/builder/resume-20261025/old-results/indexer-worker/test/TEST-io.justsearch.indexerworker.server.Release030ChallengerRecoveryTest.xml",
+        "sha256": "sha256:b8f4b4a71b9eb58f64aa4305ae712147f59bfab72b4e3ee575c0dfb7add1def2",
+        "bytes": 372699
+      },
+      "suiteTimestamp": "2026-10-24T22:48:14.719Z"
+    }
+  ],
+  "failBefore": {
+    "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+    "purpose": "preservation before",
+    "runs": [
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest.xml",
+          "sha256": "sha256:0baf89202454287fe6b8610564cf8a2311f7644f72e5860d5127370c9da3f7d4",
+          "bytes": 177852
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest.xml",
+          "sha256": "sha256:0baf89202454287fe6b8610564cf8a2311f7644f72e5860d5127370c9da3f7d4",
+          "bytes": 177852
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ReplayRetentionTest.xml",
+          "sha256": "sha256:88a62664453b9f5794197cc56b0a0326985a4378fd6839f1ea6a9f3fe921669c",
+          "bytes": 769397
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ReplayRetentionTest.xml",
+          "sha256": "sha256:88a62664453b9f5794197cc56b0a0326985a4378fd6839f1ea6a9f3fe921669c",
+          "bytes": 769397
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ReplayRetentionTest.xml",
+          "sha256": "sha256:88a62664453b9f5794197cc56b0a0326985a4378fd6839f1ea6a9f3fe921669c",
+          "bytes": 769397
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030AdmissionDebtTest.xml",
+          "sha256": "sha256:6932912956914b49865a6852ddb1ed13a1a2af764a4f5d433a7a912182505d47",
+          "bytes": 510008
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030AdmissionDebtTest.xml",
+          "sha256": "sha256:6932912956914b49865a6852ddb1ed13a1a2af764a4f5d433a7a912182505d47",
+          "bytes": 510008
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030AdmissionDebtTest.xml",
+          "sha256": "sha256:6932912956914b49865a6852ddb1ed13a1a2af764a4f5d433a7a912182505d47",
+          "bytes": 510008
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      },
+      {
+        "command": "node tmp/builder/step7/collect-upgrade-d4.mjs",
+        "kind": "documented artifact collection",
+        "xml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ChallengerRecoveryTest.xml",
+          "sha256": "sha256:12050f0ad1c2bc03380a4bbe05f94112bacd3e4a40d4f2c38234add6b5ab2556",
+          "bytes": 124392
+        },
+        "originalExecutionCommand": null,
+        "originalArgvProvenance": "Original full argv was not retained for this selected historical before run; raw XML, execution log, same-source overlay and source manifests are retained. This collector command is not presented as its Gradle command."
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java#nativeInterruptedMigrationCompletesWithoutStateEdits",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "nativeInterruptedMigrationCompletesWithoutStateEdits(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[1] migrating",
+            "method": "nativeInterruptedMigrationCompletesWithoutStateEdits"
+          },
+          {
+            "name": "nativeInterruptedMigrationCompletesWithoutStateEdits(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[2] switching",
+            "method": "nativeInterruptedMigrationCompletesWithoutStateEdits"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest.xml",
+          "sha256": "sha256:0baf89202454287fe6b8610564cf8a2311f7644f72e5860d5127370c9da3f7d4",
+          "bytes": 177852
+        },
+        "suiteTimestamp": "2026-10-24T17:43:15.466Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java#nativeCutoverKeepsUnavailableExactOldContentUntilItReturns",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "nativeCutoverKeepsUnavailableExactOldContentUntilItReturns(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "nativeCutoverKeepsUnavailableExactOldContentUntilItReturns(Path)",
+            "method": "nativeCutoverKeepsUnavailableExactOldContentUntilItReturns"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ExactFileRecoveryTest.xml",
+          "sha256": "sha256:0baf89202454287fe6b8610564cf8a2311f7644f72e5860d5127370c9da3f7d4",
+          "bytes": 177852
+        },
+        "suiteTimestamp": "2026-10-24T17:43:15.466Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#completedLegacyEffectIsSettledThroughNativeReplay",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[1] migrating, false, false",
+            "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+          },
+          {
+            "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[2] switching, false, false",
+            "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+          },
+          {
+            "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[3]",
+            "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[3] migrating, true, false",
+            "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+          },
+          {
+            "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[4]",
+            "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[4] switching, true, false",
+            "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+          },
+          {
+            "name": "completedLegacyEffectIsSettledThroughNativeReplay(String, boolean, boolean, Path)[5]",
+            "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[5] migrating, false, true",
+            "method": "completedLegacyEffectIsSettledThroughNativeReplay"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ReplayRetentionTest.xml",
+          "sha256": "sha256:88a62664453b9f5794197cc56b0a0326985a4378fd6839f1ea6a9f3fe921669c",
+          "bytes": 769397
+        },
+        "suiteTimestamp": "2026-10-24T17:44:34.044Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes(Path)",
+            "method": "routineRetentionKeepsFailedCutoverReceiptUntilRecoveryCompletes"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ReplayRetentionTest.xml",
+          "sha256": "sha256:88a62664453b9f5794197cc56b0a0326985a4378fd6839f1ea6a9f3fe921669c",
+          "bytes": 769397
+        },
+        "suiteTimestamp": "2026-10-24T17:44:34.044Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#committedNativeFileRecoveredAsUnchangedKeepsItsAdmission",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission(boolean, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[1] false",
+            "method": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission"
+          },
+          {
+            "name": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission(boolean, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030ReplayRetentionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[2] true",
+            "method": "committedNativeFileRecoveredAsUnchangedKeepsItsAdmission"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ReplayRetentionTest.xml",
+          "sha256": "sha256:88a62664453b9f5794197cc56b0a0326985a4378fd6839f1ea6a9f3fe921669c",
+          "bytes": 769397
+        },
+        "suiteTimestamp": "2026-10-24T17:44:34.044Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#neverIndexedExhaustedDebtDoesNotHoldNativeCutover",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path) [1] migrating",
+            "method": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover"
+          },
+          {
+            "name": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover(String, Path) [2] switching",
+            "method": "neverIndexedExhaustedDebtDoesNotHoldNativeCutover"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030AdmissionDebtTest.xml",
+          "sha256": "sha256:6932912956914b49865a6852ddb1ed13a1a2af764a4f5d433a7a912182505d47",
+          "bytes": 510008
+        },
+        "suiteTimestamp": "2026-10-24T17:39:28.915Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#actualDeadlineFailureRestartsWithIndependentExhaustedDebt",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path) [1] false",
+            "method": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt"
+          },
+          {
+            "name": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt(boolean, Path) [2] true",
+            "method": "actualDeadlineFailureRestartsWithIndependentExhaustedDebt"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030AdmissionDebtTest.xml",
+          "sha256": "sha256:6932912956914b49865a6852ddb1ed13a1a2af764a4f5d433a7a912182505d47",
+          "bytes": 510008
+        },
+        "suiteTimestamp": "2026-10-24T17:39:28.915Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java#indexedExhaustedExactContentIsNotDiscardedAtCutover",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "indexedExhaustedExactContentIsNotDiscardedAtCutover(Path)",
+            "classname": "io.justsearch.indexerworker.server.Release030AdmissionDebtTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "indexedExhaustedExactContentIsNotDiscardedAtCutover(Path)",
+            "method": "indexedExhaustedExactContentIsNotDiscardedAtCutover"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030AdmissionDebtTest.xml",
+          "sha256": "sha256:6932912956914b49865a6852ddb1ed13a1a2af764a4f5d433a7a912182505d47",
+          "bytes": 510008
+        },
+        "suiteTimestamp": "2026-10-24T17:39:28.915Z"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java#interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "purpose": "preservation control",
+        "outcome": "passed",
+        "cases": [
+          {
+            "name": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030ChallengerRecoveryTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[1] migrating",
+            "method": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover"
+          },
+          {
+            "name": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030ChallengerRecoveryTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "displayName": "[2] switching",
+            "method": "interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover"
+          }
+        ],
+        "rawXml": {
+          "path": "tmp/builder/evidence/before-native-final-results/TEST-io.justsearch.indexerworker.server.Release030ChallengerRecoveryTest.xml",
+          "sha256": "sha256:12050f0ad1c2bc03380a4bbe05f94112bacd3e4a40d4f2c38234add6b5ab2556",
+          "bytes": 124392
+        },
+        "suiteTimestamp": "2026-10-24T17:43:06.838Z"
+      }
+    ]
+  },
+  "sourceBindings": {
+    "path": "gates/test-intent/evidence/upgrade-retire-source-bindings.json",
+    "sha256": "sha256:455717504ee117e7d2fea5e0b56b21be1e4f08f57c66cce929164017b98819b3"
+  },
+  "scope": {
+    "after": "immutable frozen code represented by d9663d16, executed with HEAD 8292 and original dirty manifest",
+    "currentCollector": "1bb20567032b5f2af0700b9f04013b79f0aa132f",
+    "integratedProductionChanges": 95,
+    "notFreshCurrentIntegratedBehavior": true,
+    "acceptanceAuthored": false
+  },
+  "digest": "sha256:431cab6f72ea05e19b738828d9dfda9d8db7294703a5f9a5cdcf1eb3e10269e8"
+}

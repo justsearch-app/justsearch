@@ -67,6 +67,8 @@ final class SyncDirectoryOps {
   private final IndexingPacing indexingPacing;
   private final CloudPlaceholderRecorder cloudPlaceholderRecorder;
   private final ConfirmedDeletionMarker deletionMarker;
+  private java.util.function.Consumer<java.util.Collection<String>> forcedPathSink = paths -> {};
+  void setForcedPathSink(java.util.function.Consumer<java.util.Collection<String>> sink) { forcedPathSink = java.util.Objects.requireNonNull(sink); }
   private final int pathScanCap;
   private final int pathCharCap;
   private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
@@ -571,7 +573,25 @@ final class SyncDirectoryOps {
     return execute(rootPath, force, provenance, cancelled, collection, AdmissionMode.DEFAULT);
   }
 
-  enum AdmissionMode { DEFAULT, MAINTENANCE, UPGRADE_RECOVERY }
+  /** Admission only: rebuilding CURRENT Q membership never publishes a prune/walk certificate. */
+  SyncDirectoryResponse enumerateRetirementRoot(String rootPath,String collection,
+      java.util.function.BooleanSupplier cancelled,boolean automatic,
+      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp original) {
+    Path root=resolveSyncRoot(rootPath);
+    if(root==null)return syncDirectoryErrorResponse("ROOT enumeration unavailable");
+    try {
+      var result=walkAndEnqueueMissingFiles(root,true,Set.of(),
+          io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.payload()).provenance(),
+          cancelled,collection,automatic?AdmissionMode.UPGRADE_RECOVERY:AdmissionMode.RETIREMENT_REPLAY,
+          recoveryAdmission,original);
+      if(result.walkInterrupted()||cancelled.getAsBoolean())return syncDirectoryErrorResponse("ROOT enumeration cancelled");
+      return SyncDirectoryResponse.newBuilder().setFilesAdded(result.filesAdded())
+          .setDeleteDetectionUnverified(result.walkIncomplete()).build();
+    }catch(IOException|RuntimeException incomplete){return syncDirectoryErrorResponse("ROOT enumeration incomplete: "+incomplete.getMessage());}
+  }
+
+  enum AdmissionMode { DEFAULT, MAINTENANCE, UPGRADE_RECOVERY, RETIREMENT_LIVE, RETIREMENT_MAINTENANCE, RETIREMENT_REPLAY }
 
   SyncDirectoryResponse execute(String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
@@ -584,6 +604,20 @@ final class SyncDirectoryOps {
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection, AdmissionMode admissionMode,
       java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission) {
+    return execute(rootPath,force,provenance,cancelled,collection,admissionMode,recoveryAdmission,null);
+  }
+
+  SyncDirectoryResponse execute(String rootPath,boolean force,JobQueue.EnqueueProvenance provenance,
+      java.util.function.BooleanSupplier cancelled,String collection,AdmissionMode admissionMode,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp originalRoot) {
+    return execute(rootPath,force,provenance,cancelled,collection,admissionMode,
+        java.util.function.IntSupplier::getAsInt,originalRoot);
+  }
+
+  SyncDirectoryResponse execute(String rootPath,boolean force,JobQueue.EnqueueProvenance provenance,
+      java.util.function.BooleanSupplier cancelled,String collection,AdmissionMode admissionMode,
+      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp originalRoot) {
     boolean upgradeRecovery = admissionMode == AdmissionMode.UPGRADE_RECOVERY;
     if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
@@ -632,10 +666,10 @@ final class SyncDirectoryOps {
       // STEP 3: Walk disk and find missing files
       SyncWalkPhaseResult walk =
           walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled, collection,
-              admissionMode, recoveryAdmission);
+              admissionMode, recoveryAdmission, originalRoot);
       filesAdded = walk.filesAdded();
       // A recovery checkpoint cannot certify a tree whose unreadable entries were skipped.
-      pruneIncomplete |= upgradeRecovery && walk.walkIncomplete();
+      pruneIncomplete |= walk.walkIncomplete();
 
       if (cancelled.getAsBoolean()) {
         return syncDirectoryErrorResponse(filesDeleted, filesAdded, "Cancelled");
@@ -771,7 +805,8 @@ final class SyncDirectoryOps {
       Path root, boolean force, Set<String> indexedPaths,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection, AdmissionMode admissionMode,
-      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission) throws IOException {
+      java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp originalRoot) throws IOException {
     // Preserve globally deterministic enqueue order without retaining the root in shared heap.
     // The spool maintains its ordering index on disk while the walk streams one path at a time.
     try (var spool = new ReconciliationSpool()) {
@@ -881,6 +916,123 @@ final class SyncDirectoryOps {
                 .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
                 .map(entry -> entry.withinRoot(root))
                 .toList();
+            if (originalRoot != null) {
+              var queue=(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue)jobQueue;
+              boolean replay = admissionMode==AdmissionMode.RETIREMENT_REPLAY || admissionMode==AdmissionMode.UPGRADE_RECOVERY;
+              var completedRows = new java.util.HashMap<String,java.util.Map<String,String>>();
+              var changedPaths = new ArrayList<String>();
+              var corrections = new ArrayList<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation>();
+              var rootFiles=replay?queue.retirementRootFiles():null;
+              if (replay) for (var entry : admitted) {
+                if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new java.io.UncheckedIOException(new IOException("ROOT proof cancelled"));
+                String path = PathNormalizer.normalizeKey(entry.path());
+                var row = queue.watcherReconciliationRow(path);
+                var result = readPathOps.search(new org.apache.lucene.search.TermQuery(
+                    new org.apache.lucene.index.Term(SchemaFields.DOC_ID,path)), 2,
+                    Set.of(SchemaFields.DOC_ID,SchemaFields.PATH,SchemaFields.SOURCE_SHA256,SchemaFields.COLLECTION),
+                    LuceneRuntimeTypes.RuntimeSearchSort.RELEVANCE,null);
+                if(row==null) {
+                  if(!io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(originalRoot.payload()).force()
+                      && !result.hits().isEmpty())throw new IllegalStateException("Indexed force-false member ownership unavailable");
+                  continue;
+                }
+                if("PROCESSING".equals(row.get("state")))continue;
+                var origin = io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RootOrigin.fromUnit(row.get("unit_revision"));
+                var proofOwner=originalRoot;
+                boolean preservedOlder=false;
+                if (!io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(originalRoot.payload()).force()
+                    && !result.hits().isEmpty() && (origin==null || !origin.uuid().equals(originalRoot.retirementUuid()))) {
+                  var actual=rootFiles.apply(path);
+                  proofOwner=actual==null?null:actual.owner();
+                  if(proofOwner==null)throw new IllegalStateException("Indexed force-false member ownership unavailable");
+                  preservedOlder=proofOwner.acceptedOrder()<originalRoot.acceptedOrder();
+                }
+                if (!preservedOlder && (origin == null || origin.acceptedOrder()!=originalRoot.acceptedOrder()
+                    || !origin.uuid().equals(originalRoot.retirementUuid()))) continue;
+                // The necessary current-byte/A proof is shared with repeat admission. It runs
+                // before Q's write reservation; only the exact observed row may be preserved.
+                String source;
+                String sourceState;
+                try {
+                  var before = Files.readAttributes(entry.path(), BasicFileAttributes.class,
+                      java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                  source = io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(),
+                      () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());
+                  var after = Files.readAttributes(entry.path(), BasicFileAttributes.class,
+                      java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                  if (!before.isRegularFile() || !after.isRegularFile() || before.size()!=after.size()
+                      || !before.lastModifiedTime().equals(after.lastModifiedTime())
+                      || !java.util.Objects.equals(before.fileKey(),after.fileKey()))
+                    throw new IOException("ROOT source changed during proof");
+                  sourceState = "file/" + before.size() + "/" + before.lastModifiedTime().toMillis()
+                      + "/" + before.fileKey() + "/" + source;
+                }
+                catch (IOException incomplete) { throw new java.io.UncheckedIOException(incomplete); }
+                var intent = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(originalRoot.payload());
+                String effectiveCollection = collection == null || collection.isBlank() ? row.get("collection") : collection;
+                var effectiveProvenance = intent.provenance();
+                if (effectiveProvenance == null && (row.get("originator") != null || row.get("transport") != null))
+                  effectiveProvenance = new JobQueue.EnqueueProvenance(row.get("originator"),row.get("transport"));
+                var scope = preservedOlder ? rootFiles.apply(path).scope()
+                    : new io.justsearch.indexerworker.queue.SwitchBufferUpsert(path,effectiveCollection,
+                        effectiveProvenance,null,null,root);
+                effectiveCollection=scope.collection();
+                if (result.hits().size()!=1) {
+                  changedPaths.add(path);
+                  corrections.add(new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation(
+                      proofOwner,scope,row,sourceState,source,entry.sizeBytes(),false));
+                  continue;
+                }
+                var fields = result.hits().getFirst().fields();
+                String owner = effectiveCollection;
+                if (owner==null || owner.isBlank()) owner="default";
+                String indexedOwner = fields.get(SchemaFields.COLLECTION);
+                if (indexedOwner==null || indexedOwner.isBlank()) indexedOwner="default";
+                boolean indexedParentMatches=path.equals(fields.get(SchemaFields.DOC_ID))
+                    && path.equals(fields.get(SchemaFields.PATH)) && owner.equals(indexedOwner);
+                if (!indexedParentMatches || !source.equals(fields.get(SchemaFields.SOURCE_SHA256))) {
+                  changedPaths.add(path);
+                  corrections.add(new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation(
+                      proofOwner,scope,row,sourceState,source,entry.sizeBytes(),false,indexedParentMatches));
+                }
+                if ("DONE".equals(row.get("state")) && indexedParentMatches && source.equals(fields.get(SchemaFields.SOURCE_SHA256))
+                    && owner.equals(indexedOwner) && (row.get("content_hash")==null || source.equals(row.get("content_hash"))))
+                  completedRows.put(path,row);
+                if(preservedOlder && completedRows.containsKey(path))
+                  corrections.add(new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation(
+                      proofOwner,scope,row,sourceState,source,entry.sizeBytes(),true));
+              }
+              if (!corrections.isEmpty()) {
+                var outcomes=queue.correctRetirementSources(corrections,
+                    () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());
+                for(int i=0;i<corrections.size();i++)
+                  if(corrections.get(i).owner()!=null && corrections.get(i).owner().acceptedOrder()<originalRoot.acceptedOrder() && outcomes.get(i)!=2)
+                    throw new IllegalStateException("Older indexed ROOT source obligation remains unverified");
+              }
+              java.util.function.IntSupplier admit=()->queue.enqueueRetirementRootEntries(originalRoot,admitted,collection,
+                  admissionMode==AdmissionMode.RETIREMENT_MAINTENANCE,
+                  replay, ()->cancelled.getAsBoolean()||Thread.currentThread().isInterrupted(),completedRows);
+              int accepted=admissionMode==AdmissionMode.UPGRADE_RECOVERY?recoveryAdmission.applyAsInt(admit):admit.getAsInt();
+              if(accepted!=admitted.size())throw new IllegalStateException("Incomplete original ROOT admission");
+              // The retirement caller still owns the installed writer fence. Reuse ordinary
+              // targeted force only after admission succeeds; pending retry metadata is untouched.
+              if(!changedPaths.isEmpty())forcedPathSink.accept(changedPaths);
+              return accepted;
+            }
+            if (admissionMode == AdmissionMode.RETIREMENT_LIVE
+                || admissionMode == AdmissionMode.RETIREMENT_MAINTENANCE) {
+              int accepted = ((io.justsearch.indexerworker.queue.SwitchBufferCapableQueue) jobQueue)
+                  .enqueueRelease030LiveSyncEntries(admitted, collection,
+                      admissionMode == AdmissionMode.RETIREMENT_MAINTENANCE,
+                      () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());
+              if (accepted != admitted.size()) throw new IllegalStateException("Incomplete retirement sync admission");
+              return accepted;
+            }
+            if (admissionMode == AdmissionMode.RETIREMENT_REPLAY) {
+              int accepted = jobQueue.enqueueUpgradeRecoveryEntries(admitted, collection);
+              if (accepted != admitted.size()) throw new IllegalStateException("Incomplete retirement replay admission");
+              return accepted;
+            }
             if (admissionMode == AdmissionMode.UPGRADE_RECOVERY) {
               return recoveryAdmission.applyAsInt(() -> jobQueue.enqueueUpgradeRecoveryEntries(admitted, collection));
             }

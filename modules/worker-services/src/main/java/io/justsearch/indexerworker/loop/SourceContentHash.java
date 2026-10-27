@@ -16,6 +16,11 @@ public final class SourceContentHash {
   private SourceContentHash() {}
 
   public static String sha256(Path path) throws IOException {
+    return sha256(path, () -> false);
+  }
+
+  /** The caller may cancel a bounded admission while a large source is being witnessed. */
+  public static String sha256(Path path, java.util.function.BooleanSupplier cancelled) throws IOException {
     MessageDigest digest;
     try {
       digest = MessageDigest.getInstance("SHA-256");
@@ -26,6 +31,9 @@ public final class SourceContentHash {
     try (InputStream input = Files.newInputStream(path)) {
       int read;
       while ((read = input.read(buffer)) != -1) {
+        if (cancelled.getAsBoolean()) {
+          throw new java.io.InterruptedIOException("Source witnessing cancelled");
+        }
         digest.update(buffer, 0, read);
       }
     }

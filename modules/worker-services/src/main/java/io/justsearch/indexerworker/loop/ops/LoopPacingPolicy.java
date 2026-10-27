@@ -5,7 +5,8 @@ import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
 
 public final class LoopPacingPolicy {
-  private static final long IDLE_SLEEP_MS = 1000L;
+  // Scoped fixtures may shorten idle polling; production has no writer for this value.
+  private static volatile long idleSleepMillis = 1000L;
   private static final long ACTIVE_IDLE_SLEEP_MS = 100L;
 
   // Tempdoc 710 Wave-1.5 Move 4: pollBatchSize / embeddingBackfillBatchSize /
@@ -19,7 +20,7 @@ public final class LoopPacingPolicy {
   private LoopPacingPolicy() {}
 
   public static long idleSleepMs() {
-    return IDLE_SLEEP_MS;
+    return idleSleepMillis;
   }
 
   public static long activeIdleSleepMs() {
@@ -32,7 +33,7 @@ public final class LoopPacingPolicy {
    * idleness.
    */
   public static long idleSleepMs(boolean recentlyActive) {
-    return recentlyActive ? ACTIVE_IDLE_SLEEP_MS : IDLE_SLEEP_MS;
+    return recentlyActive ? ACTIVE_IDLE_SLEEP_MS : idleSleepMillis;
   }
 
   /**

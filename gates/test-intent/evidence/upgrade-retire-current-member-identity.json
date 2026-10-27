@@ -1,0 +1,347 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:96e5f6ef0499c63a0387e5d20351c36f9f6cf7f6421a3cd6dbd0563b21d0d952",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/96e5f6ef0499c63a0387e5d20351c36f9f6cf7f6421a3cd6dbd0563b21d0d952.mjs",
+        "sha256": "sha256:96e5f6ef0499c63a0387e5d20351c36f9f6cf7f6421a3cd6dbd0563b21d0d952",
+        "bytes": 10402
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T19:37:11.352Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest.xml",
+          "sha256": "sha256:cf53c0182d756c695c93a5aacdddcb44f188242467e12127e2af78eaf97d8217",
+          "bytes": 28087
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -PtestParallelism=1 --max-workers=2 --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/daemon-writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/interface.init.gradle",
+      "cwd": "/home/elias/.cache/am/8ph4dw12/tmp/before",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-R1-repair/resume-r21/before-f69-inherit/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest.xml",
+          "sha256": "sha256:eb8bc4654df450ad27d0008a48f0a65435df350d3894206a7704597606d5f4f8",
+          "bytes": 148599
+        },
+        {
+          "path": "tmp/builder/retire-R1-repair/resume-r21/before-f69-inherit/command.json",
+          "sha256": "sha256:80ce9bfc9843eb4b03b67922ad19258d93fd9654b4f8710e8804f223143b14e3",
+          "bytes": 1698002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/member-before-identities.json",
+          "sha256": "sha256:1a39d5d5364276960f02ef2c88549ef9b3a564d729596c3e39deae938b834ec4",
+          "bytes": 2941
+        },
+        {
+          "path": "tmp/builder/retire-R1-repair/resume-r21/before-f69-inherit/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:002ed58d5952789313add01eab151baa79c48b36a03a9bec05d1e2d7efae4065",
+          "bytes": 67885
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootMemberIdentityTest.java#inheritedMembersRemainDistinctAndMetadataEditsStayHeld",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootMemberIdentityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1464e20193eec47cc1790354687786f87837f37ef8fc37c5752005ef9230252",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[1]",
+          "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] collection",
+          "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+        },
+        {
+          "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[2]",
+          "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[2] provenance",
+          "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+        },
+        {
+          "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[3]",
+          "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[3] ingestion_root",
+          "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+        },
+        {
+          "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[4]",
+          "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[4] planned_source_sha256",
+          "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest.xml",
+          "sha256": "sha256:cf53c0182d756c695c93a5aacdddcb44f188242467e12127e2af78eaf97d8217",
+          "bytes": 28087
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootMemberIdentityTest.java#inheritedMembersRemainDistinctAndMetadataEditsStayHeld",
+        "contentDigest": "sha256:d1464e20193eec47cc1790354687786f87837f37ef8fc37c5752005ef9230252",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-1738281084775689440/beta/healthy.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume- | inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[2]: org.opentest4j.AssertionFai",
+        "cases": [
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-1738281084775689440/beta/healthy.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-",
+            "xmlName": "[1] collection",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-17832822252427119958/beta/healthy.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume",
+            "xmlName": "[2] provenance",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-9523978987520102025/beta/healthy.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-",
+            "xmlName": "[3] ingestion_root",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[4]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-5953736226097314233/beta/healthy.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-",
+            "xmlName": "[4] planned_source_sha256",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-6126911602469541135/beta/healthy.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-",
+            "xmlName": "[1] collection",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-9631996078876902965/beta/healthy.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-",
+            "xmlName": "[2] provenance",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-17539601966621810218/beta/healthy.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume",
+            "xmlName": "[3] ingestion_root",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[4]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-16489217427625127676/beta/healthy.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume",
+            "xmlName": "[4] planned_source_sha256",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-3445485382514366408/alpha/new.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21",
+            "xmlName": "[1] collection",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-11208395678818025461/alpha/new.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r2",
+            "xmlName": "[2] provenance",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-6161899022301935972/alpha/new.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21",
+            "xmlName": "[3] ingestion_root",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          },
+          {
+            "name": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String)[4]",
+            "classname": "io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21/jvm/before/junit-2072404412080968631/alpha/new.txt, /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/resume-r21",
+            "xmlName": "[4] planned_source_sha256",
+            "method": "inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-R1-repair/resume-r21/before-f69-inherit/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030RootMemberIdentityTest.xml",
+            "sha256": "sha256:eb8bc4654df450ad27d0008a48f0a65435df350d3894206a7704597606d5f4f8",
+            "bytes": 148599
+          },
+          {
+            "path": "tmp/builder/retire-R1-repair/resume-r21/before-f69-inherit/command.json",
+            "sha256": "sha256:80ce9bfc9843eb4b03b67922ad19258d93fd9654b4f8710e8804f223143b14e3",
+            "bytes": 1698002
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/member-before-identities.json",
+            "sha256": "sha256:1a39d5d5364276960f02ef2c88549ef9b3a564d729596c3e39deae938b834ec4",
+            "bytes": 2941
+          },
+          {
+            "path": "tmp/builder/retire-R1-repair/resume-r21/before-f69-inherit/indexer-worker-test-binary/results-generic.bin",
+            "sha256": "sha256:002ed58d5952789313add01eab151baa79c48b36a03a9bec05d1e2d7efae4065",
+            "bytes": 67885
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+            "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+            "bytes": 1795
+          },
+          {
+            "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+            "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+            "bytes": 2002
+          }
+        ],
+        "revision": "f69b9b2acd5c91f1f08b5b73221679f18091ca6b"
+      }
+    ]
+  },
+  "scope": "Four native-INHERIT and same-unit metadata tamper cases retain original whole-row and disjoint claim oracles. Stable existing queue API has genuine f69 intended assertion failures, not invalid originator fixtures. Builder execution only, no independent acceptance.",
+  "digest": "sha256:a9d2550e46447580c4d43d3bab736fd6f648e2dec11a8b79cf1678785bd41b65"
+}
