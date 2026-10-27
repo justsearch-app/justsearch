@@ -35,11 +35,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.lucene.index.Term;
-import org.apache.lucene.search.BooleanClause.Occur;
-import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.TermRangeQuery;
 
 /** One native replay attempt's published policy and exact absence proofs; never durable state. */
 public final class NativePolicyReplay {
@@ -53,6 +48,10 @@ public final class NativePolicyReplay {
   private final String candidate;
   private final List<ResolvedConfig.FileSource> roots;
   private final List<Path> protectedPaths;
+  private final RootWatcherRegistry.PolicyRoots registryRoots;
+  private final List<Path> exclusionRoots;
+  private long deadlineNanos = Long.MAX_VALUE;
+  private WorkerIngestService.NativePolicyOwnership finalOwnership;
   private final boolean uiOmission;
   private final boolean committedBoot;
   private java.util.function.Predicate<List<SwitchBufferOp>> committedAcknowledgement;
@@ -106,6 +105,11 @@ public final class NativePolicyReplay {
     this.owner = owner; this.publication = publication; this.queue = scoped;
     this.target = target; this.publisher = publisher; this.candidate = candidate;
     this.roots = List.copyOf(roots);
+    registryRoots = publisher.nativePolicyRoots();
+    var policyRoots = new java.util.HashSet<Path>();
+    roots.forEach(value -> policyRoots.add(value.path().toAbsolutePath().normalize()));
+    if (registryRoots != null) policyRoots.addAll(registryRoots.paths());
+    exclusionRoots = List.copyOf(policyRoots);
     this.snapshot = Objects.requireNonNull(snapshot);
     if (owner.currentSnapshot() != snapshot) throw new IllegalArgumentException("Native policy publication changed");
     this.committedBoot = committedBoot;
@@ -186,19 +190,35 @@ public final class NativePolicyReplay {
     return scope.contains(PathNormalizer.normalizeKey(path));
   }
 
+  /** The context supplies its existing attempt budget; incomplete scans never authorize absence. */
+  public void useDeadline(long deadline) { deadlineNanos = Math.min(deadlineNanos, deadline); }
+
+  private boolean rootScopeCurrent(Path path, Path root) {
+    return publisher.nativePolicyRootScopeCurrent(registryRoots, path, root);
+  }
+
+  private boolean excludedByAnyRoot(Path path, Path root, boolean directory) {
+    if (directory ? exclusions.isExcludedDirectory(root, path) : exclusions.isExcludedPath(root, path)) return true;
+    Path normalized = path.toAbsolutePath().normalize();
+    return exclusionRoots.stream().filter(normalized::startsWith).anyMatch(ancestor -> directory
+        ? exclusions.isExcludedDirectory(ancestor, path) : exclusions.isExcludedPath(ancestor, path));
+  }
+
   public boolean excludes(Path path, Path root, String collection) {
-    return uiOmission && current() && owns(path, root, collection) && exclusions.isExcludedPath(root, path);
+    return uiOmission && current() && owns(path, root, collection) && rootScopeCurrent(path, root)
+        && excludedByAnyRoot(path, root, false);
   }
 
   boolean excludesDirectory(Path directory, Path root, String collection) {
-    return uiOmission && current() && owns(directory, root, collection)
+    return uiOmission && current() && owns(directory, root, collection) && rootScopeCurrent(directory, root)
         && protectedPaths.stream().noneMatch(protectedPath -> protectedPath.startsWith(directory.toAbsolutePath().normalize()))
-        && exclusions.isExcludedDirectory(root, directory);
+        && excludedByAnyRoot(directory, root, true);
   }
 
   /** Ordinary current eligibility; no fail-open global exclusion cache supplies this proof. */
   public boolean allows(Path path, Path root, String collection) {
-    if (!current() || !owns(path, root, collection) || exclusions.isExcludedPath(root, path)
+    if (!current() || !owns(path, root, collection) || !rootScopeCurrent(path, root)
+        || excludedByAnyRoot(path, root, false)
         || IngestionSkipPolicy.active().shouldSkipName(path)) return false;
     for (Path parent = path.toAbsolutePath().normalize().getParent();
         parent != null && !parent.equals(root.toAbsolutePath().normalize()); parent = parent.getParent()) {
@@ -231,23 +251,65 @@ public final class NativePolicyReplay {
         }
       }
     }
-    var membership = new BooleanQuery.Builder();
-    for (String field : List.of(SchemaFields.DOC_ID,
-        SchemaFields.PARENT_DOC_ID, SchemaFields.PATH)) {
-      membership.add(new TermQuery(new Term(field, key)),
-          Occur.SHOULD);
+    // Physical Windows case-folding ownership remains unverified. Never infer absence from
+    // one guessed spelling on that platform.
+    if (io.justsearch.configuration.PlatformPaths.isWindows()) return false;
+    if (finalOwnership != null) return finalOwnership.ordinary(key);
+    if (publication.isWriteLockedByCurrentThread()) return false;
+    return publisher.nativePolicyOwnership(java.util.Set.of(key), target, deadlineNanos).ordinary(key);
+  }
+
+  /**
+   * Prepare after replay-owner writes and producer pause, before generation/publication. The
+   * actual outer mutation fence and this file fence remain held through the immediate decision.
+   * Nothing escapes the lexical scope, and an owner-thread replay write invalidates the result.
+   */
+  public FinalOwnership prepareFinalOwnership() throws IOException {
+    if (publication.isWriteLockedByCurrentThread() || finalOwnership != null) {
+      throw new IOException("Native ownership preparation is outside its lexical scope");
     }
-    var internal = new BooleanQuery.Builder();
-    for (String collection : io.justsearch.configuration.InternalCollections.RESERVED) {
-      internal.add(new TermQuery(new Term(
-          SchemaFields.COLLECTION, collection)), Occur.SHOULD);
+    if (!hasOmissions()) return new FinalOwnership(null);
+    var paths = new java.util.HashSet<String>();
+    for (var proof : omissions.values()) paths.add(SwitchBufferUpsert.decode(proof.op().payload()).path());
+    paths.addAll(rootOmissions.keySet());
+    return prepareOwnership(paths);
+  }
+
+  private FinalOwnership prepareOwnership(java.util.Set<String> paths) throws IOException {
+    if (publication.isWriteLockedByCurrentThread() || finalOwnership != null) {
+      throw new IOException("Native ownership preparation is outside its lexical scope");
     }
-    internal.add(TermRangeQuery.newStringRange(
-        SchemaFields.PROJECTION_SOURCE_ID, null, null, true, true),
-        Occur.SHOULD);
-    return publisher.nativePolicyProtectedMembershipAbsent(new BooleanQuery.Builder()
-        .add(membership.build(), Occur.FILTER)
-        .add(internal.build(), Occur.FILTER).build());
+    var file = publisher.holdNativePolicyFileWriter();
+    try {
+      var prepared = publisher.nativePolicyOwnership(paths, target, deadlineNanos);
+      var lease = new FinalOwnership(file);
+      finalOwnership = prepared;
+      return lease;
+    } catch (IOException | RuntimeException | Error failure) {
+      file.unlock(); throw failure;
+    }
+  }
+
+  public final class FinalOwnership implements AutoCloseable {
+    private final io.justsearch.indexerworker.loop.FileMutationFence file;
+    private final Thread holder = Thread.currentThread();
+    private boolean closed;
+    private FinalOwnership(io.justsearch.indexerworker.loop.FileMutationFence file) { this.file = file; }
+    @Override public void close() {
+      if (Thread.currentThread() != holder) throw new IllegalStateException("Native ownership belongs to its preparing thread");
+      if (closed) return;
+      closed = true;
+      if (file != null) { finalOwnership = null; file.unlock(); }
+    }
+  }
+
+  public boolean withFinalOwnership(java.util.function.BooleanSupplier decision) {
+    try (var ignored = prepareFinalOwnership()) { return decision.getAsBoolean(); }
+    catch (IOException | RuntimeException unknown) { return false; }
+  }
+
+  private boolean targetAbsent(String path) {
+    return finalOwnership != null && finalOwnership.targetAbsent(path);
   }
 
   private record Ancestor(Path path, Object fileKey) {}
@@ -317,6 +379,9 @@ public final class NativePolicyReplay {
                     hash, file.ingestionRoot()), group.getKey().collection()));
           }
           if (!current()) return false;
+          for (var entry : entries) {
+            if (!allows(entry.entry().path(), entry.entry().ingestionRoot(), entry.collection())) return false;
+          }
           // Recheck every member immediately before the atomic queue admission.
           for (var entry : entries) {
             if (!ancestry.get(entry.entry().path()).equals(
@@ -367,11 +432,12 @@ public final class NativePolicyReplay {
 
   private boolean prove(Omission proof) {
     var file = SwitchBufferUpsert.decode(proof.op().payload());
+    if (!excludes(Path.of(file.path()), file.ingestionRoot(), file.collection())) return false;
     java.util.function.BooleanSupplier absence = () -> {
-      try {
-        target.commitOps().maybeRefreshBlocking();
-        return current() && ordinaryIndexOwner(Path.of(file.path()))
-            && target.indexCountOps().countByIdAndChunksStrict(file.path()) == 0
+      try (var ignored = finalOwnership == null ? prepareOwnership(java.util.Set.of(file.path())) : null) {
+        return current() && excludes(Path.of(file.path()), file.ingestionRoot(), file.collection())
+            && ordinaryIndexOwner(Path.of(file.path()))
+            && targetAbsent(file.path())
             && queue.tryMatchesNativePolicySkippedAdmission(candidate,
                 proof.journal(), proof.op(), proof.row());
       } catch (IOException | RuntimeException unknown) { return false; }
@@ -394,17 +460,16 @@ public final class NativePolicyReplay {
   private boolean proveRoot(RootOmission proof) {
     var file = proof.file();
     var debt = WatcherRootReconciliation.decode(file.rootReceipt().payload());
+    if (!excludes(Path.of(file.path()), Path.of(debt.root()), debt.collection())) return false;
     return current() && publisher.tryNativePolicyFileProof(Path.of(debt.root()), debt.collection(), () -> {
-      try {
+      try (var ignored = finalOwnership == null ? prepareOwnership(java.util.Set.of(file.path())) : null) {
         if (!excludes(Path.of(file.path()), Path.of(debt.root()), debt.collection())) return false;
         // Only the directory's held identity is re-observed, never the omitted source's
         // content/stat. No discovery walk or service callback occurs under publication.
         var returned = RootIdentity.capture(Path.of(debt.root()));
         if (!proof.identity().equals(returned) || returned.volume() == null
             || !returned.matchesReceipt(debt.rootIdentity())) return false;
-        target.commitOps().maybeRefreshBlocking();
-        if (!ordinaryIndexOwner(Path.of(file.path()))
-            || target.indexCountOps().countByIdAndChunksStrict(file.path()) != 0) return false;
+        if (!ordinaryIndexOwner(Path.of(file.path())) || !targetAbsent(file.path())) return false;
         return queue.reconcileWatcherFile(file, () -> {
           try {
             var lockedRoot = RootIdentity.capture(Path.of(debt.root()));
@@ -412,7 +477,7 @@ public final class NativePolicyReplay {
                 || !proof.identity().equals(lockedRoot) || lockedRoot.volume() == null
                 || !lockedRoot.matchesReceipt(debt.rootIdentity())
                 || !ordinaryIndexOwner(Path.of(file.path()))
-                || target.indexCountOps().countByIdAndChunksStrict(file.path()) != 0) {
+                || !targetAbsent(file.path())) {
               throw new IllegalStateException("Published native root policy or absence changed");
             }
           } catch (IOException unknown) { throw new UncheckedIOException(unknown); }

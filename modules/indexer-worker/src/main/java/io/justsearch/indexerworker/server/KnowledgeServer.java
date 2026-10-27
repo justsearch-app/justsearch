@@ -7875,7 +7875,13 @@ public final class KnowledgeServer implements Closeable {
             if (closeStarted || remainingMs <= 0 || !producer.pauseProducerForCutover(Math.min(10_000L, remainingMs))) return false;
             paused[0] = true;
           }
-          return confirmCommittedNativeAcknowledgement(expectedActive, active, producer, policy, selected, official);
+          try {
+            var declarations = nativePolicyDeclaredRoots(nativePolicyConfiguration.currentSnapshot(), official);
+            return policy.withFinalOwnership(() ->
+                confirmCommittedNativeAcknowledgement(expectedActive, active, producer, policy, selected, declarations));
+          } catch (IOException | RuntimeException unknown) {
+            return false;
+          }
         });
         var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(jobQueue, active, signalBus,
             indexingPacing, indexBasePath, activeIndexPath, JSON, KnowledgeServer::chunkSpladeEnabled, () -> true,
@@ -7901,8 +7907,8 @@ public final class KnowledgeServer implements Closeable {
   /** Synchronous read-only decision point; notifying exact ACK runs after this scope returns. */
   private boolean confirmCommittedNativeAcknowledgement(String expectedActive, RunningRuntime expectedRuntime,
       DefaultWorkerAppServices expectedProducer, io.justsearch.indexerworker.services.NativePolicyReplay policy,
-      List<SwitchBufferCapableQueue.SwitchBufferOp> selected, List<RootBinding> official) {
-    if (official == null || nativePolicyRootBindings == null || nativePolicyConfiguration == null
+      List<SwitchBufferCapableQueue.SwitchBufferOp> selected, List<ResolvedConfig.FileSource> declarations) {
+    if (declarations == null || nativePolicyRootBindings == null || nativePolicyConfiguration == null
         || !runtimeSwapLock.isHeldByCurrentThread() || !committedNativeOwnerCurrent(expectedActive, expectedRuntime, expectedProducer)) return false;
     var exact = List.copyOf(selected);
     try (var generation = indexGenerationManager.beginForgetNoCandidate(activeIndexPath)) {
@@ -7913,7 +7919,6 @@ public final class KnowledgeServer implements Closeable {
           if (servingView != null && (servingView.retiring || servingView.services != expectedProducer
               || servingView.ingestRuntime != expectedRuntime || servingView.searchRuntime != expectedRuntime)) return false;
         }
-        var declarations = nativePolicyDeclaredRoots(nativePolicyConfiguration.currentSnapshot(), official);
         return policy.matchesAuthority(nativePolicyConfiguration, publicationLock, declarations)
             && policy.reproveCommittedAcknowledgement(exact);
       } finally { publicationLock.writeLock().unlock(); }
@@ -9942,7 +9947,11 @@ public final class KnowledgeServer implements Closeable {
                           > cutoverMaxFailedJobs)) {
                 throw new IOException("Green changed during cutover preparation");
               }
-              try (var transfer = current.prepareProducerTransferTo(nextServices)) {
+              var finalDeclarations = replay.orElseThrow().nativePolicy() == null ? List.<ResolvedConfig.FileSource>of()
+                  : nativePolicyDeclaredRoots(nativePolicyConfiguration.currentSnapshot(), official);
+              try (var transfer = current.prepareProducerTransferTo(nextServices);
+                   var ignoredOwnership = replay.orElseThrow().nativePolicy() == null ? null
+                       : replay.orElseThrow().nativePolicy().prepareFinalOwnership()) {
           DefaultWorkerAppServices preparedServices = nextServices;
           RecordedIngestionLifecycle.CheckedPromotion commit = () -> {
                 var projection = callbacks;
@@ -9979,7 +9988,7 @@ public final class KnowledgeServer implements Closeable {
                       migrationTransitionForPublication("migration-before-pointer-commit");
                       if (replay.orElseThrow().nativePolicy() != null
                           && (!replay.orElseThrow().nativePolicy().matchesAuthority(nativePolicyConfiguration,
-                              publicationLock, nativePolicyDeclaredRoots(nativePolicyConfiguration.currentSnapshot(), official))
+                              publicationLock, finalDeclarations)
                               || !replay.orElseThrow().nativePolicy().reproveBeforePointer())) {
                         throw new IOException("Native policy omission proof changed before pointer commitment");
                       }

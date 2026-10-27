@@ -32,7 +32,10 @@ final class NativePolicyReplayBoundaryTest {
   private static final String CANDIDATE = "g-native-policy";
 
   private ConfigStore configuration(List<?> entries) {
-    return new ConfigStore(ResolvedConfig.builder().putDefault("justsearch.ui.exclude_patterns",
+    return new ConfigStore(ResolvedConfig.builder().contributeBaseSources()
+        .putSettings("justsearch.data.dir", directory.resolve("data").toString())
+        .putSettings("justsearch.index.base_path", directory.resolve("index").toString())
+        .putSettings("justsearch.ui.exclude_patterns",
         JsonMapper.builder().build().writeValueAsString(entries)).build());
   }
 
@@ -42,6 +45,19 @@ final class NativePolicyReplayBoundaryTest {
     when(target.openedIndexPath()).thenReturn(directory.resolve(CANDIDATE));
     var publisher = mock(WorkerIngestService.class);
     when(publisher.ownsForgetQueue(queue)).thenReturn(true);
+    try {
+      // Preserve the same pure declared-root fixture on the original baseline, where these
+      // registry snapshot methods do not exist. No repaired behavior is supplied to that tree.
+      var capture = RootWatcherRegistry.class.getDeclaredMethod("policyRoots");
+      Object scope = capture.invoke(new RootWatcherRegistry());
+      when(WorkerIngestService.class.getDeclaredMethod("nativePolicyRoots").invoke(publisher)).thenReturn(scope);
+      var current = WorkerIngestService.class.getDeclaredMethod("nativePolicyRootScopeCurrent", scope.getClass(), Path.class, Path.class);
+      var scopeCurrent = scope.getClass().getDeclaredMethod("current", Path.class, Path.class);
+      when(current.invoke(publisher, any(), any(), any())).thenAnswer(call ->
+          scopeCurrent.invoke(scope, call.getArgument(1), call.getArgument(2)));
+    } catch (NoSuchMethodException baseline) {
+      // Baseline still executes every original assertion and the new ancestor-directory oracle.
+    } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     return new NativePolicyReplay(configuration, configuration.publicationLock(), queue, target,
         publisher, CANDIDATE, roots);
   }
@@ -133,7 +149,8 @@ final class NativePolicyReplayBoundaryTest {
     try {
       Files.setPosixFilePermissions(subtree, PosixFilePermissions.fromString("---------"));
       assertTrue(attempt.excludesDirectory(subtree, root, null));
-      try (var difference = discovery().discoverCandidateDifference(root.toString(), true, () -> false, attempt, null)) {
+      try (var difference = assertDoesNotThrow(() -> discovery().discoverCandidateDifference(
+          root.toString(), true, () -> false, attempt, null))) {
         assertTrue(difference.additions().isEmpty());
       }
       Files.setPosixFilePermissions(root, PosixFilePermissions.fromString("---------"));
@@ -145,10 +162,30 @@ final class NativePolicyReplayBoundaryTest {
   }
 
   @Test
+  void declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority() throws Exception {
+    Path ancestor = Files.createDirectory(directory.resolve("ancestor"));
+    Path root = Files.createDirectory(ancestor.resolve("child"));
+    Path subtree = Files.createDirectory(root.resolve("private"));
+    Files.writeString(subtree.resolve("a.txt"), "excluded bytes");
+    var roots = List.of(new ResolvedConfig.FileSource(ancestor, "ancestor"),
+        new ResolvedConfig.FileSource(root, "nested"));
+    var folder = policy(configuration(List.of("child/private/**")), roots);
+    assertTrue(folder.excludesDirectory(subtree, root, "nested"));
+    try (var difference = discovery().discoverCandidateDifference(root.toString(), true, () -> false, folder, "nested")) {
+      assertTrue(difference.additions().isEmpty());
+    }
+    assertFalse(policy(configuration(List.of("child/private/*.txt")), roots).excludesDirectory(subtree, root, "nested"));
+    assertFalse(policy(configuration(List.of(LiteralExclusion.create(subtree, LiteralExclusion.Scope.FILE))), roots)
+        .excludesDirectory(subtree, root, "nested"));
+  }
+
+  @Test
   void malformedPolicyOrUnsharedPublicationOwnerHasNoOmissionAuthority() throws Exception {
     Path root = Files.createDirectory(directory.resolve("root"));
-    var malformed = new ConfigStore(ResolvedConfig.builder()
-        .putDefault("justsearch.ui.exclude_patterns", "{\"not\":\"an array\"}").build());
+    var malformed = new ConfigStore(ResolvedConfig.builder().contributeBaseSources()
+        .putSettings("justsearch.data.dir", directory.resolve("data").toString())
+        .putSettings("justsearch.index.base_path", directory.resolve("index").toString())
+        .putSettings("justsearch.ui.exclude_patterns", "{\"not\":\"an array\"}").build());
     assertThrows(IllegalArgumentException.class, () -> policy(malformed, List.of(new ResolvedConfig.FileSource(root, null))));
     var queue = mock(JobQueue.class, withSettings().extraInterfaces(SwitchBufferCapableQueue.class));
     assertThrows(IllegalArgumentException.class, () -> new NativePolicyReplay(configuration(List.of()),

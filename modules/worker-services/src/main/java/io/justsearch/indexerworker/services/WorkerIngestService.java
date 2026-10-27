@@ -441,16 +441,47 @@ public final class WorkerIngestService {
     return withFileMutationFence(mutation);
   }
 
-  /** Exact native policy checks inspect both physical generations, independently of row labels. */
-  public boolean nativePolicyProtectedMembershipAbsent(org.apache.lucene.search.Query membership) throws IOException {
-    if (ingestLifecycle == null || searchLifecycle == null) throw new IOException("Native index ownership is unavailable");
-    ingestLifecycle.commitOps().maybeRefreshBlocking();
-    if (ingestLifecycle.indexCountOps().countQueryOrThrow(membership) != 0) return false;
-    if (searchLifecycle != ingestLifecycle) {
-      searchLifecycle.commitOps().maybeRefreshBlocking();
-      if (searchLifecycle.indexCountOps().countQueryOrThrow(membership) != 0) return false;
+  RootWatcherRegistry.PolicyRoots nativePolicyRoots() {
+    return rootWatcherRegistry.current().policyRoots();
+  }
+
+  boolean nativePolicyRootScopeCurrent(RootWatcherRegistry.PolicyRoots captured, Path path, Path root) {
+    return captured != null && rootWatcherRegistry.current() == captured.owner() && captured.current(path, root);
+  }
+
+  io.justsearch.indexerworker.loop.FileMutationFence holdNativePolicyFileWriter() throws IOException {
+    var file = fileMutationFence();
+    if (mutationAdmission == null || mutationAdmission.finalFenceScope() == null || file == null) {
+      throw new IOException("Native ownership lacks its final producer fence");
     }
-    return true;
+    file.lock();
+    return file;
+  }
+
+  /** Both physical runtimes, under the actual final producer and file-writer exclusions. */
+  NativePolicyOwnership nativePolicyOwnership(Set<String> paths,
+      io.justsearch.adapters.lucene.runtime.RunningRuntime expectedTarget, long deadlineNanos) throws IOException {
+    var file = fileMutationFence();
+    if (mutationAdmission == null || mutationAdmission.finalFenceScope() == null
+        || file == null || !file.isHeldByCurrentThread()
+        || ingestLifecycle == null || ingestLifecycle != expectedTarget || searchLifecycle == null) {
+      throw new IOException("Native ownership lacks continuous writer exclusion");
+    }
+    Object scope = mutationAdmission.finalFenceScope();
+    var ingest = ingestLifecycle.readPathOps().inspectNativeOwnership(paths,
+        io.justsearch.app.api.indexing.AcceptedProjection::isProjectionIndexId, deadlineNanos);
+    var serving = searchLifecycle == ingestLifecycle ? ingest
+        : searchLifecycle.readPathOps().inspectNativeOwnership(paths,
+            io.justsearch.app.api.indexing.AcceptedProjection::isProjectionIndexId, deadlineNanos);
+    java.util.function.BooleanSupplier held = () -> mutationAdmission.finalFenceScope() == scope && file.isHeldByCurrentThread();
+    return new NativePolicyOwnership(path -> held.getAsBoolean() && ingest.ordinary(path) && serving.ordinary(path),
+        path -> held.getAsBoolean() && ingest.absent(path));
+  }
+
+  record NativePolicyOwnership(java.util.function.Predicate<String> ordinary,
+      java.util.function.Predicate<String> targetAbsent) {
+    boolean ordinary(String path) { return ordinary.test(path); }
+    boolean targetAbsent(String path) { return targetAbsent.test(path); }
   }
 
   /** Native policy certification never waits on a file writer under publication ownership. */

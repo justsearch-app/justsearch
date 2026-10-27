@@ -283,6 +283,11 @@ final class SyncDirectoryOps {
             public FileVisitResult visitFileFailed(Path file, IOException failure)
                 throws IOException {
               checkCancelled(cancelled);
+              // An inaccessible directory may reach this callback before preVisitDirectory.
+              // Only the same proven subtree authority can omit it without opening it.
+              if (!file.equals(root) && nativePolicy != null
+                  && nativePolicy.excludesDirectory(file, root, collection)
+                  && Files.isDirectory(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return FileVisitResult.CONTINUE;
               throw new IOException("Reconciliation walk could not read: " + file, failure);
             }
 

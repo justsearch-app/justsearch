@@ -66,11 +66,16 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       var replay = f.prepare(policy);
       assertTrue(replay.isPresent(), "the no-root-debt path needs complete explicit declarations");
       assertEquals(List.of(op), replay.orElseThrow().versions());
-      assertEquals(List.of(file.toString()), policy.omittedPaths());
+      try (var fence = f.mutation.beginFinalFence(f.runtime, 1_000)) {
+        assertNotNull(fence);
+        assertEquals(List.of(file.toString()), policy.omittedPaths());
+      }
       assertEquals(0, f.runtime.indexCountOps().countByIdAndChunksStrict(file.toString()));
-      store.publicationLock().writeLock().lock();
-      try { assertTrue(policy.reproveBeforePointer()); }
-      finally { store.publicationLock().writeLock().unlock(); }
+      assertTrue(f.finalDecision(policy, () -> {
+        store.publicationLock().writeLock().lock();
+        try { return policy.reproveBeforePointer(); }
+        finally { store.publicationLock().writeLock().unlock(); }
+      }));
       store.update(f.configuration("[]").currentSnapshot());
       store.update(f.configuration("[\"private.txt\"]").currentSnapshot());
       store.publicationLock().writeLock().lock();
@@ -214,10 +219,12 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest(name = "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission({0})")
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"canonical", "dot", "dotdot"})
-  void replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(String spelling) throws Exception {
-    try (var f = new Fixture(false, true)) {
+  @org.junit.jupiter.params.ParameterizedTest(name = "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission({0},{1})")
+  @org.junit.jupiter.params.provider.CsvSource({"canonical,target", "canonical,serving", "canonical,both",
+      "dot,target", "dot,serving", "dotdot,target"})
+  void replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(String spelling, String placement) throws Exception {
+    try (var f = new Fixture(false, true, !placement.equals("target"))) {
+      var projectionRuntime = placement.equals("serving") ? f.serving : f.runtime;
       Path file = f.source("projected.txt");
       Files.createDirectory(f.root.resolve("branch"));
       String raw = switch (spelling) {
@@ -238,8 +245,8 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
               sink.accept(projection);
             }
           });
-      var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(f.queue, f.runtime, null,
-          IndexingPacing.unthrottled(), f.base, f.runtime.openedIndexPath(), JsonMapper.builder().build(),
+      var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(f.queue, projectionRuntime, null,
+          IndexingPacing.unthrottled(), f.base, projectionRuntime.openedIndexPath(), JsonMapper.builder().build(),
           () -> false, () -> true, LoggerFactory.getLogger(NativePolicyReadmissionCallerTest.class),
           System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5), f.generation, ignored -> true)
           .withPublisher(f.publisher).withMigrationRoots(List.of(new ResolvedConfig.FileSource(f.root, null)));
@@ -248,13 +255,19 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
         assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(context), "SETUP: real projection seed/replay commits and acknowledges");
       }
       assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty(), "SETUP: protection must come from indexed rows, not buffered guard");
-      assertEquals(raw, f.runtime.documentFieldOps().getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PATH));
-      assertEquals(projection.sourceId(), f.runtime.documentFieldOps()
+      assertEquals(raw, projectionRuntime.documentFieldOps().getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PATH));
+      assertEquals(projection.sourceId(), projectionRuntime.documentFieldOps()
           .getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID));
-      assertEquals(1, f.runtime.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.TermQuery(
+      assertEquals(1, projectionRuntime.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.TermQuery(
           new org.apache.lucene.index.Term(SchemaFields.DOC_ID, projection.indexId()))));
-      assertEquals(1, f.runtime.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.TermQuery(
+      assertEquals(1, projectionRuntime.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.TermQuery(
           new org.apache.lucene.index.Term(SchemaFields.PATH, raw))));
+      if (placement.equals("both")) {
+        f.serving.indexingCoordinator().indexSingle(ProjectionDocumentMapper.toIndexDocument(projection));
+        f.serving.commitOps().maybeRefreshBlocking();
+        assertEquals(projection.sourceId(), f.serving.documentFieldOps()
+            .getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID));
+      }
       var old = f.skipped(file);
       assertTrue(f.registry.watch(f.root.toString(), null).watching());
       var journal = f.queue.listSwitchBufferOpsStrict();
@@ -268,7 +281,7 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
           () -> assertFalse(readmitted, "indexed canonical projection/alias cannot acquire file readmission"),
           () -> assertEquals(journal, f.queue.listSwitchBufferOpsStrict()),
           () -> assertEquals(row, f.queue.watcherReconciliationRow(file.toString())),
-          () -> assertEquals("source-owned projection", f.runtime.documentFieldOps()
+          () -> assertEquals("source-owned projection", projectionRuntime.documentFieldOps()
               .getDocumentFieldOrThrow(projection.indexId(), SchemaFields.CONTENT)));
     }
   }
@@ -500,6 +513,354 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision({0})")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"declared", "subscribed", "awaiting"})
+  void completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(String scope) throws Exception {
+    try (var f = new Fixture(false, false, false, scope.equals("declared"))) {
+      Path file = f.source("private.txt"); var op = f.skipped(file);
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      if (scope.equals("subscribed")) assertTrue(f.registry.watch(directory.toString(), "ancestor").watching());
+      if (scope.equals("awaiting")) {
+        f.registry.watchWhenVolumeReturns(directory, "ancestor");
+        assertTrue(f.registry.awaitsVolume(directory));
+      }
+      var store = f.configuration("[\"root/**\"]");
+      var previous = ConfigStore.globalOrNull(); ConfigStore.setGlobal(store);
+      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+        assertTrue(f.publisher.isUserExcluded(file, f.root), "SETUP: the actual worker owner excludes across root labels");
+        var journal = f.queue.listSwitchBufferOpsStrict();
+        var row = f.queue.watcherReconciliationRow(file.toString());
+        var policy = f.policy(store, false);
+        assertFalse(f.readmit(policy));
+        assertFalse(f.readmit(f.policy(store, false)));
+        hashes.verify(() -> SourceContentHash.sha256(file), never());
+        assertEquals(journal, f.queue.listSwitchBufferOpsStrict());
+        assertEquals(row, f.queue.watcherReconciliationRow(file.toString()));
+        assertTrue(f.prepare(policy).isPresent(), "current exact ancestry can certify this omission");
+        assertTrue(f.finalDecision(policy, () -> {
+          store.publicationLock().writeLock().lock();
+          try { return policy.reproveBeforePointer(); }
+          finally { store.publicationLock().writeLock().unlock(); }
+        }));
+        assertEquals(List.of(op), f.queue.listSwitchBufferOpsStrict(), "proof does not notify or ACK itself");
+      } finally { ConfigStore.restoreGlobal(store, previous); }
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission({0})")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"parent", "missing-parent", "blank-marker", "reserved-id", "late-alias"})
+  void storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(String kind) throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.source("private.txt"); var op = f.skipped(file);
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      var documents = new ArrayList<Map<String, Object>>();
+      if (kind.equals("late-alias")) {
+        Files.createDirectory(f.root.resolve("zz"));
+        documents.add(Map.of(SchemaFields.DOC_ID, file.toString(), SchemaFields.PATH, file.toString()));
+        for (int n = 0; n < 300; n++) documents.add(Map.of(SchemaFields.DOC_ID, file + "#chunk-" + n,
+            SchemaFields.PARENT_DOC_ID, file.toString(), SchemaFields.PATH, file.toString()));
+        documents.add(Map.of(SchemaFields.DOC_ID, "late-owner", SchemaFields.PATH, f.root + "/zz/../private.txt",
+            SchemaFields.PROJECTION_SOURCE_ID, "late-source"));
+      } else if (kind.equals("parent") || kind.equals("missing-parent")) {
+        if (kind.equals("parent")) documents.add(Map.of(SchemaFields.DOC_ID, "source-parent",
+            SchemaFields.PROJECTION_SOURCE_ID, "real-parent-source"));
+        documents.add(Map.of(SchemaFields.DOC_ID, "child", SchemaFields.PARENT_DOC_ID, "source-parent",
+            SchemaFields.PATH, file.toString()));
+      } else if (kind.equals("blank-marker")) {
+        documents.add(Map.of(SchemaFields.DOC_ID, file.toString(), SchemaFields.PATH, file.toString(),
+            SchemaFields.PROJECTION_SOURCE_ID, " "));
+      } else documents.add(Map.of(SchemaFields.DOC_ID, "projection:unmarked", SchemaFields.PATH, file.toString()));
+      for (var metadata : documents) f.indexMetadata(metadata);
+      if (kind.equals("late-alias")) {
+        assertTrue(Files.isSameFile(file, Path.of(f.root + "/zz/../private.txt")));
+        var firstPage = f.runtime.readPathOps().search(new org.apache.lucene.search.MatchAllDocsQuery(), 256,
+            java.util.Set.of(SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID),
+            io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, null);
+        assertEquals(256, firstPage.hits().size(), "SETUP: fill the existing strict reader's complete first page");
+        assertTrue(firstPage.hits().stream().noneMatch(hit -> "late-owner".equals(hit.docId())));
+        assertEquals("late-source", f.runtime.documentFieldOps().getDocumentFieldOrThrow("late-owner", SchemaFields.PROJECTION_SOURCE_ID));
+      }
+      if (kind.equals("blank-marker")) assertEquals(" ", f.runtime.documentFieldOps()
+          .getDocumentFieldOrThrow(file.toString(), SchemaFields.PROJECTION_SOURCE_ID), "SETUP: blank stored marker exists");
+      var journal = f.queue.listSwitchBufferOpsStrict();
+      var row = f.queue.watcherReconciliationRow(file.toString());
+      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+        if (kind.equals("missing-parent")) assertThrows(java.io.IOException.class,
+            () -> f.readmit(f.policy(f.configuration("[]"), false)));
+        else assertFalse(f.readmit(f.policy(f.configuration("[]"), false)));
+        hashes.verify(() -> SourceContentHash.sha256(file), never());
+      }
+      var omitted = f.policy(f.configuration("[\"private.txt\"]"), false);
+      assertTrue(omitted.freeze(journal));
+      try (var fence = f.mutation.beginFinalFence(f.runtime, 1_000)) {
+        assertNotNull(fence);
+        assertFalse(omitted.certify(op));
+      }
+      assertEquals(journal, f.queue.listSwitchBufferOpsStrict());
+      assertEquals(row, f.queue.watcherReconciliationRow(file.toString()));
+    }
+  }
+
+  @Test
+  void ancestorExclusionStillCannotCertifyAProjectionOwner() throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.source("private.txt"); var op = f.skipped(file);
+      assertTrue(f.registry.watch(directory.toString(), "ancestor").watching());
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      f.indexMetadata(Map.of(SchemaFields.DOC_ID, "projection-owner", SchemaFields.PATH, f.root + "/./private.txt",
+          SchemaFields.PROJECTION_SOURCE_ID, "source"));
+      var policy = f.policy(f.configuration("[\"root/**\"]"), false);
+      var journal = f.queue.listSwitchBufferOpsStrict(); var row = f.queue.watcherReconciliationRow(file.toString());
+      assertTrue(policy.freeze(journal));
+      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+        assertFalse(f.readmit(policy));
+        hashes.verify(() -> SourceContentHash.sha256(file), never());
+      }
+      try (var fence = f.mutation.beginFinalFence(f.runtime, 1_000)) {
+        assertNotNull(fence);
+        assertFalse(policy.certify(op));
+      }
+      assertEquals(journal, f.queue.listSwitchBufferOpsStrict());
+      assertEquals(row, f.queue.watcherReconciliationRow(file.toString()));
+    }
+  }
+
+  @Test
+  void ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy() throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.source("private.txt"); var op = f.skipped(file);
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      var store = f.configuration("[\"root/**\"]");
+      var before = f.policy(store, false);
+      assertTrue(before.allows(file, f.root, null), "an unregistered filesystem ancestor has no policy authority");
+      assertTrue(f.registry.watch(directory.toString(), "ancestor").watching());
+      var policy = f.policy(store, false);
+      assertTrue(f.registry.unwatch(directory.toString()));
+      assertTrue(f.registry.watch(directory.toString(), "ancestor").watching());
+      assertFalse(policy.allows(file, f.root, null));
+      assertFalse(policy.excludes(file, f.root, null), "rewatch cannot revive the earlier witness");
+      assertFalse(before.allows(file, f.root, null), "ancestor addition invalidates a previously allowed attempt");
+      assertTrue(f.policy(store, false).excludes(file, f.root, null));
+      assertEquals(List.of(op), f.queue.listSwitchBufferOpsStrict());
+    }
+  }
+
+  @Test
+  void ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication() throws Exception {
+    try (var f = new Fixture(false, true)) {
+      Path file = f.source("private.txt"); var op = f.skipped(file);
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      var store = f.configuration("[\"private.txt\"]"); var policy = f.policy(store, false);
+      assertTrue(f.prepare(policy).isPresent());
+      var journal = f.queue.listSwitchBufferOpsStrict(); var row = f.queue.watcherReconciliationRow(file.toString());
+      long epoch = admissionEpoch(f.runtime);
+      assertFalse(f.finalDecision(policy, () -> {
+        var projection = new io.justsearch.app.api.indexing.AcceptedProjection("late-source", "document", 1,
+            io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+            JsonMapper.builder().build().writeValueAsString(Map.of(SchemaFields.PATH, f.root + "/./private.txt",
+                SchemaFields.COLLECTION, "documents", SchemaFields.CONTENT, "late uncommitted owner")));
+        assertDoesNotThrow(() -> f.runtime.indexingCoordinator().indexSingle(ProjectionDocumentMapper.toIndexDocument(projection)));
+        assertEquals(epoch, admissionEpoch(f.runtime), "SETUP: durable commit epoch did not change");
+        store.publicationLock().writeLock().lock();
+        try { return policy.reproveBeforePointer(); }
+        finally { store.publicationLock().writeLock().unlock(); }
+      }), "owner-thread replay cannot reuse a prepared reader or durable-epoch witness");
+      assertEquals(List.of(op), journal); assertEquals(journal, f.queue.listSwitchBufferOpsStrict());
+      assertEquals(row, f.queue.watcherReconciliationRow(file.toString()));
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "allCommittedAckConsumersRetainAReplayedProjectionOwner({0})")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"simple", "mixed", "root"})
+  void allCommittedAckConsumersRetainAReplayedProjectionOwner(String route) throws Exception {
+    try (var f = new Fixture(true, true)) {
+      Path file = f.source("private.txt");
+      var projection = new io.justsearch.app.api.indexing.AcceptedProjection("ack-source", "document", 1,
+          io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+          JsonMapper.builder().build().writeValueAsString(Map.of(SchemaFields.PATH, f.root + "/./private.txt",
+              SchemaFields.COLLECTION, "documents", SchemaFields.CONTENT, "replayed owner")));
+      f.replayProjection(projection);
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty());
+      assertEquals(projection.sourceId(), f.runtime.documentFieldOps().getDocumentFieldOrThrow(
+          projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID));
+      var op = f.skipped(file); f.addMixedOrRoot(route); f.commitPointer();
+      var journal = f.queue.listSwitchBufferOpsStrict(); var row = f.queue.watcherReconciliationRow(file.toString());
+      var store = f.configuration("[\"private.txt\"]");
+      assertFalse(f.settleWithDecision(route, store, f.policy(store, true), () -> {}, () -> {},
+          new java.util.concurrent.atomic.AtomicInteger()), "actual ACK consumer cannot erase an unproved omission");
+      assertTrue(journal.contains(op)); assertEquals(journal, f.queue.listSwitchBufferOpsStrict());
+      assertEquals(row, f.queue.watcherReconciliationRow(file.toString()));
+      assertEquals("replayed owner", f.runtime.documentFieldOps().getDocumentFieldOrThrow(projection.indexId(), SchemaFields.CONTENT));
+    }
+  }
+
+  private static long admissionEpoch(RunningRuntime runtime) {
+    try {
+      var field = runtime.commitOps().getClass().getDeclaredField("admissionCommitEpoch");
+      field.setAccessible(true); return field.getLong(runtime.commitOps());
+    } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test
+  void realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence() throws Exception {
+    try (var f = new Fixture(true, true); var producers = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      f.commitPointer();
+      Path file = f.source("private.txt"); var op = f.skipped(file);
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      var projection = new io.justsearch.app.api.indexing.AcceptedProjection("concurrent-source", "document", 1,
+          io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+          JsonMapper.builder().build().writeValueAsString(Map.of(SchemaFields.PATH, f.root + "/./private.txt",
+              SchemaFields.COLLECTION, "documents", SchemaFields.CONTENT, "concurrent owner")));
+      var control = new io.justsearch.app.api.indexing.AcceptedProjection("control-source", "document", 1,
+          io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+          JsonMapper.builder().build().writeValueAsString(Map.of(SchemaFields.COLLECTION, "documents", SchemaFields.CONTENT, "unrelated")));
+      f.publisher.underFileMutationFence(() -> {
+        var result = producers.submit(() -> f.publisher.applyProjection(control,
+            io.justsearch.app.api.indexing.ProjectionDurability.NRT, CallContext.none()));
+        assertDoesNotThrow(() -> result.get(2, java.util.concurrent.TimeUnit.SECONDS),
+            "SETUP: file fence alone does not exclude real projection writes");
+        return true;
+      });
+      var store = f.configuration("[\"private.txt\"]"); var policy = f.policy(store, false);
+      assertTrue(f.prepare(policy).isPresent());
+      var producerThread = new java.util.concurrent.atomic.AtomicReference<Thread>();
+      var submitted = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+      assertTrue(f.finalDecision(policy, () -> {
+        submitted.set(producers.submit(() -> {
+          producerThread.set(Thread.currentThread());
+          return f.publisher.applyProjection(projection, io.justsearch.app.api.indexing.ProjectionDurability.NRT, CallContext.none());
+        }));
+        assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+          while (true) {
+            Thread writer = producerThread.get();
+            if (writer != null && writer.getState() == Thread.State.WAITING
+                && java.util.Arrays.stream(writer.getStackTrace()).anyMatch(frame ->
+                    frame.getClassName().equals(WorkerMutationAdmission.class.getName()) && frame.getMethodName().equals("enter"))) break;
+            Thread.sleep(5);
+          }
+        }, "real producer must wait on the precise final admission owner");
+        assertFalse(submitted.get().isDone());
+        store.publicationLock().writeLock().lock();
+        try { return policy.reproveBeforePointer(); }
+        finally { store.publicationLock().writeLock().unlock(); }
+      }));
+      assertDoesNotThrow(() -> submitted.get().get(2, java.util.concurrent.TimeUnit.SECONDS));
+      assertEquals(projection.sourceId(), f.runtime.documentFieldOps().getDocumentFieldOrThrow(
+          projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID));
+      assertFalse(f.finalDecision(policy, () -> {
+        store.publicationLock().writeLock().lock();
+        try { return policy.reproveBeforePointer(); }
+        finally { store.publicationLock().writeLock().unlock(); }
+      }), "a resumed producer invalidates the earlier permission");
+      assertEquals(List.of(op), f.queue.listSwitchBufferOpsStrict());
+    }
+  }
+
+  @Test
+  void ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible() throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.source("private.txt"); var old = f.skipped(file);
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      f.indexMetadata(Map.of(SchemaFields.DOC_ID, file.toString(), SchemaFields.PATH, file.toString()));
+      f.indexMetadata(Map.of(SchemaFields.DOC_ID, file + "#chunk-1", SchemaFields.PARENT_DOC_ID, file.toString(),
+          SchemaFields.PATH, file.toString()));
+      var noFile = new io.justsearch.app.api.indexing.AcceptedProjection("no-file", "document", 1,
+          io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+          JsonMapper.builder().build().writeValueAsString(Map.of(SchemaFields.COLLECTION, "documents", SchemaFields.CONTENT, "unrelated")));
+      f.runtime.indexingCoordinator().indexSingle(ProjectionDocumentMapper.toIndexDocument(noFile));
+      f.indexMetadata(Map.of(SchemaFields.DOC_ID, "backslash-owner", SchemaFields.PATH, f.root + "\\private.txt",
+          SchemaFields.PROJECTION_SOURCE_ID, "backslash-source"));
+      assertNotEquals(file, Path.of(f.root + "\\private.txt").normalize(), "SETUP: Linux backslash is a filename character");
+      assertTrue(f.readmit(f.policy(f.configuration("[]"), false)), "ordinary serving metadata and unrelated projections are not blanket vetoes");
+      var fresh = f.queue.listSwitchBufferOpsStrict().getFirst();
+      assertNotEquals(old.revision(), fresh.revision()); assertTrue(fresh.acceptedOrder() > old.acceptedOrder());
+    }
+  }
+
+  @Test
+  void reservedCollectionOwnerStillBlocksReadmissionAndOmission() throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.source("private.txt"); var old = f.skipped(file);
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      Path sibling = Files.createDirectory(directory.resolve("sibling"));
+      assertTrue(f.registry.watch(sibling.toString(), "sibling").watching());
+      var unrelated = f.policy(f.configuration("[\"root/**\"]"), false);
+      assertTrue(unrelated.allows(file, f.root, null), "a registered sibling supplies no ancestor exclusion authority");
+      assertFalse(unrelated.excludes(file, f.root, null));
+      f.runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, "reserved-owner", SchemaFields.DOC_UID, "reserved-owner",
+          SchemaFields.PATH, file.toString(),
+          SchemaFields.COLLECTION, io.justsearch.configuration.InternalCollections.AGENT_HISTORY,
+          SchemaFields.CONTENT, "reserved collection fixture")));
+      f.runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(io.justsearch.configuration.InternalCollections.AGENT_HISTORY,
+          f.runtime.documentFieldOps().getDocumentFieldOrThrow("reserved-owner", SchemaFields.COLLECTION));
+      assertNull(f.runtime.documentFieldOps().getDocumentFieldOrThrow("reserved-owner", SchemaFields.PROJECTION_SOURCE_ID),
+          "SETUP: reserved collection ownership is independent of the repaired marker guard");
+      assertFalse(f.readmit(f.policy(f.configuration("[]"), false)));
+      var omitted = f.policy(f.configuration("[\"private.txt\"]"), false);
+      assertTrue(omitted.freeze(f.queue.listSwitchBufferOpsStrict()));
+      assertFalse(omitted.certify(old));
+      assertEquals(List.of(old), f.queue.listSwitchBufferOpsStrict());
+      assertEquals("DONE", f.queue.watcherReconciliationRow(file.toString()).get("state"));
+    }
+  }
+
+  @Test
+  void immutableReadOnlyServingGenerationPreservesOrdinaryReadmission() throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.source("private.txt"); var old = f.skipped(file);
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      Path bluePath = f.base.resolve("g-read-only-serving");
+      try (var writer = withTestExecutors(f.runtime.schema().atPath(bluePath)).open()) {
+        writer.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, file.toString(),
+            SchemaFields.DOC_UID, file.toString(), SchemaFields.PATH, file.toString(),
+            SchemaFields.COLLECTION, "documents", SchemaFields.CONTENT, "ordinary A")));
+        writer.commitOps().commitAndTrack();
+      }
+      try (var blue = withTestExecutors(f.runtime.schema().atPath(bluePath)).openReadOnly()) {
+        var publisher = new WorkerIngestService(f.queue, f.loop, mock(WorkerSignalBus.class), IndexingPacing.unthrottled(),
+            f.base, f.runtime.openedIndexPath(), f.runtime, blue, null, 0L);
+        publisher.setRootWatcherRegistry(f.registry); publisher.setMutationAdmission(f.mutation, f.runtime);
+        var store = f.configuration("[]");
+        var policy = new NativePolicyReplay(store, store.publicationLock(), f.queue, f.runtime, publisher,
+            f.generation, List.of(new ResolvedConfig.FileSource(f.root, null)));
+        try (var fence = f.mutation.beginFinalFence(f.runtime, 1_000)) {
+          assertNotNull(fence);
+          var journal = f.queue.listSwitchBufferOpsStrict();
+          assertTrue(policy.readmit(journal, List.of(old)));
+        }
+        assertEquals("PENDING", f.queue.watcherReconciliationRow(file.toString()).get("state"));
+        assertNotEquals(old.revision(), f.queue.listSwitchBufferOpsStrict().getFirst().revision());
+      }
+    }
+  }
+
+  @Test
+  void ancestorOperatorExclusionNeverInventsUiOmissionAuthority() throws Exception {
+    String previous = System.getProperty("justsearch.ui.exclude_patterns");
+    try (var f = new Fixture()) {
+      Path file = f.source("private.txt"); var old = f.skipped(file);
+      assertTrue(f.registry.watch(directory.toString(), "ancestor").watching());
+      assertTrue(f.registry.watch(f.root.toString(), null).watching());
+      System.setProperty("justsearch.ui.exclude_patterns", "[\"root/**\"]");
+      var store = f.configuration("[]");
+      assertTrue(store.currentSnapshot().resolution("justsearch.ui.exclude_patterns").sourceOrdinal() > 300);
+      var journal = f.queue.listSwitchBufferOpsStrict(); var row = f.queue.watcherReconciliationRow(file.toString());
+      var policy = f.policy(store, false);
+      assertTrue(policy.freeze(journal));
+      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+        assertFalse(f.readmit(policy));
+        hashes.verify(() -> SourceContentHash.sha256(file), never());
+      }
+      assertFalse(policy.certify(old));
+      assertEquals(journal, f.queue.listSwitchBufferOpsStrict()); assertEquals(row, f.queue.watcherReconciliationRow(file.toString()));
+    } finally {
+      if (previous == null) System.clearProperty("justsearch.ui.exclude_patterns");
+      else System.setProperty("justsearch.ui.exclude_patterns", previous);
+    }
+  }
+
   private final class Fixture implements AutoCloseable {
     final Path root = Files.createDirectory(directory.resolve("root"));
     final Path data;
@@ -508,8 +869,10 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
     final Path base = Files.createDirectories(directory.resolve("index"));
     final SqliteJobQueue queue = new SqliteJobQueue(directory.resolve("queue.db"));
     final RunningRuntime runtime;
+    final RunningRuntime serving;
     final RootWatcherRegistry registry = new RootWatcherRegistry();
     final WorkerIngestService publisher;
+    final IndexingLoop loop;
     final WorkerMutationAdmission mutation;
     final ReentrantReadWriteLock publication = new ReentrantReadWriteLock();
     final io.justsearch.app.services.worker.WatchedRootsState rootsOwner;
@@ -517,15 +880,24 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
     final Map<NativePolicyReplay, List<ResolvedConfig.FileSource>> attemptRoots = new java.util.IdentityHashMap<>();
     Fixture() throws Exception { this(false); }
     Fixture(boolean nativeTransition) throws Exception { this(nativeTransition, false); }
-    Fixture(boolean nativeTransition, boolean projectionReplay) throws Exception {
+    Fixture(boolean nativeTransition, boolean projectionReplay) throws Exception { this(nativeTransition, projectionReplay, false); }
+    Fixture(boolean nativeTransition, boolean projectionReplay, boolean separateServing) throws Exception {
+      this(nativeTransition, projectionReplay, separateServing, false);
+    }
+    Fixture(boolean nativeTransition, boolean projectionReplay, boolean separateServing, boolean declareAncestor) throws Exception {
       data = Files.createDirectories(nativeTransition ? directory.resolve("data") : root.resolve("data"));
       var binding = new java.util.LinkedHashMap<String, Object>();
       binding.put("path", root.toString()); binding.put("collection", null);
+      var bindings = new ArrayList<Map<String, Object>>();
+      bindings.add(binding);
+      if (declareAncestor) bindings.add(Map.of("path", directory.toString(), "collection", "ancestor"));
       Files.writeString(data.resolve("watched_roots.json"), JsonMapper.builder().build().writeValueAsString(
-          Map.of("schemaVersion", 1, "roots", List.of(binding))));
+          Map.of("schemaVersion", 1, "roots", bindings)));
       rootsOwner = io.justsearch.app.services.worker.WatchedRootsState.load(data);
-      assertEquals(List.of(new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, null)),
-          rootsOwner.snapshotBindings(), "SETUP: one actual official watched-root owner is loaded before runtime");
+      assertTrue(rootsOwner.snapshotBindings().contains(
+          new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, null)),
+          "SETUP: actual official watched-root owner is loaded before runtime");
+      assertEquals(declareAncestor ? 2 : 1, rootsOwner.snapshotBindings().size());
       manager = nativeTransition ? new io.justsearch.indexerworker.index.IndexGenerationManager(base) : null;
       if (manager != null) {
         manager.initializeOrLoad();
@@ -543,15 +915,19 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       runtime = withTestExecutors(IndexSchema.fromCatalog(new FieldCatalogDef("native-policy", fields), () -> Map.of(), ignored -> {})
           .atPath(manager == null ? base.resolve(generation) : manager.resolveGenerationPathStrict(generation))).open();
       runtime.commitOps().stopCommitTimer();
-      var loop = mock(IndexingLoop.class); var fence = new FileMutationFence();
+      serving = separateServing ? withTestExecutors(IndexSchema.fromCatalog(new FieldCatalogDef("native-policy", fields),
+          () -> Map.of(), ignored -> {}).atPath(base.resolve("g-serving"))).open() : runtime;
+      if (serving != runtime) serving.commitOps().stopCommitTimer();
+      loop = mock(IndexingLoop.class); var fence = new FileMutationFence();
       when(loop.fileMutationFence()).thenReturn(fence);
       when(loop.withFileMutationFence(any())).thenAnswer(call -> {
         java.util.function.Supplier<?> action = call.getArgument(0);
         return fence.guard(action);
       });
       publisher = new WorkerIngestService(queue, loop, mock(WorkerSignalBus.class), IndexingPacing.unthrottled(),
-          base, runtime.openedIndexPath(), runtime, runtime, null, 0L);
+          base, runtime.openedIndexPath(), runtime, serving, null, 0L);
       publisher.setRootWatcherRegistry(registry);
+      publisher.useExclusionRoots(rootsOwner::watchedPaths);
       mutation = new WorkerMutationAdmission(runtime); publisher.setMutationAdmission(mutation, runtime);
       assertNotNull(RootIdentity.capture(root).volume(), "SETUP: existing test volume convention supplies known identity");
       // This owned positive fixture begins with a real known record. Configured-root seeding
@@ -562,6 +938,32 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       assertEquals(volume, ledger.recordedFor(root).orElseThrow(), "SETUP: actual ledger owns the held root volume");
       publisher.seedConfiguredRoots(List.of(root));
       assertNull(registry.subscription(root), "SETUP: boot starts before ordinary watch registration");
+    }
+    void replayProjection(io.justsearch.app.api.indexing.AcceptedProjection projection) throws Exception {
+      KnowledgeServerMigrationOps.seedProjectionSource(queue, generation,
+          new io.justsearch.app.api.indexing.ProjectionSeedSource() {
+            @Override public String sourceId() { return projection.sourceId(); }
+            @Override public void enumerate(java.util.function.Consumer<io.justsearch.app.api.indexing.AcceptedProjection> sink) {
+              sink.accept(projection);
+            }
+          });
+      var replay = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(queue, runtime, null,
+          IndexingPacing.unthrottled(), base, runtime.openedIndexPath(), JsonMapper.builder().build(),
+          () -> false, () -> true, LoggerFactory.getLogger(NativePolicyReadmissionCallerTest.class),
+          System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5), generation, ignored -> true)
+          .withPublisher(publisher).withMigrationRoots(List.of(new ResolvedConfig.FileSource(root, null)));
+      try (var fence = mutation.beginFinalFence(runtime, 1_000)) {
+        assertNotNull(fence);
+        assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(replay), "SETUP: real accepted projection producer/replay");
+      }
+    }
+    void indexMetadata(Map<String, Object> metadata) throws Exception {
+      var fields = new java.util.LinkedHashMap<String, Object>(metadata);
+      fields.put(SchemaFields.DOC_UID, metadata.get(SchemaFields.DOC_ID));
+      fields.put(SchemaFields.COLLECTION, "documents");
+      fields.put(SchemaFields.CONTENT, "owned metadata fixture");
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
+      runtime.commitOps().maybeRefreshBlocking();
     }
     Path source(String name) throws Exception { return Files.writeString(root.resolve(name), "old skipped bytes"); }
     SwitchBufferOp skipped(Path file) throws Exception {
@@ -664,6 +1066,7 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
           assertTrue(runtime.isAcceptingWrites());
           assertTrue(publisher.ownsForgetQueue(queue));
           assertSame(publication, store.publicationLock());
+          accepted = withOwnership(policy, () -> {
           try (var state = manager.beginForgetNoCandidate(runtime.openedIndexPath())) {
             System.out.println("Caller no-candidate guard acquired for=" + runtime.openedIndexPath());
             store.publicationLock().writeLock().lock();
@@ -675,9 +1078,10 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
               System.out.println("Caller final decision official=" + official + "; frozen=" + attemptRoots.get(policy)
                   + "; current=" + currentRoots + "; authority=" + authority + "; proof=" + proof
                   + "; selected=" + selected + "; snapshotIdentity=" + System.identityHashCode(store.currentSnapshot()));
-              accepted = authority && proof;
+              return authority && proof;
             } finally { store.publicationLock().writeLock().unlock(); }
           } catch (java.io.IOException unknown) { return false; }
+          });
           assertFalse(store.publicationLock().isWriteLockedByCurrentThread());
           if (accepted) { decisions.incrementAndGet(); after.run(); }
           return accepted;
@@ -726,6 +1130,21 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
         }).get(5, java.util.concurrent.TimeUnit.SECONDS);
       } catch (Exception failure) { throw new java.util.concurrent.CompletionException(failure); }
     }
+    // Instrumentation compatibility: the original baseline has no preparation scope. The same
+    // assertions still run there, under its existing owner, without adding any repair to it.
+    boolean withOwnership(NativePolicyReplay policy, java.util.function.BooleanSupplier decision) {
+      try {
+        var prepare = NativePolicyReplay.class.getMethod("withFinalOwnership", java.util.function.BooleanSupplier.class);
+        return (boolean) prepare.invoke(policy, decision);
+      } catch (NoSuchMethodException baseline) { return decision.getAsBoolean(); }
+      catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+    boolean finalDecision(NativePolicyReplay policy, java.util.function.BooleanSupplier decision) throws Exception {
+      try (var fence = mutation.beginFinalFence(runtime, 1_000)) {
+        assertNotNull(fence);
+        return withOwnership(policy, decision);
+      }
+    }
     boolean readmit(NativePolicyReplay policy) throws Exception {
       try (var fence = mutation.beginFinalFence(runtime, 1_000)) {
         assertNotNull(fence);
@@ -747,6 +1166,9 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
           generation, ignored -> true).withPublisher(publisher).withMigrationRoots(roots)
           .withNativePolicy(policy);
     }
-    @Override public void close() throws Exception { try { runtime.close(); } finally { queue.close(); } }
+    @Override public void close() throws Exception {
+      try { if (serving != runtime) serving.close(); }
+      finally { try { runtime.close(); } finally { queue.close(); } }
+    }
   }
 }

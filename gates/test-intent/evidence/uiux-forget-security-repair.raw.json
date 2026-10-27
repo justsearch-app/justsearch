@@ -1,0 +1,517 @@
+{
+  "schema": "forget-security-raw-summary.v1",
+  "note": "Machine-generated raw JUnit comparison, not canonical test-intent D4 evidence and not independent acceptance. Canonical runner conflicts with the assignment no-init/shared-clone rules; its three D4 artifacts remain pending.",
+  "observedAt": "2026-10-27T06:57:42Z",
+  "baseline": "d320fb3f130cb6c707a27c835e4a655e79c2168c",
+  "workingModulePatchSha256AtSummary": "464dc5ff584359dfe8429fa4b4fe9b624d3fb375a5f47508a7b40012da5f62c0",
+  "workingProductionPatchSha256AtSummary": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "counts": {
+    "cases": 49,
+    "failedBefore": 26,
+    "passedBefore": 23,
+    "passedAfter": 49,
+    "failedAfter": 0,
+    "skippedAfter": 0
+  },
+  "cases": [
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "publicSaveAllowAfterSubscribedAncestorGlobReadmitsCurrentBytes()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder()",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.MultipleFailuresError",
+      "beforeMessage": "org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)\n\torg.opentest4j.AssertionFailedError: ancestor exclusion cannot mint a pending revision ==> expected: <false> but was: <true>\n\torg.mockito.exceptions.verification.NeverWantedButInvoked: \nSourceContentHash.class.sha256(\n    /home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-8254612832591897822/root/private.txt\n);\nNever wanted here:\n-> at io.justsearch.indexerworker.loop.SourceContentHash.sha256(SourceContentHash.java:21)\nBut invoked here:\n-> at io.justsearch.indexerworker.services.NativePolicyReplay.lambda$readmit$1(NativePolicyReplay.java:305) with arguments: [/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-8254612832591897822/root/private.txt]\n\n\torg.opentest4j.AssertionFailedError: expected: <[SwitchBufferOp[generation=g-native-policy, key=path:/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-8254612832591897822/root/private.txt, op=UPSERT, payload={\"version\":3,\"path\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/index",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "committedBootReadmitsPresentSourceBeforeSubscriptionWithoutInventingAWatchOrReceipt()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(declared)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(subscribed)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(awaiting)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "[1] simple",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "[2] mixed",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "[3] root",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "unknownRecordedVolumeNeverCreatesReplacementOrAdoptsARecord()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "ancestorChangeAfterRealCommitIsUnconfirmedAndRetainsTheNewAuthoritativeReceipt()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "supportedOperatorAllowingPolicyCanReadmitButOperatorExclusionCannotCertifyUiOmission()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "liveNoRootDebtCertifiesOnlyItsExactCurrentUiSkipAndFinalPublicationSnapshot()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership()",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "genuineAlreadyAdmittedUiSkipNeedsNoReadOfNowUnreadableSourceContent()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "reservedCollectionOwnerStillBlocksReadmissionAndOmission()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-reserved",
+      "afterArtifact": "candidate-preserve-final"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "ancestorReplacedByALinkIntoProtectedFixtureStorageRefusesBeforeAnyQueueEffect()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence()",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: a resumed producer invalidates the earlier permission ==> expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "[1] simple",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "[2] mixed",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "[3] root",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "acceptedProjectionPathIsProtectedBeforeItsRowsAreReplayedOnTarget()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "allCommittedAckConsumersRetainAReplayedProjectionOwner(simple)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: actual ACK consumer cannot erase an unproved omission ==> expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "allCommittedAckConsumersRetainAReplayedProjectionOwner(mixed)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: actual ACK consumer cannot erase an unproved omission ==> expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "allCommittedAckConsumersRetainAReplayedProjectionOwner(root)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: actual ACK consumer cannot erase an unproved omission ==> expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "ancestorOperatorExclusionNeverInventsUiOmissionAuthority()",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication()",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: owner-thread replay cannot reuse a prepared reader or durable-epoch witness ==> expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "ancestorExclusionStillCannotCertifyAProjectionOwner()",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(parent)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-late-owner",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(missing-parent)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: Expected java.io.IOException to be thrown, but nothing was thrown.",
+      "beforeArtifact": "baseline-late-owner",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(blank-marker)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-late-owner",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(reserved-id)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-late-owner",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(late-alias)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-late-owner",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy()",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,target)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.MultipleFailuresError",
+      "beforeMessage": "org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot certify ordinary omission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot acquire file readmission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: expected: <[SwitchBufferOp[generation=g-native-policy, key=path:/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-10369256771007418205/root/projected.txt, op=UPSERT, payload={\"version\":3,\"path\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-10369256771007418205/root/projected.txt\",\"collection\":null,\"originator\":\"system\",\"transport\":\"MIGRATION_ENUMERATOR\",\"unit_revision\":\"2a61a40dc77115c29ced2ef899a90202\",\"source_sha256\":\"74485c5465f027fba9803a91a8158bd8cdf1e179e727d3d0d61cfcb5d4d78ce1\",\"ingestion_root\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-10369256771007418205/root\"}, lastUpdatedMs=1793072264606, revision",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,serving)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.MultipleFailuresError",
+      "beforeMessage": "org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot certify ordinary omission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot acquire file readmission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: expected: <[SwitchBufferOp[generation=g-native-policy, key=path:/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-5936530645400638483/root/projected.txt, op=UPSERT, payload={\"version\":3,\"path\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-5936530645400638483/root/projected.txt\",\"collection\":null,\"originator\":\"system\",\"transport\":\"MIGRATION_ENUMERATOR\",\"unit_revision\":\"96ab6c8001283befcbb30261443acc52\",\"source_sha256\":\"74485c5465f027fba9803a91a8158bd8cdf1e179e727d3d0d61cfcb5d4d78ce1\",\"ingestion_root\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-5936530645400638483/root\"}, lastUpdatedMs=1793072264745, revision=5f",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,both)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.MultipleFailuresError",
+      "beforeMessage": "org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot certify ordinary omission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot acquire file readmission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: expected: <[SwitchBufferOp[generation=g-native-policy, key=path:/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-211416701214226842/root/projected.txt, op=UPSERT, payload={\"version\":3,\"path\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-211416701214226842/root/projected.txt\",\"collection\":null,\"originator\":\"system\",\"transport\":\"MIGRATION_ENUMERATOR\",\"unit_revision\":\"b875c024afc992123776363d77dd660d\",\"source_sha256\":\"74485c5465f027fba9803a91a8158bd8cdf1e179e727d3d0d61cfcb5d4d78ce1\",\"ingestion_root\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-211416701214226842/root\"}, lastUpdatedMs=1793072264891, revision=8d320",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(dot,target)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.MultipleFailuresError",
+      "beforeMessage": "org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot certify ordinary omission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot acquire file readmission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: expected: <[SwitchBufferOp[generation=g-native-policy, key=path:/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-10398518865470864630/root/projected.txt, op=UPSERT, payload={\"version\":3,\"path\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-10398518865470864630/root/projected.txt\",\"collection\":null,\"originator\":\"system\",\"transport\":\"MIGRATION_ENUMERATOR\",\"unit_revision\":\"1849bb5864e44020cbee7cf2740e82d3\",\"source_sha256\":\"74485c5465f027fba9803a91a8158bd8cdf1e179e727d3d0d61cfcb5d4d78ce1\",\"ingestion_root\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-10398518865470864630/root\"}, lastUpdatedMs=1793072265100, revision",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(dot,serving)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.MultipleFailuresError",
+      "beforeMessage": "org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot certify ordinary omission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot acquire file readmission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: expected: <[SwitchBufferOp[generation=g-native-policy, key=path:/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-6579028592730697490/root/projected.txt, op=UPSERT, payload={\"version\":3,\"path\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-6579028592730697490/root/projected.txt\",\"collection\":null,\"originator\":\"system\",\"transport\":\"MIGRATION_ENUMERATOR\",\"unit_revision\":\"d7db22c40eb2abce4595f9f52af53b90\",\"source_sha256\":\"74485c5465f027fba9803a91a8158bd8cdf1e179e727d3d0d61cfcb5d4d78ce1\",\"ingestion_root\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-6579028592730697490/root\"}, lastUpdatedMs=1793072265252, revision=45",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(dotdot,target)",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.MultipleFailuresError",
+      "beforeMessage": "org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot certify ordinary omission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot acquire file readmission ==> expected: <false> but was: <true>\n\torg.opentest4j.AssertionFailedError: expected: <[SwitchBufferOp[generation=g-native-policy, key=path:/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-16278601894524154034/root/projected.txt, op=UPSERT, payload={\"version\":3,\"path\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-16278601894524154034/root/projected.txt\",\"collection\":null,\"originator\":\"system\",\"transport\":\"MIGRATION_ENUMERATOR\",\"unit_revision\":\"2d61e2196d4be9e5d83c5bb0aa6e49e1\",\"source_sha256\":\"74485c5465f027fba9803a91a8158bd8cdf1e179e727d3d0d61cfcb5d4d78ce1\",\"ingestion_root\":\"/home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/indexer-worker/build/tmp/test-jvm/test/junit-16278601894524154034/root\"}, lastUpdatedMs=1793072265382, revision",
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest",
+      "case": "immutableReadOnlyServingGenerationPreservesOrdinaryReadmission()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-caller-final",
+      "afterArtifact": "caller-final-42"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest",
+      "case": "defaultOwnerIsExactAndNestedIndependentRootsRemainOutsideParentAuthority()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-boundary-final",
+      "afterArtifact": "boundary-focused"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest",
+      "case": "currentPublicationIdentityRejectsIdenticalPolicyAba()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-boundary-final",
+      "afterArtifact": "boundary-focused"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest",
+      "case": "knownExcludedFileNeedsNoContentReadButEligibleUnreadableSiblingRemainsUnknown()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-boundary-final",
+      "afterArtifact": "boundary-focused"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest",
+      "case": "fileLiteralAtANowDirectoryNeverPrunesItsEligibleChildren()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-boundary-final",
+      "afterArtifact": "boundary-focused"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest",
+      "case": "declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority()",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: expected: <true> but was: <false>",
+      "beforeArtifact": "baseline-boundary-final",
+      "afterArtifact": "boundary-focused"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest",
+      "case": "folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot()",
+      "before": "failed",
+      "after": "passed",
+      "beforeFailureType": "org.opentest4j.AssertionFailedError",
+      "beforeMessage": "org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.io.IOException: Reconciliation walk could not read: /home/elias/.cache/am/fut3m042/tmp/forget-repair/before/modules/worker-services/build/tmp/test-jvm/test/junit-6583329311826883504/root/private",
+      "beforeArtifact": "baseline-boundary-final",
+      "afterArtifact": "boundary-focused"
+    },
+    {
+      "class": "io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest",
+      "case": "malformedPolicyOrUnsharedPublicationOwnerHasNoOmissionAuthority()",
+      "before": "passed",
+      "after": "passed",
+      "beforeFailureType": null,
+      "beforeMessage": null,
+      "beforeArtifact": "baseline-boundary-final",
+      "afterArtifact": "boundary-focused"
+    }
+  ],
+  "pendingPlans": [],
+  "rawArtifactDirectory": "/tmp/forget-privacy-repair-evidence",
+  "scopeNote": "The final 42-case Caller run compiles the final production candidate, including the server proof placement. Its preservation case was subsequently extended with a registered-sibling negative control and rerun separately on both trees; that later result overrides the case here. These remain component fixtures. The separate seven-case Boundary run covers the unchanged directory implementation. These checks are not real Head/native integration or independent security acceptance.",
+  "baselineTestSourceNote": "Same test source transplanted to unchanged baseline product. Refined late-alias first-page setup uses its later five-case baseline rerun. The reserved-collection preservation method was added after the 41-case run; production stayed unchanged. Duplicate original parameterized display names are preserved as separate rows in raw XML.",
+  "pending": [
+    "Canonical D4 runner evidence and independent acceptance",
+    "Physical Windows ownership validation (new policy permission safely refused)",
+    "Real native/public-boundary security verification where root/volume preconditions are unavailable"
+  ]
+}

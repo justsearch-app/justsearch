@@ -158,6 +158,7 @@ public final class KnowledgeServerMigrationOps {
     }
     public DrainSwitchBufferContext withNativePolicy(
         io.justsearch.indexerworker.services.NativePolicyReplay policy) {
+      if (policy != null) policy.useDeadline(deadlineNanos);
       return new DrainSwitchBufferContext(jobQueue, ingestLifecycle, signalBus, indexingPacing,
           indexBasePath, activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
           deadlineNanos, replayGeneration, projectionSourceReady, approvedGapVersions, publisher,
