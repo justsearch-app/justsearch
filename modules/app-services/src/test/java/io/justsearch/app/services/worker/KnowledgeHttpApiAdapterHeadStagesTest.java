@@ -34,7 +34,8 @@ final class KnowledgeHttpApiAdapterHeadStagesTest {
             CrossEncoderSkipReason.PIPELINE_NOT_ELIGIBLE,
             false,
             "skip",
-            null);
+            null,
+            "DISABLED");
 
     // One node per declared stage — no more (no duplicates), no fewer (none dropped).
     assertEquals(SearchTraceMapper.HeadStage.values().length, stages.size());
@@ -62,7 +63,7 @@ final class KnowledgeHttpApiAdapterHeadStagesTest {
             CrossEncoderSkipReason.UNKNOWN)) {
       SearchTrace.TraceStage ce =
           SearchTraceMapper.buildHeadStages(
-                  PipelineConfig.TEXT, 0L, 0L, false, "skip", false, reason, false, "skip", null)
+                  PipelineConfig.TEXT, 0L, 0L, false, "skip", false, reason, false, "skip", null, "DISABLED")
               .stream()
               .filter(s -> "cross-encoder".equals(s.id().wireId()))
               .findFirst()

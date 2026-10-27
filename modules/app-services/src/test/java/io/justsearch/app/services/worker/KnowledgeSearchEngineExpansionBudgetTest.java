@@ -2,6 +2,11 @@
 package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -14,6 +19,12 @@ import io.justsearch.app.api.knowledge.KnowledgeSearchRequest;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponse;
 import io.justsearch.app.api.knowledge.PipelineConfig;
 import io.justsearch.app.services.TestEngineContexts;
+import io.justsearch.app.api.knowledge.QueryType;
+import io.justsearch.core.execution.EngineFutures;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.ipc.SearchQuerySyntax;
@@ -31,6 +42,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Spec D §1.6 at the head seam (test H1, results half): an expansion re-search that loses a
@@ -97,6 +110,644 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
     assertNull(expansionReason(response), "the expansion executed");
   }
 
+
+  @Test
+  void stalledQuLeavesReservedTimeForResponsiveBaseAndAbandonsQueuedRoot() throws Exception {
+    checkQuDeadline(false);
+  }
+
+  @Test
+  void stalledQuReturnsBaseWhileRunningProducerRetainsWorkUntilExit() throws Exception {
+    checkQuDeadline(true);
+  }
+
+  private void checkQuDeadline(boolean running) throws Exception {
+    checkQuDeadline(running, optionalRequest(false));
+  }
+
+  private void checkQuDeadline(boolean running, KnowledgeSearchRequest request) throws Exception {
+    optionalConfig(true);
+    try (var completion = new OwnedCompletion(running)) {
+      OnlineAiService ai = aiReturning(completion.root);
+      var searches = new AtomicInteger();
+      KnowledgeClient client = responsiveClient(searches, 80);
+      var engine = engineOver(client, ai, mock(SearchPerSourceExecutor.class));
+      assertEquals(QueryType.INFORMATIONAL, QueryClassifier.classify("climate policy"));
+      long d = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(3200);
+      var response = HeadSearchDeadline.within(d,
+          () -> engine.search(request, TestEngineContexts.internal()));
+
+      assertEquals(List.of("/base.txt"), ids(response));
+      org.mockito.Mockito.verify(ai).chatCompletion(any(), anyInt(), any(), any());
+      assertEquals(1, searches.get());
+      assertTrue(System.nanoTime() < d, "stalled QU must leave the responsive base inside caller D");
+      assertTrue(completion.root.isCompletedExceptionally(), "the original completion is bounded");
+      completion.assertAbandoned(running, false);
+    }
+  }
+
+  @Test
+  void stalledExpansionReturnsResponsiveBaseInsideShortCallerDeadline() throws Exception {
+    checkExpansionDeadline(false);
+  }
+
+  @Test
+  void stalledExpansionRetainsRunningProducerUntilActualExit() throws Exception {
+    checkExpansionDeadline(true);
+  }
+
+  @ParameterizedTest(name = "expansionCutoffAbandonsOriginalWhileSearchWaitsElsewhere({0})")
+  @ValueSource(strings = {"qu-queued", "qu-running", "base-queued", "base-running"})
+  void expansionCutoffAbandonsOriginalWhileSearchWaitsElsewhere(String schedule) throws Exception {
+    boolean qu = schedule.startsWith("qu-");
+    boolean running = schedule.endsWith("-running");
+    optionalConfig(qu);
+    try (var completion = new OwnedCompletion(running)) {
+      var waiting = new CountDownLatch(1);
+      var releaseBase = new CountDownLatch(1);
+      var terminal = new CountDownLatch(1);
+      completion.root.whenComplete((value, failure) -> terminal.countDown());
+      var quRoot = new CompletableFuture<String>();
+      OnlineAiService ai = mock(OnlineAiService.class);
+      when(ai.isAvailable()).thenReturn(true);
+      var calls = new AtomicInteger();
+      when(ai.chatCompletion(any(), anyInt(), any(), any())).thenAnswer(ignored -> {
+        if (calls.incrementAndGet() == 1) return completion.root;
+        waiting.countDown();
+        return quRoot;
+      });
+      KnowledgeClient client = mock(KnowledgeClient.class);
+      when(client.search(any(SearchRequest.class), any())).thenAnswer(ignored -> {
+        if (!qu) {
+          waiting.countDown();
+          assertTrue(releaseBase.await(5, TimeUnit.SECONDS));
+        }
+        return hits("/base.txt");
+      });
+      var engine = engineOver(client, ai, mock(SearchPerSourceExecutor.class));
+      var result = new CompletableFuture<KnowledgeSearchResponse>();
+      Thread search = new Thread(() -> {
+        try { result.complete(engine.search(optionalRequest(true), TestEngineContexts.internal())); }
+        catch (Throwable failure) { result.completeExceptionally(failure); }
+      }, "expansion-cutoff-search");
+      search.start();
+      try {
+        assertTrue(waiting.await(3, TimeUnit.SECONDS), "search reached the held QU or base retrieval");
+        assertTrue(terminal.await(3, TimeUnit.SECONDS),
+            "original expansion completion must be abandoned before releasing QU or base retrieval");
+        assertFalse(result.isDone(), "search is still waiting elsewhere at the expansion cutoff");
+        assertThrows(java.util.concurrent.CancellationException.class, completion.root::get);
+        completion.assertAbandoned(running, true);
+      } finally {
+        quRoot.complete("{\"query\":\"climate policy\"}");
+        releaseBase.countDown();
+        search.join(3000);
+        assertFalse(search.isAlive(), "the test's search thread exits after release");
+      }
+      var response = result.get(3, TimeUnit.SECONDS);
+      assertEquals(List.of("/base.txt"), ids(response));
+      assertEquals("TIMEOUT", expansionReason(response));
+      assertEquals(qu ? 2 : 1, calls.get());
+      org.mockito.Mockito.verify(client).search(any(SearchRequest.class), any());
+    }
+  }
+
+  @Test
+  void foreignCancellationAfterTimerCheckStillPropagatesFromCollector() throws Exception {
+    checkCollectorCutoff(true);
+  }
+
+  @Test
+  void timerLeavesWaitingCollectorToTimeoutAndAbandonExactlyOnce() throws Exception {
+    checkCollectorCutoff(false);
+  }
+
+  private void checkCollectorCutoff(boolean foreignCancellation) throws Exception {
+    optionalConfig(false);
+    try (var completion = new OwnedCompletion(false)) {
+      var cutoff = new AtomicReference<Runnable>();
+      var timerThread = new AtomicReference<Thread>();
+      var timerCheckedOrFinished = new CountDownLatch(1);
+      var resumeTimer = new CountDownLatch(1);
+      var timerFailure = new AtomicReference<Throwable>();
+      var cancellations = new AtomicInteger();
+      var root = new CompletableFuture<String>() {
+        @Override public boolean isDone() {
+          boolean done = completion.root.isDone();
+          if (Thread.currentThread() == timerThread.get()) {
+            // On c24cb38cb9 pause after the timer observed "pending", before it claims
+            // cancellation. The ownership design never consults the future from the timer
+            // once the collector owns it, so that timer simply exits instead.
+            timerCheckedOrFinished.countDown();
+            try { assertTrue(resumeTimer.await(3, TimeUnit.SECONDS)); }
+            catch (InterruptedException interrupted) { throw new AssertionError(interrupted); }
+          }
+          return done;
+        }
+
+        @Override public boolean cancel(boolean interrupt) {
+          assertTrue(interrupt, "expansion abandonment retains cancel(true)");
+          cancellations.incrementAndGet();
+          return completion.root.cancel(interrupt);
+        }
+
+        @Override public boolean isCancelled() { return completion.root.isCancelled(); }
+
+        @Override public String get(long timeout, TimeUnit unit)
+            throws InterruptedException, java.util.concurrent.ExecutionException,
+                java.util.concurrent.TimeoutException {
+          assertTrue(timeout > 0, "collector receives its remaining cutoff budget");
+          assertTrue(cutoff.get() != null, "the JDK cutoff was armed before collection");
+          Thread timer = new Thread(() -> {
+            try { cutoff.get().run(); }
+            catch (Throwable failure) { timerFailure.set(failure); }
+            finally { timerCheckedOrFinished.countDown(); }
+          }, "controlled-expansion-cutoff");
+          timerThread.set(timer);
+          timer.start();
+          try {
+            assertTrue(timerCheckedOrFinished.await(3, TimeUnit.SECONDS));
+            // This is an independent cancellation origin, bypassing the search's wrapper.
+            if (foreignCancellation) completion.root.cancel(false);
+          } finally {
+            resumeTimer.countDown();
+            timer.join(3000);
+            assertFalse(timer.isAlive(), "the controlled timer has exited");
+          }
+          assertNull(timerFailure.get(), "the controlled cutoff completed normally");
+          if (foreignCancellation) return completion.root.get(timeout, unit);
+          assertEquals(0, cancellations.get(), "timer must not cancel a waiting collector");
+          assertFalse(completion.root.isDone(), "the collector still owns pending expansion");
+          // The controllable timed wait reaches its own cutoff after the timer has fired.
+          throw new java.util.concurrent.TimeoutException("collector cutoff");
+        }
+      };
+      var searches = new AtomicInteger();
+      var engine = engineOver(responsiveClient(searches, 0), aiReturning(root),
+          mock(SearchPerSourceExecutor.class));
+      try (var futures = org.mockito.Mockito.mockStatic(
+          CompletableFuture.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+        futures.when(() -> CompletableFuture.delayedExecutor(
+            org.mockito.ArgumentMatchers.anyLong(), any(TimeUnit.class)))
+            .thenReturn((java.util.concurrent.Executor) cutoff::set);
+        if (foreignCancellation) {
+          var expected = new AtomicReference<java.util.concurrent.CancellationException>();
+          completion.root.whenComplete((value, failure) -> expected.set(
+              assertInstanceOf(java.util.concurrent.CancellationException.class, failure)));
+          var failure = assertThrows(java.util.concurrent.CancellationException.class,
+              () -> engine.search(optionalRequest(true), TestEngineContexts.internal()));
+          Throwable representedCause = failure;
+          while (representedCause != expected.get() && representedCause.getCause() != null) {
+            representedCause = representedCause.getCause();
+          }
+          assertSame(expected.get(), representedCause,
+              "the original foreign cancellation remains in the cause chain");
+          assertEquals(0, cancellations.get(), "search never cancels after foreign termination");
+        } else {
+          var response = engine.search(optionalRequest(true), TestEngineContexts.internal());
+          assertEquals(List.of("/base.txt"), ids(response));
+          assertEquals("TIMEOUT", expansionReason(response));
+          assertEquals(1, cancellations.get(), "only the collector abandons expansion");
+        }
+      }
+      assertEquals(1, searches.get(), "abandoned expansion never starts a re-search");
+      completion.assertAbandoned(false, !foreignCancellation);
+    }
+  }
+
+  private void checkExpansionDeadline(boolean running) throws Exception {
+    checkExpansionDeadline(running, optionalRequest(true));
+  }
+
+  private void checkExpansionDeadline(boolean running, KnowledgeSearchRequest request) throws Exception {
+    optionalConfig(false);
+    try (var completion = new OwnedCompletion(running)) {
+      OnlineAiService ai = aiReturning(completion.root);
+      var searches = new AtomicInteger();
+      KnowledgeClient client = responsiveClient(searches, 80);
+      var engine = engineOver(client, ai, mock(SearchPerSourceExecutor.class));
+      long d = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1100);
+      var response = HeadSearchDeadline.within(d,
+          () -> engine.search(request, TestEngineContexts.internal()));
+
+      assertEquals(List.of("/base.txt"), ids(response));
+      org.mockito.Mockito.verify(ai).chatCompletion(any(), anyInt(), any(), any());
+      assertEquals(1, searches.get(), "a stalled expansion cannot enter re-search");
+      assertTrue(System.nanoTime() < d - TimeUnit.MILLISECONDS.toNanos(400),
+          "completion wait ends at D minus 500ms, allowing 100ms for response mapping/scheduling");
+      assertEquals("TIMEOUT", expansionReason(response));
+      completion.assertAbandoned(running, true);
+    }
+  }
+
+  @ParameterizedTest(name = "presetQuBudgetAndOwnershipMatchControl({0})")
+  @ValueSource(strings = {"climate policy", "why does search return zero", "how to configure search", "what is search used for"})
+  void presetQuBudgetAndOwnershipMatchControl(String query) throws Exception {
+    assertEquals(QueryType.INFORMATIONAL, QueryClassifier.classify(query));
+    for (boolean running : new boolean[] {false, true}) {
+      checkQuDeadline(running, presetOptionalRequest(query, false));
+    }
+  }
+
+  @ParameterizedTest(name = "presetExpansionBudgetAndOwnershipMatchControl({0})")
+  @ValueSource(strings = {"climate policy", "why does search return zero", "how to configure search", "what is search used for"})
+  void presetExpansionBudgetAndOwnershipMatchControl(String query) throws Exception {
+    assertEquals(QueryType.INFORMATIONAL, QueryClassifier.classify(query));
+    for (boolean running : new boolean[] {false, true}) {
+      checkExpansionDeadline(running, presetOptionalRequest(query, true));
+    }
+  }
+
+  @Test
+  void spentCallerBudgetDoesNotSubmitExpansion() {
+    optionalConfig(false);
+    OnlineAiService ai = aiReturning(CompletableFuture.completedFuture("climates"));
+    var engine = engineOver(responsiveClient(new AtomicInteger(), 0), ai,
+        mock(SearchPerSourceExecutor.class));
+    var response = HeadSearchDeadline.within(System.nanoTime() - 1,
+        () -> engine.search(optionalRequest(true), TestEngineContexts.internal()));
+    assertEquals(0, completionCalls(ai), "no optional completion may be submitted");
+    assertEquals("TIMEOUT", expansionReason(response));
+  }
+
+  @Test
+  void quWithNoPositiveAssistBudgetDoesNotSubmit() {
+    optionalConfig(true);
+    OnlineAiService ai = aiReturning(CompletableFuture.completedFuture("{\"query\":\"climate policy\"}"));
+    var engine = engineOver(responsiveClient(new AtomicInteger(), 0), ai,
+        mock(SearchPerSourceExecutor.class));
+    HeadSearchDeadline.within(System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1900),
+        () -> engine.search(optionalRequest(false), TestEngineContexts.internal()));
+    assertEquals(0, completionCalls(ai), "no optional completion may be submitted");
+  }
+
+  @Test
+  void quRootTimeoutUsesOriginalCallerMinusBaseReserveAndResponseMargin() {
+    optionalConfig(true);
+    var timeoutBy = new java.util.concurrent.atomic.AtomicLong();
+    var root = new CompletableFuture<String>() {
+      @Override public CompletableFuture<String> orTimeout(long timeout, TimeUnit unit) {
+        timeoutBy.set(System.nanoTime() + unit.toNanos(timeout));
+        complete("{\"query\":\"climate policy\"}");
+        return super.orTimeout(timeout, unit);
+      }
+    };
+    OnlineAiService ai = aiReturning(root);
+    var engine = engineOver(responsiveClient(new AtomicInteger(), 0), ai,
+        mock(SearchPerSourceExecutor.class));
+    long d = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(4000);
+    HeadSearchDeadline.within(d,
+        () -> engine.search(optionalRequest(false), TestEngineContexts.internal()));
+    org.mockito.Mockito.verify(ai).chatCompletion(any(), anyInt(), any(), any());
+    long expected = d - TimeUnit.MILLISECONDS.toNanos(1500 + 500);
+    assertTrue(Math.abs(timeoutBy.get() - expected) < TimeUnit.MILLISECONDS.toNanos(25),
+        "the ORIGINAL completion receives D minus the provisional base reserve and response margin");
+  }
+
+  @Test
+  void quRecomputesRemainingBudgetAfterSynchronousSubmission() throws Exception {
+    optionalConfig(true);
+    try (var completion = new OwnedCompletion(false)) {
+      OnlineAiService ai = mock(OnlineAiService.class);
+      when(ai.isAvailable()).thenReturn(true);
+      long d = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2400);
+      when(ai.chatCompletion(any(), anyInt(), any(), any())).thenAnswer(ignored -> {
+        // Spend the entire optional budget inside setup, leaving the reserved base window.
+        TimeUnit.NANOSECONDS.sleep(Math.max(0,
+            d - TimeUnit.MILLISECONDS.toNanos(1950) - System.nanoTime()));
+        return completion.root;
+      });
+      var searches = new AtomicInteger();
+      var engine = engineOver(responsiveClient(searches, 80), ai, mock(SearchPerSourceExecutor.class));
+      var response = HeadSearchDeadline.within(d,
+          () -> engine.search(optionalRequest(false), TestEngineContexts.internal()));
+      org.mockito.Mockito.verify(ai).chatCompletion(any(), anyInt(), any(), any());
+      assertEquals(List.of("/base.txt"), ids(response));
+      assertTrue(System.nanoTime() < d, "submission time must not start a fresh QU budget");
+      completion.assertAbandoned(false, false);
+    }
+  }
+
+  @Test
+  void expansionRecomputesWaitAfterSynchronousSubmissionSpendsItsCutoff() throws Exception {
+    optionalConfig(false);
+    try (var completion = new OwnedCompletion(false)) {
+      OnlineAiService ai = mock(OnlineAiService.class);
+      when(ai.isAvailable()).thenReturn(true);
+      long d = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1100);
+      when(ai.chatCompletion(any(), anyInt(), any(), any())).thenAnswer(ignored -> {
+        TimeUnit.NANOSECONDS.sleep(Math.max(0,
+            d - TimeUnit.MILLISECONDS.toNanos(450) - System.nanoTime()));
+        return completion.root;
+      });
+      var searches = new AtomicInteger();
+      var engine = engineOver(responsiveClient(searches, 50), ai, mock(SearchPerSourceExecutor.class));
+      var response = HeadSearchDeadline.within(d,
+          () -> engine.search(optionalRequest(true), TestEngineContexts.internal()));
+      org.mockito.Mockito.verify(ai).chatCompletion(any(), anyInt(), any(), any());
+      assertEquals(List.of("/base.txt"), ids(response));
+      assertEquals(1, searches.get());
+      assertTrue(System.nanoTime() < d, "synchronous submission cannot extend the completion cutoff");
+      completion.assertAbandoned(false, true);
+    }
+  }
+
+  @Test
+  void expansionCannotLaunchAfterItsAssistCutoffEvenBeforeCallerDeadline() {
+    optionalConfig(false);
+    OnlineAiService ai = aiReturning(CompletableFuture.completedFuture("climates"));
+    var engine = engineOver(responsiveClient(new AtomicInteger(), 0), ai,
+        mock(SearchPerSourceExecutor.class));
+    var response = HeadSearchDeadline.within(System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(400),
+        () -> engine.search(optionalRequest(true), TestEngineContexts.internal()));
+    assertEquals(0, completionCalls(ai), "no optional completion may be submitted");
+    assertEquals("TIMEOUT", expansionReason(response));
+  }
+
+  @Test
+  void baseRetrievalFailureAbandonsPendingExpansionBeforeItCanDispatch() throws Exception {
+    optionalConfig(false);
+    try (var completion = new OwnedCompletion(false)) {
+      OnlineAiService ai = aiReturning(completion.root);
+      KnowledgeClient client = mock(KnowledgeClient.class);
+      var failure = new IllegalStateException("base Worker failed");
+      when(client.search(any(SearchRequest.class), any())).thenThrow(failure);
+      var engine = engineOver(client, ai, mock(SearchPerSourceExecutor.class));
+      assertSame(failure, assertThrows(IllegalStateException.class,
+          () -> engine.search(optionalRequest(true), TestEngineContexts.internal())));
+      org.mockito.Mockito.verify(ai).chatCompletion(any(), anyInt(), any(), any());
+      completion.assertAbandoned(false, true);
+    }
+  }
+
+  @Test
+  void interruptedExpansionCollectorAbandonsRootAndPreservesInterruption() throws Exception {
+    optionalConfig(false);
+    try (var completion = new OwnedCompletion(false)) {
+      OnlineAiService ai = aiReturning(completion.root);
+      KnowledgeClient client = responsiveClient(new AtomicInteger(), 0);
+      // Interrupt after the optional submission, immediately before its collector runs.
+      when(client.search(any(SearchRequest.class), any())).thenAnswer(ignored -> {
+        Thread.currentThread().interrupt();
+        return hits("/base.txt");
+      });
+      var engine = engineOver(client, ai, mock(SearchPerSourceExecutor.class));
+      try {
+        var failure = assertThrows(java.util.concurrent.CompletionException.class,
+            () -> engine.search(optionalRequest(true), TestEngineContexts.internal()));
+        assertInstanceOf(InterruptedException.class, failure.getCause());
+        assertTrue(Thread.currentThread().isInterrupted());
+        completion.assertAbandoned(false, true);
+      } finally { Thread.interrupted(); }
+    }
+  }
+
+  @Test
+  void interruptedQuCollectorAbandonsOriginalQueuedRoot() throws Exception {
+    optionalConfig(true);
+    try (var completion = new OwnedCompletion(false)) {
+      OnlineAiService ai = mock(OnlineAiService.class);
+      when(ai.isAvailable()).thenReturn(true);
+      when(ai.chatCompletion(any(), anyInt(), any(), any())).thenAnswer(ignored -> {
+        Thread.currentThread().interrupt();
+        return completion.root;
+      });
+      var searches = new AtomicInteger();
+      var engine = engineOver(responsiveClient(searches, 0), ai, mock(SearchPerSourceExecutor.class));
+      try {
+        var failure = assertThrows(java.util.concurrent.CompletionException.class,
+            () -> engine.search(optionalRequest(false), TestEngineContexts.internal()));
+        assertInstanceOf(InterruptedException.class, failure.getCause());
+        assertTrue(Thread.currentThread().isInterrupted());
+        assertEquals(0, searches.get(), "interrupted QU cannot dispatch more work");
+        completion.assertAbandoned(false, false);
+      } finally { Thread.interrupted(); }
+    }
+  }
+
+  @ParameterizedTest(name = "optionalCallerTerminationAndExecutorRefusalNeverBecomeOrdinaryFallback({0})")
+  @ValueSource(strings = {"qu-cancel", "qu-interrupt", "qu-refusal",
+      "expansion-cancel", "expansion-interrupt", "expansion-refusal"})
+  void optionalCallerTerminationAndExecutorRefusalNeverBecomeOrdinaryFallback(String termination) {
+    checkOptionalTermination(termination, optionalRequest(!termination.startsWith("qu-")));
+  }
+
+  @ParameterizedTest(name = "presetTerminationMatchesControl({0})")
+  @ValueSource(strings = {"qu-cancel", "qu-interrupt", "qu-refusal", "expansion-cancel", "expansion-interrupt", "expansion-refusal"})
+  void presetTerminationMatchesControl(String termination) {
+    for (String query : List.of("climate policy", "why does search return zero")) {
+      checkOptionalTermination(termination, presetOptionalRequest(query, !termination.startsWith("qu-")));
+    }
+  }
+
+  private void checkOptionalTermination(String termination, KnowledgeSearchRequest request) {
+    boolean qu = termination.startsWith("qu-");
+    optionalConfig(qu);
+    Throwable cause = switch (termination.substring(termination.indexOf('-') + 1)) {
+      case "cancel" -> new java.util.concurrent.CancellationException("caller left");
+      case "interrupt" -> new InterruptedException("caller interrupted");
+      case "refusal" -> new io.justsearch.core.execution.EngineExecutorRejectedException(
+          io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+          "optional-test", 1);
+      default -> throw new AssertionError(termination);
+    };
+    OnlineAiService ai = aiReturning(CompletableFuture.failedFuture(cause));
+    var searches = new AtomicInteger();
+    var engine = engineOver(responsiveClient(searches, 0), ai, mock(SearchPerSourceExecutor.class));
+    try {
+      RuntimeException failure = assertThrows(RuntimeException.class,
+          () -> engine.search(request, TestEngineContexts.internal()));
+      if (cause instanceof InterruptedException) {
+        assertInstanceOf(java.util.concurrent.CompletionException.class, failure);
+        assertSame(cause, failure.getCause());
+        assertTrue(Thread.currentThread().isInterrupted());
+      } else if (termination.equals("expansion-cancel")) {
+        assertInstanceOf(java.util.concurrent.CancellationException.class, failure);
+        Throwable representedCause = failure;
+        while (representedCause != cause && representedCause.getCause() != null) {
+          representedCause = representedCause.getCause();
+        }
+        assertSame(cause, representedCause, "the original cancellation remains in the cause chain");
+      } else {
+        assertSame(cause, failure, "the caller/refusal signal retains its identity");
+      }
+      assertEquals(1, completionCalls(ai));
+      assertEquals(qu ? 0 : 1, searches.get(), "termination cannot dispatch additional searches");
+    } finally { Thread.interrupted(); }
+  }
+
+  @Test
+  void perSourceTextRetrievalDoesNotLaunchUnconsumedExpansion() throws Exception {
+    checkPerSource(null, "compare financial times sky news", "PER_SOURCE_RETRIEVAL");
+  }
+
+  @Test
+  void perSourceInformationalQuestionSkipsUnconsumedExpansion() throws Exception {
+    assertEquals(QueryType.INFORMATIONAL,
+        QueryClassifier.classify("why compare financial times sky news"));
+    checkPerSource(null, "why compare financial times sky news", "PER_SOURCE_RETRIEVAL");
+  }
+
+  @Test
+  void perSourceCursorKeepsPaginationReasonPrecedence() throws Exception {
+    checkPerSource("controlled-cursor", "compare financial times sky news", "PAGINATED");
+  }
+
+  @Test
+  void perSourceFilenameKeepsNavigationalReasonPrecedence() throws Exception {
+    checkPerSource(null, "compare financial times sky news report.pdf", "QUERY_TYPE_NAVIGATIONAL");
+  }
+
+  @Test
+  void perSourceQuotedExactKeepsQueryTypeReasonPrecedence() throws Exception {
+    checkPerSource(null, "\"compare financial times sky news report.pdf\"", "QUERY_TYPE_EXACT_MATCH");
+  }
+
+  private void checkPerSource(String cursor, String query, String reason) throws Exception {
+    optionalConfig(false);
+    try (var completion = new OwnedCompletion(false)) {
+      OnlineAiService ai = aiReturning(completion.root);
+      KnowledgeClient client = mock(KnowledgeClient.class);
+      SearchPerSourceExecutor perSource = mock(SearchPerSourceExecutor.class);
+      when(perSource.execute(any(), any(), any(), anyInt(), any())).thenReturn(hits("/balanced.txt"));
+      var engine = engineOver(client, ai, perSource);
+      var request = new KnowledgeSearchRequest(query, 10, "text", null, cursor, List.of(),
+          null, null, null, null, false, true, null);
+      var response = engine.search(request, TestEngineContexts.internal());
+      assertEquals(List.of("/balanced.txt"), ids(response));
+      org.mockito.Mockito.verify(perSource).execute(org.mockito.ArgumentMatchers.same(client), any(),
+          org.mockito.ArgumentMatchers.argThat(sources -> sources.size() == 2), anyInt(), any());
+      assertEquals(0, completionCalls(ai), "the per-source branch cannot consume expansion");
+      assertEquals(reason, expansionReason(response));
+    }
+  }
+
+  @Test
+  void fastCompletionMayUseExistingReSearchBudgetBeyondCompletionCutoffWithBaseFallback() {
+    optionalConfig(false);
+    OnlineAiService ai = aiReturning(CompletableFuture.completedFuture("climates"));
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    long d = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1100);
+    var searches = new AtomicInteger();
+    when(client.search(any(SearchRequest.class), any())).thenAnswer(invocation -> {
+      searches.incrementAndGet();
+      if (!isExpanded(invocation.getArgument(0))) return hits("/base.txt");
+      assertEquals(d, HeadSearchDeadline.current().orElseThrow(), "re-search retains its original D bound");
+      TimeUnit.NANOSECONDS.sleep(Math.max(0,
+          d - TimeUnit.MILLISECONDS.toNanos(200) - System.nanoTime()));
+      return hits("/expanded.txt").toBuilder().setSearchTrace(SearchTrace.newBuilder()
+          .setDegradation(TraceDegradation.newBuilder().setHybridFallbackReason(SBE))).build();
+    });
+    var response = HeadSearchDeadline.within(d,
+        () -> engineOver(client, ai, mock(SearchPerSourceExecutor.class))
+            .search(optionalRequest(true), TestEngineContexts.internal()));
+    assertEquals(2, searches.get());
+    assertTrue(System.nanoTime() > d - TimeUnit.MILLISECONDS.toNanos(500),
+        "successful completion may enter re-search extending into the response margin");
+    assertTrue(System.nanoTime() < d);
+    assertEquals(List.of("/base.txt"), ids(response));
+    assertEquals("TIMEOUT", expansionReason(response));
+  }
+
+  private void optionalConfig(boolean qu) {
+    // 1500ms base reserve is provisional; these timings do not calibrate real profiles.
+    ConfigStore.setGlobal(new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
+        "justsearch.models.dir", modelsDir.toString(),
+        "justsearch.search.query_classification.enabled", "true",
+        "justsearch.qu.enabled", Boolean.toString(qu)))));
+  }
+
+  private static KnowledgeSearchRequest presetOptionalRequest(String query, boolean expansion) {
+    // Both paths exercise classifier policy, not explicit-pipeline bypass. HYBRID disables
+    // expansion for the QU schedule; TEXT permits it with QU off for the expansion schedule.
+    return new KnowledgeSearchRequest(query, 10, expansion ? "text" : "hybrid", null, null,
+        List.of(), null, null, null, null, false, true, null);
+  }
+
+  private static KnowledgeSearchRequest optionalRequest(boolean expansion) {
+    return new KnowledgeSearchRequest("climate policy", 10, "text", null, null, List.of(),
+        null, null, null, null, false, true,
+        new PipelineConfig(true, false, false, "none", false, false, 0, expansion, false));
+  }
+
+  private static KnowledgeClient responsiveClient(AtomicInteger searches, long delayMs) {
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    when(client.search(any(SearchRequest.class), any())).thenAnswer(ignored -> {
+      searches.incrementAndGet();
+      TimeUnit.MILLISECONDS.sleep(delayMs);
+      return hits("/base.txt");
+    });
+    return client;
+  }
+
+  private static long completionCalls(OnlineAiService ai) {
+    return org.mockito.Mockito.mockingDetails(ai).getInvocations().stream()
+        .filter(invocation -> invocation.getMethod().getName().equals("chatCompletion")).count();
+  }
+
+  private static OnlineAiService aiReturning(CompletableFuture<String> root) {
+    OnlineAiService ai = mock(OnlineAiService.class);
+    when(ai.isAvailable()).thenReturn(true);
+    when(ai.chatCompletion(any(), anyInt(), any(), any())).thenReturn(root);
+    return ai;
+  }
+
+  /** Uses the production producer owner; completion and actual-exit counters remain distinct. */
+  private static final class OwnedCompletion implements AutoCloseable {
+    private final AtomicInteger started = new AtomicInteger();
+    private final AtomicInteger released = new AtomicInteger();
+    private final AtomicInteger abandoned = new AtomicInteger();
+    private final AtomicInteger interrupted = new AtomicInteger();
+    private final AtomicReference<Runnable> queued = new AtomicReference<>();
+    private final CountDownLatch release = new CountDownLatch(1);
+    private final CountDownLatch entered = new CountDownLatch(1);
+    private final CountDownLatch exited = new CountDownLatch(1);
+    private final CountDownLatch sawInterrupt = new CountDownLatch(1);
+    private final CompletableFuture<String> root;
+    private final Thread producer;
+
+    private OwnedCompletion(boolean running) throws Exception {
+      root = EngineFutures.supplyAsync(() -> {
+        started.incrementAndGet();
+        entered.countDown();
+        while (release.getCount() != 0) {
+          try { release.await(); }
+          catch (InterruptedException cancelled) { interrupted.incrementAndGet(); sawInterrupt.countDown(); }
+        }
+        return "{\"query\":\"climate policy\"}";
+      }, queued::set, () -> { released.incrementAndGet(); exited.countDown(); }, abandoned::incrementAndGet);
+      producer = running ? new Thread(queued.get(), "optional-budget-producer") : null;
+      if (producer != null) {
+        producer.start();
+        assertTrue(entered.await(3, TimeUnit.SECONDS));
+      }
+    }
+
+    private void assertAbandoned(boolean running, boolean interrupt) throws Exception {
+      assertTrue(root.isCompletedExceptionally(), "original optional completion is terminal");
+      assertEquals(1, abandoned.get(), "one abandonment of the original retained work");
+      if (running) {
+        assertEquals(1, started.get());
+        assertEquals(0, released.get(), "the producer still holds its retained reference");
+        if (interrupt) assertTrue(sawInterrupt.await(3, TimeUnit.SECONDS), "expansion retains cancel(true)");
+        else assertEquals(0, interrupted.get(), "QU abandons without interrupting the running producer");
+      } else {
+        queued.get().run();
+        assertEquals(0, started.get(), "queued abandoned work must not later dispatch");
+        assertEquals(1, released.get());
+      }
+    }
+
+    @Override public void close() throws Exception {
+      release.countDown();
+      root.cancel(false);
+      if (producer != null) producer.join(3000);
+      else queued.get().run();
+      assertTrue(exited.await(3, TimeUnit.SECONDS));
+      assertEquals(1, released.get(), "the one retained reference releases exactly once at actual exit");
+    }
+  }
+
   static boolean isExpanded(SearchRequest request) {
     return request.getQuerySyntax() == SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE;
   }
@@ -121,6 +772,18 @@ final class KnowledgeSearchEngineExpansionBudgetTest {
         .thenReturn(CompletableFuture.completedFuture("quokkas"));
     return new KnowledgeSearchEngine(bootstrap, mock(SearchPerSourceExecutor.class), ai, null,
         ConfigStore.global());
+  }
+
+  @SuppressWarnings("unchecked")
+  private static KnowledgeSearchEngine engineOver(
+      KnowledgeClient client, OnlineAiService ai, SearchPerSourceExecutor perSource) {
+    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
+    var lease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    when(bootstrap.publicationLock()).thenReturn(ConfigStore.global().publicationLock());
+    when(bootstrap.acquireClientLease()).thenReturn(lease);
+    when(lease.withClient(any())).thenAnswer(invocation ->
+        ((Function<KnowledgeClient, ?>) invocation.getArgument(0)).apply(client));
+    return new KnowledgeSearchEngine(bootstrap, perSource, ai, null, ConfigStore.global());
   }
 
   /** Sparse plus dense, expansion on, no rerankers: a SIMPLE query that expands. */
