@@ -3,7 +3,7 @@ title: Search Quality Register
 type: reference
 status: stable
 created: 2026-03-19
-updated: 2026-10-26
+updated: 2026-10-27
 description: "Shared decision register for search quality. Read before starting search work. Update before finishing."
 ---
 
@@ -436,6 +436,59 @@ What's worth measuring next. Remove rows when filled.
 |---------|---------|----|----|-------------|-----|
 | mixed/cord19-qddf | bge-m3 | minilm-512 | bm25-dom | full (with working dense) | Re-run after dense fix; upgrade C→A |
 | mixed/desktop-mixed-v1 | bge-m3 | minilm-512 | balanced | full (with SciFact qrel fix) | 7% SciFact qrel coverage inflates en_sci degradation. Rebuild with qrel-aware SciFact sampling. |
+
+### Query classification: budgets, diagnostics and open gates
+
+**Current scope (2026-10-27):** routing, diagnostics and optional-assistance budgets
+are independently verified within the fixtures below. Broader multi-token
+classification failed the measured no-regression gate and was not shipped.
+The historical `query-understanding` wire stage reports
+deterministic classification, not LLM QU dispatch. Enabled classification retains
+the raw enum and bypass reason (explicit pipeline before LUCENE); disabled has
+status `disabled`, reason `DISABLED`, and no raw detail. All three bypasses use
+effective `INFORMATIONAL`, while actual QU has a separate SIMPLE-only guard.
+Raw query text, the global stage label and reasonless legacy artifacts are preserved.
+The diagnostic renderer supports raw classification and bypass reasons, but no live search surface mounts it. Sources:
+[`KnowledgeSearchEngine`](../../modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeSearchEngine.java),
+[`SearchTraceMapper`](../../modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchTraceMapper.java),
+[dispatch checks](../../modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java)
+and [UI consumer checks](../../modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts).
+
+| Area | Current evidence and limit |
+|------|----------------------------|
+| Optional assistance | Original QU completion uses `min(start + 8000 ms, original D - 1500 ms base reserve - 500 ms response margin)`, recomputed after synchronous setup; nonpositive budgets skip or abandon. Projection cancellation forwards to the root. Expansion completion uses `min(search start + 1500 ms, D - 500 ms)` and original `cancel(true)`; two or more known sources skip unused expansion with diagnostic `PER_SOURCE_RETRIEVAL`. Successful expanded re-search independently uses `min(now + 1500 ms, D)`, may cross the completion cutoff and retains base fallback. Running producers own resources until actual exit; cancellation/timeout is no native-exit bound, and the reserve is no bound on every later stage. Expansion timeout does not turn a HYBRID base into keyword-only retrieval. |
+| Qualified base calibration | Finite warmed corpus: 90 public Markdown documents / 1,367 chunks; real standard 9B model loaded and idle, CUDA embedding/CE ready, eval mode, prompt cache 0, QU/filter normalization off. 144 requests plus four warmups: 138 full requested routes and six exact q09 HYBRID requests deliberately sparse-only via `SKIPPED_NO_DISCRIMINATIVE_TERM`; no `hybridFallback` or other failure. All 144 returned HTTP 200 and complete; maximum 97.113539 ms + 250 ms headroom = 347.113539 ms ≤ fixed 1500 ms reserve. |
+| Calibration verdict | The original all-144 issue-free/full-route contract **failed**; validator exit 2 is retained. An explicit six-cell amendment was independently accepted; full-hybrid q09 remains **unverified**. No reserve increase or conditional confirmation is needed. This establishes no stable percentile, universal/cold/concurrent/large-corpus/full-preset guarantee or native-exit bound; it does not measure classifier quality. |
+| Verification boundary | Independent real model-free controller/Engine/index/producer fixtures and targeted deterministic/UI consumer checks establish scoped routing and budgets. Source-derived enums and controlled CE outputs do not measure actual 9B ranking quality. Model, application and lifetime observations each retain their own scope. One Windows-only mandatory-file-lock lifecycle case was skipped on Linux and remains **unverified**, not passed. |
+
+Durable budget and ownership anchors:
+[`QueryUnderstandingService`](../../modules/app-services/src/main/java/io/justsearch/app/services/worker/QueryUnderstandingService.java),
+[`EngineFutures`](../../modules/core/src/main/java/io/justsearch/core/execution/EngineFutures.java),
+[QU checks](../../modules/app-services/src/test/java/io/justsearch/app/services/worker/QueryUnderstandingServiceTest.java),
+[expansion/budget checks](../../modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java)
+and the [public producer checkpoint](../../gates/test-intent/.changesets/qc-optional-budgets.md).
+The finite calibration above is separate from those deterministic checks; none is
+a classifier benefit measurement.
+
+**Measured classification comparison:** finite 90-document Markdown corpus, real
+models, QU and filter normalization off; known-target ranks, not qrels. A wider
+classifier made multi-token queries INFORMATIONAL, improving two informational
+families plus quoted and multi-file lookups and raising mean known-target RR@10
+in every mode. One informational target fell from rank 1 to 3 when the
+cross-encoder then ran: the agreed no-regression gate failed, so it was not shipped.
+
+This branch keeps classifier source and SIMPLE routing unchanged; 46 SIMPLE cases
+were compared before and after on the real interface. A repeated comparison found
+no per-target regression. Aggregate mean differences came only from LLM expansion
+landing within its 1500 ms window or missing it, which varied in every arm;
+**aggregate ranking remains undecided**.
+
+**Future comparisons:** pin expansion off. Bare filename targets ranked 2–4 when
+the navigational route skipped the cross-encoder and 1 when it ran. Classification
+disabled had the highest mean RR here; classification's measured gain was lookup
+latency (~40 ms versus ~400 ms). Expansion varied between runs and sometimes lowered a
+target from rank 1 to 9; some skips lacked a trace reason. LambdaMART was not loaded
+in any arm. These findings do not establish general ranking or latency guarantees.
 
 ---
 

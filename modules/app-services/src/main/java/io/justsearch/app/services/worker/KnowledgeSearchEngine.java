@@ -88,7 +88,7 @@ final class KnowledgeSearchEngine {
   /** Hard budget (ms) for LLM expansion before falling back to base search results. */
   private static final long EXPANSION_BUDGET_MS = 1500L;
 
-  /** Provisional base-retrieval reserve after QU; real-profile calibration is still required. */
+  /** Fixed base-retrieval reserve after QU; expansion re-search keeps its independent caller-bound deadline. */
   private static final long QU_BASE_RESERVE_MS = 1500L;
 
   /**
