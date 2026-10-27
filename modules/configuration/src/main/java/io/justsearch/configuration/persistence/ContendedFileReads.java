@@ -28,7 +28,7 @@ public final class ContendedFileReads {
 
   /**
    * Lock contention, open denial on every platform and subsequent replacement gaps share one budget.
-   * Retrying open denial matches the writer and handles Windows delete-pending replacements.
+   * Retrying open denial matches the writer: Windows can deny an open during atomic replacement.
    */
   static byte[] readAllBytes(Path path, Duration budget) throws IOException {
     Objects.requireNonNull(path, "path");
@@ -49,9 +49,9 @@ public final class ContendedFileReads {
       try {
         opened = FileChannel.open(path, StandardOpenOption.READ);
       } catch (AccessDeniedException denied) {
-        // Retry on every platform, matching AtomicFileWrites: Windows atomic replacement can leave
-        // the old file delete-pending and deny fresh opens. Only opening retries; denial from
-        // locking, reading or closing must still propagate.
+        // Retry on every platform, matching AtomicFileWrites: Windows can deny a fresh open while
+        // an atomic replacement is in progress. Only opening retries; denial from locking,
+        // reading or closing must still propagate.
         opened = null;
         lastFailure = denied;
       } catch (NoSuchFileException missing) {

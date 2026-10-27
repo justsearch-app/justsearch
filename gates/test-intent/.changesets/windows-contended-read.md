@@ -7,16 +7,19 @@ author-session: 01a17c67-4997-7ad2-b841-8e7b5b5c67d3
 
 # Retry durable-file open denial on every platform within the existing read budget
 
-Open denial retries on every platform, matching AtomicFileWrites and handling Windows
-delete-pending replacements. Existing test methods and their selection remain unchanged.
+Open denial retries on every platform, matching AtomicFileWrites and handling Windows open
+denial during atomic replacement. Remaining test methods and their selection remain unchanged.
 The new checks listed below execute on Linux; the permission fixture assumes the process
 does not bypass file permissions. The orchestrator supplies script-generated evidence and
 the independent acceptance record.
 
-The Windows-only tests windowsDeletePendingOpenRetriesUntilReplacementIsPublished and
-windowsDeletePendingOpenDenialExhaustsBudget remain unchanged. Their real delete-pending
-behaviour is proven on Windows CI by the tests-first commit failing and the repair passing;
-they are not listed in newChecks.
+The real Windows failure was an AccessDeniedException opening the file during
+AtomicFileWrites' atomic replacement, seen once in
+concurrentAtomicReplacementsExposeOnlyWholeVersionsAndPropagateWriterFailure on Windows CI.
+It has no deterministic real-file reproduction, because on current Windows a delete with
+an open handle removes the name at once. The deterministic tests simulate the denial
+through a test filesystem provider, and the existing concurrent-replacement test keeps
+running on Windows CI as the real-system check.
 
 ```json
 {
@@ -58,7 +61,7 @@ they are not listed in newChecks.
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18",
           "delegationScope": "Repair durable-file open denial on every platform, matching AtomicFileWrites, while preserving callers, atomic writes, saved formats and all other retry boundaries.",
-          "choice": "Probe permission enforcement on an owned temporary file, then assert original last denial identity, its path, repeated opens and elapsed budget. This pins the all-platform rule that matches AtomicFileWrites and handles Windows delete-pending replacements.",
+          "choice": "Probe permission enforcement on an owned temporary file, then assert original last denial identity, its path, repeated opens and elapsed budget. This pins the all-platform rule that matches AtomicFileWrites and handles Windows open denial during atomic replacement.",
           "label": "agent choice"
         }
       ],
