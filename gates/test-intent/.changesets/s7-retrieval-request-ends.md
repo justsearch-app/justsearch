@@ -56,3 +56,13 @@ deadline test keeps its oracle and uses the knowledge port's typed failure vocab
 ## Acceptance records
 
 Independent acceptance is left to the orchestrator/verifier; the builder does not accept its own work.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "lfaaoqeh",
+  "verdict": "accept",
+  "digest": "sha256:3f43936da9f0cf936bf5859905df23713ad5c21fa1abb50beb12a6b6a220b3f8"
+}
+```
