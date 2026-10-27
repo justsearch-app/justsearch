@@ -48,7 +48,8 @@ final class VerifierCappedBacklogStatusTest {
         boolean capped=rows.stream().anyMatch(r->r.state().equals("PENDING") && "DEFER_WITHOUT_ATTEMPT".equals(r.policy()) && r.retry()-now>6500);
         if(capped && inRetryPause && rows.stream().allMatch(r->r.state().equals("PENDING"))) {
           var status=service.indexStatus(StatusRequest.getDefaultInstance(),CallContext.none());
-          if(h.inRetryPause() && status.getMigration().getProcessingJobsCount()==0) {
+          // Pause samples can span different batches; reject rows changed between them.
+          if(h.inRetryPause() && rows.equals(h.rows()) && status.getMigration().getProcessingJobsCount()==0) {
             observed=status;
             expiredDeferred=rows.stream().filter(r->"DEFER_WITHOUT_ATTEMPT".equals(r.policy()) && r.retry()<now).count();
             deferred=rows.stream().filter(r->"DEFER_WITHOUT_ATTEMPT".equals(r.policy())).count();
