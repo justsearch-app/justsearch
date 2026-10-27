@@ -7,6 +7,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -25,7 +26,10 @@ public final class ContendedFileReads {
     return readAllBytes(path, READ_LOCK_BUDGET);
   }
 
-  /** Only lock contention and a replacement gap following it retry. Other I/O failures propagate. */
+  /**
+   * Lock contention, open denial on every platform and subsequent replacement gaps share one budget.
+   * Retrying open denial matches the writer and handles Windows delete-pending replacements.
+   */
   static byte[] readAllBytes(Path path, Duration budget) throws IOException {
     Objects.requireNonNull(path, "path");
     Objects.requireNonNull(budget, "budget");
@@ -33,34 +37,45 @@ public final class ContendedFileReads {
     if (budgetNanos <= 0) throw new IllegalArgumentException("Read lock budget must be positive");
     long started = System.nanoTime();
     boolean contended = false;
-    NoSuchFileException missingAfterContention = null;
+    IOException lastFailure = null;
     for (;;) {
       requireNotInterrupted(path);
       if (contended && System.nanoTime() - started >= budgetNanos) {
-        if (missingAfterContention != null) throw missingAfterContention;
+        if (lastFailure != null) throw lastFailure;
         throw new FileReadContendedException(path);
       }
       // Reopen after contention: an atomic writer may have replaced the named file while waiting.
-      try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
-        missingAfterContention = null;
-        try (FileLock held = trySharedLock(channel)) {
+      FileChannel opened;
+      try {
+        opened = FileChannel.open(path, StandardOpenOption.READ);
+      } catch (AccessDeniedException denied) {
+        // Retry on every platform, matching AtomicFileWrites: Windows atomic replacement can leave
+        // the old file delete-pending and deny fresh opens. Only opening retries; denial from
+        // locking, reading or closing must still propagate.
+        opened = null;
+        lastFailure = denied;
+      } catch (NoSuchFileException missing) {
+        // The generation owner rotates state.json -> state.json.prev before publishing state.json.
+        // A path absent before any contention remains an immediate error.
+        if (!contended) throw missing;
+        opened = null;
+        lastFailure = missing;
+      }
+      if (opened != null) {
+        lastFailure = null;
+        try (FileChannel channel = opened;
+            FileLock held = trySharedLock(channel)) {
           if (held != null) {
             // The lock protects this exact channel, not a second Files.readAllBytes open.
             // Release it before parsing or calling any other durable owner.
             return Channels.newInputStream(channel).readAllBytes();
           }
         }
-      } catch (NoSuchFileException missing) {
-        // The generation owner rotates state.json -> state.json.prev before moving the new
-        // state.json into place. A reader already waiting on the old file can land in that gap.
-        // A path absent before any contention remains an immediate error.
-        if (!contended) throw missing;
-        missingAfterContention = missing;
       }
       contended = true;
       long remaining = budgetNanos - (System.nanoTime() - started);
       if (remaining <= 0) {
-        if (missingAfterContention != null) throw missingAfterContention;
+        if (lastFailure != null) throw lastFailure;
         throw new FileReadContendedException(path);
       }
       try {
