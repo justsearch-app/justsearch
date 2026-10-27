@@ -317,3 +317,14 @@ CD3/TD10a remain: recovered or ambiguous saved drafts are retained, and only pro
   "note": "CS53 count scope only: real Linux provider alias and encrypted read-unlock HTTP/dialog witnesses fail before and pass after; 49 focused checks pass, with nine intended assertion failures before. Empty and any nonexact source counts intentionally lose numeric utility under the agreed limit. Earlier rejection retained; no inherited cutover or full product acceptance."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17e32-e443-7ba3-b727-bda463aef4e9",
+  "verdict": "accept",
+  "digest": "sha256:6cdbe0f7412743d22da042073d39875e56d59cb658203f53925d9d743c91b503",
+  "note": "Recorded by the orchestrator from the acceptor decision of Codex recheck-1 (separate session 01a17e32, candidate 310c62a150): accept, digest sha256:6cdbe0f7412743d22da042073d39875e56d59cb658203f53925d9d743c91b503."
+}
+```
