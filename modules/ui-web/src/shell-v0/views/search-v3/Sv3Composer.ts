@@ -1803,7 +1803,7 @@ export class Sv3Composer extends JfElement {
   private chooseTier(tier: Sv3ComposerTier): void {
     this.tierMenuOpen = false;
     this.focusTrigger('sv3-composer-tier');
-    if (tier === this.tier) return;
+    // Choosing even the displayed mode is explicit intent (for example after task context retired).
     this.dispatchEvent(
       new CustomEvent<Sv3TierChange>(SV3_TIER_CHANGE, {
         detail: { tier },

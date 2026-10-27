@@ -1040,6 +1040,19 @@ export class SearchV3View extends JfElement {
   private draftProposal: Sv3Preparation | null = null;
   private reviewConfigured = false;
   private preparationRevision = 0;
+  /** HO9 retires one-shot context, but its unchanged text is not an all-files choice. */
+  private retiredHandoffText: string | null = null;
+
+  private get retiredHandoffNotice(): string {
+    return this.retiredHandoffText === null ? ''
+      : 'The incoming task’s files and mode were not kept after leaving. Sending is blocked: choose files or a mode, or change the question before sending.';
+  }
+
+  private clearRetiredHandoff(): void {
+    if (this.retiredHandoffText === null) return;
+    this.retiredHandoffText = null;
+    this.requestUpdate();
+  }
 
   private markDraftReview(proposal: Sv3Preparation | null = null): void {
     this.draftReview = true;
@@ -1068,6 +1081,8 @@ export class SearchV3View extends JfElement {
   }
 
   private currentPreparation(): Sv3Preparation | null {
+    // Existing recovery already represents unknown input without granting all-files authority.
+    if (this.retiredHandoffText !== null) return { kind: 'ask', scope: { kind: 'reselect', paths: [] } };
     return this.draftReview ? this.reviewConfigured ? this.draftProposal : null : this.livePreparation();
   }
 
@@ -1164,6 +1179,7 @@ export class SearchV3View extends JfElement {
       || this.preparationRevision !== revision || this.humanPlace() !== place
       || this.preparationSummary(preparation) !== summary) return;
     this.revokeHumanTask();
+    this.clearRetiredHandoff();
     this.applyPreparation(preparation);
     this.draftReview = false;
     this.draftProposal = null;
@@ -1183,13 +1199,14 @@ export class SearchV3View extends JfElement {
   }
 
   private configureDraft(): void {
+    this.clearRetiredHandoff();
     this.preparationRevision += 1;
     if (this.draftReview) { this.reviewConfigured = true; this.draftProposal = this.livePreparation(); }
     this.requestUpdate();
   }
 
   private draftMayIssue(retain = true): boolean {
-    if (this.departureBlocked || this.draftReview || this.handoffBlocked) { this.requestUpdate(); return false; }
+    if (this.departureBlocked || this.draftReview || this.handoffBlocked || this.retiredHandoffText !== null) { this.requestUpdate(); return false; }
     return !retain || this.saveRecovery();
   }
 
@@ -1439,6 +1456,7 @@ export class SearchV3View extends JfElement {
   private reviewRecoveryDraft(draft: Sv3RecoveryDraft): void {
     const next = { ...draft, place: this.humanPlace(), preparation: draft.preparation ?? null };
     if (!this.persistDraft(next, true, undefined, draft)) return;
+    this.clearRetiredHandoff();
     if (this.retireRefusedHandoff()) refreshProjection();
     this.revokeHumanTask();
     this.markDraftReview(next.preparation);
@@ -1631,7 +1649,7 @@ export class SearchV3View extends JfElement {
   private readonly placeDrafts = new Map<string, { text: string; preparation: Sv3Preparation | null; review: boolean }>();
 
   private rememberPlace(place: string, text: string): void {
-    this.placeDrafts.set(place, { text, preparation: this.currentPreparation(), review: this.draftReview });
+    this.placeDrafts.set(place, { text, preparation: this.currentPreparation(), review: this.draftReview || this.retiredHandoffText !== null });
   }
   /**
    * WP1.1 — the mode is Ask only because a conversation was opened from Search, not because the
@@ -1931,9 +1949,15 @@ export class SearchV3View extends JfElement {
     queueMicrotask(() => {
       this.movedRatherThanEntered = false;
       if (!this.isConnected && this.preparedHandoff !== null) {
+        if (this.currentDraft() !== '' && (this.search.pendingScope !== null || this.handoffBlocked
+          || this.preparedHandoff.shapeId !== null && this.preparedHandoff.shapeId !== SV3_ASK_SHAPE_ID)) {
+          this.retiredHandoffText = this.currentDraft();
+          this.draftReview = false; this.draftProposal = null; this.reviewConfigured = false;
+        }
         this.preparedHandoff = null;
         this.handoffNotice = ''; this.handoffBlocked = false;
         this.search.clearScope();
+        this.requestUpdate();
       }
     });
   }
@@ -3690,6 +3714,10 @@ export class SearchV3View extends JfElement {
   private onComposerDraft(event: Event): void {
     const detail = (event as CustomEvent<Sv3ComposerDraft>).detail;
     if (detail === undefined) return;
+    if (this.retiredHandoffText !== null && detail.text !== this.retiredHandoffText) {
+      this.clearRetiredHandoff();
+      this.saveRecovery();
+    }
     if (this.draftReview) { this.saveRecovery(); return; }
     if (this.humanTask !== null && this.tier !== 'search') this.saveRecovery();
     if (this.tier !== 'search' || !this.draftMayIssue()) return;
@@ -3721,6 +3749,7 @@ export class SearchV3View extends JfElement {
 
   /** Put text in the composer — or, before its first render, where the composer will take it from. */
   private writeDraft(text: string): void {
+    if (this.retiredHandoffText !== null && text !== this.retiredHandoffText) this.clearRetiredHandoff();
     const composer = this.composer;
     if (composer !== null) {
       composer.draft = text;
@@ -3815,6 +3844,7 @@ export class SearchV3View extends JfElement {
     this.retireRefusedHandoff();
     const leavingHandoff = this.preparedHandoff !== null;
     if (from !== null) this.rememberPlace(from, this.currentDraft());
+    if (!carry) this.clearRetiredHandoff();
     if (from === RESULTS_PLACE) this.resultsTier = this.tier;
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
@@ -3926,7 +3956,7 @@ export class SearchV3View extends JfElement {
     }
     this.revokeHumanTask();
     if (!this.acknowledgePreparation({ kind: 'ask', scope: { kind: 'files', paths: [...scope.paths] } })) return;
-    if (this.preparedHandoff !== null) this.preparedHandoff = { shapeId: SV3_ASK_SHAPE_ID, selection: null };
+    if (this.preparedHandoff !== null || this.retiredHandoffText !== null) this.preparedHandoff = { shapeId: SV3_ASK_SHAPE_ID, selection: null };
     this.handoffNotice = ''; this.handoffBlocked = false;
     this.search.prepare(scope);
     this.tier = 'ask';
@@ -4043,7 +4073,7 @@ export class SearchV3View extends JfElement {
       this.revokeHumanTask(true);
       // A journal/traversal entry describes old navigation, not the current raw draft.
       // Never reapply its original query, clear newer B, or resurrect consumed work.
-      if (this.currentDraft().trim()) {
+      if (this.currentDraft().trim() && this.retiredHandoffText === null) {
         const proposal = this.currentPreparation();
         this.markDraftReview(proposal);
         this.reviewConfigured = proposal !== null;
@@ -4119,6 +4149,7 @@ export class SearchV3View extends JfElement {
       return true;
     }
     takeSearchV3Handoff();
+    this.clearRetiredHandoff();
     this.retireRefusedHandoff();
     this.revokeHumanTask(true);
     const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
@@ -5343,6 +5374,7 @@ export class SearchV3View extends JfElement {
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
     this.abortAsk();
+    this.clearRetiredHandoff();
     // DETACHED, not halted (Slice 516 FIX-T1's rule, applied to the run half). A delegated run is
     // hosted by the product-wide controller and may be watched elsewhere, so this window stops
     // RENDERING it and never stops it. Dropping the local handle is also what keeps the composer's
@@ -5611,9 +5643,9 @@ export class SearchV3View extends JfElement {
           slot-reason=${slot.reason}
           halt-reason=${slot.haltReason}
           ?steerable=${this.steerableRun !== null}
-          unavailable-reason=${this.handoffBlocked ? this.handoffNotice : this.askUnavailableReason}
-          delegate-unavailable-reason=${this.delegateUnavailableReason}
-          structured-unavailable-reason=${this.structuredUnavailableReason}
+          unavailable-reason=${this.retiredHandoffNotice || (this.handoffBlocked ? this.handoffNotice : this.askUnavailableReason)}
+          delegate-unavailable-reason=${this.retiredHandoffNotice || this.delegateUnavailableReason}
+          structured-unavailable-reason=${this.retiredHandoffNotice || this.structuredUnavailableReason}
           .degradation=${this.degradation}
           ?detailed=${isAdvancedMode()}
           .corpus=${projectSv3Corpus(this.aiSnapshot)}
@@ -5621,7 +5653,7 @@ export class SearchV3View extends JfElement {
           tier=${this.tier}
           .schemaDraft=${this.schemaDraft}
           .structuredError=${this.structuredError}
-          task-notice=${this.handoffNotice || (this.preparedHandoff?.shapeId === 'core.summarize' ? 'Summarize prepared. Edit the instruction and send.' : '')}
+          task-notice=${this.retiredHandoffNotice || this.handoffNotice || (this.preparedHandoff?.shapeId === 'core.summarize' ? 'Summarize prepared. Edit the instruction and send.' : '')}
           scope-label=${scope !== null ? sv3ScopeLabel(scope) : ''}
           model-label=${this.currentModelLabel ?? ''}
           data-testid="sv3-composer"

@@ -376,6 +376,56 @@ worktree registration, shared node_modules or source object writes are needed.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 preservation another proposal still reports the genuine capacity limit after retirement",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.refusalRetirement.test.ts#S84 preservation rejected unknown navigation keeps refusal available for explicit discard"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Agent-adopted D-T24: navigation still retires one-shot hand-off data. When text remains after losing files or a forced mode, explain this in the composer and block sending until a file/mode choice or a changed question. Explicit new choices and unrelated text use ordinary composer behavior. A same-task layout reparent keeps the hand-off. HO9 itself is owner-agreed; this guard is an agent choice under delegation. Carrying the same guarded text into an unvisited conversation preserves the guard; only a person's file/mode choice or replacement text releases it.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md",
+          "delegationScope": "Design and implement the Search v3 cutover; preserve the owner-agreed HO9 retirement contract in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.3b.md:33.",
+          "choice": "Agent-adopted D-T24: navigation still retires one-shot hand-off data. When text remains after losing files or a forced mode, explain this in the composer and block sending until a file/mode choice or a changed question. Explicit new choices and unrelated text use ordinary composer behavior. A same-task layout reparent keeps the hand-off. HO9 itself is owner-agreed; this guard is an agent choice under delegation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-scope-retirement-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 return shows why unchanged incoming text needs a new file or mode choice",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 unchanged incoming text cannot send all files after return through Enter",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 unchanged incoming text cannot send all files after return through button",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 unchanged incoming text cannot send all files after return through submit event",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 choosing files after return sends exactly that new scope as Ask",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 carrying unchanged returned text into a conversation keeps the guard"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve ordinary Ask after replacing returned text or explicitly choosing a mode; preserve the exact prepared summary selection on synchronous layout reparent. Existing tests, including every HO9 check, remain byte-identical.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "Task t-20261019-bd718f agreement, quoted in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.5.md",
+          "delegationScope": "Design and implement the Search v3 cutover; preserve the owner-agreed HO9 retirement contract in /home/elias/dev/justsearch/tmp/verify/agreed/wp1.3b.md:33.",
+          "choice": "Agent-adopted D-T24: navigation still retires one-shot hand-off data. When text remains after losing files or a forced mode, explain this in the composer and block sending until a file/mode choice or a changed question. Explicit new choices and unrelated text use ordinary composer behavior. A same-task layout reparent keeps the hand-off. HO9 itself is owner-agreed; this guard is an agent choice under delegation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-scope-retirement-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 replacing returned text sends an ordinary all-files Ask",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 choosing a mode after return permits ordinary sending",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.scopeRetirement.test.ts#HO9 a layout reparent keeps the exact prepared hand-off"
+      ]
     }
   ]
 }
@@ -841,3 +891,107 @@ Final completion checks and limits for the refusal-notice retirement:
   owner data/display, GPU, model download, commit, push or publication is claimed.
   Browser evidence is under 200 KB; full logs/screenshots stay in the private temp
   report folder named in that evidence. Independent verification remains outstanding.
+
+
+D-T24 scope retirement guard, 2026-10-27 (agent-adopted, delegated-choice):
+
+HO9 is owner-agreed, not replaced: `/home/elias/dev/justsearch/tmp/verify/agreed/wp1.3b.md:33`
+(S15.9 / HO9) says one-shot data “never reaches a later, unrelated send ... including
+... navigates away”. D-T24 is the orchestrator's agent-adopted design under delegation.
+
+`markPossibleMove` still retires forced shape, selection and chosen-file context after
+an actual departure. The retained view now remembers which unchanged text lost context,
+shows a composer notice, and rejects both composer and view submission paths. Explicit
+file/mode choices or editing the question clear that guard. Choosing a new file also
+establishes its new one-send Ask scope. Synchronous layout reparent still skips retirement.
+Ordinary Ask preparations with no lost scope/shape are unaffected. Existing `reselect`
+preparation carries unknown input if the guarded draft is saved; no store, option,
+validator, format version or limit changed. The saved prior proposal remains available
+for explicit recovery review, preserving S67 and the existing two-proposal contract.
+
+New component checks: six repair assertions fail on 887587e2c3 and pass after; three
+preservation checks pass on both. The unchanged official producer records them in
+`uiux-scope-retirement-{repair,preservation}.json`, using shared clones, private Git
+objects/index and plain npm ci per checkout. All previously accepted test files stay
+byte-identical. No builder acceptance, commit, push, publication or issue action.
+
+Final full unit run: 649 files / 8,267 tests pass, no skips. Typecheck and lint exit 0;
+UI gates 28/28 pass. An earlier full run exposed overbroad guard/persistence changes
+(ordinary context reload and four S67 checks); those were repaired without touching
+old checks, and the final suite passes. Full logs retain those initial failures.
+Browser and final governance results are recorded in the compact evidence linked below.
+
+
+An explicit click on the already displayed mode now also reaches the existing tier
+handler (`Sv3Composer.chooseTier`); otherwise choosing Ask could not clear the new
+guard. The new preservation check clicks the real mode menu rather than synthesizing
+its event. Final official evidence was regenerated for this exact test file: six
+assertion failures before, all nine new checks passing after. The paired baseline with
+unchanged hand-off/cold-arrival/context checks: 150 pass / 6 intended failures (156).
+The final full suite after this change again passes all 8,267 tests in 649 files.
+
+Final browser evidence: [uiux-scope-retirement-browser.json](../evidence/uiux-scope-retirement-browser.json).
+On the final frozen candidate, all 13 scope/send browser assertions pass: nine Library
+→ Back, Library → Search rail and Forward-after-Back combinations across one/two/refused-
+third arrivals; three CPU-ready Enter issuance probes; and one explicit choice of the
+currently displayed Ask mode. Unchanged returned text sends no request. Choosing Ask
+explicitly permits a plain Ask with no retired selection.
+
+The final private Engine then exits 1 unexpectedly. The runtime supervisor raises
+“Own service exited”; engine.log reports a crash-head JSON file. The supplied harness
+removes its private profile in finally, so that crash report itself was removed and the
+remaining evidence establishes the exit and reported path, not its cause. Per the builder
+brief's instruction to return on a non-implementation failure, no Engine restart or JVM
+repair was attempted. The final conversation → Back and new guard-carry browser checks
+are unverified; the orchestrator must investigate or authorize a separate Engine lane
+before those can complete. All seven owned service groups are cleaned. The final group
+has 13 passing assertion cases and an unsuccessful service lifecycle; it is not an
+overall browser validation pass.
+
+Earlier intermediate conversation → Back runs pass on baseline and candidate, each
+using a genuine completed model turn as its saved-record seed. The original chosen-file
+proposal remains available for explicit review and nothing beyond the seed is sent.
+Those intermediate runs are not promoted to final-candidate verification. Baseline
+issuance probes send docIds: [] on all three routes while native inference is available.
+The nine adapted baseline return cases fail at the missing notice. The original verifier
+scope-return script additionally reproduces all three reported baseline scope losses.
+
+The verifier scripts were adapted to D-T24's visible retirement/send-block expectation;
+the obsolete expectation of live scope retention is not asserted after the repair.
+The issuance probe uses direct private native HTTP rather than the verifier's controlled
+residency gate or its unrelated pooled-source switch. Harness sources, hashes, exact
+native CPU model argv, readiness, request scopes, outcomes and cleanup are in the compact
+evidence (under 200 KB). Full dumps/screenshots/logs stay in the task's private temporary
+folder. Native Chromium sandbox startup failed; only own loopback services were tested
+with the permitted --no-sandbox fallback. All seven owned service groups and their browser
+profiles have cleanup records. One successor supervisor was launched while the prior
+shutdown poll still reported running; this sequencing lapse is recorded in the evidence.
+Later restarts waited for full supervisor completion. Only recorded owned processes
+were stopped. No GPU, downloads, dev stack, owner apps/data or desktop was used.
+
+The native build request was canceled while queued, before acquiring a Gradle slot.
+No native build is claimed: the unchanged preinstalled Engine served private before/after
+frontends with identical install hashes, as in the preceding repair. There are no JVM
+changes. Plain npm ci ran in the source root, source UI and shared-clone baseline UI;
+producer-created shared clones also installed their own dependencies. .agents/preflight
+is absent. Final typecheck, lint, 8,267 unit tests and 28 UI gates pass.
+
+Final test-intent against origin/main be1f315b5072 exits 1 with this package's missing
+independent acceptance and eight unrelated main-moved JVM items under
+modules/ui/src/test/java/io/justsearch/ui/api/: StatusFixtureWork.java,
+StatusIsolationHttpTest.java, StatusNonBlockingHttpTest.java, VerifierStatus2Test.java,
+VerifierStatus3Test.java, VerifierStatus4Test.java, VerifierStatus5Test.java and
+VerifierStatusIsolationTest.java. All eight also occur on the baseline against the
+identical main commit; none was edited. No evidence-invalid or source/digest problem
+is reported. Independent verification/acceptance belongs to the orchestrator.
+
+
+The final guard also follows unchanged text when navigation carries it into an unvisited
+conversation. Applying a preparation during that carry is not a person's mode choice.
+Only explicit review/choice clears the guard; another place's remembered guarded copy
+requires review. A new ninth component check fails on the baseline at the missing notice
+and passes on the final code. Official repair evidence now contains six fail-before
+assertions and six final passes; the three preservation checks still pass on both.
+Final browser assertions above refer to final-scope. The planned final-conversation
+group was not launched after the unexpected Engine exit; earlier after/after-online/
+after-conversation runs are retained as intermediate evidence.
