@@ -22,9 +22,12 @@ The independent verifier appends acceptance after reviewing this candidate.
       "behaviour": "An authenticated Engine returning two startup 503 responses and then a valid reconciliation attestation commits the durable intent; startup retries do not accept an invalid attempt attestation; persistent 503 responses give up after 60 seconds and persist repair-required. Tests use a contained child HTTP server with the production socket ownership/session proof, response validation, outcome transition, durable write and status projection.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Fix the reconciliation race for both platforms: the target-side confirmation waits for, or retries until, the Engine can answer (bounded, with a clear give-up that keeps today's repair-required outcome when the Engine never becomes ready). Never treat a 503 as success; a real reconciliation refusal (not \"not ready yet\") must still end in repair-required.",
-          "location": "task updater-v2-round2 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package, the in-app updater for both platforms and its release assets",
+          "choice": "Fix the reconciliation race for both platforms: the target-side confirmation waits for, or retries until, the Engine can answer (bounded, with a clear give-up that keeps today's repair-required outcome when the Engine never becomes ready). Never treat a 503 as success; a real reconciliation refusal (not \"not ready yet\") must still end in repair-required.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/updater-readiness-repair.json",
@@ -42,9 +45,12 @@ The independent verifier appends acceptance after reviewing this candidate.
       "behaviour": "A genuine HTTP 409 reconciliation refusal immediately persists repair-required, without retrying or committing.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Fix the reconciliation race for both platforms: the target-side confirmation waits for, or retries until, the Engine can answer (bounded, with a clear give-up that keeps today's repair-required outcome when the Engine never becomes ready). Never treat a 503 as success; a real reconciliation refusal (not \"not ready yet\") must still end in repair-required.",
-          "location": "task updater-v2-round2 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package, the in-app updater for both platforms and its release assets",
+          "choice": "Fix the reconciliation race for both platforms: the target-side confirmation waits for, or retries until, the Engine can answer (bounded, with a clear give-up that keeps today's repair-required outcome when the Engine never becomes ready). Never treat a 503 as success; a real reconciliation refusal (not \"not ready yet\") must still end in repair-required.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/updater-readiness-refusal.json",
@@ -61,9 +67,12 @@ The independent verifier appends acceptance after reviewing this candidate.
       "behaviour": "During a pending install, poll host status without overlapping polls so the existing recovery component shows Updating JustSearch while install_launching persists. Stop polling and refresh final status on success and cancellation; preserve the cancellation error.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "If the UI already has an installing/updating state, show it while the Linux install step runs (including the lock wait); do not design new UI.",
-          "location": "task updater-v2-round2 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package, the in-app updater for both platforms and its release assets",
+          "choice": "If the UI already has an installing/updating state, show it while the Linux install step runs (including the lock wait); do not design new UI.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/updater-readiness-repair.json",

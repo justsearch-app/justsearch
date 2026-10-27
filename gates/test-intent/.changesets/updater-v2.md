@@ -38,9 +38,12 @@ are used. Relaunch and post-start reconciliation on installed Windows/Linux rema
       "whatMoved": "Existing handoff oracles retain their stop paths, fault injections, receipts, hashes, durable witnesses, hold and resume assertions. Artifact fixtures now use debian-binary ar bytes on Linux and the same MZ bytes on Windows, with lengths and digests following those fixture inputs. The launch seam carries a typed error with the same injected messages; all original errors mean resumable. The Command import is test-only after moving the shared child reconciler. Test-only descriptor helpers use v2 and the running target and add the artifact key ID; the wire parser is exercised separately. pub(super) on test_descriptor only lets the new sibling download-format check reuse its fixture. No existing assertion is removed or weakened.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Keep everything the Windows path already does around the install step: authorization, Engine hold and admission drain, shutdown receipts, descendant termination, durable INSTALL_LAUNCHING, reconciliation through `/api/upgrade/reconcile` after start (version equality alone never commits an update).",
-          "location": "task updater-v2 user turn 2"
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package, the in-app updater for both platforms and its release assets",
+          "choice": "Keep everything the Windows path already does around the install step: authorization, Engine hold and admission drain, shutdown receipts, descendant termination, durable INSTALL_LAUNCHING, reconciliation through `/api/upgrade/reconcile` after start (version equality alone never commits an update).",
+          "label": "agent choice"
         }
       ]
     },
@@ -53,9 +56,12 @@ are used. Relaunch and post-start reconciliation on installed Windows/Linux rema
       "whySurvives": "No job, condition, runner, assertion, command or filter is removed. The previously broken binary handoff suite now uses the same child reconciliation implementation as the library rather than the probe error stub.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Since you change the handoff, make these tests meaningful again (run them where they belong, or fix the probe) without weakening what they check, and say which.",
-          "location": "task updater-v2 user turn 2"
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package, the in-app updater for both platforms and its release assets",
+          "choice": "Since you change the handoff, make these tests meaningful again (run them where they belong, or fix the probe) without weakening what they check, and say which.",
+          "label": "agent choice"
         }
       ]
     },
@@ -70,19 +76,28 @@ are used. Relaunch and post-start reconciliation on installed Windows/Linux rema
       "behaviour": "The producer-generated, metadata-signed two-target v2 bytes select Windows or Linux explicitly and retain every installed durable owner. Missing targets/owners, tampered metadata, wrong root/key ID and a lower sequence fail. The real Tauri downloader verifies the delegated key for Debian bytes and rejects a Windows-artifact signature attached to them. Linux format checks require an ar debian-binary version member, while Windows still requires MZ. Fake pkexec records separate exact argv including absolute .deb path; exit 0 creates a launch witness; 126/127 resume and re-offer; 100, other failure, a signal and spawn errors resume only with unchanged installed version/files. File-only changes or inability to inspect state retain the Engine hold and require manual repair.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Tests: both parsers (client Rust, producer and any JS consumer) against bytes the producer actually generated, including a two-target descriptor, a tampered byte, a wrong metadata key, a mismatched artifact signature, a lower sequence, a missing target for this platform, and a compatibility table missing a predecessor store.",
-          "location": "task updater-v2 user turn 2"
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package, the in-app updater for both platforms and its release assets",
+          "choice": "Tests: both parsers (client Rust, producer and any JS consumer) against bytes the producer actually generated, including a two-target descriptor, a tampered byte, a wrong metadata key, a mismatched artifact signature, a lower sequence, a missing target for this platform, and a compatibility table missing a predecessor store.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Linux install classification tests for 0, 100, 126, 127, a signal, a spawn error, unchanged versus changed installed state; use a fake pkexec/apt seam, not the real one.",
-          "location": "task updater-v2 user turn 2"
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package, the in-app updater for both platforms and its release assets",
+          "choice": "Linux install classification tests for 0, 100, 126, 127, a signal, a spawn error, unchanged versus changed installed state; use a fake pkexec/apt seam, not the real one.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "S8 \"Linux in-app update via descriptor v2 and pkexec apt-get: success relaunches the new version; cancelled prompt, lock timeout or failure resumes the old Engine and re-offers the update\".",
-          "location": "task updater-v2 user turn 2"
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package, the in-app updater for both platforms and its release assets",
+          "choice": "S8 \"Linux in-app update via descriptor v2 and pkexec apt-get: success relaunches the new version; cancelled prompt, lock timeout or failure resumes the old Engine and re-offers the update\".",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/updater-v2.json",
