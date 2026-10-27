@@ -2,17 +2,12 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
-    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
-    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-27T15:47:26.200Z",
-  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
-  "tree": "a1b5d3f27a2908ef37409d6dfbf9edf549d41bd4",
+  "createdAt": "2026-10-27T21:02:48.773Z",
+  "revision": "2f70bb229c724828ce7aa5960cdb495e0a005b55",
+  "tree": "c0064f8e885fc06a8d50423f14c2ead4991ed6c0",
   "environment": {
-    "cudaVisibleDevices": "-1",
-    "displayUnset": true,
-    "waylandDisplayUnset": true,
     "platform": "linux",
     "arch": "x64",
     "osRelease": "7.0.0-38-generic",
@@ -23,68 +18,52 @@
   },
   "runs": [
     {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.schema.WireRecordSchemaGenTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.schema.WireRecordSchemaGenTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 435079,
-      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-1.log",
-      "outputDigest": "sha256:546e8a234ab8eb01ccd419ef605f10b8fe965b1362373166088bd1aaa9f8a340"
+      "durationMs": 2765
     },
     {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.operations.CoreOperationCatalogTest\" --tests \"io.justsearch.app.services.settings.ForgetSettingsProjectionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.operations.CoreOperationCatalogTest\" --tests \"io.justsearch.app.services.settings.ForgetSettingsProjectionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 812616,
-      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-2.log",
-      "outputDigest": "sha256:99fc362784a8fcb2fb8ac48857c9bbeb0be1cdf922d99b8654d35be2aba024ad"
+      "durationMs": 3818
     },
     {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.IndexingControllerForgetHttpContractTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.IndexingControllerForgetHttpContractTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1184918,
-      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-3.log",
-      "outputDigest": "sha256:a69e3477ec6d86c54f70ad289270488f640b9b9c2b4d0620afbab418a7ef6ae0"
+      "durationMs": 7007
     },
     {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherMigrationReplayTest\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.exactReadPreservesNullableRowsAndRejectsDifferentExpectedPathAndChangedJournal\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.pairingOldPWithIncomingQRefusesTheEntireBatchWithoutChangingEitherFile\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.duplicateAndDotAliasPathsRefuseTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.oneStaleExpectationOrIssuedClaimPreventsEveryWriteInAMultiFileBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.aDoneRowWithAnActuallyIssuedHiddenClaimRefusesTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.successfulBatchReturnsActualNewRowsAndReceiptsIncludingNullOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.laterExactDeletePreventsReadmissionEvenWithTheCompleteCurrentSnapshot\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.readOnlyPredicateDoesNotWaitForTheQueueOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.confirmedCommitWithRestoreFailureThrowsAndReloadFindsReplacements\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.encodedWatcherPredecessorHasOnlyItsRealRootReceiptAuthority\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.rootOmissionCannotBorrowAMissingUpsertButCanProveItsConditionalDeleteLineage\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.immutableReadOnlyServingGenerationPreservesOrdinaryReadmission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.reservedCollectionOwnerStillBlocksReadmissionAndOmission\" --rerun -PskipWebBuild=true --console=plain",
-      "cwd": ".",
-      "exitCode": 1,
-      "durationMs": 302769,
-      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-4.log",
-      "outputDigest": "sha256:35aee43c6397f6aa3825839c5f471e951aacc6914e9f51e1937e6bc9024fb131"
-    },
-    {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherMigrationReplayTest\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.exactReadPreservesNullableRowsAndRejectsDifferentExpectedPathAndChangedJournal\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.pairingOldPWithIncomingQRefusesTheEntireBatchWithoutChangingEitherFile\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.duplicateAndDotAliasPathsRefuseTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.oneStaleExpectationOrIssuedClaimPreventsEveryWriteInAMultiFileBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.aDoneRowWithAnActuallyIssuedHiddenClaimRefusesTheWholeBatch\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.successfulBatchReturnsActualNewRowsAndReceiptsIncludingNullOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.laterExactDeletePreventsReadmissionEvenWithTheCompleteCurrentSnapshot\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.readOnlyPredicateDoesNotWaitForTheQueueOwner\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.confirmedCommitWithRestoreFailureThrowsAndReloadFindsReplacements\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.postcommitFailureIsUnconfirmedAndAuthoritativeReloadKeepsTheReplacement\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.encodedWatcherPredecessorHasOnlyItsRealRootReceiptAuthority\" --tests \"io.justsearch.indexerworker.queue.NativePolicyAdmissionTest.rootOmissionCannotBorrowAMissingUpsertButCanProveItsConditionalDeleteLineage\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryParentChunksAndLinuxBackslashSiblingRemainEligible\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.immutableReadOnlyServingGenerationPreservesOrdinaryReadmission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.reservedCollectionOwnerStillBlocksReadmissionAndOmission\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 113136,
-      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-5.log",
-      "outputDigest": "sha256:51c08df47722b60126e5a580624711f88ecffc525e4da2cdb4fd00386cbae0dc"
+      "durationMs": 29062
     },
     {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals\" --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.S55OutsideFileCompletesWithoutPermanentRuleAndUnrestrictedNewWriterCanPublishAgain\" --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor\" --tests \"io.justsearch.app.engine.EngineForgetMovePublicationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 271803,
-      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-6.log",
-      "outputDigest": "sha256:a9b852d706fb7edabf87f7ac51ae7b5517accb2afa3cb4a29a2f1d84dca7eceb"
+      "durationMs": 5336
     },
     {
-      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.excludes.LiteralExclusionPolicyTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals\" --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.S55OutsideFileCompletesWithoutPermanentRuleAndUnrestrictedNewWriterCanPublishAgain\" --tests \"io.justsearch.app.engine.EngineForgetInProcessTest.R2NonexcludedNativeMigrationControlPublishesCurrentBytesAndReopensSuccessor\" --tests \"io.justsearch.app.engine.EngineForgetMovePublicationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 337190,
-      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-7.log",
-      "outputDigest": "sha256:2941623e602687c718f37dd840490ba7c1f0f22dabce6d10872118a1e3147849"
+      "durationMs": 33091
     },
     {
-      "command": "npx vitest run --configLoader runner \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-6-1793116044641.json\"",
+      "command": "./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.excludes.LiteralExclusionPolicyTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2267
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1360577-1793134966678.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1554,
-      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-current-7b667117/run-8.log",
-      "outputDigest": "sha256:759cd2de4d488771bef3879209f1116a9520e688c0e171a15b096149495b2dfd"
+      "durationMs": 2093
     }
   ],
   "checks": [
@@ -391,31 +370,31 @@
       "contentDigest": "sha256:2ef43c413759c1b5c7d63b2f6363a03db1d1cab4d9c11188844e1f8d72486aaa",
       "executed": true,
       "skipped": false,
-      "outcome": "failed",
+      "outcome": "passed",
       "cases": [
         {
           "name": "missingEarlierUpsertWaitsForCommittedPerPathReconciliation()",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "replacementDebtSurvivesAcknowledgementOfTheOlderExactVersion()",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[1] unavailable",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[2] removed-readded",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[3] reassigned",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "laterDefaultAdmissionKeepsItsExactRevisionAcrossReconciliation()",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[1] offline",
@@ -459,47 +438,47 @@
         },
         {
           "name": "[1] before-target-commit",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[2] after-target-commit",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[3] after-pointer",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[1] prefix-before",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[2] collection-before",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[3] prefix-after",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[4] collection-after",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[1] recreated",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[2] modified",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[3] same-stamp",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[1] true",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[2] false",
@@ -507,27 +486,27 @@
         },
         {
           "name": "[1] unchanged",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[2] same-stamp",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "reconciliationReceiptIsAppliedInsteadOfRejectedAsUnsupported()",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "aRetryReprobesAReappearedSourceBeforeDestructiveReplay()",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "returnedWatcherStartsBeforeItsFreshFilesystemSnapshot()",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[1] valid",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "[2] identity",
@@ -543,7 +522,7 @@
         },
         {
           "name": "committedPointerCannotBlindlyAcknowledgeRetainedRootDebt()",
-          "status": "failed"
+          "status": "passed"
         },
         {
           "name": "exactRevisionRefusalIsVisibleAndKeepsTheReadableProjection()",
@@ -1273,5 +1252,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:20d45e3d719879bd9ed3f309abeca7dd3df59dd6a95f8661d94937465f2a0820"
+  "digest": "sha256:a3b37b49d69682819ae0119434b7a8062945534995daa9b1bf55391fbd0b116a"
 }
