@@ -1,0 +1,227 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T14:51:53.310Z",
+  "revision": "be44f3686f87033952456513e33bcdcd421791c4",
+  "tree": "77b86b7af2ca8d5a0c79aa02de6cfe974981bd86",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/chat/conversationDelete.disclosure.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-vitest-182-1793112694421.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7084
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 empty unlocked envelope cannot confirm a total and still permits consent",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c0fa2ab90b0a42e2cb0bea4d8c44c855463f8a8e33859721e09e0448af64734d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CS53 empty unlocked envelope cannot confirm a total and still permits consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 empty-string source cannot confirm a total and still permits consent",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c0fa2ab90b0a42e2cb0bea4d8c44c855463f8a8e33859721e09e0448af64734d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CS53 empty-string source cannot confirm a total and still permits consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 formerly case-variant provenance cannot confirm a total and still permits consent",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c0fa2ab90b0a42e2cb0bea4d8c44c855463f8a8e33859721e09e0448af64734d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CS53 formerly case-variant provenance cannot confirm a total and still permits consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 formerly tree with unrelated source cannot confirm a total and still permits consent",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c0fa2ab90b0a42e2cb0bea4d8c44c855463f8a8e33859721e09e0448af64734d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CS53 formerly tree with unrelated source cannot confirm a total and still permits consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 formerly zero with unrelated source cannot confirm a total and still permits consent",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c0fa2ab90b0a42e2cb0bea4d8c44c855463f8a8e33859721e09e0448af64734d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CS53 formerly zero with unrelated source cannot confirm a total and still permits consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 invalid nonexact source cannot confirm a total and still permits consent",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c0fa2ab90b0a42e2cb0bea4d8c44c855463f8a8e33859721e09e0448af64734d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CS53 invalid nonexact source cannot confirm a total and still permits consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 noncase provider alias cannot confirm a total and still permits consent",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c0fa2ab90b0a42e2cb0bea4d8c44c855463f8a8e33859721e09e0448af64734d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CS53 noncase provider alias cannot confirm a total and still permits consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 nonexact descendant spelling cannot confirm a total and still permits consent",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c0fa2ab90b0a42e2cb0bea4d8c44c855463f8a8e33859721e09e0448af64734d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CS53 nonexact descendant spelling cannot confirm a total and still permits consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 short-name spelling cannot confirm a total and still permits consent",
+      "file": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c0fa2ab90b0a42e2cb0bea4d8c44c855463f8a8e33859721e09e0448af64734d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CS53 short-name spelling cannot confirm a total and still permits consent",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "be44f3686f87033952456513e33bcdcd421791c4",
+    "revision": "be44f3686f87033952456513e33bcdcd421791c4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/chat/conversationDelete.disclosure.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-vitest-182-1793112706092.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6571,
+        "output": "Evidence scaffold effective invocation: [\"/usr/bin/node\", \"/home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/node_modules/vitest/vitest.mjs\", \"run\", \"src/shell-v0/components/chat/conversationDelete.disclosure.test.ts\", \"--reporter=json\", \"--outputFile=/home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-vitest-182-1793112706092.json\", \"--configLoader\", \"runner\", \"--maxWorkers\", \"2\"]\nJSON report written to /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-vitest-182-1793112706092.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 empty unlocked envelope cannot confirm a total and still permits consent",
+        "classification": "assertion",
+        "detail": "CS53 empty unlocked envelope cannot confirm a total and still permits consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Recorded memory link count could not …'\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts:82:18\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 empty-string source cannot confirm a total and still permits consent",
+        "classification": "assertion",
+        "detail": "CS53 empty-string source cannot confirm a total and still permits consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Recorded memory link count could not …'\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts:82:18\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 formerly case-variant provenance cannot confirm a total and still permits consent",
+        "classification": "assertion",
+        "detail": "CS53 formerly case-variant provenance cannot confirm a total and still permits consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Recorded memory link count could not …'\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts:82:18\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 formerly tree with unrelated source cannot confirm a total and still permits consent",
+        "classification": "assertion",
+        "detail": "CS53 formerly tree with unrelated source cannot confirm a total and still permits consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Recorded memory link count could not …'\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts:82:18\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 formerly zero with unrelated source cannot confirm a total and still permits consent",
+        "classification": "assertion",
+        "detail": "CS53 formerly zero with unrelated source cannot confirm a total and still permits consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Recorded memory link count could not …'\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts:82:18\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 invalid nonexact source cannot confirm a total and still permits consent",
+        "classification": "assertion",
+        "detail": "CS53 invalid nonexact source cannot confirm a total and still permits consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Recorded memory link count could not …'\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts:82:18\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 noncase provider alias cannot confirm a total and still permits consent",
+        "classification": "assertion",
+        "detail": "CS53 noncase provider alias cannot confirm a total and still permits consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Recorded memory link count could not …'\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts:82:18\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 nonexact descendant spelling cannot confirm a total and still permits consent",
+        "classification": "assertion",
+        "detail": "CS53 nonexact descendant spelling cannot confirm a total and still permits consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Recorded memory link count could not …'\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts:82:18\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts#CS53 short-name spelling cannot confirm a total and still permits consent",
+        "classification": "assertion",
+        "detail": "CS53 short-name spelling cannot confirm a total and still permits consent:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Recorded memory link count could not …'\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-ucy9xo/modules/ui-web/src/shell-v0/components/chat/conversationDelete.disclosure.test.ts:82:18\n    at file:///home/e"
+      }
+    ]
+  },
+  "digest": "sha256:04780c88bb6fcc737d491cf1a68f2878065571f6650fc40b248fca386c8cab67"
+}
