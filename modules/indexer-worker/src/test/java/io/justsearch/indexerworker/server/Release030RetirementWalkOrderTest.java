@@ -18,7 +18,7 @@ import org.junit.jupiter.api.io.TempDir;
 @Timeout(180)
 @org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030RetirementWalkOrderTest {
- @org.junit.jupiter.params.ParameterizedTest(name = "{0} delete then later {1} owner")
+ @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} {0} delete then later {1} owner")
  @org.junit.jupiter.params.provider.CsvSource({"migrating,root", "migrating,exact", "switching,root", "switching,exact"})
  void acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry(String fixture, String owner, @TempDir Path temporary) throws Exception {
   Path root=Release030Fixture.unpack(fixture,temporary);
@@ -197,7 +197,7 @@ final class Release030RetirementWalkOrderTest {
    }
   }finally{ConfigStore.restoreGlobal(installed,previous);}
  }
- @org.junit.jupiter.params.ParameterizedTest(name = "{0} then {1}")
+ @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} {0} then {1}")
  @org.junit.jupiter.params.provider.CsvSource({"sync,exact", "sync,prefix", "sync,collection", "prefix,sync", "collection,sync", "prefix,explicit"})
  void overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String first, String last,
      @TempDir Path temporary) throws Exception {
@@ -337,7 +337,7 @@ final class Release030RetirementWalkOrderTest {
  static KnowledgeServer namedBoot(Path root,TestEngineExecutors ex,MigrationTransitionBarrier.Hook hook)throws Exception {
   return Release030RetirementPublicSyncTest.namedBoot(root,ex,hook);
  }
- @org.junit.jupiter.params.ParameterizedTest(name = "repeated target faults / restore earlier DB={0}")
+ @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} repeated target faults / restore earlier DB={0}")
  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
  void repeatedFaultsRetainDebtAndDeletionProofAcrossRestart(boolean restore,@TempDir Path temporary)throws Exception {
   Path root=Release030Fixture.unpack("switching",temporary);var original=state(root);

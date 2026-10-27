@@ -17,7 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 final class Release030RootMemberIdentityTest {
   @TempDir Path temporary;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings={"collection", "provenance", "ingestion_root", "planned_source_sha256"})
   void inheritedMembersRemainDistinctAndMetadataEditsStayHeld(String changed) throws Exception {
     Path alpha=Files.createDirectories(temporary.resolve("alpha"));

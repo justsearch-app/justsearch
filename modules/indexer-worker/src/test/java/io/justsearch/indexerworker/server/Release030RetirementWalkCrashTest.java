@@ -36,7 +36,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 @Timeout(600)
 @org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030RetirementWalkCrashTest {
-  @ParameterizedTest(name = "{0} completed walk with pending writer")
+  @ParameterizedTest(name = "{displayName} {0} completed walk with pending writer")
   @ValueSource(strings = {"migrating", "switching"})
   void completedWalkSurvivesAnActualKillAndRestart(String fixture, @TempDir Path temporary)
       throws Exception {

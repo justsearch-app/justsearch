@@ -25,7 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 @org.junit.jupiter.api.extension.ExtendWith(
     io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030RetirementOrderingTest {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"update", "delete", "prefix"})
   void newerAcknowledgementWinsPausedReplayAndRestart(String mutation, @TempDir Path temporary)
       throws Exception {

@@ -90,7 +90,7 @@ final class Release030ExactFileRecoveryTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"migrating", "switching"})
   void nativeInterruptedMigrationCompletesWithoutStateEdits(String fixture, @TempDir Path temporary)
       throws Exception {

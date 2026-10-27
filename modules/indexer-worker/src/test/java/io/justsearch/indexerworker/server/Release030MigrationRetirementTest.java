@@ -20,7 +20,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 @org.junit.jupiter.api.extension.ExtendWith(
     io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030MigrationRetirementTest {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"migrating", "switching"})
   void replayRetiresObsoleteBuildAndKeepsServingIdentity(String fixture, @TempDir Path temporary)
       throws Exception {
@@ -61,7 +61,7 @@ final class Release030MigrationRetirementTest {
       }
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover(boolean mixed,
       @TempDir Path temporary) throws Exception {
@@ -113,7 +113,7 @@ final class Release030MigrationRetirementTest {
           assertTrue(server.appServices().ingestService().requestCutover(
               io.justsearch.ipc.MigrationCutoverRequest.newBuilder().setForceSwitching(true).build(),
               io.justsearch.indexerworker.services.CallContext.none()).getAccepted());
-          assertTrue(queue(server).nativeCutoverCountsStrict().pendingBackoffCount() > 0,
+          assertTrue(queue(server).jobStateCountsStrict().pendingBackoffCount() > 0,
               "relevant backoff work is still pending at monitor entry, not exempt independent debt");
           var manager = (io.justsearch.indexerworker.index.IndexGenerationManager)
               Release030ExtractionRecoveryTest.field(server, "indexGenerationManager");

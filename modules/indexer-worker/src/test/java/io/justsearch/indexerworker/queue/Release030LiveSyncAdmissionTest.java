@@ -63,7 +63,7 @@ final class Release030LiveSyncAdmissionTest {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings={"", "building"})
   void liveRootRefreshRetainsOriginalRawReceiptAcrossCoalescingAndRestart(String originalGeneration) throws Exception {
     Path file=Files.writeString(root.resolve("raw.txt"),"original raw bytes");

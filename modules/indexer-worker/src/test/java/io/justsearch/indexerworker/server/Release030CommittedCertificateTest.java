@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 @Timeout(120)
 @org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030CommittedCertificateTest {
- @ParameterizedTest(name = "{0} / stored {1}")
+ @ParameterizedTest(name = "{displayName} {0} / stored {1}")
  @CsvSource({"migrating,null", "migrating,absent", "switching,null", "switching,absent"})
  void unknownStoredModelCannotCertifyRetirement(String fixture, String form, @TempDir Path temporary) throws Exception {
   Path root=Release030Fixture.unpack(fixture, temporary);
@@ -46,7 +46,7 @@ final class Release030CommittedCertificateTest {
    }
   } finally { ConfigStore.restoreGlobal(installed,previous); }
  }
- @ParameterizedTest(name = "{0} / complete {1}")
+ @ParameterizedTest(name = "{displayName} {0} / complete {1}")
  @CsvSource({"migrating,digest-only", "switching,digest-only", "migrating,inputs-only", "switching,inputs-only"})
  void completeCommittedEvidenceRetiresAcrossRestart(String fixture,String form,@TempDir Path temporary) throws Exception {
   Path root=Release030Fixture.unpack(fixture,temporary);var original=state(root);
@@ -70,7 +70,7 @@ final class Release030CommittedCertificateTest {
    }
   }finally{ConfigStore.restoreGlobal(installed,previous);}
  }
- @ParameterizedTest(name = "{0} / genuinely changed model")
+ @ParameterizedTest(name = "{displayName} {0} / genuinely changed model")
  @org.junit.jupiter.params.provider.ValueSource(strings = {"migrating", "switching"})
  void changedCommittedModelKeepsNativeMigration(String fixture,@TempDir Path temporary)throws Exception {
   Path root=Release030Fixture.unpack(fixture,temporary);var original=state(root);

@@ -73,7 +73,7 @@ final class Release030RetirementSafetyTest {
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"migrating", "switching"})
   void unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String fixture,
       @TempDir Path temporary) throws Exception {
@@ -158,7 +158,7 @@ final class Release030RetirementSafetyTest {
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"analyzer_fp", "vector_format", "unresolved-model"})
   void uncertifiedServingGenerationKeepsOriginalMigration(String failure, @TempDir Path temporary)
       throws Exception {
@@ -213,7 +213,7 @@ final class Release030RetirementSafetyTest {
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"migrating", "switching"})
   void corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String fixture, @TempDir Path temporary)
       throws Exception {

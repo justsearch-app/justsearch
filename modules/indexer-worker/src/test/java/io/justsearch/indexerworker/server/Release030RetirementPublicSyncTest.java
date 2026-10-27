@@ -17,7 +17,7 @@ import org.junit.jupiter.api.io.TempDir;
 @Timeout(180)
 @org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 class Release030RetirementPublicSyncTest {
- @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
  @org.junit.jupiter.params.provider.CsvSource({"true,false", "false,false", "true,true", "false,true"})
  void laterPublicSyncMaySupersedeAnEarlierExactAdmission(boolean watched, boolean changed, @TempDir Path temporary)throws Exception {
   Path root=Release030Fixture.unpack("switching",temporary);var original=state(root);

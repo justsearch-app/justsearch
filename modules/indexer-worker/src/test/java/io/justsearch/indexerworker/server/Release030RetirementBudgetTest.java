@@ -26,7 +26,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 @org.junit.jupiter.api.extension.ExtendWith(
     io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030RetirementBudgetTest {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"1,2,false,false", "1,2,true,false", "1,1,false,true", "1,1,true,true",
       "-1,2,false,true", "-1,2,true,true", "0,0,false,true"})
   void nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int limit, int failures,

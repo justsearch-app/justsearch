@@ -75,7 +75,7 @@ final class Release030ReplayRetentionTest {
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"migrating,false,false", "switching,false,false", "migrating,true,false", "switching,true,false", "migrating,false,true"})
   void completedLegacyEffectIsSettledThroughNativeReplay(String fixture, boolean restart, boolean retention,
       @TempDir Path temporary) throws Exception {
@@ -260,7 +260,7 @@ final class Release030ReplayRetentionTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void committedNativeFileRecoveredAsUnchangedKeepsItsAdmission(boolean retention, @TempDir Path temporary) throws Exception {
     Path root = Release030Fixture.unpackNativeMigration("migrating", temporary);

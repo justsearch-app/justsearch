@@ -17,7 +17,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 final class Release030RetirementClaimOwnershipTest {
   @TempDir Path temporary;
 
-  @ParameterizedTest(name="{0} owner / changed {1}")
+  @ParameterizedTest(name="{displayName} {0} owner / changed {1}")
   @CsvSource({"exact,planned_source_sha256", "exact,collection", "exact,originator", "exact,transport", "exact,ingestion_root",
       "root,planned_source_sha256", "root,collection", "root,originator", "root,transport", "root,ingestion_root", "unknown,unit_revision"})
   void changedMetadataStaysHeldAfterBindingWasPreparedWhileDisjointRootClaims(String owner, String column) throws Exception {
@@ -52,7 +52,7 @@ final class Release030RetirementClaimOwnershipTest {
     }
   }
 
-  @ParameterizedTest(name="obsolete {0} owner / changed {1}")
+  @ParameterizedTest(name="{displayName} obsolete {0} owner / changed {1}")
   @CsvSource({"exact,planned_source_sha256", "exact,collection", "exact,originator", "exact,transport", "exact,ingestion_root",
       "root,planned_source_sha256", "root,collection", "root,originator", "root,transport", "root,ingestion_root", "legacy,unit_revision"})
   void obsoleteMismatchedMetadataIsHeldRatherThanAdministrativelyErased(String owner,String column) throws Exception {
@@ -79,7 +79,7 @@ final class Release030RetirementClaimOwnershipTest {
     }
   }
 
-  @ParameterizedTest(name="historical {0} / later {1} owner")
+  @ParameterizedTest(name="{displayName} historical {0} / later {1} owner")
   @CsvSource({"exact,root", "exact,exact", "prefix,root", "prefix,exact", "collection,root", "collection,exact"})
   void historicalScopesPreserveLaterPendingOwnersAcrossReopen(String scope,String owner) throws Exception {
     Path alpha=Files.createDirectories(temporary.resolve("alpha")),target=Files.writeString(alpha.resolve("target.txt"),"target");
@@ -107,7 +107,7 @@ final class Release030RetirementClaimOwnershipTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings={"outside","excluded","policy"})
   void rootIdentityCannotAuthorizeOutsideItsScopeOrExclusions(String kind) throws Exception {
     Path alpha=Files.createDirectories(temporary.resolve("alpha")),beta=Files.createDirectories(temporary.resolve("beta"));
@@ -146,7 +146,7 @@ final class Release030RetirementClaimOwnershipTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
   void historicalReconciliationRetainsRecordedCoverageAndUnacknowledgedSeal(boolean sealed) throws Exception {
     Path alpha=Files.createDirectories(temporary.resolve("alpha")),target=Files.writeString(alpha.resolve("recorded.txt"),"recorded");

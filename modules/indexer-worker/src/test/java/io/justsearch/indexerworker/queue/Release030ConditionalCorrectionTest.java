@@ -86,7 +86,7 @@ final class Release030ConditionalCorrectionTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings={"ROOT","FILE","DELETE"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings={"ROOT","FILE","DELETE"})
   void laterAuthorityHoldsTheInstalledConditionalCorrection(String later) throws Exception {
     try(var q=nativeQueue()) {
       var receipt=owner(q);Files.writeString(file,"changed bytes");
@@ -120,7 +120,7 @@ final class Release030ConditionalCorrectionTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings={"collection","unit_revision","ingestion_root","retry_after"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings={"collection","unit_revision","ingestion_root","retry_after"})
   void changedNativePredecessorIsHeld(String column) throws Exception {
     try(var q=nativeQueue()) {
       var receipt=owner(q);Files.writeString(file,"changed bytes");var observation=observe(q,receipt);
@@ -133,7 +133,7 @@ final class Release030ConditionalCorrectionTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings={"unknown-namespace","modern-unowned","forged-cohort"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings={"unknown-namespace","modern-unowned","forged-cohort"})
   void freshlyObservedUnprovenRowIsHeld(String kind) throws Exception {
     try(var q=nativeQueue()) {
       var receipt=owner(q);Files.writeString(file,"changed bytes");
@@ -164,7 +164,7 @@ final class Release030ConditionalCorrectionTest {
     q.prepareRetirementClaims();
   }
 
-  @ParameterizedTest @ValueSource(strings={"missing","wrong"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings={"missing","wrong"})
   void checkpointWithoutOriginalCohortHoldsChangedSource(String kind) throws Exception {
     try(var q=nativeQueue()) {assertNotNull(owner(q));}
     var properties=checkpoint();
@@ -180,7 +180,7 @@ final class Release030ConditionalCorrectionTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings={"missing","wrong"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings={"missing","wrong"})
   void installedCorrectionNeedsOriginalCohortAtActualClaim(String kind) throws Exception {
     String unit;
     try(var q=nativeQueue()) {
@@ -201,7 +201,7 @@ final class Release030ConditionalCorrectionTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings={"restart","copy"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings={"restart","copy"})
   void originalCohortSurvivesCurrentDatabasePreparation(String kind) throws Exception {
     String cohort;
     try(var q=nativeQueue()) {assertNotNull(owner(q));cohort=checkpoint().getProperty("native-cohort");assertNotNull(cohort);}

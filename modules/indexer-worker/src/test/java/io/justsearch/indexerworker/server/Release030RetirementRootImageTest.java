@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 @Timeout(300)
 @org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030RetirementRootImageTest {
- @ParameterizedTest(name="ordinaryRootImage / live named collection={0}")
+ @ParameterizedTest(name="{displayName} ordinaryRootImage / live named collection={0}")
  @ValueSource(booleans={false,true})
  void acknowledgedImageSurvivesUncertaintyThenConverges(boolean named,@TempDir Path root)throws Exception {
   Release030Fixture.unpack("switching",root);var original=state(root);

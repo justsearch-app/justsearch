@@ -24,7 +24,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 @org.junit.jupiter.api.extension.ExtendWith(
     io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030RetirementCompletedBuildTest {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"migrating,false", "switching,false", "migrating,true", "switching,true"})
   @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
   void completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String fixture, boolean denied,

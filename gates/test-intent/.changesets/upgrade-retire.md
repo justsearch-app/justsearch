@@ -219,9 +219,6 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         }
       ],
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#replayRetiresObsoleteBuildAndKeepsServingIdentity",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#alreadyDoneExplicitFileOnServingGenerationSurvivesResume",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#killedRetirementResumesAndBackupCannotReviveBuild",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java#newerAcknowledgementWinsPausedReplayAndRestart",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#partialWalkRetainsReceiptAndBuildUntilACompleteWalk",
@@ -230,11 +227,12 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#modernUnownedAdmissionCannotBorrowRetiredBuildAuthority",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java#ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java#closeDrainsMaintenanceWithoutInterruptingTheServingWriter",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#defaultSchedulerRecoversAcrossStartupAndRestart",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java#cancellationDrainsOwnedCallbackAndSubmittedFailurePropagates"
       ],
-      "repaired": true,
       "evidence": "gates/test-intent/evidence/upgrade-retire-recovery-current-bindings.json",
-      "classificationRationale": "New repaired behavior: each named check requires an actual assertion failure on 8292 and a real completed frozen-code execution. Evidence explicitly distinguishes frozen production dependencies from integrated main; no current integrated recovery pass is inferred. Reappeared DELETE is explicitly listed so all 50 repaired invocations are bound. The unavailable-root method now has a separate fresh method-only before/current evidence entry because historical duplicate display names were ambiguous. Original frozen raw evidence remains unchanged.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: Split: the U6 authentic MIGRATING/SWITCHING boot, U13 backoff-only promotion, and DONE explicit-file outside roots exercise existing main behavior; keep repaired only for those checks. Crash cuts, ordering, uncertainty, completed-build reconciliation and shutdown are new retirement-path checks. Historical runs and their original revision bindings remain unchanged.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
@@ -337,9 +335,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkCrashTest.java#completedWalkSurvivesAnActualKillAndRestart",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootProgressTest.java#uncertainEarlierAlphaDoesNotStarveUnqueuedBetaOrAcknowledgedMutation"
       ],
-      "repaired": true,
       "evidence": "gates/test-intent/evidence/upgrade-retire-r35-repaired.json",
-      "classificationRationale": "New repaired checks, with preservation cells retained within their ordering table. The original sync-then-collection fixture had no named member and remains excluded as intended fail-before proof. Its corrected precondition uses public root registration, an actual named queue member and an ordered root receipt. The reviewed R4 exact R1 sources pass all32 new cases in the completed local run, including unchanged100s/search/A/B/restart oracles and two real process kills with full child stdout. The matching before refresh for the changed WalkOrder/WalkCrash inputs and final D4 envelopes remain pending; no compile/setup failure or invalid old fixture is counted. A separate real prefix→exact-admission→later-public-sync probe fails100s completion on both b84 and this candidate: the newer root admission replaces the file unit without replacing its old exact receipt. That remaining ownership/completion gap is not accepted or hidden by these passing cells. Original repeated-injection failed fixtures remain immutable.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: committed retirement certificates and retirement walk ordering/progress are introduced by this PR. Historical runs and their original revision bindings remain unchanged.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
@@ -426,9 +423,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
       ],
-      "repaired": true,
       "evidence": "gates/test-intent/evidence/upgrade-retire-r35-unavailable-method.json",
-      "classificationRationale": "New repaired real-interface check: unchanged frozen original before assertions remain attached. Actual R33 candidate2 passes migrating and switching with identical Safety/check/helper sources and the three applied production inputs; unrelated changed test files are disclosed. The earlier bbdd switching failure remains history.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: retaining retirement debt/B for an unavailable root is a new retirement path. Historical runs and their original revision bindings remain unchanged.",
       "sourceDependencies": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
@@ -491,8 +487,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "classificationRationale": "New running-system/queue/Lucene regression coverage. Existing assertions, faults, deadlines and policy checks are retained; no historical duplicate XML is assigned by status. R12 raw commands/source manifests distinguish initial/intermediate/final source and setup failures; final D4 envelopes and independent acceptance remain pending.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: retirement SQL ACK, cleanup continuation and ownership mechanics do not exist on main. Historical runs and their original revision bindings remain unchanged.",
       "evidenceScope": "Focused author evidence only; final source-bound envelopes are the separately pending D4 assignment.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementAckRecoveryTest.java#acknowledgedHeadResumes",
@@ -542,8 +537,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "classificationRationale": "New running-system/queue/Lucene regression coverage. Existing assertions, faults, deadlines and policy checks are retained; no historical duplicate XML is assigned by status. R12 raw commands/source manifests distinguish initial/intermediate/final source and setup failures; final D4 envelopes and independent acceptance remain pending.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: retirement root-image and frozen prefix-successor mechanics do not exist on main. Historical runs and their original revision bindings remain unchanged.",
       "evidenceScope": "Focused author evidence only; final source-bound envelopes are the separately pending D4 assignment.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementRootImageTest.java#sameStampedPublicSyncTargetsOnlyChangedMember",
@@ -588,12 +582,11 @@ amended PR4 design governs the implementation. No acceptance record is authored 
           "label": "agent choice"
         }
       ],
-      "repaired": true,
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java#namedDoneRawReceiptKeepsCollectionAndExactBoundary",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementLegacyMetadataTest.java#missingOriginalQueueNamespaceStaysHeldAcrossChangedConfig"
       ],
-      "classificationRationale": "New repaired real-boot namespace regressions; all expanded whole-method oracles remain required. The exact expanded after source passed on bbdd. The attempted f081 before did not compile because legacyExpectation was absent, and establishes no behavior failure. Earlier narrower R14 before assertions remain history; final expanded before proof is unverified.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: raw-receipt namespace attribution and recovery are new retirement mechanics; the existing DONE outside-root repair is separately pinned by entry 6. Historical runs and their original revision bindings remain unchanged.",
       "evidenceScope": "Actual corrected-fixtures-after XML: two passes, with PMD-only exit 1 and the raw sourceStable=false flag retained. The only archived-manifest mismatch is the changeset; later PublicSync/RootProgress file changes are disclosed. This proves the captured bbdd production, not the applied parent.",
       "evidence": "gates/test-intent/evidence/upgrade-retire-current-legacy-metadata.json"
     },
@@ -665,8 +658,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "classificationRationale": "Original row preservation uses genuine a53 before; changed-source uses genuine 5324 before. Both execute the identical final whole three-method check file. Exact executed helper bodies and actual whole helper-file input manifests are bound; the unselected policy test boot-reference redirect is disclosed separately. Earlier one-method and models-resource two-method source bindings remain history.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: retirement correction and inherited namespace ownership are new mechanisms. Historical runs and their original revision bindings remain unchanged.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#indexedOrdinaryMemberKeepsOlderNamespaceAcrossForceFalseAndDelete",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementForceFalseTest.java#readableChangedOlderMemberCompletesInOriginalNamespaceAndRestarts"
@@ -714,8 +706,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "classificationRationale": "The promoted final whole file runs on exact genuine pre-gap 5d30, known-good ea61 and final bbdd production. Original prefix conversion oracle remains. New API absence or fixture setup failure is not behavior evidence.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New preservation: main already excludes exact approved gap versions from replayDeleteOrder; the additional approved-ROOT filtering protects the retirement-only root-intent decoder introduced in this PR. Historical runs and their original revision bindings remain unchanged.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#exactApprovedMalformedRootPreservesUnrelatedDelete"
       ],
@@ -764,8 +755,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "classificationRationale": "New repaired old-interface public-service coverage for U6. Keep every oracle and the genuine b84 assertion failures, but require a before execution with the final whole check/helper source. No missing API or stale source is a fail-before.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: public sync ordering during retirement is a new retirement path. Historical runs and their original revision bindings remain unchanged.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPublicSyncTest.java#laterPublicSyncMaySupersedeAnEarlierExactAdmission"
       ],
@@ -788,8 +778,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "classificationRationale": "Four native-INHERIT and same-unit metadata tamper cases retain original whole-row and disjoint claim oracles. Stable existing queue API has genuine f69 intended assertion failures, not invalid originator fixtures.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: retained retirement root-member identity and metadata ownership are new mechanisms. Historical runs and their original revision bindings remain unchanged.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030RootMemberIdentityTest.java#inheritedMembersRemainDistinctAndMetadataEditsStayHeld"
       ],
@@ -812,8 +801,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "classificationRationale": "Six ROOT/FILE/DELETE by mutable-wait cases retain durable intent and exact Q at cancellation before SQL, resume the same intent with actual mutable state, and preserve later winner/delete controls. Exact ea61 whole-source before has eighteen configured intended assertion failures; it is reused without rerun.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: durable retirement intent cancellation/recovery is a new mechanism. Historical runs and their original revision bindings remain unchanged.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesBeneathPreservingRoot",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030DurableIntentCancellationTest.java#durableIntentResumesWithSameMutableRetry"
@@ -971,8 +959,7 @@ amended PR4 design governs the implementation. No acceptance record is authored 
           "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "classificationRationale": "Direct current-scope API safety is after-only; explicit inherited provenance has genuine a6f9 intended assertion failure on identical final source. NoSuchMethodException is archived setup failure.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: retirement correction provenance and rollback history are new mechanisms. Historical runs and their original revision bindings remain unchanged.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java#explicitCollectionRootRetainsInheritedAttributionDuringSourceCorrection"
       ],
@@ -988,7 +975,8 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         {
           "kind": "delegated-choice",
           "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
-          "delegationLocation": "Root evidence control: e948216 exact R33 repair applied 2026-10-26T20:25:27.512878005Z",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "label": "agent choice",
           "delegationScope": "Retirement recovery safety and evidence closure; author metadata only, independent acceptance remains outstanding",
           "choice": "Bind the applied native v13 cohort before preparation and exact conditional owner at actual claim; unknown/modern/forged authority is held. Preserve all direct queue safety controls."
         }
@@ -1018,17 +1006,84 @@ amended PR4 design governs the implementation. No acceptance record is authored 
         {
           "kind": "delegated-choice",
           "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
-          "delegationLocation": "Root evidence control: e948216 exact R33 repair applied 2026-10-26T20:25:27.512878005Z",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "label": "agent choice",
           "delegationScope": "Retirement recovery safety and evidence closure; author metadata only, independent acceptance remains outstanding",
           "choice": "Bind the applied native v13 cohort before preparation and exact conditional owner at actual claim; unknown/modern/forged authority is held. Preserve all direct queue safety controls."
         }
       ],
-      "repaired": true,
-      "classificationRationale": "Genuine eb01 before with the final whole check file executes all three cells across configured attempts: forged-cohort fails three intended assertions; other six invocations pass. Actual candidate2 passes all three cells. No exception is relabelled.",
+      "classificationRationale": "Agent choice under task t-20261020-c2e24a request: New: captured retirement cohort and conditional correction authority are new mechanisms. Historical runs and their original revision bindings remain unchanged.",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#freshlyObservedUnprovenRowIsHeld"
       ],
       "evidence": "gates/test-intent/evidence/upgrade-retire-r35-conditional-repaired.json"
+    },
+    {
+      "class": "New",
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "behaviour": "U6: authentic MIGRATING and SWITCHING fixtures replay acknowledged updates and confirmed deletions onto the original serving generation, retire the obsolete build and survive restart. An already-DONE explicit file outside every root remains searchable without ingesting its neighbor. U13: backoff-only work must not enter live promotion or authorize an incomplete cutover; unrelated mutation admission remains available.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U6",
+          "quote": "An upgrade from an interrupted 0.3.0 migration (state MIGRATING or SWITCHING, switch-buffer entries): acknowledged updates and deletes survive replay, including an interrupted replay, without losing the serving generation.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U13",
+          "quote": "Waiting jobs do not authorize an incomplete cutover where a migration does run: backoff-only work is not treated as drained, and the failed-job budget and explicit overrides apply as configured.",
+          "label": "agent-drafted, owner-adopted",
+          "adoptedAt": "2026-10-20",
+          "adoptionQuote": "i agree, proceed accordingly"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Retire obsolete interrupted release-0.3.0 migrations on base 8292c62e3, preserving #893 recovery; no commit, schema change or option.",
+          "choice": "Cancel only with a positive compatibility certificate for A. Reconcile every A/B difference against sources and retain uncertain obligations and B. Keep new mutations ordered by accepted_order in the existing fenced journal during replay. Preserve preparation/root debt until retirement and both pointer copies are normalized. Use authentic fixtures and real admission for receipt-bearing variants.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You have full autonomy through the merges of #889 and PR 4, under the rules in that file; do not ask me for verdicts.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Resume PR4 and settle corrupt-commit and budget preservation loops before completing the original checks.",
+          "choice": "Corrupt A follows base's backup-first boot while B, migration state and receipts match base; assert the same outcome on both trees. Run budget checks unchanged on base first; follow base if it also resumes MIGRATING, otherwise repair any candidate regression. These rulings reset the repeated-failure loops. Executed base budget checks show the same MIGRATING restart phase as the candidate; retain the first-boot FAILED budget assertion and use MIGRATING for that restart, with A retained. The earlier timing-only U13 probe passed base and is not fail-before evidence; observe promotion entry deterministically using the real booted queue and writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "task": "t-20261020-c2e24a request",
+          "delegationQuote": "the gate's before-state for this change is main, the PR's merge base (git merge-base HEAD origin/main), not an earlier candidate of this PR.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Classify repaired versus new retirement checks and collect assertion fail-before only against the PR merge base.",
+          "choice": "Use merge base 4f9df2c1f8b3c5c0377508c1b9ea8ae97d01d227. Entry 6: Split: the U6 authentic MIGRATING/SWITCHING boot, U13 backoff-only promotion, and DONE explicit-file outside roots exercise existing main behavior; keep repaired only for those checks. Crash cuts, ordering, uncertainty, completed-build reconciliation and shutdown are new retirement-path checks. Entry 8: New: committed retirement certificates and retirement walk ordering/progress are introduced by this PR. Entry 10: New: retaining retirement debt/B for an unavailable root is a new retirement path. Entry 12: New: retirement SQL ACK, cleanup continuation and ownership mechanics do not exist on main. Entry 14: New: retirement root-image and frozen prefix-successor mechanics do not exist on main. Entry 16: New: raw-receipt namespace attribution and recovery are new retirement mechanics; the existing DONE outside-root repair is separately pinned by entry 6. Entry 19: New: retirement correction and inherited namespace ownership are new mechanisms. Entry 21: New preservation: main already excludes exact approved gap versions from replayDeleteOrder; the additional approved-ROOT filtering protects the retirement-only root-intent decoder introduced in this PR. Entry 23: New: public sync ordering during retirement is a new retirement path. Entry 24: New: retained retirement root-member identity and metadata ownership are new mechanisms. Entry 25: New: durable retirement intent cancellation/recovery is a new mechanism. Entry 31: New: retirement correction provenance and rollback history are new mechanisms. Entry 33: New: captured retirement cohort and conditional correction authority are new mechanisms.",
+          "label": "agent choice"
+        }
+      ],
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#replayRetiresObsoleteBuildAndKeepsServingIdentity",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java#backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#alreadyDoneExplicitFileOnServingGenerationSurvivesResume"
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-retire-main-repairs-r39.json",
+      "classificationRationale": "New repaired existing-main behavior: U6 authentic MIGRATING/SWITCHING boot, U13 backoff-only promotion, and already-DONE explicit file outside roots. Requires actual assertion failures against merge base 4f9df2c1f8b3c5c0377508c1b9ea8ae97d01d227; intermediate PR runs are history only.",
+      "sourceDependencies": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java"
+      ],
+      "evidenceScope": "Frozen source on execution HEAD 8292 plus its original uncommitted manifest, later materialized unchanged as d9663d16. Check/helper bytes still match integrated HEAD 1bb20567; changed production dependencies are enumerated separately. This is not a fresh integrated recovery execution.",
+      "repaired": true
     }
   ]
 }

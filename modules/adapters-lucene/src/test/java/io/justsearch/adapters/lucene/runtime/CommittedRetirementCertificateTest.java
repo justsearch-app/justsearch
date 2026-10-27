@@ -20,7 +20,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /** Retirement needs positive committed identity; native opening retains its uncertainty rules. */
 final class CommittedRetirementCertificateTest {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void completeDigestCertifiesKnownAbsentModelsWithOrWithoutDiagnosticInputs(boolean diagnostic,
       @TempDir Path index) throws Exception {
@@ -41,7 +41,7 @@ final class CommittedRetirementCertificateTest {
     assertTrue(IndexMetadataParityGuard.certifiesCommittedCompatibility(index, expected, List.of()));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"null", "absent"})
   void unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement(String form,
       @TempDir Path index) throws Exception {

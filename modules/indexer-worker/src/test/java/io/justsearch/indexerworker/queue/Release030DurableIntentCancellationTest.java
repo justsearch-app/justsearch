@@ -68,12 +68,12 @@ final class Release030DurableIntentCancellationTest {
         "test-file/"+hash,hash,Files.size(file),false,true);
   }
 
-  @ParameterizedTest @ValueSource(strings={"ROOT","FILE","DELETE"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings={"ROOT","FILE","DELETE"})
   void durableIntentResumesBeneathPreservingRoot(String laterWinner) throws Exception {
     resume(false,laterWinner);
   }
 
-  @ParameterizedTest @ValueSource(strings={"ROOT","FILE","DELETE"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings={"ROOT","FILE","DELETE"})
   void durableIntentResumesWithSameMutableRetry(String laterWinner) throws Exception {
     resume(true,laterWinner);
   }

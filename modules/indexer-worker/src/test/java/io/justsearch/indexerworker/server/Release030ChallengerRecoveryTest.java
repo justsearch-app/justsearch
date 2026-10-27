@@ -147,7 +147,7 @@ final class Release030ChallengerRecoveryTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"migrating", "switching"})
   void interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String fixture, @TempDir Path temporary)
       throws Exception {
