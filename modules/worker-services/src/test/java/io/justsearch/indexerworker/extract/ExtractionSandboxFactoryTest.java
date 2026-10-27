@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.configuration.resolved.ResolvedConfig;
-import io.justsearch.indexerworker.TestWorkerExecutorRegistrations;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -89,7 +88,7 @@ final class ExtractionSandboxFactoryTest {
   void directTikaDelegateReportsConfiguredPolicyAndValidatesArtifact() throws Exception {
     TikaExtractionPolicy policy = contentPolicy();
     try (TimeboxedContentExtractor extractor =
-        new TimeboxedContentExtractor(TestWorkerExecutorRegistrations.timebox(), tika(policy))) {
+        new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), tika(policy))) {
       assertPolicyAndArtifact(extractor, policy);
     }
   }
@@ -108,9 +107,9 @@ final class ExtractionSandboxFactoryTest {
       }
     };
     try (TimeboxedContentExtractor direct =
-            new TimeboxedContentExtractor(TestWorkerExecutorRegistrations.timebox(), provider);
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), provider);
         TimeboxedContentExtractor registry =
-            new TimeboxedContentExtractor(TestWorkerExecutorRegistrations.timebox(),
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                 ExtractorContributionRegistry.withCoreTika(provider))) {
       assertPolicyAndArtifact(direct, TikaExtractionPolicy.defaults());
       assertPolicyAndArtifact(registry, TikaExtractionPolicy.defaults());
@@ -141,8 +140,8 @@ final class ExtractionSandboxFactoryTest {
   private static TimeboxedContentExtractor factory(
       ExtractionSandboxFactory.Mode mode, TikaExtractionPolicy policy) {
     // Text stays in process in AUTO; this command must never be needed by these checks.
-    return ExtractionSandboxFactory.create(TestWorkerExecutorRegistrations.ocr(),
-        TestWorkerExecutorRegistrations.timebox(), TestWorkerExecutorRegistrations.readers(),
+    return ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
         mode, policy, Duration.ofSeconds(5), null, List.of("unused-extraction-child"));
   }
 
@@ -155,7 +154,7 @@ final class ExtractionSandboxFactoryTest {
 
   private void assertStructuredPolicy(TikaExtractionPolicy policy) throws Exception {
     try (TimeboxedContentExtractor extractor = ExtractionSandboxFactory.inProcessStructured(
-        TestWorkerExecutorRegistrations.ocr(), TestWorkerExecutorRegistrations.timebox(), null,
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null,
         OcrRoutingConfig.disabled(), OcrMetricCatalog.noop(), policy)) {
       assertPolicyAndArtifact(extractor, policy);
     }
@@ -163,10 +162,10 @@ final class ExtractionSandboxFactoryTest {
 
   private void assertPublicConstructorPolicies(TikaExtractionPolicy policy) throws Exception {
     try (TimeboxedContentExtractor defaultTimeout = new TimeboxedContentExtractor(
-            TestWorkerExecutorRegistrations.timebox(),
+            io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             ExtractorContributionRegistry.withCoreTika(tika(policy)));
         TimeboxedContentExtractor explicitTimeout = new TimeboxedContentExtractor(
-            TestWorkerExecutorRegistrations.timebox(),
+            io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             ExtractorContributionRegistry.withCoreTika(tika(policy)), Duration.ofSeconds(5), null)) {
       assertPolicyAndArtifact(defaultTimeout, policy);
       assertPolicyAndArtifact(explicitTimeout, policy);
@@ -174,7 +173,7 @@ final class ExtractionSandboxFactoryTest {
   }
 
   private static PolicyDrivenTikaExtractor tika(TikaExtractionPolicy policy) {
-    return new PolicyDrivenTikaExtractor(TestWorkerExecutorRegistrations.ocrFactory(), policy);
+    return new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), policy);
   }
 
   private void assertPolicyAndArtifact(TimeboxedContentExtractor extractor, TikaExtractionPolicy policy)
