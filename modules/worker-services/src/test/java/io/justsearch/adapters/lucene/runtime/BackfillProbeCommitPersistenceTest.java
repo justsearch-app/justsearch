@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Real conditional writes and fresh committed readers; no timer, sleeps, or clock seam. */
-final class BackfillSchedulerPersistenceTest extends LuceneExecutorTestBase {
+final class BackfillProbeCommitPersistenceTest extends LuceneExecutorTestBase {
   private static final float[] NEW_VECTOR = {1, 0, 0, 0};
   private static final float[] OLD_VECTOR = {0, 1, 0, 0};
   @TempDir Path directory;
