@@ -2,6 +2,9 @@
 package io.justsearch.configuration.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -10,15 +13,40 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.AccessMode;
+import java.nio.file.CopyOption;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileStore;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystemException;
+import java.nio.file.FileSystems;
+import java.nio.file.LinkOption;
+import java.nio.file.OpenOption;
+import java.nio.file.PathMatcher;
+import java.nio.file.WatchService;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.FileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipalLookupService;
+import java.nio.file.spi.FileSystemProvider;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -32,6 +60,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
@@ -266,6 +295,263 @@ class ContendedFileReadsTest {
     }
   }
 
+  @Test
+  @EnabledOnOs(OS.WINDOWS)
+  void windowsDeletePendingOpenRetriesUntilReplacementIsPublished() throws Exception {
+    Path target = tempDir.resolve("delete-pending.json");
+    byte[] replacement = "published-after-delete".getBytes();
+    Files.writeString(target, "old");
+    CountDownLatch deniedTwice = new CountDownLatch(2);
+    CountDownLatch missing = new CountDownLatch(1);
+    ScriptedOpens opens = new ScriptedOpens(target, attempt -> {
+      try {
+        return FileChannel.open(target, StandardOpenOption.READ);
+      } catch (AccessDeniedException denied) {
+        deniedTwice.countDown();
+        throw denied;
+      } catch (NoSuchFileException absent) {
+        missing.countDown();
+        throw absent;
+      }
+    });
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (FileChannel holder = FileChannel.open(target, StandardOpenOption.READ)) {
+      Files.delete(target);
+      assertThrows(AccessDeniedException.class, () -> FileChannel.open(target, StandardOpenOption.READ));
+      Future<byte[]> reader = executor.submit(() -> ContendedFileReads.readAllBytes(opens.path()));
+      boolean retried = deniedTwice.await(1, TimeUnit.SECONDS);
+      if (reader.isDone()) {
+        assertDoesNotThrow(() -> reader.get(1, TimeUnit.SECONDS), "reader must survive the denied open");
+      }
+      assertTrue(retried, "reader must retry the denied open before release");
+      holder.close();
+      assertTrue(missing.await(1, TimeUnit.SECONDS), "reader must tolerate the publication gap after denial");
+      AtomicFileWrites.replace(target, replacement);
+      assertArrayEquals(replacement, assertDoesNotThrow(() -> reader.get(2, TimeUnit.SECONDS)));
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(2, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  @EnabledOnOs(OS.WINDOWS)
+  void windowsDeletePendingOpenDenialExhaustsBudget() throws Exception {
+    Path target = tempDir.resolve("persistent-delete-pending.json");
+    Files.writeString(target, "old");
+    AtomicReference<AccessDeniedException> lastDenial = new AtomicReference<>();
+    ScriptedOpens opens = new ScriptedOpens(target, attempt -> {
+      try {
+        return FileChannel.open(target, StandardOpenOption.READ);
+      } catch (AccessDeniedException denied) {
+        lastDenial.set(denied);
+        throw denied;
+      }
+    });
+    try (FileChannel holder = FileChannel.open(target, StandardOpenOption.READ)) {
+      Files.delete(target);
+      assertTrue(holder.isOpen());
+      assertThrows(AccessDeniedException.class, () -> FileChannel.open(target, StandardOpenOption.READ));
+      long started = System.nanoTime();
+      AccessDeniedException failure = assertThrows(AccessDeniedException.class,
+          () -> ContendedFileReads.readAllBytes(opens.path(), SHORT_BUDGET));
+      assertSame(lastDenial.get(), failure, "the original last denial must be retained");
+      assertEquals(target.toString(), failure.getFile());
+      assertTrue(opens.attempts.get() >= 2, "persistent denial must retry");
+      assertRetryElapsed(started);
+    }
+  }
+
+  @Test
+  @DisabledOnOs(OS.WINDOWS)
+  void permissionDenialRetriesUntilBudgetIsSpent() throws Exception {
+    Path target = tempDir.resolve("unreadable.json");
+    Files.writeString(target, "private");
+    Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(target);
+    try {
+      Files.setPosixFilePermissions(target, Set.of());
+      boolean canRead;
+      try (FileChannel probe = FileChannel.open(target, StandardOpenOption.READ)) {
+        canRead = probe.isOpen();
+      } catch (AccessDeniedException expected) {
+        canRead = false;
+      }
+      assumeTrue(!canRead, "process bypasses file permissions (for example root); denial fixture unavailable");
+      AtomicReference<AccessDeniedException> lastDenial = new AtomicReference<>();
+      ScriptedOpens opens = new ScriptedOpens(target, attempt -> {
+        try {
+          return FileChannel.open(target, StandardOpenOption.READ);
+        } catch (AccessDeniedException denied) {
+          lastDenial.set(denied);
+          throw denied;
+        }
+      });
+      long started = System.nanoTime();
+      AccessDeniedException failure = assertThrows(AccessDeniedException.class,
+          () -> ContendedFileReads.readAllBytes(opens.path(), SHORT_BUDGET));
+      assertEquals(target.toString(), failure.getFile());
+      long elapsed = System.nanoTime() - started;
+      assertSame(lastDenial.get(), failure, "the original last denial must be retained");
+      assertTrue(elapsed >= SHORT_BUDGET.toNanos(), "the read must spend the retry budget");
+      assertTrue(opens.attempts.get() >= 2, "persistent denial must retry");
+    } finally {
+      Files.setPosixFilePermissions(target, permissions);
+    }
+  }
+
+  @Test
+  void denialThenMissingReopensAndReadsOneLockedChannel() throws Exception {
+    Path target = tempDir.resolve("scripted-replacement.json");
+    byte[] expected = "whole-replacement".getBytes();
+    Files.write(target, expected);
+    ScriptedOpens opens = new ScriptedOpens(target, attempt -> {
+      if (attempt == 1) throw new AccessDeniedException(target.toString());
+      if (attempt == 2) throw new NoSuchFileException(target.toString());
+      return new CheckedChannel(FileChannel.open(target, StandardOpenOption.READ), "", null);
+    });
+    assertArrayEquals(expected,
+        assertDoesNotThrow(() -> ContendedFileReads.readAllBytes(opens.path(), SHORT_BUDGET)));
+    assertEquals(3, opens.attempts.get());
+  }
+
+  @Test
+  void mixedRetriesReportTheLastFailedAttempt() throws Exception {
+    Path target = tempDir.resolve("mixed-retries.json");
+    Files.writeString(target, "held");
+    IOException cause = new IOException("original denial cause");
+    AccessDeniedException denial = new AccessDeniedException(target.toString());
+    denial.initCause(cause);
+    NoSuchFileException missing = new NoSuchFileException(target.toString());
+    // Both orders must continue retrying, and the final attempt alone selects the timeout failure.
+    for (String sequence : new String[] {"denial-lock", "lock-denial", "denial-missing"}) {
+      ScriptedOpens opens = new ScriptedOpens(target, attempt -> {
+        boolean deny = sequence.equals("denial-lock") ? attempt == 1 : attempt > 1;
+        if (sequence.equals("denial-missing")) {
+          if (attempt == 1) throw denial;
+          throw missing;
+        }
+        if (deny) throw denial;
+        return new CheckedChannel(FileChannel.open(target, StandardOpenOption.READ), "unavailable", null);
+      });
+      long started = System.nanoTime();
+      IOException failure = assertThrows(IOException.class,
+          () -> ContendedFileReads.readAllBytes(opens.path(), SHORT_BUDGET), sequence);
+      if (sequence.equals("denial-lock")) {
+        assertInstanceOf(ContendedFileReads.FileReadContendedException.class, failure);
+      } else {
+        assertSame(sequence.equals("lock-denial") ? denial : missing, failure);
+      }
+      assertTrue(opens.attempts.get() >= 3, sequence + " must continue after the transition");
+      assertRetryElapsed(started);
+    }
+    assertSame(cause, denial.getCause());
+  }
+
+  @Test
+  void denialAndLockContentionShareOneBudget() throws Exception {
+    Path target = tempDir.resolve("shared-budget.json");
+    Files.writeString(target, "held");
+    AccessDeniedException denial = new AccessDeniedException(target.toString());
+    ScriptedOpens opens = new ScriptedOpens(target, attempt -> {
+      if (attempt == 1) {
+        // A filesystem call may block; retrying another kind of failure must not restart the clock.
+        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(600));
+        throw denial;
+      }
+      return new CheckedChannel(FileChannel.open(target, StandardOpenOption.READ), "unavailable", null);
+    });
+    long started = System.nanoTime();
+    assertThrows(ContendedFileReads.FileReadContendedException.class,
+        () -> ContendedFileReads.readAllBytes(opens.path(), Duration.ofMillis(800)));
+    long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+    assertTrue(elapsed >= 750, "the shared budget must be consumed");
+    assertTrue(elapsed < 1_100, "lock contention must not receive a fresh budget after denial");
+    assertTrue(opens.attempts.get() >= 2);
+  }
+
+  @Test
+  void interruptedDenialRetainsTheReadersInterruptFlag() throws Exception {
+    Path target = tempDir.resolve("interrupted-denial.json");
+    CountDownLatch retried = new CountDownLatch(2);
+    ScriptedOpens opens = new ScriptedOpens(target, attempt -> {
+      retried.countDown();
+      throw new AccessDeniedException(target.toString());
+    });
+    AtomicReference<Throwable> outcome = new AtomicReference<>();
+    AtomicBoolean retained = new AtomicBoolean();
+    Thread reader = new Thread(() -> {
+      try {
+        ContendedFileReads.readAllBytes(opens.path(), Duration.ofSeconds(10));
+        outcome.set(new AssertionError("denial unexpectedly succeeded"));
+      } catch (Throwable failure) {
+        outcome.set(failure);
+        retained.set(Thread.currentThread().isInterrupted());
+      }
+    }, "denied-file-reader-interruption-test");
+    try {
+      reader.start();
+      assertTrue(retried.await(1, TimeUnit.SECONDS));
+      assertTrue(awaitState(reader, Thread.State.TIMED_WAITING, Duration.ofSeconds(1)));
+      reader.interrupt();
+      reader.join(2_000);
+      assertFalse(reader.isAlive());
+      assertInstanceOf(InterruptedIOException.class, outcome.get());
+      assertTrue(retained.get());
+    } finally {
+      reader.interrupt();
+      reader.join(2_000);
+    }
+  }
+
+  @Test
+  void disappearanceAfterLockContentionTimesOutAsMissing() throws Exception {
+    Path target = tempDir.resolve("disappeared.json");
+    Files.writeString(target, "held");
+    NoSuchFileException missing = new NoSuchFileException(target.toString());
+    ScriptedOpens opens = new ScriptedOpens(target, attempt -> {
+      if (attempt > 1) throw missing;
+      return new CheckedChannel(FileChannel.open(target, StandardOpenOption.READ), "unavailable", null);
+    });
+    long started = System.nanoTime();
+    assertSame(missing, assertThrows(NoSuchFileException.class,
+        () -> ContendedFileReads.readAllBytes(opens.path(), SHORT_BUDGET)));
+    assertTrue(opens.attempts.get() >= 3);
+    assertRetryElapsed(started);
+  }
+
+  @Test
+  void otherOpenFailuresPropagateWithoutRetry() {
+    Path target = tempDir.resolve("other-open-failure.json");
+    FileSystemException failure = new FileSystemException(target.toString(), null, "not a sharing denial");
+    ScriptedOpens opens = new ScriptedOpens(target, attempt -> { throw failure; });
+    assertSame(failure, assertThrows(FileSystemException.class,
+        () -> ContendedFileReads.readAllBytes(opens.path(), SHORT_BUDGET)));
+    assertEquals(1, opens.attempts.get());
+  }
+
+  @Test
+  void channelLockReadAndCloseFailuresPropagateWithoutRetry() throws Exception {
+    Path target = tempDir.resolve("channel-failure.json");
+    Files.writeString(target, "content");
+    for (String stage : new String[] {"lock", "read", "close"}) {
+      for (IOException failure : new IOException[] {
+          new AccessDeniedException(target.toString()), new NoSuchFileException(target.toString()),
+          new FileSystemException(target.toString())}) {
+        ScriptedOpens opens = new ScriptedOpens(target,
+            attempt -> new CheckedChannel(FileChannel.open(target, StandardOpenOption.READ), stage, failure));
+        assertSame(failure, assertThrows(IOException.class,
+            () -> ContendedFileReads.readAllBytes(opens.path(), SHORT_BUDGET)), stage);
+        assertEquals(1, opens.attempts.get(), stage + " failure must not retry");
+      }
+    }
+  }
+
+  private static void assertRetryElapsed(long started) {
+    long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+    assertTrue(elapsed >= 200, "the read must use the retry budget");
+    assertTrue(elapsed < 2_000, "the short budget must bound retries");
+  }
+
   private static void assertWholeVersion(byte[] observed, byte[] oldBytes, byte[] newBytes) {
     assertTrue(
         Arrays.equals(oldBytes, observed) || Arrays.equals(newBytes, observed),
@@ -302,6 +588,122 @@ class ContendedFileReadsTest {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("worker was interrupted", interrupted);
     }
+  }
+
+  @FunctionalInterface
+  private interface ChannelOpener {
+    FileChannel open(int attempt) throws IOException;
+  }
+
+  /** Routes the existing Path API through observable opens; no production test hook is needed. */
+  private static final class ScriptedOpens extends FileSystemProvider {
+    private final Path target;
+    private final ChannelOpener opener;
+    private final AtomicInteger attempts = new AtomicInteger();
+    private final FileSystem fileSystem = new FileSystem() {
+      @Override public FileSystemProvider provider() { return ScriptedOpens.this; }
+      @Override public void close() { throw new UnsupportedOperationException(); }
+      @Override public boolean isOpen() { return true; }
+      @Override public boolean isReadOnly() { return true; }
+      @Override public String getSeparator() { return FileSystems.getDefault().getSeparator(); }
+      @Override public Iterable<Path> getRootDirectories() { throw new UnsupportedOperationException(); }
+      @Override public Iterable<FileStore> getFileStores() { throw new UnsupportedOperationException(); }
+      @Override public Set<String> supportedFileAttributeViews() { return Set.of(); }
+      @Override public Path getPath(String first, String... more) { throw new UnsupportedOperationException(); }
+      @Override public PathMatcher getPathMatcher(String syntaxAndPattern) { throw new UnsupportedOperationException(); }
+      @Override public UserPrincipalLookupService getUserPrincipalLookupService() { throw new UnsupportedOperationException(); }
+      @Override public WatchService newWatchService() { throw new UnsupportedOperationException(); }
+    };
+
+    private ScriptedOpens(Path target, ChannelOpener opener) {
+      this.target = target;
+      this.opener = opener;
+    }
+
+    Path path() {
+      return (Path) Proxy.newProxyInstance(Path.class.getClassLoader(), new Class<?>[] {Path.class},
+          (proxy, method, args) -> switch (method.getName()) {
+            case "getFileSystem" -> fileSystem;
+            case "toString" -> target.toString();
+            default -> throw new UnsupportedOperationException(method.getName());
+          });
+    }
+
+    @Override
+    public FileChannel newFileChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs)
+        throws IOException {
+      assertEquals(Set.of(StandardOpenOption.READ), options);
+      return opener.open(attempts.incrementAndGet());
+    }
+
+    @Override public String getScheme() { return "scripted-read"; }
+    @Override public FileSystem newFileSystem(URI uri, Map<String, ?> env) { throw new UnsupportedOperationException(); }
+    @Override public FileSystem getFileSystem(URI uri) { return fileSystem; }
+    @Override public Path getPath(URI uri) { throw new UnsupportedOperationException(); }
+    @Override public java.nio.channels.SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs) { throw new UnsupportedOperationException(); }
+    @Override public DirectoryStream<Path> newDirectoryStream(Path dir, DirectoryStream.Filter<? super Path> filter) { throw new UnsupportedOperationException(); }
+    @Override public void createDirectory(Path dir, FileAttribute<?>... attrs) { throw new UnsupportedOperationException(); }
+    @Override public void delete(Path path) { throw new UnsupportedOperationException(); }
+    @Override public void copy(Path source, Path target, CopyOption... options) { throw new UnsupportedOperationException(); }
+    @Override public void move(Path source, Path target, CopyOption... options) { throw new UnsupportedOperationException(); }
+    @Override public boolean isSameFile(Path path, Path other) { throw new UnsupportedOperationException(); }
+    @Override public boolean isHidden(Path path) { throw new UnsupportedOperationException(); }
+    @Override public FileStore getFileStore(Path path) { throw new UnsupportedOperationException(); }
+    @Override public void checkAccess(Path path, AccessMode... modes) { throw new UnsupportedOperationException(); }
+    @Override public <V extends FileAttributeView> V getFileAttributeView(Path path, Class<V> type, LinkOption... options) { throw new UnsupportedOperationException(); }
+    @Override public <A extends BasicFileAttributes> A readAttributes(Path path, Class<A> type, LinkOption... options) { throw new UnsupportedOperationException(); }
+    @Override public Map<String, Object> readAttributes(Path path, String attributes, LinkOption... options) { throw new UnsupportedOperationException(); }
+    @Override public void setAttribute(Path path, String attribute, Object value, LinkOption... options) { throw new UnsupportedOperationException(); }
+  }
+
+  /** A real read channel whose lock, read or close boundary can independently fail. */
+  private static final class CheckedChannel extends FileChannel {
+    private final FileChannel delegate;
+    private final String stage;
+    private final IOException failure;
+    private FileLock held;
+
+    private CheckedChannel(FileChannel delegate, String stage, IOException failure) {
+      this.delegate = delegate;
+      this.stage = stage;
+      this.failure = failure;
+    }
+
+    @Override public FileLock tryLock(long position, long size, boolean shared) throws IOException {
+      assertTrue(shared, "read must acquire a shared lock");
+      assertEquals(0, position);
+      assertEquals(Long.MAX_VALUE, size);
+      if (stage.equals("lock")) throw failure;
+      if (stage.equals("unavailable")) return null;
+      held = delegate.tryLock(position, size, shared);
+      return held;
+    }
+
+    @Override public int read(ByteBuffer dst) throws IOException {
+      assertTrue(held != null && held.isValid(), "read must use the channel protected by the shared lock");
+      if (stage.equals("read")) throw failure;
+      return delegate.read(dst);
+    }
+
+    @Override protected void implCloseChannel() throws IOException {
+      delegate.close();
+      if (stage.equals("close")) throw failure;
+    }
+
+    @Override public long position() throws IOException { return delegate.position(); }
+    @Override public long size() throws IOException { return delegate.size(); }
+    @Override public FileChannel position(long position) { throw new UnsupportedOperationException(); }
+    @Override public long read(ByteBuffer[] dsts, int offset, int length) { throw new UnsupportedOperationException(); }
+    @Override public int read(ByteBuffer dst, long position) { throw new UnsupportedOperationException(); }
+    @Override public int write(ByteBuffer src) { throw new UnsupportedOperationException(); }
+    @Override public long write(ByteBuffer[] srcs, int offset, int length) { throw new UnsupportedOperationException(); }
+    @Override public int write(ByteBuffer src, long position) { throw new UnsupportedOperationException(); }
+    @Override public FileChannel truncate(long size) { throw new UnsupportedOperationException(); }
+    @Override public void force(boolean metaData) { throw new UnsupportedOperationException(); }
+    @Override public long transferTo(long position, long count, WritableByteChannel target) { throw new UnsupportedOperationException(); }
+    @Override public long transferFrom(ReadableByteChannel src, long position, long count) { throw new UnsupportedOperationException(); }
+    @Override public MappedByteBuffer map(MapMode mode, long position, long size) { throw new UnsupportedOperationException(); }
+    @Override public FileLock lock(long position, long size, boolean shared) { throw new UnsupportedOperationException(); }
   }
 
   private static final class RecordingFailureFiles implements AtomicFileWrites.FileAccess {
