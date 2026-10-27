@@ -8,6 +8,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import org.apache.tika.detect.CompositeEncodingDetector;
@@ -69,11 +70,16 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
       return null;
     }
     byte[] window;
-    input.mark(UTF16_WINDOW_BYTES);
+    // One byte past the window tells whether the file continues beyond it.
+    input.mark(UTF16_WINDOW_BYTES + 1);
     try {
-      window = input.readNBytes(UTF16_WINDOW_BYTES);
+      window = input.readNBytes(UTF16_WINDOW_BYTES + 1);
     } finally {
       input.reset();
+    }
+    boolean continues = window.length > UTF16_WINDOW_BYTES;
+    if (continues) {
+      window = Arrays.copyOf(window, UTF16_WINDOW_BYTES);
     }
     if (window.length >= 2
         && ((window[0] == (byte) 0xFF && window[1] == (byte) 0xFE)
@@ -103,10 +109,10 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
         .onMalformedInput(CodingErrorAction.REPORT)
         .onUnmappableCharacter(CodingErrorAction.REPORT);
     CharBuffer decoded = CharBuffer.allocate(units);
-    // A full window may stop between a surrogate pair's units. With endOfInput=false the
-    // decoder retains only that final high surrogate; all other malformed input still fails.
-    if (decoder.decode(ByteBuffer.wrap(window, 0, units * 2), decoded,
-        window.length < UTF16_WINDOW_BYTES).isError()) {
+    // A window cut short of the file may stop between a surrogate pair's units. With
+    // endOfInput=false the decoder retains only that final high surrogate; all other malformed
+    // input, and a high surrogate that ends the file, still fails.
+    if (decoder.decode(ByteBuffer.wrap(window, 0, units * 2), decoded, !continues).isError()) {
       return null;
     }
     decoded.flip();

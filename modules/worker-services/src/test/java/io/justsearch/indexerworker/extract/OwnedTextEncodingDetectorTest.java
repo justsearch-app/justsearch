@@ -89,9 +89,24 @@ class OwnedTextEncodingDetectorTest {
 
   @Test
   void fullWindowCanEndWithHighSurrogate() throws Exception {
+    byte[] bytes = appendUnit(appendUnit(
+        "a".repeat(4095).getBytes(StandardCharsets.UTF_16LE), 0xD83D), 0xDE00);
+    assertEquals(8194, bytes.length);
+    assertEquals(StandardCharsets.UTF_16LE, detect(bytes));
+    byte[] bigEndian = ("a".repeat(4095) + "\uD83D\uDE00").getBytes(StandardCharsets.UTF_16BE);
+    assertEquals(8194, bigEndian.length);
+    assertEquals(StandardCharsets.UTF_16BE, detect(bigEndian));
+  }
+
+  @Test
+  void highSurrogateEndingFileUsesDefault() throws Exception {
     byte[] bytes = appendUnit("a".repeat(4095).getBytes(StandardCharsets.UTF_16LE), 0xD800);
     assertEquals(8192, bytes.length);
-    assertEquals(StandardCharsets.UTF_16LE, detect(bytes));
+    assertUsesDefault(bytes);
+    byte[] bigEndian = Arrays.copyOf("a".repeat(4095).getBytes(StandardCharsets.UTF_16BE), 8192);
+    bigEndian[8190] = (byte) 0xD8;
+    assertUsesDefault(bigEndian);
+    assertUsesDefault(appendUnit("a".repeat(10).getBytes(StandardCharsets.UTF_16LE), 0xD800));
   }
 
   @Test
