@@ -243,6 +243,169 @@
   "audience" : "OPERATOR",
   "consumers" : [ ]
 }, {
+  "id" : "core.forget-indexed-path",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.forget-indexed-path.label",
+    "descriptionKey" : "ops.forget-indexed-path.description",
+    "iconHint" : "warning",
+    "category" : "destructive"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "path" : {
+          "type" : "string",
+          "minLength" : 1
+        },
+        "scope" : {
+          "type" : "string",
+          "enum" : [
+            "FILE",
+            "FOLDER"
+          ]
+        }
+      },
+      "required" : [
+        "path",
+        "scope"
+      ]
+    },
+    "result" : {},
+    "errors" : [],
+    "uiHints" : {}
+  },
+  "policy" : {
+    "risk" : "HIGH",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : {},
+  "lineage" : {
+    "affects" : [],
+    "supersedes" : []
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [
+    "UI"
+  ],
+  "audience" : "USER",
+  "consumers" : []
+}, {
+  "id" : "core.retry-forget",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.retry-forget.label",
+    "descriptionKey" : "ops.retry-forget.description",
+    "iconHint" : "warning",
+    "category" : "destructive"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "forgetKey" : {
+          "type" : "string",
+          "minLength" : 36,
+          "maxLength" : 36
+        }
+      },
+      "required" : [
+        "forgetKey"
+      ]
+    },
+    "result" : {},
+    "errors" : [],
+    "uiHints" : {}
+  },
+  "policy" : {
+    "risk" : "HIGH",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : {},
+  "lineage" : {
+    "affects" : [],
+    "supersedes" : []
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [
+    "UI"
+  ],
+  "audience" : "USER",
+  "consumers" : []
+}, {
+  "id" : "core.withdraw-forget",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.withdraw-forget.label",
+    "descriptionKey" : "ops.withdraw-forget.description",
+    "iconHint" : "warning",
+    "category" : "destructive"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "forgetKey" : {
+          "type" : "string",
+          "minLength" : 36,
+          "maxLength" : 36
+        }
+      },
+      "required" : [
+        "forgetKey"
+      ]
+    },
+    "result" : {},
+    "errors" : [],
+    "uiHints" : {}
+  },
+  "policy" : {
+    "risk" : "HIGH",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : {},
+  "lineage" : {
+    "affects" : [],
+    "supersedes" : []
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [
+    "UI"
+  ],
+  "audience" : "USER",
+  "consumers" : []
+}, {
   "id" : "core.ping-backend",
   "type" : "operation",
   "presentation" : {
