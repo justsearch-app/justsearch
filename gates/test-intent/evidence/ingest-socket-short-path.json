@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T04:12:48.337Z",
+  "revision": "92c5c3d401747a7804caac5b08018a264b958f93",
+  "tree": "970a5b827528d072422b6f76c7a393dfd225a9f6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.tools.IngestPreparationBoundaryTest.socketInputIsRefusedAsAnUnsupportedFileType\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5953
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/tools/IngestPreparationBoundaryTest.java#socketInputIsRefusedAsAnUnsupportedFileType",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/tools/IngestPreparationBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:04797e2a7d1916838ed492b980183f9e8c6f61a52bdb1a43af01885757aa439c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "socketInputIsRefusedAsAnUnsupportedFileType()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ebd480301e2647c03d33fa4ffae7a4543ccf86ed2caad78d1f87b3fa61f3f2b4"
+}
