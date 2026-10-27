@@ -282,8 +282,11 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
       }
       var receipts = f.queue.listSwitchBufferOpsStrict();
       f.loop.start();
+      long started = System.nanoTime();
       var replay = f.prepare();
-      assertTrue(replay.isPresent(), "current-byte prep must not move an admission after a final delete: " + order);
+      long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+      assertTrue(replay.isPresent(), "current-byte prep must not move an admission after a final delete: "
+          + order + " (prep took " + elapsedMs + " ms)");
       assertEquals(order.endsWith("before") ? SourceContentHash.sha256(file) : null, f.hash(file));
       assertEquals(receipts, f.queue.listSwitchBufferOpsStrict());
       assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(f.queue, replay.orElseThrow()));
@@ -687,8 +690,8 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
     }
     java.util.Optional<KnowledgeServerMigrationOps.StrictReplay> prepare() throws Exception {
       // Preparation waits for the started loop to settle and returns as soon as it has; the budget
-      // only bounds a regression. 8 s expired once in a loaded full unit run (about 2.5 s idle).
-      return prepare(System.nanoTime() + TimeUnit.SECONDS.toNanos(30));
+      // only bounds a regression, inside JUnit's 30 s default. 8 s expired under load (2.5 s idle).
+      return prepare(System.nanoTime() + TimeUnit.SECONDS.toNanos(20));
     }
     java.util.Optional<KnowledgeServerMigrationOps.StrictReplay> prepare(long deadline) throws Exception {
       return KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(
