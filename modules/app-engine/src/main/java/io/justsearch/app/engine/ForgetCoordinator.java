@@ -327,7 +327,7 @@ final class ForgetCoordinator implements ForgetService {
               : ForgetOutcome.KeepOut.NOT_REQUIRED,
           withdrawn ? ForgetOutcome.Reason.WITHDRAWN : ForgetOutcome.Reason.ENTRY_REMOVED,
           withdrawn ? "This forget intent ended. "
-              + (plan.keepOutRequired() ? "Its own keep-out was released. " : "No permanent keep-out was needed. ")
+              + (plan.keepOutRequired() ? "No keep-out from this forget remains. " : "No permanent keep-out was needed. ")
               + "Prior index removal may already have happened; no rows or original files were restored."
               : "This forget's keep-out was removed or replaced. This intent will not remove more indexed content.");
     }

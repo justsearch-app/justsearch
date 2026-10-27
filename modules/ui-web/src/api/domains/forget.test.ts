@@ -15,6 +15,7 @@ interface ForgetApi {
   readUnfinishedForgets(base: string, afterId?: number, signal?: AbortSignal, limit?: number): Promise<unknown>;
   forgetContainsPath(path: string, scope: 'FILE' | 'FOLDER', candidate: string): boolean;
   forgetParentFolder(path: string): string | null;
+  forgetObservationText(outcome: Outcome): string;
 }
 let api: ForgetApi;
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -167,4 +168,14 @@ it('S56 unfinished pagination is explicit and malformed or failed reads cannot b
   await expect(api.readUnfinishedForgets('')).rejects.toThrow();
   fetchMock.mockResolvedValueOnce(json({ error: 'unreadable' }, 503));
   await expect(api.readUnfinishedForgets('')).rejects.toThrow();
+});
+
+it('S56.4 the shown outcome states each fact once and never claims a keep-out was released', () => {
+  const sentence = 'The target is no longer in the search index.';
+  const shown = api.forgetObservationText(outcome('k1', { explanation: `${sentence} Original files were not erased.` }));
+  expect(shown.split(sentence)).toHaveLength(2);
+  expect(shown).toContain('Exact keep-out installed.');
+  const withdrawn = api.forgetObservationText(outcome('k2', { status: 'WITHDRAWN', removal: 'UNCONFIRMED',
+    keepOut: 'RELEASED', explanation: 'This forget intent ended.' }));
+  expect(withdrawn).toBe('This forget intent ended. Removal not confirmed. No keep-out from this forget remains.');
 });
