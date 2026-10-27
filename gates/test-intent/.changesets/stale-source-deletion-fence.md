@@ -119,3 +119,16 @@ its logs folder retains raw completed reports and XML. There was no exit-75 or r
 hazard, no commit/push/publication, and no independent acceptance authored by this builder.
 Physical Windows/volume, outcome-write/commit/crash convergence, external recreation without a
 delivered event and full Forget privacy acceptance remain unverified/held under the contract.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "8c330fb4-0ab8-439d-8de2-6a42f0669e2b",
+  "verdict": "accept",
+  "digest": "sha256:68657938e402a8b046de0edbfc1397824cc24fc767b2c8aa9f7443bf0c7ab32f",
+  "note": "Independent Codex verifier (separate session) on 3f470e6c5e: 8 repair cases fail on main for the reason under test and pass on the candidate; 4 preservation cases pass on both; adjacent controls pass on both; 64 full-suite failures reproduce identically on main (sandbox mount/watcher environment); 72 installed-Engine save cycles plus genuine deletion pass on both; live race not reproduced on main (real-system fail-before unverified)."
+}
+```
