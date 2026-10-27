@@ -25,3 +25,15 @@ The existing recovery oracle is preserved. This author records no acceptance.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17c2d-b1aa-7171-a1c9-b46333864bcc",
+  "verdict": "accept",
+  "digest": "sha256:533fd1a647f156939e799203db80b1ea10b87a78568d26d6f362fcd1c7f782dc"
+}
+```
