@@ -15,6 +15,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -22,6 +23,26 @@ import org.junit.jupiter.api.io.TempDir;
 @Timeout(45)
 final class OutstandingHttpFailureCleanupIntegrationTest {
   @TempDir(cleanup = org.junit.jupiter.api.io.CleanupMode.ON_SUCCESS) Path directory;
+
+  @Test
+  void budgetCleanupOnlyObservesItsOwnCloserThreads() throws Exception {
+    var release = new CountDownLatch(1);
+    Thread foreign = new Thread(() -> {
+      try { release.await(); }
+      catch (InterruptedException failure) { Thread.currentThread().interrupt(); }
+    }, "fixture-http-stop");
+    foreign.start();
+    try {
+      var target = new LinuxWatchedDriveReturnIntegrationTest();
+      target.directory = directory;
+      target.outstandingHttpCleanupSharesTheBudgetAndRetainsOwnersUntilRetry(0);
+      assertTrue(foreign.isAlive(), "the other fixture's closer is still independently owned");
+    } finally {
+      release.countDown();
+      foreign.join(10_000);
+    }
+    assertFalse(foreign.isAlive());
+  }
 
   @ParameterizedTest(name = "preEntryExchangeFailureKeepsItsIdentityAndClosesTheFixture({arguments})")
   @ValueSource(booleans = {false, true})
