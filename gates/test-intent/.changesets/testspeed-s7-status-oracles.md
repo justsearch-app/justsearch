@@ -464,3 +464,13 @@ cleanup remains outside S7 and is not claimed as a passing preservation check.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17c54-efef-75a0-8a70-e2a36bacdb00",
+  "verdict": "accept",
+  "digest": "sha256:83e9be2705ce179a5b81d532bdb945029c397c6c38acb859714b87ea766f40e8"
+}
+```
