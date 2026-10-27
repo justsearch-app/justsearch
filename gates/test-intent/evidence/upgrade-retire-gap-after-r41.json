@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T06:41:11.991Z",
+  "revision": "7bf055fd09412fa9a158875e57b858318cd08c1c",
+  "tree": "170a47a97d5e21ef3a340e421436acd724909243",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete\" --tests \"io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.unapprovedMalformedRootIsHeld\" --tests \"io.justsearch.indexerworker.server.ops.LegacyApprovedGapReplayTest.changedRevisionCannotReuseApproval\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3689
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "upgradingAnApprovedGapCannotTurnItsSkippedDeleteIntoAnAppliedDelete()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#unapprovedMalformedRootIsHeld",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unapprovedMalformedRootIsHeld()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java#changedRevisionCannotReuseApproval",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LegacyApprovedGapReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92b3124632cb677ba4f99c420ccb32ed6a0ceb3f922751e38dc424f894d60a6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "changedRevisionCannotReuseApproval()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d3e45ceeb2e5dde775178573bf9202b930650ed7b31227a2819bed1a6529cd2d"
+}
