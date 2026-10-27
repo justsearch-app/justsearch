@@ -76,6 +76,7 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
    */
   private final ContributionComposer<String, ExtractorContribution> composer =
       new ContributionComposer<>(id -> id);
+  private TikaExtractionPolicy effectivePolicy = TikaExtractionPolicy.defaults();
   private boolean closed;
 
   /**
@@ -97,12 +98,21 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
             true,
             null,
             Map.of(contribution.id(), contribution)));
+    if ("core.tika".equals(contribution.id())) {
+      effectivePolicy = contribution.provider() instanceof PolicyDrivenTikaExtractor policyDriven
+          ? policyDriven.policy()
+          : TikaExtractionPolicy.defaults();
+    }
   }
 
   /** Lifecycle substrate: revoke a contribution by id. Returns false if it was not installed. */
   public synchronized boolean uninstall(String id) {
     if (closed) throw new IngestionServiceUnavailableException("Extractor registry is closed");
-    return composer.uninstall(id).wasInstalled();
+    boolean wasInstalled = composer.uninstall(id).wasInstalled();
+    if (wasInstalled && "core.tika".equals(id)) {
+      effectivePolicy = TikaExtractionPolicy.defaults();
+    }
+    return wasInstalled;
   }
 
   /** The installed contribution ids, in install order. */
@@ -110,12 +120,9 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
     return composer.keys();
   }
 
-  /** The core Tika contribution's artifact policy, or the default for other providers. */
+  /** The core Tika contribution's artifact policy, retained after close, or the default otherwise. */
   public synchronized TikaExtractionPolicy policy() {
-    ExtractorContribution coreTika = composer.get("core.tika").orElse(null);
-    return coreTika != null && coreTika.provider() instanceof PolicyDrivenTikaExtractor policyDriven
-        ? policyDriven.policy()
-        : TikaExtractionPolicy.defaults();
+    return effectivePolicy;
   }
 
   /** Dispatch substrate: the first installed contribution (install order) whose predicate matches. */
@@ -147,7 +154,7 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
       if (parserId == null || parserId.isBlank()) {
         parserId = provider.getClass().getName();
       }
-      return ExtractionArtifact.full(provider.extract(file), parserId);
+      return ExtractionArtifact.full(provider.extract(file), policy(), parserId, false);
     } catch (IOException | ExtractionException | RuntimeException failure) {
       synchronized (this) {
         if (closed) throw new IngestionServiceUnavailableException("Extractor registry is closed", failure);

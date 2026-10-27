@@ -16,11 +16,12 @@ configuration precedence, recovery and ledger rows were verified separately on r
   "entries": [
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java"
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "CL1/CL2/CL4/CL11: auto and in_process factory compositions, the structured factory with an explicit policy, and both public provider constructors over a core Tika registry report the configured policy and yield text artifacts that validate against that reported policy. Each composition separately covers a content-only limit of 128 UTF-16 units and a file-only limit of 4096 bytes. CL6: text longer than the configured content limit yields SUCCESS_PARTIAL with truncated=true, keeps its prefix within the limit, excludes text after the cut, and validates against the reported configured policy.",
+      "behaviour": "CL1/CL2/CL4/CL11: auto and in_process factory compositions, the structured factory with an explicit policy, and both public provider constructors over a core Tika registry report the configured policy and yield text artifacts that validate against that reported policy. Each composition separately covers a content-only limit of 128 UTF-16 units and a file-only limit of 4096 bytes. CL6: text longer than the configured content limit yields SUCCESS_PARTIAL with truncated=true, keeps its prefix within the limit, excludes text after the cut, and validates against the reported configured policy. Ordinary contributions dispatched ahead of configured core Tika use and obey the registry policy, and close retains that policy.",
       "sources": [
         {
           "kind": "defect-source",
@@ -46,15 +47,18 @@ configuration precedence, recovery and ledger rows were verified separately on r
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#structuredFactoryReportsConfiguredFileLimitAndValidatesArtifact",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#publicConstructorsReportRegistryContentLimitAndValidateArtifact",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#publicConstructorsReportRegistryFileLimitAndValidateArtifact",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#configuredContentLimitTruncatesAndValidatesAgainstReportedPolicy"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#configuredContentLimitTruncatesAndValidatesAgainstReportedPolicy",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#ordinaryContributionUsesConfiguredRegistryPolicyAndValidatesArtifact",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#closeRetainsConfiguredCoreTikaPolicy"
       ]
     },
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java"
       ],
       "class": "New",
-      "behaviour": "CL7/CL11b: default auto, in_process, structured and registry compositions preserve default policy and valid artifacts; a direct configured Tika delegate still reports its own policy; ordinary direct providers and ordinary providers under core.tika retain the default policy and valid artifacts. CL9: validation still rejects a configured-policy artifact when defaults are expected with the policy-mismatch diagnostic. The pre-existing processFactoryBuildsSandboxWithProvidedCommandAndPolicy check is unchanged and remains the CL8 preservation check.",
+      "behaviour": "CL7/CL11b: default auto, in_process, structured and registry compositions preserve default policy and valid artifacts; a direct configured Tika delegate still reports its own policy; ordinary direct providers and ordinary providers under core.tika retain the default policy and valid artifacts. CL9: validation still rejects a configured-policy artifact when defaults are expected with the policy-mismatch diagnostic. The pre-existing processFactoryBuildsSandboxWithProvidedCommandAndPolicy check is unchanged and remains the CL8 preservation check. Explicitly uninstalling core Tika restores the default registry policy.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -70,7 +74,8 @@ configuration precedence, recovery and ledger rows were verified separately on r
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#defaultCompositionsReportDefaultPolicyAndValidateArtifacts",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#directTikaDelegateReportsConfiguredPolicyAndValidatesArtifact",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#ordinaryProvidersReportDefaultPolicyAndValidateArtifacts",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#mismatchedArtifactPolicyIsStillRejected"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxFactoryTest.java#mismatchedArtifactPolicyIsStillRejected",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractorContributionRegistryTest.java#uninstallCoreTikaRestoresDefaultPolicy"
       ]
     }
   ]

@@ -1,10 +1,13 @@
 package io.justsearch.indexerworker.extract;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.indexerworker.TestWorkerExecutorRegistrations;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
 import io.justsearch.indexerworker.extract.ExtractorContributionRegistry.ExtractorContribution;
 import io.justsearch.indexerworker.extract.ExtractorContributionRegistry.ExtractorTrust;
@@ -53,6 +56,61 @@ class ExtractorContributionRegistryTest {
 
     assertEquals("md", registry.extract(Path.of("notes.md")).content());
     assertEquals("tika", registry.extract(Path.of("notes.pdf")).content());
+  }
+
+  @Test
+  void ordinaryContributionUsesConfiguredRegistryPolicyAndValidatesArtifact() throws Exception {
+    TikaExtractionPolicy policy = configuredPolicy();
+    String markdown = "markdown sentinel ".repeat(20);
+    try (ExtractorContributionRegistry registry = new ExtractorContributionRegistry()) {
+      registry.install(
+          new ExtractorContribution(
+              "vendor.md",
+              ExtractorTrust.TRUSTED,
+              file -> file.toString().endsWith(".md"),
+              provider(markdown)));
+      registry.install(ExtractorContribution.catchAll(
+          "core.tika", ExtractorTrust.CORE,
+          new PolicyDrivenTikaExtractor(TestWorkerExecutorRegistrations.ocrFactory(), policy)));
+
+      assertEquals(policy, registry.policy());
+      ExtractionArtifact artifact = registry.extractArtifact(Path.of("notes.md"));
+      assertEquals(policy.policyId(), artifact.policyId());
+      assertEquals(markdown.substring(0, policy.maxExtractedChars()), artifact.result().content());
+      assertTrue(artifact.truncated());
+      assertEquals(ExtractionStatus.SUCCESS_PARTIAL, artifact.status());
+      assertDoesNotThrow(() -> artifact.validate(registry.policy(), null));
+    }
+  }
+
+  @Test
+  void closeRetainsConfiguredCoreTikaPolicy() {
+    TikaExtractionPolicy policy = configuredPolicy();
+    ExtractorContributionRegistry registry = ExtractorContributionRegistry.withCoreTika(
+        new PolicyDrivenTikaExtractor(TestWorkerExecutorRegistrations.ocrFactory(), policy));
+    assertEquals(policy, registry.policy());
+
+    registry.close();
+
+    assertTrue(registry.ids().isEmpty());
+    assertEquals(policy, registry.policy());
+  }
+
+  @Test
+  void uninstallCoreTikaRestoresDefaultPolicy() {
+    TikaExtractionPolicy policy = configuredPolicy();
+    try (PolicyDrivenTikaExtractor tika =
+            new PolicyDrivenTikaExtractor(TestWorkerExecutorRegistrations.ocrFactory(), policy);
+        ExtractorContributionRegistry registry = ExtractorContributionRegistry.withCoreTika(tika)) {
+      assertEquals(policy, registry.policy());
+      assertTrue(registry.uninstall("core.tika"));
+      assertEquals(TikaExtractionPolicy.defaults(), registry.policy());
+    }
+  }
+
+  private static TikaExtractionPolicy configuredPolicy() {
+    return TikaExtractionPolicy.fromWorkerLimits(
+        new ResolvedConfig.Worker(128, TikaExtractionPolicy.DEFAULT_MAX_INPUT_BYTES));
   }
 
   @Test
