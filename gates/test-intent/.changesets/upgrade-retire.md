@@ -1251,3 +1251,13 @@ R40 builder checkpoint: comparisons and executions are retained in tmp/builder/r
   "note": "F1: unknown stored model identity authorizes cancellation. F2: retirement replay loses later forced-sync admissions after an older prefix delete. See verification-report.md in a125vcwh evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a17c1b-734c-7f13-9cc5-587f8b41f3aa",
+  "verdict": "accept",
+  "digest": "sha256:fb7986e218bf52de715d2f0fe37516efeed4144fde52604947a30ea71fc5012d"
+}
+```
