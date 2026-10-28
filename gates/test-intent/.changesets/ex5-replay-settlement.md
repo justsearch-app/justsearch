@@ -51,3 +51,13 @@ is unchanged.
   "digest": "sha256:89a733af2fbf928fe1bb0eaebd3b4f7df91098c87966b1ddceac7dee0a16824b"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1806a-3817-7262-b001-027153e9265e",
+  "verdict": "accept",
+  "digest": "sha256:8c922bea1612fe9ba3f2bcce598bb441524ae5db0d19f7a94d333800b7cabed0"
+}
+```
