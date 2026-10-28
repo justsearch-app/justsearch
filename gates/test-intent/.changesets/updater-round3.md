@@ -97,7 +97,7 @@ The independent verifier supplies acceptance after checking the candidate.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/updater-round5.json",
+      "evidence": "gates/test-intent/evidence/updater-round4.json",
       "newChecks": [
         "modules/shell/src-tauri/src/updater.rs#updater::tests::committed_cleanup_never_follows_a_linked_staging_root"
       ]
