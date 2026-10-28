@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.server.ops;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -22,6 +21,7 @@ import io.justsearch.adapters.lucene.runtime.QueryFilterBuilder;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.indexerworker.queue.SwitchBufferSyncRoot;
@@ -36,10 +36,10 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 /**
- * A retained SYNC_ROOT in B's snapshot, after a pointer-before-acknowledgement stop, is never a
- * reason for the real settlement entry point, or for its root-sync replay, to accept anything the
- * existing certification refuses. What a real boot then settles is covered by the real-process
- * crash-recovery test.
+ * A retained SYNC_ROOT in B's snapshot, after a pointer-before-acknowledgement stop, is validated
+ * and acknowledged with B's other receipts and never walked again; it is never a reason for the
+ * real settlement entry point to accept anything the existing certification refuses. What a real
+ * boot then settles is covered by the real-process crash-recovery test.
  */
 final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
   private static final String B = "g-20261028-000000";
@@ -48,6 +48,91 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
   private static final String SOURCE = "memory";
 
   @TempDir Path temp;
+
+  // ---- P6: legacy and versioned payloads are acknowledged; their committed effects stand ----
+
+  @Test
+  void legacyAndVersionedRootSyncsAreAcknowledgedWithoutAWalk() throws Exception {
+    Path legacy = Files.createDirectories(temp.resolve("legacy"));
+    Path versioned = Files.createDirectories(temp.resolve("versioned"));
+    Files.writeString(legacy.resolve("on-disk.txt"), "never admitted again");
+    Files.writeString(versioned.resolve("on-disk.txt"), "never admitted again");
+    String legacyRoot = QueryFilterBuilder.normalizePathPrefix(legacy.toString());
+    try (var queue = queue()) {
+      queue.putSwitchBufferForGeneration(B, "sync_root:" + legacyRoot, "SYNC_ROOT",
+          "{\"root_path\":\"" + legacyRoot + "\",\"force\":true}");
+      syncRoot(queue, B, versioned, true, new JobQueue.EnqueueProvenance("agent", "MCP"));
+      var runtime = fileRuntime();
+
+      assertTrue(settle(queue, runtime, B));
+      assertEquals(List.of(), queue.listSwitchBufferOpsStrict(), "both receipts are acknowledged");
+      assertFalse(queue.hasNonterminalJobsByPathPrefixStrict(QueryFilterBuilder.normalizePathPrefix(temp.toString())),
+          "no file is admitted again");
+      verify(runtime.indexingCoordinator(), never()).deleteByIdAndChunks(anyString());
+    }
+  }
+
+  // ---- P7: unrelated backlog is not a prerequisite ----
+
+  @Test
+  void unrelatedQueueBacklogDoesNotHoldRootSyncSettlement() throws Exception {
+    try (var queue = queue()) {
+      Path unrelated = Files.writeString(temp.resolve("unrelated.txt"), "backlog");
+      assertEquals(1, queue.enqueue(List.of(unrelated), null));
+      syncRoot(queue, B, Files.createDirectories(temp.resolve("watched")), false);
+      delete(queue, B, file("gone.txt"));
+
+      assertTrue(settle(queue, fileRuntime(), B));
+      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+      assertTrue(queue.hasNonterminalJobsByPathPrefixStrict(
+          QueryFilterBuilder.normalizePathPrefix(temp.toString())), "the backlog is left alone");
+    }
+  }
+
+  // ---- S2: a later SYNC_ROOT supersedes the exact file receipts under its root ----
+
+  @Test
+  void fileReceiptsUnderALaterRootSyncAreAcknowledgedWithoutReplay() throws Exception {
+    Path watched = Files.createDirectories(temp.resolve("watched"));
+    String restored = watched.resolve("restored.txt").toString();
+    String outside = file("outside.txt");
+    String later = watched.resolve("later.txt").toString();
+    try (var queue = queue()) {
+      Path changed = Files.writeString(watched.resolve("changed.txt"), "admitted, then rewalked");
+      assertTrue(queue.enqueueAndBufferFileForGeneration(B,
+          JobQueue.EnqueueEntry.stat(changed).withinRoot(watched), null));
+      delete(queue, B, restored);
+      delete(queue, B, outside);
+      syncRoot(queue, B, watched, true);
+      delete(queue, B, later);
+      var runtime = fileRuntime();
+
+      assertTrue(settle(queue, runtime, B));
+      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+      verify(runtime.indexingCoordinator(), never()).deleteByIdAndChunks(restored);
+      verify(runtime.indexingCoordinator()).deleteByIdAndChunks(outside);
+      verify(runtime.indexingCoordinator()).deleteByIdAndChunks(later);
+      verify(runtime, never()).documentFieldOps();
+    }
+  }
+
+  @Test
+  void fileWitnessAcceptedAfterTheRootSyncIsStillRequired() throws Exception {
+    Path watched = Files.createDirectories(temp.resolve("watched"));
+    try (var queue = queue()) {
+      syncRoot(queue, B, watched, true);
+      Path after = Files.writeString(watched.resolve("after.txt"), "not yet in B");
+      assertTrue(queue.enqueueAndBufferFileForGeneration(B,
+          JobQueue.EnqueueEntry.stat(after).withinRoot(watched), null));
+      var retained = queue.listSwitchBufferOpsStrict();
+      var runtime = fileRuntime();
+      var fields = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      when(runtime.documentFieldOps()).thenReturn(fields);
+
+      assertFalse(settle(queue, runtime, B));
+      assertEquals(retained, queue.listSwitchBufferOpsStrict(), "nothing is acknowledged");
+    }
+  }
 
   // ---- S7: a broad-delete snapshot with a SYNC_ROOT is still refused when B disagrees ----
 
@@ -149,27 +234,6 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
     }
   }
 
-  @Test
-  void rootSyncReplayRefusesAMismatchedOrForeignReceiptAndRemovesNothing() throws Exception {
-    String watched = QueryFilterBuilder.normalizePathPrefix(temp.resolve("watched").toString());
-    String elsewhere = QueryFilterBuilder.normalizePathPrefix(temp.resolve("elsewhere").toString());
-    try (var queue = queue()) {
-      queue.putSwitchBufferForGeneration(B, "sync_root:" + elsewhere, "SYNC_ROOT",
-          new SwitchBufferSyncRoot(watched, true, null).encode());
-      syncRoot(queue, OTHER, temp, true);
-      var retained = queue.listSwitchBufferOpsStrict();
-      var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(queue, fileRuntime(),
-          null, null, null, null, null, () -> false, () -> true,
-          LoggerFactory.getLogger(CommittedNativeSyncRootTest.class), Long.MAX_VALUE, B);
-
-      for (var receipt : retained) {
-        assertThrows(IllegalArgumentException.class,
-            () -> KnowledgeServerMigrationOps.replayCommittedRootSync(context, receipt), receipt::key);
-      }
-      assertEquals(retained, queue.listSwitchBufferOpsStrict(), "nothing is replayed or removed");
-    }
-  }
-
   // ---- fixtures ----
 
   private SqliteJobQueue queue() throws Exception {
@@ -184,9 +248,14 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
 
   /** The receipt IngestSwitchBufferOps.bufferSyncDirectoryDuringSwitching journals. */
   private static void syncRoot(SqliteJobQueue queue, String generation, Path root, boolean force) {
+    syncRoot(queue, generation, root, force, null);
+  }
+
+  private static void syncRoot(SqliteJobQueue queue, String generation, Path root, boolean force,
+      JobQueue.EnqueueProvenance provenance) {
     String normalized = QueryFilterBuilder.normalizePathPrefix(root.toAbsolutePath().toString());
     assertTrue(queue.putSyncRootForGeneration(generation, "sync_root:" + normalized,
-        new SwitchBufferSyncRoot(normalized, force, null)));
+        new SwitchBufferSyncRoot(normalized, force, provenance)));
   }
 
   /** The receipt IngestSwitchBufferOps.journalDeletePrefixForGeneration journals. */

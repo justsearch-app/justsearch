@@ -162,8 +162,6 @@ public final class KnowledgeServer implements Closeable {
    * deferred root the person removed after it is dropped from the deferred set, never reconciled.
    */
   private volatile long deferredBootRootsRemovalMark;
-  /** Whether that generation still retains a SYNC_ROOT receipt whose replay has not succeeded. */
-  private volatile boolean deferredRootSyncs;
   /** Deferred roots reconciled on the running server that still await convergence. */
   private final Set<RootBinding> reconciledDeferredBootRoots =
       java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -7581,11 +7579,6 @@ public final class KnowledgeServer implements Closeable {
    * convergence check so every other root is served, and this generation's root reconciliation
    * stays unsettled, which keeps the previous generation until {@link #settleDeferredBootRoots}
    * has reconciled the root on its returned volume. Every other failure fails the boot as before.
-   *
-   * <p>A native B's retained SYNC_ROOT receipts are then replayed on B through the switch-buffer
-   * SYNC_ROOT replay the cutover uses, and each exact revision is removed once its replay
-   * succeeded. A receipt whose root is missing, away or fails keeps the previous generation and is
-   * retried by {@link #settleDeferredBootRoots}, never a start-up failure.
    */
   private void settleCommittedBootRoots(String expectedActive) throws IOException {
     if (!bootRootBindingsBound) {
@@ -7658,7 +7651,6 @@ public final class KnowledgeServer implements Closeable {
         }
       }
     }
-    List<RootBinding> deferredAtPublication = null;
     for (int attempt = 0; attempt < 3; attempt++) {
       if (closeStarted || System.nanoTime() >= deadline) break;
       List<RootBinding> settling = new ArrayList<>();
@@ -7721,8 +7713,12 @@ public final class KnowledgeServer implements Closeable {
               if (!fence.releaseCurrentOwnerIfReplayCertain()) {
                 throw new IOException("Committed successor watcher failed at final release");
               }
-              deferredAtPublication = deferred;
-              break;
+              if (deferred.isEmpty()) {
+                rootReconciliationSettledGeneration = expectedActive;
+              } else {
+                deferBootRoots(expectedActive, deferred, removalMark);
+              }
+              return;
             }
           }
         } finally {
@@ -7733,34 +7729,18 @@ public final class KnowledgeServer implements Closeable {
         throw new IOException("Committed successor root replay interrupted", interrupted);
       }
     }
-    if (deferredAtPublication == null) {
-      throw new IOException("Committed successor roots did not converge before publication");
-    }
-    // Outside the writer pause and the fence: the replay walks and queues as the cutover did.
-    boolean rootSyncsRetained = nativeOwner && !replayRetainedRootSyncs(producer, active, expectedActive);
-    if (deferredAtPublication.isEmpty() && !rootSyncsRetained) {
-      rootReconciliationSettledGeneration = expectedActive;
-    } else {
-      deferBootRoots(expectedActive, deferredAtPublication, removalMark, rootSyncsRetained);
-    }
+    throw new IOException("Committed successor roots did not converge before publication");
   }
 
-  private void deferBootRoots(String expectedActive, List<RootBinding> deferred, long removalMark,
-      boolean rootSyncsRetained) {
+  private void deferBootRoots(
+      String expectedActive, List<RootBinding> deferred, long removalMark) {
     reconciledDeferredBootRoots.clear();
     deferredBootRootsGeneration = expectedActive;
     deferredBootRootsRemovalMark = removalMark;
     deferredBootRoots = List.copyOf(deferred);
-    deferredRootSyncs = rootSyncsRetained;
-    if (!deferred.isEmpty()) {
-      log.warn("Committed boot deferred {} root(s) not on the volume first seen at their path: {};"
-              + " the previous generation is kept until they are reconciled on that volume",
-          deferred.size(), deferred.stream().map(RootBinding::path).toList());
-    }
-    if (rootSyncsRetained) {
-      log.warn("Committed boot keeps generation {}'s retained root sync(s) whose replay did not"
-          + " succeed; the previous generation is kept until they replay", expectedActive);
-    }
+    log.warn("Committed boot deferred {} root(s) not on the volume first seen at their path: {};"
+            + " the previous generation is kept until they are reconciled on that volume",
+        deferred.size(), deferred.stream().map(RootBinding::path).toList());
     // The server's own maintenance scheduler, opened before the boot reconcile, runs the check
     // only while something is deferred; it is closed with the reaper.
     if (stuckJobReaper != null && deferredBootRootTask == null) {
@@ -7792,18 +7772,15 @@ public final class KnowledgeServer implements Closeable {
    * resolved: it is never reconciled, watched or indexed, and nothing of it is carried forward.
    * When none is left the check stops. A root is reconciled only once it is proven on the volume
    * recorded for it; this check never records a volume.
-   *
-   * <p>Retained SYNC_ROOT receipts whose boot replay did not succeed are replayed again here, and
-   * settle the generation only once every one of them replayed and was removed.
    */
   private void settleDeferredBootRoots() {
-    if ((deferredBootRoots.isEmpty() && !deferredRootSyncs) || closeStarted) return;
+    if (deferredBootRoots.isEmpty() || closeStarted) return;
     boolean allSettled;
     runtimeSwapLock.lock();
     try {
       List<RootBinding> pending = deferredBootRoots;
       String expectedActive = deferredBootRootsGeneration;
-      if ((pending.isEmpty() && !deferredRootSyncs) || closeStarted || indexGenerationManager == null
+      if (pending.isEmpty() || closeStarted || indexGenerationManager == null
           || !(appServices instanceof DefaultWorkerAppServices producer)
           || !(ingestLifecycle instanceof RunningRuntime active)
           || ingestLifecycle != searchLifecycle || !active.isAcceptingWrites()) return;
@@ -7814,7 +7791,6 @@ public final class KnowledgeServer implements Closeable {
             expectedActive);
         reconciledDeferredBootRoots.clear();
         deferredBootRoots = List.of();
-        deferredRootSyncs = false;
         if (deferredBootRootTask != null) deferredBootRootTask.cancel(false);
         return;
       }
@@ -7830,10 +7806,7 @@ public final class KnowledgeServer implements Closeable {
           declared.stream().filter(binding -> !settled.contains(binding)).toList(), removalMark);
       settled.forEach(reconciledDeferredBootRoots::remove);
       deferredBootRoots = remaining;
-      if (deferredRootSyncs) {
-        deferredRootSyncs = !replayRetainedRootSyncs(producer, active, expectedActive);
-      }
-      allSettled = remaining.isEmpty() && !deferredRootSyncs;
+      allSettled = remaining.isEmpty();
       if (allSettled) {
         if (deferredBootRootTask != null) deferredBootRootTask.cancel(false);
         rootReconciliationSettledGeneration = expectedActive;
@@ -7844,42 +7817,6 @@ public final class KnowledgeServer implements Closeable {
       runtimeSwapLock.unlock();
     }
     if (allSettled) retryCommittedGenerationRetirement();
-  }
-
-  /**
-   * Replays each retained SYNC_ROOT receipt of the committed native {@code generation} on B through
-   * the switch-buffer SYNC_ROOT replay, and removes exactly the revisions whose replay succeeded.
-   * True once none of its SYNC_ROOT receipts is left; a receipt accepted meanwhile stays retained.
-   */
-  @SuppressWarnings("PMD.AvoidCatchingGenericException") // a failed replay or removal is retried
-  private boolean replayRetainedRootSyncs(
-      DefaultWorkerAppServices producer, RunningRuntime active, String generation) {
-    try {
-      if (!(jobQueue instanceof SwitchBufferCapableQueue journal)) {
-        throw new IOException("Committed root syncs require a generation journal");
-      }
-      var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
-          jobQueue, active, signalBus, indexingPacing, indexBasePath, activeIndexPath, JSON,
-          KnowledgeServer::chunkSpladeEnabled, () -> true, log, Long.MAX_VALUE, generation,
-          this::projectionSourceReady).withPublisher(producer.ingestService());
-      for (var receipt : retainedRootSyncs(journal, generation)) {
-        if (closeStarted) return false;
-        if (!KnowledgeServerMigrationOps.replayCommittedRootSync(context, receipt)) continue;
-        migrationTransitionForPublication("committed-boot-root-sync-replayed");
-        journal.removeReplayedSwitchBufferOpsForGeneration(generation, List.of(receipt));
-      }
-      return retainedRootSyncs(journal, generation).isEmpty();
-    } catch (IOException | RuntimeException failure) {
-      log.warn("Retained root syncs of {} stay for another replay: {}", generation,
-          failure.toString());
-      return false;
-    }
-  }
-
-  private static List<SwitchBufferCapableQueue.SwitchBufferOp> retainedRootSyncs(
-      SwitchBufferCapableQueue journal, String generation) {
-    return journal.listSwitchBufferOpsStrictForGeneration(generation).stream()
-        .filter(op -> "SYNC_ROOT".equals(op.op())).toList();
   }
 
   /** {@code bindings} without the roots the person removed after {@code removalMark}. */
