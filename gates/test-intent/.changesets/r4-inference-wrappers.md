@@ -82,3 +82,13 @@ author-session: 01a181de-5332-7be0-a7af-2f3904d4d6c0
   "digest": "sha256:ece9f6a6fc31a0ec8db2ab440f823a31b16342440aa93b33ab91b69122774f85"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a181f7-6061-76e1-b075-528366567bc8",
+  "verdict": "accept",
+  "digest": "sha256:ece9f6a6fc31a0ec8db2ab440f823a31b16342440aa93b33ab91b69122774f85"
+}
+```
