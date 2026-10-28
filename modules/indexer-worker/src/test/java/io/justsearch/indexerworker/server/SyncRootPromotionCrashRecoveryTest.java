@@ -215,28 +215,31 @@ final class SyncRootPromotionCrashRecoveryTest {
 
   /**
    * S4: a revision of an UPSERT receipt replaces the cutover's after its snapshot. The first
-   * restart's first receipt removal fails (S4b); the restart stops abruptly again once the
-   * receipts are acknowledged, before publication (S4a). The next restart publishes and settles.
+   * restart's first SYNC_ROOT removal (S4b) and the removal of an exact DELETE that the later
+   * force=true sync of its collection root superseded (S4c) are each ignored once; the restart
+   * stops abruptly again once the receipts are acknowledged, before publication (S4a). The next
+   * restart publishes and settles.
    */
   @Test
   void interruptedSettlementKeepsRetryableEvidenceAndSettlesOnRetry(@TempDir Path root)
       throws Exception {
     migrateAndCut(root, "NATIVE", "replacement", AFTER_POINTER);
     String generation = Files.readString(root.resolve("building"));
-    sql(root, "CREATE TABLE removal_fault(id INTEGER)", "INSERT INTO removal_fault VALUES (1)",
-        "CREATE TRIGGER removal_fault_once BEFORE DELETE ON switch_buffer"
-            + " WHEN OLD.op = 'SYNC_ROOT' AND EXISTS (SELECT 1 FROM removal_fault)"
-            + " BEGIN DELETE FROM removal_fault; SELECT RAISE(IGNORE); END");
+    String rootSync = "sync_root:" + PathNormalizer.normalizePathPrefix(root.resolve("watched").toString());
+    String supersededDelete = "path:" + key(root.resolve("archive/a-restored.txt"));
+    Files.write(root.resolve("refuse-removals"), List.of(rootSync, supersededDelete));
     var interrupted = restart(root, "NATIVE", "replacement", "restart-halt");
+    Files.delete(root.resolve("refuse-removals"));
+    var refused = Files.exists(root.resolve("refused")) ? Files.readAllLines(root.resolve("refused")) : List.of();
     var state = new IndexGenerationManager(root.resolve("data/index")).readStateBestEffort();
     assertAll("S4: the interrupted settlement leaves retryable evidence",
-        () -> assertEquals(0, count(root, "SELECT COUNT(*) FROM removal_fault"),
-            "S4b: one receipt removal was refused"),
+        () -> assertTrue(refused.contains(rootSync), "S4b: one receipt removal was refused"),
+        () -> assertTrue(refused.contains(supersededDelete), "S4c: the superseded DELETE's removal was refused"),
         () -> assertTrue(interrupted.halted(), "S4a: the restart stopped at publication"),
         () -> assertFalse(interrupted.published(), "S4a: nothing was published"),
         () -> assertEquals(generation, state.active_generation()),
         () -> assertNotNull(state.previous_generation(), "the predecessor keeps the next boot committed"),
-        () -> assertEquals(List.of(), retained(root, generation), "S4b: the refused removal was retried"));
+        () -> assertEquals(List.of(), retained(root, generation), "S4b/S4c: the refused removal was retried"));
     Files.writeString(root.resolve("await-retirement"), "yes");
     var restart = restart(root, "NATIVE", "replacement", "restart");
     assertRootSyncsSettled("S4", restart);
@@ -246,6 +249,8 @@ final class SyncRootPromotionCrashRecoveryTest {
         () -> assertHits(restart, "archivekeeptoken", "archive/keep.txt"),
         () -> assertEquals("true", restart.hits().getProperty("@previous-retired"),
             "the predecessor is retired once B settled"));
+    assertAll("S4c: the retry acknowledged the whole snapshot; the superseded DELETE was not replayed",
+        () -> assertHits(restart, "arestoredtoken", "archive/a-restored.txt"));
   }
 
   /**
@@ -392,20 +397,6 @@ final class SyncRootPromotionCrashRecoveryTest {
       queue.open();
       return queue.listSwitchBufferOpsStrict().stream().filter(op -> generation.equals(op.generation()))
           .map(op -> op.op()).toList();
-    }
-  }
-
-  private static void sql(Path root, String... statements) throws Exception {
-    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + root.resolve("data/jobs.db"));
-        var statement = connection.createStatement()) {
-      for (String command : statements) statement.executeUpdate(command);
-    }
-  }
-
-  private static int count(Path root, String query) throws Exception {
-    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + root.resolve("data/jobs.db"));
-        var statement = connection.createStatement(); var row = statement.executeQuery(query)) {
-      return row.next() ? row.getInt(1) : -1;
     }
   }
 
@@ -625,6 +616,15 @@ final class SyncRootPromotionCrashRecoveryTest {
         WorkerBootFixture.workerConfig(dataDir), null, ManagedChildRegistry.noop(), lifecycle(root)));
     org.mockito.Mockito.doNothing().when(server)
         .startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
+    if (Files.exists(root.resolve("refuse-removals"))) {
+      var refusing = java.util.concurrent.ConcurrentHashMap.<String>newKeySet();
+      refusing.addAll(Files.readAllLines(root.resolve("refuse-removals")));
+      // The queue is open and boot has not settled B's receipts yet.
+      org.mockito.Mockito.doAnswer(reaper -> {
+        refuseRemovalsOnce(root, (SqliteJobQueue) reaper.getArgument(0), refusing);
+        return reaper.callRealMethod();
+      }).when(server).startStuckJobReaper(org.mockito.ArgumentMatchers.any());
+    }
     server.bindBootRootBindings(watched.stream().map(path -> new RootBinding(path, null)).toList());
     server.bindExclusionRoots(() -> watched);
     if (scenario.equals("projection")) server.installProjectionSeedSources(List.of(new ProjectionSeedSource() {
@@ -637,6 +637,45 @@ final class SyncRootPromotionCrashRecoveryTest {
       migrate(root, mode, scenario, server);
     } else {
       restart(root, mode, scenario, phase, server, watched);
+    }
+  }
+
+  /**
+   * S4b and S4c: the first removal of each named receipt is ignored, as a row that vanished would
+   * be, and recorded in {@code refused}. The refusal lives in this process, so rolling the removal
+   * back does not arm it again.
+   */
+  private static void refuseRemovalsOnce(Path root, SqliteJobQueue queue, java.util.Set<String> keys)
+      throws ReflectiveOperationException, java.sql.SQLException {
+    var connectionField = SqliteJobQueue.class.getDeclaredField("connection");
+    var lockField = SqliteJobQueue.class.getDeclaredField("lock");
+    connectionField.setAccessible(true);
+    lockField.setAccessible(true);
+    var lock = (java.util.concurrent.locks.ReentrantLock) lockField.get(queue);
+    lock.lock();
+    try {
+      var connection = (java.sql.Connection) connectionField.get(queue);
+      org.sqlite.Function.create(connection, "refuse_removal", new org.sqlite.Function() {
+        @Override protected void xFunc() throws java.sql.SQLException {
+          String key = value_text(0);
+          boolean refused = keys.remove(key);
+          if (refused) {
+            try {
+              Files.writeString(root.resolve("refused"), key + "\n", java.nio.file.StandardOpenOption.CREATE,
+                  java.nio.file.StandardOpenOption.APPEND);
+            } catch (IOException failure) {
+              throw new java.sql.SQLException(failure);
+            }
+          }
+          result(refused ? 1 : 0);
+        }
+      });
+      try (var statement = connection.createStatement()) {
+        statement.execute("CREATE TEMP TRIGGER refuse_removal BEFORE DELETE ON main.switch_buffer"
+            + " WHEN refuse_removal(OLD.key) BEGIN SELECT RAISE(IGNORE); END");
+      }
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -811,6 +850,8 @@ final class SyncRootPromotionCrashRecoveryTest {
       case "replacement" -> {
         write(root, "archive/keep.txt", "archivekeeptoken");
         syncRoot(queue, building, root.resolve("watched"), true, null);
+        // S4c: inside the collection root, the force=true sync after it supersedes this receipt.
+        delete(queue, building, write(root, "archive/a-restored.txt", "arestoredtoken")); // stays on disk
         syncRoot(queue, building, root.resolve("archive"), true, null);
         // A collection root no sync covers: only this receipt brings late.txt into B.
         upsert(queue, building, root, write(root, "shelf/late.txt", "lateoldtoken"));

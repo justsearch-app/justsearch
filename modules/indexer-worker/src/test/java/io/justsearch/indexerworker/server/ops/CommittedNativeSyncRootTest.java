@@ -172,6 +172,51 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
     }
   }
 
+  // ---- B's selected receipts are acknowledged together, so a retry never sees one alone ----
+
+  @Test
+  void partialAcknowledgementLeavesEverySelectedReceiptForTheRetry() throws Exception {
+    Path archive = Files.createDirectories(temp.resolve("archive"));
+    String restored = archive.resolve("restored.txt").toAbsolutePath().toString();
+    try (var queue = queue()) {
+      delete(queue, B, restored);
+      syncRoot(queue, B, archive, true);
+      var retained = queue.listSwitchBufferOpsStrict();
+      var runtime = fileRuntime();
+      refuseDeleteRemoval(true);
+
+      assertFalse(settle(queue, runtime, B), "the DELETE's removal was refused");
+      assertEquals(retained, queue.listSwitchBufferOpsStrict(), "the SYNC_ROOT that supersedes it stays too");
+      refuseDeleteRemoval(false);
+      assertTrue(settle(queue, runtime, B));
+      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+      verify(runtime.indexingCoordinator(), never()).deleteByIdAndChunks(restored);
+    }
+  }
+
+  @Test
+  void partialMixedAcknowledgementLeavesEverySelectedReceiptForTheRetry() throws Exception {
+    Path archive = Files.createDirectories(temp.resolve("archive"));
+    String restored = archive.resolve("restored.txt").toAbsolutePath().toString();
+    var later = projectionAt("later", 1, "notes", file("notes/later.md"));
+    try (var queue = queue(); var runtime = luceneRuntime()) {
+      indexFile(runtime, restored);
+      index(runtime, later);
+      delete(queue, B, restored);
+      syncRoot(queue, B, archive, true);
+      queue.admitProjectionForGeneration(B, later.encode());
+      var retained = queue.listSwitchBufferOpsStrict();
+      refuseDeleteRemoval(true);
+
+      assertFalse(settle(queue, runtime, B, List.of(SOURCE)), "the DELETE's removal was refused");
+      assertEquals(retained, queue.listSwitchBufferOpsStrict(), "the SYNC_ROOT that supersedes it stays too");
+      refuseDeleteRemoval(false);
+      assertTrue(settle(queue, runtime, B, List.of(SOURCE)));
+      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+      assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(restored), "B keeps the restored file");
+    }
+  }
+
   // ---- S7: a broad-delete snapshot with a SYNC_ROOT is still refused when B disagrees ----
 
   @Test
@@ -306,6 +351,15 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
   private static void delete(SqliteJobQueue queue, String generation, String path) {
     assertTrue(queue.putSwitchBufferForGeneration(generation, "path:" + path, "DELETE",
         new SwitchBufferDelete(path, SwitchBufferDelete.Origin.EXPLICIT, null).encode()));
+  }
+
+  /** While refused, SQLite ignores the removal of any DELETE receipt, as a vanished row would be. */
+  private void refuseDeleteRemoval(boolean refused) throws Exception {
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+        var statement = connection.createStatement()) {
+      statement.execute(refused ? "CREATE TRIGGER refuse_delete_removal BEFORE DELETE ON switch_buffer"
+          + " WHEN OLD.op = 'DELETE' BEGIN SELECT RAISE(IGNORE); END" : "DROP TRIGGER refuse_delete_removal");
+    }
   }
 
   private String file(String leaf) {

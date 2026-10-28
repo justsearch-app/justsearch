@@ -804,7 +804,8 @@ public final class KnowledgeServerMigrationOps {
    * Settle the accepted UPSERT receipts against their exact queue revision and B source identity;
    * replay exact DELETEs on B in accepted order, then durably commit and verify their absence.
    * Mixed projection and broad-delete snapshots certify B's final accepted effects without
-   * replaying destructive mutations. Conditional removal retains concurrent replacement rows.
+   * replaying destructive mutations. Conditional removal retains concurrent replacement rows and
+   * acknowledges the selected receipts together or not at all.
    * A SYNC_ROOT was replayed onto B before its pointer moved: its exact receipt is validated and
    * acknowledged with the others in accepted order, never walked again. On either path, a file
    * receipt a later SYNC_ROOT covers is checked as a receipt only.
@@ -868,7 +869,7 @@ public final class KnowledgeServerMigrationOps {
           if (!certifyCommittedDeleteScope(queue, active, effects, survivors, i, List.of())) return false;
         }
       }
-      if (scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) return false;
+      if (!acknowledgeEvery(scoped, selected)) return false;
       return scoped.listSwitchBufferOpsStrict().stream()
           .noneMatch(op -> generation.equals(op.generation()));
     } catch (IOException | RuntimeException unavailable) {
@@ -1143,14 +1144,23 @@ public final class KnowledgeServerMigrationOps {
           }
         }
       }
-      if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
-        return false;
-      }
+      if (!selected.isEmpty() && !acknowledgeEvery(scoped, selected)) return false;
       return switchBufferEmptyStrict(queue, generation);
     } catch (IOException | RuntimeException unavailable) {
       log.warn("Committed native file witnesses remain unresolved", unavailable);
       return false;
     }
+  }
+
+  /**
+   * Acknowledges B's selected receipts together or not at all. Supersession reads the later
+   * receipt from the retained snapshot, so a partial removal could let a retry replay an earlier
+   * receipt alone; the retry instead sees the whole snapshot again.
+   */
+  private static boolean acknowledgeEvery(SwitchBufferCapableQueue scoped,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> selected) {
+    return scoped instanceof SqliteJobQueue sqlite ? sqlite.removeEveryReplayedSwitchBufferOp(selected)
+        : scoped.removeReplayedSwitchBufferOps(selected) == selected.size();
   }
 
   /** File receipts whose path a SYNC_ROOT accepted after them walked again before B committed. */

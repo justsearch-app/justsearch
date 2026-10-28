@@ -2214,6 +2214,36 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  /**
+   * Removes every unchanged version of a settled snapshot, or none. A removal that leaves any
+   * selected version behind is rolled back in the same transaction, so a later receipt whose
+   * effect supersedes an earlier one is never acknowledged without it.
+   */
+  public boolean removeEveryReplayedSwitchBufferOp(List<SwitchBufferCapableQueue.SwitchBufferOp> replayed) {
+    var snapshot = List.copyOf(replayed);
+    for (var entry : snapshot) {
+      if (entry.revision() == null || entry.revision().isBlank()) {
+        throw new IllegalArgumentException("Replayed buffer entry has no replacement identity");
+      }
+    }
+    lock.lock();
+    try {
+      ensureOpen();
+      return inTransaction(() -> {
+        var removal = connection.setSavepoint();
+        boolean complete = switchBufferOps.removeReplayedLocked(snapshot) == snapshot.size();
+        if (!complete) connection.rollback(removal);
+        connection.releaseSavepoint(removal);
+        return complete;
+      });
+    } catch (SQLException failure) {
+      recordDbError();
+      throw new IllegalStateException("Failed to remove replayed switch-buffer versions", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
 
   @Override
   public int enqueue(List<Path> paths, String collection) {
