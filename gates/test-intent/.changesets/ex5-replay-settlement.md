@@ -41,3 +41,13 @@ is unchanged.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18032-2638-7a21-8631-def678fd8ebb",
+  "verdict": "accept",
+  "digest": "sha256:89a733af2fbf928fe1bb0eaebd3b4f7df91098c87966b1ddceac7dee0a16824b"
+}
+```
