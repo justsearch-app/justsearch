@@ -113,3 +113,14 @@ D4 evidence paths are handover inputs for the orchestrator. Builder has behavior
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a183bd-577c-7b03-a83c-3769053d2773",
+  "verdict": "accept",
+  "digest": "sha256:62dc0645bb4edba72376bea592022df259e20f9a9203071c5a6261be0956f169",
+  "note": "Codex verifier-2 (separate session, same family): All four entries and current D4 evidence checked."
+}
+```

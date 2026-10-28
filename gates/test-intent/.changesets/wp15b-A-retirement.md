@@ -312,3 +312,14 @@ Exact removed files/members license only retired old-host policies. Retained or 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a183bd-577c-7b03-a83c-3769053d2773",
+  "verdict": "accept",
+  "digest": "sha256:cf6d1f11e0575528b43adaa0f844a34579f318c7d009afcb6e8e207ce5784d1b",
+  "note": "Codex verifier-2 (separate session, same family): Named removals fit SA15 and adopted retirement decisions."
+}
+```

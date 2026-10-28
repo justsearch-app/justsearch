@@ -809,3 +809,14 @@ S2 assertion-level mapping and mutation commands/results are in tmp/verify/wp1.5
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a183bd-577c-7b03-a83c-3769053d2773",
+  "verdict": "accept",
+  "digest": "sha256:be072ce48f8b69d5ed63d023bd5fb8ea17c25912e4afe37645d5c70be48eeacc",
+  "note": "Codex verifier-2 (separate session, same family): 36 adaptations and 2 structural rules preserve their oracles."
+}
+```

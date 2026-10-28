@@ -57,3 +57,14 @@ SA15 compatibility implementation. D4 files and independent acceptance are left 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a183bd-577c-7b03-a83c-3769053d2773",
+  "verdict": "accept",
+  "digest": "sha256:5db45bf5a9c11fff24843badf146b7beebd757d67e46e8af46b32bb8da6c7914",
+  "note": "Codex verifier-2 (separate session, same family): SA15 New expectations and execution evidence fit delegation."
+}
+```
