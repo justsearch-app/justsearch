@@ -75,7 +75,7 @@
         "io.justsearch.indexerworker.extract.ExtractionOutcomeClassifierTest"
       ],
       "pure": true,
-      "law": "Total, injective mapping from an extraction attempt's (content, truncated) facts to its ExtractionStatus; blank content maps to SUCCESS_EMPTY regardless of truncated, non-blank+truncated maps to SUCCESS_PARTIAL, non-blank+untruncated maps to SUCCESS_FULL. A swapped/reused arm silently claims full success for a document with no usable content — the same failure mode as ocr-outcome-classifier, one level more foundational (tempdoc 671, Long-term design part 2).",
+      "law": "Total mapping from an extraction attempt's (content, truncated, lossy) facts to its ExtractionStatus; blank content maps to SUCCESS_EMPTY regardless of truncation or decoding loss, non-blank with truncation or decoding loss maps to SUCCESS_PARTIAL, otherwise non-blank maps to SUCCESS_FULL. A swapped/reused arm silently claims full success for a document with no usable content — the same failure mode as ocr-outcome-classifier, one level more foundational (tempdoc 671, Long-term design part 2).",
       "guard": "test:ExtractionOutcomeClassifierTest",
       "note": "Functional-core extraction from ExtractionArtifact.full (both overloads) — the cross-extractor, already-indexed trust/provenance field, not OCR-specific. Confirmed via live testing to affect any empty document (plain text, third-party extractor plugins), not just scans."
     },

@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.loop;
 
 import io.justsearch.indexerworker.extract.TikaExtractionPolicy;
+import io.justsearch.indexerworker.extract.ExtractionStatus;
 import io.justsearch.indexerworker.extract.ValidatedExtractionArtifact;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.util.PathNormalizer;
@@ -71,7 +72,9 @@ public final class LedgerEntryFactory {
         artifact != null ? artifact.policyId() : defaultPolicy.policyId(),
         artifact != null ? artifact.parserId() : "UNKNOWN",
         provenance == null ? null : provenance.originator(),
-        provenance == null ? null : provenance.transport());
+        provenance == null ? null : provenance.transport(),
+        artifact != null && artifact.status() == ExtractionStatus.SUCCESS_PARTIAL
+            ? artifact.rawArtifact().partialReasonCode() : null);
   }
 
   private static String blankToNull(String value) {

@@ -1,0 +1,883 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T01:01:01.400Z",
+  "revision": "3bfb0dfe7fba8d1ae06753330b65366ae7e9eaca",
+  "tree": "bd0b3790c6217536731e9400d0ff25f4a82f6c51",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.flatFallbackDiscardsFailedAttemptState\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlEncodingMetaCannotInventLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlParserMetaCannotEnableAuditForMail\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lateHtmlDeclarationUsesReportedCharset\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanWindows1252IsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanShiftJisIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanGb18030IsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanEucKrIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanKoi8RIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.undeclaredHtmlIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.intentionalReplacementCharacterIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8WithBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8WithoutBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.asciiIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf16LeBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf16BeBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf16LeWithoutBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf16BeWithoutBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.markdownUsesTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.jsonUsesTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sourceUsesSourceCodeParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.csvUsesTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.tsvUsesTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanHtmlIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanTruncationRemainsPartialWithoutLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.blankRemainsEmpty\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inputBudgetStillRefusesBeforeParsing\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.validDecodedControlsDoNotImplyLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.misdeclaredMailPartKeepsExistingOutcome\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.invalidXmlStillFailsThroughXmlParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.pdfKeepsExistingOutcome\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.officeKeepsExistingOutcome\" --tests \"io.justsearch.indexerworker.extract.ExtractionOutcomeClassifierTest.intentionalReplacementAndControlsDoNotImplyLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.plainTextParserOwnsOuterDocument\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inlineImageHtmlParserOwnsOuterDocument\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.containerWithOuterCharsetAndLossyTextPartIsNotAudited\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.samePdfNamedPdfIsNotAudited\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanAsciiAuditIsNotLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.validUtf8AcrossAuditBufferInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.validUtf8AcrossAuditBufferSpilled\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4379
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.JobQueueTest.historicalPartialLedgerReasonRemainsUnchangedAfterReopen\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2058
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#flatFallbackDiscardsFailedAttemptState",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "flatFallbackDiscardsFailedAttemptState()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlEncodingMetaCannotInventLoss",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "htmlEncodingMetaCannotInventLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlParserMetaCannotEnableAuditForMail",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "htmlParserMetaCannotEnableAuditForMail()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lateHtmlDeclarationUsesReportedCharset",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lateHtmlDeclarationUsesReportedCharset()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanWindows1252IsUnchanged",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cleanWindows1252IsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanShiftJisIsUnchanged",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cleanShiftJisIsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanGb18030IsUnchanged",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cleanGb18030IsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanEucKrIsUnchanged",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cleanEucKrIsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanKoi8RIsUnchanged",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cleanKoi8RIsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#undeclaredHtmlIsUnchanged",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "undeclaredHtmlIsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#intentionalReplacementCharacterIsClean",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "intentionalReplacementCharacterIsClean()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8WithBomIsClean",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf8WithBomIsClean()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8WithoutBomIsClean",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf8WithoutBomIsClean()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#asciiIsClean",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "asciiIsClean()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf16LeBomIsClean",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf16LeBomIsClean()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf16BeBomIsClean",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf16BeBomIsClean()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf16LeWithoutBomIsClean",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf16LeWithoutBomIsClean()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf16BeWithoutBomIsClean",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf16BeWithoutBomIsClean()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#markdownUsesTextParser",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "markdownUsesTextParser()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#jsonUsesTextParser",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "jsonUsesTextParser()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sourceUsesSourceCodeParser",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sourceUsesSourceCodeParser()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#csvUsesTextParser",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "csvUsesTextParser()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#tsvUsesTextParser",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tsvUsesTextParser()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanHtmlIsUnchanged",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cleanHtmlIsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanTruncationRemainsPartialWithoutLoss",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cleanTruncationRemainsPartialWithoutLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#blankRemainsEmpty",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blankRemainsEmpty()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#inputBudgetStillRefusesBeforeParsing",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inputBudgetStillRefusesBeforeParsing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validDecodedControlsDoNotImplyLoss",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validDecodedControlsDoNotImplyLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#misdeclaredMailPartKeepsExistingOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "misdeclaredMailPartKeepsExistingOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#invalidXmlStillFailsThroughXmlParser",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidXmlStillFailsThroughXmlParser()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#pdfKeepsExistingOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pdfKeepsExistingOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#officeKeepsExistingOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "officeKeepsExistingOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionOutcomeClassifierTest.java#intentionalReplacementAndControlsDoNotImplyLoss",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionOutcomeClassifierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eb4c5a6fa5a67bca7466be26d09e0895f43e59453077f5c6f64883b7f3882131",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "intentionalReplacementAndControlsDoNotImplyLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueTest.java#historicalPartialLedgerReasonRemainsUnchangedAfterReopen",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1789805d6270efa24f9fb3522ac7f00205f6001ac209897202e52e7f874451f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "historicalPartialLedgerReasonRemainsUnchangedAfterReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#plainTextParserOwnsOuterDocument",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plainTextParserOwnsOuterDocument()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#inlineImageHtmlParserOwnsOuterDocument",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inlineImageHtmlParserOwnsOuterDocument()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#containerWithOuterCharsetAndLossyTextPartIsNotAudited",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containerWithOuterCharsetAndLossyTextPartIsNotAudited()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#samePdfNamedPdfIsNotAudited",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "samePdfNamedPdfIsNotAudited()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanAsciiAuditIsNotLossy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cleanAsciiAuditIsNotLossy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validUtf8AcrossAuditBufferInMemory",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validUtf8AcrossAuditBufferInMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validUtf8AcrossAuditBufferSpilled",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:39c18d3860618050415e560827b3ca35dc6875b0b4e284025e4c667e826174a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validUtf8AcrossAuditBufferSpilled()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2950147c7e",
+    "revision": "2950147c7e42db172c71194e1041de8cdd289e6f",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/compatibility/lossy-decoding-before.patch",
+        "contentDigest": "sha256:e02d7d67846e6d5b8455880ac46e94f562ab843e20a358dd9d59b6ca2a33dafc"
+      }
+    ],
+    "runs": [
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.flatFallbackDiscardsFailedAttemptState\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlEncodingMetaCannotInventLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlParserMetaCannotEnableAuditForMail\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lateHtmlDeclarationUsesReportedCharset\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanWindows1252IsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanShiftJisIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanGb18030IsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanEucKrIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanKoi8RIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.undeclaredHtmlIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.intentionalReplacementCharacterIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8WithBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8WithoutBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.asciiIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf16LeBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf16BeBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf16LeWithoutBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf16BeWithoutBomIsClean\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.markdownUsesTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.jsonUsesTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sourceUsesSourceCodeParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.csvUsesTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.tsvUsesTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanHtmlIsUnchanged\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanTruncationRemainsPartialWithoutLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.blankRemainsEmpty\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inputBudgetStillRefusesBeforeParsing\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.validDecodedControlsDoNotImplyLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.misdeclaredMailPartKeepsExistingOutcome\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.invalidXmlStillFailsThroughXmlParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.pdfKeepsExistingOutcome\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.officeKeepsExistingOutcome\" --tests \"io.justsearch.indexerworker.extract.ExtractionOutcomeClassifierTest.intentionalReplacementAndControlsDoNotImplyLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.plainTextParserOwnsOuterDocument\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inlineImageHtmlParserOwnsOuterDocument\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.containerWithOuterCharsetAndLossyTextPartIsNotAudited\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.samePdfNamedPdfIsNotAudited\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.cleanAsciiAuditIsNotLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.validUtf8AcrossAuditBufferInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.validUtf8AcrossAuditBufferSpilled\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 6877
+      },
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.JobQueueTest.historicalPartialLedgerReasonRemainsUnchangedAfterReopen\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 3194
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#flatFallbackDiscardsFailedAttemptState",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlEncodingMetaCannotInventLoss",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlParserMetaCannotEnableAuditForMail",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lateHtmlDeclarationUsesReportedCharset",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanWindows1252IsUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanShiftJisIsUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanGb18030IsUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanEucKrIsUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanKoi8RIsUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#undeclaredHtmlIsUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#intentionalReplacementCharacterIsClean",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8WithBomIsClean",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8WithoutBomIsClean",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#asciiIsClean",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf16LeBomIsClean",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf16BeBomIsClean",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf16LeWithoutBomIsClean",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf16BeWithoutBomIsClean",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#markdownUsesTextParser",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#jsonUsesTextParser",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sourceUsesSourceCodeParser",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#csvUsesTextParser",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#tsvUsesTextParser",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanHtmlIsUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanTruncationRemainsPartialWithoutLoss",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#blankRemainsEmpty",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#inputBudgetStillRefusesBeforeParsing",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validDecodedControlsDoNotImplyLoss",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#misdeclaredMailPartKeepsExistingOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#invalidXmlStillFailsThroughXmlParser",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#pdfKeepsExistingOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#officeKeepsExistingOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionOutcomeClassifierTest.java#intentionalReplacementAndControlsDoNotImplyLoss",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueTest.java#historicalPartialLedgerReasonRemainsUnchangedAfterReopen",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#plainTextParserOwnsOuterDocument",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#inlineImageHtmlParserOwnsOuterDocument",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#containerWithOuterCharsetAndLossyTextPartIsNotAudited",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#samePdfNamedPdfIsNotAudited",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanAsciiAuditIsNotLossy",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validUtf8AcrossAuditBufferInMemory",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validUtf8AcrossAuditBufferSpilled",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:912afd5017c42759ffe4837283d7d3371d4de23acae7030367ce008e3b4494e0"
+}

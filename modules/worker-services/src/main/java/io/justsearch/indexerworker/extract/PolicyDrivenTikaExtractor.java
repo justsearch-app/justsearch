@@ -216,6 +216,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     }
     return withVisualEvidence(
         ExtractionArtifact.full(result, policy, "tika-policy-structured", truncated)
+            .withDecodingLoss(structured.lossy())
             .withEmbeddedCounts(structured.embeddedResourceCount(), structured.maxEmbeddedDepth()),
         summary,
         "structured",

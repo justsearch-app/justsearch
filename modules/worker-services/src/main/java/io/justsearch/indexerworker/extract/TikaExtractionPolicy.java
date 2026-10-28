@@ -36,7 +36,7 @@ public record TikaExtractionPolicy(
   public static final long DEFAULT_MAX_OFFICE_INPUT_BYTES = 30L * 1024 * 1024;
 
   public TikaExtractionPolicy {
-    policyId = policyId == null || policyId.isBlank() ? "tika-default-v6" : policyId.trim();
+    policyId = policyId == null || policyId.isBlank() ? "tika-default-v7" : policyId.trim();
     maxExtractedChars = positive(maxExtractedChars, DEFAULT_MAX_EXTRACTED_CHARS);
     maxInputBytes = positive(maxInputBytes, DEFAULT_MAX_INPUT_BYTES);
     maxOfficeInputBytes = positive(maxOfficeInputBytes, DEFAULT_MAX_OFFICE_INPUT_BYTES);
@@ -56,9 +56,14 @@ public record TikaExtractionPolicy(
     excludedMimeTypes = excludedMimeTypes == null ? Set.of() : Set.copyOf(excludedMimeTypes);
   }
 
+  // Policy identity history (persisted with extracted documents):
+  // v4: worker-owned, surrogate-safe text/CSV parser.
+  // v5: strict 16 KiB UTF-8 window before Tika's encoding detectors.
+  // v6: captured snapshot fact resolves inconclusive ASCII-first UTF-8 windows.
+  // v7: decoding loss is reported as partial.
   public static TikaExtractionPolicy defaults() {
     return new TikaExtractionPolicy(
-        "tika-default-v6",
+        "tika-default-v7",
         DEFAULT_MAX_EXTRACTED_CHARS,
         DEFAULT_MAX_INPUT_BYTES,
         DEFAULT_MAX_OFFICE_INPUT_BYTES,
@@ -81,7 +86,7 @@ public record TikaExtractionPolicy(
    * <p><strong>Why this is a separate factory rather than making {@link #defaults()}
    * config-aware.</strong> {@code policyId} is a PERSISTED IDENTITY: {@code ExtractionArtifact}
    * stamps it onto every extraction and {@code SqliteJobQueue} stores it in the ledger. If the
-   * limits behind {@code "tika-default-v6"} varied with configuration while the id stayed
+   * limits behind {@code "tika-default-v7"} varied with configuration while the id stayed
    * constant, that identity would silently stop identifying the policy — a document extracted
    * under a 1 MB cap and one extracted under 10 MB would record the same id, and any staleness or
    * re-extract decision keyed on it would treat them as equivalent. {@code defaults()} therefore
@@ -106,7 +111,7 @@ public record TikaExtractionPolicy(
     return new TikaExtractionPolicy(
         // Deterministic and human-readable in the ledger — the same limits always yield the same
         // id, across processes, with no hashing.
-        "tika-config-v6-" + chars + "-" + bytes,
+        "tika-config-v7-" + chars + "-" + bytes,
         chars,
         bytes,
         Math.min(base.maxOfficeInputBytes(), bytes),

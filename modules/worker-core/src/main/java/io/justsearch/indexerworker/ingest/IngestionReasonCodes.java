@@ -11,6 +11,8 @@ public final class IngestionReasonCodes {
    * distinguish "got everything" from "got the prefix Tika handed us before we cut it off."
    */
   public static final String SUCCESS_PARTIAL = "SUCCESS_PARTIAL";
+  public static final String TEXT_LOST_WHILE_DECODING = "TEXT_LOST_WHILE_DECODING";
+  public static final String TEXT_LOST_WHILE_DECODING_AND_TRUNCATED = "TEXT_LOST_WHILE_DECODING_AND_TRUNCATED";
 
   /**
    * Indexed successfully, but the parser produced no usable content at all (tempdoc 671,

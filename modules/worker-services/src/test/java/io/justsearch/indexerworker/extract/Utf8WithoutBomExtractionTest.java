@@ -95,7 +95,7 @@ class Utf8WithoutBomExtractionTest extends io.justsearch.adapters.lucene.runtime
     Path file = Files.writeString(tempDir.resolve("sandbox.txt"), HEBREW);
     var policy = configured ? TikaExtractionPolicy.fromWorkerLimits(new ResolvedConfig.Worker(100_000, 1_000_000))
         : TikaExtractionPolicy.defaults();
-    String expectedPolicy = configured ? "tika-config-v6-100000-1000000" : "tika-default-v6";
+    String expectedPolicy = configured ? "tika-config-v7-100000-1000000" : "tika-default-v7";
     try (var sandbox = new PersistentExtractionSandbox(TestWorkerExecutorRegistrations.readers(),
         PersistentExtractionSandboxTest.javaCommand(ExtractionSandboxChild.class), policy,
         OcrRoutingConfig.disabled(), Duration.ofSeconds(25), 1, 2, null)) {
@@ -127,7 +127,7 @@ class Utf8WithoutBomExtractionTest extends io.justsearch.adapters.lucene.runtime
           var artifact = sandbox.extract(file);
           assertEquals(ExtractionStatus.SUCCESS_FULL, artifact.status());
           assertText(extension, body, source, artifact.result());
-          assertEquals("tika-default-v6", artifact.policyId());
+          assertEquals("tika-default-v7", artifact.policyId());
         }
       }
       assertEquals(1, sandbox.spawnCount(), "all formats use the same real child");

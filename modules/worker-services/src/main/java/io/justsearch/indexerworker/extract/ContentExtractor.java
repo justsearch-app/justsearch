@@ -104,6 +104,11 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
 
   ExtractionResult extract(PreparedExtractionInput input, org.apache.tika.parser.ParseContext context,
       EmbeddedResourceBudget budget) throws IOException, ExtractionException {
+    return extract(input, context, budget, input.metadata());
+  }
+
+  ExtractionResult extract(PreparedExtractionInput input, org.apache.tika.parser.ParseContext context,
+      EmbeddedResourceBudget budget, Metadata metadata) throws IOException, ExtractionException {
     Path file = input.source();
     long fileSize = input.size();
     if (fileSize > MAX_FILE_SIZE) {
@@ -133,7 +138,6 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
     log.debug("Extracting content from: {} ({} bytes)", file.getFileName(), fileSize);
 
     StructuredContentExtractor.configureTesseractSkipOcr(context);
-    Metadata metadata = input.metadata();
 
     // No owner window: this parser graph cannot launch Tesseract (OwnedTikaParsers excludes it).
     try (InputStream is = input.openParserStream(tika)) {

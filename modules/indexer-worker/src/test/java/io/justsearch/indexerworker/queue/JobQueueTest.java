@@ -51,6 +51,21 @@ final class JobQueueTest {
   }
 
   @Test
+  void historicalPartialLedgerReasonRemainsUnchangedAfterReopen() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("old.txt"), "historical");
+    jobQueue.recordIngestionEvent(file,
+        IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_PARTIAL, "SUCCESS_PARTIAL", IngestionRetryPolicy.NONE),
+        new JobQueue.IngestionLedgerEntry("old", null, 10L, 20L, "REGULAR_FILE", "SUCCESS_PARTIAL", "tika-default-v3", "parser"));
+    jobQueue.close();
+    jobQueue = new SqliteJobQueue(dbPath);
+    jobQueue.open();
+    assertEquals("SUCCESS_PARTIAL", jobQueue.recentIngestionEvents(10).getFirst().reasonCode());
+    assertEquals("tika-default-v3", jobQueue.recentIngestionEvents(10).getFirst().policyId());
+    assertEquals("SUCCESS_PARTIAL", jobQueue.ingestionOutcomeSummary(0).getFirst().reasonCode());
+    assertEquals(1, jobQueue.ingestionOutcomeSummary(0).getFirst().count());
+  }
+
+  @Test
   void healthRejectsFailedSqliteReadThatBestEffortDepthReportsAsZero() throws Exception {
     var health = new WorkerHealthService("test", jobQueue, null, null);
     assertTrue(health.check(HealthCheckRequest.getDefaultInstance()).getServing());

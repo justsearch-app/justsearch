@@ -15,15 +15,15 @@ class AsciiFirstUtf8PolicyTest {
   @NullAndEmptySource
   @ValueSource(strings = {" ", "\t"})
   void blankOrNullIdentityUsesVersionSix(String identity) {
-    assertEquals("tika-default-v6", new TikaExtractionPolicy(identity, 1000, 1000, 1000,
+    assertEquals("tika-default-v7", new TikaExtractionPolicy(identity, 1000, 1000, 1000,
         128, 128, 4096, 256, 8, 100, true, Set.of(), Set.of()).policyId());
   }
 
   @Test
   void defaultAndConfiguredIdentitiesUseVersionSix() {
-    assertEquals("tika-default-v6", TikaExtractionPolicy.defaults().policyId());
-    assertEquals("tika-default-v6", TikaExtractionPolicy.fromWorkerLimits(null).policyId());
-    assertEquals("tika-config-v6-1000-2000", TikaExtractionPolicy.fromWorkerLimits(
+    assertEquals("tika-default-v7", TikaExtractionPolicy.defaults().policyId());
+    assertEquals("tika-default-v7", TikaExtractionPolicy.fromWorkerLimits(null).policyId());
+    assertEquals("tika-config-v7-1000-2000", TikaExtractionPolicy.fromWorkerLimits(
         new ResolvedConfig.Worker(1000, 2000)).policyId());
   }
 }
