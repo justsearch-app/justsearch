@@ -1,0 +1,1181 @@
+{
+  "kind": "installed-model-activation-live-round2",
+  "baseline": "7a6ab81ea11279008a853fa5574b11da4b051c02",
+  "candidate": "repair commit containing this file; production bytecode f00f25ff30",
+  "workRoot": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028",
+  "runs": [
+    {
+      "version": "candidate",
+      "scenario": "installer-before-marker",
+      "exitCode": 0,
+      "seconds": 127.586,
+      "log": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/output.log",
+      "logSha256": "86926ee4d466d4c1a95f7491bbc6946dd9858f56eda5551cf5f7cd91a36810c5",
+      "proofs": [
+        {
+          "marker": "INSTALLER_ACTIVATION_FAULT_PASS",
+          "evidence": {
+            "scenario": "installer-before-marker",
+            "operationKey": "op1",
+            "phase": "installer-before-marker",
+            "faulted": {
+              "runId": "1b476c01-ef66-4b3c-8869-851e4530a6dc",
+              "instanceId": "bbfadebc-ccb1-4b5c-b5e6-fed682ac5ed2",
+              "pid": 2707334,
+              "incarnation": 1,
+              "restartCount": 0,
+              "state": "running",
+              "lastExit": null
+            },
+            "cooldown": {
+              "runId": "1b476c01-ef66-4b3c-8869-851e4530a6dc",
+              "instanceId": "bbfadebc-ccb1-4b5c-b5e6-fed682ac5ed2",
+              "pid": 2707334,
+              "incarnation": 1,
+              "restartCount": 1,
+              "state": "restarting",
+              "lastExit": {
+                "code": null,
+                "reason": "unknown(null)",
+                "class": "TRANSIENT",
+                "codeReason": "unknown(null)",
+                "codeClass": "TRANSIENT",
+                "counted": true,
+                "requestedReason": null,
+                "incarnation": 1,
+                "at": "2026-10-28T16:15:40.427Z"
+              }
+            },
+            "recovered": {
+              "runId": "1b476c01-ef66-4b3c-8869-851e4530a6dc",
+              "instanceId": "e2bf71f6-c4c8-44f5-a1cc-0904e303de7e",
+              "pid": 2713818,
+              "incarnation": 2,
+              "restartCount": 1,
+              "state": "running",
+              "lastExit": {
+                "code": null,
+                "reason": "unknown(null)",
+                "class": "TRANSIENT",
+                "codeReason": "unknown(null)",
+                "codeClass": "TRANSIENT",
+                "counted": true,
+                "requestedReason": null,
+                "incarnation": 1,
+                "at": "2026-10-28T16:15:40.427Z"
+              }
+            },
+            "operation": {
+              "id": 1,
+              "operation_key": "op1",
+              "state": "COMPLETE",
+              "phase": "settled",
+              "attempts": 2
+            },
+            "pointer": "g-op1",
+            "settings": {
+              "witness": {
+                "acceptedRevision": 1,
+                "lastCommittedOperationKey": "op1"
+              },
+              "settings": {
+                "apiPort": null,
+                "chatEnabled": null,
+                "citationScorerModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/onnx/citation-scorer",
+                "contextLength": 0,
+                "declinedAiPackages": [],
+                "defaultAction": "open",
+                "density": "comfort",
+                "embedOnnxModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/onnx/gte-multilingual-base",
+                "excludePatterns": [],
+                "gpuGameDetection": null,
+                "gpuLayers": null,
+                "highContrast": false,
+                "indexBasePath": "",
+                "inspectorWidth": 0,
+                "llamaLibPath": "",
+                "llmModelPath": "",
+                "maxTokens": 1024,
+                "mode": "simple",
+                "nerModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/onnx/ner",
+                "rerankerModelPath": "",
+                "resultsDividerPosition": 0.5,
+                "schemaVersion": 1,
+                "serverExecutablePath": "",
+                "spladeModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/splade/naver-splade-v3",
+                "splits": {
+                  "leftPane": 0.5,
+                  "rightPane": 0.5
+                },
+                "theme": "system",
+                "trustLoopNudgeSeen": false,
+                "version": 1,
+                "vimMode": false,
+                "window": {
+                  "height": 800,
+                  "lastShownAt": "",
+                  "maximized": true,
+                  "width": 1280
+                }
+              }
+            },
+            "search": [
+              {
+                "path": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-root-a/installer-0.txt",
+                "matches": 1
+              },
+              {
+                "path": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-root-b/installer-1.txt",
+                "matches": 1
+              }
+            ],
+            "preparationSha256": "7f7a4c6c27c1f3dc20374a50e3f0975d3374b4fceaa967fdb85f774712386a6a"
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "ok": true,
+          "outcome": "STOPPED",
+          "runId": "1b476c01-ef66-4b3c-8869-851e4530a6dc",
+          "killedPids": [],
+          "portsClosed": true,
+          "childCleanup": [],
+          "engineJob": {
+            "source": "runner",
+            "incarnation": 2,
+            "outcome": "ended",
+            "endedByJob": [],
+            "survivors": []
+          }
+        }
+      ],
+      "orderedShutdown": [
+        {
+          "time": "2026-10-28T17:16:43.567261186+01:00",
+          "message": "Ordered shutdown complete (reason=quit, clean=true, errors=[], elapsedMs=2605)"
+        }
+      ],
+      "installer-cut.json": {
+        "state": {
+          "format_version": 2,
+          "active_generation": "g-20261028-161444",
+          "building_generation": "g-op1",
+          "previous_generation": "g-20261028-161444",
+          "migration_state": "SWITCHING",
+          "migration_paused": false,
+          "updated_at_ms": 1793204135822
+        },
+        "operation": {
+          "operation_key": "op1",
+          "state": "RUNNING",
+          "phase": "settled",
+          "attempts": 1,
+          "units_completed": 2,
+          "units_failed": 0
+        },
+        "walk": {
+          "operation_key": "op1",
+          "plan_hash": "6a0b02009b0f3034ce6c269860abd0576c5b960464aef45033fb0997d12ceb0f",
+          "enumeration_epoch": 1,
+          "enumeration_closed_at": 1793204104592,
+          "enumeration_outcome": "COMPLETE",
+          "completed_units": 2,
+          "failed_units": 0,
+          "revision": 7,
+          "sealed_at": 1793204136598,
+          "receipt_json": "{\"version\":2,\"revision\":7,\"completedUnits\":2,\"failedUnits\":0,\"currentFailedUnits\":0,\"currentSkippedUnits\":0,\"enumerationOutcome\":\"COMPLETE\",\"failedPathHashes\":[],\"failedPathHashesTruncated\":false,\"manifestSha256\":\"594c87694a7a2c1a4376fbf8fce2349faa8e5b50ad2e7ecfaeb3884e33c27ba1\",\"plannedUnits\":2,\"settlementSha256\":\"cd85e53b2249442d895409266bf6cc29f99a0b358e4a1e54e3fda5c8d33c31d3\",\"gapCount\":0,\"failedEvents\":0,\"supersededEvents\":0}",
+          "acknowledged_revision": 0,
+          "captured_plan": 1,
+          "manifest_sha256": "594c87694a7a2c1a4376fbf8fce2349faa8e5b50ad2e7ecfaeb3884e33c27ba1",
+          "planned_units": 2
+        },
+        "settingsWitness": {
+          "acceptedRevision": 0,
+          "lastCommittedOperationKey": null
+        },
+        "generationModels": {
+          "ner": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/onnx/ner/model.onnx",
+            "sha256": "92977e4b2335a2ee2fb95225e32fd0743a608091856b245c27d9001772023b06"
+          },
+          "splade": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/splade/naver-splade-v3/model.onnx",
+            "sha256": "6399e92fbe1d2c99301504dc84235c9275f0ae31cdab0125e541ac663f27d6cf"
+          },
+          "embedding": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/onnx/gte-multilingual-base/model.onnx",
+            "sha256": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86"
+          },
+          "citation-scorer": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/onnx/citation-scorer/model.onnx",
+            "sha256": "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          }
+        }
+      },
+      "installer-final.json": {
+        "state": {
+          "format_version": 2,
+          "active_generation": "g-op1",
+          "migration_state": "IDLE",
+          "migration_paused": false,
+          "updated_at_ms": 1793204200529
+        },
+        "operation": {
+          "operation_key": "op1",
+          "state": "COMPLETE",
+          "phase": "settled",
+          "attempts": 2,
+          "units_completed": 2,
+          "units_failed": 0
+        },
+        "walk": {
+          "operation_key": "op1",
+          "plan_hash": "6a0b02009b0f3034ce6c269860abd0576c5b960464aef45033fb0997d12ceb0f",
+          "enumeration_epoch": 1,
+          "enumeration_closed_at": 1793204104592,
+          "enumeration_outcome": "COMPLETE",
+          "completed_units": 2,
+          "failed_units": 0,
+          "revision": 7,
+          "sealed_at": 1793204136598,
+          "receipt_json": "{\"version\":2,\"revision\":7,\"completedUnits\":2,\"failedUnits\":0,\"currentFailedUnits\":0,\"currentSkippedUnits\":0,\"enumerationOutcome\":\"COMPLETE\",\"failedPathHashes\":[],\"failedPathHashesTruncated\":false,\"manifestSha256\":\"594c87694a7a2c1a4376fbf8fce2349faa8e5b50ad2e7ecfaeb3884e33c27ba1\",\"plannedUnits\":2,\"settlementSha256\":\"cd85e53b2249442d895409266bf6cc29f99a0b358e4a1e54e3fda5c8d33c31d3\",\"gapCount\":0,\"failedEvents\":0,\"supersededEvents\":0}",
+          "acknowledged_revision": 7,
+          "captured_plan": 1,
+          "manifest_sha256": "594c87694a7a2c1a4376fbf8fce2349faa8e5b50ad2e7ecfaeb3884e33c27ba1",
+          "planned_units": 2
+        },
+        "settingsWitness": {
+          "acceptedRevision": 1,
+          "lastCommittedOperationKey": "op1"
+        },
+        "generationModels": {
+          "ner": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/onnx/ner/model.onnx",
+            "sha256": "92977e4b2335a2ee2fb95225e32fd0743a608091856b245c27d9001772023b06"
+          },
+          "splade": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/splade/naver-splade-v3/model.onnx",
+            "sha256": "6399e92fbe1d2c99301504dc84235c9275f0ae31cdab0125e541ac663f27d6cf"
+          },
+          "embedding": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/onnx/gte-multilingual-base/model.onnx",
+            "sha256": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86"
+          },
+          "citation-scorer": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-marker/installer-models/onnx/citation-scorer/model.onnx",
+            "sha256": "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          }
+        }
+      }
+    },
+    {
+      "version": "candidate",
+      "scenario": "installer-before-arm",
+      "exitCode": 0,
+      "seconds": 4980.865,
+      "log": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/output.log",
+      "logSha256": "ccb8e25af1b389f22cc92655a9b9d48c7977e6aa1071f317c3b76eb93d58c494",
+      "proofs": [
+        {
+          "marker": "INSTALLER_ACTIVATION_FAULT_PASS",
+          "evidence": {
+            "scenario": "installer-before-arm",
+            "operationKey": "op2",
+            "phase": "installer-before-arm",
+            "faulted": {
+              "runId": "5f61b237-2cce-427f-9a20-09a5802f0cdb",
+              "instanceId": "751ca1b4-6ee4-4bb7-9b01-3f882e3bee1e",
+              "pid": 2721303,
+              "incarnation": 1,
+              "restartCount": 0,
+              "state": "running",
+              "lastExit": null
+            },
+            "cooldown": {
+              "runId": "5f61b237-2cce-427f-9a20-09a5802f0cdb",
+              "instanceId": "751ca1b4-6ee4-4bb7-9b01-3f882e3bee1e",
+              "pid": 2721303,
+              "incarnation": 1,
+              "restartCount": 1,
+              "state": "restarting",
+              "lastExit": {
+                "code": null,
+                "reason": "unknown(null)",
+                "class": "TRANSIENT",
+                "codeReason": "unknown(null)",
+                "codeClass": "TRANSIENT",
+                "counted": true,
+                "requestedReason": null,
+                "incarnation": 1,
+                "at": "2026-10-28T16:18:03.768Z"
+              }
+            },
+            "recovered": {
+              "runId": "5f61b237-2cce-427f-9a20-09a5802f0cdb",
+              "instanceId": "69647c52-c09c-4a92-9c05-a907291a2ae9",
+              "pid": 2734903,
+              "incarnation": 2,
+              "restartCount": 1,
+              "state": "running",
+              "lastExit": {
+                "code": null,
+                "reason": "unknown(null)",
+                "class": "TRANSIENT",
+                "codeReason": "unknown(null)",
+                "codeClass": "TRANSIENT",
+                "counted": true,
+                "requestedReason": null,
+                "incarnation": 1,
+                "at": "2026-10-28T16:18:03.768Z"
+              }
+            },
+            "operation": {
+              "id": 1,
+              "operation_key": "op2",
+              "state": "COMPLETE",
+              "phase": "settled",
+              "attempts": 2
+            },
+            "pointer": "g-op2",
+            "settings": {
+              "witness": {
+                "acceptedRevision": 1,
+                "lastCommittedOperationKey": "op2"
+              },
+              "settings": {
+                "apiPort": null,
+                "chatEnabled": null,
+                "citationScorerModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/onnx/citation-scorer",
+                "contextLength": 0,
+                "declinedAiPackages": [],
+                "defaultAction": "open",
+                "density": "comfort",
+                "embedOnnxModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/onnx/gte-multilingual-base",
+                "excludePatterns": [],
+                "gpuGameDetection": null,
+                "gpuLayers": null,
+                "highContrast": false,
+                "indexBasePath": "",
+                "inspectorWidth": 0,
+                "llamaLibPath": "",
+                "llmModelPath": "",
+                "maxTokens": 1024,
+                "mode": "simple",
+                "nerModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/onnx/ner",
+                "rerankerModelPath": "",
+                "resultsDividerPosition": 0.5,
+                "schemaVersion": 1,
+                "serverExecutablePath": "",
+                "spladeModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/splade/naver-splade-v3",
+                "splits": {
+                  "leftPane": 0.5,
+                  "rightPane": 0.5
+                },
+                "theme": "system",
+                "trustLoopNudgeSeen": false,
+                "version": 1,
+                "vimMode": false,
+                "window": {
+                  "height": 800,
+                  "lastShownAt": "",
+                  "maximized": true,
+                  "width": 1280
+                }
+              }
+            },
+            "search": [
+              {
+                "path": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-root-a/installer-0.txt",
+                "matches": 1
+              },
+              {
+                "path": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-root-b/installer-1.txt",
+                "matches": 1
+              }
+            ],
+            "preparationSha256": "23fa9c2e2286396b8e3515c3f75aa7a5acb898bb34561dd5b477e0ddcef7794d"
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "ok": true,
+          "outcome": "STOPPED",
+          "runId": "5f61b237-2cce-427f-9a20-09a5802f0cdb",
+          "killedPids": [],
+          "portsClosed": true,
+          "childCleanup": [],
+          "engineJob": {
+            "source": "runner",
+            "incarnation": 2,
+            "outcome": "ended",
+            "endedByJob": [],
+            "survivors": []
+          }
+        }
+      ],
+      "orderedShutdown": [
+        {
+          "time": "2026-10-28T17:19:07.488542352+01:00",
+          "message": "Ordered shutdown complete (reason=quit, clean=true, errors=[], elapsedMs=2532)"
+        }
+      ],
+      "installer-cut.json": {
+        "state": {
+          "format_version": 2,
+          "active_generation": "g-20261028-161651",
+          "building_generation": "g-op2",
+          "previous_generation": "g-20261028-161651",
+          "migration_state": "SWITCHING",
+          "migration_paused": false,
+          "updated_at_ms": 1793204276569
+        },
+        "operation": {
+          "operation_key": "op2",
+          "state": "RUNNING",
+          "phase": "settled",
+          "attempts": 1,
+          "units_completed": 2,
+          "units_failed": 0
+        },
+        "walk": {
+          "operation_key": "op2",
+          "plan_hash": "309e572bc961813fb185e2f35f941227b111c58dd4b675cad11b0202e787dad9",
+          "enumeration_epoch": 1,
+          "enumeration_closed_at": 1793204236052,
+          "enumeration_outcome": "COMPLETE",
+          "completed_units": 2,
+          "failed_units": 0,
+          "revision": 7,
+          "sealed_at": 1793204276873,
+          "receipt_json": "{\"version\":2,\"revision\":7,\"completedUnits\":2,\"failedUnits\":0,\"currentFailedUnits\":0,\"currentSkippedUnits\":0,\"enumerationOutcome\":\"COMPLETE\",\"failedPathHashes\":[],\"failedPathHashesTruncated\":false,\"manifestSha256\":\"0221700e51aade1c5b0a55f6644ed9f0f281d53bafb56cd5f8c0bc2111e9fd4f\",\"plannedUnits\":2,\"settlementSha256\":\"f83b4dca2aade9e25a3d86167c1cadb26db3d136404941c3109684c962af320f\",\"gapCount\":0,\"failedEvents\":0,\"supersededEvents\":0}",
+          "acknowledged_revision": 0,
+          "captured_plan": 1,
+          "manifest_sha256": "0221700e51aade1c5b0a55f6644ed9f0f281d53bafb56cd5f8c0bc2111e9fd4f",
+          "planned_units": 2
+        },
+        "settingsWitness": {
+          "acceptedRevision": 0,
+          "lastCommittedOperationKey": null
+        },
+        "generationModels": {
+          "citation-scorer": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/onnx/citation-scorer/model.onnx",
+            "sha256": "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          },
+          "ner": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/onnx/ner/model.onnx",
+            "sha256": "92977e4b2335a2ee2fb95225e32fd0743a608091856b245c27d9001772023b06"
+          },
+          "splade": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/splade/naver-splade-v3/model.onnx",
+            "sha256": "6399e92fbe1d2c99301504dc84235c9275f0ae31cdab0125e541ac663f27d6cf"
+          },
+          "embedding": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/onnx/gte-multilingual-base/model.onnx",
+            "sha256": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86"
+          }
+        }
+      },
+      "installer-final.json": {
+        "state": {
+          "format_version": 2,
+          "active_generation": "g-op2",
+          "migration_state": "IDLE",
+          "migration_paused": false,
+          "updated_at_ms": 1793204344518
+        },
+        "operation": {
+          "operation_key": "op2",
+          "state": "COMPLETE",
+          "phase": "settled",
+          "attempts": 2,
+          "units_completed": 2,
+          "units_failed": 0
+        },
+        "walk": {
+          "operation_key": "op2",
+          "plan_hash": "309e572bc961813fb185e2f35f941227b111c58dd4b675cad11b0202e787dad9",
+          "enumeration_epoch": 1,
+          "enumeration_closed_at": 1793204236052,
+          "enumeration_outcome": "COMPLETE",
+          "completed_units": 2,
+          "failed_units": 0,
+          "revision": 7,
+          "sealed_at": 1793204276873,
+          "receipt_json": "{\"version\":2,\"revision\":7,\"completedUnits\":2,\"failedUnits\":0,\"currentFailedUnits\":0,\"currentSkippedUnits\":0,\"enumerationOutcome\":\"COMPLETE\",\"failedPathHashes\":[],\"failedPathHashesTruncated\":false,\"manifestSha256\":\"0221700e51aade1c5b0a55f6644ed9f0f281d53bafb56cd5f8c0bc2111e9fd4f\",\"plannedUnits\":2,\"settlementSha256\":\"f83b4dca2aade9e25a3d86167c1cadb26db3d136404941c3109684c962af320f\",\"gapCount\":0,\"failedEvents\":0,\"supersededEvents\":0}",
+          "acknowledged_revision": 7,
+          "captured_plan": 1,
+          "manifest_sha256": "0221700e51aade1c5b0a55f6644ed9f0f281d53bafb56cd5f8c0bc2111e9fd4f",
+          "planned_units": 2
+        },
+        "settingsWitness": {
+          "acceptedRevision": 1,
+          "lastCommittedOperationKey": "op2"
+        },
+        "generationModels": {
+          "citation-scorer": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/onnx/citation-scorer/model.onnx",
+            "sha256": "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          },
+          "ner": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/onnx/ner/model.onnx",
+            "sha256": "92977e4b2335a2ee2fb95225e32fd0743a608091856b245c27d9001772023b06"
+          },
+          "splade": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/splade/naver-splade-v3/model.onnx",
+            "sha256": "6399e92fbe1d2c99301504dc84235c9275f0ae31cdab0125e541ac663f27d6cf"
+          },
+          "embedding": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-arm/installer-models/onnx/gte-multilingual-base/model.onnx",
+            "sha256": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86"
+          }
+        }
+      }
+    },
+    {
+      "version": "candidate",
+      "scenario": "installer-before-pointer",
+      "exitCode": 0,
+      "seconds": 235.285,
+      "log": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/output.log",
+      "logSha256": "8cd7ba2b5ccba0fde6915a7e59b736df40dee67a4b3a1f9d4e6ddf6242f3cfac",
+      "proofs": [
+        {
+          "marker": "INSTALLER_ACTIVATION_FAULT_PASS",
+          "evidence": {
+            "scenario": "installer-before-pointer",
+            "operationKey": "op3",
+            "phase": "installer-before-pointer",
+            "faulted": {
+              "runId": "6566a044-2a71-4372-b6e2-3b63a8bee1a8",
+              "instanceId": "0d50e878-87ee-4718-86cf-19b630cd4e37",
+              "pid": 3156906,
+              "incarnation": 1,
+              "restartCount": 0,
+              "state": "running",
+              "lastExit": null
+            },
+            "cooldown": {
+              "runId": "6566a044-2a71-4372-b6e2-3b63a8bee1a8",
+              "instanceId": "0d50e878-87ee-4718-86cf-19b630cd4e37",
+              "pid": 3156906,
+              "incarnation": 1,
+              "restartCount": 1,
+              "state": "restarting",
+              "lastExit": {
+                "code": null,
+                "reason": "unknown(null)",
+                "class": "TRANSIENT",
+                "codeReason": "unknown(null)",
+                "codeClass": "TRANSIENT",
+                "counted": true,
+                "requestedReason": null,
+                "incarnation": 1,
+                "at": "2026-10-28T17:40:51.355Z"
+              }
+            },
+            "recovered": {
+              "runId": "6566a044-2a71-4372-b6e2-3b63a8bee1a8",
+              "instanceId": "99a828dd-5e89-4a6b-b63a-0bb69d6cc808",
+              "pid": 3165021,
+              "incarnation": 2,
+              "restartCount": 1,
+              "state": "running",
+              "lastExit": {
+                "code": null,
+                "reason": "unknown(null)",
+                "class": "TRANSIENT",
+                "codeReason": "unknown(null)",
+                "codeClass": "TRANSIENT",
+                "counted": true,
+                "requestedReason": null,
+                "incarnation": 1,
+                "at": "2026-10-28T17:40:51.355Z"
+              }
+            },
+            "operation": {
+              "id": 1,
+              "operation_key": "op3",
+              "state": "COMPLETE",
+              "phase": "settled",
+              "attempts": 2
+            },
+            "pointer": "g-op3",
+            "settings": {
+              "witness": {
+                "acceptedRevision": 1,
+                "lastCommittedOperationKey": "op3"
+              },
+              "settings": {
+                "apiPort": null,
+                "chatEnabled": null,
+                "citationScorerModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/onnx/citation-scorer",
+                "contextLength": 0,
+                "declinedAiPackages": [],
+                "defaultAction": "open",
+                "density": "comfort",
+                "embedOnnxModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/onnx/gte-multilingual-base",
+                "excludePatterns": [],
+                "gpuGameDetection": null,
+                "gpuLayers": null,
+                "highContrast": false,
+                "indexBasePath": "",
+                "inspectorWidth": 0,
+                "llamaLibPath": "",
+                "llmModelPath": "",
+                "maxTokens": 1024,
+                "mode": "simple",
+                "nerModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/onnx/ner",
+                "rerankerModelPath": "",
+                "resultsDividerPosition": 0.5,
+                "schemaVersion": 1,
+                "serverExecutablePath": "",
+                "spladeModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/splade/naver-splade-v3",
+                "splits": {
+                  "leftPane": 0.5,
+                  "rightPane": 0.5
+                },
+                "theme": "system",
+                "trustLoopNudgeSeen": false,
+                "version": 1,
+                "vimMode": false,
+                "window": {
+                  "height": 800,
+                  "lastShownAt": "",
+                  "maximized": true,
+                  "width": 1280
+                }
+              }
+            },
+            "search": [
+              {
+                "path": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-root-a/installer-0.txt",
+                "matches": 1
+              },
+              {
+                "path": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-root-b/installer-1.txt",
+                "matches": 1
+              }
+            ],
+            "preparationSha256": "d43af487cd907be006f7c244d17ec4ced8165673411f3efe9a7431f381221df5"
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "ok": true,
+          "outcome": "STOPPED",
+          "runId": "6566a044-2a71-4372-b6e2-3b63a8bee1a8",
+          "killedPids": [],
+          "portsClosed": true,
+          "childCleanup": [],
+          "engineJob": {
+            "source": "runner",
+            "incarnation": 2,
+            "outcome": "ended",
+            "endedByJob": [],
+            "survivors": []
+          }
+        }
+      ],
+      "orderedShutdown": [
+        {
+          "time": "2026-10-28T18:41:57.729800223+01:00",
+          "message": "Ordered shutdown complete (reason=quit, clean=true, errors=[], elapsedMs=2604)"
+        }
+      ],
+      "installer-cut.json": {
+        "state": {
+          "format_version": 2,
+          "active_generation": "g-20261028-173955",
+          "building_generation": "g-op3",
+          "previous_generation": "g-20261028-173955",
+          "migration_state": "SWITCHING",
+          "migration_paused": false,
+          "updated_at_ms": 1793209244459
+        },
+        "operation": {
+          "operation_key": "op3",
+          "state": "RUNNING",
+          "phase": "settled",
+          "attempts": 1,
+          "units_completed": 2,
+          "units_failed": 0
+        },
+        "walk": {
+          "operation_key": "op3",
+          "plan_hash": "ea0734a8dd55ab2af2e2f094498412783be283dcd2bde3d5e6c7b7734f6dc5f6",
+          "enumeration_epoch": 1,
+          "enumeration_closed_at": 1793209215429,
+          "enumeration_outcome": "COMPLETE",
+          "completed_units": 2,
+          "failed_units": 0,
+          "revision": 7,
+          "sealed_at": 1793209245236,
+          "receipt_json": "{\"version\":2,\"revision\":7,\"completedUnits\":2,\"failedUnits\":0,\"currentFailedUnits\":0,\"currentSkippedUnits\":0,\"enumerationOutcome\":\"COMPLETE\",\"failedPathHashes\":[],\"failedPathHashesTruncated\":false,\"manifestSha256\":\"44758d1f477452f8e80749fe56ed986251683e4ea1dc27f3689aad8c3bed87cc\",\"plannedUnits\":2,\"settlementSha256\":\"462e8d1da8af4bc34f2893e2220025c0a6311c7f19b98e0af300406e8d6608d3\",\"gapCount\":0,\"failedEvents\":0,\"supersededEvents\":0}",
+          "acknowledged_revision": 0,
+          "captured_plan": 1,
+          "manifest_sha256": "44758d1f477452f8e80749fe56ed986251683e4ea1dc27f3689aad8c3bed87cc",
+          "planned_units": 2
+        },
+        "settingsWitness": {
+          "acceptedRevision": 0,
+          "lastCommittedOperationKey": null
+        },
+        "generationModels": {
+          "embedding": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/onnx/gte-multilingual-base/model.onnx",
+            "sha256": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86"
+          },
+          "citation-scorer": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/onnx/citation-scorer/model.onnx",
+            "sha256": "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          },
+          "ner": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/onnx/ner/model.onnx",
+            "sha256": "92977e4b2335a2ee2fb95225e32fd0743a608091856b245c27d9001772023b06"
+          },
+          "splade": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/splade/naver-splade-v3/model.onnx",
+            "sha256": "6399e92fbe1d2c99301504dc84235c9275f0ae31cdab0125e541ac663f27d6cf"
+          }
+        }
+      },
+      "installer-final.json": {
+        "state": {
+          "format_version": 2,
+          "active_generation": "g-op3",
+          "migration_state": "IDLE",
+          "migration_paused": false,
+          "updated_at_ms": 1793209314659
+        },
+        "operation": {
+          "operation_key": "op3",
+          "state": "COMPLETE",
+          "phase": "settled",
+          "attempts": 2,
+          "units_completed": 2,
+          "units_failed": 0
+        },
+        "walk": {
+          "operation_key": "op3",
+          "plan_hash": "ea0734a8dd55ab2af2e2f094498412783be283dcd2bde3d5e6c7b7734f6dc5f6",
+          "enumeration_epoch": 1,
+          "enumeration_closed_at": 1793209215429,
+          "enumeration_outcome": "COMPLETE",
+          "completed_units": 2,
+          "failed_units": 0,
+          "revision": 7,
+          "sealed_at": 1793209245236,
+          "receipt_json": "{\"version\":2,\"revision\":7,\"completedUnits\":2,\"failedUnits\":0,\"currentFailedUnits\":0,\"currentSkippedUnits\":0,\"enumerationOutcome\":\"COMPLETE\",\"failedPathHashes\":[],\"failedPathHashesTruncated\":false,\"manifestSha256\":\"44758d1f477452f8e80749fe56ed986251683e4ea1dc27f3689aad8c3bed87cc\",\"plannedUnits\":2,\"settlementSha256\":\"462e8d1da8af4bc34f2893e2220025c0a6311c7f19b98e0af300406e8d6608d3\",\"gapCount\":0,\"failedEvents\":0,\"supersededEvents\":0}",
+          "acknowledged_revision": 7,
+          "captured_plan": 1,
+          "manifest_sha256": "44758d1f477452f8e80749fe56ed986251683e4ea1dc27f3689aad8c3bed87cc",
+          "planned_units": 2
+        },
+        "settingsWitness": {
+          "acceptedRevision": 1,
+          "lastCommittedOperationKey": "op3"
+        },
+        "generationModels": {
+          "embedding": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/onnx/gte-multilingual-base/model.onnx",
+            "sha256": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86"
+          },
+          "citation-scorer": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/onnx/citation-scorer/model.onnx",
+            "sha256": "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          },
+          "ner": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/onnx/ner/model.onnx",
+            "sha256": "92977e4b2335a2ee2fb95225e32fd0743a608091856b245c27d9001772023b06"
+          },
+          "splade": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-before-pointer/installer-models/splade/naver-splade-v3/model.onnx",
+            "sha256": "6399e92fbe1d2c99301504dc84235c9275f0ae31cdab0125e541ac663f27d6cf"
+          }
+        }
+      }
+    },
+    {
+      "version": "candidate",
+      "scenario": "installer-pointer-before-settings",
+      "exitCode": 0,
+      "seconds": null,
+      "log": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/output.log",
+      "exitEvidence": {
+        "pid": 3192345,
+        "startTicks": "28506195",
+        "procState": "Z",
+        "procExitCode": 0
+      },
+      "schedulerNote": "Harness completed with exit 0 and STOP 0 before its paused scheduler could reap it. Result harvested from identity-bound /proc status; scheduler then terminated due repeated VM resource contention.",
+      "logSha256": "404f70d4cbd200125d91436655eebd86cc235aee5042c658a35ba2612cf81b25",
+      "proofs": [
+        {
+          "marker": "INSTALLER_ACTIVATION_FAULT_PASS",
+          "evidence": {
+            "scenario": "installer-pointer-before-settings",
+            "operationKey": "op4",
+            "phase": "installer-pointer-before-settings",
+            "faulted": {
+              "runId": "c4add86d-279b-4c38-a6b8-fb1279e72b98",
+              "instanceId": "88dd5db3-7154-4dbd-80ee-acef476a6fed",
+              "pid": 3192504,
+              "incarnation": 1,
+              "restartCount": 0,
+              "state": "running",
+              "lastExit": null
+            },
+            "cooldown": {
+              "runId": "c4add86d-279b-4c38-a6b8-fb1279e72b98",
+              "instanceId": "88dd5db3-7154-4dbd-80ee-acef476a6fed",
+              "pid": 3192504,
+              "incarnation": 1,
+              "restartCount": 1,
+              "state": "restarting",
+              "lastExit": {
+                "code": null,
+                "reason": "unknown(null)",
+                "class": "TRANSIENT",
+                "codeReason": "unknown(null)",
+                "codeClass": "TRANSIENT",
+                "counted": true,
+                "requestedReason": null,
+                "incarnation": 1,
+                "at": "2026-10-28T17:44:42.671Z"
+              }
+            },
+            "recovered": {
+              "runId": "c4add86d-279b-4c38-a6b8-fb1279e72b98",
+              "instanceId": "e1950488-6521-42dd-9485-776effbf7188",
+              "pid": 3200383,
+              "incarnation": 2,
+              "restartCount": 1,
+              "state": "running",
+              "lastExit": {
+                "code": null,
+                "reason": "unknown(null)",
+                "class": "TRANSIENT",
+                "codeReason": "unknown(null)",
+                "codeClass": "TRANSIENT",
+                "counted": true,
+                "requestedReason": null,
+                "incarnation": 1,
+                "at": "2026-10-28T17:44:42.671Z"
+              }
+            },
+            "operation": {
+              "id": 1,
+              "operation_key": "op4",
+              "state": "COMPLETE",
+              "phase": "settled",
+              "attempts": 1
+            },
+            "pointer": "g-op4",
+            "settings": {
+              "witness": {
+                "acceptedRevision": 1,
+                "lastCommittedOperationKey": "op4"
+              },
+              "settings": {
+                "apiPort": null,
+                "chatEnabled": null,
+                "citationScorerModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/onnx/citation-scorer",
+                "contextLength": 0,
+                "declinedAiPackages": [],
+                "defaultAction": "open",
+                "density": "comfort",
+                "embedOnnxModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/onnx/gte-multilingual-base",
+                "excludePatterns": [],
+                "gpuGameDetection": null,
+                "gpuLayers": null,
+                "highContrast": false,
+                "indexBasePath": "",
+                "inspectorWidth": 0,
+                "llamaLibPath": "",
+                "llmModelPath": "",
+                "maxTokens": 1024,
+                "mode": "simple",
+                "nerModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/onnx/ner",
+                "rerankerModelPath": "",
+                "resultsDividerPosition": 0.5,
+                "schemaVersion": 1,
+                "serverExecutablePath": "",
+                "spladeModelPath": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/splade/naver-splade-v3",
+                "splits": {
+                  "leftPane": 0.5,
+                  "rightPane": 0.5
+                },
+                "theme": "system",
+                "trustLoopNudgeSeen": false,
+                "version": 1,
+                "vimMode": false,
+                "window": {
+                  "height": 800,
+                  "lastShownAt": "",
+                  "maximized": true,
+                  "width": 1280
+                }
+              }
+            },
+            "search": [
+              {
+                "path": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-root-a/installer-0.txt",
+                "matches": 1
+              },
+              {
+                "path": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-root-b/installer-1.txt",
+                "matches": 1
+              }
+            ],
+            "preparationSha256": "5e39b0596302e5c1a6e25ae3c0333cffd209817dc324c1061f4abd533119a765"
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "ok": true,
+          "outcome": "STOPPED",
+          "runId": "c4add86d-279b-4c38-a6b8-fb1279e72b98",
+          "killedPids": [],
+          "portsClosed": true,
+          "childCleanup": [],
+          "engineJob": {
+            "source": "runner",
+            "incarnation": 2,
+            "outcome": "ended",
+            "endedByJob": [],
+            "survivors": []
+          }
+        }
+      ],
+      "orderedShutdown": [
+        {
+          "time": "2026-10-28T18:47:13.483064645+01:00",
+          "message": "Ordered shutdown complete (reason=quit, clean=true, errors=[], elapsedMs=3144)"
+        }
+      ],
+      "installer-cut.json": {
+        "state": {
+          "format_version": 2,
+          "active_generation": "g-op4",
+          "previous_generation": "g-20261028-174348",
+          "migration_state": "IDLE",
+          "migration_paused": false,
+          "updated_at_ms": 1793209482251
+        },
+        "operation": {
+          "operation_key": "op4",
+          "state": "RUNNING",
+          "phase": "settled",
+          "attempts": 1,
+          "units_completed": 2,
+          "units_failed": 0
+        },
+        "walk": {
+          "operation_key": "op4",
+          "plan_hash": "9622198ebfd326030d3d646042101ec54c912e99221deb1f374890ff0585563f",
+          "enumeration_epoch": 1,
+          "enumeration_closed_at": 1793209448787,
+          "enumeration_outcome": "COMPLETE",
+          "completed_units": 2,
+          "failed_units": 0,
+          "revision": 7,
+          "sealed_at": 1793209476145,
+          "receipt_json": "{\"version\":2,\"revision\":7,\"completedUnits\":2,\"failedUnits\":0,\"currentFailedUnits\":0,\"currentSkippedUnits\":0,\"enumerationOutcome\":\"COMPLETE\",\"failedPathHashes\":[],\"failedPathHashesTruncated\":false,\"manifestSha256\":\"49b7e96f6adfb91b5f9f0df43d28cffc4fa55089dc263203d9dae5ef89621235\",\"plannedUnits\":2,\"settlementSha256\":\"39e05fd2bfd9831567be998b35f2dcb288398f8f5fb438d6e7c6fbeb06477fd8\",\"gapCount\":0,\"failedEvents\":0,\"supersededEvents\":0}",
+          "acknowledged_revision": 0,
+          "captured_plan": 1,
+          "manifest_sha256": "49b7e96f6adfb91b5f9f0df43d28cffc4fa55089dc263203d9dae5ef89621235",
+          "planned_units": 2
+        },
+        "settingsWitness": {
+          "acceptedRevision": 0,
+          "lastCommittedOperationKey": null
+        },
+        "generationModels": {
+          "splade": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/splade/naver-splade-v3/model.onnx",
+            "sha256": "6399e92fbe1d2c99301504dc84235c9275f0ae31cdab0125e541ac663f27d6cf"
+          },
+          "embedding": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/onnx/gte-multilingual-base/model.onnx",
+            "sha256": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86"
+          },
+          "citation-scorer": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/onnx/citation-scorer/model.onnx",
+            "sha256": "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          },
+          "ner": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/onnx/ner/model.onnx",
+            "sha256": "92977e4b2335a2ee2fb95225e32fd0743a608091856b245c27d9001772023b06"
+          }
+        }
+      },
+      "installer-final.json": {
+        "state": {
+          "format_version": 2,
+          "active_generation": "g-op4",
+          "migration_state": "IDLE",
+          "migration_paused": false,
+          "updated_at_ms": 1793209629825
+        },
+        "operation": {
+          "operation_key": "op4",
+          "state": "COMPLETE",
+          "phase": "settled",
+          "attempts": 1,
+          "units_completed": 2,
+          "units_failed": 0
+        },
+        "walk": {
+          "operation_key": "op4",
+          "plan_hash": "9622198ebfd326030d3d646042101ec54c912e99221deb1f374890ff0585563f",
+          "enumeration_epoch": 1,
+          "enumeration_closed_at": 1793209448787,
+          "enumeration_outcome": "COMPLETE",
+          "completed_units": 2,
+          "failed_units": 0,
+          "revision": 7,
+          "sealed_at": 1793209476145,
+          "receipt_json": "{\"version\":2,\"revision\":7,\"completedUnits\":2,\"failedUnits\":0,\"currentFailedUnits\":0,\"currentSkippedUnits\":0,\"enumerationOutcome\":\"COMPLETE\",\"failedPathHashes\":[],\"failedPathHashesTruncated\":false,\"manifestSha256\":\"49b7e96f6adfb91b5f9f0df43d28cffc4fa55089dc263203d9dae5ef89621235\",\"plannedUnits\":2,\"settlementSha256\":\"39e05fd2bfd9831567be998b35f2dcb288398f8f5fb438d6e7c6fbeb06477fd8\",\"gapCount\":0,\"failedEvents\":0,\"supersededEvents\":0}",
+          "acknowledged_revision": 7,
+          "captured_plan": 1,
+          "manifest_sha256": "49b7e96f6adfb91b5f9f0df43d28cffc4fa55089dc263203d9dae5ef89621235",
+          "planned_units": 2
+        },
+        "settingsWitness": {
+          "acceptedRevision": 1,
+          "lastCommittedOperationKey": "op4"
+        },
+        "generationModels": {
+          "splade": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/splade/naver-splade-v3/model.onnx",
+            "sha256": "6399e92fbe1d2c99301504dc84235c9275f0ae31cdab0125e541ac663f27d6cf"
+          },
+          "embedding": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/onnx/gte-multilingual-base/model.onnx",
+            "sha256": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86"
+          },
+          "citation-scorer": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/onnx/citation-scorer/model.onnx",
+            "sha256": "a13ec391ca99f49886694e12d3e800521f36d4267d7d448c34421c541a2baf50"
+          },
+          "ner": {
+            "id": "/home/elias/dev/justsearch/tmp/rel-act-round2-20261028/candidate/tmp/rel-act-isolated/installer-pointer-before-settings/installer-models/onnx/ner/model.onnx",
+            "sha256": "92977e4b2335a2ee2fb95225e32fd0743a608091856b245c27d9001772023b06"
+          }
+        }
+      }
+    }
+  ],
+  "setupFailures": [],
+  "runtimeArtifacts": {
+    "candidate": {
+      "buildStamp": "52f8839160a48eb5\n",
+      "jars": {
+        "indexer-worker-0.3.0.jar": "sha256:48cd0c6d19b6830a031ede6b7f29c33f16d57ff9c45044e3f7c82ee637126e5d",
+        "app-engine-0.3.0.jar": "sha256:8e5f8b6031b1c8d27fa060796b7dc2ad610f11a6bf8604eab738042c1bdb3e91",
+        "app-api-0.3.0.jar": "sha256:7214bd75deac3c6fcaa55aed80d22697c6124d1dfb4d417bf3b85e2aa9aea792",
+        "app-services-0.3.0.jar": "sha256:0398deca9c96470d907d5a4236830793fcb48906586f81840e30685600158c4f",
+        "app-observability-0.3.0.jar": "sha256:a33403bd721f9fb86c681358af5faff0796c2a3662ddf09855d4d83a99c73c15"
+      }
+    },
+    "baseline": {
+      "buildStamp": "82be31d8eb0aa29a\n",
+      "jars": {
+        "indexer-worker-0.3.0.jar": "sha256:bfbca9ef583c548ad2acac84a393a04fa9e0dce3d3dc8613029b6161c7536d73",
+        "app-engine-0.3.0.jar": "sha256:c6534ca1f6aff06ee0a76bc9bc3e83f8b1fe405629e5b56c20ce1b50b6f59889",
+        "app-api-0.3.0.jar": "sha256:47fb43938feb63d00caa57144ca11a3191b482869da64b30abe03cd3b996b727",
+        "app-services-0.3.0.jar": "sha256:7aba2fd55b6672dcbe87f695604cf6a35291515636b9adf341ecadc4e47960c2",
+        "app-observability-0.3.0.jar": "sha256:996a5a19da18486f395479346b8b0d7ade3fd466f2666169c6c1fcd17850e8f9"
+      }
+    }
+  },
+  "resourceNotes": [
+    "Qualified reruns use explicit per-checkout JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR, private JVM user.home/java.io.tmpdir, private data, XDG, DJL roots and ports; model source files are read-only retained fixtures. No GPU or VM was used by the fixtures.",
+    "Earlier live attempts under tmp/rel-act-round2 used /home/elias/.justsearch/cache/ort-optimized despite private HOME/XDG. OrtOptimizedModelStore.touch rewrites entry.json lastUsed on cache hits. Those runs are disqualified for isolation; qualified results below come from fresh tmp/rel-act-isolated state. Raw earlier logs remain under the work root.",
+    "External-session VMs relaunched while conformance cases were in flight, including the earlier disqualified pointer case and isolated before-arm, before-pointer and pointer-before-settings cases. In-flight checks finished and the owned scheduler paused before another case; it now waits for the whole qualification driver. This departed from the one-heavy-job limit during those in-flight overlaps. Shared model files and the shared Gradle cache were the authorized shared resources; the early shared ORT access was an invocation error.",
+    "First layout attempt was rejected before app startup because data was outside the copied checkout. A separate early query-only attempt lacked the initial citation asset, was stopped by recorded run ID, and was repeated from fresh privately staged state. Existing harness assertions were unchanged."
+  ],
+  "runnerCleanup": {
+    "utc": "2026-10-28T17:52:52.357328+00:00",
+    "reason": "Repeated VM launches prevented a stable exclusive heavy-job slot; no answer to slot-availability question before handback. All four completed harnesses returned STOP 0; remaining dependent jobs were never launched.",
+    "stopped": [
+      {
+        "pid": 3217893,
+        "stat": "3217893 (python3) S 3217878 3217878 3217878 0 -1 4194304 1470 0 1 0 1 0 0 0 20 0 1 0 28543039 24305664 2183 18446744073709551615 4333568 8024065 140732805562128 0 0 0 0 16781312 2 1 0 0 17 2 0 0 0 0 0 11038136 11672456 920825856 140732805568923 140732805569008 140732805569008 140732805574631 0\n",
+        "kind": "owned resource-hold watcher"
+      },
+      {
+        "pid": 2706593,
+        "stat": "2706593 (python3) T 2706592 2706592 2706592 0 -1 4194304 1883 28388581 1108 54343 1 2 34134 11269 20 0 1 0 27970313 26017792 1683 18446744073709551615 4333568 8024065 140721525248720 0 0 0 0 16781312 2 1 0 0 17 16 0 0 0 0 0 11038136 11672456 694272000 140721525254551 140721525254640 140721525254640 140721525260263 19\n",
+        "kind": "owned paused conformance scheduler"
+      }
+    ]
+  },
+  "resourceStatus": "Blocked: repeated external VM runs prevented a stable exclusive heavy-job slot. Remaining sequence was terminated before dependent jobs launched. Slot-availability clarification had no reply at cleanup.",
+  "secondRestartRuns": [],
+  "a1Runs": [],
+  "enginePidCleanupObservations": [
+    {
+      "scenario": "installer-before-marker",
+      "role": "faulted",
+      "recordedPid": 2707334,
+      "procEntryExistsAtCleanup": false,
+      "state": null
+    },
+    {
+      "scenario": "installer-before-marker",
+      "role": "recovered",
+      "recordedPid": 2713818,
+      "procEntryExistsAtCleanup": false,
+      "state": null
+    },
+    {
+      "scenario": "installer-before-arm",
+      "role": "faulted",
+      "recordedPid": 2721303,
+      "procEntryExistsAtCleanup": false,
+      "state": null
+    },
+    {
+      "scenario": "installer-before-arm",
+      "role": "recovered",
+      "recordedPid": 2734903,
+      "procEntryExistsAtCleanup": false,
+      "state": null
+    },
+    {
+      "scenario": "installer-before-pointer",
+      "role": "faulted",
+      "recordedPid": 3156906,
+      "procEntryExistsAtCleanup": false,
+      "state": null
+    },
+    {
+      "scenario": "installer-before-pointer",
+      "role": "recovered",
+      "recordedPid": 3165021,
+      "procEntryExistsAtCleanup": false,
+      "state": null
+    },
+    {
+      "scenario": "installer-pointer-before-settings",
+      "role": "faulted",
+      "recordedPid": 3192504,
+      "procEntryExistsAtCleanup": false,
+      "state": null
+    },
+    {
+      "scenario": "installer-pointer-before-settings",
+      "role": "recovered",
+      "recordedPid": 3200383,
+      "procEntryExistsAtCleanup": false,
+      "state": null
+    }
+  ],
+  "identifierPresentation": "Accepted operation UUIDs and their embedded generation-name occurrences are consistently replaced by op1 through op4. Exact originals remain in local raw logs identified by recorded SHA256. These are operation identifiers, not authorization secrets; public evidence uses labels to avoid publishing key-like runtime identifiers. No product assertion, raw witness, model SHA, raw-log hash or product setting was changed."
+}

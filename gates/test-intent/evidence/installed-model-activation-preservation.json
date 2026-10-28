@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:8e3c308b8a7225a4e051fc7a16b390c7f7cec3a53cba795e484cca972858f31f"
+    "scriptDigest": "sha256:029e7b67b29488f1d59722cf245accb34aa4670a1003ff85558bfead3ae0d121"
   },
-  "createdAt": "2026-10-28T13:31:01.981Z",
-  "revision": "7a6ab81ea11279008a853fa5574b11da4b051c02",
-  "tree": "cb8d7fd4894633fa3ddfc0d0691da6083cd7416f",
+  "createdAt": "2026-10-28T15:22:11.421Z",
+  "revision": "f00f25ff30ceb97d371fb48c48effc585264f1af",
+  "tree": "e1c1e18f3f708f85600b77a5b7b252f63e41a33b",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,28 @@
   },
   "runs": [
     {
-      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest\" --tests \"io.justsearch.indexerworker.server.GpuOffNativeRerankerSessionTest\" --tests \"io.justsearch.indexerworker.server.ops.InstallerEmptyMetadataTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 49406
+      "durationMs": 51238
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedInstallerGenerationBootProjectionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5161
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest\" --tests \"io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifierTest\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9247
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:worker-core:test --tests \"io.justsearch.indexerworker.embed.EmbeddingCompatibilityControllerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2535
     }
   ],
   "checks": [
@@ -219,8 +237,638 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:14d9c1917a94aaff98ed786631edc334a9ad0e8188ca90cb0428a4873a778b88",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "settledInstallerCanRecoverItsPromotedEncodersWithoutAnotherMigration(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "installerReplaysBundledHelpDespiteTheStartupMarker(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "installerBudgetChangeGovernsTheNextFailedNativeMigration(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queryOnlyPublicationRetainsIssuedAThenRetiresItWithoutReplacingIndexOwner(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "inPlaceWaitsForIssuedARequestBeforeRetiringQuery(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "retirementTimeoutRepublishesUntouchedA(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "inPlaceOlderIssuedQueryTimeoutRestoresUntouchedA(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "besideCleanupErrorReleasesCapturedAAndOrderedShutdownRetriesCandidate(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "failedRestorationRetainsBothReasonsForExistingRecovery(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "composeRefusalRestoresExactAWithoutComposerRegistration(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownMemoryAndInsufficientReleaseRefuseBeforeRetirement(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "inPlaceIgnoresOlderServiceCleanupAfterItsQueryCallsDrain(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "inPlaceReleasesOwnCaptureAndKeepsIndexAndProducerDuringCompose(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "queryRecoveryCasLossReleasesReservationAndPreservesNewerOwner(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "retainedQueryRecoveryShutdownClosesDegradedAndRetriesCandidate(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "besideServesAWhileCandidateComposes(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "failedCandidateCleanupIsRetainedByQueryRecovery(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "besideCleanupErrorPreservesEarlierServiceFailureAndCandidate(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8533e66edb46fb0e0790498a4a208eb3ae570d5eda19091a574cbcc9f0ae9a2f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "standardToCompactActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "compactToStandardActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GpuOffNativeRerankerSessionTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GpuOffNativeRerankerSessionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a7509dc02a19065880f47771fec77cc70d02fbf9f9e6626cabaf109d19fbfff5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gpuOffCreatesOnlyCpuRerankerSessions(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/InstallerEmptyMetadataTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/InstallerEmptyMetadataTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4c96a066c827e36533fb22f9696932e772bc376b4388f0c99c690a84aa676672",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installerEmptyProofOmitsOnlyTheMissingStamp()",
+          "status": "passed"
+        },
+        {
+          "name": "emptyProofRetainsTargetCompletionAndContradictionChecks()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedInstallerGenerationBootProjectionTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedInstallerGenerationBootProjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:11aef9ddfce3b042269031e55dc69fd447dba028b2ca31f5d8b78e5ce4e82191",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "committedBRollsForwardExactCandidateAndSecondBootIsIdempotent()",
+          "status": "passed"
+        },
+        {
+          "name": "pointerBeforeCommitLeavesAAndDoesNotInstallCandidateSettings()",
+          "status": "passed"
+        },
+        {
+          "name": "unrelatedSettingsWitnessFailsClosedAfterB()",
+          "status": "passed"
+        },
+        {
+          "name": "committedBWithChangedSelectedChatBytesStaysFencedWithoutRollback()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] ",
+          "status": "passed"
+        },
+        {
+          "name": "[2] authority",
+          "status": "passed"
+        },
+        {
+          "name": "unrelatedPointerSourceFailsClosedWithoutChangingSettings()",
+          "status": "passed"
+        },
+        {
+          "name": "successorWitnessWithWrongSettingsFailsClosedAsAmbiguousMove()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyV2WithoutChatKeepsAThenRollsForwardCommittedB()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyV2UnprovenChatAfterPointerStaysFencedWithoutFalseTerminal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:367baa4049cdf9cc0a343275444f00f8279deed4d4ba9b40e4025d8ba64bd7af",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootUnchangedWitnessFailsAndExactNewWitnessCompletes()",
+          "status": "passed"
+        },
+        {
+          "name": "installerPostmoveFailureWithMatchingWitnessButDifferentBytesRequiresRecovery()",
+          "status": "passed"
+        },
+        {
+          "name": "impossiblePostcommitInstallerFailureRetainsCommittedWitnessForOrderedRecovery()",
+          "status": "passed"
+        },
+        {
+          "name": "restartRequiredPortCompletesBeforeSchedulingOneRequestedRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "processClosingRefusesBeforeReplacingSettings()",
+          "status": "passed"
+        },
+        {
+          "name": "componentCancellationReachesAbortAndLeavesExactSettingsAtA()",
+          "status": "passed"
+        },
+        {
+          "name": "reentrantPreparationAndCrossThreadNotificationCallsAreRefused()",
+          "status": "passed"
+        },
+        {
+          "name": "unrelatedSettingsChangeDoesNotPrepareAnyComponent()",
+          "status": "passed"
+        },
+        {
+          "name": "installerProjectionAddsEncoderToItsSingleSettingsBatchBeforePointer()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "concurrentContenderIsRefusedWhilePreparationHoldsPhysicalMutex()",
+          "status": "passed"
+        },
+        {
+          "name": "multipleArmedRowsBlockTheWholeSettingsSet()",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotBoundHybridDriftRefusesBeforeUnrelatedSettingsPublication()",
+          "status": "passed"
+        },
+        {
+          "name": "generationBoundChangeRefusesWithReindexPointerBeforeFileOrConfigPublication()",
+          "status": "passed"
+        },
+        {
+          "name": "installerProjectionRefusesFullWitnessConflictBeforePointer()",
+          "status": "passed"
+        },
+        {
+          "name": "committedTransientProfileWaitsForBootCompositionBeforeTerminalCompletion()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] missing",
+          "status": "passed"
+        },
+        {
+          "name": "[2] malformed-nonce",
+          "status": "passed"
+        },
+        {
+          "name": "[3] malformed-envelope",
+          "status": "passed"
+        },
+        {
+          "name": "indexPathChangeCommitsForRestartWhileServingRootAndTraceStayAtA()",
+          "status": "passed"
+        },
+        {
+          "name": "maskedInstallerDesiredPathStillCommitsThroughOrdinarySettingsOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "bootContradictoryQuarantinedAndInMemoryRowsWaitAndBlockHealth()",
+          "status": "passed"
+        },
+        {
+          "name": "chatEnabledChangeCannotEscapeThroughPostcommitReconciler()",
+          "status": "passed"
+        },
+        {
+          "name": "componentValidationFailureReachesAbortAndLeavesExactSettingsAtA()",
+          "status": "passed"
+        },
+        {
+          "name": "acceptedProfilePreparationCannotBeChangedByExecutingBody()",
+          "status": "passed"
+        },
+        {
+          "name": "failedSqlArmDoesNotPrepareAndReleasesOnlyAfterDurableFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "installerProjectionKeepsSettingsAtAUntilItsPointerCallback()",
+          "status": "passed"
+        },
+        {
+          "name": "secondComponentRefusalAbortsFirstAndLeavesAcceptedSettingsAtA()",
+          "status": "passed"
+        },
+        {
+          "name": "installerGenerationRecoveryWaitsForCompositeOwnerOnBothSidesOfSettingsMove()",
+          "status": "passed"
+        },
+        {
+          "name": "generativeRefusalAfterQueryOwnerPreparationLeavesTheExactSettingsWitnessAtA()",
+          "status": "passed"
+        },
+        {
+          "name": "installerProjectionKeepsNonPathComponentChangesOwnedByFixedComposer()",
+          "status": "passed"
+        },
+        {
+          "name": "thirdAndCorruptWitnessesRetainRunningRowRequestRestartAndBlockHealth()",
+          "status": "passed"
+        },
+        {
+          "name": "operatorMaskedQueryPathCannotCommitAnUnpreparedWitness()",
+          "status": "passed"
+        },
+        {
+          "name": "committedTransientProfileWithoutPreparationStaysRunningAndBlocksServing()",
+          "status": "passed"
+        },
+        {
+          "name": "installerProjectionRefusesGpuPolicyDriftBeforeOwnersOrPointer()",
+          "status": "passed"
+        },
+        {
+          "name": "unrelatedSettingsCommitRetainsCommittedQueryRoleSelection()",
+          "status": "passed"
+        },
+        {
+          "name": "installerProjectionRefusesEffectiveModelPathOverridesEvenWhenAlreadyServing()",
+          "status": "passed"
+        },
+        {
+          "name": "installerProjectionRequiresExactlyOnePhysicalEncoderObservationBeforePointer()",
+          "status": "passed"
+        },
+        {
+          "name": "statusCounterTracksSettingsCommitAndNotExactReplay()",
+          "status": "passed"
+        },
+        {
+          "name": "installerRollForwardPersistsOnlyCompletePlanQueryIdentities()",
+          "status": "passed"
+        },
+        {
+          "name": "componentChangeRefusesBeforePublicationUntilItsRuntimeOwnerCanPrepare()",
+          "status": "passed"
+        },
+        {
+          "name": "terminalSqlFailureRetainsCommittedFenceForRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "cancellationBeforeCommitAdmissionLeavesFileWitnessAndServingConfigUntouched()",
+          "status": "passed"
+        },
+        {
+          "name": "replacementBeforeMoveFailsAndAfterMoveCommitsByExactWitness()",
+          "status": "passed"
+        },
+        {
+          "name": "occupiedAndStaleReservationsRefuseBeforeSqlArm()",
+          "status": "passed"
+        },
+        {
+          "name": "installerProjectionRefusesModelPathsMissingOrContradictingAcceptedPlan()",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedReconfigureBeforeFileMoveUsesEngineApplyFailureReason()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryIssueSubscriberCanCallOwnerAfterMutexIsReleased()",
+          "status": "passed"
+        },
+        {
+          "name": "fatalBeforeFileRequestsRestartAndReopensAsPrecommitFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "missingRecoveredProfileModelLeavesCommittedRowRunningWithoutBootRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "delayedRetryReturnsItsCommittedRevisionWithoutOverwritingLaterSettings()",
+          "status": "passed"
+        },
+        {
+          "name": "normalCommitPublishesFileWitnessConfigAndPreparedResponse()",
+          "status": "passed"
+        },
+        {
+          "name": "installerTerminalGuardRequiresBothSuccessorWitnessAndExactCandidate()",
+          "status": "passed"
+        },
+        {
+          "name": "foreignAndRetiredReservationsCannotBeApplied()",
+          "status": "passed"
+        },
+        {
+          "name": "transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta()",
+          "status": "passed"
+        },
+        {
+          "name": "preparationFailureDoesNotWriteOrSwapAndTerminalFailureReleasesGuard()",
+          "status": "passed"
+        },
+        {
+          "name": "externalWitnessChangeDuringPreparationRefusesBeforeReplacingSettings()",
+          "status": "passed"
+        },
+        {
+          "name": "fatalAfterFileIsRetainedAndAReopenedOwnerReconcilesExactWitness()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/RecordedInstallerAssetVerifierTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/RecordedInstallerAssetVerifierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e75cd13c2b5fa72b06ddeb673c0cdeee25f9d946bfc11d151dfcf1984ae74cef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejectsSymbolicLinkWithoutReadingItsTarget()",
+          "status": "passed"
+        },
+        {
+          "name": "rejectsMissingModelUsingItsIdentity()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyChatPathWithoutRecordedOwnershipRefusesButNoChatAndExplicitNoneRemainSafe()",
+          "status": "passed"
+        },
+        {
+          "name": "verifiesModelAndAssetBytes()",
+          "status": "passed"
+        },
+        {
+          "name": "rejectsSamePathWithDifferentByteIdentity()",
+          "status": "passed"
+        },
+        {
+          "name": "selectedChatCompanionDriftRefuses()",
+          "status": "passed"
+        },
+        {
+          "name": "rejectsAssetByteDriftUsingItsIdentity()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bgeM3IsNeverPlacedOnTheGpuByAPlanUnlessTheUserPutsItThere()",
+          "status": "passed"
+        },
+        {
+          "name": "thePlansOwnContributionIsNotReadBackAsASetting()",
+          "status": "passed"
+        },
+        {
+          "name": "aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt()",
+          "status": "passed"
+        },
+        {
+          "name": "theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k()",
+          "status": "passed"
+        },
+        {
+          "name": "p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps()",
+          "status": "passed"
+        },
+        {
+          "name": "statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitSettingsKeepWinningAndABrokenPlanIsReportedUnmet()",
+          "status": "passed"
+        },
+        {
+          "name": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/EmbeddingCompatibilityControllerTest.java",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/EmbeddingCompatibilityControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cf7f60aac8226cbad0cce26f7be213645c78c943cf60fadd62f9a037b3239a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refreshResolvesCompatibleOnAGenuinelyEmptyIndex()",
+          "status": "passed"
+        },
+        {
+          "name": "maybeAutoStartRebuildForBlockedLegacyGuardsEmptyIndex()",
+          "status": "passed"
+        },
+        {
+          "name": "checkRebuildCompletionCertifiesOnPendingZeroEvenWhenJobQueueNonEmpty()",
+          "status": "passed"
+        },
+        {
+          "name": "autoRescueDoesNotFireOnProperlyStampedGeneration()",
+          "status": "passed"
+        },
+        {
+          "name": "checkRebuildCompletionFinalizesRebuildAndEnablesFingerprintStamp()",
+          "status": "passed"
+        },
+        {
+          "name": "autoRescueTagsTheDiagnosticReasonForOperators()",
+          "status": "passed"
+        },
+        {
+          "name": "maybeAutoStartRebuildForBlockedLegacyFiresRegardlessOfDistribution()",
+          "status": "passed"
+        },
+        {
+          "name": "refreshWhileRebuildingIsIgnored()",
+          "status": "passed"
+        },
+        {
+          "name": "firstSuccessfulEmbeddingEarnsTheStampOnAFreshIndex()",
+          "status": "passed"
+        },
+        {
+          "name": "checkRebuildCompletionRefusesButStaysRetryableWhenTheCountCannotBeRead()",
+          "status": "passed"
+        },
+        {
+          "name": "checkRebuildCompletionStillCertifiesThePoisonPillDistribution()",
+          "status": "passed"
+        },
+        {
+          "name": "checkRebuildCompletionStopsReAttemptingAfterARefusal()",
+          "status": "passed"
+        },
+        {
+          "name": "anAlreadyStampedIndexKeepsStampingWithoutFreshEvidence()",
+          "status": "passed"
+        },
+        {
+          "name": "anAlreadyStampedIndexKeepsOfferingItsFingerprintWithoutFreshEmbeddings()",
+          "status": "passed"
+        },
+        {
+          "name": "checkRebuildCompletionRefusesWhenEveryEmbeddingFailed()",
+          "status": "passed"
+        },
+        {
+          "name": "waivedEvidenceCertifiesWithoutConsultingTheIndex()",
+          "status": "passed"
+        },
+        {
+          "name": "refreshFailsClosedWhenTheDocCountCannotBeRead()",
+          "status": "passed"
+        },
+        {
+          "name": "checkRebuildCompletionDoesNotFinalizeWhenEmbeddingsStillPending()",
+          "status": "passed"
+        },
+        {
+          "name": "maybeAutoStartRebuildForBlockedLegacyTransitionsToRebuilding()",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:04581d891a688a7581632958c8c9d72c9aa560523ff9780df49038ee4e4cf769"
+  "digest": "sha256:caa8378d357c3254a1a65493d4a6fbde20ead211c1b00135593d9ce062568b3a"
 }
