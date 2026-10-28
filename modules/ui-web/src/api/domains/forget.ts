@@ -138,7 +138,7 @@ export function forgetObservationText(outcome: ForgetOutcome): string {
   const keepOut = { INSTALLED: 'Exact keep-out installed.', NOT_REQUIRED: 'No permanent keep-out applies.',
     NOT_INSTALLED: 'Keep-out not installed.', RELEASED: 'No keep-out from this forget remains.', UNKNOWN: 'Keep-out outcome unknown.' }[outcome.keepOut];
   // The Engine's explanation may already state the removal; never repeat a sentence.
-  return [outcome.explanation, removal, keepOut].filter((part, i, parts) => i === 0 || !parts[0].includes(part)).join(' ');
+  return [outcome.explanation, removal, keepOut].filter((part, i) => i === 0 || !outcome.explanation.includes(part)).join(' ');
 }
 
 /** Index-key rules: Unix backslashes remain filename bytes; drive/UNC paths use Windows rules. */

@@ -1,0 +1,520 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-R35-evidence-audit/collect.mjs",
+      "digest": "sha256:34a996c9f24a47ff72ecc84af14dd80462eee91b76a0144244100018724f5f36",
+      "configuration": {
+        "path": "tmp/builder/retire-R35-evidence-audit/collect.json",
+        "sha256": "sha256:7ca9557c8a98d81b947ed3c40adbee73aee0c7dc1eb560c7c975d21a17db3051",
+        "bytes": 20868
+      },
+      "canonicalParsers": [
+        {
+          "path": "scripts/governance/gates/test-intent/evidence-runners.mjs",
+          "sha256": "sha256:5edf1266ced4b81b748a21ae22168e029aba07cfc16b024a9d993cc1081b5c25",
+          "bytes": 7879
+        },
+        {
+          "path": "scripts/governance/gates/test-intent/evidence.mjs",
+          "sha256": "sha256:f5a094974e7f55bb5ee9d1d3452387dfaeebf2602dd1995af65be4aab366e44c",
+          "bytes": 5439
+        }
+      ],
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-R35-evidence-audit/producers/34a996c9f24a47ff72ecc84af14dd80462eee91b76a0144244100018724f5f36.mjs",
+        "sha256": "sha256:34a996c9f24a47ff72ecc84af14dd80462eee91b76a0144244100018724f5f36",
+        "bytes": 12802
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T20:39:57.424Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementSafetyTest.unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:09b67a9fe2e28e9787a10d558c29ca14ee427afac9ab11156ab771b2f518f9e3",
+          "bytes": 514764
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/command.json",
+          "sha256": "sha256:e968eed60b0518b4922cb479c0bc8635211036150608c70b18df0c770b0a95b7",
+          "bytes": 1700573
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:998578d1bcc4f7c443dfa29a95dffdd4c03bde685c4de749387f446ed62e09f1",
+          "bytes": 14760
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:classes :modules:indexer-worker:testClasses :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:indexer-worker:test --tests *Release030ConditionalCorrectionTest --tests *Release030RetirementClaimOwnershipTest --tests *Release030CorrectionHistoryTest.sameIntentResumesAfterRollbackWithActualMutableRetryPreserved --tests *Release030CorrectionHistoryTest.laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims --tests *Release030RetirementSafetyTest.unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed --tests *Release030RetirementLegacyMetadataTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/retire-safety-diagnostic",
+      "raw": [
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:03ea7329ceddfda8f843ed9c9c766c958b6fd1450b7392edee397fb6e0afbe46",
+          "bytes": 161428
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/command.json",
+          "sha256": "sha256:dcedeadd595504da0892a7b88f83151cdbcc044994adb51f796c460640df7122",
+          "bytes": 2967
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/candidate2-method-identities.json",
+          "sha256": "sha256:096ce144115ee6fb53b08cb2d11f7113c3746017d92804f54811c6c0c4242e37",
+          "bytes": 15966
+        },
+        {
+          "path": "tmp/builder/step7/read-gradle-identities.py",
+          "sha256": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+          "bytes": 2546
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:d2abfbecdf5a8dac96d3e9d3526df813ad9a7db797699a6c3d38e7f2f3df4ce1",
+          "bytes": 16158
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030Fixture.java",
+          "sha256": "sha256:32a1b804d12f8928a5383969be74efd50536feeca8487bd5d9cfebc4e49cd38b",
+          "bytes": 15101
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030UpgradeCharacterizationTest.java",
+          "sha256": "sha256:0224afdbbbaca5931fc5964741679db52da70cb014c0f96ae65b40dbce8cdb65",
+          "bytes": 17119
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030RetirementSafetyTest.java",
+          "sha256": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+          "bytes": 20314
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/changed-source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+          "sha256": "sha256:0d3ffa81d1ce3a24c56ab4d6566494d5b4f3d51d7270a66fe8a1014f0b6fc893",
+          "bytes": 15763
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/run-final.py",
+          "sha256": "sha256:b344fd7669c1b464c762b6281d0a2ccff1060e0ea42ca5e25c2282897b7ad7fd",
+          "bytes": 5884
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/selection.init.gradle",
+          "sha256": "sha256:f30743dac76c03ddcf2f19f24a4f222c3d0237ba6dd5bb4e8adf410a6539319f",
+          "bytes": 3869
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/writeability.init.gradle",
+          "sha256": "sha256:589e609cf6cb55855085ccbaa648e42817612a0899dfd18c332fb5146c0aa786",
+          "bytes": 2564
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/source/io/justsearch/indexerworker/server/RetirementDiagnosticTest.java",
+          "sha256": "sha256:f84a7762bb7c8756d33eed324891a20a25097f9706bc509894fe50a619ce57bf",
+          "bytes": 881
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/source-before.json",
+          "sha256": "sha256:7404a77a8e18bba88c4447959301698041dfd59ed0d3f77a5c9b61f844862ef6",
+          "bytes": 1675697
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-effective.json",
+          "sha256": "sha256:76d3b2b0e0bc3be7499727c37e73aafeda870d37e67f577ea3375b7c20cd4a00",
+          "bytes": 34641
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/selected-daemon-writeability.json",
+          "sha256": "sha256:dcc7132abd3ea4426f9d1ae07aabbd7e9cebb621bcea1e4f1ee28f01d383146e",
+          "bytes": 1904
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/output-events.bin",
+          "sha256": "sha256:11cca69dbf842656b05283cd338572cbbcc153f08b1e87894f6f54c922725526",
+          "bytes": 1549825
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:d2abfbecdf5a8dac96d3e9d3526df813ad9a7db797699a6c3d38e7f2f3df4ce1",
+          "bytes": 16158
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json",
+          "sha256": "sha256:c6b7a1c18ad6df2ee91a118822edf565dddfa3eca84d6a36a07ca7137557b005",
+          "bytes": 6518
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:97a2eb0ae949168c7677e0ea38da05bb066fdb1ee61f5f765c55289c2522a421",
+          "bytes": 75502
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] migrating",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[2] switching",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:03ea7329ceddfda8f843ed9c9c766c958b6fd1450b7392edee397fb6e0afbe46",
+          "bytes": 161428
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/command.json",
+          "sha256": "sha256:dcedeadd595504da0892a7b88f83151cdbcc044994adb51f796c460640df7122",
+          "bytes": 2967
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/candidate2-method-identities.json",
+          "sha256": "sha256:096ce144115ee6fb53b08cb2d11f7113c3746017d92804f54811c6c0c4242e37",
+          "bytes": 15966
+        },
+        {
+          "path": "tmp/builder/step7/read-gradle-identities.py",
+          "sha256": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+          "bytes": 2546
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:d2abfbecdf5a8dac96d3e9d3526df813ad9a7db797699a6c3d38e7f2f3df4ce1",
+          "bytes": 16158
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030Fixture.java",
+          "sha256": "sha256:32a1b804d12f8928a5383969be74efd50536feeca8487bd5d9cfebc4e49cd38b",
+          "bytes": 15101
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030UpgradeCharacterizationTest.java",
+          "sha256": "sha256:0224afdbbbaca5931fc5964741679db52da70cb014c0f96ae65b40dbce8cdb65",
+          "bytes": 17119
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030RetirementSafetyTest.java",
+          "sha256": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+          "bytes": 20314
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/changed-source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+          "sha256": "sha256:0d3ffa81d1ce3a24c56ab4d6566494d5b4f3d51d7270a66fe8a1014f0b6fc893",
+          "bytes": 15763
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/run-final.py",
+          "sha256": "sha256:b344fd7669c1b464c762b6281d0a2ccff1060e0ea42ca5e25c2282897b7ad7fd",
+          "bytes": 5884
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/selection.init.gradle",
+          "sha256": "sha256:f30743dac76c03ddcf2f19f24a4f222c3d0237ba6dd5bb4e8adf410a6539319f",
+          "bytes": 3869
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/writeability.init.gradle",
+          "sha256": "sha256:589e609cf6cb55855085ccbaa648e42817612a0899dfd18c332fb5146c0aa786",
+          "bytes": 2564
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/source/io/justsearch/indexerworker/server/RetirementDiagnosticTest.java",
+          "sha256": "sha256:f84a7762bb7c8756d33eed324891a20a25097f9706bc509894fe50a619ce57bf",
+          "bytes": 881
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/source-before.json",
+          "sha256": "sha256:7404a77a8e18bba88c4447959301698041dfd59ed0d3f77a5c9b61f844862ef6",
+          "bytes": 1675697
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-effective.json",
+          "sha256": "sha256:76d3b2b0e0bc3be7499727c37e73aafeda870d37e67f577ea3375b7c20cd4a00",
+          "bytes": 34641
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/selected-daemon-writeability.json",
+          "sha256": "sha256:dcc7132abd3ea4426f9d1ae07aabbd7e9cebb621bcea1e4f1ee28f01d383146e",
+          "bytes": 1904
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/output-events.bin",
+          "sha256": "sha256:11cca69dbf842656b05283cd338572cbbcc153f08b1e87894f6f54c922725526",
+          "bytes": 1549825
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:d2abfbecdf5a8dac96d3e9d3526df813ad9a7db797699a6c3d38e7f2f3df4ce1",
+          "bytes": 16158
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json",
+          "sha256": "sha256:c6b7a1c18ad6df2ee91a118822edf565dddfa3eca84d6a36a07ca7137557b005",
+          "bytes": 6518
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:97a2eb0ae949168c7677e0ea38da05bb066fdb1ee61f5f765c55289c2522a421",
+          "bytes": 75502
+        }
+      ],
+      "executionScope": "Actual R33 candidate2 Safety execution; exact applied production inputs and unchanged invoked Safety helper sources are bound separately. Raw head is bbdd with the reviewed production overlay; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING> | unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING> | unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]: org.opentest4j.AssertionFail",
+        "cases": [
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "xmlName": "[1] migrating",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 0,
+            "binaryOffset": 11
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "xmlName": "[1] migrating",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 2,
+            "binaryOffset": 8518
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <MIGRATING>",
+            "xmlName": "[1] migrating",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 4,
+            "binaryOffset": 17025
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "xmlName": "[2] switching",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 1,
+            "binaryOffset": 4081
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "xmlName": "[2] switching",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 3,
+            "binaryOffset": 12588
+          },
+          {
+            "name": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <IDLE> but was: <SWITCHING>",
+            "xmlName": "[2] switching",
+            "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+            "xmlOrdinal": 5,
+            "binaryOffset": 21095
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/safety-before-unavailable/migrating.json",
+            "sha256": "sha256:c53e81ef43dfa079d23ddd6911cce8fc4bb030368b703112db7748664710ea33",
+            "bytes": 12397
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/safety-before-unavailable/switching.json",
+            "sha256": "sha256:2324cb5a53425954da3febf1ef77133ed869b4482f1101915df67588dbcde21e",
+            "bytes": 12400
+          }
+        ],
+        "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+        "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16"
+      }
+    ],
+    "scope": "Retained actual before records from the previous envelope, unchanged. New after-only imports add no before assertion."
+  },
+  "unverified": [],
+  "appliedSourceEquivalence": {
+    "commit": "e948216336f5b46c69183dbe7265e0bdbeb45f66",
+    "artifact": "tmp/builder/retire-R35-evidence-audit/r33-applied-source-comparison.json",
+    "scope": "Production inputs; required invoked helper files verified by collector. Not a blanket current-parent result for other D4 checks."
+  },
+  "sourceBindings": [
+    {
+      "run": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2",
+      "comparisonArtifact": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json"
+    }
+  ],
+  "scope": "Two captured phases pass on actual reviewed R33 candidate2. Applied e948 production source equivalence is checked by hashes, with unrelated changed tests disclosed. Retains the failed earlier bbdd after and the unchanged original frozen before.",
+  "frozenBase": {
+    "artifact": {
+      "path": "gates/test-intent/evidence/upgrade-retire-r1-unavailable-method.json",
+      "sha256": "sha256:91e928ea4b11a69882318d83bdd881d8d768ef9ff32bd92e7ee9c5308a7d9e2c",
+      "bytes": 12583
+    },
+    "producer": {
+      "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+      "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+      "artifactCollector": {
+        "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+        "digest": "sha256:39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a",
+        "sourceArtifact": {
+          "path": "tmp/builder/retire-P4-evidence-closure/producers/39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a.mjs",
+          "sha256": "sha256:39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a",
+          "bytes": 7360
+        }
+      },
+      "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+    },
+    "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+    "scope": "Unmodified earlier evidence envelope; retained checks keep their original raw bindings and execution scope"
+  },
+  "historicalOriginalChecks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "[1] migrating",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] migrating",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[2] switching",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: returned root resolves its durable obligation and permits B retirement ==> expected: <true> but was: <false>",
+          "xmlName": "[2] switching",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[1] migrating",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] migrating",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[2] switching",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: returned root resolves its durable obligation and permits B retirement ==> expected: <true> but was: <false>",
+          "xmlName": "[2] switching",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[1] migrating",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] migrating",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        },
+        {
+          "name": "[2] switching",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: returned root resolves its durable obligation and permits B retirement ==> expected: <true> but was: <false>",
+          "xmlName": "[2] switching",
+          "method": "unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:09b67a9fe2e28e9787a10d558c29ca14ee427afac9ab11156ab771b2f518f9e3",
+          "bytes": 514764
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/command.json",
+          "sha256": "sha256:e968eed60b0518b4922cb479c0bc8635211036150608c70b18df0c770b0a95b7",
+          "bytes": 1700573
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/safety-unavailable-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:998578d1bcc4f7c443dfa29a95dffdd4c03bde685c4de749387f446ed62e09f1",
+          "bytes": 14760
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "digest": "sha256:887a7e3e01d84356dcf8bed92f555f5e6aa3b943546a37decd6fb65577b41a67"
+}

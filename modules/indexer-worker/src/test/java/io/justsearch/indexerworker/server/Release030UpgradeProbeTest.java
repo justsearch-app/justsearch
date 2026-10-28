@@ -39,8 +39,13 @@ final class Release030UpgradeProbeTest {
             disposition = refused.getClass().getSimpleName() + ": " + refused.getMessage();
           }
           assertTrue(Files.isDirectory(serving), "interrupted serving generation is retained");
-          assertEquals(metadata.get("index_fingerprint"),
-              Release030CompatibilityTest.readMetadata(serving).get("index_fingerprint"));
+          assertEquals(serving, Release030CompatibilityTest.generation(root), "the serving generation identity survives");
+          var oldInputs = new tools.jackson.databind.ObjectMapper().readTree(metadata.get("index_fingerprint_inputs"));
+          var newInputs = new tools.jackson.databind.ObjectMapper().readTree(
+              Release030CompatibilityTest.readMetadata(serving).get("index_fingerprint_inputs"));
+          for (String identity : List.of("analyzer_fp", "embedding_model_sha256", "splade_model_sha256", "ner_model_sha256")) {
+            assertEquals(oldInputs.get(identity), newInputs.get(identity), "compatible writes preserve " + identity);
+          }
           assertTrue(count(root, "1=1") >= jobs, "no legacy queue row is deleted by this change");
           System.out.println("Release030 " + name + ": " + disposition
               + ", jobs=" + count(root, "1=1") + ", queued="

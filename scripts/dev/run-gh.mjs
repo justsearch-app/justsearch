@@ -64,6 +64,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const POLL_INTERVAL_MS = 15_000;
+const MERGE_POLL_INTERVAL_MS = 60_000;
 const DEFAULT_TIMEOUT_SEC = 1800;
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PREVIEW_SCRIPT = path.resolve(SCRIPT_DIR, '..', 'ci', 'preview-squash-message.mjs');
@@ -163,12 +164,42 @@ export function classifyWorkflowRun(run) {
   return { verdict: 'fail', key: `${run.databaseId}:${conclusion || 'unknown'}`, message: `run ${run.databaseId} concluded ${conclusion || 'unknown'}` };
 }
 
+/** gh versions emit either one merged array or consecutive JSON arrays for --paginate. */
+function parsePaginatedArrays(text) {
+  const rows = [];
+  let start = 0; let depth = 0; let inString = false; let escaped = false; let pages = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (depth === 0) {
+      if (/\s/.test(char)) continue;
+      if (char !== '[') throw new Error('expected branch rules array');
+      start = i;
+    }
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+    } else if (char === '"') inString = true;
+    else if (char === '[' || char === '{') depth += 1;
+    else if (char === ']' || char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        rows.push(...JSON.parse(text.slice(start, i + 1)));
+        pages += 1;
+      }
+    }
+  }
+  if (depth || !pages) throw new Error('incomplete branch rules JSON');
+  return rows;
+}
+
 function capturedJson(bin, args) {
   const result = runGhCaptured(bin, args);
+  if (args[0] === 'pr' && args[1] === 'checks') return parseRequiredChecksResult(result);
   if (result.error) return { error: result.error };
-  if (result.status !== 0) return { error: new Error(`${result.stderr || result.stdout || `gh exited ${result.status}`}`.trim()) };
+  if (result.status !== 0) return { error: new Error(`${result.stderr || result.stdout || `gh exited ${result.status}`}`.trim()), stderr: result.stderr };
   try {
-    return { value: JSON.parse(result.stdout) };
+    return { value: args.includes('--paginate') ? parsePaginatedArrays(result.stdout) : JSON.parse(result.stdout) };
   } catch (error) {
     return { error: new Error(`invalid gh JSON: ${error.message}`) };
   }
@@ -179,29 +210,192 @@ function emitTransition(prefix, classified, previousKey) {
   return classified.key;
 }
 
+/** Decode required checks by their current JSON rows, never by gh's checks exit bits. */
+export function parseRequiredChecksResult(result) {
+  if (result.error) return { error: result.error };
+  if (typeof result.status !== 'number' || result.signal) {
+    return { error: new Error(`gh checks terminated without an exit status${result.signal ? ` (${result.signal})` : ''}`) };
+  }
+  // isUnregistered also accepts empty failures for checks-wait; merge-wait requires the message.
+  const text = `${result.stdout || ''}${result.stderr || ''}`;
+  if (text.trim() && isUnregistered(result)) return { value: [] };
+  try {
+    const value = JSON.parse(result.stdout);
+    if (!Array.isArray(value) || value.some((row) => !row ||
+        ['name', 'state', 'bucket', 'link'].some((key) => typeof row[key] !== 'string'))) {
+      throw new Error('incomplete required-check rows');
+    }
+    return { value };
+  } catch (error) {
+    return { error: new Error(`${text.trim() || `gh exited ${result.status}`}: invalid gh checks JSON: ${error.message}`) };
+  }
+}
+
+export function classifyRequiredChecks(rows) {
+  const failures = [];
+  let passed = 0;
+  for (const row of rows) {
+    const state = row.state.toUpperCase();
+    if (['fail', 'cancel'].includes(row.bucket) ||
+        ['STARTUP_FAILURE', 'ERROR', 'FAILURE', 'TIMED_OUT', 'ACTION_REQUIRED'].includes(state)) {
+      failures.push(row);
+    } else if (state !== 'STALE' && (row.bucket === 'pass' || ['SUCCESS', 'SKIPPED', 'NEUTRAL'].includes(state))) {
+      passed += 1;
+    }
+  }
+  return { reported: rows.length, passed, pending: rows.length - passed - failures.length, failures };
+}
+
+function requiredChecksSummary(checks) {
+  return checks.reported ? `${checks.reported} reported, ${checks.passed} passed, ${checks.pending} pending` : 'none reported yet';
+}
+
+export function classifyMergePoll(before, after, rows, watchedHead, passingForMs = 0, requiredContexts = []) {
+  for (const snapshot of [before, after]) {
+    const classified = classifyMergeSnapshot(snapshot);
+    if (classified.verdict === 'pass') return classified;
+  }
+  if (before.headRefOid !== after.headRefOid || before.state !== after.state) {
+    return { verdict: 'pending', key: 'CHANGED', message: 'PR head or state changed during poll; waiting for a stable snapshot' };
+  }
+  const classified = classifyMergeSnapshot(after);
+  if (classified.verdict === 'fail') return classified;
+  if (after.headRefOid !== watchedHead) {
+    return { verdict: 'fail', key: 'NEW_HEAD', message: `new head ${after.headRefOid}; enqueue again` };
+  }
+  if (after.isDraft) return { verdict: 'fail', key: 'DRAFT', message: 'PR is a draft' };
+  if (after.mergeStateStatus === 'DIRTY') return { verdict: 'fail', key: 'DIRTY', message: 'PR has merge conflicts (DIRTY)' };
+  const checks = classifyRequiredChecks(rows);
+  if (checks.failures.length) {
+    return { verdict: 'fail', key: 'CHECKS_FAILED', message: `required checks failed: ${checks.failures.map((row) => `${row.name} (${row.state}, ${row.bucket}) ${row.link}`).join('; ')}` };
+  }
+  if (!after.autoMergeRequest) {
+    return { verdict: 'fail', key: 'AUTO_MERGE_OFF', message: 'auto-merge is off; enqueue again after a fix' };
+  }
+  const allPassed = requiredContexts.length > 0 && checks.passed === checks.reported &&
+    requiredContexts.every((context) => rows.some((row) => row.name === context && classifyRequiredChecks([row]).passed === 1));
+  if (allPassed && passingForMs >= 600_000) {
+    return { verdict: 'fail', key: 'STALLED', message: `merge stalled for 10 minutes with required checks passing; mergeStateStatus ${after.mergeStateStatus}` };
+  }
+  const checkKey = rows.map((row) => `${row.name}:${row.state}:${row.bucket}`).sort().join(',');
+  return { verdict: 'pending', key: `${classified.key}:${checkKey}`, message: `${classified.message}; required checks: ${requiredChecksSummary(checks)}`, allPassed };
+}
+
 export async function mergeWait(bin, prNumber, timeoutSec, {
   loadJson = capturedJson,
   now = () => Date.now(),
   pause = sleep,
   emit = emitTransition,
+  repo = null,
+  head = null,
 } = {}) {
   const deadline = now() + timeoutSec * 1000;
+  const viewArgs = ['pr', 'view', String(prNumber), '--json',
+    'state,mergedAt,mergeCommit,headRefOid,baseRefName,isDraft,mergeStateStatus,autoMergeRequest'];
+  const checksArgs = ['pr', 'checks', String(prNumber), '--required', '--json', 'name,state,bucket,link'];
+  if (repo) { viewArgs.push('--repo', repo); checksArgs.push('--repo', repo); }
+  const readSnapshot = () => {
+    const loaded = loadJson(bin, viewArgs);
+    if (loaded.error) return loaded;
+    const snapshot = loaded.value;
+    if (!snapshot || !['OPEN', 'CLOSED', 'MERGED'].includes(snapshot.state) ||
+        typeof snapshot.headRefOid !== 'string' || !snapshot.headRefOid ||
+        typeof snapshot.baseRefName !== 'string' || !snapshot.baseRefName ||
+        typeof snapshot.isDraft !== 'boolean' || typeof snapshot.mergeStateStatus !== 'string' ||
+        !Object.hasOwn(snapshot, 'autoMergeRequest')) {
+      return { error: new Error('invalid gh JSON: incomplete PR snapshot') };
+    }
+    return loaded;
+  };
   let previousKey = null;
+  let watchedHead = head?.toLowerCase() ?? null;
+  let requiredContexts = null;
+  let passingSince = null;
   for (;;) {
-    const loaded = loadJson(bin, ['pr', 'view', String(prNumber), '--json', 'state,mergedAt,mergeCommit,mergeStateStatus,url']);
-    if (loaded.error) {
-      process.stderr.write(`run-gh merge-wait: ${loaded.error.message}\n`);
+    const before = readSnapshot();
+    if (before.error) {
+      process.stderr.write(`run-gh merge-wait: ${before.error.message}\n`);
       return 2;
     }
-    const classified = classifyMergeSnapshot(loaded.value);
+    if (watchedHead === null) watchedHead = before.value.headRefOid;
+    const mergedBefore = classifyMergeSnapshot(before.value);
+    if (mergedBefore.verdict === 'pass') {
+      emit(`run-gh merge-wait PR #${prNumber}`, mergedBefore, previousKey);
+      return 0;
+    }
+    if (requiredContexts === null) {
+      const base = encodeURIComponent(before.value.baseRefName);
+      const repository = `repos/${repo || '{owner}/{repo}'}`;
+      const classic = loadJson(bin, ['api', `${repository}/branches/${base}/protection/required_status_checks`]);
+      const rules = loadJson(bin, ['api', `${repository}/rules/branches/${base}`, '--paginate']);
+      // gh reports API failures as "gh: <message> (HTTP <status>)" on stderr.
+      const classicStatus = classic.error ? /\bHTTP (403|404)\b/.exec(classic.stderr || '')?.[1] : null;
+      const unprotected = classicStatus === '404' && /Branch not protected/i.test(classic.stderr);
+      const unknown = classicStatus && !unprotected && !/rate limit|abuse detection/i.test(classic.stderr);
+      try {
+        if (classic.error && !unprotected && !unknown) throw classic.error;
+        if (rules.error) throw rules.error;
+        const contexts = [];
+        if (!classic.error) {
+          const protection = classic.value;
+          if (!Array.isArray(protection?.contexts) || !Array.isArray(protection?.checks) ||
+              protection.contexts.some((context) => typeof context !== 'string' || !context) ||
+              protection.checks.some((check) => typeof check?.context !== 'string' || !check.context)) {
+            throw new Error('invalid gh JSON: incomplete classic required status checks');
+          }
+          contexts.push(...protection.contexts, ...protection.checks.map((check) => check.context));
+        }
+        if (!Array.isArray(rules.value) || rules.value.some((rule) => typeof rule?.type !== 'string' || !rule.type)) {
+          throw new Error('invalid gh JSON: incomplete branch rules');
+        }
+        for (const rule of rules.value.filter((rule) => rule.type === 'required_status_checks')) {
+          const checks = rule.parameters?.required_status_checks;
+          if (!Array.isArray(checks) || checks.some((check) => typeof check?.context !== 'string' || !check.context)) {
+            throw new Error('invalid gh JSON: incomplete required status check contexts');
+          }
+          contexts.push(...checks.map((check) => check.context));
+        }
+        requiredContexts = unknown ? [] : [...new Set(contexts)];
+        const reason = unknown ? 'classic required checks unknown: protection cannot be read' :
+          !requiredContexts.length ? 'branch protection and rulesets returned no required contexts' : null;
+        if (reason) process.stderr.write(`run-gh merge-wait: stall detection disabled: ${reason}; timeout still applies\n`);
+      } catch (error) {
+        process.stderr.write(`run-gh merge-wait: ${error.message}\n`);
+        return 2;
+      }
+    }
+    const checks = loadJson(bin, checksArgs);
+    const after = readSnapshot();
+    let classified = classifyMergeSnapshot(before.value);
+    if (classified.verdict !== 'pass') {
+      if (after.error) {
+        process.stderr.write(`run-gh merge-wait: ${after.error.message}\n`);
+        return 2;
+      }
+      classified = classifyMergeSnapshot(after.value);
+      if (classified.verdict !== 'pass') {
+        if (checks.error) {
+          process.stderr.write(`run-gh merge-wait: ${checks.error.message}\n`);
+          return 2;
+        }
+        classified = classifyMergePoll(before.value, after.value, checks.value, watchedHead, 0, requiredContexts);
+        if (classified.allPassed) {
+          if (passingSince === null) passingSince = now();
+          classified = classifyMergePoll(before.value, after.value, checks.value, watchedHead, now() - passingSince, requiredContexts);
+        } else {
+          passingSince = null;
+        }
+      }
+    }
     previousKey = emit(`run-gh merge-wait PR #${prNumber}`, classified, previousKey);
     if (classified.verdict === 'pass') return 0;
     if (classified.verdict === 'fail') return 1;
     if (now() >= deadline) {
-      process.stderr.write(`run-gh merge-wait: TIMEOUT after ${timeoutSec}s\n`);
+      const missing = requiredContexts.filter((context) => !checks.value.some((row) => row.name === context));
+      process.stderr.write(`run-gh merge-wait: TIMEOUT after ${timeoutSec}s; required checks: ${requiredChecksSummary(classifyRequiredChecks(checks.value))}${missing.length ? `; not reported yet: ${missing.join(', ')}` : ''}\n`);
       return 3;
     }
-    await pause(POLL_INTERVAL_MS);
+    await pause(MERGE_POLL_INTERVAL_MS);
   }
 }
 
@@ -434,7 +628,11 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
     '--match-head-commit', after.value.headRefOid, '--subject', preview.expectedLandedSubject, '--body', preview.body];
   if (repo) mergeArgs.push('--repo', repo);
   const result = run(bin, mergeArgs, { stdio: 'inherit', windowsHide: true });
-  return childFailure('squash auto-merge request', result, writeError);
+  const failure = childFailure('squash auto-merge request', result, writeError);
+  if (failure === 0) {
+    writeError(`run-gh enqueue: run node scripts/dev/run-gh.mjs merge-wait ${prNumber}${repo ? ` --repo ${repo}` : ''} --head ${after.value.headRefOid} --timeout-sec 5400 in the background.\n`);
+  }
+  return failure;
 }
 
 async function main() {
@@ -455,12 +653,18 @@ async function main() {
 
   if (argv[0] === 'merge-wait') {
     const { timeoutSec, rest } = parseTimeoutSec(argv.slice(1));
-    const prNumber = rest[0];
+    const repoFlag = parseValueFlag(rest, '--repo');
+    const headFlag = parseValueFlag(repoFlag.rest, '--head');
+    if (rest.includes('--head') && (!/^[a-f0-9]{40}$/i.test(headFlag.value ?? '') || headFlag.rest.includes('--head'))) {
+      process.stderr.write('run-gh merge-wait: --head must be a 40-hex SHA\n');
+      process.exit(2);
+    }
+    const prNumber = headFlag.rest[0];
     if (!prNumber) {
       process.stderr.write('run-gh merge-wait: missing <pr-number>\n');
       process.exit(2);
     }
-    process.exit(await mergeWait(bin, prNumber, timeoutSec));
+    process.exit(await mergeWait(bin, prNumber, timeoutSec, { repo: repoFlag.value, head: headFlag.value }));
   }
 
   if (argv[0] === 'run-wait-sha') {

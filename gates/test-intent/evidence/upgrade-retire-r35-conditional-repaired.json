@@ -1,0 +1,580 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-R35-evidence-audit/collect.mjs",
+      "digest": "sha256:34a996c9f24a47ff72ecc84af14dd80462eee91b76a0144244100018724f5f36",
+      "configuration": {
+        "path": "tmp/builder/retire-R35-evidence-audit/collect.json",
+        "sha256": "sha256:7ca9557c8a98d81b947ed3c40adbee73aee0c7dc1eb560c7c975d21a17db3051",
+        "bytes": 20868
+      },
+      "canonicalParsers": [
+        {
+          "path": "scripts/governance/gates/test-intent/evidence-runners.mjs",
+          "sha256": "sha256:5edf1266ced4b81b748a21ae22168e029aba07cfc16b024a9d993cc1081b5c25",
+          "bytes": 7879
+        },
+        {
+          "path": "scripts/governance/gates/test-intent/evidence.mjs",
+          "sha256": "sha256:f5a094974e7f55bb5ee9d1d3452387dfaeebf2602dd1995af65be4aab366e44c",
+          "bytes": 5439
+        }
+      ],
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-R35-evidence-audit/producers/34a996c9f24a47ff72ecc84af14dd80462eee91b76a0144244100018724f5f36.mjs",
+        "sha256": "sha256:34a996c9f24a47ff72ecc84af14dd80462eee91b76a0144244100018724f5f36",
+        "bytes": 12802
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T20:39:57.525Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:classes :modules:indexer-worker:testClasses :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:indexer-worker:test --tests *Release030ConditionalCorrectionTest --tests *Release030RetirementClaimOwnershipTest --tests *Release030CorrectionHistoryTest.sameIntentResumesAfterRollbackWithActualMutableRetryPreserved --tests *Release030CorrectionHistoryTest.laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims --tests *Release030RetirementSafetyTest.unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed --tests *Release030RetirementLegacyMetadataTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/retire-safety-diagnostic",
+      "raw": [
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.xml",
+          "sha256": "sha256:b7dbcd4eaad3e8e8cbe8c48d993a7b53d8746d9739c67dd7fc01fa7e4a964926",
+          "bytes": 736102
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/command.json",
+          "sha256": "sha256:dcedeadd595504da0892a7b88f83151cdbcc044994adb51f796c460640df7122",
+          "bytes": 2967
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/candidate2-method-identities.json",
+          "sha256": "sha256:096ce144115ee6fb53b08cb2d11f7113c3746017d92804f54811c6c0c4242e37",
+          "bytes": 15966
+        },
+        {
+          "path": "tmp/builder/step7/read-gradle-identities.py",
+          "sha256": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+          "bytes": 2546
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:d2abfbecdf5a8dac96d3e9d3526df813ad9a7db797699a6c3d38e7f2f3df4ce1",
+          "bytes": 16158
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030Fixture.java",
+          "sha256": "sha256:32a1b804d12f8928a5383969be74efd50536feeca8487bd5d9cfebc4e49cd38b",
+          "bytes": 15101
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030UpgradeCharacterizationTest.java",
+          "sha256": "sha256:0224afdbbbaca5931fc5964741679db52da70cb014c0f96ae65b40dbce8cdb65",
+          "bytes": 17119
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030RetirementSafetyTest.java",
+          "sha256": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+          "bytes": 20314
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/changed-source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+          "sha256": "sha256:0d3ffa81d1ce3a24c56ab4d6566494d5b4f3d51d7270a66fe8a1014f0b6fc893",
+          "bytes": 15763
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/run-final.py",
+          "sha256": "sha256:b344fd7669c1b464c762b6281d0a2ccff1060e0ea42ca5e25c2282897b7ad7fd",
+          "bytes": 5884
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/selection.init.gradle",
+          "sha256": "sha256:f30743dac76c03ddcf2f19f24a4f222c3d0237ba6dd5bb4e8adf410a6539319f",
+          "bytes": 3869
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/writeability.init.gradle",
+          "sha256": "sha256:589e609cf6cb55855085ccbaa648e42817612a0899dfd18c332fb5146c0aa786",
+          "bytes": 2564
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/source/io/justsearch/indexerworker/server/RetirementDiagnosticTest.java",
+          "sha256": "sha256:f84a7762bb7c8756d33eed324891a20a25097f9706bc509894fe50a619ce57bf",
+          "bytes": 881
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/source-before.json",
+          "sha256": "sha256:7404a77a8e18bba88c4447959301698041dfd59ed0d3f77a5c9b61f844862ef6",
+          "bytes": 1675697
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-effective.json",
+          "sha256": "sha256:76d3b2b0e0bc3be7499727c37e73aafeda870d37e67f577ea3375b7c20cd4a00",
+          "bytes": 34641
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/selected-daemon-writeability.json",
+          "sha256": "sha256:dcc7132abd3ea4426f9d1ae07aabbd7e9cebb621bcea1e4f1ee28f01d383146e",
+          "bytes": 1904
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/output-events.bin",
+          "sha256": "sha256:11cca69dbf842656b05283cd338572cbbcc153f08b1e87894f6f54c922725526",
+          "bytes": 1549825
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:d2abfbecdf5a8dac96d3e9d3526df813ad9a7db797699a6c3d38e7f2f3df4ce1",
+          "bytes": 16158
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json",
+          "sha256": "sha256:c6b7a1c18ad6df2ee91a118822edf565dddfa3eca84d6a36a07ca7137557b005",
+          "bytes": 6518
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:97a2eb0ae949168c7677e0ea38da05bb066fdb1ee61f5f765c55289c2522a421",
+          "bytes": 75502
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030ConditionalCorrectionTest.freshlyObservedUnprovenRowIsHeld --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/selection.init.gradle",
+      "cwd": "/home/elias/.cache/am/79y1c7_8/tmp/before",
+      "raw": [
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.xml",
+          "sha256": "sha256:5021a763ade67b205069af77b0ab663c60361f50494c7fe2a7b386bd91d48de7",
+          "bytes": 330395
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/command.json",
+          "sha256": "sha256:5a171f309f8b300f2dbd472d14d0fc54344206332a992929534c4413f8028bbc",
+          "bytes": 2298
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/before-final-method-identities.json",
+          "sha256": "sha256:e03c55693ddf8894262445bea45188173189701ec295d7184f57eff660713e19",
+          "bytes": 1838
+        },
+        {
+          "path": "tmp/builder/step7/read-gradle-identities.py",
+          "sha256": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+          "bytes": 2546
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:476ec42fd8edbc7ee3e79b637a1a37288c902e3c3fa0c33fc89be3041d130ba1",
+          "bytes": 16890
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/changed-source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+          "sha256": "sha256:0d3ffa81d1ce3a24c56ab4d6566494d5b4f3d51d7270a66fe8a1014f0b6fc893",
+          "bytes": 15763
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/run.py",
+          "sha256": "sha256:8f05f24e957b46e3383afa101c6b5cda345c4bf9b030722f53ec4f41e7761147",
+          "bytes": 5548
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/selection.init.gradle",
+          "sha256": "sha256:f30743dac76c03ddcf2f19f24a4f222c3d0237ba6dd5bb4e8adf410a6539319f",
+          "bytes": 3869
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/writeability.init.gradle",
+          "sha256": "sha256:589e609cf6cb55855085ccbaa648e42817612a0899dfd18c332fb5146c0aa786",
+          "bytes": 2564
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/source/io/justsearch/indexerworker/server/RetirementDiagnosticTest.java",
+          "sha256": "sha256:f84a7762bb7c8756d33eed324891a20a25097f9706bc509894fe50a619ce57bf",
+          "bytes": 881
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/source-before.json",
+          "sha256": "sha256:5fae0143c70c70de2d5100a4ece2003b47eb7a03252f361f4258597826a2d96d",
+          "bytes": 1675697
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-effective.json",
+          "sha256": "sha256:b09d49450fa79bcd86c413fa876fb85a544269357a0d5148190d2379f5fd16c9",
+          "bytes": 32554
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/selected-daemon-writeability.json",
+          "sha256": "sha256:fb15db726f3f18a138a47aa735c022f067088d83f2e3541f832712faffb39aae",
+          "bytes": 1484
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-binary/output-events.bin",
+          "sha256": "sha256:3cc1ae586217d9d6991a8be90304b91775858cba35f022b144ed9c477b473759",
+          "bytes": 357548
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:476ec42fd8edbc7ee3e79b637a1a37288c902e3c3fa0c33fc89be3041d130ba1",
+          "bytes": 16890
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json",
+          "sha256": "sha256:c6b7a1c18ad6df2ee91a118822edf565dddfa3eca84d6a36a07ca7137557b005",
+          "bytes": 6518
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:ae031c335c302a43235eb226a73c3f078d8a4b50ddd28a5571ac8eb4af2d3bbb",
+          "bytes": 15642
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#freshlyObservedUnprovenRowIsHeld",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0d3ffa81d1ce3a24c56ab4d6566494d5b4f3d51d7270a66fe8a1014f0b6fc893",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "freshlyObservedUnprovenRowIsHeld(String)[1]",
+          "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] unknown-namespace",
+          "method": "freshlyObservedUnprovenRowIsHeld"
+        },
+        {
+          "name": "freshlyObservedUnprovenRowIsHeld(String)[2]",
+          "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[2] modern-unowned",
+          "method": "freshlyObservedUnprovenRowIsHeld"
+        },
+        {
+          "name": "freshlyObservedUnprovenRowIsHeld(String)[3]",
+          "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[3] forged-cohort",
+          "method": "freshlyObservedUnprovenRowIsHeld"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.xml",
+          "sha256": "sha256:b7dbcd4eaad3e8e8cbe8c48d993a7b53d8746d9739c67dd7fc01fa7e4a964926",
+          "bytes": 736102
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/command.json",
+          "sha256": "sha256:dcedeadd595504da0892a7b88f83151cdbcc044994adb51f796c460640df7122",
+          "bytes": 2967
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/candidate2-method-identities.json",
+          "sha256": "sha256:096ce144115ee6fb53b08cb2d11f7113c3746017d92804f54811c6c0c4242e37",
+          "bytes": 15966
+        },
+        {
+          "path": "tmp/builder/step7/read-gradle-identities.py",
+          "sha256": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+          "bytes": 2546
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:d2abfbecdf5a8dac96d3e9d3526df813ad9a7db797699a6c3d38e7f2f3df4ce1",
+          "bytes": 16158
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030Fixture.java",
+          "sha256": "sha256:32a1b804d12f8928a5383969be74efd50536feeca8487bd5d9cfebc4e49cd38b",
+          "bytes": 15101
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030UpgradeCharacterizationTest.java",
+          "sha256": "sha256:0224afdbbbaca5931fc5964741679db52da70cb014c0f96ae65b40dbce8cdb65",
+          "bytes": 17119
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/original-source/Release030RetirementSafetyTest.java",
+          "sha256": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+          "bytes": 20314
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/changed-source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+          "sha256": "sha256:0d3ffa81d1ce3a24c56ab4d6566494d5b4f3d51d7270a66fe8a1014f0b6fc893",
+          "bytes": 15763
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/run-final.py",
+          "sha256": "sha256:b344fd7669c1b464c762b6281d0a2ccff1060e0ea42ca5e25c2282897b7ad7fd",
+          "bytes": 5884
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/selection.init.gradle",
+          "sha256": "sha256:f30743dac76c03ddcf2f19f24a4f222c3d0237ba6dd5bb4e8adf410a6539319f",
+          "bytes": 3869
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/writeability.init.gradle",
+          "sha256": "sha256:589e609cf6cb55855085ccbaa648e42817612a0899dfd18c332fb5146c0aa786",
+          "bytes": 2564
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/source/io/justsearch/indexerworker/server/RetirementDiagnosticTest.java",
+          "sha256": "sha256:f84a7762bb7c8756d33eed324891a20a25097f9706bc509894fe50a619ce57bf",
+          "bytes": 881
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/source-before.json",
+          "sha256": "sha256:7404a77a8e18bba88c4447959301698041dfd59ed0d3f77a5c9b61f844862ef6",
+          "bytes": 1675697
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-effective.json",
+          "sha256": "sha256:76d3b2b0e0bc3be7499727c37e73aafeda870d37e67f577ea3375b7c20cd4a00",
+          "bytes": 34641
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/selected-daemon-writeability.json",
+          "sha256": "sha256:dcc7132abd3ea4426f9d1ae07aabbd7e9cebb621bcea1e4f1ee28f01d383146e",
+          "bytes": 1904
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/output-events.bin",
+          "sha256": "sha256:11cca69dbf842656b05283cd338572cbbcc153f08b1e87894f6f54c922725526",
+          "bytes": 1549825
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:d2abfbecdf5a8dac96d3e9d3526df813ad9a7db797699a6c3d38e7f2f3df4ce1",
+          "bytes": 16158
+        },
+        {
+          "path": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json",
+          "sha256": "sha256:c6b7a1c18ad6df2ee91a118822edf565dddfa3eca84d6a36a07ca7137557b005",
+          "bytes": 6518
+        },
+        {
+          "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:97a2eb0ae949168c7677e0ea38da05bb066fdb1ee61f5f765c55289c2522a421",
+          "bytes": 75502
+        }
+      ],
+      "executionScope": "Actual source-bound R33 candidate2 direct queue check; applied production equivalence is bound separately; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java#freshlyObservedUnprovenRowIsHeld",
+        "contentDigest": "sha256:0d3ffa81d1ce3a24c56ab4d6566494d5b4f3d51d7270a66fe8a1014f0b6fc893",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "freshlyObservedUnprovenRowIsHeld(String)[3]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[0]> but was: <[1]> | freshlyObservedUnprovenRowIsHeld(String)[3]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[0]> but was: <[1]> | freshlyObservedUnprovenRowIsHeld(String)[3]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[0]> but was: <[1]>",
+        "cases": [
+          {
+            "name": "freshlyObservedUnprovenRowIsHeld(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "[1] unknown-namespace",
+            "method": "freshlyObservedUnprovenRowIsHeld"
+          },
+          {
+            "name": "freshlyObservedUnprovenRowIsHeld(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "[2] modern-unowned",
+            "method": "freshlyObservedUnprovenRowIsHeld"
+          },
+          {
+            "name": "freshlyObservedUnprovenRowIsHeld(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[0]> but was: <[1]>",
+            "xmlName": "[3] forged-cohort",
+            "method": "freshlyObservedUnprovenRowIsHeld"
+          },
+          {
+            "name": "freshlyObservedUnprovenRowIsHeld(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "[1] unknown-namespace",
+            "method": "freshlyObservedUnprovenRowIsHeld"
+          },
+          {
+            "name": "freshlyObservedUnprovenRowIsHeld(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "[2] modern-unowned",
+            "method": "freshlyObservedUnprovenRowIsHeld"
+          },
+          {
+            "name": "freshlyObservedUnprovenRowIsHeld(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[0]> but was: <[1]>",
+            "xmlName": "[3] forged-cohort",
+            "method": "freshlyObservedUnprovenRowIsHeld"
+          },
+          {
+            "name": "freshlyObservedUnprovenRowIsHeld(String)[1]",
+            "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "[1] unknown-namespace",
+            "method": "freshlyObservedUnprovenRowIsHeld"
+          },
+          {
+            "name": "freshlyObservedUnprovenRowIsHeld(String)[2]",
+            "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "[2] modern-unowned",
+            "method": "freshlyObservedUnprovenRowIsHeld"
+          },
+          {
+            "name": "freshlyObservedUnprovenRowIsHeld(String)[3]",
+            "classname": "io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <[0]> but was: <[1]>",
+            "xmlName": "[3] forged-cohort",
+            "method": "freshlyObservedUnprovenRowIsHeld"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030ConditionalCorrectionTest.xml",
+            "sha256": "sha256:5021a763ade67b205069af77b0ab663c60361f50494c7fe2a7b386bd91d48de7",
+            "bytes": 330395
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/command.json",
+            "sha256": "sha256:5a171f309f8b300f2dbd472d14d0fc54344206332a992929534c4413f8028bbc",
+            "bytes": 2298
+          },
+          {
+            "path": "tmp/builder/retire-R35-evidence-audit/before-final-method-identities.json",
+            "sha256": "sha256:e03c55693ddf8894262445bea45188173189701ec295d7184f57eff660713e19",
+            "bytes": 1838
+          },
+          {
+            "path": "tmp/builder/step7/read-gradle-identities.py",
+            "sha256": "sha256:4b86ec037108b063cc7f1c2fd1bf710496d596bc4f46a3ef464ca973cc79bea0",
+            "bytes": 2546
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-binary/results-generic.bin",
+            "sha256": "sha256:476ec42fd8edbc7ee3e79b637a1a37288c902e3c3fa0c33fc89be3041d130ba1",
+            "bytes": 16890
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/changed-source/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030ConditionalCorrectionTest.java",
+            "sha256": "sha256:0d3ffa81d1ce3a24c56ab4d6566494d5b4f3d51d7270a66fe8a1014f0b6fc893",
+            "bytes": 15763
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/run.py",
+            "sha256": "sha256:8f05f24e957b46e3383afa101c6b5cda345c4bf9b030722f53ec4f41e7761147",
+            "bytes": 5548
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/selection.init.gradle",
+            "sha256": "sha256:f30743dac76c03ddcf2f19f24a4f222c3d0237ba6dd5bb4e8adf410a6539319f",
+            "bytes": 3869
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/writeability.init.gradle",
+            "sha256": "sha256:589e609cf6cb55855085ccbaa648e42817612a0899dfd18c332fb5146c0aa786",
+            "bytes": 2564
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/source/io/justsearch/indexerworker/server/RetirementDiagnosticTest.java",
+            "sha256": "sha256:f84a7762bb7c8756d33eed324891a20a25097f9706bc509894fe50a619ce57bf",
+            "bytes": 881
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/source-before.json",
+            "sha256": "sha256:5fae0143c70c70de2d5100a4ece2003b47eb7a03252f361f4258597826a2d96d",
+            "bytes": 1675697
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-effective.json",
+            "sha256": "sha256:b09d49450fa79bcd86c413fa876fb85a544269357a0d5148190d2379f5fd16c9",
+            "bytes": 32554
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/selected-daemon-writeability.json",
+            "sha256": "sha256:fb15db726f3f18a138a47aa735c022f067088d83f2e3541f832712faffb39aae",
+            "bytes": 1484
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-binary/output-events.bin",
+            "sha256": "sha256:3cc1ae586217d9d6991a8be90304b91775858cba35f022b144ed9c477b473759",
+            "bytes": 357548
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-binary/results-generic.bin",
+            "sha256": "sha256:476ec42fd8edbc7ee3e79b637a1a37288c902e3c3fa0c33fc89be3041d130ba1",
+            "bytes": 16890
+          },
+          {
+            "path": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json",
+            "sha256": "sha256:c6b7a1c18ad6df2ee91a118822edf565dddfa3eca84d6a36a07ca7137557b005",
+            "bytes": 6518
+          },
+          {
+            "path": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/before-final/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:ae031c335c302a43235eb226a73c3f078d8a4b50ddd28a5571ac8eb4af2d3bbb",
+            "bytes": 15642
+          }
+        ],
+        "revision": "eb01b70639f6ca14db5acecb541480e572a608b2"
+      }
+    ]
+  },
+  "unverified": [],
+  "appliedSourceEquivalence": {
+    "commit": "e948216336f5b46c69183dbe7265e0bdbeb45f66",
+    "artifact": "tmp/builder/retire-R35-evidence-audit/r33-applied-source-comparison.json",
+    "scope": "Production inputs; required invoked helper files verified by collector. Not a blanket current-parent result for other D4 checks."
+  },
+  "sourceBindings": [
+    {
+      "run": "tmp/orchestrator/retire-safety-diagnostic/tmp/retire-r33/candidate2",
+      "comparisonArtifact": "tmp/builder/retire-R35-evidence-audit/source-bindings-r35.json"
+    }
+  ],
+  "scope": "New direct API safety controls are after-only; the freshly observed unknown-namespace/modern-unowned/forged-cohort table has a separate genuine eb01 before, with only forged-cohort failing intended assertions. No API absence is classified as a failure.",
+  "digest": "sha256:97d247bc6dc77419656fe16cda5072bb46655143293e372334f1792857ac9d72"
+}

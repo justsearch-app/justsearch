@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a.mjs",
+        "sha256": "sha256:39cfda1480eb4ca8f8187e9827a207a7cf3badc3a1205e9b4fb07bb173601c5a",
+        "bytes": 7360
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T19:17:00.393Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementSafetyTest.corruptCommitKeepsNativeRecoveryInsteadOfRetiring --tests *LegacyApprovedGapReplayTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPartialWalkTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:f94dd45157805b6287534c51d516d0888e145cdb78b1a0daf680886f94afccf4",
+          "bytes": 189183
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#corruptCommitKeepsNativeRecoveryInsteadOfRetiring",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] migrating",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] migrating",
+          "method": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
+        },
+        {
+          "name": "[2] switching",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[2] switching",
+          "method": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementSafetyTest.xml",
+          "sha256": "sha256:f94dd45157805b6287534c51d516d0888e145cdb78b1a0daf680886f94afccf4",
+          "bytes": 189183
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/command.json",
+          "sha256": "sha256:cbe3f65feca2dfcc912b1a075fcf66738e905d92a7f89ea7cdf0db3edcd95283",
+          "bytes": 1700828
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/focused-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:0a0065e9527bfc88dafcfbf221829dd71c088cc46b8c59d6b85c7705e3052643",
+          "bytes": 14570
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java#corruptCommitKeepsNativeRecoveryInsteadOfRetiring",
+        "executed": true,
+        "skipped": false,
+        "outcome": "passed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair",
+        "cases": [
+          {
+            "name": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String, Path)[1]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "[1] migrating",
+            "method": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring",
+            "xmlOrdinal": 0,
+            "binaryOffset": 11
+          },
+          {
+            "name": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String, Path)[2]",
+            "classname": "io.justsearch.indexerworker.server.Release030RetirementSafetyTest",
+            "status": "passed",
+            "failureType": null,
+            "message": null,
+            "xmlName": "[2] switching",
+            "method": "corruptCommitKeepsNativeRecoveryInsteadOfRetiring",
+            "xmlOrdinal": 1,
+            "binaryOffset": 192
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/safety-before-corrupt/migrating.json",
+            "sha256": "sha256:912d5edd8e7c85115516237f6aacf1bb093a94946ce06aab88cae3ccf46f34e3",
+            "bytes": 10607
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/safety-before-corrupt/switching.json",
+            "sha256": "sha256:79fc2d296d7555dc6dfd0229a77f988ff5fc1f8cd44c68bdbfe49c3f1d68c39d",
+            "bytes": 10608
+          }
+        ],
+        "revision": "8292c62e381684eb506c96f50990b212ea1fb879",
+        "contentDigest": "sha256:4e1a326d1510e0b4aa244a15d86e2c6a0ceaa6d5bb278539325c2b888fe79e16"
+      }
+    ]
+  },
+  "scope": "Preservation: both MIGRATING/SWITCHING phases passed before and after; two existing unique METHOD before executions yielded four leaves, not four before calls. Exact nine helper and five fixture source bytes are preserved; no acceptance.",
+  "digest": "sha256:1093e72f5e9c2d6ca30d515b20b7659dae53ad0d387ad0baa2f47faa0c421725"
+}

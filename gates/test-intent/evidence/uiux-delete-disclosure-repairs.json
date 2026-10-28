@@ -1,0 +1,307 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T14:52:26.440Z",
+  "revision": "be44f3686f87033952456513e33bcdcd421791c4",
+  "tree": "bb165283e60f00b93580de43514f45af8443267c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/conversationDeleteRetention.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-vitest-414-1793112725684.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7781
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts#S53.6 a lost reply reconciled as deleted retires only the confirmed identity title",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:da8c89a871184e175526f8275a5b3c574019ecbee1a3df537af6e6a8c9435314",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S53.6 a lost reply reconciled as deleted retires only the confirmed identity title",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts#S53.6 another window deletion marker retires its title without disturbing unrelated adoption",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:da8c89a871184e175526f8275a5b3c574019ecbee1a3df537af6e6a8c9435314",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S53.6 another window deletion marker retires its title without disturbing unrelated adoption",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts#S53.6 confirmed single deletion retires only its legacy title and recent pointer",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:da8c89a871184e175526f8275a5b3c574019ecbee1a3df537af6e6a8c9435314",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S53.6 confirmed single deletion retires only its legacy title and recent pointer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts#S53.6 partial tree deletion retires the confirmed child title and preserves the surviving parent",
+      "file": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:da8c89a871184e175526f8275a5b3c574019ecbee1a3df537af6e6a8c9435314",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S53.6 partial tree deletion retires the confirmed child title and preserves the surviving parent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 a confirmed child retires only its unchanged live draft when the parent refuses",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 a confirmed child retires only its unchanged live draft when the parent refuses",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 a handoff during a slow memory read cancels the old consent",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 a handoff during a slow memory read cancels the old consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 a second window keeps its draft when the initiating window deletes its own unchanged draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 a second window keeps its draft when the initiating window deletes its own unchanged draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 an unchanged live follow-up of the deleted place is retired before progress resets the view",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 an unchanged live follow-up of the deleted place is retired before progress resets the view",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 changing place during discovery cancels the pending consent",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 changing place during discovery cancels the pending consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 duplicate Remove activations share one consent and one deletion",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 duplicate Remove activations share one consent and one deletion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 later reconciliation retires an unchanged live draft only when absence is confirmed",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 later reconciliation retires an unchanged live draft only when absence is confirmed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 leaving the screen during a memory read cancels consent and ignores the late count",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 leaving the screen during a memory read cancels consent and ignores the late count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 returning to the hero with a recovered draft cancels discovery consent",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efb45800db9c8b37d968f31ebfe682b3c9dd923237de79bc7e796302c92db2ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CD3 returning to the hero with a recovered draft cancels discovery consent",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "be44f3686f87033952456513e33bcdcd421791c4",
+    "revision": "be44f3686f87033952456513e33bcdcd421791c4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/conversationDeleteRetention.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-vitest-414-1793112738013.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7706,
+        "output": "Evidence scaffold effective invocation: [\"/usr/bin/node\", \"/home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/node_modules/vitest/vitest.mjs\", \"run\", \"src/shell-v0/state/conversationDeleteRetention.test.ts\", \"src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts\", \"--reporter=json\", \"--outputFile=/home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-vitest-414-1793112738013.json\", \"--configLoader\", \"runner\", \"--maxWorkers\", \"2\"]\nJSON report written to /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-vitest-414-1793112738013.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts#S53.6 a lost reply reconciled as deleted retires only the confirmed identity title",
+        "classification": "assertion",
+        "detail": "S53.6 a lost reply reconciled as deleted retires only the confirmed identity title:  AssertionError: expected { root: 'Root legacy', …(2) } to deeply equal { root: 'Root legacy', …(1) }\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts:55:20\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts#S53.6 another window deletion marker retires its title without disturbing unrelated adoption",
+        "classification": "assertion",
+        "detail": "S53.6 another window deletion marker retires its title without disturbing unrelated adoption:  AssertionError: expected { root: 'Root legacy', …(2) } to deeply equal { root: 'Root legacy', …(1) }\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts:59:20\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts#S53.6 confirmed single deletion retires only its legacy title and recent pointer",
+        "classification": "assertion",
+        "detail": "S53.6 confirmed single deletion retires only its legacy title and recent pointer:  AssertionError: expected { root: 'Root legacy', …(2) } to deeply equal { root: 'Root legacy', …(1) }\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts:42:20\n    at processTicksAndRejections (node:internal/pr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts#S53.6 partial tree deletion retires the confirmed child title and preserves the surviving parent",
+        "classification": "assertion",
+        "detail": "S53.6 partial tree deletion retires the confirmed child title and preserves the surviving parent:  AssertionError: expected { root: 'Root legacy', …(2) } to deeply equal { root: 'Root legacy', …(1) }\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/state/conversationDeleteRetention.test.ts:49:20\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 a confirmed child retires only its unchanged live draft when the parent refuses",
+        "classification": "assertion",
+        "detail": "CD3 a confirmed child retires only its unchanged live draft when the parent refuses:  AssertionError: expected 'Child follow-up' to be '' // Object.is equality\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts:136:29\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 a handoff during a slow memory read cancels the old consent",
+        "classification": "assertion",
+        "detail": "CD3 a handoff during a slow memory read cancels the old consent:  AssertionError: expected <jf-confirm-dialog open></jf-confirm-dialog> to be null\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts:277:61\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/wp53/test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 a second window keeps its draft when the initiating window deletes its own unchanged draft",
+        "classification": "assertion",
+        "detail": "CD3 a second window keeps its draft when the initiating window deletes its own unchanged draft:  AssertionError: expected 'First draft' to be '' // Object.is equality\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts:201:30\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 an unchanged live follow-up of the deleted place is retired before progress resets the view",
+        "classification": "assertion",
+        "detail": "CD3 an unchanged live follow-up of the deleted place is retired before progress resets the view:  AssertionError: expected 'Old live follow-up' to be '' // Object.is equality\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts:128:29\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/wp53/test-int"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 changing place during discovery cancels the pending consent",
+        "classification": "assertion",
+        "detail": "CD3 changing place during discovery cancels the pending consent:  AssertionError: expected <jf-confirm-dialog open></jf-confirm-dialog> to be null\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts:211:61\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/wp53/test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 duplicate Remove activations share one consent and one deletion",
+        "classification": "assertion",
+        "detail": "CD3 duplicate Remove activations share one consent and one deletion:  AssertionError: expected …(2) to have a length of 1 but got 2\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m7jvddq4/tmp/wp53/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 later reconciliation retires an unchanged live draft only when absence is confirmed",
+        "classification": "assertion",
+        "detail": "CD3 later reconciliation retires an unchanged live draft only when absence is confirmed:  AssertionError: expected 'Unchanged pending follow-up' to be '' // Object.is equality\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts:288:29\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/wp53"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 leaving the screen during a memory read cancels consent and ignores the late count",
+        "classification": "assertion",
+        "detail": "CD3 leaving the screen during a memory read cancels consent and ignores the late count:  AssertionError: expected <jf-confirm-dialog open></jf-confirm-dialog> to be null\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts:231:61\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/wp53/test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts#CD3 returning to the hero with a recovered draft cancels discovery consent",
+        "classification": "assertion",
+        "detail": "CD3 returning to the hero with a recovered draft cancels discovery consent:  AssertionError: expected <jf-confirm-dialog open></jf-confirm-dialog> to be null\n    at /home/elias/.cache/am/m7jvddq4/tmp/wp53/test-intent-before-YxatwU/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.deleteRetention.test.ts:223:61\n    at file:///home/elias/.cache/am/m7jvddq4/tmp/wp53/test"
+      }
+    ]
+  },
+  "digest": "sha256:1f42137fbccb3695fcf7b84ac8f6883e97f828b1d6a9153c0be26b303e015ad9"
+}

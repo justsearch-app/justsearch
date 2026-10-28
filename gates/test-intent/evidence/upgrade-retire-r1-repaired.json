@@ -1,0 +1,1035 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952.mjs",
+        "sha256": "sha256:14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952",
+        "bytes": 10467
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T20:06:15.205Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030CommittedCertificateTest.xml",
+          "sha256": "sha256:d9030e0c8eed7347cadd811ae742ddbca31a6418eba7d9ec0b67881830836a68",
+          "bytes": 690120
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementSyncPolicyTest --tests *Release030CommittedCertificateTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/.cache/am/fopeqp12/tmp/p4-evidence-before",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/public-policy-certificates-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030CommittedCertificateTest.xml",
+          "sha256": "sha256:9c40c87c8c6aca16762298efe712cd93d058aabae8bc022cf0fbdfa1440fee7e",
+          "bytes": 1149158
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/public-policy-certificates-before/command.json",
+          "sha256": "sha256:42622e4f24a08b6f65282009615606407751e484d9cb5c8da78e8678528b8852",
+          "bytes": 1691695
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/public-policy-certificates-before/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:3263cccac69bc71578531fc13969b267fb674f0571f67eb2ca790c235956d955",
+          "bytes": 21876
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/adapters-lucene-test-xml/TEST-io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest.xml",
+          "sha256": "sha256:3920002d5af35a674989cdc322e6b014ed047718044016a0b75a06a052514f88",
+          "bytes": 1668
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/adapters-lucene-test-events.ndjson",
+          "sha256": "sha256:97b292d72fd9e9d53a44c2fd4373861204c6bcc74d2cc675bd83720e15ab4442",
+          "bytes": 13880
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementRootProgressTest :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest --continue -PskipWebBuild=true -PskipErrorProneTests=false -PtestParallelism=1 --max-workers=2 --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-repair/probes-r3c.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-R1-before",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-R1-repair/r3-new-before/adapters-lucene-xml/TEST-io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest.xml",
+          "sha256": "sha256:daf8e5ff1bfd887c807587107afc9c242a68594dc78b16b595712cf0899af265",
+          "bytes": 9539
+        },
+        {
+          "path": "tmp/builder/retire-R1-repair/r3-new-before/command.json",
+          "sha256": "sha256:56d5c72d53f974956c6586d2573677e595442bd671dd001b84e1558a65dcfc80",
+          "bytes": 1690996
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/native-before-identities.json",
+          "sha256": "sha256:162eaeec99aa928742eecdc81b92b6e7a5da55d57464dd8a16644391f64295fa",
+          "bytes": 1940
+        },
+        {
+          "path": "tmp/builder/retire-R1-repair/r3-new-before/adapters-lucene-xml/binary/results-generic.bin",
+          "sha256": "sha256:bb4fe87c98566e01b6b53890607cf35365badcdc7396d62e540078ea27b15816",
+          "bytes": 9649
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.xml",
+          "sha256": "sha256:9b8921e4d89564eb2ed73e01d38351f094b67ed3162841ebbb0dc5a616f1c8d8",
+          "bytes": 1827134
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.xml",
+          "sha256": "sha256:9b8921e4d89564eb2ed73e01d38351f094b67ed3162841ebbb0dc5a616f1c8d8",
+          "bytes": 1827134
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.xml",
+          "sha256": "sha256:9b8921e4d89564eb2ed73e01d38351f094b67ed3162841ebbb0dc5a616f1c8d8",
+          "bytes": 1827134
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests *CommittedRetirementCertificateTest :modules:indexer-worker:test --tests *Release030CommittedCertificateTest --tests *Release030RetirementContinuationTest --tests *Release030RetirementForceFalseTest --tests *Release030RetirementInheritedPolicyTest --tests *Release030RetirementLegacyMetadataTest --tests *Release030RetirementPublicSyncTest --tests *Release030RetirementRootImageTest --tests *Release030RetirementRootProgressTest --tests *Release030RetirementSurvivorProgressTest --tests *Release030RetirementSyncPolicyTest --tests *Release030RetirementTransitiveOrderTest --tests *Release030RetirementWalkCrashTest --tests *Release030RetirementWalkOrderTest --tests *Release030RetirementAckRecoveryTest --tests *Release030RetirementPrefixRestoreTest --tests *Release030RetirementOrderingTest --tests *Release030LiveSyncAdmissionTest --tests *Release030RootIntentTest --tests *Release030RootMemberIdentityTest --tests *Release030CorrectionHistoryTest --tests *Release030DurableIntentCancellationTest --tests *Release030RetirementClaimOwnershipTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkCrashTest.xml",
+          "sha256": "sha256:30682d5e6b08786b4e2e7df94622a21fc1d3578d32fc19c4d5300a79aa309abc",
+          "bytes": 919250
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java#unknownStoredModelCannotCertifyRetirement",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9fd17396891bb3ebfb86b876fdc17f11b8bfb546be27429e3a79eef37efeee86",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownStoredModelCannotCertifyRetirement(String, String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "migrating / stored null",
+          "method": "unknownStoredModelCannotCertifyRetirement"
+        },
+        {
+          "name": "unknownStoredModelCannotCertifyRetirement(String, String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "migrating / stored absent",
+          "method": "unknownStoredModelCannotCertifyRetirement"
+        },
+        {
+          "name": "unknownStoredModelCannotCertifyRetirement(String, String, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "switching / stored null",
+          "method": "unknownStoredModelCannotCertifyRetirement"
+        },
+        {
+          "name": "unknownStoredModelCannotCertifyRetirement(String, String, Path)[4]",
+          "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "switching / stored absent",
+          "method": "unknownStoredModelCannotCertifyRetirement"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030CommittedCertificateTest.xml",
+          "sha256": "sha256:d9030e0c8eed7347cadd811ae742ddbca31a6418eba7d9ec0b67881830836a68",
+          "bytes": 690120
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9b7d716ceeb7d69f7ec9e0823a2747842ecd75a7d865df91417230f5a99a1bea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] null",
+          "classname": "io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[1] null",
+          "method": "unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement"
+        },
+        {
+          "name": "[2] absent",
+          "classname": "io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "[2] absent",
+          "method": "unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/adapters-lucene-test-xml/TEST-io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest.xml",
+          "sha256": "sha256:3920002d5af35a674989cdc322e6b014ed047718044016a0b75a06a052514f88",
+          "bytes": 1668
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/adapters-lucene-test-events.ndjson",
+          "sha256": "sha256:97b292d72fd9e9d53a44c2fd4373861204c6bcc74d2cc675bd83720e15ab4442",
+          "bytes": 13880
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b12f8326db896c88234b688f85c529d5e01f8150775ef924ce804bba2ba43dbb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry(String, String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "migrating delete then later root owner",
+          "method": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry"
+        },
+        {
+          "name": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry(String, String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "migrating delete then later exact owner",
+          "method": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry"
+        },
+        {
+          "name": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry(String, String, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "switching delete then later root owner",
+          "method": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry"
+        },
+        {
+          "name": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry(String, String, Path)[4]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "switching delete then later exact owner",
+          "method": "acknowledgedPrefixThenForcedSyncSurvivesPendingWriterRetry"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.xml",
+          "sha256": "sha256:9b8921e4d89564eb2ed73e01d38351f094b67ed3162841ebbb0dc5a616f1c8d8",
+          "bytes": 1827134
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#overlappingScopesKeepTheirAcceptedOrderAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b12f8326db896c88234b688f85c529d5e01f8150775ef924ce804bba2ba43dbb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "sync then exact",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "sync then prefix",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[3]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "sync then collection",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[4]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "prefix then sync",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[5]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "collection then sync",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        },
+        {
+          "name": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart(String, String, Path)[6]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "prefix then explicit",
+          "method": "overlappingScopesKeepTheirAcceptedOrderAcrossRestart"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.xml",
+          "sha256": "sha256:9b8921e4d89564eb2ed73e01d38351f094b67ed3162841ebbb0dc5a616f1c8d8",
+          "bytes": 1827134
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java#repeatedFaultsRetainDebtAndDeletionProofAcrossRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b12f8326db896c88234b688f85c529d5e01f8150775ef924ce804bba2ba43dbb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeatedFaultsRetainDebtAndDeletionProofAcrossRestart(boolean, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "repeated target faults / restore earlier DB=false",
+          "method": "repeatedFaultsRetainDebtAndDeletionProofAcrossRestart"
+        },
+        {
+          "name": "repeatedFaultsRetainDebtAndDeletionProofAcrossRestart(boolean, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "repeated target faults / restore earlier DB=true",
+          "method": "repeatedFaultsRetainDebtAndDeletionProofAcrossRestart"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkOrderTest.xml",
+          "sha256": "sha256:9b8921e4d89564eb2ed73e01d38351f094b67ed3162841ebbb0dc5a616f1c8d8",
+          "bytes": 1827134
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkCrashTest.java#completedWalkSurvivesAnActualKillAndRestart",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementWalkCrashTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ae3c2b7e5c1ee33e0251c40efbdc7ffeb5231a2587e251dddbd19853e9fd337",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "completedWalkSurvivesAnActualKillAndRestart(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkCrashTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/final-selected-after/jvm&#10;20:16:53.059 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo",
+          "xmlName": "migrating completed walk with pending writer",
+          "method": "completedWalkSurvivesAnActualKillAndRestart"
+        },
+        {
+          "name": "completedWalkSurvivesAnActualKillAndRestart(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkCrashTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/final-selected-after/jvm&#10;20:19:23.204 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo",
+          "xmlName": "switching completed walk with pending writer",
+          "method": "completedWalkSurvivesAnActualKillAndRestart"
+        },
+        {
+          "name": "completedWalkSurvivesAnActualKillAndRestart(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkCrashTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/final-selected-after/jvm&#10;20:21:58.873 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo",
+          "xmlName": "migrating completed walk with pending writer",
+          "method": "completedWalkSurvivesAnActualKillAndRestart"
+        },
+        {
+          "name": "completedWalkSurvivesAnActualKillAndRestart(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkCrashTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/final-selected-after/jvm&#10;20:24:29.100 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo",
+          "xmlName": "switching completed walk with pending writer",
+          "method": "completedWalkSurvivesAnActualKillAndRestart"
+        },
+        {
+          "name": "completedWalkSurvivesAnActualKillAndRestart(String, Path)[1]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkCrashTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/final-selected-after/jvm&#10;20:27:03.960 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo",
+          "xmlName": "migrating completed walk with pending writer",
+          "method": "completedWalkSurvivesAnActualKillAndRestart"
+        },
+        {
+          "name": "completedWalkSurvivesAnActualKillAndRestart(String, Path)[2]",
+          "classname": "io.justsearch.indexerworker.server.Release030RetirementWalkCrashTest",
+          "status": "failed",
+          "failureType": "org.opentest4j.AssertionFailedError",
+          "message": "org.opentest4j.AssertionFailedError: NOTE: Picked up JDK_JAVA_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/final-selected-after/jvm&#10;20:29:34.552 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo",
+          "xmlName": "switching completed walk with pending writer",
+          "method": "completedWalkSurvivesAnActualKillAndRestart"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030RetirementWalkCrashTest.xml",
+          "sha256": "sha256:30682d5e6b08786b4e2e7df94622a21fc1d3578d32fc19c4d5300a79aa309abc",
+          "bytes": 919250
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/command.json",
+          "sha256": "sha256:bae7be5173fb0687a9a65441eddacb7c5e58a30167f7016a8f1e756bef561620",
+          "bytes": 1702422
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after-identities.json",
+          "sha256": "sha256:c96d5e6f618b441835e1c9f305920b510d86c2b697d0d0a514e8a46827148b44",
+          "bytes": 32893
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-binary/results-generic.bin",
+          "sha256": "sha256:b11a2747538c63909b525e8583031e4b9a882a0320f5b266a906b3b57bbf6222",
+          "bytes": 561306
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+          "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+          "bytes": 1795
+        },
+        {
+          "path": "tmp/orchestrator/d4-before-evidence-frozen/decode-identities.py",
+          "sha256": "sha256:bd74e41c8fdacb1d1ff352b66d04a30f58a303627bf26093a3dae04ec7de9cb2",
+          "bytes": 2002
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/final-selected-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:2d4bbda568f1b41a0df3f78b7ec637c60eb065f2a20b95684ddb7d815e740ace",
+          "bytes": 93504
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CommittedCertificateTest.java#unknownStoredModelCannotCertifyRetirement",
+        "contentDigest": "sha256:9fd17396891bb3ebfb86b876fdc17f11b8bfb546be27429e3a79eef37efeee86",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "migrating / stored null: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <MIGRATING> but was: <IDLE> | migrating / stored absent: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <MIGRATING> but was: <IDLE> | switching / stored null: org.opentest4j.AssertionFailedError org.opentest4j.",
+        "cases": [
+          {
+            "name": "migrating / stored null",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <MIGRATING> but was: <IDLE>",
+            "xmlName": "migrating / stored null",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "migrating / stored absent",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <MIGRATING> but was: <IDLE>",
+            "xmlName": "migrating / stored absent",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "switching / stored null",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <SWITCHING> but was: <IDLE>",
+            "xmlName": "switching / stored null",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "switching / stored absent",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <SWITCHING> but was: <IDLE>",
+            "xmlName": "switching / stored absent",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "migrating / stored null",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <MIGRATING> but was: <IDLE>",
+            "xmlName": "migrating / stored null",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "migrating / stored absent",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <MIGRATING> but was: <IDLE>",
+            "xmlName": "migrating / stored absent",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "switching / stored null",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <SWITCHING> but was: <IDLE>",
+            "xmlName": "switching / stored null",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "switching / stored absent",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <SWITCHING> but was: <IDLE>",
+            "xmlName": "switching / stored absent",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "migrating / stored null",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <MIGRATING> but was: <IDLE>",
+            "xmlName": "migrating / stored null",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "migrating / stored absent",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <MIGRATING> but was: <IDLE>",
+            "xmlName": "migrating / stored absent",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "switching / stored null",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <SWITCHING> but was: <IDLE>",
+            "xmlName": "switching / stored null",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          },
+          {
+            "name": "switching / stored absent",
+            "classname": "io.justsearch.indexerworker.server.Release030CommittedCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: unknown stored model identity cannot positively certify cancellation ==> expected: <SWITCHING> but was: <IDLE>",
+            "xmlName": "switching / stored absent",
+            "method": "unknownStoredModelCannotCertifyRetirement"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/public-policy-certificates-before/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.server.Release030CommittedCertificateTest.xml",
+            "sha256": "sha256:9c40c87c8c6aca16762298efe712cd93d058aabae8bc022cf0fbdfa1440fee7e",
+            "bytes": 1149158
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/public-policy-certificates-before/command.json",
+            "sha256": "sha256:42622e4f24a08b6f65282009615606407751e484d9cb5c8da78e8678528b8852",
+            "bytes": 1691695
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/public-policy-certificates-before/indexer-worker-test-events.ndjson",
+            "sha256": "sha256:3263cccac69bc71578531fc13969b267fb674f0571f67eb2ca790c235956d955",
+            "bytes": 21876
+          }
+        ],
+        "revision": "b84fc08dc5d029fc328258469f7f06dd4426fc88"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/CommittedRetirementCertificateTest.java#unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement",
+        "contentDigest": "sha256:9b7d716ceeb7d69f7ec9e0823a2747842ecd75a7d865df91417230f5a99a1bea",
+        "executed": true,
+        "skipped": false,
+        "outcome": "failed",
+        "classification": "assertion",
+        "detail": "unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement(String, Path)[1]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true> | unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement(String, Path)[2]: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+        "cases": [
+          {
+            "name": "unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement(String, Path)[1]",
+            "classname": "io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+            "xmlName": "[1] null",
+            "method": "unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement"
+          },
+          {
+            "name": "unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement(String, Path)[2]",
+            "classname": "io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest",
+            "status": "failed",
+            "failureType": "org.opentest4j.AssertionFailedError",
+            "message": "org.opentest4j.AssertionFailedError: expected: <false> but was: <true>",
+            "xmlName": "[2] absent",
+            "method": "unknownStoredInputsAllowNativeOpeningButCannotCertifyRetirement"
+          }
+        ],
+        "raw": [
+          {
+            "path": "tmp/builder/retire-R1-repair/r3-new-before/adapters-lucene-xml/TEST-io.justsearch.adapters.lucene.runtime.CommittedRetirementCertificateTest.xml",
+            "sha256": "sha256:daf8e5ff1bfd887c807587107afc9c242a68594dc78b16b595712cf0899af265",
+            "bytes": 9539
+          },
+          {
+            "path": "tmp/builder/retire-R1-repair/r3-new-before/command.json",
+            "sha256": "sha256:56d5c72d53f974956c6586d2573677e595442bd671dd001b84e1558a65dcfc80",
+            "bytes": 1690996
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/native-before-identities.json",
+            "sha256": "sha256:162eaeec99aa928742eecdc81b92b6e7a5da55d57464dd8a16644391f64295fa",
+            "bytes": 1940
+          },
+          {
+            "path": "tmp/builder/retire-R1-repair/r3-new-before/adapters-lucene-xml/binary/results-generic.bin",
+            "sha256": "sha256:bb4fe87c98566e01b6b53890607cf35365badcdc7396d62e540078ea27b15816",
+            "bytes": 9649
+          },
+          {
+            "path": "tmp/builder/retire-P4-evidence-closure/decode-identities.py",
+            "sha256": "sha256:c9a887bc41bbae4bb0448573f01968ede91b3fa9546d8585dc1ff57d8e16bd94",
+            "bytes": 1795
+          }
+        ],
+        "revision": "b84fc08dc5d029fc328258469f7f06dd4426fc88"
+      }
+    ]
+  },
+  "scope": "Actual final check-source after and actual before where listed. Missing before is UNVERIFIED, not a claimed fail-before. WalkCrash after fails its child marker before intended kill. Whole method oracles remain. Root owns independent acceptance.",
+  "digest": "sha256:89f017c79a9ef559ee232b67c2f49b1ca9026e9c23b59118a7f6d38773d580d4"
+}

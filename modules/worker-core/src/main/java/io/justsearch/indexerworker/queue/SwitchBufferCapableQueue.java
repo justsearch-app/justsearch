@@ -39,10 +39,133 @@ public interface SwitchBufferCapableQueue extends JobQueue {
       this(generation, key, op, payload, lastUpdatedMs, revision, 0);
     }
 
+    /** Release retirement requires the actual SQL order and exact replacement UUID. */
+    public String retirementUuid() {
+      if (acceptedOrder <= 0 || revision == null
+          || !revision.replace("-", "").matches("[0-9a-f]{32}")) {
+        throw new IllegalArgumentException("Incomplete ordered retirement receipt");
+      }
+      return revision.replace("-", "");
+    }
+
+    public String retirementRootUnit() {
+      if (!"SYNC_ROOT".equals(op)) throw new IllegalStateException("Not a ROOT receipt");
+      return "root1:" + retirementUuid() + ":" + acceptedOrder + ":"
+          + java.util.UUID.randomUUID().toString().replace("-", "");
+    }
+
     /** Compatibility constructor for the pre-generation switch buffer API. */
     public SwitchBufferOp(String key, String op, String payload, long lastUpdatedMs, String revision) {
       this("", key, op, payload, lastUpdatedMs, revision);
     }
+  }
+
+  /** Both ROOT formats preserve their original receipt position; root1 nonces remain opaque. */
+  record RootOrigin(String uuid, long acceptedOrder) {
+    public static RootOrigin fromUnit(String unit) {
+      if (unit == null || !(unit.startsWith("root1:") || unit.startsWith("root2:"))) return null;
+      String[] parts = unit.split(":", -1);
+      boolean bound = unit.startsWith("root2:");
+      if (parts.length != (bound ? 5 : 4) || bound && !parts[4].matches("[0-9a-f]{64}")
+          || !parts[1].matches("[0-9a-f]{32}")
+          || !parts[3].matches("[0-9a-f]{32}") || !parts[2].matches("[1-9][0-9]{0,18}")) {
+        throw new IllegalArgumentException("Invalid ROOT unit identity");
+      }
+      long order = Long.parseLong(parts[2]);
+      return new RootOrigin(parts[1], order);
+    }
+  }
+
+  /** Integrity binding of resolved admission metadata, not authentication or source proof. */
+  static String rootMemberDigest(String path, String collection, String originator, String transport,
+      String ingestionRoot, String plannedHash) {
+    try {
+      var bytes = new java.io.ByteArrayOutputStream();
+      try (var out = new java.io.DataOutputStream(bytes)) {
+        out.writeUTF("justsearch/retirement-root-member/v2");
+        for (String value : new String[] {path, collection, originator, transport, ingestionRoot, plannedHash}) {
+          if (value == null) out.writeInt(-1);
+          else {
+            byte[] encoded = value.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            out.writeInt(encoded.length); out.write(encoded);
+          }
+        }
+      }
+      return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
+    } catch (java.io.IOException | java.security.NoSuchAlgorithmException impossible) {
+      throw new IllegalStateException(impossible);
+    }
+  }
+
+  default boolean retirementRootPolicyKnown(SwitchBufferOp root) { return retirementRootCollection(root) != null; }
+  default SwitchBufferUpsert retirementRootFileScope(SwitchBufferOp root,String path) {
+    throw new UnsupportedOperationException("Resolved ROOT member metadata unavailable");
+  }
+  default boolean retirementRootLegacyExecution(SwitchBufferOp root) { return false; }
+
+  /** Actual retained ROOT owner of the fully validated current row, never inferred from A. */
+  default SwitchBufferOp retirementSourceRoot(String path) { return null; }
+
+  record RetirementRootFile(SwitchBufferOp owner, SwitchBufferUpsert scope) {}
+
+  /** One immutable history snapshot for a caller's existing source-observation batch. */
+  default java.util.function.Function<String,RetirementRootFile> retirementRootFiles() { return path -> null; }
+
+  record RetirementSourceObservation(SwitchBufferOp owner, SwitchBufferUpsert scope,
+      java.util.Map<String,String> observedRow, String sourceState, String sourceSha256,
+      long size, boolean targetMatches, boolean indexedParentMatches) {
+    public RetirementSourceObservation(SwitchBufferOp owner, SwitchBufferUpsert scope,
+        java.util.Map<String,String> observedRow, String sourceState, String sourceSha256,
+        long size, boolean targetMatches) {
+      this(owner,scope,observedRow,sourceState,sourceSha256,size,targetMatches,false);
+    }
+  }
+
+  /**
+   * Targeted recovery only; source and complete rows are observed before Q's batch reservation.
+   * Results: 0 unsettled, 1 corrective admission, 2 verified, 3 removal authorized but unsettled.
+   * A removal still needs a fresh non-regular-source check, A's commit and a new target proof.
+   */
+  default List<Integer> correctRetirementSources(List<RetirementSourceObservation> observations,
+      java.util.function.BooleanSupplier cancelled) {
+    throw new UnsupportedOperationException("Conditional retirement source correction unavailable");
+  }
+
+  default SwitchBufferOp retirementRootReceipt(String generation, String key) {
+    throw new UnsupportedOperationException("Ordered ROOT receipt unavailable");
+  }
+
+  default void retainRetirementRootCollection(SwitchBufferOp root,String collection) {
+    throw new UnsupportedOperationException("ROOT collection evidence unavailable");
+  }
+  default String retirementRootCollection(SwitchBufferOp root) { return null; }
+
+  default int enqueueRetirementRootEntries(SwitchBufferOp root, List<EnqueueEntry> entries,
+      String collection, boolean maintenance, boolean replay,
+      java.util.function.BooleanSupplier cancelled) {
+    throw new UnsupportedOperationException("Receipt-owned ROOT admissions unavailable");
+  }
+
+  /** Completed rows are preserved only after the live owner proved current source and A outside Q. */
+  default int enqueueRetirementRootEntries(SwitchBufferOp root, List<EnqueueEntry> entries,
+      String collection, boolean maintenance, boolean replay,
+      java.util.function.BooleanSupplier cancelled, java.util.Map<String,java.util.Map<String,String>> completedRows) {
+    throw new UnsupportedOperationException("Current ROOT completion proof unavailable");
+  }
+
+  /** Exact candidate whose retained release-recovery journal still orders new admissions. */
+  default String release030RetirementGeneration() { return null; }
+
+  /** Live retirement sync refreshes only retained exact receipts in the job admission transaction. */
+  default int enqueueRelease030LiveSyncEntries(List<EnqueueEntry> entries, String collection,
+      java.util.function.BooleanSupplier cancelled) {
+    return enqueueRelease030LiveSyncEntries(entries, collection, false, cancelled);
+  }
+
+  /** Policy-preserving form: maintenance may cover an existing waiting row without replacing it. */
+  default int enqueueRelease030LiveSyncEntries(List<EnqueueEntry> entries, String collection,
+      boolean maintenance, java.util.function.BooleanSupplier cancelled) {
+    throw new UnsupportedOperationException("Atomic retirement sync admissions are unavailable");
   }
 
   /** Full expected row, including absence, used only by fenced watcher reconciliation. */
@@ -249,6 +372,14 @@ public interface SwitchBufferCapableQueue extends JobQueue {
       String generation, String key, SwitchBufferSyncRoot payload) {
     throw new UnsupportedOperationException(
         "Generation-scoped sync-root buffering is unavailable");
+  }
+
+  /** Fresh creator namespace, frozen with the retained ROOT before acknowledgement. */
+  default boolean putSyncRootForGeneration(String generation, String key,
+      SwitchBufferSyncRoot payload, String collection) {
+    if (release030RetirementGeneration() != null)
+      throw new UnsupportedOperationException("Creator ROOT namespace admission unavailable");
+    return putSyncRootForGeneration(generation, key, payload);
   }
 
   /** Durably freezes legacy prefix scopes before any reader may apply them. */

@@ -1,0 +1,150 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa",
+    "artifactCollector": {
+      "path": "tmp/builder/retire-P4-evidence-closure/collect.mjs",
+      "digest": "sha256:14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952",
+      "sourceArtifact": {
+        "path": "tmp/builder/retire-P4-evidence-closure/producers/14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952.mjs",
+        "sha256": "sha256:14596c6aa06ab97f591254bd92d5143b24a0a0e87e92accd6888c1eaeb1c6952",
+        "bytes": 10467
+      }
+    },
+    "mode": "Import immutable actual executions through canonical parser, summarizer, classifier and self-digest; canonical execution launcher was not invoked"
+  },
+  "revision": "bbddf3f564a66ae54abe4f9518d0f408164233b6",
+  "tree": "84563e1b9a0eb9c33610530b02c77e21ea50e93d",
+  "createdAt": "2026-10-26T20:06:53.968Z",
+  "environment": {
+    "kind": "Actual per-run environment, argv, complete input hashes, selected daemon RW probes and effective settings are bound in command artifacts"
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030CorrectionHistoryTest --tests *Release030RetirementLegacyMetadataTest :modules:indexer-worker:pmdTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030CorrectionHistoryTest.xml",
+          "sha256": "sha256:94213e0f836a76a986a591fd9111c3cd89aee9a5fe96e1665a3bba352ae09268",
+          "bytes": 21329
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/command.json",
+          "sha256": "sha256:fbd7e53d75e3e67f4f43335c0bbbb78be90065cbfb81d01721e016bce2023f00",
+          "bytes": 1702081
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:fb7f2dc4d4c87cd61761bdfa0f067d30e33342a791652beffd996d578b19594c",
+          "bytes": 7266
+        }
+      ]
+    },
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests *Release030CorrectionHistoryTest --tests *Release030RetirementLegacyMetadataTest :modules:indexer-worker:pmdTest --continue -PskipWebBuild=true -PskipErrorProneTests=false --no-configuration-cache -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/writeability.init.gradle -I /home/elias/dev/justsearch/.claude/worktrees/upgrade-retire/tmp/builder/retire-P4-evidence-closure/selection.init.gradle",
+      "cwd": "/home/elias/dev/justsearch/.claude/worktrees/upgrade-retire",
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030CorrectionHistoryTest.xml",
+          "sha256": "sha256:94213e0f836a76a986a591fd9111c3cd89aee9a5fe96e1665a3bba352ae09268",
+          "bytes": 21329
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/command.json",
+          "sha256": "sha256:fbd7e53d75e3e67f4f43335c0bbbb78be90065cbfb81d01721e016bce2023f00",
+          "bytes": 1702081
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:fb7f2dc4d4c87cd61761bdfa0f067d30e33342a791652beffd996d578b19594c",
+          "bytes": 7266
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java#sameIntentResumesAfterRollbackWithActualMutableRetryPreserved",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c946c97b6ff12856ef01fa2e1aefff1f58575946187ebd01fe8e82e89a879ed2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sameIntentResumesAfterRollbackWithActualMutableRetryPreserved()",
+          "classname": "io.justsearch.indexerworker.queue.Release030CorrectionHistoryTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "sameIntentResumesAfterRollbackWithActualMutableRetryPreserved()",
+          "method": "sameIntentResumesAfterRollbackWithActualMutableRetryPreserved"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030CorrectionHistoryTest.xml",
+          "sha256": "sha256:94213e0f836a76a986a591fd9111c3cd89aee9a5fe96e1665a3bba352ae09268",
+          "bytes": 21329
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/command.json",
+          "sha256": "sha256:fbd7e53d75e3e67f4f43335c0bbbb78be90065cbfb81d01721e016bce2023f00",
+          "bytes": 1702081
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:fb7f2dc4d4c87cd61761bdfa0f067d30e33342a791652beffd996d578b19594c",
+          "bytes": 7266
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java#laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/Release030CorrectionHistoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c946c97b6ff12856ef01fa2e1aefff1f58575946187ebd01fe8e82e89a879ed2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims()",
+          "classname": "io.justsearch.indexerworker.queue.Release030CorrectionHistoryTest",
+          "status": "passed",
+          "failureType": null,
+          "message": null,
+          "xmlName": "laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims()",
+          "method": "laterUnwalkedRootHoldsAnInstalledCorrectionWhileDisjointRootClaims"
+        }
+      ],
+      "raw": [
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/indexer-worker-test-xml/TEST-io.justsearch.indexerworker.queue.Release030CorrectionHistoryTest.xml",
+          "sha256": "sha256:94213e0f836a76a986a591fd9111c3cd89aee9a5fe96e1665a3bba352ae09268",
+          "bytes": 21329
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/command.json",
+          "sha256": "sha256:fbd7e53d75e3e67f4f43335c0bbbb78be90065cbfb81d01721e016bce2023f00",
+          "bytes": 1702081
+        },
+        {
+          "path": "tmp/builder/retire-P4-evidence-closure/corrected-fixtures-after/indexer-worker-test-events.ndjson",
+          "sha256": "sha256:fb7f2dc4d4c87cd61761bdfa0f067d30e33342a791652beffd996d578b19594c",
+          "bytes": 7266
+        }
+      ],
+      "executionScope": "Actual source-bound candidate execution; not independent acceptance"
+    }
+  ],
+  "failBefore": {
+    "checks": []
+  },
+  "scope": "Builder execution evidence only; original frozen packets and acceptance remain unchanged",
+  "digest": "sha256:3c32df68b74c0f8d0560d309d6f0dbfd484dd36ab104b2c249783db27493dec4"
+}

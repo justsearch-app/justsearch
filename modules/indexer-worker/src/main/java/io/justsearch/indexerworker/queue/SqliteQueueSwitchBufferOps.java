@@ -30,6 +30,17 @@ final class SqliteQueueSwitchBufferOps {
   private final Runnable onWriteFailure;
   private final Runnable errorRecorder;
   private MigrationJournalWitness admissionWitness;
+  private java.util.function.LongSupplier retainedOrderFloor = () -> 0L;
+  private Runnable admissionChanged = () -> {};
+  private Supplier<List<SwitchBufferCapableQueue.SwitchBufferOp>> retainedReceipts = List::of;
+
+  private java.util.function.Consumer<SwitchBufferCapableQueue.SwitchBufferOp> beforeReplacement = ignored -> {};
+
+  void retirementAdmissions(java.util.function.LongSupplier floor, Runnable changed,
+      Supplier<List<SwitchBufferCapableQueue.SwitchBufferOp>> retained,
+      java.util.function.Consumer<SwitchBufferCapableQueue.SwitchBufferOp> replacing) {
+    retainedOrderFloor = floor; admissionChanged = changed; retainedReceipts = retained; beforeReplacement = replacing;
+  }
 
   void attachAdmissionWitness(MigrationJournalWitness witness) throws SQLException {
     admissionWitness = witness;
@@ -218,6 +229,24 @@ final class SqliteQueueSwitchBufferOps {
       throw new IllegalArgumentException("Projection requires a building generation");
     }
     String key = incoming.journalKey();
+    var historical = retainedReceipts.get();
+    if (!historical.isEmpty()) {
+      AcceptedProjection newest = null;
+      var receipts = new ArrayList<>(historical); receipts.addAll(listAllStrictForGeneration(generation));
+      for (var receipt : receipts) if (generation.equals(receipt.generation()) && key.equals(receipt.key())
+          && "PROJECTION".equals(receipt.op())) {
+        var prior = AcceptedProjection.decode(receipt.payload());
+        if (!key.equals(prior.journalKey())) throw new IllegalStateException("Projection identity changed");
+        if (newest == null || prior.sourceRevision()>newest.sourceRevision()) newest=prior;
+        else if (prior.sourceRevision()==newest.sourceRevision() && !prior.sameEffect(newest))
+          throw new IllegalStateException("Conflicting retained projection revision");
+      }
+      if (newest != null) {
+        if (incoming.sourceRevision()<newest.sourceRevision()) return SwitchBufferCapableQueue.ProjectionAdmission.STALE;
+        if (incoming.sourceRevision()==newest.sourceRevision()) return incoming.sameEffect(newest)
+            ? SwitchBufferCapableQueue.ProjectionAdmission.DUPLICATE : SwitchBufferCapableQueue.ProjectionAdmission.CONFLICT;
+      }
+    }
     try (PreparedStatement query = conn.prepareStatement(
         "SELECT op, payload FROM switch_buffer WHERE generation = ? AND key = ?")) {
       query.setString(1, generation);
@@ -278,12 +307,26 @@ final class SqliteQueueSwitchBufferOps {
 
   private boolean writeForGeneration(
       Connection conn, String generation, String key, String op, String payload) throws SQLException {
+    try (var query = conn.prepareStatement(
+        "SELECT op,payload,last_updated,revision,accepted_order FROM switch_buffer WHERE generation=? AND key=?")) {
+      query.setString(1,generation); query.setString(2,key);
+      try (var row = query.executeQuery()) {
+        if (row.next()) beforeReplacement.accept(new SwitchBufferCapableQueue.SwitchBufferOp(
+            generation,key,row.getString(1),row.getString(2),row.getLong(3),row.getString(4),row.getLong(5)));
+      }
+    }
+    long floor = retainedOrderFloor.getAsLong();
+    long highest;
+    try (var query = conn.createStatement(); var row = query.executeQuery("SELECT COALESCE(MAX(accepted_order),0) FROM switch_buffer")) {
+      if (!row.next()) throw new SQLException("Missing admission order evidence");
+      highest = Math.max(floor, row.getLong(1));
+    }
+    if (highest < 0 || highest == Long.MAX_VALUE) throw new SQLException("Switch-buffer admission order exhausted");
     String sql =
         """
         INSERT OR REPLACE INTO switch_buffer
           (generation, key, op, payload, last_updated, revision, accepted_order)
-        VALUES (?, ?, ?, ?, ?, ?,
-          (SELECT COALESCE(MAX(accepted_order), 0) + 1 FROM switch_buffer))
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """;
     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
       stmt.setString(1, generation);
@@ -292,7 +335,9 @@ final class SqliteQueueSwitchBufferOps {
       stmt.setString(4, payload);
       stmt.setLong(5, System.currentTimeMillis());
       stmt.setString(6, java.util.UUID.randomUUID().toString());
+      stmt.setLong(7, highest + 1);
       stmt.executeUpdate();
+      admissionChanged.run();
       if (conn.getAutoCommit()) acknowledgeAdmissions();
       return true;
     }

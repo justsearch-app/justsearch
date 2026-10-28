@@ -34,7 +34,7 @@ final class Release030UnavailableRootTest {
       Files.setPosixFilePermissions(file, java.util.Set.of());
       assertFalse(Files.isReadable(file), "precondition: this user cannot read the file");
       var models = new ReleasedModelIdentities(root);
-      try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
+      try (models; var executors = new TestEngineExecutors(); var server = bootWithProductionRetryTimings(root, executors)) {
         assertEquals("IDLE", state(root).migration_state());
         var task = KnowledgeServer.class.getDeclaredField("release030RecoveryTask");
         task.setAccessible(true);

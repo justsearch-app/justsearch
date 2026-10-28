@@ -15,6 +15,7 @@ import io.justsearch.app.api.DocumentService.ContextSection;
 import io.justsearch.app.api.DocumentService.DocumentRecord;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.RetrieveContextParams;
+import io.justsearch.app.services.worker.EngineRequestEnds;
 import io.justsearch.core.util.ContextBudget;
 import io.justsearch.core.util.DocumentTypeDetector;
 import io.justsearch.core.util.Strings;
@@ -387,7 +388,12 @@ public final class RAGContext implements ContextInjector {
     if (docIds.isEmpty()) {
       attempt = tryOpenRetrieval(budget, question, topK, excludedSourceIds, collection, engineContext);
     } else {
-      attempt = tryRetrieveContext(question, docIdSet, topK, excludedSourceIds, collection, engineContext);
+      try {
+        attempt = tryRetrieveContext(question, docIdSet, topK, excludedSourceIds, collection, engineContext);
+      } catch (RuntimeException e) {
+        if (EngineRequestEnds.isDeadline(e)) return retrievalTimeout();
+        throw e;
+      }
     }
     ContextResult retrieval = attempt.result();
     String context = retrieval == null ? null : retrieval.context();
@@ -447,11 +453,7 @@ public final class RAGContext implements ContextInjector {
         // the same question answered in ~9.5s on retry. An attempt that did not finish reports itself
         // as unfinished; only a retrieval that ran and found nothing may claim nothing is there.
         if (attempt.timedOut()) {
-          return InjectorResult.terminalError(
-              errorEvent(
-                  "Still working on it - the search engine did not answer in time. This is not a"
-                      + " result about your documents; ask again in a moment.",
-                  "RETRIEVAL_TIMEOUT"));
+          return retrievalTimeout();
         }
         if (attempt.failed()) {
           return InjectorResult.terminalError(
@@ -468,7 +470,13 @@ public final class RAGContext implements ContextInjector {
       // Tempdoc 610 §J.3 — mirror the worker fallback: never re-inject (via whole-doc fetch) a parent
       // doc whose chunks the user hid. If every selected doc is hidden, this empties to NO_CONTENT.
       List<String> fallbackDocIds = dropExcludedParentDocs(docIds, excludedSourceIds);
-      String fallback = fallbackDocIds.isEmpty() ? null : fetchBatchFallback(fallbackDocIds, engineContext);
+      String fallback;
+      try {
+        fallback = fallbackDocIds.isEmpty() ? null : fetchBatchFallback(fallbackDocIds, engineContext);
+      } catch (RuntimeException e) {
+        if (EngineRequestEnds.isDeadline(e)) return retrievalTimeout();
+        throw e;
+      }
       if (fallback == null || fallback.isBlank()) {
         Map<String, Object> err = errorPayload("No content in selected files", "NO_CONTENT");
         err.put("retrievalScoped", true);
@@ -810,22 +818,16 @@ public final class RAGContext implements ContextInjector {
     }
 
     static RetrievalAttempt from(Exception e) {
-      return new RetrievalAttempt(null, isDeadline(e), true);
+      return new RetrievalAttempt(null, EngineRequestEnds.isDeadline(e), true);
     }
   }
 
-  /** True when a throwable (or any cause) is a local budget expiry or an in-process port DEADLINE_EXCEEDED. */
-  private static boolean isDeadline(Throwable t) {
-    for (Throwable c = t; c != null; c = c.getCause()) {
-      if (c instanceof java.util.concurrent.TimeoutException) {
-        return true;
-      }
-      String message = c.getMessage();
-      if (message != null && message.contains("DEADLINE_EXCEEDED")) {
-        return true;
-      }
-    }
-    return false;
+  private static InjectorResult retrievalTimeout() {
+    return InjectorResult.terminalError(
+        errorEvent(
+            "Still working on it - the search engine did not answer in time. This is not a"
+                + " result about your documents; ask again in a moment.",
+            "RETRIEVAL_TIMEOUT"));
   }
 
   private RetrievalAttempt tryRetrieveContext(
@@ -843,6 +845,10 @@ public final class RAGContext implements ContextInjector {
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS));
     } catch (Exception e) {
       io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
+      EngineRequestEnds.rethrowCancellation(e);
+      // Only our own wait expiring permits another fetch. A remote scoped retrieval already
+      // handles retrieval deadlines; a deadline escaping it ended its whole-document fallback.
+      if (!(e instanceof java.util.concurrent.TimeoutException)) EngineRequestEnds.rethrow(e);
       LOG.warn("RAGContext: scoped retrieveContext failed; will fall back to batch fetch", e);
       return RetrievalAttempt.from(e);
     }
@@ -872,6 +878,7 @@ public final class RAGContext implements ContextInjector {
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS));
     } catch (Exception e) {
       io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
+      EngineRequestEnds.rethrowCancellation(e);
       LOG.warn("RAGContext: open-retrieval failed (no docIds, pre-search path)", e);
       return RetrievalAttempt.from(e);
     }
@@ -922,6 +929,7 @@ public final class RAGContext implements ContextInjector {
       return formatDocuments(docs, docIds);
     } catch (Exception e) {
       io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
+      EngineRequestEnds.rethrow(e);
       LOG.warn("RAGContext: fetchBatch fallback failed for {} docIds", docIds.size(), e);
       return null;
     }

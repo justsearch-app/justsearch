@@ -633,11 +633,16 @@ public final class ConversationEngine {
               || shape.contextInjectorIds().contains(
                   io.justsearch.app.services.conversation.spi.RAGContext.ID))
           && injectorRun.terminalError != null) {
-        conversationStore.createSession(retrievalRecordId, shape.id().value());
-        conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-            String.valueOf(injectorRun.terminalError.payload().getOrDefault("error", "Retrieval failed")),
-            injectorRun.terminalError.payload().get("errorCode"), null);
+        boolean interrupted = Thread.interrupted();
+        try {
+          conversationStore.createSession(retrievalRecordId, shape.id().value());
+          conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+              String.valueOf(injectorRun.terminalError.payload().getOrDefault("error", "Retrieval failed")),
+              injectorRun.terminalError.payload().get("errorCode"), null);
+        } finally {
+          if (interrupted) Thread.currentThread().interrupt();
+        }
       }
       return;
     }
@@ -1236,6 +1241,23 @@ public final class ConversationEngine {
       try {
         result = inj.inject(ctx);
       } catch (Exception e) {
+        RuntimeException cancelled =
+            io.justsearch.app.services.worker.EngineRequestEnds.cancellation(e);
+        if (cancelled != null) {
+          Map<String, Object> payload = new LinkedHashMap<>();
+          String message = cancelled.getMessage();
+          if (message == null || message.isBlank()) message = "Engine work cancelled";
+          payload.put("message", message);
+          payload.put("error", message);
+          payload.put("errorCode", "SERVICE_UNAVAILABLE");
+          payload.put("i18nKey", "errors.SERVICE_UNAVAILABLE");
+          if (cancelled instanceof io.justsearch.app.api.EngineWorkCancelledException reason) {
+            payload.put("reasonCode", reason.reasonCode());
+          }
+          SseEvent terminal = new SseEvent("error", payload);
+          if (!stoppedByUser(work)) sink.accept(terminal);
+          return new InjectorRunResult(out, forwarded, true, retrievalMetadata, citations, terminal);
+        }
         SseEvent refusal = refusalEvent(e);
         if (refusal != null) {
           if (!stoppedByUser(work)) sink.accept(refusal);

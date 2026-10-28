@@ -417,6 +417,7 @@ public final class RemoteDocumentService implements DocumentService {
 
       } catch (Exception e) {
         EngineRefusals.rethrow(e);
+        EngineRequestEnds.rethrowCancellation(e);
         log.error("Failed to retrieve context from the index half, falling back to default", e);
         // Record fallback counter
         recordRagFallback();
@@ -481,6 +482,8 @@ public final class RemoteDocumentService implements DocumentService {
         return mapRetrieveContextResponse(response);
       } catch (Exception e) {
         EngineRefusals.rethrow(e);
+        if (params.docIds().isEmpty()) EngineRequestEnds.rethrow(e);
+        else EngineRequestEnds.rethrowCancellation(e);
         log.error("Failed to retrieve context from the index half (rich params), falling back", e);
         recordRagFallback();
         return retrieveContextFallback(effectiveParams.docIds(), engineContext, client);
@@ -631,6 +634,7 @@ public final class RemoteDocumentService implements DocumentService {
       return new PreSearch(docIds, semanticLoading);
     } catch (Exception e) {
       EngineRefusals.rethrow(e);
+      EngineRequestEnds.rethrow(e);
       log.warn("Pre-search for open retrieval failed", e);
       return PreSearch.NONE;
     }
@@ -741,6 +745,7 @@ public final class RemoteDocumentService implements DocumentService {
           "FULLTEXT_FALLBACK", "GRPC_FAILED", false, fallbackSections);
     } catch (Exception e) {
       EngineRefusals.rethrow(e);
+      EngineRequestEnds.rethrow(e);
       log.error("Fallback context retrieval also failed", e);
       return failedContextResult();
     }

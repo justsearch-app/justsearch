@@ -17,6 +17,7 @@ import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.services.WorkerMutationAdmission;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -106,7 +107,7 @@ final class KnowledgeServerProducerOwnershipTest {
         verify(registry.handles.get(WorkerExecutorRegistrations.STUCK_JOB_REAPER)).openScheduled(any());
         assertEquals(TimeUnit.MINUTES.toMillis(2), registry.reaperDelayMillis);
         closed = closeInBackground(server);
-        assertTrue(interrupted.await(3, TimeUnit.SECONDS));
+        assertTrue(registry.reaperShutdown.await(3, TimeUnit.SECONDS));
         assertFalse(server.awaitClosed(150));
         verify(queue, never()).close();
         release.countDown();
@@ -141,6 +142,7 @@ final class KnowledgeServerProducerOwnershipTest {
   private static final class RecordingRegistry implements EngineExecutorRegistry {
     private final TestEngineExecutors delegate = new TestEngineExecutors();
     private final Map<String, Registration> handles = new HashMap<>();
+    private final CountDownLatch reaperShutdown = new CountDownLatch(1);
     private long reaperDelayMillis;
     @Override public Registration register(EngineExecutorSpec spec) {
       Registration owned = delegate.register(spec);
@@ -148,6 +150,15 @@ final class KnowledgeServerProducerOwnershipTest {
       if (spec.name().equals(WorkerExecutorRegistrations.STUCK_JOB_REAPER)) {
         doAnswer(invocation -> {
           var scheduler = new ScheduledThreadPoolExecutor(1, invocation.getArgument(0, java.util.concurrent.ThreadFactory.class)) {
+            @Override public void shutdown() {
+              super.shutdown();
+              reaperShutdown.countDown();
+            }
+            @Override public List<Runnable> shutdownNow() {
+              var pending = super.shutdownNow();
+              reaperShutdown.countDown();
+              return pending;
+            }
             @Override public java.util.concurrent.ScheduledFuture<?> scheduleWithFixedDelay(
                 Runnable task, long initialDelay, long delay, TimeUnit unit) {
               assertEquals(initialDelay, delay);

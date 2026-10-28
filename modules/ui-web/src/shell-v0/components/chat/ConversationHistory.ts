@@ -35,11 +35,14 @@ export class ConversationHistory extends JfElement {
     open: { type: Boolean, reflect: true },
     conversations: { state: true },
     loading: { state: true },
+    apiBase: { type: String, attribute: 'api-base' },
   };
 
   declare open: boolean;
   declare conversations: Conversation[];
   declare loading: boolean;
+  declare apiBase: string;
+  private removal: AbortController | null = null;
 
   private unsub: (() => void) | null = null;
 
@@ -48,6 +51,7 @@ export class ConversationHistory extends JfElement {
     this.open = false;
     this.conversations = [];
     this.loading = false;
+    this.apiBase = '';
   }
 
   static styles = css`
@@ -158,6 +162,7 @@ export class ConversationHistory extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.removal?.abort();
     super.disconnectedCallback();
     this.unsub?.();
   }
@@ -202,17 +207,24 @@ export class ConversationHistory extends JfElement {
 
   private async onDelete(c: Conversation, e: Event): Promise<void> {
     e.stopPropagation();
+    if (this.removal !== null) return;
+    const consent = new AbortController();
+    this.removal = consent;
     let tree: DeleteTreeEntry[] = [];
     const report = (result: DeleteCascadeResult) => {
       if (!result.ok && !result.cancelled) {
         emitEphemeralToast({ message: conversationDeleteOutcome(result, tree), severity: 'warning' });
       }
     };
-    const result = await deleteConversationWithCascade(c.id, (children, preview) => {
-      tree = preview;
-      return confirmConversationTree(children, preview);
-    }, report);
-    report(result);
+    try {
+      const result = await deleteConversationWithCascade(c.id, (children, preview) => {
+        tree = preview;
+        return confirmConversationTree(children, preview, this.apiBase, consent.signal);
+      }, report);
+      report(result);
+    } finally {
+      this.removal = null;
+    }
   }
 
   private renderItem(c: Conversation): TemplateResult {
