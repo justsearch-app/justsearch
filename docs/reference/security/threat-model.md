@@ -58,8 +58,8 @@ Local indexing, retrieval, and built-in inference are anchored in the Engine and
    NVIDIA hardware, when downloads and GPU acceleration are permitted by policy, it also downloads a CUDA `llama-server` build and selects it automatically unless
    the user configured an executable. Desktop builds with an embedded release URL check it by default
    about 30 seconds after chrome mount. CI-built installers embed the repository's configured GitHub
-   release URL, including branch candidates and pre-releases. Discovery fetches `release.v1.json`,
-   `release.v1.json.sig` and `latest.json`; installation rechecks `latest.json` and downloads the signed
+   release URL, including branch candidates and pre-releases. Discovery fetches `release.v2.json`,
+   `release.v2.json.sig` and `latest.json`; installation rechecks `latest.json` and downloads the signed
    installer only on request. Requests follow GitHub redirects to download/CDN hosts. Those hosts
    receive the request IP and time; these updater requests send no document content or queries.
    Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process to suppress only
@@ -184,7 +184,7 @@ The desktop updater is another supply-chain path. Integrity + availability consi
 - **Integrity.** Each model package pins a `sha256` in `model-registry.v2.json`; a tampered download
   fails verification. Every model/runtime `downloadUrl` must use HTTPS and resolve from an allowlisted
   public host.
-- **Update authenticity and rollback protection.** The shell fetches `release.v1.json` and its
+- **Update authenticity and rollback protection.** The shell fetches `release.v2.json` and its
   signature over HTTPS, verifies the descriptor against the build's pinned metadata root, rejects
   a sequence below its persisted highest accepted sequence, and checks that Tauri's `latest.json`
   names the same artifact and signature. The artifact digest and signature are verified before

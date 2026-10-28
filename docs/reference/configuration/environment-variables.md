@@ -254,7 +254,7 @@ system-property precedence rule above does not apply to them.
 ## Desktop app-update traffic and policy
 
 Desktop builds with a configured release URL check by default, including CI-built branch candidates
-and pre-releases. Discovery fetches `release.v1.json`, `release.v1.json.sig` and `latest.json` from
+and pre-releases. Discovery fetches `release.v2.json`, `release.v2.json.sig` and `latest.json` from
 GitHub, following download/CDN redirects. Installation rechecks `latest.json` and downloads installer
 bytes only on request. The contacted hosts see request IP and time; these updater requests send no
 document content or queries. A build without a configured URL makes no updater requests; debug

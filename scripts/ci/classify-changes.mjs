@@ -24,6 +24,8 @@ export const RULES = [
   [/^modules\/(?:app-api-tck|app-launcher|benchmarks|dead-code-audit|ssot-tools|test-support)\//, ['build', 'services', 'platform', 'windows', 'jseval']],
   [/^modules\/ui-web\//, ['build', 'ui', 'services', 'windows', 'jseval', 'lifecycle', 'integration']],
   [/^modules\/ui-web\/src\/api\/backendRestart\.ts$/, ['rust']],
+  // The shell's updater v2 tests run this fixture generator.
+  [/^scripts\/release\/updater-v2-fixture\.mjs$/, ['rust']],
   [/^modules\/app-services\/src\/test\/resources\/policy\/app-update-policy-cases\.json$/, ['rust']],
   // Rust recovery tests and both conformance adapters consume the shared crash fixtures.
   [/^modules\/app-services\/src\/test\/resources\/io\/justsearch\/app\/services\/diagnostics\/hotspot-fatal-headers\//, ['rust']],
