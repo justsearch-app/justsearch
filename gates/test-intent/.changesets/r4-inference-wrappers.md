@@ -72,3 +72,13 @@ author-session: 01a181de-5332-7be0-a7af-2f3904d4d6c0
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a181e6-db44-7e60-b389-85b7948482a2",
+  "verdict": "accept",
+  "digest": "sha256:ece9f6a6fc31a0ec8db2ab440f823a31b16342440aa93b33ab91b69122774f85"
+}
+```
