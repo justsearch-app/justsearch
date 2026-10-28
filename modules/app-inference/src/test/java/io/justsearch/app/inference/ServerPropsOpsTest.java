@@ -6,10 +6,13 @@ import static org.mockito.Mockito.when;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.NullNode;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 class ServerPropsOpsTest {
@@ -337,5 +340,111 @@ class ServerPropsOpsTest {
     assertFalse(
         ServerPropsOps.looksLikeLlamaServerProps(
             MAPPER.readTree("{\"model_alias\":\"\"}")));
+  }
+
+  // ==================== asPositiveInt tests ====================
+
+  @Nested
+  @DisplayName("asPositiveInt()")
+  class AsPositiveIntTests {
+
+    @Test
+    @DisplayName("positive value returns value")
+    void positiveValue_returnsValue() throws Exception {
+      JsonNode node = MAPPER.readTree("42");
+      assertEquals(42, ServerPropsOps.asPositiveInt(node));
+    }
+
+    @Test
+    @DisplayName("zero returns null")
+    void zeroValue_returnsNull() throws Exception {
+      JsonNode node = MAPPER.readTree("0");
+      assertNull(ServerPropsOps.asPositiveInt(node));
+    }
+
+    @Test
+    @DisplayName("negative value returns null")
+    void negativeValue_returnsNull() throws Exception {
+      JsonNode node = MAPPER.readTree("-5");
+      assertNull(ServerPropsOps.asPositiveInt(node));
+    }
+
+    @Test
+    @DisplayName("null node returns null")
+    void nullNode_returnsNull() throws Exception {
+      assertNull(ServerPropsOps.asPositiveInt(null));
+    }
+
+    @Test
+    @DisplayName("NullNode returns null")
+    void nullJsonNode_returnsNull() throws Exception {
+      assertNull(ServerPropsOps.asPositiveInt(NullNode.getInstance()));
+    }
+
+    @Test
+    @DisplayName("text node with positive number parses value")
+    void textNodeWithPositiveNumber_parsesValue() throws Exception {
+      JsonNode node = MAPPER.readTree("\"256\"");
+      assertEquals(256, ServerPropsOps.asPositiveInt(node));
+    }
+
+    @Test
+    @DisplayName("text node with zero returns null")
+    void textNodeWithZero_returnsNull() throws Exception {
+      JsonNode node = MAPPER.readTree("\"0\"");
+      assertNull(ServerPropsOps.asPositiveInt(node));
+    }
+
+    @Test
+    @DisplayName("text node with negative returns null")
+    void textNodeWithNegative_returnsNull() throws Exception {
+      JsonNode node = MAPPER.readTree("\"-10\"");
+      assertNull(ServerPropsOps.asPositiveInt(node));
+    }
+
+    @Test
+    @DisplayName("text node with invalid returns null")
+    void textNodeWithInvalid_returnsNull() throws Exception {
+      JsonNode node = MAPPER.readTree("\"abc\"");
+      assertNull(ServerPropsOps.asPositiveInt(node));
+    }
+
+    @Test
+    @DisplayName("boolean node returns null")
+    void booleanNode_returnsNull() throws Exception {
+      JsonNode node = MAPPER.readTree("true");
+      assertNull(ServerPropsOps.asPositiveInt(node));
+    }
+  }
+
+  @Test
+  @DisplayName("Extract n_ctx from default_generation_settings.n_ctx")
+  void extractNestedNctx() throws Exception {
+    JsonNode root = MAPPER.readTree("{\"default_generation_settings\":{\"n_ctx\":4096}}");
+    assertEquals(4096, ServerPropsOps.extractContextTokensFromProps(root));
+  }
+
+  @Test
+  @DisplayName("Extract n_ctx from default_generation_settings.params.n_ctx")
+  void extractNestedParamsNctx() throws Exception {
+    JsonNode root = MAPPER.readTree("{\"default_generation_settings\":{\"params\":{\"n_ctx\":8192}}}");
+    assertEquals(8192, ServerPropsOps.extractContextTokensFromProps(root));
+  }
+
+  @Test
+  @DisplayName("Handles real-world shape where n_ctx is followed by a close-brace before comma")
+  void extractRealWorldShape() throws Exception {
+    // Matches the observed llama-server /props structure:
+    // {"default_generation_settings":{"params":{...},"n_ctx":4096},"total_slots":4,...}
+    JsonNode root =
+        MAPPER.readTree("{\"default_generation_settings\":{\"params\":{},\"n_ctx\":4096},\"total_slots\":4}");
+    assertEquals(4096, ServerPropsOps.extractContextTokensFromProps(root));
+  }
+
+  @Test
+  @DisplayName("Returns null when n_ctx is missing")
+  void missingNctxReturnsNull() throws Exception {
+    JsonNode root = MAPPER.readTree("{\"default_generation_settings\":{\"params\":{}}}");
+    assertNull(ServerPropsOps.extractContextTokensFromProps(root));
   }
 }
