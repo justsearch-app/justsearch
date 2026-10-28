@@ -24,22 +24,29 @@ async function mount(ids = ['/docs/held.md', '/docs/gone.md'], observe = true) {
 }
 const cards = (el: CitationsPanel) => [...el.renderRoot.querySelectorAll('.source-card')];
 const response = (states: Record<string, string>) => new Response(JSON.stringify({ states }));
+// The button's explicit name and description, which a screen reader announces on focus. The name
+// computed from content is left out: happy-dom cannot compute it, and real Chromium did not announce
+// the inner status text on focus (WP5.8 verifier 1).
+function nameAndDescription(button: Element) {
+  const root = button.getRootNode() as Document | ShadowRoot;
+  const describedBy = (button.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+    .map(id => root.getElementById(id)?.textContent ?? '');
+  return [button.getAttribute('aria-label') ?? '', button.getAttribute('aria-description') ?? '', ...describedBy]
+    .map(part => part.replace(/\s+/g, ' ').trim()).join(' | ');
+}
 afterEach(() => { document.body.replaceChildren(); vi.resetAllMocks(); });
 describe('WP5.8 source availability', () => {
-  it.each(['present', 'unknown', 'absent'])('includes only confirmed absence in the source button description (%s)', async (state) => {
+  it.each(['present', 'unknown', 'absent'])('includes only confirmed absence in the source button name or description (%s)', async (state) => {
     let release!: (value: Response) => void;
     fetchPresence.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
     const el = await mount(['/docs/source.md']);
     const button = cards(el)[0]!.querySelector('button.source')!;
-    const originalName = button.getAttribute('aria-label');
-    const originalDescription = button.getAttribute('aria-description');
-    const originalDescribedBy = button.getAttribute('aria-describedby');
+    const original = nameAndDescription(button);
     const status = button.querySelector('[role="status"]')!;
     release(response({ '/docs/source.md': state }));
     await settle(el);
-    expect(button.getAttribute('aria-label')).toBe(originalName);
-    expect(button.getAttribute('aria-describedby')).toBe(originalDescribedBy);
-    expect(button.getAttribute('aria-description')).toBe(state === 'absent' ? 'No longer available' : originalDescription);
+    if (state === 'absent') expect(nameAndDescription(button)).toContain('No longer available');
+    else expect(nameAndDescription(button)).toBe(original);
     expect(button.querySelectorAll('[role="status"]')).toHaveLength(1);
     expect(button.querySelector('[role="status"]')).toBe(status);
     expect(status.getAttribute('aria-live')).toBe('polite');

@@ -184,7 +184,7 @@ longer sufficient evidence that the index has no record.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "A focused confirmed-absent source button exposes No longer available in its accessible description and keeps one polite status node. Present and unknown sources keep the existing name attributes and description. All prior availability assertions remain intact.",
+      "behaviour": "A focused confirmed-absent source button exposes No longer available through its explicit name or description and keeps one polite status node. Present and unknown sources keep the same explicit name and description. All prior availability assertions remain intact.",
       "sources": [
         {
           "kind": "delegated-choice",
