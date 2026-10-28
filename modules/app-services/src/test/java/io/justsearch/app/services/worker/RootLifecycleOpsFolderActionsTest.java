@@ -101,6 +101,7 @@ final class RootLifecycleOpsFolderActionsTest {
             watchers.remove(path);
           }
         }, (path, context) -> {
+          watchers.remove(path.toString()); // Worker retires the root within scoped deletion.
           calls.incrementAndGet();
           return DeleteByPathResponse.newBuilder().setDeletedJobs(1).build();
         }, (id, context) -> null, mock(SyncOps.class), mock(ExecutorService.class),

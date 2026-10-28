@@ -59,6 +59,7 @@ final class ProfilingResetRemovesRootsTest {
           (r, collection, mode, excludes, progress, context) -> null,
           worker,
           (r, context) -> {
+            worker.unwatch(r.toString(), context); // Worker retirement is inside the deletion call.
             deleted.add(r.toAbsolutePath().normalize());
             return DeleteByPathResponse.newBuilder().setDeletedJobs(0).build();
           },
