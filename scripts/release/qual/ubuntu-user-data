@@ -1,0 +1,49 @@
+#cloud-config
+autoinstall:
+  version: 1
+  refresh-installer:
+    update: false
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  timezone: Etc/UTC
+  source:
+    id: ubuntu-desktop
+    search_drivers: false
+  identity:
+    hostname: qual-ubuntu
+    username: qual
+    realname: Release Qualification
+    password: '@PASSWORD_HASH@'
+  storage:
+    layout:
+      name: direct
+  apt:
+    geoip: false
+    mirror-selection:
+      primary:
+        - uri: https://archive.ubuntu.com/ubuntu
+    security:
+      - arches: [amd64]
+        uri: https://security.ubuntu.com/ubuntu
+    fallback: abort
+  ssh:
+    install-server: true
+    allow-pw: false
+    authorized-keys:
+      - '@SSH_KEY@'
+  codecs:
+    install: false
+  drivers:
+    install: false
+  oem:
+    install: false
+  late-commands:
+    - curtin in-target -- systemctl disable apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service
+    - curtin in-target -- systemctl mask apt-daily.service apt-daily-upgrade.service unattended-upgrades.service
+    - curtin in-target -- sh -c 'printf "APT::Periodic::Enable \"0\";\n" > /etc/apt/apt.conf.d/99qual'
+    - curtin in-target -- sh -c 'printf "[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin=qual\n[security]\n[xdmcp]\n[chooser]\n[debug]\n" > /etc/gdm3/custom.conf'
+    - curtin in-target -- sh -c 'mkdir -p /var/lib/AccountsService/users; printf "[User]\nSession=ubuntu\nXSession=ubuntu\nSystemAccount=false\n" > /var/lib/AccountsService/users/qual'
+    - curtin in-target -- sh -c 'mkdir -p /home/qual/.config; touch /home/qual/.config/gnome-initial-setup-done; chown -R qual:qual /home/qual/.config'
+    - curtin in-target -- touch /var/lib/qual-ready
+  shutdown: poweroff
