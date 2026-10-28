@@ -183,6 +183,21 @@
       "staleDays": 30,
       "blocking": false,
       "advisory": true
+    },
+    {
+      "name": "Build Linux Installer",
+      "path": ".github/workflows/build-installer-linux.yml",
+      "class": "release-gate",
+      "expectedTriggers": [
+        "workflow_call",
+        "workflow_dispatch",
+        "pull_request"
+      ],
+      "owner": "Linux Debian packaging",
+      "failureDefault": "release-blocking-failure",
+      "staleDays": 14,
+      "blocking": true,
+      "advisory": false
     }
   ]
 }

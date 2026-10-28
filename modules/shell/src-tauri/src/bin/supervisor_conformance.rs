@@ -68,7 +68,7 @@ mod shell_actuator;
 #[allow(dead_code)]
 mod updater_probe {
     include!("../updater.rs");
-    include!("support/updater_probe.inc.rs");
+    include!("../supervisor_support/updater_probe.inc.rs");
 }
 // AppHandle paths are never driven by the conformance binary. Fail explicitly if used.
 #[cfg_attr(test, derive(Default))]

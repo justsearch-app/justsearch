@@ -38,8 +38,7 @@ function getCapabilities(): ReadonlySet<string> {
 export async function openExternalUrl(url: string): Promise<void> {
   try {
     if (isTauriRuntime()) {
-      const coreSpec = ['@tauri-apps', 'api', 'core'].join('/');
-      const { invoke } = await import(/* @vite-ignore */ coreSpec) as { invoke: (cmd: string, args: unknown) => Promise<unknown> };
+      const { invoke } = await import('@tauri-apps/api/core');
       await invoke('open_external_url', { url });
       return;
     }
@@ -56,8 +55,7 @@ export async function openExternalUrl(url: string): Promise<void> {
 export async function openLocalFile(path: string): Promise<void> {
   try {
     if (isTauriRuntime()) {
-      const coreSpec = ['@tauri-apps', 'api', 'core'].join('/');
-      const { invoke } = await import(/* @vite-ignore */ coreSpec) as { invoke: (cmd: string, args: unknown) => Promise<unknown> };
+      const { invoke } = await import('@tauri-apps/api/core');
       await invoke('open_file', { path });
       return;
     }
@@ -81,8 +79,7 @@ export async function openLocalFile(path: string): Promise<void> {
 export async function revealLocalPath(path: string): Promise<void> {
   if (!path || !getCapabilities().has('reveal-in-explorer')) return;
   try {
-    const coreSpec = ['@tauri-apps', 'api', 'core'].join('/');
-    const { invoke } = await import(/* @vite-ignore */ coreSpec) as { invoke: (cmd: string, args: unknown) => Promise<unknown> };
+    const { invoke } = await import('@tauri-apps/api/core');
     await invoke('reveal_in_explorer', { path });
   } catch (error) {
     emitEphemeralToast({ message: String(error), severity: 'error' });
@@ -106,8 +103,7 @@ export function createPlatformApi(tier: PluginTrustTier): PluginPlatform {
         pickFile: async (options?: { multiple?: boolean; filters?: Array<{ name: string; extensions: string[] }> }) => {
           if (!capabilities.has('file-picker')) return null;
           try {
-            const dlgSpec = ['@tauri-apps', 'plugin-dialog'].join('/');
-            const { open } = await import(/* @vite-ignore */ dlgSpec) as { open: (o: unknown) => Promise<unknown> };
+            const { open } = await import('@tauri-apps/plugin-dialog');
             const result = await open({
               multiple: options?.multiple ?? false,
               filters: options?.filters,

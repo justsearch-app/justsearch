@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T21:29:52.312Z",
+  "revision": "e8398c2c69d9d0453e54c617b8e78201f12aa497",
+  "tree": "ca364872faaf8b370e0be661cb091af7a0e0924f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::linux_desktop_uri_argv_is_available_to_the_cold_launch_reader\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 87681
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/router/sources/TauriDeepLinkSource.desktop.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/h9jgkddc/tmp/test-intent-vitest-65-1793136591300.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1011
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::linux_desktop_uri_argv_is_available_to_the_cold_launch_reader",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:48d1d4513a5d2d66190d8d57ae24cfcbec511f61f799c8036a449ff6856bb0b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::linux_desktop_uri_argv_is_available_to_the_cold_launch_reader",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/sources/TauriDeepLinkSource.desktop.test.ts#dispatches the fresh-instance URL, then a URL forwarded to the running instance",
+      "file": "modules/ui-web/src/shell-v0/router/sources/TauriDeepLinkSource.desktop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:90c76ccb86ad0c392f1c9b5fc44f95d2be29e26bc519375758a3272340b73e5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "desktop deep links (Linux argv and single-instance events) dispatches the fresh-instance URL, then a URL forwarded to the running instance",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:601d582dd4eaaa4ab77d35c31825f677634dac2bf7c6f1cbe3e0cea50380ab1d"
+}
