@@ -805,8 +805,8 @@ public final class KnowledgeServerMigrationOps {
    * replay exact DELETEs on B in accepted order, then durably commit and verify their absence.
    * Mixed projection and broad-delete snapshots certify B's final accepted effects without
    * replaying destructive mutations. Conditional removal retains concurrent replacement rows.
-   * A SYNC_ROOT receipt is validated here and stays retained: the committed boot reconciles its
-   * root with current disk on B and only then acknowledges that exact revision.
+   * A SYNC_ROOT receipt is validated here and stays retained: the committed boot replays it on B
+   * through {@link #replayCommittedRootSync} and only then removes that exact revision.
    */
   public static boolean settleCommittedNativeFileWitnesses(
       JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log) {
@@ -1148,7 +1148,7 @@ public final class KnowledgeServerMigrationOps {
     return ops.stream().filter(op -> !"SYNC_ROOT".equals(op.op())).toList();
   }
 
-  /** Every receipt but {@code generation}'s own SYNC_ROOTs, which root reconciliation settles, is gone. */
+  /** Every receipt but {@code generation}'s own SYNC_ROOTs, which the boot replays, is gone. */
   private static boolean onlyRootSyncsRemain(JobQueue queue, String generation) {
     if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
     try {
@@ -1160,14 +1160,26 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /**
-   * The root a committed native generation's retained SYNC_ROOT receipt asks to sync, once its
-   * key names exactly that root; a malformed or mismatched receipt throws and is never settled.
+   * Replays {@code receipt}, a retained SYNC_ROOT of the committed native generation the context
+   * replays onto, through the switch-buffer SYNC_ROOT replay with the receipt's own force and
+   * provenance, as the cutover would have, and removes nothing. True only when that exact revision
+   * walked its root without error; the caller then removes exactly it. Any failure leaves the
+   * receipt for a retry; a root that is missing or on another volume is refused before anything
+   * under it is pruned.
    */
-  public static Path committedRootSyncPath(SwitchBufferCapableQueue.SwitchBufferOp op) {
-    if (!"SYNC_ROOT".equals(op.op())) throw new IllegalArgumentException("Not a root sync receipt");
-    decodeCommittedNativeEffect(op, Set.of());
-    return Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath())
-        .toAbsolutePath().normalize();
+  public static boolean replayCommittedRootSync(DrainSwitchBufferContext context,
+      SwitchBufferCapableQueue.SwitchBufferOp receipt) {
+    if (!"SYNC_ROOT".equals(receipt.op()) || context.replayGeneration() == null
+        || !context.replayGeneration().equals(receipt.generation())) {
+      throw new IllegalArgumentException("Not a root sync receipt of the replayed generation");
+    }
+    decodeCommittedNativeEffect(receipt, Set.of());
+    java.util.function.Predicate<SwitchBufferCapableQueue.SwitchBufferOp> exact = op ->
+        "SYNC_ROOT".equals(op.op()) && receipt.generation().equals(op.generation())
+            && receipt.key().equals(op.key()) && Objects.equals(receipt.revision(), op.revision());
+    var replay = drainSwitchBuffer(context, false, false, false, () -> {}, false, () -> {}, () -> {},
+        null, exact);
+    return replay.applied() && replay.versions().stream().anyMatch(exact);
   }
 
   /** No post-snapshot versions may remain while the final mutation admission fence is held. */
@@ -1267,6 +1279,16 @@ public final class KnowledgeServerMigrationOps {
       boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped,
       Runnable firstCandidateProjectionApplied, boolean refusedSourceRecovery,
       Runnable firstPruneRemoval, Runnable sourceBeforeCommit, Release030Roots recoveryRoots) {
+    return drainSwitchBuffer(context, exactRead, removeAfterReplay, includeUnscoped,
+        firstCandidateProjectionApplied, refusedSourceRecovery, firstPruneRemoval, sourceBeforeCommit,
+        recoveryRoots, op -> true);
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped,
+      Runnable firstCandidateProjectionApplied, boolean refusedSourceRecovery,
+      Runnable firstPruneRemoval, Runnable sourceBeforeCommit, Release030Roots recoveryRoots,
+      java.util.function.Predicate<SwitchBufferCapableQueue.SwitchBufferOp> selected) {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
       return new ReplayOutcome(false, List.of());
     }
@@ -1292,6 +1314,7 @@ public final class KnowledgeServerMigrationOps {
               .filter(op -> (includeUnscoped && (op.generation() == null || op.generation().isEmpty()))
                   || (context.replayGeneration() != null
                       && context.replayGeneration().equals(op.generation()))).toList();
+      allOps = allOps.stream().filter(selected).toList();
     } catch (RuntimeException unreadable) {
       context.log().warn("Switch buffer cannot certify final replay", unreadable);
       if (context.publisher() != null) context.publisher().watcherReplayRefusal(unreadable.getMessage());

@@ -10,6 +10,8 @@ import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.app.api.indexing.ProjectionSeedSource;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.queue.JobQueue;
@@ -28,6 +30,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -117,13 +120,20 @@ final class SyncRootPromotionCrashRecoveryTest {
         () -> assertHits(restart, "newchangetoken", "watched/change-me.txt"),
         () -> assertHits(restart, "oldchangetoken"),
         () -> assertHits(restart, "removedtoken"));
-    assertCollectionRootMatchesDisk("S3 force=false", restart);
+    assertAll("S3 force=false: the configured collection root matches an uninterrupted replay of its receipt",
+        () -> assertHits(restart, "archiveaddedtoken", "archive/added.txt"),
+        () -> assertHits(restart, "archiveremovedtoken"),
+        () -> assertHits(restart, "archivekeeptoken", "archive/keep.txt"),
+        // A force=false sync admits only files B lacks; B built change-me.txt before the stop.
+        () -> assertHits(restart, "archiveoldtoken", "archive/change-me.txt"),
+        () -> assertHits(restart, "archivenewtoken"));
   }
 
   /**
-   * S4a: a second abrupt stop once the roots are reconciled, before the SYNC_ROOT receipts are
-   * removed. S4b: on the next boot the first removal fails and a replacement revision is accepted
-   * during the retried removal; it survives that cleanup and is settled by the next check.
+   * S4a: a second abrupt stop once the first SYNC_ROOT replayed, before its receipt is removed.
+   * S4b: on the next boot the first removal fails; on the retry a replacement revision of the
+   * collection root's receipt is accepted between its replay and its removal; it survives that
+   * exact removal and is replayed and settled by the next check.
    */
   @Test
   void interruptedSettlementKeepsRetryableEvidenceAndSettlesOnRetry(@TempDir Path root)
@@ -137,7 +147,7 @@ final class SyncRootPromotionCrashRecoveryTest {
     }
     System.out.println("CRASH-RECOVERY NATIVE restart-cut evidence:\n" + evidence(log(root, "restart-cut")));
     assertTrue(Files.exists(root.resolve("roots-reconciled")),
-        "S4a: the first restart must reconcile the roots before it acknowledges their syncs");
+        "S4a: the first restart must replay a root sync before it removes its receipt");
     var state = new IndexGenerationManager(root.resolve("data/index")).readStateBestEffort();
     assertAll("S4a: retryable evidence after the second stop",
         () -> assertEquals(Files.readString(root.resolve("building")), state.active_generation()),
@@ -183,11 +193,60 @@ final class SyncRootPromotionCrashRecoveryTest {
         () -> assertEquals(key(root.resolve("watched/keep.txt")), returned.getProperty("keeptoken")));
   }
 
-  /** S6: as S1, with the stop after live publication rather than right after the pointer. */
+  /**
+   * S5 for a configured collection root whose folder was removed while the Engine was stopped:
+   * boot serves the other roots, and its replay fails as a sync of a missing root does, so the
+   * root's indexed files, its receipt and the predecessor are kept. Once the folder is back, the
+   * retried replay settles the receipt and retires the predecessor without another restart.
+   */
+  @Test
+  void removedCollectionRootIsKeptAndReplayedWhenItReturns(@TempDir Path root) throws Exception {
+    migrateAndCut(root, "NATIVE", "root-only", AFTER_POINTER);
+    try (var removed = Files.walk(root.resolve("archive"))) {
+      for (Path path : removed.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(path);
+    }
+    var restart = restart(root, "NATIVE", "root-only", "restart", STARTUP_SECONDS);
+    assertAll("S5: boot serves while the collection root is removed",
+        () -> assertTrue(restart.published(), "boot must publish within " + STARTUP_SECONDS + "s"),
+        () -> assertHits(restart, TOKEN, "watched/replayed.txt"),
+        () -> assertHits(restart, "keeptoken", "watched/keep.txt"),
+        () -> assertHits(restart, "controltoken", "other/control.txt"),
+        () -> assertHits(restart, "archivekeeptoken", "archive/keep.txt"),
+        () -> assertHits(restart, "archiveoldtoken", "archive/change-me.txt"),
+        () -> assertHits(restart, "archiveremovedtoken", "archive/remove-me.txt"),
+        () -> assertEquals("[SYNC_ROOT " + PathNormalizer.normalizePathPrefix(root.resolve("archive").toString()) + "]",
+            restart.deferred().getProperty("retained"), "only the removed root's sync stays retained"),
+        () -> assertEquals("true", restart.deferred().getProperty("previousKept"),
+            "the predecessor stays retained while the root's sync has not replayed"));
+    var returned = restart.returned();
+    assertAll("S5: the returned folder is replayed without another restart",
+        () -> assertEquals("true", returned.getProperty("previousRetired")),
+        () -> assertEquals("[]", returned.getProperty("retained"), "the returned root's sync settled"),
+        () -> assertEquals(key(root.resolve("archive/keep.txt")), returned.getProperty("archivekeeptoken")),
+        () -> assertEquals("", returned.getProperty("archiveremovedtoken")),
+        () -> assertEquals(key(root.resolve("watched/keep.txt")), returned.getProperty("keeptoken")));
+  }
+
+  /**
+   * S6: as S1, with the stop after live publication rather than right after the pointer. The
+   * configured collection root's receipt was journaled by an agent over MCP: its replay queues the
+   * file added while the Engine was stopped with that attribution and, as an ordinary restart
+   * does, gives the collection root no watcher.
+   */
   @Test
   void nativeBootPublishesReplayedRootAfterPublicationCrash(@TempDir Path root) throws Exception {
     migrateAndCut(root, "NATIVE", "root-only", AFTER_PUBLICATION);
-    assertRootReplayRecovered("S6", restart(root, "NATIVE", "root-only", "restart", STARTUP_SECONDS));
+    Files.writeString(root.resolve("archive/added.txt"), "archiveaddedtoken");
+    var restart = restart(root, "NATIVE", "root-only", "restart", STARTUP_SECONDS);
+    assertRootReplayRecovered("S6", restart);
+    assertAll("S6: the collection root's sync is replayed, not adopted as a watched root",
+        () -> assertHits(restart, "archiveaddedtoken", "archive/added.txt"),
+        () -> assertEquals(List.of("agent", "MCP"), jobAttribution(root, "archive/added.txt"),
+            "P6: the offline file is queued with the receipt's own provenance"),
+        () -> assertEquals("false", restart.hits().getProperty("@archive-watched"),
+            "an ordinary restart registers no watcher for a configured collection root"),
+        () -> assertEquals("true", restart.hits().getProperty("@watched-watched"),
+            "the declared watched root keeps its watcher"));
   }
 
   /**
@@ -246,9 +305,21 @@ final class SyncRootPromotionCrashRecoveryTest {
     }
   }
 
+  /** The originator and transport the queue holds for {@code file}'s job, once the child stopped. */
+  private static List<String> jobAttribution(Path root, String file) throws Exception {
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + root.resolve("data/jobs.db"));
+        var query = connection.prepareStatement("SELECT originator, transport FROM jobs WHERE path = ?")) {
+      query.setString(1, key(root.resolve(file)));
+      try (var row = query.executeQuery()) {
+        return row.next() ? java.util.Arrays.asList(row.getString("originator"), row.getString("transport"))
+            : List.of();
+      }
+    }
+  }
+
   /**
    * S3: in the watched root and in the configured collection root, one file added, one removed
-   * and one changed while no Engine runs. The collection root's change keeps size and mtime.
+   * and one changed while no Engine runs. Each change is saved anew, so its size and mtime change.
    */
   private static void changeRootWhileStopped(Path root) throws IOException {
     Files.writeString(root.resolve("watched/added.txt"), "addedtoken");
@@ -258,11 +329,11 @@ final class SyncRootPromotionCrashRecoveryTest {
     Files.delete(root.resolve("archive/remove-me.txt"));
     Path changed = root.resolve("archive/change-me.txt");
     var modified = Files.getLastModifiedTime(changed);
-    Files.writeString(changed, "archivenewtoken");
-    Files.setLastModifiedTime(changed, modified);
+    Files.writeString(changed, "archivenewtoken saved");
+    assertNotEquals(modified, Files.getLastModifiedTime(changed), "the edit must change the mtime");
   }
 
-  /** S3 for the configured collection root: B matches its current disk. */
+  /** S3 for a force=true receipt of the configured collection root: B matches its current disk. */
   private static void assertCollectionRootMatchesDisk(String scenario, Restart restart) {
     assertAll(scenario + ": the configured collection root matches its disk",
         () -> assertHits(restart, "archiveaddedtoken", "archive/added.txt"),
@@ -364,6 +435,8 @@ final class SyncRootPromotionCrashRecoveryTest {
         || line.contains("SYNC_ROOT")
         || line.contains("Committed boot roots settled")
         || line.contains("Committed boot deferred")
+        || line.contains("retained root sync")
+        || line.contains("Retained root syncs")
         || line.contains("Committed native mutation witnesses remain unresolved")
         || line.contains("Committed native file witnesses remain unresolved")
         || line.contains("Unsupported committed mutation")
@@ -415,7 +488,8 @@ final class SyncRootPromotionCrashRecoveryTest {
     Files.writeString(dataDir.resolve("watched_roots.json"), new tools.jackson.databind.ObjectMapper()
         .writeValueAsString(Map.of("schemaVersion", 1, "roots", List.of(
             Map.of("path", watched.toString()), Map.of("path", other.toString())))));
-    var executors = new TestEngineExecutors();
+    var executors = phase.equals("migrate") ? new TestEngineExecutors()
+        : compressedMaintenance(new TestEngineExecutors());
     var server = org.mockito.Mockito.spy(new KnowledgeServer(executors,
         WorkerBootFixture.workerConfig(dataDir), null, ManagedChildRegistry.noop(), lifecycle(root)));
     org.mockito.Mockito.doNothing().when(server)
@@ -433,6 +507,47 @@ final class SyncRootPromotionCrashRecoveryTest {
     } else {
       restart(root, mode, phase, server);
     }
+  }
+
+  /**
+   * The test registry whose server maintenance scheduler (stuck-job reaper and deferred-root check)
+   * runs each fixed-delay task at a tenth of its delay, so a restart sees the deferred-root check
+   * retry without waiting out its 10 s production cadence.
+   */
+  private static EngineExecutorRegistry compressedMaintenance(EngineExecutorRegistry executors) {
+    return delegating(EngineExecutorRegistry.class, (method, args) -> {
+      Object registration = method.invoke(executors, args);
+      if (!method.getName().equals("register")
+          || !WorkerExecutorRegistrations.STUCK_JOB_REAPER.equals(((EngineExecutorSpec) args[0]).name())) {
+        return registration;
+      }
+      return delegating(EngineExecutorRegistry.Registration.class, (open, openArgs) -> {
+        Object scheduler = open.invoke(registration, openArgs);
+        if (!open.getName().equals("openScheduled")) return scheduler;
+        return delegating(ScheduledExecutorService.class, (schedule, scheduleArgs) -> {
+          if (schedule.getName().equals("scheduleWithFixedDelay")) {
+            scheduleArgs[1] = (long) scheduleArgs[1] / 10;
+            scheduleArgs[2] = (long) scheduleArgs[2] / 10;
+          }
+          return schedule.invoke(scheduler, scheduleArgs);
+        });
+      });
+    });
+  }
+
+  private interface Call {
+    Object invoke(java.lang.reflect.Method method, Object[] args) throws ReflectiveOperationException;
+  }
+
+  private static <T> T delegating(Class<T> type, Call call) {
+    return type.cast(java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+        (proxy, method, args) -> {
+          try {
+            return call.invoke(method, args);
+          } catch (java.lang.reflect.InvocationTargetException thrown) {
+            throw thrown.getCause();
+          }
+        }));
   }
 
   /**
@@ -541,7 +656,7 @@ final class SyncRootPromotionCrashRecoveryTest {
     if (!mixed) seedRootFiles(watched, other); // without receipts: only reconciliation sees other/
     Files.writeString(watched.resolve("replayed.txt"), TOKEN);
     syncRoot(queue, building, watched, !mixed);
-    syncRoot(queue, building, archive, !mixed);
+    syncRoot(queue, building, archive, !mixed, mixed ? null : new JobQueue.EnqueueProvenance("agent", "MCP"));
     if (mixed) {
       upsert(queue, building, watched, write(watched.resolve("u-after.txt"), "uaftertoken"));
       Files.delete(watched.resolve("d-after.txt"));
@@ -555,9 +670,14 @@ final class SyncRootPromotionCrashRecoveryTest {
 
   /** IngestSwitchBufferOps.bufferSyncDirectoryDuringSwitching. */
   private static void syncRoot(SqliteJobQueue queue, String building, Path root, boolean force) {
+    syncRoot(queue, building, root, force, null);
+  }
+
+  private static void syncRoot(SqliteJobQueue queue, String building, Path root, boolean force,
+      JobQueue.EnqueueProvenance provenance) {
     String normalized = PathNormalizer.normalizePathPrefix(root.toString());
     assertTrue(queue.putSyncRootForGeneration(building, "sync_root:" + normalized,
-        new SwitchBufferSyncRoot(normalized, force, null)));
+        new SwitchBufferSyncRoot(normalized, force, provenance)));
   }
 
   /** A projection in the deletable "scratch" collection, under the removed prefix. */
@@ -592,7 +712,7 @@ final class SyncRootPromotionCrashRecoveryTest {
     var evidence = new Properties();
     if (phase.equals("restart-cut")) {
       server.installMigrationBarrierForTests(transition -> {
-        if (!transition.point().equals("committed-boot-root-syncs-reconciled")) return;
+        if (!transition.point().equals("committed-boot-root-sync-replayed")) return;
         System.out.println("CRASH-RECOVERY " + mode + " stop at " + transition.point() + " active="
             + transition.sourceGeneration());
         mark(root, "roots-reconciled");
@@ -640,9 +760,10 @@ final class SyncRootPromotionCrashRecoveryTest {
     System.out.println("CRASH-RECOVERY " + mode + " search " + TOKEN + " -> " + search(server, TOKEN));
     if (search(server, TOKEN).contains(replayed)) mark(root, "searched");
     boolean away = Files.exists(root.resolve("watched/while-away.txt"));
-    // A retried removal settles on the deferred-root check; a root away keeps its sync retained.
+    boolean removed = !Files.exists(root.resolve("archive"));
+    // A retried removal settles on the deferred-root check; a root away or removed keeps its sync.
     boolean retried = phase.equals("restart-fault");
-    deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(away ? 0 : retried ? 60 : 30);
+    deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(away || removed ? 0 : retried ? 60 : 30);
     while ((!retained(queue, active).isEmpty()
         || retried && manager.readStateBestEffort().previous_generation() != null)
         && System.nanoTime() < deadline) Thread.sleep(100);
@@ -653,21 +774,24 @@ final class SyncRootPromotionCrashRecoveryTest {
     evidence.forEach((name, value) -> hits.setProperty("@" + name, (String) value));
     hits.setProperty("@previous-retired", Boolean.toString(manager.readStateBestEffort().previous_generation() == null));
     hits.setProperty("@later-id", projection(root, "later", 1, "").indexId());
+    hits.setProperty("@archive-watched", Boolean.toString(watching(server, root.resolve("archive"))));
+    hits.setProperty("@watched-watched", Boolean.toString(watching(server, root.resolve("watched"))));
     store(root.resolve("hits.properties"), hits);
-    if (away) awaitReturnedVolume(root, server, manager, queue, active);
+    if (away || removed) awaitReturnedRoot(root, server, manager, queue, active, removed);
     mark(root, "verified");
     Runtime.getRuntime().halt(0);
   }
 
   /**
-   * S4b fault seam at the acknowledgement of reconciled root syncs: the first removal fails; the
-   * retried removal meets a replacement revision accepted meanwhile; the next check settles it.
+   * S4b fault seam between a replayed root sync and the removal of its receipt: the first removal
+   * fails; on the retry the collection root's receipt is replaced after its replay succeeded and
+   * before its exact removal; the next check replays and settles the replacement.
    */
   private static void installRemovalFaults(Path root, KnowledgeServer server, Properties evidence) {
     var calls = new java.util.concurrent.atomic.AtomicInteger();
     var replacement = new java.util.concurrent.atomic.AtomicReference<String>();
     server.installMigrationBarrierForTests(transition -> {
-      if (!transition.point().equals("committed-boot-root-syncs-reconciled")) return;
+      if (!transition.point().equals("committed-boot-root-sync-replayed")) return;
       var queue = (SqliteJobQueue) server.jobQueueForTests();
       String active = transition.sourceGeneration();
       switch (calls.incrementAndGet()) {
@@ -675,7 +799,8 @@ final class SyncRootPromotionCrashRecoveryTest {
           evidence.setProperty("removal-failed", "true");
           throw new IOException("injected receipt removal failure");
         }
-        case 2 -> {
+        case 2 -> { } // the watched root's receipt, replayed again, is removed
+        case 3 -> {
           syncRoot(queue, active, root.resolve("archive"), false);
           replacement.set(queue.listSwitchBufferOpsStrictForGeneration(active).stream()
               .filter(op -> op.key().endsWith(PathNormalizer.normalizePathPrefix(root.resolve("archive").toString())))
@@ -694,20 +819,27 @@ final class SyncRootPromotionCrashRecoveryTest {
         .map(op -> op.op() + " " + op.key().substring(op.key().indexOf(':') + 1)).toList();
   }
 
-  /** S5: evidence while the root is away, then after its volume returns to the running Engine. */
-  private static void awaitReturnedVolume(Path root, KnowledgeServer server, IndexGenerationManager manager,
-      SqliteJobQueue queue, String active) throws Exception {
+  /**
+   * S5: evidence while the root is away or its folder removed, then after its volume or its folder
+   * (holding only keep.txt) returns to the running Engine.
+   */
+  private static void awaitReturnedRoot(Path root, KnowledgeServer server, IndexGenerationManager manager,
+      SqliteJobQueue queue, String active, boolean removed) throws Exception {
     var away = manager.readStateBestEffort();
     var deferred = new Properties();
     deferred.setProperty("previousKept", Boolean.toString(away.previous_generation() != null
         && Files.isDirectory(manager.resolveGenerationPathStrict(away.previous_generation()))));
     deferred.setProperty("retained", retained(queue, active).toString());
     store(root.resolve("deferred.properties"), deferred);
-    mark(root, "volume-returned");
+    if (removed) {
+      Files.writeString(Files.createDirectories(root.resolve("archive")).resolve("keep.txt"), "archivekeeptoken");
+    } else {
+      mark(root, "volume-returned");
+    }
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(90);
     String awayFile = key(root.resolve("watched/while-away.txt"));
     while ((manager.readStateBestEffort().previous_generation() != null
-        || !search(server, "awaytoken").contains(awayFile)) && System.nanoTime() < deadline) {
+        || !removed && !search(server, "awaytoken").contains(awayFile)) && System.nanoTime() < deadline) {
       Thread.sleep(250);
     }
     var returned = hits(server);
@@ -715,6 +847,17 @@ final class SyncRootPromotionCrashRecoveryTest {
         Boolean.toString(manager.readStateBestEffort().previous_generation() == null));
     returned.setProperty("retained", retained(queue, active).toString());
     store(root.resolve("returned.properties"), returned);
+  }
+
+  /** Whether the live Worker holds a watch registration for {@code folder}. */
+  private static boolean watching(KnowledgeServer server, Path folder) throws ReflectiveOperationException {
+    var field = io.justsearch.indexerworker.services.WorkerIngestService.class
+        .getDeclaredField("rootWatcherRegistry");
+    field.setAccessible(true);
+    Object registry = field.get(server.appServices().ingestService());
+    var declared = registry.getClass().getDeclaredMethod("declaredRoots");
+    declared.setAccessible(true);
+    return ((java.util.Set<?>) declared.invoke(registry)).contains(folder.toAbsolutePath().normalize());
   }
 
   private static boolean busy(SqliteJobQueue queue, Path root) {

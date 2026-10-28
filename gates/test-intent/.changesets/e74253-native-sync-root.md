@@ -11,7 +11,15 @@ The two test classes are isolated new sources; only the shared volume seam is ga
 evidence: `gates/test-intent/evidence/e74253-native-sync-root.json` records the rows first fixed in
 round 1 (S1, S2, S4, S5, S6, S7) failing before on 9e492f703f; `gates/test-intent/evidence/e74253-native-sync-root-round2.json`
 records the checks new in round 2 (configured collection root for force=true and force=false in S1/S3 and
-S2/S3, retained SYNC_ROOT until its root converged in S4 and S5) failing before on 4a9a22afff.
+S2/S3, retained SYNC_ROOT until its root converged in S4 and S5) failing before on 4a9a22afff;
+`gates/test-intent/evidence/e74253-native-sync-root-round3.json` records the checks new in round 3 (a
+configured collection root removed at restart in S5; in S6 the receipt's agent/MCP provenance on the
+queued offline file and no watcher for the recovered collection root) failing before on 5a77e377f7;
+`gates/test-intent/evidence/e74253-native-sync-root-round4.json` records the S1, S2 and S4 checks
+changed when S3 was narrowed (the configured collection root's edit now changes its mtime; force=true
+finds the new content, force=false keeps what an uninterrupted replay of its receipt keeps) failing
+before on 9e492f703f with the volume seam overlaid, and `gates/test-intent/evidence/e74253-native-sync-root-round4-since-4a9a22afff.json`
+records the same checks failing before on 4a9a22afff.
 Independent acceptance is intentionally absent.
 
 ```json

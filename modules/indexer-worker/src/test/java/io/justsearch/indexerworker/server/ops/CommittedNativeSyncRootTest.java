@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.server.ops;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -36,8 +37,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A retained SYNC_ROOT in B's snapshot, after a pointer-before-acknowledgement stop, is never a
- * reason for the real settlement entry point to accept anything the existing certification
- * refuses. What a real boot then settles is covered by the real-process crash-recovery test.
+ * reason for the real settlement entry point, or for its root-sync replay, to accept anything the
+ * existing certification refuses. What a real boot then settles is covered by the real-process
+ * crash-recovery test.
  */
 final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
   private static final String B = "g-20261028-000000";
@@ -144,6 +146,27 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
 
       assertFalse(settle(queue, runtime, RECORDED, List.of(SOURCE)));
       assertEquals(retained, queue.listSwitchBufferOpsStrict());
+    }
+  }
+
+  @Test
+  void rootSyncReplayRefusesAMismatchedOrForeignReceiptAndRemovesNothing() throws Exception {
+    String watched = QueryFilterBuilder.normalizePathPrefix(temp.resolve("watched").toString());
+    String elsewhere = QueryFilterBuilder.normalizePathPrefix(temp.resolve("elsewhere").toString());
+    try (var queue = queue()) {
+      queue.putSwitchBufferForGeneration(B, "sync_root:" + elsewhere, "SYNC_ROOT",
+          new SwitchBufferSyncRoot(watched, true, null).encode());
+      syncRoot(queue, OTHER, temp, true);
+      var retained = queue.listSwitchBufferOpsStrict();
+      var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(queue, fileRuntime(),
+          null, null, null, null, null, () -> false, () -> true,
+          LoggerFactory.getLogger(CommittedNativeSyncRootTest.class), Long.MAX_VALUE, B);
+
+      for (var receipt : retained) {
+        assertThrows(IllegalArgumentException.class,
+            () -> KnowledgeServerMigrationOps.replayCommittedRootSync(context, receipt), receipt::key);
+      }
+      assertEquals(retained, queue.listSwitchBufferOpsStrict(), "nothing is replayed or removed");
     }
   }
 
