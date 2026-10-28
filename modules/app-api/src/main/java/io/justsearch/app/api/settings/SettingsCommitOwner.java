@@ -120,6 +120,20 @@ public interface SettingsCommitOwner {
     throw new UnsupportedOperationException("Installer generation settings are unavailable");
   }
 
+  /** B's physical owner proves the full session projection before consuming encoder changes. */
+  @FunctionalInterface
+  interface GenerationEncoders {
+    void requireRealized(io.justsearch.configuration.resolved.ResolvedConfig desired,
+        java.util.Set<String> changedKeys);
+  }
+
+  default PreparedGenerationProjection prepareInstallerGenerationProjection(Reservation reservation,
+      UiSettings candidate, AttemptControl control, RecordedInstallerGenerationPlan plan,
+      GenerationEncoders encoders) {
+    if (encoders != null) throw new UnsupportedOperationException("Generation encoder proof is unavailable");
+    return prepareInstallerGenerationProjection(reservation, candidate, control, plan);
+  }
+
   /** Read-only terminal guard for the generation owner after B is serving. */
   default boolean installerGenerationProjected(RecordedInstallerGenerationPlan plan) {
     return false;

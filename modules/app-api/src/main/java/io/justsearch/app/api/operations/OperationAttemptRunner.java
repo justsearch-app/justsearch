@@ -174,6 +174,14 @@ public interface OperationAttemptRunner {
     throw new UnsupportedOperationException("Installer generation settings are unavailable");
   }
 
+  default io.justsearch.app.api.settings.SettingsCommitOwner.PreparedGenerationProjection
+      prepareInstallerGenerationProjection(OperationRecordHandle handle,
+          RecordedInstallerGenerationPlan plan, io.justsearch.app.api.EngineWorkHandle work,
+          io.justsearch.app.api.settings.SettingsCommitOwner.GenerationEncoders encoders) {
+    if (encoders != null) throw new UnsupportedOperationException("Generation encoder proof is unavailable");
+    return prepareInstallerGenerationProjection(handle, plan, work);
+  }
+
   /** The recorded owner asks its fixed settings collaborator for exact roll-forward evidence. */
   default boolean installerGenerationProjected(RecordedInstallerGenerationPlan plan) {
     return false;

@@ -1,0 +1,226 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8e3c308b8a7225a4e051fc7a16b390c7f7cec3a53cba795e484cca972858f31f"
+  },
+  "createdAt": "2026-10-28T13:31:01.981Z",
+  "revision": "7a6ab81ea11279008a853fa5574b11da4b051c02",
+  "tree": "cb8d7fd4894633fa3ddfc0d0691da6083cd7416f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 49406
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:90adacdb4d70529d23cd2a3a8bced3aea8bee28225a345ec1f94ebb85e013882",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCutAfterTheJournalAcknowledgementResumesToCleanFailure(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCandidateWhoseEnumeratorRunsKeepsWaiting(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "unprovedAdmissionStillRetainsGreen(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "installerEmptyProofIsNotReusedAfterAnInterveningWrite(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aRetiredLaterAdmissionWaitsForTheAJobItQueues(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "anUnlatchedMigratingCandidateKeepsBuilding(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "installerEmptyCandidateCanFinalizeWithoutEarningAStamp(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCandidateWithAPendingRowKeepsWaiting(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "keywordOnlyEmptyCandidateIsNotRefused(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "[1] document",
+          "status": "passed"
+        },
+        {
+          "name": "[2] planned-unit",
+          "status": "passed"
+        },
+        {
+          "name": "[3] issued-claim",
+          "status": "passed"
+        },
+        {
+          "name": "[4] pending-row",
+          "status": "passed"
+        },
+        {
+          "name": "[5] processing-row",
+          "status": "passed"
+        },
+        {
+          "name": "[6] running-enumerator",
+          "status": "passed"
+        },
+        {
+          "name": "[7] unfinished-enumerator",
+          "status": "passed"
+        },
+        {
+          "name": "[8] incomplete-walk",
+          "status": "passed"
+        },
+        {
+          "name": "[9] uncaptured-walk",
+          "status": "passed"
+        },
+        {
+          "name": "[10] unreadable-count",
+          "status": "passed"
+        },
+        {
+          "name": "[11] upsert",
+          "status": "passed"
+        },
+        {
+          "name": "[12] projection",
+          "status": "passed"
+        },
+        {
+          "name": "[13] projection-source",
+          "status": "passed"
+        },
+        {
+          "name": "[14] replay-uncertain",
+          "status": "passed"
+        },
+        {
+          "name": "aCandidateWithAnUnreadableWalkKeepsWaiting(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCandidateWithAPlannedUnitKeepsWaiting(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "cleanupRetriesUntilTheEngineRecordsTheRefusal(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCandidateWithAProjectionObligationKeepsWaiting(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCutAfterTheSourceCommitResumesToCleanFailure(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "latchedWatcherUncertaintyDoesNotBlockRollback(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "latchedSwitchingCandidateFailsPromptly(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCutAfterAbandonmentResumesToCleanFailure(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCutAfterPhysicalRetirementResumesToCleanFailure(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "claimedRowStillRetainsGreen(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCandidateWithAJournalObligationKeepsWaiting(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aLatchedMigratingCandidateFailsBeforeItsEnumerationEnds(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aLaterFinishedAdmissionWaitsForTheAJobItQueues(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCandidateWithADocumentKeepsWaiting(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "provablyEmptyCandidateFailsPromptly(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aPendingLaterAdmissionHandsOverOnceACommitsIt(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "anInFlightMutationDelaysTheRefusalWithoutHoldingTheSwapLock(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aLaterAdmissionCommittedOnAHandsTheUpdateToA(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "anEmptyCandidateWithOnlyACollectionDeleteFailsPromptly(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:04581d891a688a7581632958c8c9d72c9aa560523ff9780df49038ee4e4cf769"
+}

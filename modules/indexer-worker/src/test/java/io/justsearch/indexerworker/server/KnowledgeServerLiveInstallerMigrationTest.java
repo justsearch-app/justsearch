@@ -51,6 +51,23 @@ import org.junit.jupiter.api.io.TempDir;
 @Timeout(180)
 final class KnowledgeServerLiveInstallerMigrationTest {
   @Test
+  void installerReplaysBundledHelpDespiteTheStartupMarker(@TempDir Path tempDir) throws Exception {
+    Path help = Files.createDirectories(tempDir.resolve("data/SSOT/docs/help"));
+    Path file = Files.writeString(help.resolve("welcome.md"), "# Welcome\nhelpactivationmarker capybara");
+    Files.writeString(tempDir.resolve("data/.help-ingested-version"), "v3");
+    try (Fixture fixture = new Fixture(tempDir)) {
+      fixture.promoteInstaller(true);
+      try (var view = fixture.server.captureServingView()) {
+        assertEquals("justsearch-help", view.searchRuntime().documentFieldOps().getDocumentField(
+            io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file),
+            io.justsearch.indexing.SchemaFields.COLLECTION));
+        assertEquals(1L, view.searchRuntime().indexCountOps().docCountOrThrow());
+      }
+      assertEquals("v3", Files.readString(tempDir.resolve("data/.help-ingested-version")));
+    }
+  }
+
+  @Test
   void installerBudgetChangeGovernsTheNextFailedNativeMigration(@TempDir Path tempDir)
       throws Exception {
     try (Fixture fixture = new Fixture(tempDir)) {
