@@ -581,24 +581,8 @@ public final class SearchInputCapture {
       return filters;
     }
 
-    return LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder()
-        .mime(filters.mime())
-        .language(filters.language())
-        .fileKind(filters.fileKind())
-        .mimeBase(filters.mimeBase())
-        .pathPrefix(filters.pathPrefix())
-        .modifiedFromMs(filters.modifiedFromMs())
-        .modifiedToMs(filters.modifiedToMs())
-        .includeChunks(filters.includeChunks())
-        .entityPersons(persons)
-        .entityOrganizations(orgs)
-        .entityLocations(locs)
-        .metaSource(filters.metaSource())
-        .metaAuthor(filters.metaAuthor())
-        .metaCategory(filters.metaCategory())
-        .metaPublishedFromMs(filters.metaPublishedFromMs())
-        .metaPublishedToMs(filters.metaPublishedToMs())
-        .build();
+    return filters.withEntityPersons(persons)
+        .withEntityOrganizations(orgs).withEntityLocations(locs);
   }
 
   // visible for testing

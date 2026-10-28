@@ -111,7 +111,9 @@ public final class LuceneRuntimeTypes {
       Long metaPublishedToMs,
       List<String> docIds,
       // Tempdoc 585 §D Phase 4 (D4b) — scope to Lucene collection tag(s) (e.g. "agent-history").
-      List<String> collection)
+      List<String> collection,
+      Long sizeFromBytes,
+      Long sizeToBytes)
       implements LuceneRuntimeTypesRuntimeSearchFiltersBuilder.With {}
 
   // ==========================================================================

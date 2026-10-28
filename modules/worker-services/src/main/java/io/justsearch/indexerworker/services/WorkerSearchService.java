@@ -1196,6 +1196,9 @@ public final class WorkerSearchService {
         }
         EngineFutures.rethrowExecutorRefusal(e);
         EngineFutures.rethrowCancellation(e);
+        if (e instanceof io.justsearch.adapters.lucene.runtime.ParentFilterOverflowException) {
+          throw WorkerServiceException.resourceExhausted(e.getMessage());
+        }
         log.error("RetrieveContext failed", e);
         throw WorkerServiceException.internal("RetrieveContext failed: " + e.getMessage());
       }

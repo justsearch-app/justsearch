@@ -384,11 +384,17 @@ public class KnowledgeSearchController {
       List<String> injectedFeedbackFields = injectedFeedbackFields(projection);
       List<String> workerProjection = withFeedbackUid(projection);
 
+      var restrictions = ctx.body() == null
+          ? io.justsearch.app.api.knowledge.SearchRestrictions.parse(body.get("filters"))
+          : io.justsearch.app.api.knowledge.SearchRestrictions.fromJson(ctx.body());
       // Optional: filters
       KnowledgeSearchRequest.Filters filters = null;
       Object filtersRaw = body.get("filters");
       if (filtersRaw instanceof Map<?, ?> filtersMap) {
         filters = parseFilters(filtersMap);
+        filters = KnowledgeSearchRequestFiltersBuilder.builder(filters)
+            .pathPrefix(restrictions.pathPrefix()).modifiedAt(restrictions.modifiedAt())
+            .sizeBytes(restrictions.sizeBytes()).build();
       }
 
       // Optional: soft-boost filters (363)
@@ -513,6 +519,8 @@ public class KnowledgeSearchController {
       }
       ctx.json(out);
 
+    } catch (io.justsearch.app.api.knowledge.SearchRestrictions.Invalid e) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, e.getMessage(), telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (KnowledgeClientException e) {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       if (e.isInvalidCursor()) {
@@ -636,18 +644,10 @@ public class KnowledgeSearchController {
     List<String> language = extractStringList(filtersMap.get("language"));
     List<String> fileKind = extractStringList(filtersMap.get("fileKind"));
     List<String> mimeBase = extractStringList(filtersMap.get("mimeBase"));
-    String pathPrefix = (filtersMap.get("pathPrefix") instanceof String s && !s.isBlank()) ? s : null;
+    var restrictions = io.justsearch.app.api.knowledge.SearchRestrictions.parse(filtersMap);
+    String pathPrefix = restrictions.pathPrefix();
     Boolean includeChunks = (filtersMap.get("includeChunks") instanceof Boolean b) ? b : null;
-
-    KnowledgeSearchRequest.TimeRangeMs modifiedAt = null;
-    Object modifiedAtRaw = filtersMap.get("modifiedAt");
-    if (modifiedAtRaw instanceof Map<?, ?> m) {
-      Long fromMs = (m.get("fromMs") instanceof Number n) ? n.longValue() : null;
-      Long toMs = (m.get("toMs") instanceof Number n) ? n.longValue() : null;
-      if ((fromMs != null && fromMs > 0) || (toMs != null && toMs > 0)) {
-        modifiedAt = new KnowledgeSearchRequest.TimeRangeMs(fromMs, toMs);
-      }
-    }
+    KnowledgeSearchRequest.TimeRangeMs modifiedAt = restrictions.modifiedAt();
     // Parse entity and metadata filters (accept both camelCase and snake_case for MCP compat)
     List<String> entityPersons = extractStringListAny(filtersMap, "entityPersons", "entity_persons");
     List<String> entityOrganizations =
@@ -671,6 +671,7 @@ public class KnowledgeSearchController {
         .pathPrefix(pathPrefix)
         .includeChunks(includeChunks)
         .modifiedAt(modifiedAt)
+        .sizeBytes(restrictions.sizeBytes())
         .entityPersons(entityPersons)
         .entityOrganizations(entityOrganizations)
         .entityLocations(entityLocations)
