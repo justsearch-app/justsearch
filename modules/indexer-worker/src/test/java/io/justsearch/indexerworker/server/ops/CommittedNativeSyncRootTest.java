@@ -134,6 +134,44 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
     }
   }
 
+  // ---- F1: the mixed path applies the same root supersession, and no other relaxation ----
+
+  @Test
+  void mixedSnapshotAcknowledgesADeleteWhoseFileALaterRootSyncRestored() throws Exception {
+    Path archive = Files.createDirectories(temp.resolve("archive"));
+    String restored = archive.resolve("restored.txt").toAbsolutePath().toString();
+    var later = projectionAt("later", 1, "notes", file("notes/later.md"));
+    try (var queue = queue(); var runtime = luceneRuntime()) {
+      indexFile(runtime, restored);
+      index(runtime, later);
+      delete(queue, B, restored);
+      syncRoot(queue, B, archive, true);
+      queue.admitProjectionForGeneration(B, later.encode());
+
+      assertTrue(settle(queue, runtime, B, List.of(SOURCE)));
+      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+      assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(restored), "B keeps the restored file");
+    }
+  }
+
+  @Test
+  void mixedSnapshotStillRefusesADeleteNoLaterRootSyncCovers() throws Exception {
+    Path archive = Files.createDirectories(temp.resolve("archive"));
+    String uncovered = file("uncovered.txt");
+    var later = projectionAt("later", 1, "notes", file("notes/later.md"));
+    try (var queue = queue(); var runtime = luceneRuntime()) {
+      indexFile(runtime, uncovered);
+      index(runtime, later);
+      delete(queue, B, uncovered);
+      syncRoot(queue, B, archive, true);
+      queue.admitProjectionForGeneration(B, later.encode());
+      var retained = queue.listSwitchBufferOpsStrict();
+
+      assertFalse(settle(queue, runtime, B, List.of(SOURCE)));
+      assertEquals(retained, queue.listSwitchBufferOpsStrict(), "nothing is acknowledged");
+    }
+  }
+
   // ---- S7: a broad-delete snapshot with a SYNC_ROOT is still refused when B disagrees ----
 
   @Test
@@ -307,6 +345,16 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
   private static void index(RunningRuntime runtime, AcceptedProjection projection) {
     runtime.commitOps().stopCommitTimer();
     runtime.indexingCoordinator().indexSingle(ProjectionDocumentMapper.toIndexDocument(projection));
+    runtime.commitOps().maybeRefreshBlocking();
+  }
+
+  /** A file document B holds at {@code path}, as an UPSERT's job would have indexed it. */
+  private static void indexFile(RunningRuntime runtime, String path) {
+    var fields = new java.util.HashMap<>(ProjectionDocumentMapper.toIndexDocument(
+        projectionAt("file", 1, "archive", path)).fields());
+    fields.put(SchemaFields.DOC_ID, path);
+    runtime.commitOps().stopCommitTimer();
+    runtime.indexingCoordinator().indexSingle(new io.justsearch.indexing.api.IndexDocument(fields));
     runtime.commitOps().maybeRefreshBlocking();
   }
 

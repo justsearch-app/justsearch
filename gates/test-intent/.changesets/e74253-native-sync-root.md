@@ -11,8 +11,10 @@ The two test classes are isolated new sources; only the shared volume seam is ga
 evidence: `gates/test-intent/evidence/e74253-native-sync-root.json` records the S1-S8 checks (S1, S3,
 S5 and S8 against an uninterrupted migration followed by an ordinary restart, S5b and S8 also with a
 PROMOTED crash and once the root or permissions return; S2 with its unit supersession check;
-S4a/S4b; S6; S7a with the delete-after-sync S7b order; P6 and P7) failing before on 9e492f703f with
-the volume seam overlaid, and passing after.
+S4a/S4b; S6; S7a with the delete-after-sync S7b order; P6 and P7) and the F1 checks (a DELETE a
+later sync restores, beside a projection, in the S7 restart and in the mixed unit settlement)
+failing before on 9e492f703f with the volume seam overlaid, and passing after. The F1 control
+mixedSnapshotStillRefusesADeleteNoLaterRootSyncCovers is not recorded: it refuses on both sides.
 Independent acceptance is intentionally absent.
 
 ```json

@@ -806,7 +806,8 @@ public final class KnowledgeServerMigrationOps {
    * Mixed projection and broad-delete snapshots certify B's final accepted effects without
    * replaying destructive mutations. Conditional removal retains concurrent replacement rows.
    * A SYNC_ROOT was replayed onto B before its pointer moved: its exact receipt is validated and
-   * acknowledged with the others in accepted order, never walked again.
+   * acknowledged with the others in accepted order, never walked again. On either path, a file
+   * receipt a later SYNC_ROOT covers is checked as a receipt only.
    */
   public static boolean settleCommittedNativeFileWitnesses(
       JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log) {
@@ -830,8 +831,10 @@ public final class KnowledgeServerMigrationOps {
       for (int i = 0; i < effects.size(); i++) {
         effects.set(i, observeCommittedProjection(active, effects.get(i)));
       }
+      // B's commit holds a later root sync's walk over these paths; only their receipts are checked.
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> superseded = supersededByRootSync(selected);
       for (var op : selected) {
-        if ("DELETE".equals(op.op())) {
+        if ("DELETE".equals(op.op()) && !superseded.contains(op)) {
           var deletion = SwitchBufferDelete.decode(op.payload());
           if (deletion.origin() != SwitchBufferDelete.Origin.EXPLICIT
               && !settleConditionalNativeDelete(queue, active, deletion)) return false;
@@ -851,6 +854,8 @@ public final class KnowledgeServerMigrationOps {
       // Complete every reader/queue proof before conditionally acknowledging any receipt.
       for (int i = 0; i < effects.size(); i++) {
         var effect = effects.get(i);
+        // A superseded survivor stays an accepted exception to the broad deletes before it.
+        if (superseded.contains(effect.op())) continue;
         if (survivors.contains(effect)) {
           if (!certifyCommittedSurvivor(scoped, active, effects, deleteIndexes, i)) return false;
         } else if (effect.id() != null
@@ -1097,6 +1102,10 @@ public final class KnowledgeServerMigrationOps {
         if (op.payload() == null || op.payload().isBlank()) return false;
         if ("SYNC_ROOT".equals(op.op()) || superseded.contains(op)) {
           // B's commit holds the later root sync's walk over this path; only the receipt is checked.
+          // A retained SYNC_ROOT is in the snapshot B committed: promoteServingSuccessor holds
+          // beginFinalFence from before B's commit until finishPromotedSwitchReplay removes the
+          // receipts, refusing when promotionReplaySnapshotUnchanged fails, and once the pointer
+          // moves buildingGenerationForFileAdmission has no generation to admit B-scoped rows for.
           decodeCommittedNativeEffect(op, Set.of());
         } else if ("UPSERT".equals(op.op())) {
           var upsert = SwitchBufferUpsert.decode(op.payload());
@@ -1154,7 +1163,7 @@ public final class KnowledgeServerMigrationOps {
       if ("SYNC_ROOT".equals(op.op())) {
         laterRoots.add(new PathPrefixScope(
             io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath(), List.of()));
-      } else if (!laterRoots.isEmpty()) {
+      } else if (!laterRoots.isEmpty() && ("UPSERT".equals(op.op()) || "DELETE".equals(op.op()))) {
         String path = "UPSERT".equals(op.op()) ? SwitchBufferUpsert.decode(op.payload()).path()
             : SwitchBufferDelete.decode(op.payload()).path();
         if (laterRoots.stream().anyMatch(root -> root.contains(path))) superseded.add(op);

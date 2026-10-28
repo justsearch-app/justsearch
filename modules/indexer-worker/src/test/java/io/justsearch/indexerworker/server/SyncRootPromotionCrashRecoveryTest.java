@@ -84,6 +84,7 @@ final class SyncRootPromotionCrashRecoveryTest {
       Map.entry("arestoredtoken", "archive/a-restored.txt"),
       Map.entry("lateoldtoken", "shelf/late.txt"), Map.entry("latenewtoken", "shelf/late.txt"),
       Map.entry("projectedfiletoken", "projected/file.txt"), Map.entry("clearedtoken", "cleared/cleared.txt"),
+      Map.entry("shelfrestoredtoken", "shelf/restored.txt"),
       Map.entry("earlyprojectiontoken", "-"), Map.entry("laterprojectiontoken", "-"));
   private static final String PROJECTION_SOURCE = "memory";
 
@@ -272,7 +273,9 @@ final class SyncRootPromotionCrashRecoveryTest {
   /**
    * S7a and S7b in reverse order, against the control: a projection accepted after a SYNC_ROOT and
    * inside its root stays searchable; a sync followed by a prefix or a collection delete over its
-   * files leaves B as the control; the projection both broad deletes cover stays deleted.
+   * files leaves B as the control; the projection both broad deletes cover stays deleted. Beside
+   * them (F1), inside a configured collection root, an explicit DELETE is followed by the
+   * force=true sync that restores its file, before that projection is accepted.
    */
   @Test
   void syncRootBesideProjectionAndBroadDeletesPublishesCertifiedContent(@TempDir Path temporary)
@@ -286,6 +289,10 @@ final class SyncRootPromotionCrashRecoveryTest {
     var restarts = all(() -> restart(root, "NATIVE", "projection", "restart"),
         () -> restart(control, "NATIVE", "projection", "restart"));
     var restart = restarts.get(0);
+    assertAll("F1: a DELETE a later sync restores does not hold boot beside a later projection",
+        () -> assertTrue(restart.published(), "boot must publish B within " + STARTUP_SECONDS
+            + "s (observed " + restart.seconds() + "s)"),
+        () -> assertHits(restart, "shelfrestoredtoken", "shelf/restored.txt"));
     assertRootSyncsSettled("S7", restart);
     assertAll("S7a: a projection accepted after the sync and inside its root survives",
         () -> assertEquals(restart.hits().getProperty("@later-id"),
@@ -830,6 +837,9 @@ final class SyncRootPromotionCrashRecoveryTest {
         write(root, "projected/file.txt", "projectedfiletoken");
         syncRoot(queue, building, root.resolve("projected"), true, null);
         assertTrue(queue.putSwitchBufferForGeneration(building, "collection:scratch", "DELETE_COLLECTION", "scratch"));
+        write(root, "shelf/restored.txt", "shelfrestoredtoken");
+        delete(queue, building, root.resolve("shelf/restored.txt")); // stays on disk: the walk restores it
+        syncRoot(queue, building, root.resolve("shelf"), true, null);
         queue.admitProjectionForGeneration(building,
             projection(root.resolve("projected"), "later", 1, "laterprojectiontoken").encode());
         write(root, "cleared/cleared.txt", "clearedtoken");
