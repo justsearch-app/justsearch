@@ -194,6 +194,7 @@ class RunnerTests(unittest.TestCase):
         calls = []
         run.wd.click.side_effect = lambda *a: calls.append('click')
         with patch.object(linux, 'assert_state', return_value={}), \
+             patch.object(linux, 'interaction_observation', create=True), \
              patch.object(linux, 'close_popovers', create=True, side_effect=lambda r: calls.append('close')), \
              patch.object(linux, 'bookmark_text', return_value='Library'):
             linux.restart(run)
@@ -204,6 +205,7 @@ class RunnerTests(unittest.TestCase):
         from unittest.mock import Mock
         run = Mock()
         with patch.object(linux, 'assert_state', return_value={}), \
+             patch.object(linux, 'interaction_observation', create=True), \
              patch.object(linux, 'close_popovers', create=True), \
              patch.object(linux, 'browser_bookmarks', create=True,
                           return_value={'status': 'unavailable', 'reason': 'No HTTP UI'}) as browser, \
@@ -212,6 +214,53 @@ class RunnerTests(unittest.TestCase):
                 linux.restart(run)
         browser.assert_called_once_with(run)
         run.wd.click.assert_called_once_with('button[aria-label="View bookmarks"]')
+
+    def test_update_starts_from_banner_action(self):
+        import linux
+        from unittest.mock import Mock
+        run = Mock()
+        run.args.phase = 'predecessor'
+        run.args.predecessor.name = 'JustSearch_0.3.0_amd64.deb'
+        run.work = '/tmp/own-run'
+        run.facts = {}
+        run.require.side_effect = lambda key: '0.3.1' if key == 'initialVersion' else {}
+        run.target.run.side_effect = [types.SimpleNamespace(stdout='0.3.0'),
+                                      types.SimpleNamespace(stdout='', returncode=0)]
+        run.wd.execute.side_effect = [False, 'JustSearch 0.3.1 is available. Review and install', True]
+        with patch.object(linux, 'installed_version', return_value='0.3.0'), \
+             patch.object(linux, 'digest', return_value='package-hash'):
+            linux.update_prepare(run)
+        run.nav.assert_not_called()
+        self.assertEqual(run.wd.click.call_args_list[0].args,
+                         ('button[aria-label="Open app update settings"]',))
+        self.assertTrue(run.facts['updateOffered'])
+        run.wd.element.assert_called_with('button[aria-label="Install update"]:not(:disabled)', seconds=45)
+
+    def test_recovered_update_returns_through_banner_after_settings_reset(self):
+        import linux
+        from unittest.mock import Mock, call
+        run = Mock()
+        run.require.return_value = '0.3.1'
+        run.wd.execute.side_effect = [True, 'JustSearch 0.3.1 is available. Review and install', True]
+        linux.open_update_offer(run, 'recovered')
+        self.assertEqual(run.wd.click.call_args_list, [
+            call('button[aria-label="Close Settings"]'),
+            call('button[aria-label="Open app update settings"]'),
+            call('button[data-settings-category="desktop"]')])
+        run.nav.assert_not_called()
+        run.wd.element.assert_called_with('button[aria-label="Install update"]:not(:disabled)', seconds=45)
+
+    def test_interaction_timing_records_running_indexing_and_unknown(self):
+        import linux
+        from unittest.mock import Mock
+        run = Mock()
+        run.require.return_value = 10
+        for state, expected in [('RUNNING', True), ('IDLE', False), (None, None)]:
+            run.api.return_value = {'operating': {'indexing': {'state': state}}}
+            with patch.object(linux.time, 'monotonic', return_value=12.5):
+                result = linux.interaction_observation(run, 'click')
+            self.assertEqual(result['secondsSinceWindowShown'], 2.5)
+            self.assertIs(result['indexingRunning'], expected)
 
     def test_plain_browser_reproduction_records_absent_installed_http_ui(self):
         import linux

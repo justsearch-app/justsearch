@@ -110,6 +110,12 @@ private signing key is needed or used for these tests.
 - J5 (VM): parent-state preparation, signed HTTPS update offer, cancelled
   PolicyKit prompt with old Engine recovery and re-offer, the **real 300-second
   dpkg lock timeout**, then accepted elevation and automatic candidate relaunch.
+  The offer is entered through the banner's **Review and install** action,
+  which opens Settings. A direct Settings fallback is allowed only when the
+  visible banner has no action, and the chosen entry is recorded. Recovery
+  can recreate Settings at Appearance; the runner closes that window, follows
+  the banner again, and waits for an enabled Install update control before
+  claiming a re-offer. The observed time and readiness signal are recorded.
 - J6 (VM): reinstall, apt remove, retained app data, reinstall and state checks.
 - J7: menu entry, cold/warm OS deep links, X11 registration or the physically
   invoked GNOME Wayland `--focus-search` binding, and scanned-PDF OCR.
@@ -123,6 +129,11 @@ element-click interception. Native dialog handling uses keyboard input and QMP
 screenshots. Full-screen OCR uses sparse-text segmentation; screenshots remain
 the primary evidence for diagnosing missed text and focus. Startup, persistence,
 deep links and updater relaunch are also checked without WebDriver automation.
+Native screenshots record when each new app window is first observed. J4's
+bookmarks click and J7's warm OS dispatch record elapsed time from that
+observation, the production operating-indexing state and worker queue/enrichment
+snapshot. These observations add no indexing-idle prerequisite and retain the
+30-second bookmarks and 45-second deep-link assertions.
 
 `corpus.py` generates eight small, original CC0 documents: text, long Markdown
 and text reports, CSV, HTML, email, DOCX and an image-only PDF. The unique open

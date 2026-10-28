@@ -335,6 +335,7 @@ def restart(run):
     # Reattach in a fresh automation process only after the normal-launch check.
     run.start_ui()
     close_popovers(run)
+    interaction_observation(run, 'J4-bookmarks-click')
     run.wd.click('button[aria-label="View bookmarks"]')
     try:
         assert 'Library' in bookmark_text(run), 'Saved bookmark is retained on disk but missing from the restarted UI'
@@ -354,6 +355,21 @@ def close_popovers(run):
     wait_for(lambda: run.wd.execute("return all(document,':popover-open,[open]').filter(e=>e.matches(':popover-open')||e.localName.endsWith('-popover')).length===0"),
              'All popovers closed before bookmarks', seconds=15, error=Infrastructure)
     run.evidence('J4-popovers-closed', {'dismissal': 'Escape', 'openPopovers': []})
+
+
+def interaction_observation(run, name):
+    status = run.api('/api/status')
+    indexing = status.get('operating', {}).get('indexing', {})
+    state = indexing.get('state')
+    worker = status.get('worker', {})
+    observed = {'secondsSinceWindowShown': round(time.monotonic() - run.require('windowShownAt'), 3),
+                'windowShownEvidence': run.require('windowShownEvidence'),
+                'indexingRunning': state in ('RUNNING', 'SLOWED', 'PAUSING') if state else None,
+                'indexing': indexing,
+                'worker': {k: worker.get(k) for k in ('core', 'migration', 'enrichment', 'visualExtraction')},
+                'statusObservedAt': status.get('observed_at')}
+    run.evidence(name, observed)
+    return observed
 
 
 def browser_bookmarks(run):
@@ -404,12 +420,34 @@ def update_prepare(run):
     run.evidence('J5-predecessor-package', run.facts['predecessorPackage'])
     run.target.vm.mirror('ubuntu', str(run.args.mirror), False, False)
     run.start_ui()
-    run.nav('Settings')
-    run.wd.click('button[data-settings-category="desktop"]')
-    run.wd.click('button[aria-label="Check for updates"]')
-    run.wd.element('button[aria-label="Install update"]', seconds=60)
+    open_update_offer(run, 'J5-update-entry')
     run.native.shot('J5-update-offered')
     run.facts['updateOffered'] = True
+
+
+def open_update_offer(run, evidence):
+    # Begin where the user sees the offer. The banner's own action navigates
+    # to Settings; it does not directly install the update. Engine recovery
+    # recreates Settings at Appearance, so do not reuse its former category.
+    started = time.monotonic()
+    close = run.wd.execute("return all(document,'button[aria-label=\"Close Settings\"]').some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0})")
+    if close:
+        run.wd.click('button[aria-label="Close Settings"]')
+    banner = wait_for(lambda: run.wd.execute("return all(document,'jf-app-update-banner').filter(e=>!e.hidden).map(e=>e.shadowRoot.textContent).join(' ').trim()"),
+                      'Update banner visible', seconds=45, error=Infrastructure)
+    expected_candidate = run.require('initialVersion')
+    assert expected_candidate in banner, 'Update banner does not name the candidate version'
+    run.native.shot(evidence + '-banner')
+    action = run.wd.execute("return all(document,'button[aria-label=\"Open app update settings\"]').some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0})")
+    if action:
+        run.wd.click('button[aria-label="Open app update settings"]')
+    else:
+        run.nav('Settings')
+    run.wd.click('button[data-settings-category="desktop"]')
+    run.wd.element('button[aria-label="Install update"]:not(:disabled)', seconds=45)
+    run.evidence(evidence, {'banner': banner, 'action': 'banner: Review and install' if action else 'Settings fallback: banner has no visible action',
+                          'secondsToControlsReady': round(time.monotonic() - started, 3),
+                          'readinessSignal': 'Banner names candidate; enabled Install update visible in Desktop settings'})
 
 
 def cancel_update(run):
@@ -417,12 +455,12 @@ def cancel_update(run):
     old_version = installed_version(run)
     run.wd.click('button[aria-label="Install update"]')
     prompt = wait_for(lambda: (v if 'authenticat' in v.lower() or 'password' in v.lower() else None)
-                      if (v := run.native.screen_text('J5-polkit-cancel-prompt')) else None,
+                      if (v := run.native.screen_text('J5-polkit-cancel-prompt', psm=6)) else None,
                       'PolicyKit prompt', seconds=180, error=Infrastructure)
     run.native.key('escape')
     run.ready()
     assert installed_version(run) == old_version, 'Cancelled update changed the installed version'
-    run.wd.element('button[aria-label="Install update"]', seconds=45)
+    open_update_offer(run, 'J5-cancel-reoffer-entry')
     state = assert_state(run)
     run.facts['updateCancelled'] = True
     return {'prompt': prompt, 'resumedVersion': old_version, 'state': state}
@@ -430,9 +468,11 @@ def cancel_update(run):
 
 def update_success(run):
     run.require('updateCancelled')
+    open_update_offer(run, 'J5-success-entry')
+    old_shells = [p for p in run.target.owned() if p['exe'] == run.binary]
     run.wd.click('button[aria-label="Install update"]')
     wait_for(lambda: (v if 'authenticat' in v.lower() or 'password' in v.lower() else None)
-             if (v := run.native.screen_text('J5-polkit-accept-prompt')) else None,
+             if (v := run.native.screen_text('J5-polkit-accept-prompt', psm=6)) else None,
              'PolicyKit prompt', seconds=180, error=Infrastructure)
     run.native.type(run.target.vm.config()['password'])
     run.native.key('enter')
@@ -442,16 +482,27 @@ def update_success(run):
     run.wd = None
     run.facts.pop('ui', None)
     run.ready()
+    run.observe_window('updater-relaunch')
+    shells = wait_for(lambda: [p for p in run.target.owned() if p['exe'] == run.binary
+                               and not any(p['pid'] == old['pid'] and p['ticks'] == old['ticks'] for old in old_shells)],
+                      'Updater relaunched a new installed shell', seconds=60)
+    # A retained old process can execute an unlinked predecessor inode even
+    # after dpkg reports the candidate. Observe the actual running executable.
+    for shell in shells:
+        same = run.target.py('import json,os,sys;from pathlib import Path;a=json.loads(sys.argv[1]);print(os.path.samestat(Path("/proc/"+str(a[0])+"/exe").stat(),Path(a[1]).stat()))',
+                             [shell['pid'], run.binary]).strip()
+        assert same == 'True', 'Relaunched shell is not executing the installed candidate binary'
     state = assert_state(run)
     run.native.shot('J5-normal-updater-relaunch')
     verify = run.target.run(['dpkg', '--verify', 'just-search'], check=False)
     assert verify.returncode == 0 and not verify.stdout.strip(), 'Updated installed payload checksum mismatch'
     run.facts['updated'] = True
-    return {'installedVersion': installed_version(run), 'state': state}
+    return {'installedVersion': installed_version(run), 'state': state, 'relaunchedShells': shells}
 
 
 def update_lock(run):
     run.require('updateCancelled')
+    open_update_offer(run, 'J5-lock-entry')
     # Use the real dpkg lock protocol, not flock (apt uses POSIX record locks).
     source = """
 import fcntl,json,os,time
@@ -460,7 +511,7 @@ root=Path(__file__).parent
 with open('/var/lib/dpkg/lock-frontend','a') as lock:
  fcntl.lockf(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
  (root/'lock-ready.json').write_text(json.dumps({'pid':os.getpid(),'ticks':Path('/proc/self/stat').read_text().split(') ',1)[1].split()[19]}))
- end=time.monotonic()+420
+ end=time.monotonic()+900
  while time.monotonic()<end and not (root/'release-lock').exists():time.sleep(.25)
 """
     script = run.work + '/hold-dpkg.py'
@@ -476,17 +527,21 @@ with open('/var/lib/dpkg/lock-frontend','a') as lock:
         old = installed_version(run)
         run.wd.click('button[aria-label="Install update"]')
         wait_for(lambda: (v if 'authenticat' in v.lower() or 'password' in v.lower() else None)
-                 if (v := run.native.screen_text('J5-lock-polkit')) else None,
+                 if (v := run.native.screen_text('J5-lock-polkit', psm=6)) else None,
                  'PolicyKit lock-test prompt', seconds=180, error=Infrastructure)
         run.native.type(run.target.vm.config()['password'])
         run.native.key('enter')
         # The packaged updater specifies DPkg::Lock::Timeout=300. Do not shorten
         # the product timeout or replace its apt process in qualification.
         time_started = time.monotonic()
-        run.wd.element('button[aria-label="Install update"]', seconds=390)
+        # Recovery may recreate Settings at Appearance. Observe the banner's
+        # own re-offer first, then follow it back to the install control.
+        wait_for(lambda: run.wd.execute("return all(document,'jf-app-update-banner').some(e=>!e.hidden && e.shadowRoot.textContent.includes(arguments[0]))", [run.require('initialVersion')]),
+                 'Update re-offered after dpkg lock timeout', seconds=390)
         assert time.monotonic() - time_started >= 290, 'Update re-offered before the real lock timeout'
         run.ready()
         assert installed_version(run) == old, 'Lock-timeout update changed the installed version'
+        open_update_offer(run, 'J5-lock-reoffer-entry')
         return {'version': old, 'state': assert_state(run), 'heldLock': identity}
     finally:
         run.target.py('import json,sys;from pathlib import Path;(Path(json.loads(sys.argv[1]))/"release-lock").touch()', run.work)
@@ -534,10 +589,12 @@ def deep_links(run):
     run.require('folder')
     run.stop_app()
     run.desktop_spawn(['xdg-open', 'justsearch://query?q=orchid%20lighthouse'], run.work + '/cold-deep-link.log')
+    run.observe_window('cold-deep-link')
     run.ready()
     cold = wait_for(lambda: (s if 'orchid' in s.lower() else None)
                     if (s := run.native.screen_text('J7-deep-link-cold')) else None,
                     'Cold OS deep link search destination', seconds=45)
+    interaction_observation(run, 'J7-warm-dispatch')
     run.desktop_spawn(['xdg-open', 'justsearch://surface/core.library-surface'], run.work + '/warm-deep-link.log')
     warm = wait_for(lambda: (s if 'Add Folder' in s else None)
                     if (s := run.native.screen_text('J7-deep-link-warm')) else None,

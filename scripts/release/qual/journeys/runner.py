@@ -449,6 +449,7 @@ with opener.open(req,timeout=30) as r: print(json.dumps(json.load(r)))
         self.wd = WebDriver(self.target, 4444)
         wait_for(lambda: self.target.http(4444, '/status'), 'tauri-driver ready', seconds=20, error=Infrastructure)
         self.wd.start(self.binary)
+        self.observe_window('automation')
         self.ready()
         wait_for(lambda: self.wd.execute("return all(document,'button[data-surface-id]').length > 0"),
                  'Packaged UI rail mounted', seconds=60, error=Infrastructure)
@@ -470,7 +471,20 @@ with opener.open(req,timeout=30) as r: print(json.dumps(json.load(r)))
     def normal_launch(self, args=None):
         self.stop_app()
         self.desktop_spawn([self.binary, *(args or [])], self.work + '/normal.log')
+        self.observe_window('normal')
         self.ready()
+
+    def observe_window(self, name):
+        name = name + '-' + str(time.time_ns())
+        started = time.monotonic()
+        text = wait_for(lambda: (s if 'JustSearch' in s or 'Search v3' in s else None)
+                        if (s := self.native.screen_text('window-shown-' + name)) else None,
+                        'Installed app window shown', seconds=60, error=Infrastructure)
+        self.facts['windowShownAt'] = time.monotonic()
+        self.facts['windowShownEvidence'] = 'window-shown-' + name + '.json'
+        self.evidence('window-shown-' + name, {'text': text,
+                      'secondsToObserve': round(time.monotonic() - started, 3),
+                      'signal': 'Native screenshot OCR contains JustSearch or Search v3'})
 
     def desktop_spawn(self, command, logfile):
         if not self.target.vm:
@@ -510,7 +524,7 @@ with opener.open(req,timeout=30) as r: print(json.dumps(json.load(r)))
     def finish(self):
         errors = []
         try:
-            for name in ('driver.log', 'normal.log'):
+            for name in ('driver.log', 'normal.log', 'cold-deep-link.log', 'warm-deep-link.log'):
                 try:
                     content = self.target.py('import json,sys;from pathlib import Path;p=Path(json.loads(sys.argv[1]));print(p.read_text(errors="replace")[-4000000:] if p.exists() else "not created")', self.work + '/' + name)
                     content = re.sub(r'("sessionToken"\s*:\s*")[^"]+', r'\1<redacted>', content)
