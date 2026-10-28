@@ -75,6 +75,7 @@ class IndexingDocumentOpsScalarIntegrationTest extends LuceneExecutorTestBase {
       runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
           SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, "stable-uid", SchemaFields.PATH, id,
           SchemaFields.MODIFIED_AT, Files.getLastModifiedTime(file).toMillis(),
+          SchemaFields.SIZE_BYTES, Files.size(file),
           SchemaFields.CONTENT, "legacy content")));
       refresh(runtime);
       assertTrue(extractor.extractAll(List.of(claim)).isEmpty());

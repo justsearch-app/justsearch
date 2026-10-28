@@ -58,7 +58,7 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
       // This check uses internal Lucene doc numbers to detect a child rewrite. Segment merges
       // may renumber untouched children, so keep the fixture's segments fixed before seeding.
       writer(runtime).getConfig().setMergePolicy(NoMergePolicy.INSTANCE);
-      total = seed(runtime, id, content, modified);
+      total = seed(runtime, id, content, modified, Files.size(file));
       children = childIds(index, id);
       vectors = vectors(index);
       assertEquals(total + 1, vectors.size(), "fixture has real parent and child vectors");
@@ -97,7 +97,7 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
     String id = PathNormalizer.normalizeKey(file);
     long modified = Files.getLastModifiedTime(file).toMillis();
     try (var runtime = open(tempDir.resolve("partial-index"))) {
-      int total = seed(runtime, id, content, modified);
+      int total = seed(runtime, id, content, modified, Files.size(file));
       runtime.indexingCoordinator().deleteById(runtime.documentFieldOps().queryDocIdsByField(SchemaFields.PARENT_DOC_ID, id, 10000).getFirst());
       refresh(runtime);
       var extraction = mock(TimeboxedContentExtractor.class);
@@ -142,10 +142,10 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
         .withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
-  private static int seed(RunningRuntime runtime, String id, String content, long modified) {
+  private static int seed(RunningRuntime runtime, String id, String content, long modified, long sizeBytes) {
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, id,
         SchemaFields.DOC_UID, id, SchemaFields.PATH, id, SchemaFields.CONTENT, content,
-        SchemaFields.MODIFIED_AT, modified)));
+        SchemaFields.MODIFIED_AT, modified, SchemaFields.SIZE_BYTES, sizeBytes)));
     refresh(runtime);
     int total = ChunkDocumentWriter.regenerateChunksFromExistingParent(runtime.documentFieldOps(), runtime.indexingCoordinator(), id, content, false);
     refresh(runtime);
@@ -156,7 +156,8 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
     // Simulate the pre-declaration writer. Children are the real canonical writer's documents.
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, id,
         SchemaFields.DOC_UID, id, SchemaFields.PATH, id, SchemaFields.CONTENT, content,
-        SchemaFields.MODIFIED_AT, modified, SchemaFields.VECTOR, new float[] {0.5f, 0.5f})));
+        SchemaFields.MODIFIED_AT, modified, SchemaFields.SIZE_BYTES, sizeBytes,
+        SchemaFields.VECTOR, new float[] {0.5f, 0.5f})));
     refresh(runtime);
     return total;
   }

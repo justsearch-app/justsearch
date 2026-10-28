@@ -238,8 +238,17 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
     List<LuceneRuntimeTypes.SearchHit> hits = java.util.Arrays.stream(paths)
         .map(path -> {
           String normalized = PathNormalizer.normalizeKey(path);
-          return new LuceneRuntimeTypes.SearchHit(
-              normalized, 1.0f, Map.of(SchemaFields.PATH, normalized));
+          var fields = new java.util.HashMap<String, String>();
+          fields.put(SchemaFields.PATH, normalized);
+          if (Files.isRegularFile(path)) {
+            try {
+              fields.put(SchemaFields.SIZE_BYTES, String.valueOf(Files.size(path)));
+              fields.put(SchemaFields.MODIFIED_AT, String.valueOf(Files.getLastModifiedTime(path).toMillis()));
+            } catch (IOException failure) {
+              throw new java.io.UncheckedIOException(failure);
+            }
+          }
+          return new LuceneRuntimeTypes.SearchHit(normalized, 1.0f, fields);
         })
         .toList();
     return searchHits(hits.toArray(LuceneRuntimeTypes.SearchHit[]::new));
