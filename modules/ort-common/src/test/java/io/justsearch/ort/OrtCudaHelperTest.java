@@ -122,4 +122,30 @@ class OrtCudaHelperTest {
     assertTrue(order.indexOf("libnvJitLink.so.12") < order.indexOf("libcusolver.so.11"));
   }
 
+  @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void linuxResolvesPackInstalledAfterBootWithoutChangingProcessSources() throws IOException {
+    var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    try {
+      var boot = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+          .putDefault("justsearch.data.dir", tmp.toString()).build();
+      io.justsearch.configuration.resolved.ConfigStore.setGlobal(
+          new io.justsearch.configuration.resolved.ConfigStore(boot));
+      Path fallback = Files.createDirectories(tmp.resolve("model"));
+      org.junit.jupiter.api.Assertions.assertEquals(fallback, OrtCudaHelper.resolveOrtNativePath(fallback));
+      Path pack = Files.createDirectories(tmp.resolve("native-bin/llama-server/variants/cuda12"));
+      org.junit.jupiter.api.Assertions.assertEquals(pack, OrtCudaHelper.resolveOrtNativePath(fallback));
+      org.junit.jupiter.api.Assertions.assertNull(boot.paths().ortNativePath());
+      Path operator = Files.createDirectories(tmp.resolve("operator"));
+      var explicit = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+          .putDefault("justsearch.data.dir", tmp.toString())
+          .putSettings("justsearch.onnxruntime.native_path", operator.toString()).build();
+      io.justsearch.configuration.resolved.ConfigStore.setGlobal(
+          new io.justsearch.configuration.resolved.ConfigStore(explicit));
+      org.junit.jupiter.api.Assertions.assertEquals(operator, OrtCudaHelper.resolveOrtNativePath(fallback));
+    } finally {
+      io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(previous);
+    }
+  }
+
 }
