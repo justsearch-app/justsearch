@@ -1,0 +1,11 @@
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java
+@@ -2070,7 +2070,7 @@
+         declinedPackages(), modelsDir, homeDir, hardware.policyExcluded());
+   }
+ 
+-  private HardwareProfile detectHardwareProfile() {
++  HardwareProfile detectHardwareProfile() {
+     // Tempdoc 587: read every GPU fact from the ONE composition seam (GpuCapabilityResolver),
+     // which folds the CUDA driver-API probe into the NVML/nvidia-smi VRAM+device merge. This
+     // replaces the prior split — a direct GpuDriverApiProbe call for cudaFunctional plus a

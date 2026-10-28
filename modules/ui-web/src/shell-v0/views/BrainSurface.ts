@@ -1161,7 +1161,14 @@ export class BrainSurface extends JfElement {
       // conditionally-armed pollInstall/pollPack/pollRuntime timers (which only ever self-armed
       // AFTER a prior fetch had already succeeded — the structural cause of the "stuck on
       // Connecting… forever" bug, tempdoc 663 §O). Same non-null-adopt rule as inference/status.
-      if (s.installStatus) this.installStatus = s.installStatus;
+      if (s.installStatus) {
+        const previous = this.installStatus;
+        this.installStatus = s.installStatus;
+        if ((previous?.state === 'running' && s.installStatus.state !== 'running')
+          || (previous?.phase === 'activation_required' && s.installStatus.phase !== 'activation_required')) {
+          void this.refreshInstallPlanPreview();
+        }
+      }
       if (s.runtimeStatus) this.runtimeStatus = s.runtimeStatus;
       if (s.packStatus) this.packStatus = s.packStatus;
       this.requestUpdate();
@@ -1805,6 +1812,9 @@ export class BrainSurface extends JfElement {
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
     const repairRemedy = deriveRepairRemedy(this.installStatus);
+    const chatComponent = this.planPreview?.components?.find(c => c.id === 'chat');
+    const chatUnavailableReason = chatComponent?.state === 'unavailable'
+      ? chatComponent.unavailableReason || 'Chat is not supported here.' : null;
 
     const statusConfig: Record<string, { dot: string; label: string; sub: string }> = {
       not_installed: {
@@ -1856,7 +1866,7 @@ export class BrainSurface extends JfElement {
           (this.installStatus?.installedFully === false
             ? 'Installed with limitations'
             : 'AI Offline'),
-        sub: repairRemedySub(repairRemedy) ?? 'Start AI to enable chat and summaries.',
+        sub: repairRemedySub(repairRemedy) ?? chatUnavailableReason ?? 'Start AI to enable chat and summaries.',
       },
       starting: {
         dot: 'starting',
@@ -1959,7 +1969,9 @@ export class BrainSurface extends JfElement {
             label: 'Start AI',
             iconName: 'check-circle-2' as const,
             onClick: () => void this.setChatEnabled(true),
-            availability: onlineDisabled
+            availability: chatUnavailableReason
+              ? unavailableBecause(chatUnavailableReason)
+              : onlineDisabled
               ? unavailableBecause('Online AI is disabled by administrator policy.')
               : this.busy['inference-switch']
                 ? ({ kind: 'blocked' } as const)
@@ -1990,7 +2002,9 @@ export class BrainSurface extends JfElement {
             label: 'Resume Chat AI',
             iconName: 'check-circle-2' as const,
             onClick: () => void this.setChatEnabled(true),
-            availability: onlineDisabled
+            availability: chatUnavailableReason
+              ? unavailableBecause(chatUnavailableReason)
+              : onlineDisabled
               ? unavailableBecause('Online AI is disabled by administrator policy.')
               : this.busy['inference-switch']
                 ? ({ kind: 'blocked' } as const)
@@ -2005,7 +2019,9 @@ export class BrainSurface extends JfElement {
             label: 'Start Chat AI',
             iconName: 'check-circle-2' as const,
             onClick: () => void this.setChatEnabled(true),
-            availability: onlineDisabled
+            availability: chatUnavailableReason
+              ? unavailableBecause(chatUnavailableReason)
+              : onlineDisabled
               ? unavailableBecause('Online AI is disabled by administrator policy.')
               : this.busy['inference-switch']
                 ? ({ kind: 'blocked' } as const)

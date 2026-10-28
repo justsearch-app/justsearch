@@ -23,6 +23,7 @@ interface PanelHarness {
   policy: unknown;
   busy: Record<string, boolean>;
   installStatus: unknown;
+  planPreview: unknown;
   inference: unknown;
   _unifiedAiState: unknown;
   host_: unknown;
@@ -38,13 +39,14 @@ interface ActionButton extends Element {
 const verdict = (kind: AiEngineVerdict['kind']): AiEngineVerdict =>
   ({ kind, stability: { kind: 'settled' }, installFailure: null }) as AiEngineVerdict;
 
-function renderPanel(kind: AiEngineVerdict['kind'], opts: { onlineAiEnabled?: boolean } = {}) {
+function renderPanel(kind: AiEngineVerdict['kind'], opts: { onlineAiEnabled?: boolean; chatUnavailable?: string } = {}) {
   const invocations: Array<{ operationId: string; args: Record<string, unknown> }> = [];
   const el = document.createElement('jf-brain-surface') as unknown as PanelHarness;
   el.apiBase = '';
   el.busy = {};
   el.policy = { downloadsEnabled: true, onlineAiEnabled: opts.onlineAiEnabled ?? true };
   el.installStatus = null;
+  el.planPreview = opts.chatUnavailable ? { components: [{ id: 'chat', state: 'unavailable', unavailableReason: opts.chatUnavailable }] } : null;
   el.inference = null;
   el._unifiedAiState = { aiEngine: verdict(kind) };
   el.host_ = {
@@ -88,6 +90,13 @@ describe('BrainSurface Simple panel â€” chat-enabled intent write (tempdoc 737 Â
       expect(invocations).toEqual([{ operationId: 'core.set-chat-enabled', args: { enabled } }]);
     });
   }
+
+  it('disables Start AI with the plan reason when chat is unavailable', () => {
+    const reason = 'Chat runtime is not supplied for linux-x86_64.';
+    const { button, container } = renderPanel('offline', { chatUnavailable: reason });
+    expect(button.availability).toEqual(unavailableBecause(reason));
+    expect(container.textContent).toContain(reason);
+  });
 
   it('never posts the superseded core.switch-inference-mode from any chat-lifecycle state', async () => {
     for (const [kind] of CHAT_INTENT_STATES) {

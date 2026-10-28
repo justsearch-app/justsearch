@@ -83,6 +83,14 @@ public final class AiPreflightService {
       }
       Path baseDir = pkg.installRoot() != null ? aiHome.resolve(pkg.installRoot()) : modelsDir;
       Path pkgDir = baseDir.resolve(pkg.targetDir());
+      // Acquisition retains ONNX assets in a directory keyed by the selected variant and
+      // supporting-file identities. Reconcile that same directory, including incomplete
+      // candidates; retain flat-directory discovery for older installs.
+      Path candidateDir = baseDir.resolve(
+          InstallPlanner.effectiveTargetDir(pkg, pkg.selectVariant(hardware.downloadProfile())));
+      if (Files.isDirectory(candidateDir)) {
+        pkgDir = candidateDir;
+      }
 
       List<String> presentVariantFiles = new ArrayList<>();
       for (ModelVariant v : pkg.variants()) {
@@ -111,7 +119,7 @@ public final class AiPreflightService {
       // (that's the implicit "that's fine" case); a wanted+permitted incomplete package is the new
       // severity signal.
       boolean blockingIncomplete =
-          !complete && InstallPlanner.isIncludedByPlan(pkg, intent, declined, hardware);
+          !complete && InstallPlanner.isIncludedByPlan(pkg, registry, intent, declined, hardware);
 
       packages.add(
           new PackageStatus(
