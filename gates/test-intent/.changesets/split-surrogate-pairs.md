@@ -276,3 +276,13 @@ and performance verification remain outside this builder assignment. No run-evid
 and no evidence files were edited. This record supersedes the initial fixture blocker above.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18081-908d-7380-92e7-b4d2041ce378",
+  "verdict": "accept",
+  "digest": "sha256:85a98beae907407ad99693904da509e44e41148c9a1a3e30c1ee36dd20700cc4"
+}
+```
