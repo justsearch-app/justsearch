@@ -7,7 +7,7 @@ author-session: codex-uiux-forget-builder
 
 # Native policy receipt test intent
 
-Agent-adopted under the owner’s design delegation. Named portable component evidence is machine-generated; no acceptance record is authored. Windows and public native/Head convergence remain unverified. The complete watcher preservation class remains enabled and failing on both candidate and main; its failing artifact is retained explicitly.
+Agent-adopted under the owner’s design delegation. Named portable component evidence is machine-generated; no acceptance record is authored. Windows and public native/Head convergence remain unverified.
 
 ```json
 {
@@ -53,23 +53,11 @@ Agent-adopted under the owner’s design delegation. Named portable component ev
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java"
       ],
-      "class": "New",
-      "behaviour": "The existing reflective fixture now selects its original eight-argument WatcherReplay constructor by its exact existing signature instead of getConstructors()[0], whose unspecified ordering becomes ambiguous when adding the native-only overload. All existing scenario oracles, writer behavior and ownership/root checks remain. This is test-fixture preservation: the complete 39-case class executes on candidate and main be1f315b50 with the identical 24 failures and 15 passes on this machine. It stays enabled and failing, explicitly unverified because real root volume proof is unavailable. Its failing full-class artifact is retained; no passing preservation evidence, product repair or silent skip is claimed.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
-          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
-          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
-          "choice": "R1–R11, adopted native policy receipt contract4 and mandatory implementation clarifications5: exact nullable queue/journal identity, atomic normal readmission and unconfirmed commit semantics; current published strict policy, actual physical/projection/root ownership, UI-only omission and separate boot present-source authority.",
-          "label": "agent choice"
-        }
+      "class": "Adaptation",
+      "moved": [
+        "signature"
       ],
-      "evidence": "gates/test-intent/evidence/uiux-forget-current-java.json",
-      "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java"
-      ],
-      "repaired": false
+      "whatMoved": "The existing reflective fixture selects its original eight-argument WatcherReplay constructor by that exact signature instead of getConstructors()[0], whose order becomes ambiguous once the native-only overload exists. Inputs, preconditions, observations, expected outcomes, tags and conditions are unchanged. The complete class passes on the candidate (current evidence uiux-forget-current-java.json) and on the host's real ext4 volume (39 cases)."
     },
     {
       "items": [
