@@ -286,3 +286,13 @@ and no evidence files were edited. This record supersedes the initial fixture bl
   "digest": "sha256:85a98beae907407ad99693904da509e44e41148c9a1a3e30c1ee36dd20700cc4"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a180da-806e-7020-aeda-62506c5542ad",
+  "verdict": "accept",
+  "digest": "sha256:85a98beae907407ad99693904da509e44e41148c9a1a3e30c1ee36dd20700cc4"
+}
+```
