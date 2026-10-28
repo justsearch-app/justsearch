@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { readdirSync, readFileSync } from 'node:fs';
 import { generateFixture, signArtifact } from './updater-v2-fixture.mjs';
 const subject = await import('./release-candidate.mjs').catch(() => ({}));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -238,7 +239,7 @@ else throw Error('unexpected gh arguments: ' + JSON.stringify(a));
   await assert.rejects(run('publish'), /draft bytes changed before publication/);
 });
 
-for (const fails of [false, true]) test(`descriptor signing command removes its temporary private key on ${fails ? 'a thrown error' : 'success'}`, async t => {
+for (const fails of [false, true]) test(`descriptor signing command never writes its private key during or after ${fails ? 'a thrown error' : 'success'}`, async t => {
   const f = await fixture(t);
   const dir = path.dirname(f.outDir);
   const runnerTemp = path.join(dir, 'runner-temp');
@@ -249,7 +250,14 @@ for (const fails of [false, true]) test(`descriptor signing command removes its 
     METADATA_PRIVATE_KEY_PEM: await readFile(f.metadataPrivateKeyPath, 'utf8'),
     METADATA_PUBLIC_KEY_PEM: await readFile(f.metadataPublicKeyPath, 'utf8') };
   delete env.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PATH;
+  const pem = env.METADATA_PRIVATE_KEY_PEM;
+  await unlink(f.metadataPrivateKeyPath);
   delete f.metadataPrivateKeyPath;
+  // Keep assembly active long enough to observe temporary files as well as output.
+  const installer = f.targets['windows-x86_64'];
+  const bytes = Buffer.concat([Buffer.from('MZ'), Buffer.alloc(8 * 1024 * 1024, 7)]);
+  await writeFile(installer.installerPath, bytes);
+  await writeFile(installer.artifactSignaturePath, signArtifact(bytes).signature);
   // Execute the workflow's key-staging commands as well: a key exported by an
   // earlier step must not survive the signing step, even when assembly throws.
   const yaml = createRequire(import.meta.url)('js-yaml');
@@ -267,9 +275,28 @@ for (const fails of [false, true]) test(`descriptor signing command removes its 
   if (fails) delete f.targets['linux-x86_64'];
   const config = path.join(dir, 'signing-options.json');
   await writeFile(config, JSON.stringify(f));
-  const run = promisify(execFile)(process.execPath, [script, 'build', config], { env });
+  const exposed = new Set();
+  let scans = 0;
+  const scan = (directory = dir) => {
+    if (directory === dir) scans++;
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name);
+      try {
+        if (entry.isDirectory()) scan(file);
+        else if (entry.isFile() && readFileSync(file).includes(pem.trim())) exposed.add(file);
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
+  };
+  // Both the runner temp tree and the working directory are under this root.
+  const timer = setInterval(scan, 1);
+  const run = promisify(execFile)(process.execPath, [script, 'build', config], { cwd: dir, env: { ...env, TMPDIR: runnerTemp, TEMP: runnerTemp, TMP: runnerTemp } });
+  t.after(() => clearInterval(timer));
   if (fails) await assert.rejects(run, /candidate requires both targets/);
   else { await run; assert((await readdir(f.outDir)).includes('release.v2.json.sig')); }
+  clearInterval(timer);
+  scan();
+  assert(scans > 1, 'must scan while the build command runs');
+  assert.deepEqual([...exposed], [], 'build command wrote private key material to disk');
   assert.deepEqual((await readdir(runnerTemp)).filter(name => name !== 'metadata-public.pem'), [], 'signing step left private key material on disk');
   assert.doesNotMatch(await readFile(githubEnv, 'utf8'), /PRIVATE_KEY_PATH/, 'private key path escaped into GITHUB_ENV');
 });

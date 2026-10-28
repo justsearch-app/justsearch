@@ -42,8 +42,8 @@ async function validatePublicKeys(o) {
 }
 export async function validateKeys(o) {
   await validatePublicKeys(o);
-  required('metadata private key', o.metadataPrivateKeyPath);
-  const privateKey = createPrivateKey(await readFile(o.metadataPrivateKeyPath));
+  const pem = o.metadataPrivateKeyPem ?? await readFile(required('metadata private key', o.metadataPrivateKeyPath));
+  const privateKey = createPrivateKey(pem);
   const publicKey = createPublicKey(await readFile(o.metadataPublicKeyPath));
   if (privateKey.asymmetricKeyType !== 'ed25519'
     || !createPublicKey(privateKey).export({ type: 'spki', format: 'der' }).equals(publicKey.export({ type: 'spki', format: 'der' }))) {
@@ -231,15 +231,8 @@ async function main() {
   const [command, ...args] = process.argv.slice(2);
   const o = { ...envOptions(), ...(args[0]?.endsWith('.json') ? JSON.parse(await readFile(args[0])) : {}) };
   if (command === 'build') {
-    const pem = required('METADATA_PRIVATE_KEY_PEM', process.env.METADATA_PRIVATE_KEY_PEM);
-    const dir = await mkdtemp(path.join(process.env.RUNNER_TEMP ?? os.tmpdir(), 'release-signing-'));
-    try {
-      const metadataPrivateKeyPath = path.join(dir, 'metadata-private.pem');
-      await writeFile(metadataPrivateKeyPath, pem, { mode: 0o600, flag: 'wx' });
-      return await buildCandidate({ ...o, metadataPrivateKeyPath });
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    const metadataPrivateKeyPem = required('METADATA_PRIVATE_KEY_PEM', process.env.METADATA_PRIVATE_KEY_PEM);
+    return buildCandidate({ ...o, metadataPrivateKeyPem });
   }
   if (command === 'checksums') return writeChecksums(args[0]);
   if (command === 'verify' || command === 'upload' || command === 'publish') {

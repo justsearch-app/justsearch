@@ -149,7 +149,7 @@ function targetInputs(options) {
 }
 
 export async function buildReleaseAssets(options) {
-  const { metadataPrivateKeyPath, compatibilityRegisterPath, compatibilityBaselinePath,
+  const { metadataPrivateKeyPath, metadataPrivateKeyPem, compatibilityRegisterPath, compatibilityBaselinePath,
     outDir, version, sequence, metadataKeyId, publishedAt = new Date().toISOString(),
     notes = '' } = options;
   if (options.qualificationMode || process.env.JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE === '1') {
@@ -187,7 +187,7 @@ export async function buildReleaseAssets(options) {
     metadataRootPolicy: 'OFFLINE_LONG_LIVED_V1', publishedAt, targets };
   const descriptorBytes = Buffer.from(`${canonicalJson(descriptor)}\n`);
   const metadataSignature = sign(null, descriptorBytes,
-    createPrivateKey(await readFile(metadataPrivateKeyPath, 'utf8'))).toString('base64');
+    createPrivateKey(metadataPrivateKeyPem ?? await readFile(metadataPrivateKeyPath, 'utf8'))).toString('base64');
   const latest = { version, notes, pub_date: publishedAt, platforms };
   await mkdir(outDir, { recursive: true });
   // A reused output directory must not accidentally offer v2 to an installed v0.3.0 client.

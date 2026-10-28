@@ -179,6 +179,34 @@ for (const name of ['build-installer', 'build-installer-windows', 'build-install
     const { check } = policyFixture(t, name);
     assert(check('run: echo check-only').some(e => /step that signs/.test(e.message)));
   });
+  for (const expression of ['toJSON(secrets)', "secrets[format('JUSTSEARCH_{0}', 'CODESIGN_COMMAND')]", 'secrets[env.X]']) {
+    test(`workflow policy rejects ${expression} even in the signing step in ${name}`, t => {
+      const { check } = policyFixture(t, name);
+      assert(check('run: node scripts/release/release-candidate.mjs build options.json', `KEY: \${{ ${expression} }}`)
+        .some(e => /literal secret names/.test(e.message)));
+    });
+  }
+  test(`workflow policy matches signing secret names case-insensitively in ${name}`, t => {
+    const { check } = policyFixture(t, name);
+    for (const secret of ['justsearch_codesign_command', 'JustSearch_Tauri_Updater_Private_Key', 'justsearch_release_metadata_private_key_pem']) {
+      for (const ref of [`secrets.${secret}`, `secrets['${secret}']`]) {
+        assert(check('run: echo check-only', `KEY: \${{ ${ref} }}`).some(e => /step that signs/.test(e.message)), ref);
+        assert.deepEqual(check('run: node scripts/release/release-candidate.mjs build options.json', `KEY: \${{ ${ref} }}`), []);
+      }
+    }
+  });
+  test(`workflow policy restricts inherited secrets to per-release calls in ${name}`, t => {
+    const { repoRoot } = policyFixture(t, name);
+    const file = `.github/workflows/${name}.yml`;
+    const policy = { workflows: [{ path: file, expectedTriggers: ['workflow_dispatch'] }] };
+    for (const destination of ['./.github/workflows/build-installer-windows.yml', './.github/workflows/packaging-smoke.yml',
+      './.github/workflows/sign-vendored-mirrors.yml', 'other/repo/.github/workflows/build.yml@main']) {
+      writeFileSync(path.join(repoRoot, file), `on: workflow_dispatch\njobs:\n  call:\n    uses: ${destination}\n    secrets: inherit\n`);
+      const errors = validateWorkflows({ repoRoot, policy });
+      if (['./.github/workflows/build-installer-windows.yml', './.github/workflows/packaging-smoke.yml'].includes(destination)) assert.deepEqual(errors, []);
+      else assert(errors.some(e => /inherited only/.test(e.message)), destination);
+    }
+  });
 }
 test('step-only secret policy excludes the separately tracked mirror workflow', t => {
   const { check } = policyFixture(t, 'sign-vendored-mirrors');
