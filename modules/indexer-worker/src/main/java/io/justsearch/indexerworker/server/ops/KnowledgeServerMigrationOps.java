@@ -805,6 +805,9 @@ public final class KnowledgeServerMigrationOps {
    * replay exact DELETEs on B in accepted order, then durably commit and verify their absence.
    * Mixed projection and broad-delete snapshots certify B's final accepted effects without
    * replaying destructive mutations. Conditional removal retains concurrent replacement rows.
+   * A SYNC_ROOT was walked onto B before its pointer moved, and the committed boot reconciles
+   * every declared root with current disk before publication; its exact receipt is validated
+   * and acknowledged with the others, never walked again.
    */
   public static boolean settleCommittedNativeFileWitnesses(
       JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log) {
@@ -814,7 +817,8 @@ public final class KnowledgeServerMigrationOps {
       scopeLegacyPrefixes(scoped, active, null);
       List<SwitchBufferCapableQueue.SwitchBufferOp> selected = scoped.listSwitchBufferOpsStrict()
           .stream().filter(op -> generation.equals(op.generation())).toList();
-      if (selected.stream().allMatch(op -> "UPSERT".equals(op.op()) || "DELETE".equals(op.op()))) {
+      if (selected.stream().allMatch(op -> "UPSERT".equals(op.op()) || "DELETE".equals(op.op())
+          || "SYNC_ROOT".equals(op.op()))) {
         return settleCommittedNativeFiles(queue, active, generation, log, selected);
       }
       // Native fallback can reopen a recorded generation whose promotion approved gaps. It does
@@ -920,6 +924,8 @@ public final class KnowledgeServerMigrationOps {
         }
         expectedKey = "collection:" + op.payload();
       }
+      case "SYNC_ROOT" -> expectedKey = "sync_root:"
+          + io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath();
       case "PROJECTION_SOURCE" -> {
         if (!sources.contains(op.payload())) throw new IllegalArgumentException("Unowned projection source");
         expectedKey = "projection-source:" + op.payload().length() + ":" + op.payload();
@@ -1081,7 +1087,7 @@ public final class KnowledgeServerMigrationOps {
     try {
       // Refuse unsupported kinds before applying any partial replay on this boot attempt.
       if (selected.stream().anyMatch(op -> !"UPSERT".equals(op.op())
-          && !"DELETE".equals(op.op()))) return false;
+          && !"DELETE".equals(op.op()) && !"SYNC_ROOT".equals(op.op()))) return false;
       if (selected.stream().anyMatch(op -> "UPSERT".equals(op.op()))) {
         active.commitOps().maybeRefreshBlocking();
       }
@@ -1089,7 +1095,9 @@ public final class KnowledgeServerMigrationOps {
       // earlier DELETE half-applied while the boot attempt waits for its exact queue revision.
       for (var op : selected) {
         if (op.payload() == null || op.payload().isBlank()) return false;
-        if ("UPSERT".equals(op.op())) {
+        if ("SYNC_ROOT".equals(op.op())) {
+          decodeCommittedNativeEffect(op, Set.of());
+        } else if ("UPSERT".equals(op.op())) {
           var upsert = SwitchBufferUpsert.decode(op.payload());
           String indexed = active.documentFieldOps()
               .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);

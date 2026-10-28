@@ -7651,6 +7651,8 @@ public final class KnowledgeServer implements Closeable {
         }
       }
     }
+    // Receipts are acknowledged; the retained predecessor alone makes the next boot reconcile.
+    migrationTransitionForPublication("committed-boot-replay-settled");
     for (int attempt = 0; attempt < 3; attempt++) {
       if (closeStarted || System.nanoTime() >= deadline) break;
       List<RootBinding> settling = new ArrayList<>();
