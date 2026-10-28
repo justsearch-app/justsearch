@@ -634,9 +634,9 @@ final class StatusNonBlockingHttpTest {
 
     void assertKnownPublic(JsonNode body) {
       assertRegistryTimes(body);
-      VerifierStatusIsolationTest.assertWorkerEpoch(body, now.get());
+      StatusIsolationFixtureSupport.assertWorkerEpoch(body, now.get());
       if (source.equals("worker") || source.endsWith("lock"))
-        VerifierStatusIsolationTest.assertWorkerTimes(body, now.get(), false, projectionStartedMs,
+        StatusIsolationFixtureSupport.assertWorkerTimes(body, now.get(), false, projectionStartedMs,
             requestStartedMs, requestCompletedMs, java.util.Map.of());
       boolean after = recovered.get();
       var dimensions = body.path("readiness").path("components");
@@ -792,10 +792,10 @@ final class StatusNonBlockingHttpTest {
 
     void assertHeldPublic(JsonNode body) {
       assertRegistryTimes(body);
-      VerifierStatusIsolationTest.assertWorkerEpoch(body,
+      StatusIsolationFixtureSupport.assertWorkerEpoch(body,
           source.equals("worker") || source.endsWith("lock") ? initialAtMs : now.get());
       if (source.equals("worker") || source.endsWith("lock"))
-        VerifierStatusIsolationTest.assertWorkerTimes(body, initialAtMs, true, initialAtMs,
+        StatusIsolationFixtureSupport.assertWorkerTimes(body, initialAtMs, true, initialAtMs,
             requestStartedMs, requestCompletedMs, source.endsWith("lock")
                 ? java.util.Map.of("indexServing", now.get() - initialAtMs, "embedding", now.get() - initialAtMs,
                     "chunkEmbedding", now.get() - initialAtMs, "visualTextExtraction", now.get() - initialAtMs,
