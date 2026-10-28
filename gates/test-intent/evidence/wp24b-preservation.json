@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T21:58:35.004Z",
+  "revision": "c77d93e3890f8a68aeec68ef53bd04decf5b2f14",
+  "tree": "f78b71003f25dd46e1baa61e3f3f1f1e79db06c1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.recents.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-910321-1793224708100.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6902
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y8 keeps saved conversations and historical SEARCH readable without writing events",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y8 keeps saved conversations and historical SEARCH readable without writing events",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5da5ef8a0d78514dbf57a8d281d6e82f3772863480d89b3c56bd5b4d9572319e"
+}

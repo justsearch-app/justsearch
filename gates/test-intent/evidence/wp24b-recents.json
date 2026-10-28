@@ -1,0 +1,267 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T21:58:24.244Z",
+  "revision": "c77d93e3890f8a68aeec68ef53bd04decf5b2f14",
+  "tree": "8f61a73871ed87ae2e6b21cf1eb7747c834052cc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.recents.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-907909-1793224687571.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9250
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y1 opens only for an empty focused Search bar and owns selection and dismiss keys",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y1 opens only for an empty focused Search bar and owns selection and dismiss keys",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y2 records only accepted explicit Search actions with exact dedup and an eight item cap",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y2 records only accepted explicit Search actions with exact dedup and an eight item cap",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 replays operators with current restrictions and selects conversations through navigation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y3 replays operators with current restrictions and selects conversations through navigation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y4 Clear hides the full population with no backfill, rename reactivation or mutation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y4 Clear hides the full population with no backfill, rename reactivation or mutation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y4 Clear before a first delayed list response suppresses every old row",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y4 Clear before a first delayed list response suppresses every old row",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y5 fresh windows forget searches and Clear while profile ABA drops pending responses",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y5 fresh windows forget searches and Clear while profile ABA drops pending responses",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y6 observed lock hides cached optimistic and legacy labels and pre-lock responses until unlock refresh",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y6 observed lock hides cached optimistic and legacy labels and pre-lock responses until unlock refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y6 a history 423 immediately suppresses conversation disclosure",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y6 a history 423 immediately suppresses conversation disclosure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y7 exposes a named list and active descendant in hero, docked and narrow themes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y7 exposes a named list and active descendant in hero, docked and narrow themes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 protects a retained preparation with text \"retained question\" during search and conversation replay",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y3 protects a retained preparation with text \"retained question\" during search and conversation replay",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 protects a retained preparation with text \"\" during search and conversation replay",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Y3 protects a retained preparation with text \"\" during search and conversation replay",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c92f2b9d53aac21b9bad6b6c7279f5be4ee9804e",
+    "revision": "c92f2b9d53aac21b9bad6b6c7279f5be4ee9804e",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.recents.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-907909-1793224698794.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5182,
+        "output": "JSON report written to /tmp/test-intent-vitest-907909-1793224698794.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y1 opens only for an empty focused Search bar and owns selection and dismiss keys",
+        "classification": "assertion",
+        "detail": "Y1 opens only for an empty focused Search bar and owns selection and dismiss keys:  AssertionError: empty focused Search exposes Recent: expected null not to be null\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:93:63\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y2 records only accepted explicit Search actions with exact dedup and an eight item cap",
+        "classification": "assertion",
+        "detail": "Y2 records only accepted explicit Search actions with exact dedup and an eight item cap:  AssertionError: expected [] to deeply equal [ '\"', 'failed', 'seven', 'six', …(4) ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:115:54\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chun"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 replays operators with current restrictions and selects conversations through navigation",
+        "classification": "assertion",
+        "detail": "Y3 replays operators with current restrictions and selects conversations through navigation:  AssertionError: expected [] to include 'title:\"budget review\" -draft author:A…'\n    at Proxy.<anonymous> (file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y4 Clear hides the full population with no backfill, rename reactivation or mutation",
+        "classification": "assertion",
+        "detail": "Y4 Clear hides the full population with no backfill, rename reactivation or mutation:  AssertionError: expected [] to have a length of 5 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/expect/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y4 Clear before a first delayed list response suppresses every old row",
+        "classification": "assertion",
+        "detail": "Y4 Clear before a first delayed list response suppresses every old row:  AssertionError: expected null not to be null\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:171:72\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y5 fresh windows forget searches and Clear while profile ABA drops pending responses",
+        "classification": "assertion",
+        "detail": "Y5 fresh windows forget searches and Clear while profile ABA drops pending responses:  AssertionError: expected [] to deeply equal [ 'profile A search' ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:178:32\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:190"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y6 observed lock hides cached optimistic and legacy labels and pre-lock responses until unlock refresh",
+        "classification": "assertion",
+        "detail": "Y6 observed lock hides cached optimistic and legacy labels and pre-lock responses until unlock refresh:  AssertionError: expected [] to include 'Secret'\n    at Proxy.<anonymous> (file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/expect/dist/index.js"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y6 a history 423 immediately suppresses conversation disclosure",
+        "classification": "assertion",
+        "detail": "Y6 a history 423 immediately suppresses conversation disclosure:  AssertionError: expected [] to deeply equal [ 'Sensitive' ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:210:22\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y7 exposes a named list and active descendant in hero, docked and narrow themes",
+        "classification": "assertion",
+        "detail": "Y7 exposes a named list and active descendant in hero, docked and narrow themes:  AssertionError: expected undefined to be 'sv3-recent-heading' // Object.is equality\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:216:53\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chun"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 protects a retained preparation with text \"retained question\" during search and conversation replay",
+        "classification": "assertion",
+        "detail": "Y3 protects a retained preparation with text \"retained question\" during search and conversation replay:  AssertionError: expected [] to deeply equal [ 'replay' ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:150:32\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 protects a retained preparation with text \"\" during search and conversation replay",
+        "classification": "assertion",
+        "detail": "Y3 protects a retained preparation with text \"\" during search and conversation replay:  AssertionError: expected [] to deeply equal [ 'replay' ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:150:32\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      }
+    ]
+  },
+  "digest": "sha256:b0364ff07ce8bced9c1e5045e89b697dbe614d272b316b15486954ca21f56b8d"
+}
