@@ -2174,6 +2174,10 @@
       "reason": "JVM/OS temp scratch: justsearch-reconciliation-*.db is a per-sync SQLite path/size ordering spool, not the durable job queue. SyncDirectoryOps owns it with try-with-resources; close closes the statement and connection and attempts deletion even if closing fails, while failed construction also deletes the file. Journaling is disabled and the spool is never reopened for recovery; losing it costs another source-directory reconciliation scan."
     },
     {
+      "path": "modules/shell/src-tauri/src/updater_linux_tests.rs",
+      "reason": "Included by updater_linux.rs only under cfg(test). It writes a fake pkexec script into the test's own temporary directory to classify install outcomes; no production path includes these writes, and losing the fixture costs only a rerun."
+    },
+    {
       "path": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
       "reason": "Included only under cfg(test). The updater coordinator fixtures write staged artifacts, intents, witnesses and manifests in test-owned temporary directories; this module cannot write from a production binary. Production updater stores retain their existing classifications."
     },
