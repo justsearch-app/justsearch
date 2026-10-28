@@ -129,3 +129,13 @@ Evidence paths are reserved for the independent verifier. The builder does not r
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a181f5-7c33-7933-a96f-9e6deb942624",
+  "verdict": "accept",
+  "digest": "sha256:70635fc9f03fc20dbcf319ef1bba576ee43584dbc3e5b5def799a1f32c533d6c"
+}
+```
