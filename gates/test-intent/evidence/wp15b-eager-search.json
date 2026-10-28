@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T17:09:39.779Z",
+  "revision": "edf31674779d432098809d29f711951d64110cf1",
+  "tree": "8156911f27460be10e8aba08884ddba8ade26131",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2915680-1793207377421.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2356
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#registers eagerly as the landing window without a lazy loader",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f439f3adb59237227d11df9a3cbb5bf05736b63d45a8e2f0a40b93c096267d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the surface is registered as the main Search window registers eagerly as the landing window without a lazy loader",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ace30b1ad2e7369a2c8ddd6c23b3139f4fd34192087c59b0e1e0c6ffcd549104"
+}
