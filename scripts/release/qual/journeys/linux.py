@@ -38,7 +38,10 @@ def require_candidate(run):
 
 
 def package_install(run):
-    initial = run.args.assets / run.args.package
+    candidate = run.args.assets / run.args.package
+    run.target.copy(candidate, run.work + '/' + candidate.name)
+    run.facts['initialVersion'] = run.target.run(['dpkg-deb', '-f', run.work + '/' + candidate.name, 'Version']).stdout.strip()
+    initial = run.args.predecessor if run.args.phase == 'predecessor' else candidate
     if not initial.is_file():
         raise Infrastructure('Initial package missing: ' + str(initial))
     target = run.work + '/' + initial.name
@@ -49,7 +52,6 @@ def package_install(run):
     binaries = [p for p in paths if p.endswith('/JustSearch') and '/bin/' in p]
     assert len(binaries) == 1, 'Package has no unique installed executable'
     run.binary = binaries[0]
-    run.facts['initialVersion'] = installed_version(run)
     expected = run.target.run(['dpkg-deb', '-f', target, 'Version']).stdout.strip()
     assert installed_version(run) == expected, 'Installed package version differs from the selected bytes'
     verify = run.target.run(['dpkg', '--verify', 'just-search'], check=False)
@@ -150,6 +152,45 @@ def search_api(run, query=QUERY, filename=OPEN_FILE):
     return wait_for(probe, 'Indexed fixture returned: ' + filename, seconds=240)
 
 
+def add_folder_api(run):
+    run.require('ui')
+    corpus = run.require('corpus')
+    run.api('/api/indexing/roots', {'path': corpus, 'collection': 'default'})
+    roots = wait_for(lambda: (v if corpus in json.dumps(v) else None)
+                     if (v := run.api('/api/indexing/roots')) else None,
+                     'Production API added watched folder', seconds=45)
+    run.facts['folder'] = roots
+    return roots
+
+
+def viewer_fixture(rows, fixture):
+    return next((r for r in rows if Path(r['exe']).name == 'mousepad'
+                 and fixture in r['argv'] + r['fds']), None)
+
+
+def receiving_viewer(run):
+    rows = run.target.json("""
+import json,os,sys
+from pathlib import Path
+rows=[]; marker=('QUAL_JOURNEY_RUN='+json.loads(sys.argv[1])).encode()
+for p in Path('/proc').glob('[0-9]*'):
+ try:
+  if p.stat().st_uid != os.getuid() or marker not in (p/'environ').read_bytes().split(b'\\0'):continue
+  exe=str((p/'exe').resolve())
+  if Path(exe).name!='mousepad':continue
+  fds=[]
+  for fd in (p/'fd').iterdir():
+   try:fds.append(os.readlink(fd))
+   except OSError:pass
+  rows.append({'pid':int(p.name),'ticks':(p/'stat').read_text().split(') ',1)[1].split()[19],
+               'exe':exe,'argv':(p/'cmdline').read_bytes().decode().strip('\\0').split('\\0'),'fds':fds})
+ except (OSError,IndexError):pass
+print(json.dumps(rows))
+""", run.run_id)
+    run.evidence('J2-receiving-viewer-processes', rows)
+    return viewer_fixture(rows, run.require('corpus') + '/' + OPEN_FILE)
+
+
 def search_open(run):
     run.require('folder')
     run.require('ui')
@@ -174,17 +215,13 @@ def search_open(run):
     wait_for(lambda: (v if all(word in v for word in ('File', 'Edit', 'Document')) else None)
              if (v := run.native.screen_text('J2-receiving-viewer-opening')) else None,
              'Default text viewer visible', seconds=30, error=Infrastructure)
-    # Mousepad's initial window truncates the absolute path in its title bar.
-    # Maximize the actual foreground viewer before asserting the filename.
-    run.native.key('alt+f10')
-    text = wait_for(lambda: (v if OPEN_FILE.lower() in v.lower() else None)
-                    if (v := run.native.screen_text('J2-receiving-viewer')) else None,
-                    'Filename visible in receiving viewer', seconds=30, error=Infrastructure)
-    assert OPEN_FILE.lower() in text.lower(), 'Viewer does not show the unique filename'
-    run.native.key('alt+f4')
+    viewer = wait_for(lambda: receiving_viewer(run),
+                      'Receiving viewer opened exact fixture (cmdline or fd)', seconds=30)
+    run.native.shot('J2-receiving-viewer')
+    run.target.stop([viewer])
     run.desktop_spawn([run.binary], run.work + '/return-from-viewer.log')
     run.facts['search'] = True
-    return {'search': result, 'receivingViewerText': text}
+    return {'search': result, 'receivingViewerProcess': viewer}
 
 
 def install_ai(run):
@@ -293,14 +330,51 @@ def restart(run):
     run.require('beforeState')
     run.normal_launch()
     state = assert_state(run)
+    run.evidence('J4-retained-state', state)
     run.native.shot('J4-normal-restart')
     # Reattach in a fresh automation process only after the normal-launch check.
     run.start_ui()
+    close_popovers(run)
     run.wd.click('button[aria-label="View bookmarks"]')
-    assert 'Library' in bookmark_text(run), 'Saved bookmark is retained on disk but missing from the restarted UI'
+    try:
+        assert 'Library' in bookmark_text(run), 'Saved bookmark is retained on disk but missing from the restarted UI'
+    except (Infrastructure, AssertionError) as exc:
+        run.native.shot('J4-restart-bookmarks-failure')
+        run.evidence('J4-browser-reproduction', browser_bookmarks(run))
+        raise AssertionError('Suspected product defect: after bookmarking Library, selecting Dark and restarting, '
+                             'close popovers with Escape, wait for none open, click View bookmarks once; '
+                             'Library is not visibly accessible. See J4-browser-reproduction.json. ' + str(exc)) from exc
     run.native.shot('J4-restarted-bookmark')
     run.native.key('escape')
     return state
+
+
+def close_popovers(run):
+    run.native.key('escape')
+    wait_for(lambda: run.wd.execute("return all(document,':popover-open,[open]').filter(e=>e.matches(':popover-open')||e.localName.endsWith('-popover')).length===0"),
+             'All popovers closed before bookmarks', seconds=15, error=Infrastructure)
+    run.evidence('J4-popovers-closed', {'dismissal': 'Escape', 'openPopovers': []})
+
+
+def browser_bookmarks(run):
+    """Record the concrete reason this installed candidate has no HTTP UI to drive."""
+    try:
+        origin = run.target.json("""
+import json,sys,urllib.request,urllib.error
+from pathlib import Path
+m=json.loads((Path(json.loads(sys.argv[1]))/'runtime/manifest.json').read_text())
+url='http://127.0.0.1:'+str(m['head']['apiPort'])+'/'
+req=urllib.request.Request(url,headers={'X-JustSearch-Session':m['head']['sessionToken']})
+try:
+ with urllib.request.urlopen(req,timeout=10) as r:
+  print(json.dumps({'url':url,'status':r.status,'contentType':r.headers.get('Content-Type'),'body':r.read(500).decode(errors='replace')}))
+except urllib.error.HTTPError as e:print(json.dumps({'url':url,'status':e.code,'body':e.read(500).decode(errors='replace')}))
+""", run.data)
+        if origin['status'] != 200 or 'text/html' not in origin.get('contentType', ''):
+            return {'status': 'unavailable', 'reason': 'Installed candidate does not serve its web UI at its production HTTP origin; no dev frontend substituted', 'httpProbe': origin}
+        return {'status': 'unavailable', 'reason': 'Unexpected HTML at the production origin; plain-browser reproduction requires investigation', 'httpProbe': origin}
+    except Exception as exc:
+        return {'status': 'unavailable', 'reason': 'Candidate HTTP UI probe failed: ' + str(exc)}
 
 
 def bookmark_text(run):
@@ -318,38 +392,15 @@ def update_prepare(run):
     if not run.args.predecessor or not run.args.mirror:
         raise Unavailable('Update requires --predecessor and --mirror with the same test pins')
     run.require('beforeState')
-    # J1-J4 must qualify the candidate on this desktop too. Prepare the parent
-    # independently for J5, preserving the candidate's already-checked state in
-    # our private run folder; never open newer saved state with an older app.
-    run.stop_app()
-    run.target.run(['mv', run.data, run.work + '/candidate-state-before-J5'])
-    apt(run, 'remove', 'just-search')
+    if run.args.phase != 'predecessor':
+        raise Infrastructure('J5 requires its own fresh predecessor overlay')
     predecessor = run.work + '/' + run.args.predecessor.name
-    run.target.copy(run.args.predecessor, predecessor)
-    apt(run, 'install', predecessor)
     expected = run.target.run(['dpkg-deb', '-f', predecessor, 'Version']).stdout.strip()
     assert installed_version(run) == expected, 'Predecessor package was not installed for J5'
     verify = run.target.run(['dpkg', '--verify', 'just-search'], check=False)
     assert verify.returncode == 0 and not verify.stdout.strip(), 'Predecessor installed payload differs from its package'
     run.facts['predecessorPackage'] = {'name': run.args.predecessor.name,
                                      'sha256': digest(run.args.predecessor), 'version': expected}
-    for key in ('folder', 'search', 'ai', 'authored', 'beforeState', 'ui', 'ready'):
-        run.facts.pop(key, None)
-    outer = run.out
-    prep = outer / 'J5-predecessor'
-    prep.mkdir()
-    run.out = run.native.evidence = prep
-    try:
-        for journey in run.definition['journeys']:
-            if journey['id'] not in ('J1', 'J2', 'J3', 'J4'):
-                continue
-            for check in journey['checks']:
-                if check['id'] == 'install' or run.args.lane not in check['lanes']:
-                    continue
-                value = CHECKS[check['id']](run)
-                run.evidence(journey['id'] + '-' + check['id'], value)
-    finally:
-        run.out = run.native.evidence = outer
     run.evidence('J5-predecessor-package', run.facts['predecessorPackage'])
     run.target.vm.mirror('ubuntu', str(run.args.mirror), False, False)
     run.start_ui()
@@ -538,6 +589,7 @@ def shortcut(run):
 def ocr(run):
     require_candidate(run)
     run.require('folder')
+    run.require('ready')
     run.ready()
     return search_api(run, OCR_QUERY, 'scanned-delivery.pdf')
 
@@ -597,6 +649,7 @@ def mcp_metadata(run):
 
 CHECKS = {
     'install': package_install, 'first-run': first_run, 'folder-picker': add_folder,
+    'folder-api': add_folder_api,
     'search-open': search_open, 'cpu-ai': install_ai, 'author-state': author_state,
     'restart': restart, 'update-offer': update_prepare, 'update-cancel': cancel_update,
     'update-success': update_success, 'update-lock': update_lock, 'reinstall': reinstall, 'remove-retain-reinstall': remove_reinstall,

@@ -149,6 +149,164 @@ class RunnerTests(unittest.TestCase):
             with self.assertRaises(linux.Unavailable):
                 linux.require_candidate(run)
 
+    def test_x11_only_exercises_fresh_install(self):
+        definition = json.loads(Path(__file__).with_name('journeys.json').read_text())
+        active = [j['id'] for j in definition['journeys']
+                  if any('vm-linux-x11' in c['lanes'] for c in j['checks'])]
+        self.assertEqual(active, ['J1'])
+
+    def test_hosted_picker_is_skipped_and_api_add_is_exercised(self):
+        definition = json.loads(Path(__file__).with_name('journeys.json').read_text())
+        checks = {c['id']: c for j in definition['journeys'] for c in j['checks']}
+        self.assertNotIn('hosted-linux-x11', checks['folder-picker']['lanes'])
+        self.assertIn('hosted-linux-x11', checks['folder-api']['lanes'])
+
+    def test_viewer_requires_exact_fixture_path_in_receiving_process(self):
+        import linux
+        fixture = '/tmp/this-run/' + linux.OPEN_FILE
+        row = {'exe': '/usr/bin/mousepad', 'argv': ['mousepad', fixture], 'fds': []}
+        self.assertEqual(linux.viewer_fixture([row], fixture), row)
+        self.assertIsNone(linux.viewer_fixture([dict(row, argv=['mousepad', '/other/' + linux.OPEN_FILE])], fixture))
+        self.assertIsNone(linux.viewer_fixture([dict(row, exe='/usr/bin/JustSearch')], fixture))
+        self.assertEqual(linux.viewer_fixture([dict(row, argv=['mousepad'], fds=[fixture])], fixture)['fds'], [fixture])
+
+    def test_open_result_closes_only_the_identified_viewer(self):
+        import linux
+        from unittest.mock import Mock
+        run = Mock()
+        run.facts = {}
+        run.work = '/tmp/own-run'
+        run.require.return_value = '/tmp/own-corpus'
+        run.wd.text.return_value = linux.OPEN_FILE
+        run.wd.element.return_value = {'element-6066-11e4-a52e-4f735466cecf': 'fixture'}
+        run.native.screen_text.return_value = 'File Edit Document ' + linux.OPEN_FILE
+        viewer = {'pid': 123, 'ticks': '456', 'exe': '/usr/bin/mousepad'}
+        with patch.object(linux, 'search_api', return_value={}), \
+             patch.object(linux, 'receiving_viewer', create=True, return_value=viewer):
+            linux.search_open(run)
+        run.target.stop.assert_called_once_with([viewer])
+        self.assertNotIn('alt+f4', [c.args[0] for c in run.native.key.call_args_list])
+
+    def test_restart_closes_popovers_before_single_bookmark_click(self):
+        import linux
+        from unittest.mock import Mock
+        run = Mock()
+        calls = []
+        run.wd.click.side_effect = lambda *a: calls.append('click')
+        with patch.object(linux, 'assert_state', return_value={}), \
+             patch.object(linux, 'close_popovers', create=True, side_effect=lambda r: calls.append('close')), \
+             patch.object(linux, 'bookmark_text', return_value='Library'):
+            linux.restart(run)
+        self.assertEqual(calls, ['close', 'click'])
+
+    def test_restart_bookmarks_failure_reports_product_and_attempts_browser_once(self):
+        import linux
+        from unittest.mock import Mock
+        run = Mock()
+        with patch.object(linux, 'assert_state', return_value={}), \
+             patch.object(linux, 'close_popovers', create=True), \
+             patch.object(linux, 'browser_bookmarks', create=True,
+                          return_value={'status': 'unavailable', 'reason': 'No HTTP UI'}) as browser, \
+             patch.object(linux, 'bookmark_text', side_effect=linux.Infrastructure('popover not visible')):
+            with self.assertRaisesRegex(AssertionError, 'Suspected product defect'):
+                linux.restart(run)
+        browser.assert_called_once_with(run)
+        run.wd.click.assert_called_once_with('button[aria-label="View bookmarks"]')
+
+    def test_plain_browser_reproduction_records_absent_installed_http_ui(self):
+        import linux
+        from unittest.mock import Mock
+        run = Mock()
+        run.target.json.return_value = {'url': 'http://127.0.0.1:8080/', 'status': 404}
+        result = linux.browser_bookmarks(run)
+        self.assertEqual(result['status'], 'unavailable')
+        self.assertEqual(result['httpProbe']['status'], 404)
+        run.desktop_spawn.assert_not_called()
+
+    def test_candidate_overlay_excludes_update_and_retention(self):
+        self.assertEqual(self.r.phase_journeys('candidate'), {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'})
+
+    def test_fresh_predecessor_overlay_prepares_state_before_update(self):
+        self.assertEqual(self.r.phase_journeys('predecessor'), {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'})
+
+    def test_hosted_add_uses_canonical_production_root_api(self):
+        import linux
+        from unittest.mock import Mock
+        run = Mock()
+        run.require.return_value = '/tmp/own-corpus'
+        run.facts = {}
+        run.api.side_effect = [{}, {'roots': ['/tmp/own-corpus']}]
+        linux.add_folder_api(run)
+        self.assertEqual(run.api.call_args_list[0].args,
+                         ('/api/indexing/roots', {'path': '/tmp/own-corpus', 'collection': 'default'}))
+        run.wd.click.assert_not_called()
+
+    def test_vm_launch_waits_for_native_dialog_and_acknowledgment(self):
+        from unittest.mock import Mock
+        run = Mock()
+        run.target.vm = True
+        run.target.env = {'HOME': '/home/qual'}
+        run.work = '/tmp/own-run'
+        run.target.py.side_effect = [None, 'True\n']
+        run.native.screen_text.return_value = 'Run a Command'
+        self.r.Run.desktop_spawn(run, ['/usr/bin/JustSearch'], '/tmp/own-run/app.log')
+        self.assertEqual([c.args[0] for c in run.native.key.call_args_list],
+                         ['escape', 'alt+f2', 'ctrl+a', 'enter'])
+        run.native.screen_text.assert_called()
+        self.assertEqual(run.target.py.call_count, 2)
+
+    def test_static_rail_navigation_uses_native_webdriver_element_click(self):
+        from unittest.mock import Mock
+        run = Mock()
+        run.wd.session = 'session'
+        run.wd.element.return_value = {'element-6066-11e4-a52e-4f735466cecf': 'rail-button'}
+        self.r.Run.nav(run, 'Settings')
+        run.wd.call.assert_called_once_with('/session/session/element/rail-button/click', {})
+        run.wd.click.assert_not_called()
+
+    def test_ocr_is_unavailable_after_a_launcher_failure(self):
+        import linux
+        from unittest.mock import Mock
+        run = Mock()
+        run.require.side_effect = lambda key: (_ for _ in ()).throw(linux.Unavailable('No launched Engine')) if key == 'ready' else True
+        with patch.object(linux, 'require_candidate'):
+            with self.assertRaises(linux.Unavailable):
+                linux.ocr(run)
+        run.ready.assert_not_called()
+
+    def test_vm_restart_waits_for_bindable_ports(self):
+        import socket
+        spec = importlib.util.spec_from_file_location('journey_vm', Path(__file__).with_name('vm-run.py'))
+        wrapper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(wrapper)
+        with socket.socket() as occupied:
+            occupied.bind(('127.0.0.1', 0))
+            port = occupied.getsockname()[1]
+            self.assertFalse(wrapper.ports_available([port]))
+        self.assertTrue(wrapper.ports_available([port]))
+
+    def test_guest_evidence_links_resolve_and_traversal_is_rejected(self):
+        import io
+        import tarfile
+        spec = importlib.util.spec_from_file_location('journey_vm', Path(__file__).with_name('vm-run.py'))
+        wrapper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(wrapper)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            archive = root / 'guest.tar'
+            for name in ('evidence/viewer.png', '../escaped.png'):
+                with tarfile.open(archive, 'w') as tar:
+                    member = tarfile.TarInfo(name)
+                    member.size = 4
+                    tar.addfile(member, io.BytesIO(b'shot'))
+                if name.startswith('evidence/'):
+                    wrapper.extract_evidence(archive, root / 'out')
+                    self.assertEqual((root / 'out/evidence/viewer.png').read_bytes(), b'shot')
+                else:
+                    with self.assertRaises(wrapper.Infrastructure):
+                        wrapper.extract_evidence(archive, root / 'out')
+                    self.assertFalse((root / 'escaped.png').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

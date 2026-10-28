@@ -23,6 +23,10 @@ HERE = Path(__file__).resolve().parent
 STATUSES = ('passed', 'failed-product', 'failed-infrastructure', 'skipped-by-decision', 'unavailable')
 
 
+def phase_journeys(phase):
+    return {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'} if phase == 'predecessor' else {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'}
+
+
 class Infrastructure(Exception):
     """An observed harness, desktop or download failure, not a product verdict."""
 
@@ -338,9 +342,9 @@ class Native:
             self.target.run(['scrot', '--overwrite', str(path)])
         return path
 
-    def screen_text(self, name):
+    def screen_text(self, name, psm=11):
         shot = self.shot(name)
-        return subprocess.check_output(['tesseract', str(shot), 'stdout', '--psm', '11'], stderr=subprocess.DEVNULL, text=True, timeout=30)
+        return subprocess.check_output(['tesseract', str(shot), 'stdout', '--psm', str(psm)], stderr=subprocess.DEVNULL, text=True, timeout=30)
 
     def picker_visible(self, name):
         if self.target.vm:
@@ -474,19 +478,34 @@ with opener.open(req,timeout=30) as r: print(json.dumps(json.load(r)))
             return
         # Alt+F2 gives descendants the active graphical login session, which
         # PolicyKit needs. Merely exporting DISPLAY over SSH is insufficient.
-        script = 'exec env -i ' + shlex.join(f'{k}={v}' for k, v in self.target.env.items()) + ' ' + shlex.join(command)
+        # One short launcher path is reused only after the previous invocation
+        # acknowledged entry and exec'ed; none of these invocations overlap.
+        path = self.work + '/launch.sh'
+        ack = path + '.started'
+        script = ': >' + shlex.quote(ack) + '\nexec env -i ' + shlex.join(f'{k}={v}' for k, v in self.target.env.items()) + ' ' + shlex.join(command)
         script += ' >>' + shlex.quote(logfile) + ' 2>&1\n'
-        path = self.work + '/launch-' + str(time.time_ns()) + '.sh'
-        self.target.py('import json,sys;from pathlib import Path;a=json.loads(sys.argv[1]);Path(a[0]).write_text(a[1])', [path, script])
+        self.target.py('import json,sys;from pathlib import Path;a=json.loads(sys.argv[1]);Path(a[0]).write_text(a[1]);Path(a[0]+".started").unlink(missing_ok=True)', [path, script])
+        self.native.key('escape')
         self.native.key('alt+f2')
+        shot_name = 'native-launch-dialog-' + str(time.time_ns())
+        wait_for(lambda: 'Run a Command' in self.native.screen_text(shot_name, psm=6),
+                 'GNOME command dialog ready for input', seconds=20, error=Infrastructure)
+        self.native.key('ctrl+a')
         self.native.type('sh ' + path)
         self.native.key('enter')
+        wait_for(lambda: self.target.py('import json,sys;from pathlib import Path;print(Path(json.loads(sys.argv[1])).exists())', ack).strip() == 'True',
+                 'Desktop launcher acknowledged execution', seconds=20, error=Infrastructure)
 
     def nav(self, surface):
         self.require('ui')
         ids = {'Library': 'core.library-surface', 'Search': 'core.search-v3-surface',
                'AI Brain': 'core.brain-surface', 'Settings': 'core.settings-surface'}
-        self.wd.click('button[data-surface-id=' + json.dumps(ids[surface]) + ']')
+        # Rail buttons are ordinary native buttons in one shadow root. Use
+        # WebDriver's element click so moved/recreated windows resolve their own
+        # hit point; the viewport adapter remains for nested component controls.
+        element = self.wd.element('button[data-surface-id=' + json.dumps(ids[surface]) + ']')
+        key = element['element-6066-11e4-a52e-4f735466cecf']
+        self.wd.call(f'/session/{self.wd.session}/element/{key}/click', {})
 
     def finish(self):
         errors = []
@@ -517,6 +536,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--lane', choices=['hosted-linux-x11', 'vm-linux-wayland', 'vm-linux-x11'], required=True)
     parser.add_argument('--vm', choices=['ubuntu'])
+    parser.add_argument('--phase', choices=['candidate', 'predecessor'], default='candidate',
+                        help='VM wrapper runs predecessor J5/J6 on a separate fresh overlay')
     parser.add_argument('--assets', type=Path, required=True)
     parser.add_argument('--package', required=True, help='basename within --assets')
     parser.add_argument('--mcpb', default='justsearch-mcp.mcpb')
@@ -551,6 +572,8 @@ def main():
         except Exception as exc:
             setup_error = exc
         for journey in definition['journeys']:
+            if journey['id'] not in phase_journeys(args.phase) and args.vm and args.lane != 'vm-linux-x11':
+                continue
             row = {'id': journey['id'], 'title': journey['title'], 'scenarioIds': journey['scenarioIds'], 'checks': []}
             run.results.append(row)
             for check in journey['checks']:

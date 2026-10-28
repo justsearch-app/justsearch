@@ -43,6 +43,10 @@ joins the graphical session's display/runtime/D-Bus environment, caps native
 thread pools at eight, and stops only the VM run it started on every outcome.
 It installs tools **inside the guest**. No host sudo, desktop window or GPU is used.
 Supply a tauri-driver 2.0.4 binary built separately as qualification tooling.
+Between overlays it waits up to 90 seconds for the stopped guest's ports to be
+bindable, including TCP TIME_WAIT. Native GNOME launches wait for the command
+dialog with block-text OCR and for a script-entry acknowledgment; a missed
+desktop launch is an infrastructure failure before any product assertion.
 
 ```sh
 export QUAL_OWNER=w4a
@@ -56,20 +60,24 @@ python3 scripts/release/qual/journeys/vm-run.py \
   --driver /path/to/tauri-driver --evidence /path/to/new-wayland-evidence
 ```
 
-Repeat sequentially with `--session x11` and a new evidence directory. To run
+Repeat sequentially with `--session x11` and a new evidence directory; that
+lane runs J1 only and does not require `--predecessor` or `--mirror`. To run
 the hosted equivalent locally without installing anything on the host, use the
 same wrapper with `--session hosted` and omit `--predecessor`/`--mirror`. This
 runs the exact hosted entry point under Xvfb and D-Bus in a fresh Ubuntu VM.
 The default VM runs use QMP through the existing `screen.py`; the hosted run
-uses xdotool-class input under X11. Neither replaces the system folder picker.
+uses xdotool-class input under X11. By the round-two decision, the hosted lane
+adds the corpus through the production HTTP API and records the native picker
+as skipped by decision. The Wayland VM exercises the system picker.
 
-The VM lanes first install the **candidate** for J1–J4. J5 then stops it, moves
-that run's candidate data aside (without opening it with an older app), removes
-the package and installs the predecessor on fresh state. The same UI actions
-prepare and verify the predecessor's folder, default AI installation, bookmark,
-setting and restart; their evidence is under `J5-predecessor/`. The app's updater
-then installs the candidate, preserving that predecessor state. J6–J8 use the
-candidate. This avoids qualifying only the predecessor's first-run behavior.
+Wayland runs J1–J4 and J7–J8 on a fresh **candidate** overlay. The wrapper stops
+that guest and starts a second fresh overlay, installing the **predecessor from
+scratch**. J1–J4 prepare that predecessor's folder, default AI installation,
+bookmark, setting and restart; J5 then updates it to the candidate and J6 checks
+install-over and retained data. No candidate data is moved aside or reused by
+the predecessor. Each overlay retains its own summary; the wrapper combines the
+candidate observations and predecessor update/retention observations into one
+Wayland summary. Predecessor preparation remains separately recorded.
 
 For local test builds, build the predecessor from the candidate's **parent** in
 a shared clone inside `$TMPDIR`, with a separate build directory. Use the same
@@ -85,13 +93,20 @@ private signing key is needed or used for these tests.
 
 - J1: apt, installed payload checksums, bundled JVM, normal packaged window and
   first-run WebDriver session against `/usr/bin/JustSearch`.
-- J2: the real chooser, Ctrl+L and a generated corpus path; production API index
-  and search observations; **Open file** followed by the unique filename in the
-  receiving viewer. An IPC result alone does not pass this check.
+- J2: the real chooser, Ctrl+L and a generated corpus path on the Wayland VM;
+  production API folder addition on hosted; index and search observations;
+  **Open file** followed by the exact fixture path in the receiving Mousepad
+  process's `/proc/<pid>/cmdline` or open file descriptor, plus a screenshot.
+  The process must belong to this run. Window titles and maximization do not
+  determine which file was opened.
 - J3: default production downloads, CPU search plan and receipts, search, and
   the plan's chat-unavailable explanation in the UI. Downloads are not seeded.
 - J4: a UI-authored bookmark and theme, normal restart, retained settings,
   watched folder, indexed fixture, authored records and model file hashes.
+  Escape closes existing popovers before one bookmarks click, with a wait for
+  none open. A repeated failure records a suspected product defect and one
+  plain-browser reproduction (or the concrete reason it could not run), then
+  continues the remaining checks.
 - J5 (VM): parent-state preparation, signed HTTPS update offer, cancelled
   PolicyKit prompt with old Engine recovery and re-offer, the **real 300-second
   dpkg lock timeout**, then accepted elevation and automatic candidate relaunch.
