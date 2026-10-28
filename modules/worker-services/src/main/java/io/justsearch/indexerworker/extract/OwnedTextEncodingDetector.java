@@ -128,8 +128,9 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
     // Only these inconclusive windows may consult the complete top-level snapshot. BOMs,
     // malformed windows and read failures returned above; existing UTF-8 window wins unchanged.
     if (!PreparedExtractionInput.isNonAsciiUtf8(metadata)) return null;
-    // A declaration still valid but unfinished at the window edge keeps the existing path,
-    // whatever it names. A complete UTF-8 declaration (including aliases) agrees with the fact.
+    // A declaration still valid but unfinished at a fully decoded window edge keeps the
+    // existing path, whatever it names. An undecoded multi-byte prefix makes it malformed.
+    // A complete UTF-8 declaration (including aliases) agrees with the fact.
     chars.flip();
     var declaration = XML_DECLARATION.matcher(chars);
     if (declaration.lookingAt()) {
@@ -137,7 +138,7 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
       if (!Charset.isSupported(encoding) || !StandardCharsets.UTF_8.equals(Charset.forName(encoding))) {
         return null;
       }
-    } else if (declaration.hitEnd()) {
+    } else if (declaration.hitEnd() && !bytes.hasRemaining()) {
       return null;
     }
     return StandardCharsets.UTF_8;

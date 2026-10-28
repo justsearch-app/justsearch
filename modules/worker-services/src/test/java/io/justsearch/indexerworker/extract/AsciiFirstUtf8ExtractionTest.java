@@ -159,6 +159,22 @@ class AsciiFirstUtf8ExtractionTest extends io.justsearch.adapters.lucene.runtime
     assertUtf8DeclarationText(file, source, source, "txt");
   }
 
+  static Stream<Arguments> malformedDeclarationsAtSplitSequence() {
+    return Stream.of("txt", "html").flatMap(extension -> Stream.of("UTF-8", "ISO-8859-1")
+        .map(encoding -> Arguments.of(extension, encoding)));
+  }
+
+  @ParameterizedTest(name = "malformedXmlDeclarationAtSplitSequenceUsesSnapshotUtf8({0}, {1})")
+  @MethodSource("malformedDeclarationsAtSplitSequence")
+  void malformedXmlDeclarationAtSplitSequenceUsesSnapshotUtf8(String extension, String encoding)
+      throws Exception {
+    String prefix = "<?xml version=\"1.0\" encoding=\"" + encoding + "\"";
+    String source = prefix + " ".repeat(16_383 - prefix.length()) + "é LOG HEADER";
+    Path file = Files.writeString(tempDir.resolve("split-declaration." + extension), source);
+    // HTML consumes the unterminated processing instruction; plain text preserves it literally.
+    assertUtf8DeclarationText(file, source, "html".equals(extension) ? "" : source, extension);
+  }
+
   static Stream<Arguments> declaredUtf8Charsets() {
     return Stream.of("html", "txt").flatMap(extension -> Stream.of("UTF-8", "utf8")
         .map(encoding -> Arguments.of(extension, encoding)));
