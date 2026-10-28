@@ -77,7 +77,7 @@ impl UpgradeHandoff for ProbeEdge {
         self.resumes.fetch_add(1, Ordering::SeqCst);
         self.host.release_replacement_hold()
     }
-    fn launch(&self, _: &Path) -> Result<(u32, u128), String> {
+    fn launch(&self, _: &Path) -> Result<(u32, u128), InstallerError> {
         self.launches.fetch_add(1, Ordering::SeqCst);
         Ok((42, now_epoch_ms()))
     }
@@ -90,11 +90,11 @@ pub(super) fn drive(
     let root = data_dir.join("updater-probe");
     let path = root.join("staged/probe/installer.exe");
     fs::create_dir_all(path.parent().unwrap()).unwrap();
-    fs::write(&path, b"MZfixture").unwrap();
+    fs::write(&path, probe_installer_bytes()).unwrap();
     let staged = StagedArtifact {
         path: path.to_string_lossy().into_owned(),
-        sha256: sha256_bytes(b"MZfixture"),
-        size: 9,
+        sha256: sha256_bytes(probe_installer_bytes()),
+        size: probe_installer_bytes().len() as u64,
     };
     let descriptor = ReleaseDescriptor {
         schema_version: 1,
@@ -107,9 +107,10 @@ pub(super) fn drive(
         artifact: ReleaseArtifact {
             url: "https://example.test/installer.exe".into(),
             sha256: staged.sha256.clone(),
-            size: 9,
+            size: probe_installer_bytes().len() as u64,
             signature: "fixture".into(),
             public_key: "fixture".into(),
+            key_id: "fixture-artifact".into(),
         },
         compatibility: vec![],
     };
@@ -163,4 +164,13 @@ pub(super) fn drive(
     let _ = helper.kill();
     let _ = helper.wait();
     payload
+}
+
+// The probe builds outside cfg(test), so it carries its own copy of the fixture bytes.
+fn probe_installer_bytes() -> &'static [u8] {
+    if cfg!(target_os = "linux") {
+        b"!<arch>\ndebian-binary   0           0     0     100644  4         `\n2.0\n"
+    } else {
+        b"MZfixture"
+    }
 }

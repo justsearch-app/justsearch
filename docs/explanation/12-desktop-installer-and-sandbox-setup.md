@@ -215,7 +215,7 @@ The application updater is a coordinated replacement of the installed app,
 not a component updater. AI Home models remain outside the NSIS artifact and
 are reused in place.
 
-1. The shell fetches `release.v1.json` and its detached Ed25519 signature from
+1. The shell fetches `release.v2.json` and its detached Ed25519 signature from
    the compile-time-pinned HTTPS release endpoint.
 2. The shell verifies release identity, monotonic sequence, durable-store
    compatibility, and closed-set agreement with Tauri's `latest.json`.

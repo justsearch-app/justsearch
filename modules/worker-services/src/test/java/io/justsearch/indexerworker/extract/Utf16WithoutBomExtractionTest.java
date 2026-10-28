@@ -94,20 +94,20 @@ class Utf16WithoutBomExtractionTest {
   }
 
   @Test
-  void defaultPolicyIdentityIsV3() throws Exception {
-    assertEquals("tika-default-v3", TikaExtractionPolicy.defaults().policyId());
+  void defaultPolicyIdentityIsV4() throws Exception {
+    assertEquals("tika-default-v4", TikaExtractionPolicy.defaults().policyId());
   }
 
   @Test
-  void blankPolicyIdentityFallsBackToV3() throws Exception {
+  void blankPolicyIdentityFallsBackToV4() throws Exception {
     var policy = new TikaExtractionPolicy(" ", 48, 1024, 1024, 128, 128, 4096,
         0, 0, 100.0d, true, Set.of(), Set.of());
-    assertEquals("tika-default-v3", policy.policyId());
+    assertEquals("tika-default-v4", policy.policyId());
   }
 
   @Test
-  void configuredPolicyIdentityIsV3() throws Exception {
-    assertEquals("tika-config-v3-48-1024", TikaExtractionPolicy.fromWorkerLimits(
+  void configuredPolicyIdentityIsV4() throws Exception {
+    assertEquals("tika-config-v4-48-1024", TikaExtractionPolicy.fromWorkerLimits(
         new ResolvedConfig.Worker(48, 1024)).policyId());
   }
 

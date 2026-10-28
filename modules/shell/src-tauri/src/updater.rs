@@ -18,7 +18,7 @@ use crate::BackendState;
 
 const INTENT_SCHEMA_VERSION: u32 = 1;
 const EVIDENCE_SCHEMA_VERSION: u32 = 1;
-const DESCRIPTOR_SCHEMA_VERSION: u32 = 1;
+const DESCRIPTOR_SCHEMA_VERSION: u32 = 2;
 const HEAD_TIMEOUT: Duration = Duration::from_secs(15);
 const BACKEND_EXIT_TIMEOUT: Duration = Duration::from_secs(30);
 const BACKEND_READY_TIMEOUT: Duration = Duration::from_secs(60);
@@ -46,6 +46,58 @@ struct ReleaseDescriptor {
     compatibility: Vec<ReleaseStoreCompatibility>,
 }
 
+/// Wire v2 is authenticated as a whole, then projected onto the running platform.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReleaseEnvelope {
+    schema_version: u32,
+    sequence: u64,
+    version: String,
+    channel: String,
+    metadata_key_id: String,
+    metadata_root_policy: String,
+    targets: HashMap<String, ReleaseTarget>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseTarget {
+    artifact: ReleaseArtifact,
+    compatibility: Vec<ReleaseStoreCompatibility>,
+}
+
+fn running_target() -> Result<&'static str, String> {
+    if cfg!(all(windows, target_arch = "x86_64")) {
+        Ok("windows-x86_64")
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        Ok("linux-x86_64")
+    } else {
+        Err("Application updates are unsupported on this platform".into())
+    }
+}
+
+fn parse_descriptor(bytes: &[u8], target: &str) -> Result<ReleaseDescriptor, String> {
+    let mut envelope: ReleaseEnvelope = serde_json::from_slice(bytes)
+        .map_err(|error| format!("Release descriptor is invalid: {error}"))?;
+    if envelope.schema_version != DESCRIPTOR_SCHEMA_VERSION {
+        return Err("Unsupported release descriptor schema".into());
+    }
+    let selected = envelope
+        .targets
+        .remove(target)
+        .ok_or_else(|| format!("Release descriptor has no target for {target}"))?;
+    Ok(ReleaseDescriptor {
+        schema_version: envelope.schema_version,
+        sequence: envelope.sequence,
+        version: envelope.version,
+        channel: envelope.channel,
+        target: target.into(),
+        metadata_key_id: envelope.metadata_key_id,
+        metadata_root_policy: envelope.metadata_root_policy,
+        artifact: selected.artifact,
+        compatibility: selected.compatibility,
+    })
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ReleaseArtifact {
@@ -54,6 +106,7 @@ struct ReleaseArtifact {
     size: u64,
     signature: String,
     public_key: String,
+    key_id: String,
 }
 
 /// Target-side compatibility declaration copied from the release's reviewed store register.
@@ -511,7 +564,10 @@ pub(crate) async fn run_install_now(
         app.package_info().version.to_string(),
     )
     .await?;
-    // The coordinator persisted the Windows launch witness before the shell exits.
+    // Linux waits for apt before restarting; Windows transfers control to NSIS.
+    #[cfg(target_os = "linux")]
+    app.request_restart();
+    #[cfg(not(target_os = "linux"))]
     app.exit(0);
     Ok(())
 }
@@ -731,21 +787,30 @@ async fn finish_staged_update(
     let (process_id, launched_at_epoch_ms) = match launch {
         Ok(witness) => witness,
         Err(error) => {
+            if error.repair_required {
+                let message = error.message;
+                mark_repair_required_at(root, coordinator, intent, &message)?;
+                return Err(message);
+            }
             let restart = edge.resume();
             let (phase, message) = match restart {
                 Ok(()) => (
                     UpgradePhase::Cancelled,
-                    format!("Installer launch failed; Engine supervision was resumed: {error}"),
+                    format!("Installer launch failed; Engine supervision was resumed: {}", error.message),
                 ),
                 Err(restart_error) => (
                     UpgradePhase::RepairRequired,
                     format!(
-                        "Installer launch failed and Engine supervised resume failed: {error}; {restart_error}"
+                        "Installer launch failed and Engine supervised resume failed: {}; {restart_error}", error.message
                     ),
                 ),
             };
             transition(&mut intent, phase, Some(message.clone()))?;
             persist_intent_at(root, coordinator, &intent)?;
+            #[cfg(target_os = "linux")]
+            if intent.phase == UpgradePhase::Cancelled {
+                set_state(coordinator, "available", Some(message.clone()));
+            }
             return Err(message);
         }
     };
@@ -821,7 +886,7 @@ trait UpgradeHandoff: Sync {
     ) -> Result<crate::containment::JobEmpty, String>;
     fn terminate_contained(&self) -> Result<(), String>;
     fn resume(&self) -> Result<(), String>;
-    fn launch(&self, path: &Path) -> Result<(u32, u128), String>;
+    fn launch(&self, path: &Path) -> Result<(u32, u128), InstallerError>;
 }
 
 struct ShellUpgradeHandoff<'a> {
@@ -902,11 +967,18 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
         }
         result
     }
-    fn launch(&self, path: &Path) -> Result<(u32, u128), String> {
+    fn launch(&self, path: &Path) -> Result<(u32, u128), InstallerError> {
         if self.backend.host.quit_started() {
             return Err("Quit won; update remains staged".into());
         }
-        launch_installer(path)
+        #[cfg(target_os = "linux")]
+        {
+            linux_installer::launch(path)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            launch_installer(path).map_err(InstallerError::from)
+        }
     }
 }
 
@@ -1399,18 +1471,12 @@ async fn check_release(app: &AppHandle) -> Result<Option<ReleaseDescriptor>, Str
     let descriptor_bytes = fetch_bytes(&client, &descriptor_url).await?;
     let signature = fetch_text(&client, &format!("{descriptor_url}.sig")).await?;
     verify_metadata_signature(&descriptor_bytes, signature.trim())?;
-    let descriptor: ReleaseDescriptor = serde_json::from_slice(&descriptor_bytes)
-        .map_err(|error| format!("Release descriptor is invalid: {error}"))?;
+    let descriptor = parse_descriptor(&descriptor_bytes, running_target()?)?;
     validate_descriptor(&descriptor)?;
 
     let sequence_path = sequence_path(app);
     let sequence = read_sequence(&sequence_path)?;
-    if descriptor.sequence < sequence.highest_accepted_sequence {
-        return Err(format!(
-            "Release sequence {} is older than accepted sequence {}",
-            descriptor.sequence, sequence.highest_accepted_sequence
-        ));
-    }
+    validate_sequence(descriptor.sequence, sequence.highest_accepted_sequence)?;
 
     let update = updater_for(app, &descriptor)?
         .check()
@@ -1430,6 +1496,16 @@ async fn check_release(app: &AppHandle) -> Result<Option<ReleaseDescriptor>, Str
     Ok(Some(descriptor))
 }
 
+fn validate_sequence(sequence: u64, highest: u64) -> Result<(), String> {
+    if sequence < highest {
+        Err(format!(
+            "Release sequence {sequence} is older than accepted sequence {highest}"
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 fn updater_for(
     app: &AppHandle,
     descriptor: &ReleaseDescriptor,
@@ -1437,6 +1513,7 @@ fn updater_for(
     let latest = latest_url()?;
     app.updater_builder()
         .pubkey(descriptor.artifact.public_key.clone())
+        .target(running_target()?)
         .endpoints(vec![latest
             .parse()
             .map_err(|error| format!("Invalid updater endpoint: {error}"))?])
@@ -1453,18 +1530,25 @@ fn require_closed_set(
         || update.download_url.as_str() != descriptor.artifact.url
         || update.signature.trim() != descriptor.artifact.signature.trim()
     {
-        return Err("release.v1.json and latest.json do not describe the same artifact".into());
+        return Err("release.v2.json and latest.json do not describe the same artifact".into());
     }
     Ok(())
 }
 
 fn validate_descriptor(descriptor: &ReleaseDescriptor) -> Result<(), String> {
+    validate_descriptor_with_key_id(descriptor, &metadata_root_key_id()?)
+}
+
+fn validate_descriptor_with_key_id(
+    descriptor: &ReleaseDescriptor,
+    key_id: &str,
+) -> Result<(), String> {
     if descriptor.schema_version != DESCRIPTOR_SCHEMA_VERSION
         || descriptor.channel != "stable"
-        || descriptor.target != "windows-x86_64"
+        || descriptor.target != running_target()?
         || descriptor.sequence == 0
         || descriptor.version.trim().is_empty()
-        || descriptor.metadata_key_id != metadata_root_key_id()?
+        || descriptor.metadata_key_id != key_id
         || descriptor.metadata_root_policy != "OFFLINE_LONG_LIVED_V1"
     {
         return Err("Release descriptor identity or metadata key id is invalid".into());
@@ -1479,6 +1563,7 @@ fn validate_descriptor(descriptor: &ReleaseDescriptor) -> Result<(), String> {
         || descriptor.artifact.size == 0
         || descriptor.artifact.signature.trim().is_empty()
         || descriptor.artifact.public_key.trim().is_empty()
+        || descriptor.artifact.key_id.trim().is_empty()
     {
         return Err("Release descriptor artifact fields are incomplete".into());
     }
@@ -1552,8 +1637,16 @@ fn validate_store_compatibility_against(
 }
 
 fn verify_metadata_signature(bytes: &[u8], signature: &str) -> Result<(), String> {
+    verify_metadata_signature_with_key(bytes, signature, &metadata_root_key()?)
+}
+
+fn verify_metadata_signature_with_key(
+    bytes: &[u8],
+    signature: &str,
+    public_key: &str,
+) -> Result<(), String> {
     let key = base64::engine::general_purpose::STANDARD
-        .decode(metadata_root_key()?.trim())
+        .decode(public_key.trim())
         .map_err(|error| format!("Metadata root key is not base64: {error}"))?;
     if key.len() != 32 {
         return Err("Metadata root key must decode to 32 Ed25519 bytes".into());
@@ -1869,20 +1962,50 @@ async fn post_head<T: for<'de> Deserialize<'de>>(
     path: &str,
     body: Option<serde_json::Value>,
 ) -> Result<T, String> {
-    let host = backend.host.clone();
-    let path = path.to_owned();
-    let response = tokio::task::spawn_blocking(move || {
-        crate::shell_actuator::post(
-            &host,
-            &path,
-            &body.unwrap_or_else(|| serde_json::json!({})),
-            HEAD_TIMEOUT.as_millis() as u64,
-        )
-    })
-    .await
-    .map_err(|error| format!("Backend upgrade task failed: {error}"))??;
-    serde_json::from_value(response)
-        .map_err(|error| format!("Backend upgrade response was invalid: {error}"))
+    // The authenticated Head can accept requests before its durable owners/worker are ready.
+    // UpgradeReconciliationProbe uses 503 only for this condition; configuration/identity
+    // refusals use 409. Keep every other error terminal, including an invalid 2xx attestation.
+    let reconciling = path == "/api/upgrade/reconcile";
+    let deadline = tokio::time::Instant::now() + BACKEND_READY_TIMEOUT;
+    loop {
+        if reconciling && tokio::time::Instant::now() >= deadline {
+            return Err("Target Head reconciliation did not become ready before timeout".into());
+        }
+        let host = backend.host.clone();
+        let request_path = path.to_owned();
+        let body = body.clone().unwrap_or_else(|| serde_json::json!({}));
+        let task = tokio::task::spawn_blocking(move || {
+            crate::shell_actuator::post(
+                &host,
+                &request_path,
+                &body,
+                HEAD_TIMEOUT.as_millis() as u64,
+            )
+        });
+        let response = if reconciling {
+            tokio::time::timeout_at(deadline, task)
+                .await
+                .map_err(|_| {
+                    "Target Head reconciliation did not become ready before timeout".to_string()
+                })?
+        } else {
+            task.await
+        }
+        .map_err(|error| format!("Backend upgrade task failed: {error}"))?;
+        match response {
+            // The existing actor transport reports HTTP status errors in this exact form.
+            Err(error) if reconciling && error == "Engine request rejected (503)" => {
+                tokio::time::sleep_until(
+                    deadline.min(tokio::time::Instant::now() + Duration::from_millis(250)),
+                )
+                .await;
+            }
+            response => {
+                return serde_json::from_value(response?)
+                    .map_err(|error| format!("Backend upgrade response was invalid: {error}"));
+            }
+        }
+    }
 }
 
 async fn fetch_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, String> {
@@ -1913,9 +2036,9 @@ fn descriptor_url() -> Result<String, String> {
 
 fn latest_url() -> Result<String, String> {
     descriptor_url()?
-        .strip_suffix("release.v1.json")
+        .strip_suffix("release.v2.json")
         .map(|prefix| format!("{prefix}latest.json"))
-        .ok_or_else(|| "Release descriptor URL must end with release.v1.json".into())
+        .ok_or_else(|| "Release descriptor URL must end with release.v2.json".into())
 }
 
 fn metadata_root_key() -> Result<String, String> {
@@ -2009,7 +2132,11 @@ fn stage_installer(
     let directory = staging_root(app).join(attempt_id);
     fs::create_dir_all(&directory)
         .map_err(|error| format!("Failed to create installer staging directory: {error}"))?;
-    let path = directory.join("JustSearch-update-setup.exe");
+    let path = directory.join(if cfg!(target_os = "linux") {
+        "JustSearch-update.deb"
+    } else {
+        "JustSearch-update-setup.exe"
+    });
     write_bytes_atomic(&path, bytes)?;
     let staged = StagedArtifact {
         path: path.to_string_lossy().into_owned(),
@@ -2036,9 +2163,7 @@ fn validate_staged_artifact(staged: &StagedArtifact, root: &Path) -> Result<(), 
     if bytes.len() as u64 != staged.size || sha256_bytes(&bytes) != staged.sha256 {
         return Err("Staged installer failed post-write size or digest verification".into());
     }
-    if bytes.get(0..2) != Some(b"MZ") {
-        return Err("Staged installer is not a Windows executable".into());
-    }
+    validate_installer_format(&bytes)?;
     Ok(())
 }
 
@@ -2115,9 +2240,47 @@ fn launch_installer(path: &Path) -> Result<(u32, u128), String> {
     Ok((process_id, now_epoch_ms()))
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn launch_installer(_path: &Path) -> Result<(u32, u128), String> {
     Err("Application updater installer launch is Windows-only".into())
+}
+
+#[derive(Debug)]
+struct InstallerError {
+    message: String,
+    repair_required: bool,
+}
+impl From<String> for InstallerError {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            repair_required: false,
+        }
+    }
+}
+impl From<&str> for InstallerError {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[path = "updater_linux.rs"]
+mod linux_installer;
+
+fn validate_installer_format(bytes: &[u8]) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        linux_installer::validate_deb(bytes)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        if bytes.get(0..2) == Some(b"MZ") {
+            Ok(())
+        } else {
+            Err("Authenticated updater artifact is not a Windows NSIS executable".into())
+        }
+    }
 }
 
 fn read_intent(path: &Path) -> Result<Option<UpgradeIntent>, String> {
@@ -2185,7 +2348,69 @@ fn reconcile_intent(
         }
     }
     write_json_atomic(path, &intent)?;
+    cleanup_committed_packages(staging_root, &intent);
     Ok(intent)
+}
+
+fn cleanup_committed_packages(staging_root: &Path, intent: &UpgradeIntent) {
+    if intent.phase != UpgradePhase::Committed {
+        return;
+    }
+    // COMMITTED is already durable. A failed cleanup cannot undo reconciliation or turn a
+    // healthy installation into repair-required; startup retries it from the committed intent.
+    let result = (|| -> Result<(), String> {
+        // Never sweep through a staging root that is a link to somewhere else.
+        match fs::symlink_metadata(staging_root) {
+            Ok(metadata) if metadata.file_type().is_dir() => {}
+            Ok(_) => return Err("Installer staging root is not a directory; not cleaning it".into()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(format!("Failed to inspect installer staging root: {error}")),
+        }
+        let attempts = match fs::read_dir(staging_root) {
+            Ok(attempts) => attempts,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(format!("Failed to read installer staging root: {error}")),
+        };
+        for attempt in attempts {
+            let attempt = attempt.map_err(|error| error.to_string())?;
+            // Never traverse links to directories outside shell staging.
+            if !attempt
+                .file_type()
+                .map_err(|error| error.to_string())?
+                .is_dir()
+            {
+                continue;
+            }
+            let directory = attempt.path();
+            let result = (|| -> std::io::Result<()> {
+                for name in ["JustSearch-update.deb", "JustSearch-update-setup.exe"] {
+                    // remove_file unlinks a package symlink without touching its target.
+                    match fs::remove_file(directory.join(name)) {
+                        Ok(()) => {}
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(error) => return Err(error),
+                    }
+                }
+                match fs::remove_dir(&directory) {
+                    Ok(()) => Ok(()),
+                    // Retain any unexpected contents; only packages and empty folders are ours
+                    // to remove. Other attempts can still be cleaned if this one fails.
+                    Err(error) if error.kind() == std::io::ErrorKind::DirectoryNotEmpty => Ok(()),
+                    Err(error) => Err(error),
+                }
+            })();
+            if let Err(error) = result {
+                eprintln!(
+                    "[updater] Failed to clean staged attempt {}: {error}",
+                    directory.display()
+                );
+            }
+        }
+        Ok(())
+    })();
+    if let Err(error) = result {
+        eprintln!("[updater] {error}");
+    }
 }
 
 /// The Head PID recorded on the intent at commit-shutdown time.
@@ -2444,9 +2669,7 @@ fn checked_installer_bytes(
         {
             return Err("Downloaded installer bytes do not match release descriptor".into());
         }
-        if bytes.get(0..2) != Some(b"MZ") {
-            return Err("Authenticated updater artifact is not a Windows NSIS executable".into());
-        }
+        validate_installer_format(&bytes)?;
         Ok(bytes)
     });
     if let Err(error) = &result {
@@ -2473,6 +2696,7 @@ fn persist_intent_at(
     intent: &UpgradeIntent,
 ) -> Result<(), String> {
     write_json_atomic(&root.join("intent.v1.json"), intent)?;
+    cleanup_committed_packages(&root.join("staged"), intent);
     set_intent_status(coordinator, intent);
     Ok(())
 }
@@ -2627,9 +2851,8 @@ mod tests {
         // These are the configurations used by check_release and post_head. Keep the clients
         // local to this child: a global provider installed by another test must not satisfy this.
         for timeout in [Duration::from_secs(20), HEAD_TIMEOUT] {
-            let client = std::panic::catch_unwind(|| {
-                reqwest::Client::builder().timeout(timeout).build()
-            });
+            let client =
+                std::panic::catch_unwind(|| reqwest::Client::builder().timeout(timeout).build());
             assert!(
                 matches!(client, Ok(Ok(_))),
                 "client construction must not panic or fail",
@@ -2921,11 +3144,11 @@ mod tests {
         let attempt = root.join("attempt");
         fs::create_dir_all(&attempt).unwrap();
         let path = attempt.join("installer.exe");
-        fs::write(&path, b"MZsafe").unwrap();
+        fs::write(&path, fixture_installer_bytes()).unwrap();
         let staged = StagedArtifact {
             path: path.to_string_lossy().into_owned(),
-            sha256: sha256_bytes(b"MZsafe"),
-            size: 6,
+            sha256: sha256_bytes(fixture_installer_bytes()),
+            size: fixture_installer_bytes().len() as u64,
         };
         validate_staged_artifact(&staged, &root).unwrap();
         fs::write(&path, b"MZevil").unwrap();
@@ -2934,7 +3157,7 @@ mod tests {
             .contains("post-write"));
 
         let outside = dir.path().join("outside.exe");
-        fs::write(&outside, b"MZsafe").unwrap();
+        fs::write(&outside, fixture_installer_bytes()).unwrap();
         let escaped = StagedArtifact {
             path: outside.to_string_lossy().into_owned(),
             ..staged
@@ -3005,6 +3228,176 @@ mod tests {
         assert_eq!(reconciled.phase, UpgradePhase::Committed);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn committed_cleanup_never_follows_a_linked_staging_root() {
+        let fixture = evidence_fixture(UpgradePhase::Committed);
+        let outside = fixture.staging_root.with_file_name("outside");
+        fs::rename(&fixture.staging_root, &outside).unwrap();
+        std::os::unix::fs::symlink(&outside, &fixture.staging_root).unwrap();
+        let empty = outside.join("Documents");
+        fs::create_dir_all(&empty).unwrap();
+        let root = fixture.intent_path.parent().unwrap();
+        persist_intent_at(root, &UpdateCoordinator::default(), &fixture.intent).unwrap();
+        assert_eq!(
+            outside.join("attempt-1").join("JustSearch-update-setup.exe").exists(),
+            true,
+            "a package behind a linked staging root is not ours to delete"
+        );
+        assert_eq!(empty.exists(), true, "a folder behind a linked staging root is not ours to delete");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn committed_reconciliation_removes_all_staged_packages_and_empty_attempts() {
+        for name in ["JustSearch-update.deb", "JustSearch-update-setup.exe"] {
+            let fixture = evidence_fixture(UpgradePhase::Reconciling);
+            let root = fixture.intent_path.parent().unwrap();
+            let coordinator = UpdateCoordinator::default();
+            let mut intent = fixture.intent;
+            let package = Path::new(&intent.staged_artifact.path).with_file_name(name);
+            fs::rename(&intent.staged_artifact.path, &package).unwrap();
+            intent.staged_artifact.path = package.to_string_lossy().into_owned();
+            let old_attempt = fixture.staging_root.join("cancelled-attempt");
+            let failed_attempt = fixture.staging_root.join("failed-attempt");
+            let empty_attempt = fixture.staging_root.join("empty-attempt");
+            for attempt in [&old_attempt, &failed_attempt, &empty_attempt] {
+                fs::create_dir_all(attempt).unwrap();
+            }
+            let other_package = old_attempt.join("JustSearch-update.deb");
+            let failed_package = failed_attempt.join("JustSearch-update-setup.exe");
+            fs::write(&other_package, fixture_installer_bytes()).unwrap();
+            fs::write(&failed_package, fixture_installer_bytes()).unwrap();
+            persist_intent_at(root, &coordinator, &intent).unwrap();
+            assert!(package.exists(), "reconciliation is not yet committed");
+            assert!(other_package.exists(), "keep cancelled packages before commit");
+            assert!(failed_package.exists(), "keep failed packages before commit");
+            apply_reconciliation_outcome(&mut intent, Ok(())).unwrap();
+            persist_intent_at(root, &coordinator, &intent).unwrap();
+            assert_eq!(
+                read_intent(&fixture.intent_path).unwrap().unwrap().phase,
+                UpgradePhase::Committed
+            );
+            assert_eq!(
+                package.exists(),
+                false,
+                "the durably committed update package must be deleted: {name}"
+            );
+            assert_eq!(
+                other_package.exists(), false,
+                "delete the older cancelled package"
+            );
+            assert_eq!(
+                failed_package.exists(), false,
+                "delete the older failed package"
+            );
+            for attempt in [
+                package.parent().unwrap(), &old_attempt, &failed_attempt, &empty_attempt,
+            ] {
+                assert_eq!(attempt.exists(), false, "delete empty attempt folders");
+            }
+            assert!(fixture.witness_path.exists(), "keep the launch evidence");
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn startup_retries_committed_package_cleanup() {
+        let fixture = evidence_fixture(UpgradePhase::Committed);
+        let package = fixture.intent.staged_artifact.path.clone();
+        let root = fixture.intent_path.parent().unwrap();
+        // A prior cleanup may have deleted the committed package before it was interrupted.
+        fs::remove_file(&package).unwrap();
+        let old_attempt = fixture.staging_root.join("cancelled-attempt");
+        fs::create_dir_all(&old_attempt).unwrap();
+        fs::write(
+            old_attempt.join("JustSearch-update.deb"), fixture_installer_bytes(),
+        ).unwrap();
+        let reconciled = reconcile_intent(
+            &fixture.intent_path,
+            &fixture.witness_path,
+            &fixture.staging_root,
+            "1.1.0",
+            fixture.intent,
+        )
+        .unwrap();
+        assert_eq!(reconciled.phase, UpgradePhase::Committed);
+        assert_eq!(
+            Path::new(&package).exists(),
+            false,
+            "startup retries cleanup after a crash following durable commit"
+        );
+        assert_eq!(fixture.staging_root.join("attempt-1").exists(), false);
+        assert_eq!(
+            old_attempt.exists(), false,
+            "startup removes older attempts too"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn uncommitted_or_repair_required_packages_remain_available() {
+        for phase in [
+            UpgradePhase::Prepared,
+            UpgradePhase::HeadStopped,
+            UpgradePhase::EngineUnrecoverable,
+            UpgradePhase::InstallLaunching,
+            UpgradePhase::InstallLaunched,
+            UpgradePhase::Reconciling,
+            UpgradePhase::RepairRequired,
+            UpgradePhase::Cancelled,
+        ] {
+            let fixture = evidence_fixture(phase);
+            let root = fixture.intent_path.parent().unwrap();
+            persist_intent_at(root, &UpdateCoordinator::default(), &fixture.intent).unwrap();
+            assert!(
+                Path::new(&fixture.intent.staged_artifact.path).exists(),
+                "retain package in {:?}",
+                fixture.intent.phase
+            );
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn failed_commit_write_keeps_the_staged_package() {
+        let fixture = evidence_fixture(UpgradePhase::Reconciling);
+        let root = fixture.intent_path.parent().unwrap();
+        fs::remove_file(&fixture.intent_path).unwrap();
+        fs::create_dir(&fixture.intent_path).unwrap();
+        let mut intent = fixture.intent;
+        apply_reconciliation_outcome(&mut intent, Ok(())).unwrap();
+        assert!(persist_intent_at(root, &UpdateCoordinator::default(), &intent).is_err());
+        assert!(Path::new(&intent.staged_artifact.path).exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn committed_cleanup_never_follows_a_package_outside_staging() {
+        let fixture = evidence_fixture(UpgradePhase::Committed);
+        let root = fixture.intent_path.parent().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let package = outside.path().join("manual-reinstall.deb");
+        fs::write(&package, fixture_installer_bytes()).unwrap();
+        fs::remove_file(&fixture.intent.staged_artifact.path).unwrap();
+        std::os::unix::fs::symlink(&package, &fixture.intent.staged_artifact.path).unwrap();
+        let outside_attempt = outside.path().join("attempt-outside");
+        fs::create_dir_all(&outside_attempt).unwrap();
+        let outside_package = outside_attempt.join("JustSearch-update.deb");
+        fs::write(&outside_package, fixture_installer_bytes()).unwrap();
+        std::os::unix::fs::symlink(
+            &outside_attempt, fixture.staging_root.join("linked-attempt"),
+        ).unwrap();
+        persist_intent_at(root, &UpdateCoordinator::default(), &fixture.intent).unwrap();
+        assert!(package.exists());
+        assert!(
+            outside_package.exists(),
+            "never traverse a linked attempt folder"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn cancelled_terminal_state_allows_future_update_checks() {
         let coordinator = UpdateCoordinator::default();
@@ -3045,13 +3438,13 @@ mod tests {
 
         // The transport allowance tracks the gate exactly - never wider.
         assert_eq!(
-            ensure_https("http://127.0.0.1:8765/release.v1.json").is_ok(),
+            ensure_https("http://127.0.0.1:8765/release.v2.json").is_ok(),
             sandbox_test_mode(),
             "loopback HTTP is permitted if and only if this build was compiled for qualification"
         );
         // Non-loopback plaintext is refused in every build, gated or not.
-        assert!(ensure_https("http://example.com/release.v1.json").is_err());
-        assert!(ensure_https("https://example.com/release.v1.json").is_ok());
+        assert!(ensure_https("http://example.com/release.v2.json").is_err());
+        assert!(ensure_https("https://example.com/release.v2.json").is_ok());
     }
 
     #[test]
@@ -3279,13 +3672,13 @@ mod tests {
             .unwrap()
             .keep();
         let staging_root = directory.join("staged");
-        let staged_path = staging_root.join("attempt-1").join("installer.exe");
+        let staged_path = staging_root.join("attempt-1").join("JustSearch-update-setup.exe");
         fs::create_dir_all(staged_path.parent().unwrap()).unwrap();
-        fs::write(&staged_path, b"MZfixture").unwrap();
+        fs::write(&staged_path, fixture_installer_bytes()).unwrap();
         let staged = StagedArtifact {
             path: staged_path.to_string_lossy().into_owned(),
-            sha256: sha256_bytes(b"MZfixture"),
-            size: 9,
+            sha256: sha256_bytes(fixture_installer_bytes()),
+            size: fixture_installer_bytes().len() as u64,
         };
         let witness = InstallerLaunchWitness {
             schema_version: 1,
@@ -3561,8 +3954,8 @@ mod tests {
         for kind in ["transport", "signature", "digest", "size", "executable"] {
             let coordinator = UpdateCoordinator::default();
             let mut descriptor = test_descriptor(vec![]);
-            descriptor.artifact.sha256 = sha256_bytes(b"MZfixture");
-            descriptor.artifact.size = 9;
+            descriptor.artifact.sha256 = sha256_bytes(fixture_installer_bytes());
+            descriptor.artifact.size = fixture_installer_bytes().len() as u64;
             *coordinator.pending.lock().unwrap() = Some(descriptor.clone());
             set_state(&coordinator, "downloading", None);
             set_download_progress(&coordinator, 7, Some(9));
@@ -3573,7 +3966,7 @@ mod tests {
                 "digest" => Ok(b"MZtampered".to_vec()),
                 "size" => {
                     descriptor.artifact.size = 99;
-                    Ok(b"MZfixture".to_vec())
+                    Ok(fixture_installer_bytes().to_vec())
                 }
                 _ => {
                     descriptor.artifact.sha256 = sha256_bytes(b"not an exe");
@@ -3596,13 +3989,15 @@ mod tests {
         }
     }
 
-    fn test_descriptor(compatibility: Vec<ReleaseStoreCompatibility>) -> ReleaseDescriptor {
+    pub(super) fn test_descriptor(
+        compatibility: Vec<ReleaseStoreCompatibility>,
+    ) -> ReleaseDescriptor {
         ReleaseDescriptor {
-            schema_version: 1,
+            schema_version: 2,
             sequence: 3,
             version: "1.1.0".into(),
             channel: "stable".into(),
-            target: "windows-x86_64".into(),
+            target: running_target().unwrap().into(),
             metadata_key_id: "metadata-test".into(),
             metadata_root_policy: "OFFLINE_LONG_LIVED_V1".into(),
             artifact: ReleaseArtifact {
@@ -3611,6 +4006,7 @@ mod tests {
                 size: 1,
                 signature: "signature".into(),
                 public_key: "public-key".into(),
+                key_id: "fixture-artifact".into(),
             },
             compatibility,
         }
@@ -3632,3 +4028,20 @@ mod actor_hold_witness_tests;
 #[cfg(all(test, target_os = "linux"))]
 #[path = "updater_connection_tests.rs"]
 mod connection_tests;
+
+#[cfg(test)]
+fn fixture_installer_bytes() -> &'static [u8] {
+    if cfg!(target_os = "linux") {
+        b"!<arch>\ndebian-binary   0           0     0     100644  4         `\n2.0\n"
+    } else {
+        b"MZfixture"
+    }
+}
+
+#[cfg(test)]
+#[path = "updater_v2_tests.rs"]
+mod v2_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "updater_reconciliation_tests.rs"]
+mod reconciliation_tests;

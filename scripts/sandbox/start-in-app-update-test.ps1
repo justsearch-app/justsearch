@@ -44,7 +44,7 @@ $server = Start-Process -FilePath "powershell.exe" -WindowStyle Hidden -PassThru
 )
 $server.Id | Set-Content -LiteralPath (Join-Path $feedRoot "server.pid") -Encoding ASCII
 
-$env:JUSTSEARCH_RELEASE_DESCRIPTOR_URL = "http://127.0.0.1:$Port/release.v1.json"
+$env:JUSTSEARCH_RELEASE_DESCRIPTOR_URL = "http://127.0.0.1:$Port/release.v2.json"
 $env:JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY = [string]$config.metadataRootPublicKey
 $env:JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID = [string]$config.metadataRootKeyId
 

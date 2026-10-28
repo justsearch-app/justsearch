@@ -11,12 +11,12 @@
  * locked in with the first stable tag (v0.2.0, sequence 40, published 2026-08-13).
  *
  * The replacement source is the published release descriptors themselves: the next
- * sequence is `max(sequence over every published release.v1.json) + 1`. That is
+ * sequence is `max(sequence over every published release.v1.json or release.v2.json) + 1`. That is
  * independent of workflow-file identity, and monotonic by construction against exactly
  * the values clients can have accepted — the same artifacts the updater reads.
  *
  * Fail-closed rules (a guessed sequence is what bricks clients):
- *   - A release WITHOUT a `release.v1.json` asset is skipped with a warning (v0.1.0
+ *   - A release WITHOUT a v1 or v2 descriptor asset is skipped with a warning (v0.1.0
  *     predates the descriptor).
  *   - A release WITH the asset whose bytes cannot be fetched or parsed, or whose
  *     `sequence` is not a positive integer, is a HARD ERROR. Never guess past a
@@ -32,6 +32,7 @@
  */
 
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import process from 'node:process';
 import { mkdir, rename, rm, writeFile, lstat } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -49,6 +50,7 @@ import { checkRetiredDurableStores } from './check-store-recoverability.mjs';
 export const RELEASE_SEQUENCE_FLOOR = 41;
 
 export const DESCRIPTOR_ASSET_NAME = 'release.v1.json';
+export const DESCRIPTOR_ASSET_NAMES = ['release.v1.json', 'release.v2.json'];
 
 // Overridable so the test suite can drive the network-failure path offline (against a closed
 // loopback port). Production callers never set it.
@@ -75,7 +77,7 @@ export async function deriveReleaseSequence({
   const warnings = [];
   const observed = [];
   let predecessor = null;
-  let ambiguousPredecessor = false;
+  const sequences = new Map();
 
   for (const release of releases) {
     const tag = release.tag_name ?? '(untagged)';
@@ -87,51 +89,75 @@ export async function deriveReleaseSequence({
       warnings.push(`skipped ${tag}: it is the tag being built (keeps a re-run of a published tag idempotent)`);
       continue;
     }
-    const asset = (release.assets ?? []).find((candidate) => candidate?.name === DESCRIPTOR_ASSET_NAME);
-    if (!asset) {
-      warnings.push(`skipped ${tag}: no ${DESCRIPTOR_ASSET_NAME} asset (predates the release descriptor)`);
+    const assets = (release.assets ?? []).filter(candidate => DESCRIPTOR_ASSET_NAMES.includes(candidate?.name));
+    if (!assets.length) {
+      warnings.push(`skipped ${tag}: no release.v1.json or release.v2.json asset (predates the release descriptor)`);
       continue;
     }
 
-    let text;
-    try {
-      text = await fetchAsset(asset, release);
-    } catch (error) {
-      throw new Error(
-        `Failed to download ${DESCRIPTOR_ASSET_NAME} from published release ${tag}: ${error.message}. ` +
-          'Refusing to derive a sequence past a descriptor that exists but could not be read.',
-      );
-    }
+    let releaseDescriptor = null;
+    for (const asset of assets) {
+      const assetName = asset.name;
+      if (assets.filter(candidate => candidate.name === assetName).length !== 1) {
+        throw new Error(`Conflicting duplicate ${assetName} assets in published release ${tag}.`);
+      }
+      let text;
+      try {
+        text = await fetchAsset(asset, release);
+      } catch (error) {
+        throw new Error(
+          `Failed to download ${assetName} from published release ${tag}: ${error.message}. ` +
+            'Refusing to derive a sequence past a descriptor that exists but could not be read.',
+        );
+      }
 
-    let descriptor;
-    try {
-      descriptor = JSON.parse(text);
-    } catch (error) {
-      throw new Error(
-        `Published release ${tag} has an unparseable ${DESCRIPTOR_ASSET_NAME}: ${error.message}. ` +
-          'Refusing to derive a sequence past a descriptor that exists but could not be read.',
-      );
-    }
+      let descriptor;
+      try {
+        descriptor = JSON.parse(text);
+      } catch (error) {
+        throw new Error(
+          `Published release ${tag} has an unparseable ${assetName}: ${error.message}. ` +
+            'Refusing to derive a sequence past a descriptor that exists but could not be read.',
+        );
+      }
 
-    const sequence = descriptor?.sequence;
-    if (!Number.isSafeInteger(sequence) || sequence <= 0 || sequence === Number.MAX_SAFE_INTEGER) {
-      throw new Error(
-        `Published release ${tag} has ${DESCRIPTOR_ASSET_NAME} with an invalid sequence ` +
-          `(${JSON.stringify(sequence)}); expected a positive safe integer with a safe successor.`,
-      );
-    }
-    if (fetchCompatibilityBaseline && (descriptor.schemaVersion !== 1
-        || descriptor.channel !== 'stable' || descriptor.target !== 'windows-x86_64'
-        || typeof descriptor.version !== 'string' || !descriptor.version.trim()
-        || tag !== `v${descriptor.version}`)) {
-      throw new Error(`Published predecessor ${tag} descriptor/tag identity mismatch.`);
-    }
-    observed.push({ tag, sequence });
-    if (!predecessor || sequence > predecessor.sequence) {
-      predecessor = { release, descriptor, tag, sequence };
-      ambiguousPredecessor = false;
-    } else if (sequence === predecessor.sequence && tag !== predecessor.tag) {
-      ambiguousPredecessor = true;
+      const sequence = descriptor?.sequence;
+      if (!Number.isSafeInteger(sequence) || sequence <= 0 || sequence === Number.MAX_SAFE_INTEGER) {
+        throw new Error(
+          `Published release ${tag} has ${assetName} with an invalid sequence ` +
+            `(${JSON.stringify(sequence)}); expected a positive safe integer with a safe successor.`,
+        );
+      }
+      if (fetchCompatibilityBaseline && ((assetName === 'release.v1.json'
+            ? descriptor.schemaVersion !== 1 || descriptor.target !== 'windows-x86_64'
+            : descriptor.schemaVersion !== 2 || !descriptor.targets
+              || !Object.keys(descriptor.targets).length
+              || Object.keys(descriptor.targets).some(target => !['windows-x86_64', 'linux-x86_64'].includes(target)))
+          || descriptor.channel !== 'stable'
+          || typeof descriptor.version !== 'string' || !descriptor.version.trim()
+          || tag !== `v${descriptor.version}`)) {
+        throw new Error(`Published predecessor ${tag} descriptor/tag identity mismatch.`);
+      }
+      const prior = sequences.get(sequence);
+      if (prior && prior !== tag) {
+        throw new Error(`Conflicting published sequence ${sequence}: ambiguous predecessor tags ${prior} and ${tag}.`);
+      }
+      sequences.set(sequence, tag);
+      if (releaseDescriptor) {
+        const envelope = d => JSON.stringify([d.sequence, d.version, d.channel, d.metadataKeyId, d.metadataRootPolicy]);
+        const windows = d => d.schemaVersion === 2 ? d.targets?.['windows-x86_64']
+          : { artifact: d.artifact, compatibility: d.compatibility };
+        if (envelope(descriptor) !== envelope(releaseDescriptor)
+            || !isDeepStrictEqual(windows(descriptor), windows(releaseDescriptor))) {
+          throw new Error(`Conflicting v1/v2 descriptors in published release ${tag}.`);
+        }
+      }
+      releaseDescriptor = descriptor;
+      observed.push({ tag, sequence, asset: assetName });
+      if (!predecessor || sequence > predecessor.sequence
+          || (tag === predecessor.tag && descriptor.schemaVersion > predecessor.descriptor.schemaVersion)) {
+        predecessor = { release, descriptor, tag, sequence };
+      }
     }
   }
 
@@ -141,7 +167,7 @@ export async function deriveReleaseSequence({
     }
     return {
       sequence: floor,
-      provenance: `no published ${DESCRIPTOR_ASSET_NAME} found; using checked-in floor ${floor}`,
+      provenance: `no published v1/v2 descriptor found; using checked-in floor ${floor}`,
       warnings,
       observed,
     };
@@ -150,7 +176,6 @@ export async function deriveReleaseSequence({
   const highest = observed.reduce((best, entry) => (entry.sequence > best.sequence ? entry : best));
   let compatibilityBaseline;
   if (fetchCompatibilityBaseline) {
-    if (ambiguousPredecessor) throw new Error('Highest published sequence has ambiguous predecessor tags.');
     const text = await fetchCompatibilityBaseline(predecessor.release);
     validateCompatibilityBaseline(text, predecessor.descriptor, predecessor.tag);
     compatibilityBaseline = { tag: predecessor.tag, text };
@@ -160,7 +185,7 @@ export async function deriveReleaseSequence({
     return {
       sequence: floor,
       provenance:
-        `highest published sequence ${highest.sequence} (${highest.tag}/${DESCRIPTOR_ASSET_NAME}) + 1 = ${next}, ` +
+        `highest published sequence ${highest.sequence} (${highest.tag}/${highest.asset}) + 1 = ${next}, ` +
         `raised to checked-in floor ${floor}`,
       warnings,
       observed,
@@ -169,7 +194,7 @@ export async function deriveReleaseSequence({
   }
   return {
     sequence: next,
-    provenance: `highest published sequence ${highest.sequence} (${highest.tag}/${DESCRIPTOR_ASSET_NAME}) + 1`,
+    provenance: `highest published sequence ${highest.sequence} (${highest.tag}/${highest.asset}) + 1`,
     warnings,
     observed,
     ...(compatibilityBaseline ? { compatibilityBaseline } : {}),
@@ -194,18 +219,25 @@ function validateCompatibilityBaseline(text, descriptor, tag) {
     byId.set(store.id, store);
   }
   for (const store of baseline.retiredDurableStores ?? []) byId.set(store.id, store);
-  if (!Array.isArray(descriptor.compatibility) || descriptor.compatibility.length === 0) {
-    throw new Error(`Predecessor ${tag} descriptor has no compatibility evidence.`);
-  }
-  const seen = new Set();
-  for (const row of descriptor.compatibility) {
-    const store = byId.get(row?.ownerId);
-    if (!store || seen.has(row.ownerId) || row.owner !== store.owner
-        || row.role !== store.recoverability || row.reconciliationStrategy !== store.reconciliation
-        || row.formatVersion !== store.currentVersion) {
-      throw new Error(`Predecessor ${tag} descriptor/tag compatibility identity or format mismatch.`);
+  const tables = descriptor.schemaVersion === 2
+    ? Object.values(descriptor.targets).map(target => target.compatibility)
+    : [descriptor.compatibility];
+  for (const compatibility of tables) {
+    if (!Array.isArray(compatibility) || compatibility.length === 0) {
+      throw new Error(`Predecessor ${tag} descriptor has no compatibility evidence.`);
     }
-    seen.add(row.ownerId);
+    const seen = new Set();
+    for (const row of compatibility) {
+      const store = byId.get(row?.ownerId);
+      if (!store || seen.has(row.ownerId) || row.owner !== store.owner
+          || row.role !== store.recoverability || row.reconciliationStrategy !== store.reconciliation
+          || row.formatVersion !== store.currentVersion) {
+        throw new Error(`Predecessor ${tag} descriptor/tag compatibility identity or format mismatch.`);
+      }
+      seen.add(row.ownerId);
+    }
+    // A v1 predecessor projected only its own predecessor. Its full tagged register, above,
+    // is authoritative for the next release. V2 follows the same rule for newly added stores.
   }
 }
 
@@ -302,7 +334,7 @@ async function main() {
   if (opts.help) {
     console.log(
       'Usage: node scripts/ci/derive-release-sequence.mjs [--repo owner/repo] [--exclude-tag vX.Y.Z] [--compat-baseline-out FILE]\n\n' +
-        'Prints max(sequence over published release.v1.json assets) + 1 on stdout,\n' +
+        'Prints max(sequence over published v1/v2 descriptor assets) + 1 on stdout,\n' +
         `never below the checked-in floor ${RELEASE_SEQUENCE_FLOOR}.`,
     );
     return;

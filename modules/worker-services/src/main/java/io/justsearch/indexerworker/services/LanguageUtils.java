@@ -100,7 +100,12 @@ public final class LanguageUtils {
 
     // 8. Truncate
     if (preview.length() > maxChars) {
-      preview = preview.substring(0, maxChars);
+      int cut = maxChars;
+      if (cut > 0 && Character.isHighSurrogate(preview.charAt(cut - 1))
+          && Character.isLowSurrogate(preview.charAt(cut))) {
+        cut--;
+      }
+      preview = preview.substring(0, cut);
     }
     return preview;
   }

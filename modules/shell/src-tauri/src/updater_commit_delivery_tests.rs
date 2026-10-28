@@ -76,7 +76,7 @@ impl UpgradeHandoff for DeliveryFixture {
     fn resume(&self) -> Result<(), String> {
         panic!("nothing restarts while held")
     }
-    fn launch(&self, _: &Path) -> Result<(u32, u128), String> {
+    fn launch(&self, _: &Path) -> Result<(u32, u128), InstallerError> {
         assert!(self.exit.load(Ordering::SeqCst));
         self.launches.fetch_add(1, Ordering::SeqCst);
         Ok((100, now_epoch_ms()))
@@ -95,11 +95,11 @@ async fn consumed_commit_queue_held_crash_installs_for_every_exit_observation_or
         };
         let path = fixture.root.path().join("staged/probe/installer.exe");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(&path, b"MZfixture").unwrap();
+        fs::write(&path, fixture_installer_bytes()).unwrap();
         let staged = StagedArtifact {
             path: path.to_string_lossy().into_owned(),
-            sha256: sha256_bytes(b"MZfixture"),
-            size: 9,
+            sha256: sha256_bytes(fixture_installer_bytes()),
+            size: fixture_installer_bytes().len() as u64,
         };
         let descriptor = ReleaseDescriptor {
             schema_version: 1,
@@ -115,6 +115,7 @@ async fn consumed_commit_queue_held_crash_installs_for_every_exit_observation_or
                 size: staged.size,
                 signature: "fixture".into(),
                 public_key: "fixture".into(),
+                key_id: "fixture-artifact".into(),
             },
             compatibility: vec![],
         };
@@ -156,7 +157,13 @@ fn actor_without_terminal_observation_cannot_authorize_install() {
     let host = crate::engine_host::EngineHost::default();
     host.acquire_replacement_hold(Duration::ZERO).unwrap();
     let supervisor = crate::supervisor::Supervisor::new(crate::supervisor::load_policy());
-    host.publish_state(None, &supervisor.record(None, None, None, None, "2026-10-07T00:00:00Z".into()), |_| {});
-    assert_eq!(finish_held_actor_exit(&host, Duration::ZERO).unwrap_err(),
-        "Actor ended without publishing its exit observation");
+    host.publish_state(
+        None,
+        &supervisor.record(None, None, None, None, "2026-10-07T00:00:00Z".into()),
+        |_| {},
+    );
+    assert_eq!(
+        finish_held_actor_exit(&host, Duration::ZERO).unwrap_err(),
+        "Actor ended without publishing its exit observation"
+    );
 }

@@ -18,6 +18,14 @@ related:
 
 # 617 - Full auto-update: decisions before design (374 G1 deep-dive)
 
+> **Descriptor update (2026-10-27).** New clients use signed descriptor v2 with explicit Windows
+> and Linux targets and one shared release sequence history across v1/v2. Linux applies a verified
+> Debian package through pkexec/apt and relaunches only on success. New releases omit the v1
+> descriptor; installed 0.3.0 clients receive a recoverable check error and upgrade manually.
+> The root key, signature/hash checks, Engine handoff and owner reconciliation remain required.
+> See [Cut a release](../how-to/cut-a-release.md) for the current format and commands; the v1
+> design below is dated history.
+
 > **Implementation update (2026-07-31).** The decision-scoping text below is
 > retained as dated history. The implemented design supersedes its earlier
 > assumption that `tauri-plugin-updater` belongs only to a future silent tier.
@@ -552,45 +560,7 @@ the sibling work may already have landed under a differently-titled squash.
 
 ### 10.7 Predecessor-session transcript: triage of its own risk register
 
-The prior Codex session's full transcript was reviewed (3,428 lines). Its last
-formal verdict was **"NO-GO for merge or release. Final confidence: 4/10"** —
-materially more cautious than this doc's frontmatter, which read
-`implemented; release qualification pending`. The doc had drifted optimistic
-relative to its author's judgment; the frontmatter is corrected above.
-
-The session ended mid-flow, on *"then I'll run the integrated verification and
-independent review"* — neither ran. That, not carelessness, is why §10.4's three
-gate violations survived: they were never given a chance to fail. Leaving the
-tree uncommitted was likewise a stated policy (*"I'll leave all changes
-uncommitted"*), not an oversight — but it is what made §10.1 necessary.
-
-Its confidence trajectory is worth preserving: 6/10 → 7/10 after derisk →
-**3/10** after an independent refute-first review that found ten P0/P1 blockers
-→ 4/10 after remediation. Confidence fell under scrutiny, twice. The
-"version equality is only an observation" rule in §7.5 is a *remediation* of one
-of those P0s, not original design — the review loop earned it.
-
-One dated claim needs retiring: the session recorded *"Rust test execution is
-blocked locally by Windows Smart App Control."* That diagnosis was wrong. The
-real blocker was the unstaged `resources/headless` bundle glob; with SAC still
-enforcing, staging a placeholder ran all 39 tests (§10.3). This is the
-`ai-offline-isnt-a-wall` handle: a tier declared environmentally unavailable
-while a tool for it was at hand.
-
-Its remaining-risk register, re-checked against current code rather than taken
-as read:
-
-| Item | Status |
-|---|---|
-| P0 no durable-owner reconciliation protocol | **closed** — `updater.rs:931` gates `COMMITTED` on a durable-owner format check, `UpgradeReconciliationProbe` backs it |
-| P0 release workflow cannot publish the closed asset set | **closed** — `tauri.updater.conf.json` overlay carries `createUpdaterArtifacts` + `basicUi`, applied at `package-installer-win.ps1:288-298`, signing secrets wired at `build-installer.yml:231` |
-| P0 quiescence coverage incomplete | **partly closed** — see §10.8 |
-| P0 Sandbox lane does not exercise the in-app updater | **open** — §9 items 3-4; see §10.12 for what is actually reachable |
-| P1 inventory completeness unproven | **closed** — `dd749c1d` |
-| P1 authored stores at version 0 | **not a defect** — the two remaining (`byo-ai-assets`, `user-plugin-payloads`) are `PRESERVE_EXTERNAL` formats the app never parses or rewrites; version-stamping them would be meaningless. Run events are versioned |
-| P1 Tauri exits after `ShellExecuteW` unchecked | **closed** — §7.5's witnessed `ShellExecuteExW` |
-| P1 tempdoc contradicts the implemented Tier-A decision | **closed** — the header note |
-| P2 `tauri.conf.json` collides with 772 | **open** — §10.6 |
+Moved to [617-evidence/predecessor-transcript-triage.md](617-evidence/predecessor-transcript-triage.md): the prior session's risk register, item by item; one item stays open (§10.6).
 
 ### 10.8 The quiescence hole, and what is still open
 

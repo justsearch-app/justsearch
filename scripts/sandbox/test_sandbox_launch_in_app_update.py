@@ -31,7 +31,7 @@ class InAppUpdaterClosedSetTests(unittest.TestCase):
             installer = root / "JustSearch_2.0.0_x64-setup.exe"
             installer.write_bytes(b"selected candidate")
             descriptor = {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "metadataKeyId": "sandbox-root",
                 "version": "2.0.0",
                 "sequence": 2,
@@ -41,17 +41,19 @@ class InAppUpdaterClosedSetTests(unittest.TestCase):
                     "signature": "signed",
                 },
             }
+            artifact = descriptor.pop("artifact")
+            descriptor["targets"] = {"windows-x86_64": {"artifact": artifact, "compatibility": []}}
             latest = {
                 "version": "2.0.0",
                 "platforms": {
                     "windows-x86_64": {
-                        "url": descriptor["artifact"]["url"],
+                        "url": artifact["url"],
                         "signature": "signed",
                     }
                 },
             }
-            (release / "release.v1.json").write_text(json.dumps(descriptor))
-            (release / "release.v1.json.sig").write_text("metadata-signature")
+            (release / "release.v2.json").write_text(json.dumps(descriptor))
+            (release / "release.v2.json.sig").write_text("metadata-signature")
             (release / "latest.json").write_text(json.dumps(latest))
             (release / f"{installer.name}.sig").write_text("artifact-signature")
             public_key = root / "metadata-public.pem"
@@ -76,7 +78,7 @@ class InAppUpdaterClosedSetTests(unittest.TestCase):
 
             digest = hashlib.sha256(installer.read_bytes()).hexdigest()
             descriptor = {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "metadataKeyId": "production-root",
                 "version": "2.0.0",
                 "sequence": 2,
@@ -86,18 +88,20 @@ class InAppUpdaterClosedSetTests(unittest.TestCase):
                     "signature": "signed",
                 },
             }
+            artifact = descriptor.pop("artifact")
+            descriptor["targets"] = {"windows-x86_64": {"artifact": artifact, "compatibility": []}}
             latest = {
                 "version": "2.0.0",
                 "platforms": {
                     "windows-x86_64": {
-                        "url": descriptor["artifact"]["url"],
+                        "url": artifact["url"],
                         "signature": "signed",
                     }
                 },
             }
             for name, value in {
-                "release.v1.json": json.dumps(descriptor),
-                "release.v1.json.sig": "metadata-signature",
+                "release.v2.json": json.dumps(descriptor),
+                "release.v2.json.sig": "metadata-signature",
                 "latest.json": json.dumps(latest),
                 f"{installer.name}.sig": "artifact-signature",
             }.items():
