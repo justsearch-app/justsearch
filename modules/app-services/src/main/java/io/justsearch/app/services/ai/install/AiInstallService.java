@@ -1290,7 +1290,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     if (NativeTargets.current().hasCpuBaselineRuntime()
         || planIncludesChatRuntimeConsumer(plan, registry)) {
       updateState("running", "restore_runtime", "Restoring AI runtime...");
-      boolean bundledRuntimePresent = RuntimeRestoreUtil.ensureRuntimePresent(homeDir);
+      // A Linux pack supplies both first installation and repair of a deleted executable.
+      // Probing a stale saved path first would throw before acquisition could restore it.
+      boolean runtimeFromPlan = !NativeTargets.current().hasCpuBaselineRuntime()
+          && planSuppliesRuntime(plan, registry);
+      boolean bundledRuntimePresent = !runtimeFromPlan && RuntimeRestoreUtil.ensureRuntimePresent(homeDir);
       if (!runtimePreconditionMet(bundledRuntimePresent, plan, registry)) {
         fail(
             "RUNTIME_MISSING",
@@ -2063,7 +2067,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       io.justsearch.gpu.GpuCapabilities.Effective effective =
           new io.justsearch.app.services.gpu.GpuCapabilityResolver().snapshot().effective();
       if (effective.cuda() != null && Boolean.TRUE.equals(effective.cuda().functional())) {
-        cudaFunctional = true;
+        cudaFunctional = NativeTargets.current().hasCpuBaselineRuntime()
+            || (effective.driverVersionMajor() != null && effective.driverVersionMajor() >= 570);
       }
       if (effective.totalVramBytes() != null && effective.totalVramBytes() > 0) {
         vramBytes = effective.totalVramBytes();
@@ -2324,7 +2329,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    *     override was respected
    */
   private boolean applyCudaServerExe() {
-    if (!PlatformPaths.isWindows() || !gpuAccelerationAllowed()) return false;
+    if (!NativeTargets.current().supportsRuntimePacks() || !gpuAccelerationAllowed()) return false;
     Path cuda12Exe =
         homeDir
             .resolve("native-bin/llama-server/variants/cuda12")

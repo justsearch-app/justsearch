@@ -45,6 +45,13 @@ public final class OrtCudaHelper {
    * Version-pinned to CUDA 12 / cuDNN 9 / cuFFT 11. Update this list when upgrading CUDA toolkit.
    */
   static List<String> cudaDependencyDllOrder() {
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      // Linux's sparse/solver libraries need nvJitLink first. SONAME preloading works even
+      // after a CPU session initialized ORT; changing ORT's one-shot native.path does not.
+      return nativeLibraryNames("nvJitLink", "cudart", "cublasLt", "cublas", "cufft", "curand",
+          "cusparse", "cusolver", "cudnn", "cudnn_graph", "cudnn_heuristic", "cudnn_ops",
+          "cudnn_cnn", "cudnn_adv", "cudnn_engines_runtime_compiled", "cudnn_engines_precompiled");
+    }
     return nativeLibraryNames("cudart", "cublasLt", "cublas", "cufft", "curand", "cusparse", "cusolver",
           "nvJitLink", "cudnn", "cudnn_graph", "cudnn_heuristic", "cudnn_ops", "cudnn_cnn",
           "cudnn_adv", "cudnn_engines_runtime_compiled", "cudnn_engines_precompiled");

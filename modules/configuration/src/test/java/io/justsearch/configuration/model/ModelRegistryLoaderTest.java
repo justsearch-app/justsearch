@@ -8,6 +8,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class ModelRegistryLoaderTest {
+  private String priorOs;
+  @org.junit.jupiter.api.BeforeEach void windowsRegistryContract() {
+    priorOs = System.getProperty("os.name");
+    System.setProperty("os.name", "Windows 11");
+  }
+  @org.junit.jupiter.api.AfterEach void restoreOs() { System.setProperty("os.name", priorOs); }
+
 
   @Test
   void loadsV2RegistryFromClasspath() {

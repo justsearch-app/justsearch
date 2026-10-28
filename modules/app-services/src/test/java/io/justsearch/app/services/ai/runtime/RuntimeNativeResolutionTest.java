@@ -69,4 +69,22 @@ class RuntimeNativeResolutionTest {
       System.setProperty("os.name", previous);
     }
   }
+  @Test void linuxDownloadedPackIsUsedForExplicitAndDefaultActivation() throws Exception {
+    Path variants = Files.createDirectories(root.resolve("variants"));
+    Path cuda = Files.createDirectories(variants.resolve("cuda12")).resolve("llama-server");
+    Files.writeString(cuda, "#!/bin/sh\nexit 0\n");
+    assertTrue(cuda.toFile().setExecutable(true, true));
+    for (String variant : new String[] {null, "", "default", "cuda12"}) {
+      assertEquals(cuda, RuntimeActivationService.activationExecutable(variants, variant, null));
+    }
+  }
+
+  @Test void linuxNeverDiscoversAnUnconfiguredFlatCpuFallback() throws Exception {
+    Path variants = Files.createDirectories(root.resolve("variants"));
+    Path flat = Files.writeString(root.resolve("llama-server"), "#!/bin/sh\nexit 0\n");
+    assertTrue(flat.toFile().setExecutable(true, true));
+    assertThrows(IllegalStateException.class,
+        () -> RuntimeActivationService.activationExecutable(variants, "default", null));
+  }
+
 }

@@ -2797,8 +2797,7 @@ public class HeadlessApp {
    * </ol>
    */
   static Path maybeAutoSelectCuda12Variant(UiSettings settings, ConfigStore activeConfigStore) {
-    // cuda12 is the packaged Windows backend. Linux uses the validated operator runtime.
-    if (!PlatformPaths.isWindows()) return null;
+    if (!io.justsearch.configuration.NativeTargets.current().supportsRuntimePacks()) return null;
     try {
       // Check if GPU acceleration is requested
       int gpuLayers = settings.getGpuLayers();
@@ -2816,6 +2815,13 @@ public class HeadlessApp {
       if (source != null && source.isResolved() && source.sourceOrdinal() >= 300) {
         log.info("GPU auto-selection: SKIPPED (explicit server source={})", source.sourceName());
         return null;
+      }
+
+      if (!io.justsearch.configuration.NativeTargets.current().hasCpuBaselineRuntime()) {
+        Path downloaded = PlatformPaths.resolveDataDir()
+            .resolve("native-bin/llama-server/variants/cuda12")
+            .resolve(io.justsearch.configuration.NativeTargets.current().executableName("llama-server"));
+        return Files.isRegularFile(downloaded) && Files.isExecutable(downloaded) ? downloaded : null;
       }
 
       // Find the current/default server executable

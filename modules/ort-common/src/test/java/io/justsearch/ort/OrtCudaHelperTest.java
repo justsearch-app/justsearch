@@ -114,4 +114,12 @@ class OrtCudaHelperTest {
     Files.createDirectories(file.getParent());
     Files.writeString(file, "stub");
   }
+  @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void linuxJitLinkIsPreloadedBeforeSparseAndSolver() {
+    var order = OrtCudaHelper.cudaDependencyDllOrder();
+    assertTrue(order.indexOf("libnvJitLink.so.12") < order.indexOf("libcusparse.so.12"));
+    assertTrue(order.indexOf("libnvJitLink.so.12") < order.indexOf("libcusolver.so.11"));
+  }
+
 }
