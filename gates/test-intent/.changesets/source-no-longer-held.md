@@ -336,3 +336,25 @@ longer sufficient evidence that the index has no record.
   "note": "Codex auditor-3: the revised accessibility oracle still rejects valid names/descriptions and accepts an overridden description; the other five entries satisfy their classes"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1803b-1938-78f0-bc7d-b6c62642929d",
+  "verdict": "accept",
+  "digest": "sha256:a22f72fce3b97bdd1f9d10f0013d3b761442c202331f3468ac4255699550c66f",
+  "note": "Separate Codex acceptor on 29b74efd6d: all six classes valid; Chromium absent case fails before by assertion and all three pass after; 119 frontend and 70 JVM tests pass"
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1803b-2199-7bf2-b951-609f14761413",
+  "verdict": "accept",
+  "digest": "sha256:a22f72fce3b97bdd1f9d10f0013d3b761442c202331f3468ac4255699550c66f",
+  "note": "Six classes warranted; real-Chromium oracle fails before by assertion, passes after, accepts valid name/description variants and rejects an overridden description"
+}
+```
