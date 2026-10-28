@@ -35,3 +35,13 @@ The deep-link test added in #986 indexes `mock.calls[0]` without a non-null asse
   "digest": "sha256:13657ba8ac1ff7990f5630ab9281f389863f189362a93723d0b4811fa2ec02e1"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "audit-7uj4o23q-14f1ae22-bd00-4706-853e-1682abb53b1a",
+  "verdict": "accept",
+  "digest": "sha256:13657ba8ac1ff7990f5630ab9281f389863f189362a93723d0b4811fa2ec02e1"
+}
+```
