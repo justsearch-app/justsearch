@@ -35,3 +35,14 @@ acceptor verifies it.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a181eb-976d-74d0-8947-47eb0db61e54",
+  "verdict": "accept",
+  "digest": "sha256:e8546e651809e8ff1ba97a1170a5e0a92f473d32177853017ee7629450ecd1ff",
+  "note": "Adaptation preserves legacy-v1 acceptance and frozen-strategy rejection while updating successor fixtures to v6."
+}
+```
