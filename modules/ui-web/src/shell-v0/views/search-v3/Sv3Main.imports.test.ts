@@ -796,15 +796,19 @@ for (const theme of ['light', 'dark'] as const) {
   it(`D-T46 Sources hover breadcrumb and preview detail clear AA with margin in ${theme}`, () => {
     const source = componentSource('CitationsPanel.ts');
     const scope = themeScope(theme, bridgeFor(MAIN, '\\.sv3-citations'));
-    const bg = surface(['var(--surface-3)'], scope);
-    const primary = contrastRatio(composite(color('var(--text-primary)', scope), bg), bg);
-    for (const selector of ['.heading-breadcrumb', '.preview .detail']) {
-      const block = source.slice(source.indexOf(selector + ' {')).split('}')[0]!;
-      const ink = block.match(/\bcolor:\s*([^;]+);/)?.[1];
-      expect(ink, selector).toBeDefined();
-      const ratio = contrastRatio(composite(color(ink!, scope), bg), bg);
-      expect(ratio, `${theme} ${selector} hover: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.7);
-      expect(ratio, `${selector} remains below primary ink`).toBeLessThan(primary);
+    // The hovered card, and the card that is both selected and hovered (`.source[data-selected]:hover`):
+    // the second was the measured light-theme failure (4.27:1), so it is pinned explicitly.
+    for (const card of ['var(--surface-3)', 'var(--cp-selected, var(--surface-3))']) {
+      const bg = surface([card], scope);
+      const primary = contrastRatio(composite(color('var(--text-primary)', scope), bg), bg);
+      for (const selector of ['.heading-breadcrumb', '.preview .detail']) {
+        const block = source.slice(source.indexOf(selector + ' {')).split('}')[0]!;
+        const ink = block.match(/\bcolor:\s*([^;]+);/)?.[1];
+        expect(ink, selector).toBeDefined();
+        const ratio = contrastRatio(composite(color(ink!, scope), bg), bg);
+        expect(ratio, `${theme} ${selector} on ${card}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.7);
+        expect(ratio, `${selector} remains below primary ink`).toBeLessThan(primary);
+      }
     }
   });
 }

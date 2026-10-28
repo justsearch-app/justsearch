@@ -69,7 +69,7 @@ D4 evidence paths are handover inputs for the orchestrator. Builder has behavior
         "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts"
       ],
       "class": "New",
-      "behaviour": "D-T46: Sources-card hovered breadcrumb/detail maintain AA with margin and remain below primary ink; the bridge is local to the citations panel. Light is the repaired before failure; dark is the preservation control.",
+      "behaviour": "D-T46: Sources-card breadcrumb/detail on the hovered card and on the selected-and-hovered card maintain AA with a 4.7:1 margin and remain below primary ink, in light and dark; the bridge is local to the citations panel. Before the repair, light falls below the margin on the hovered card and below AA on the selected-and-hovered card in the browser; dark selected-and-hovered falls below the margin.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -83,7 +83,8 @@ D4 evidence paths are handover inputs for the orchestrator. Builder has behavior
       "repaired": true,
       "evidence": "gates/test-intent/evidence/wp15b-sources-hover.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#D-T46 Sources hover breadcrumb and preview detail clear AA with margin in light"
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#D-T46 Sources hover breadcrumb and preview detail clear AA with margin in light",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#D-T46 Sources hover breadcrumb and preview detail clear AA with margin in dark"
       ]
     },
     {
