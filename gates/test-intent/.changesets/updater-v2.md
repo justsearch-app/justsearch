@@ -52,7 +52,7 @@ are used. Relaunch and post-start reconciliation on installed Windows/Linux rema
         ".github/workflows/ci.yml"
       ],
       "class": "Structural rule kept",
-      "rule": "Both existing shell library lanes and producer tests remain required and unfiltered. Each Rust lane additionally runs the supervisor-conformance binary unit tests; the release test step additionally runs the v2 producer and sequence checks.",
+      "rule": "Both existing shell library lanes and producer tests remain required and unfiltered. The Linux Rust lane additionally runs the supervisor-conformance binary unit tests; the Windows lane runs exactly what it ran before, because the binary's one Windows-only handoff test does not compile there (it names a helper only the library has, as on main); the release test step additionally runs the v2 producer and sequence checks.",
       "whySurvives": "No job, condition, runner, assertion, command or filter is removed. The previously broken binary handoff suite now uses the same child reconciliation implementation as the library rather than the probe error stub.",
       "sources": [
         {

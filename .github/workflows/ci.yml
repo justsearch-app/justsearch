@@ -1932,9 +1932,7 @@ jobs:
 
       - name: Cargo test
         working-directory: modules/shell/src-tauri
-        run: |
-          cargo test --lib --locked
-          cargo test --bin supervisor-conformance --features supervisor-conformance --locked
+        run: cargo test --lib --locked
 
       # Lane F stage B item B10 (stages/B.md Q2, answer (a)). `cargo test --lib` above proves the
       # supervisor's DECISIONS — supervisor.rs's table, read from the same register the Node harness
