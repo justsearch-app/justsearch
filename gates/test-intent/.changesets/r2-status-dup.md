@@ -47,3 +47,15 @@ retired.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18203-6630-76e1-a0f5-3d90748f4f5d",
+  "verdict": "accept",
+  "digest": "sha256:2e389f4c93f97c6404c58a98af5695c1dd30bac30cf3c8a0ba96e54755e98e3f"
+}
+```
