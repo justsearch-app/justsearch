@@ -133,7 +133,7 @@ final class ExtractionRoutingTest {
             Duration.ofSeconds(5),
             null,
             List.of())) {
-      assertEquals("tika-default-v4", inProcess.extractionPolicy().policyId());
+      assertEquals("tika-default-v5", inProcess.extractionPolicy().policyId());
     }
 
     for (ExtractionSandboxFactory.Mode mode :
