@@ -19,11 +19,11 @@ describe('desktop deep links (Linux argv and single-instance events)', () => {
     const dispatch = vi.fn();
     const teardown = await createTauriDeepLinkSource().start(dispatch);
     expect(dispatch).toHaveBeenCalledTimes(1);
-    expect(dispatch.mock.calls[0][0]).toMatchObject({ transport: 'URL_DEEPLINK' });
-    const coldIntent = dispatch.mock.calls[0][0];
-    expect(bridge.listen.mock.calls[0][0]).toBe('justsearch://deep-link');
+    expect(dispatch.mock.calls[0]![0]).toMatchObject({ transport: 'URL_DEEPLINK' });
+    const coldIntent = dispatch.mock.calls[0]![0];
+    expect(bridge.listen.mock.calls[0]![0]).toBe('justsearch://deep-link');
     // The single-instance callback emits its forwarded argv URL on this event.
-    bridge.listen.mock.calls[0][1]({ payload: url });
+    bridge.listen.mock.calls[0]![1]({ payload: url });
     expect(dispatch).toHaveBeenCalledTimes(2);
     expect(dispatch.mock.calls[1]).toEqual([coldIntent, { pushHistory: true }]);
     if (typeof teardown === 'function') teardown();
