@@ -52,3 +52,13 @@ Independent acceptance is intentionally absent.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18385-61d7-7212-8910-b1e2424d6f51",
+  "verdict": "accept",
+  "digest": "sha256:65a39a4c048d3438ac65ff0f5bb5b83011e8bd4705139f14954ed3276284d292"
+}
+```
