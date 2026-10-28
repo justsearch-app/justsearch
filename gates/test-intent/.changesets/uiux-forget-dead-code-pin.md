@@ -34,3 +34,14 @@ independent acceptor verifies it.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1813f-fc57-7f32-bd00-90a178fbf102",
+  "verdict": "accept",
+  "digest": "sha256:66e37043d7dcdb77eca97cbedc9732d5ba9a7bbdf96fb50a50063793c919c0e7",
+  "note": "Structural rule kept: the sole pin increase covers two generated Forget barrel exports; both ratchet protections remain effective."
+}
+```
