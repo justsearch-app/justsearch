@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-28T21:58:24.244Z",
-  "revision": "c77d93e3890f8a68aeec68ef53bd04decf5b2f14",
-  "tree": "8f61a73871ed87ae2e6b21cf1eb7747c834052cc",
+  "createdAt": "2026-10-28T23:41:09.907Z",
+  "revision": "2b085cf8a0dd6901d8ede828f9b54942e37193e0",
+  "tree": "6d82a7b8cdbe25a0b489436ee7dd1e4fbb028e59",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.recents.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-907909-1793224687571.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.recents.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1976396-1793230859778.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 9250
+      "durationMs": 5645
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y1 opens only for an empty focused Search bar and owns selection and dismiss keys",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y2 records only accepted explicit Search actions with exact dedup and an eight item cap",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 replays operators with current restrictions and selects conversations through navigation",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y4 Clear hides the full population with no backfill, rename reactivation or mutation",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y4 Clear before a first delayed list response suppresses every old row",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y5 fresh windows forget searches and Clear while profile ABA drops pending responses",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y6 observed lock hides cached optimistic and legacy labels and pre-lock responses until unlock refresh",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y6 a history 423 immediately suppresses conversation disclosure",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y7 exposes a named list and active descendant in hero, docked and narrow themes",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 protects a retained preparation with text \"retained question\" during search and conversation replay",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -179,7 +179,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 protects a retained preparation with text \"\" during search and conversation replay",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5303b6415703b067b734e415b8ceb1468da31c8fe348b171ce8878ca7b04f7d8",
+      "contentDigest": "sha256:5b3e2e5a6e75fee541c8cc2d89da5a687201f67ed6da17cac91ba8bd69f1c809",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -198,23 +198,23 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.recents.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-907909-1793224698794.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.recents.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1976396-1793230866598.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5182,
-        "output": "JSON report written to /tmp/test-intent-vitest-907909-1793224698794.json\n\n"
+        "durationMs": 3145,
+        "output": "JSON report written to /tmp/test-intent-vitest-1976396-1793230866598.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y1 opens only for an empty focused Search bar and owns selection and dismiss keys",
         "classification": "assertion",
-        "detail": "Y1 opens only for an empty focused Search bar and owns selection and dismiss keys:  AssertionError: empty focused Search exposes Recent: expected null not to be null\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:93:63\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-a"
+        "detail": "Y1 opens only for an empty focused Search bar and owns selection and dismiss keys:  AssertionError: empty focused Search exposes Recent: expected null not to be null\n    at /tmp/test-intent-before-tgfMV4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:95:63\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-a"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y2 records only accepted explicit Search actions with exact dedup and an eight item cap",
         "classification": "assertion",
-        "detail": "Y2 records only accepted explicit Search actions with exact dedup and an eight item cap:  AssertionError: expected [] to deeply equal [ '\"', 'failed', 'seven', 'six', …(4) ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:115:54\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chun"
+        "detail": "Y2 records only accepted explicit Search actions with exact dedup and an eight item cap:  AssertionError: expected [] to deeply equal [ '\"', 'failed', 'seven', 'six', …(4) ]\n    at /tmp/test-intent-before-tgfMV4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:117:54\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chun"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 replays operators with current restrictions and selects conversations through navigation",
@@ -229,12 +229,12 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y4 Clear before a first delayed list response suppresses every old row",
         "classification": "assertion",
-        "detail": "Y4 Clear before a first delayed list response suppresses every old row:  AssertionError: expected null not to be null\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:171:72\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        "detail": "Y4 Clear before a first delayed list response suppresses every old row:  AssertionError: expected null not to be null\n    at /tmp/test-intent-before-tgfMV4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:173:72\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y5 fresh windows forget searches and Clear while profile ABA drops pending responses",
         "classification": "assertion",
-        "detail": "Y5 fresh windows forget searches and Clear while profile ABA drops pending responses:  AssertionError: expected [] to deeply equal [ 'profile A search' ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:178:32\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:190"
+        "detail": "Y5 fresh windows forget searches and Clear while profile ABA drops pending responses:  AssertionError: expected [] to deeply equal [ 'profile A search' ]\n    at /tmp/test-intent-before-tgfMV4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:180:32\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:190"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y6 observed lock hides cached optimistic and legacy labels and pre-lock responses until unlock refresh",
@@ -244,24 +244,24 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y6 a history 423 immediately suppresses conversation disclosure",
         "classification": "assertion",
-        "detail": "Y6 a history 423 immediately suppresses conversation disclosure:  AssertionError: expected [] to deeply equal [ 'Sensitive' ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:210:22\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        "detail": "Y6 a history 423 immediately suppresses conversation disclosure:  AssertionError: expected [] to deeply equal [ 'Sensitive' ]\n    at /tmp/test-intent-before-tgfMV4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:235:22\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y7 exposes a named list and active descendant in hero, docked and narrow themes",
         "classification": "assertion",
-        "detail": "Y7 exposes a named list and active descendant in hero, docked and narrow themes:  AssertionError: expected undefined to be 'sv3-recent-heading' // Object.is equality\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:216:53\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chun"
+        "detail": "Y7 exposes a named list and active descendant in hero, docked and narrow themes:  AssertionError: expected undefined to be 'sv3-recent-heading' // Object.is equality\n    at /tmp/test-intent-before-tgfMV4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:241:53\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chun"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 protects a retained preparation with text \"retained question\" during search and conversation replay",
         "classification": "assertion",
-        "detail": "Y3 protects a retained preparation with text \"retained question\" during search and conversation replay:  AssertionError: expected [] to deeply equal [ 'replay' ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:150:32\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        "detail": "Y3 protects a retained preparation with text \"retained question\" during search and conversation replay:  AssertionError: expected [] to deeply equal [ 'replay' ]\n    at /tmp/test-intent-before-tgfMV4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:152:32\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 protects a retained preparation with text \"\" during search and conversation replay",
         "classification": "assertion",
-        "detail": "Y3 protects a retained preparation with text \"\" during search and conversation replay:  AssertionError: expected [] to deeply equal [ 'replay' ]\n    at /tmp/test-intent-before-pote2w/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:150:32\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        "detail": "Y3 protects a retained preparation with text \"\" during search and conversation replay:  AssertionError: expected [] to deeply equal [ 'replay' ]\n    at /tmp/test-intent-before-tgfMV4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts:152:32\n    at file:///home/elias/dev/js-uiux-recents/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       }
     ]
   },
-  "digest": "sha256:b0364ff07ce8bced9c1e5045e89b697dbe614d272b316b15486954ca21f56b8d"
+  "digest": "sha256:146268fa6a385c54e695750f1f91350eb393b2bce7f93459430ec0dc46584e33"
 }
