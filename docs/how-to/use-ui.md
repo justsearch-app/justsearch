@@ -10,6 +10,7 @@ description: "Running dev modes and accessing debug dashboards."
 This guide explains how to run, use, and debug the JustSearch user interface.
 
 Related docs:
+- [Owner-run Windows screen-reader checklist](screen-reader-checklist.md)
 - UI workflow readiness checklist + known issues: `docs/reference/ui-user-readiness.md`
 - Troubleshooting schema mismatch / “reindex no-op”: `docs/reference/index-schema-mismatch-reindex-noop.md`
 - Schema migration architecture overview: `docs/explanation/11-index-schema-migration.md`

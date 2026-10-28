@@ -13,8 +13,8 @@ on or off and reports whether registration succeeded. Another application may
 already own the chord. It is on by default on a fresh install or after deleting
 all app data. Settings, modal dialogs, indexing overlays and command palettes
 keep focus when summoned. Session renaming and text edits keep focus when the
-default search is visible; a summon from another view returns to Search. In the
-old window, the search bar cannot take focus while an answer is streaming.
+default search is visible; a summon from another view returns to Search. Search's
+bar can take focus while an answer is streaming; summoning does not stop the answer.
 
 You can also run the desktop shell with `--focus-search`, even when the built-in
 shortcut is off or unavailable. Use the installed **desktop executable**, not the
@@ -70,3 +70,7 @@ does not establish support. Alt + Shift + Space is provisional until the Windows
 check with two input languages passes. If it changes the language, chord selection
 must be reopened. No current-monitor or workspace placement policy is promised:
 saved geometry is kept unless it is wholly outside the connected screens.
+
+For owner-run NVDA and Narrator checks on the installed Windows app, use the
+[screen-reader checklist](screen-reader-checklist.md). No screen-reader run has
+been recorded yet.
