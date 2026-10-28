@@ -167,3 +167,13 @@ its own build directories, tests used temporary indices/queues/files and their o
 Builder execution window: 2026-10-28 04:00:12 UTC to 2026-10-28 04:55:42 UTC, including shared-slot waits.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18105-0068-7730-8ee1-3d39679a6578",
+  "verdict": "accept",
+  "digest": "sha256:80ed2519a20b460b7ecd80016b362e610aa044d5cf19cb5bbd0fa5810705f8af"
+}
+```
