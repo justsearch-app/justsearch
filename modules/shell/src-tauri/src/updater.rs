@@ -3237,14 +3237,15 @@ mod tests {
         std::os::unix::fs::symlink(&outside, &fixture.staging_root).unwrap();
         let empty = outside.join("Documents");
         fs::create_dir_all(&empty).unwrap();
-        cleanup_committed_packages(&fixture.staging_root, &fixture.intent);
+        let root = fixture.intent_path.parent().unwrap();
+        persist_intent_at(root, &UpdateCoordinator::default(), &fixture.intent).unwrap();
         assert_eq!(
             outside.join("attempt-1").join("JustSearch-update-setup.exe").exists(),
             true,
             "a package behind a linked staging root is not ours to delete"
         );
         assert_eq!(empty.exists(), true, "a folder behind a linked staging root is not ours to delete");
-        fs::remove_dir_all(fixture.intent_path.parent().unwrap()).unwrap();
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
