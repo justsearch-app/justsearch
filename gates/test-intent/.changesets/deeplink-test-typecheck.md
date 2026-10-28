@@ -25,3 +25,13 @@ The deep-link test added in #986 indexes `mock.calls[0]` without a non-null asse
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-10561f2e-07e7-42a3-94c8-adf983b04fb9",
+  "verdict": "accept",
+  "digest": "sha256:13657ba8ac1ff7990f5630ab9281f389863f189362a93723d0b4811fa2ec02e1"
+}
+```
