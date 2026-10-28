@@ -34,7 +34,7 @@ if ($releaseTag -and $AllowUntrusted.IsPresent) {
 }
 
 if ($requested -and $normalizedMode -eq "command" -and $AllowUntrusted.IsPresent) {
-  throw "Command signing mode cannot use JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED; vendor signing always requires provider budget verification."
+  throw "Command signing mode cannot use JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED; vendor signing always requires trusted signatures."
 }
 
 if ($releaseTag) {
@@ -52,14 +52,9 @@ if ($requested -and -not $configured) {
   throw "Signing was requested for '$GitRef', but mode '$normalizedMode' is missing its complete credential inputs."
 }
 
+# Provider balance admission is reserved for the bulk mirror-signing workflow.
+# Installer runs retain the signer ledger and the 12-signature hard ceiling.
 $remaining = $null
-if ($requested -and -not $AllowUntrusted.IsPresent) {
-  $parsed = 0
-  if (-not [int]::TryParse($ProviderRemainingSignatures, [ref]$parsed) -or $parsed -lt $SignatureMaximum) {
-    throw "Production signing requires providerRemainingSignatures >= $SignatureMaximum from the provider portal."
-  }
-  $remaining = $parsed
-}
 
 $result = [ordered]@{
   schemaVersion = 1

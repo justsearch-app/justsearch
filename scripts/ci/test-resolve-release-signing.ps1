@@ -30,7 +30,7 @@ $selfSigned = Resolve-Case 'refs/heads/rehearsal' '' $true $true $true ''
 if ($selfSigned.packageSwitch -ne 'Sign' -or -not $selfSigned.rehearsal) { throw "self-signed rehearsal was rejected" }
 
 foreach ($tag in @('refs/tags/v0.2.1', 'refs/tags/v0.3.0-rc.1')) {
-  $release = Resolve-Case $tag $tag.Substring('refs/tags/v'.Length) $false $true $false '12'
+  $release = Resolve-Case $tag $tag.Substring('refs/tags/v'.Length) $false $true $false ''
   if ($release.packageSwitch -ne 'Release') { throw "$tag did not select -Release" }
 }
 
@@ -62,7 +62,7 @@ try {
   $ErrorActionPreference = $previous
 }
 if ($missingCredentialExit -eq 0 -or $missingCredential -notmatch 'missing its complete credential') { throw "missing credential did not fail closed" }
-if ($lowBudgetExit -eq 0 -or $lowBudget -notmatch 'providerRemainingSignatures') { throw "low provider budget did not fail closed" }
+if ($lowBudgetExit -ne 0) { throw "release tag still required a provider-portal balance input" }
 if ($releaseRehearsalExit -eq 0 -or $releaseRehearsal -notmatch 'rehearsal-only') { throw "release tag accepted rehearsal-only trust relaxation" }
 if ($versionMismatchExit -eq 0 -or $versionMismatch -notmatch 'must exactly match') { throw "release tag accepted a different project version" }
 if ($wrongModeCredentialExit -eq 0 -or $wrongModeCredential -notmatch "mode 'command'") { throw "command mode was admitted by stale PFX inputs" }

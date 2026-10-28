@@ -68,7 +68,7 @@ halves share objects.
 - [Test GPU Inference Locally](how-to/test-gpu-locally.md): How to run llama-server with GPU offload for local development and testing.
 - [Using the UI](how-to/use-ui.md): Running dev modes and accessing debug dashboards.
 - [Verify an Update Preserves the User's Models](how-to/verify-update-preserves-models.md): Run the Update Preserves Models CI lane, which installs a published release, seeds model files, upgrades to the next release, and asserts the seeded bytes survive both the upgrade and the uninstall.
-- [Verify your JustSearch download](how-to/verify-your-download.md): Checking the installer's SHA-256 and Authenticode identity, understanding Windows reputation warnings, and using the build-from-source alternative.
+- [Verify your JustSearch download](how-to/verify-your-download.md): Check Windows and Linux downloads with SHA256SUMS, GitHub build attestations and Windows publisher identity.
 - [Writing a JustSearch plugin](how-to/write-a-plugin.md): Author a V1.5 plugin that runs in a SES Compartment, contributes a Surface, and integrates with the host's trust + capability model.
 
 ### Reference (Standards)

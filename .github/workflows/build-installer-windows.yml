@@ -1,0 +1,259 @@
+name: Build Windows Installer
+on:
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
+      sandboxTestMode:
+        type: boolean
+        default: false
+      candidateVersion:
+        type: string
+        default: ''
+permissions:
+  contents: read
+  actions: read
+env:
+  NODE_VERSION: '24.14.0'
+  JAVA_VERSION: '25'
+  JUSTSEARCH_RELEASE_DESCRIPTOR_URL: https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json
+  JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY }}
+  JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID }}
+  JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY }}
+  JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID }}
+jobs:
+  cached:
+    runs-on: ubuntu-24.04
+    outputs:
+      exists: ${{ steps.cache.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/packaging-smoke.mjs cached windows-installer
+  build-windows-installer:
+    needs: cached
+    if: github.event_name == 'push' && inputs.release && startsWith(github.ref, 'refs/tags/v') && needs.cached.outputs.exists != 'true'
+    environment: release-signing
+    # Only signed tag builds share the metered-signing queue.
+    concurrency:
+      group: release-signing-spend
+      cancel-in-progress: false
+    name: Windows NSIS Installer
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - &windows-actions-checkout-v7
+        uses: actions/checkout@v7
+      - &windows-guard-qualification-and-candidate-version
+        name: Guard qualification and candidate version
+        shell: pwsh
+        env:
+          SANDBOX: ${{ inputs.sandboxTestMode }}
+          CANDIDATE_VERSION: ${{ inputs.candidateVersion }}
+          RELEASE_BUILD: ${{ inputs.release }}
+        run: |
+          if ($env:SANDBOX -eq 'true' -and ($env:RELEASE_BUILD -eq 'true' -or $env:GITHUB_REF -like 'refs/tags/v*')) { throw 'Qualification build on a release tag is forbidden' }
+          if ($env:CANDIDATE_VERSION) {
+            if ($env:SANDBOX -ne 'true') { throw 'candidateVersion requires sandboxTestMode' }
+            if ($env:CANDIDATE_VERSION -notmatch '^\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?$') { throw 'Invalid candidate version' }
+            $raw = Get-Content -Raw gradle.properties
+            [IO.File]::WriteAllText((Join-Path $PWD 'gradle.properties'), ($raw -replace '(?m)^version=.*$', "version=$env:CANDIDATE_VERSION"))
+          }
+      - &windows-test-trust-pins-for-unsigned-packaging-smoke
+        name: Test trust pins for unsigned packaging smoke
+        if: ${{ !inputs.release }}
+        run: node scripts/ci/packaging-smoke.mjs pins
+      - &windows-setup-rust-msvc
+        name: Setup Rust (MSVC)
+        uses: dtolnay/rust-toolchain@stable
+
+      - &windows-verify-rust-toolchain
+        name: Verify Rust toolchain
+        shell: pwsh
+        run: |
+          $hostLine = rustc -Vv | Select-String 'host:'
+          if ($hostLine -notmatch 'msvc') {
+            throw "Wrong Rust target: $hostLine"
+          }
+          Write-Host "Rust host: $hostLine"
+
+      - &windows-cache-rust-builds
+        name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: modules/shell/src-tauri
+
+      - &windows-cache-gradle-module-build-outputs
+        name: Cache Gradle module build outputs
+        uses: actions/cache@v6
+        with:
+          path: |
+            modules/ui/build
+          key: gradle-ui-build-v2-${{ runner.os }}-${{ hashFiles('modules/ui/build.gradle.kts', 'modules/**/build.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'gradle/verification-metadata.xml', 'gradle/wrapper/gradle-wrapper.properties', '**/*.java') }}
+          restore-keys: |
+            gradle-ui-build-v2-${{ runner.os }}-
+
+      - &windows-cache-llama-server-prebuilt
+        name: Cache llama-server prebuilt
+        uses: actions/cache@v6
+        with:
+          path: modules/ui/build/llama-server/prebuilt
+          key: llama-server-${{ runner.os }}-b8571-40D8C4B9
+
+      - &windows-cache-tauri-bundler-downloads
+        name: Cache Tauri bundler downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/AppData/Local/tauri
+          key: tauri-bundler-${{ runner.os }}-v2
+
+      - &windows-setup-java
+        name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - &windows-setup-gradle
+        name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - &windows-setup-node-js
+        name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            modules/shell/package-lock.json
+            modules/ui-web/package-lock.json
+
+      - &windows-check-dependency-free-tool-invocation-before-npm-install
+        name: Check dependency-free tool invocation before npm install
+        run: node scripts/lib/tool-invoker.test.mjs
+
+      - &windows-install-dependencies
+        name: Install dependencies
+        run: |
+          npm ci --prefix modules/shell --audit=false
+          npm ci --prefix modules/ui-web --audit=false
+
+      - &windows-install-verified-esigner-codesigntool
+        name: Install verified eSigner CodeSignTool
+        if: inputs.release
+        shell: pwsh
+        run: ./scripts/ci/install-codesign-tool.ps1 -Destination (Join-Path $env:RUNNER_TEMP "CodeSignTool")
+
+      - name: Build installer
+        shell: pwsh
+        env:
+          JUSTSEARCH_CODESIGN_MODE: ${{ secrets.JUSTSEARCH_CODESIGN_MODE }}
+          JUSTSEARCH_CODESIGN_PFX_B64: ${{ secrets.JUSTSEARCH_CODESIGN_PFX_B64 }}
+          JUSTSEARCH_CODESIGN_PFX_PASSWORD: ${{ secrets.JUSTSEARCH_CODESIGN_PFX_PASSWORD }}
+          JUSTSEARCH_CODESIGN_TIMESTAMP_URL: ${{ secrets.JUSTSEARCH_CODESIGN_TIMESTAMP_URL }}
+          JUSTSEARCH_CODESIGN_THUMBPRINT: ${{ secrets.JUSTSEARCH_CODESIGN_THUMBPRINT }}
+          JUSTSEARCH_CODESIGN_COMMAND: ${{ secrets.JUSTSEARCH_CODESIGN_COMMAND }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY_PASSWORD }}
+          RELEASE_BUILD: ${{ inputs.release }}
+          ORG_GRADLE_PROJECT_includeCuda: "false"
+          ORG_GRADLE_PROJECT_skipOnnxModels: "true"
+          CODE_SIGN_TOOL_PATH: ${{ runner.temp }}\CodeSignTool
+          JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE: ${{ inputs.sandboxTestMode && '1' || '' }}
+          JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED: ${{ vars.JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED }}
+          JUSTSEARCH_CODESIGN_LEDGER_PATH: ${{ runner.temp }}\justsearch-signing-ledger.jsonl
+          JUSTSEARCH_CODESIGN_MAX_SIGNATURES: "12"
+        run: ./scripts/ci/build-installer-windows.ps1
+      - &windows-actions-upload-artifact-v7
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: dist/installer/*
+          if-no-files-found: error
+          retention-days: 14
+  build-windows-unsigned:
+    needs: cached
+    if: ${{ !inputs.release && needs.cached.outputs.exists != 'true' }}
+    name: Windows NSIS Installer (unsigned)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - *windows-actions-checkout-v7
+      - *windows-guard-qualification-and-candidate-version
+      - *windows-test-trust-pins-for-unsigned-packaging-smoke
+      - *windows-setup-rust-msvc
+      - *windows-verify-rust-toolchain
+      - *windows-cache-rust-builds
+      - *windows-cache-gradle-module-build-outputs
+      - *windows-cache-llama-server-prebuilt
+      - *windows-cache-tauri-bundler-downloads
+      - *windows-setup-java
+      - *windows-setup-gradle
+      - *windows-setup-node-js
+      - *windows-check-dependency-free-tool-invocation-before-npm-install
+      - *windows-install-dependencies
+      - *windows-install-verified-esigner-codesigntool
+      - name: Build installer
+        shell: pwsh
+        env:
+          RELEASE_BUILD: ${{ inputs.release }}
+          ORG_GRADLE_PROJECT_includeCuda: "false"
+          ORG_GRADLE_PROJECT_skipOnnxModels: "true"
+          CODE_SIGN_TOOL_PATH: ${{ runner.temp }}\CodeSignTool
+          JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE: ${{ inputs.sandboxTestMode && '1' || '' }}
+          JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED: ${{ vars.JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED }}
+          JUSTSEARCH_CODESIGN_LEDGER_PATH: ${{ runner.temp }}\justsearch-signing-ledger.jsonl
+          JUSTSEARCH_CODESIGN_MAX_SIGNATURES: "12"
+        run: ./scripts/ci/build-installer-windows.ps1
+      - *windows-actions-upload-artifact-v7
+  installer_verify:
+    name: Verify installer (packaged)
+    needs: [cached, build-windows-installer, build-windows-unsigned]
+    if: always() && !cancelled() && needs.cached.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci --audit=false
+
+      - name: Download installer artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-installer
+          path: dist/installer
+
+      - name: Built installer does not request elevation
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Path dist/installer -Filter "*-setup.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $setup) { throw "No *-setup.exe found in dist/installer after artifact download." }
+          node scripts/ci/check-installer-execution-level.mjs --installer $setup.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Built installer requests elevation; see the check output above." }
+
+      - name: Run packaged verify lane
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Path dist/installer -Filter "*-setup.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $setup) { throw "No *-setup.exe found in dist/installer after artifact download." }
+          ./scripts/ci/verify-installer-nsis-win.ps1 -SetupExePath $setup.FullName -IncludeUpgradeArrival
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged verification failed' }
+          node scripts/ci/packaging-smoke.mjs evidence windows dist/smoke-windows.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-check-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/smoke-windows.json
+          if-no-files-found: error
