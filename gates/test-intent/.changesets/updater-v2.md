@@ -116,3 +116,14 @@ are used. Relaunch and post-start reconciliation on installed Windows/Linux rema
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-60x_8huq",
+  "verdict": "accept",
+  "digest": "sha256:b4c1ef0dc92f72204462f80cbab2637191e77113a89808f30007de5101b88e5e",
+  "note": "Verifier of d0895c8587. Adaptation: removed assertions in updater.rs/commit-delivery tests are only v1->v2 URL inputs and reformatting; no oracle weakened. ci.yml only adds the supervisor-conformance binary tests and v2 producer/sequence suites; nothing removed. New checks pass on the candidate per evidence; Linux S8 checked end to end on an Ubuntu 24.04 VM (cancel resumes and re-offers; accepted 0.4.0->0.4.1 relaunches and commits). Delegation quotes not checked against the task record (not available to the verifier)."
+}
+```

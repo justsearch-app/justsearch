@@ -63,3 +63,14 @@ The independent verifier appends acceptance after reviewing this candidate. The 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-60x_8huq",
+  "verdict": "accept",
+  "digest": "sha256:a48c7b3ed64cebdcaae3062400aade7e4f6970358f7f92de63063ea6983f6f46",
+  "note": "Verifier of d0895c8587. New/repaired reconciliation checks: evidence shows assertion fail-before on the patched baseline (503 -> RepairRequired) and pass after; refusal check is new behaviour. On the VM the relaunched 0.4.1 reconciled to COMMITTED. Delegation quote not checked against the task record (not available to the verifier)."
+}
+```

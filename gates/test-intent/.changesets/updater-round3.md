@@ -107,3 +107,14 @@ The independent verifier supplies acceptance after checking the candidate.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-60x_8huq",
+  "verdict": "accept",
+  "digest": "sha256:31d122bed91613d20c07ed465589028902fffcb860ea71d187a610239808aa32",
+  "note": "Verifier of d0895c8587. Independently reproduced fail-before on c138996c9e with only the candidate's test hunks applied: removes_all_staged_packages (older cancelled package kept), startup_retries (older attempt kept), linked_staging_root (package behind link deleted) fail by assertion; the three preservation checks pass before and after. VM: after commit all staged packages and empty attempt folders were removed, a folder with a non-package file and a stray file were kept. desktopRecoveryUpdate.test.ts 4/4; appUpdateState.ts identical to main. Delegation quote not checked against the task record (not available to the verifier)."
+}
+```
