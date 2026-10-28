@@ -170,16 +170,36 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
                     .flatMap(h -> h.info().startInstant())
                     .map(i -> OptionalLong.of(i.toEpochMilli()))
                     .orElse(OptionalLong.empty()));
+    List<ManagedChild> predecessors = new ArrayList<>();
+    try {
+      predecessors.addAll(readPredecessorChildren(manifestPath, mapper));
+    } catch (IllegalStateException invalid) {
+      // HeadlessApp acquired app.lock before construction: a live owner cannot be displaced.
+      // Keep the original bytes private, outside redacted instance history, with bounded retention.
+      Path quarantine = runtimeDir.resolve("manifest.quarantine.json");
+      try {
+        OwnerOnlyFile.restrict(manifestPath);
+        try {
+          Files.move(manifestPath, quarantine,
+              StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException atomicFailed) {
+          Files.move(manifestPath, quarantine, StandardCopyOption.REPLACE_EXISTING);
+        }
+      } catch (IOException failure) {
+        throw new UncheckedIOException("Cannot quarantine predecessor manifest", failure);
+      }
+      log.warn("{}; predecessor evidence moved to {}", invalid.getMessage(), quarantine);
+      previous = new PreviousShutdown(true, previous.pid());
+    }
     this.uncleanPreviousShutdown = previous.unclean();
     this.previousInstancePid = previous.pid();
-    List<ManagedChild> predecessors = new ArrayList<>(readPredecessorChildren(manifestPath, mapper));
     try {
       for (ManagedChild child : LedgerReconciler.predecessorChildren(dataDir)) {
         if (predecessors.stream().noneMatch(existing -> existing.pid() == child.pid()
             && existing.startedAt().equals(child.startedAt()))) predecessors.add(child);
       }
     } catch (IOException failure) {
-      throw new IllegalStateException("PREDECESSOR_LEDGER_UNREADABLE", failure);
+      log.warn("PREDECESSOR_LEDGER_UNREADABLE; continuing with manifest children", failure);
     }
     this.childRegistry.seed(predecessors);
     this.childRegistry.installWriter(this::publishChildren);

@@ -1,5 +1,6 @@
 package io.justsearch.ui.runtime;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -456,12 +457,17 @@ class RuntimeManifestPublisherTest {
   }
 
   @Test
-  void futureManifestSchemaIsRefusedBeforePublication(@TempDir Path tmp) throws IOException {
+  void futureManifestSchemaIsQuarantinedBeforePublication(@TempDir Path tmp) throws IOException {
     Path runtime = tmp.resolve("runtime");
     Files.createDirectories(runtime);
     Files.writeString(runtime.resolve("manifest.json"), "{\"schemaVersion\":3,\"pid\":424242}");
 
-    assertThrows(IllegalStateException.class, () -> new RuntimeManifestPublisher(tmp));
+    try (var publisher = assertDoesNotThrow(() -> new RuntimeManifestPublisher(tmp))) {
+      assertTrue(publisher.detectedUncleanPreviousShutdown());
+      assertFalse(Files.exists(runtime.resolve("manifest.json")));
+      assertEquals("{\"schemaVersion\":3,\"pid\":424242}",
+          Files.readString(runtime.resolve("manifest.quarantine.json")));
+    }
   }
 
   @Test

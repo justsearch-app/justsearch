@@ -2,8 +2,8 @@
 package io.justsearch.ui.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.runtime.ManagedChild;
@@ -159,7 +159,7 @@ final class RuntimeManifestRecoveryTest {
   }
 
   @Test
-  void invalidEvidenceIsRefusedWithNamedReasonAndKept(@TempDir Path data) throws Exception {
+  void invalidEvidenceIsQuarantinedAndKept(@TempDir Path data) throws Exception {
     String[][] cases = {
         {"{", "MALFORMED"}, {"null", "MALFORMED"},
         {"{\"schemaVersion\":\"2\"}", "MALFORMED"},
@@ -171,10 +171,11 @@ final class RuntimeManifestRecoveryTest {
     };
     for (String[] fixture : cases) {
       Path manifest = write(data, fixture[0]);
-      var refused = assertThrows(IllegalStateException.class, () -> new RuntimeManifestPublisher(data));
-      assertTrue(refused.getMessage().contains("PREDECESSOR_MANIFEST_" + fixture[1]),
-          refused.toString());
-      assertEquals(fixture[0], Files.readString(manifest));
+      try (var publisher = assertDoesNotThrow(() -> new RuntimeManifestPublisher(data))) {
+        assertTrue(publisher.detectedUncleanPreviousShutdown(), fixture[1]);
+        assertFalse(Files.exists(manifest));
+        assertEquals(fixture[0], Files.readString(manifest.resolveSibling("manifest.quarantine.json")));
+      }
     }
   }
 

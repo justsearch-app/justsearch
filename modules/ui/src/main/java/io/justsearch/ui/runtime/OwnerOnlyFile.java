@@ -24,6 +24,15 @@ final class OwnerOnlyFile {
       return;
     }
     Files.createFile(path);
+    restrict(path);
+  }
+
+  /** Protect an existing evidence file before moving it into quarantine. */
+  static void restrict(Path path) throws IOException {
+    if (Files.getFileStore(path).supportsFileAttributeView(PosixFileAttributeView.class)) {
+      Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"));
+      return;
+    }
     var acl = Files.getFileAttributeView(path, AclFileAttributeView.class);
     if (acl == null) throw new IOException("No owner-only file permissions available: " + path);
     var owner = Files.getOwner(path);
