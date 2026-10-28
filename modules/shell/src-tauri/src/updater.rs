@@ -2359,6 +2359,13 @@ fn cleanup_committed_packages(staging_root: &Path, intent: &UpgradeIntent) {
     // COMMITTED is already durable. A failed cleanup cannot undo reconciliation or turn a
     // healthy installation into repair-required; startup retries it from the committed intent.
     let result = (|| -> Result<(), String> {
+        // Never sweep through a staging root that is a link to somewhere else.
+        match fs::symlink_metadata(staging_root) {
+            Ok(metadata) if metadata.file_type().is_dir() => {}
+            Ok(_) => return Err("Installer staging root is not a directory; not cleaning it".into()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(format!("Failed to inspect installer staging root: {error}")),
+        }
         let attempts = match fs::read_dir(staging_root) {
             Ok(attempts) => attempts,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -3219,6 +3226,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!(reconciled.phase, UpgradePhase::Committed);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn committed_cleanup_never_follows_a_linked_staging_root() {
+        let fixture = evidence_fixture(UpgradePhase::Committed);
+        let outside = fixture.staging_root.with_file_name("outside");
+        fs::rename(&fixture.staging_root, &outside).unwrap();
+        std::os::unix::fs::symlink(&outside, &fixture.staging_root).unwrap();
+        let empty = outside.join("Documents");
+        fs::create_dir_all(&empty).unwrap();
+        cleanup_committed_packages(&fixture.staging_root, &fixture.intent);
+        assert!(
+            outside.join("attempt-1").join("JustSearch-update-setup.exe").exists(),
+            "a package behind a linked staging root is not ours to delete"
+        );
+        assert!(empty.exists(), "a folder behind a linked staging root is not ours to delete");
+        fs::remove_dir_all(fixture.intent_path.parent().unwrap()).unwrap();
     }
 
     #[test]

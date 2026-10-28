@@ -79,6 +79,28 @@ The independent verifier supplies acceptance after checking the candidate.
       "newChecks": [
         "modules/ui-web/src/boot/desktopRecoveryUpdate.test.ts"
       ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/updater.rs#cfg(test)"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Committed cleanup refuses a staging root that is a symbolic link: packages and folders behind the link are kept.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "no, i think its better if we just make the next release for both windows and linux, theres no hurry. and id like you to takeover that work.",
+          "delegationLocation": "task t-20261027-4e4d6b request",
+          "delegationScope": "preparing the next release for Windows and Linux, including the Linux package, the in-app updater for both platforms and its release assets",
+          "choice": "After a confirmed update, the cleanup of staged update packages acts only on the shell's own staging folder: when that folder is itself a link, nothing behind it is deleted.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/updater-round5.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/updater.rs#updater::tests::committed_cleanup_never_follows_a_linked_staging_root"
+      ]
     }
   ]
 }
