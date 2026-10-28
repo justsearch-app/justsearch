@@ -21,7 +21,7 @@ shell-v0/
 ├── chrome/              — the production chrome: jf-shell / jf-rail / jf-stage
 │                           (chrome/Shell.ts), OverlayHost
 ├── views/                — surface views mounted into the stage (ActivitySurface,
-│                           BrainSurface, UnifiedChatView, ApiExplorerView, ...)
+│                           BrainSurface, search-v3/SearchV3View, ApiExplorerView, ...)
 ├── state/                — client-persisted state stores (NavigationJournal,
 │                           UserStateDocument)
 ├── controllers/          — behavior controllers (AgentSessionController,
@@ -77,9 +77,12 @@ shell-v0/
   standalone Lit custom element mounted into `<jf-stage>`. All route
   surfaces except the default landing surface are lazy-loaded on first
   navigation (`views/lazySurfaceRegistry.ts`, referenced from
-  `index.ts:52-58`); the default landing surface (`UnifiedChatView`,
-  `views/UnifiedChatView.ts`) is imported eagerly, transitively via
+  `index.ts:52-58`); the default landing surface (`SearchV3View`,
+  `views/search-v3/SearchV3View.ts`, tag `jf-sv3-window`) is imported eagerly, transitively via
   `chrome/Shell.ts` (`index.ts:61-65`).
+- **Search.** `core.search-v3-surface` is the main window. Search mode retrieves files;
+  Ask, Structured and Delegate share its composer, transcript and document reader.
+  The retired Search, Agent and unified-chat surface ids resolve directly to Search.
 - **State stores.** Client-persisted state lives in typed documents
   under `state/` (`NavigationJournal.ts`, `UserStateDocument.ts`), not
   in component instance fields.

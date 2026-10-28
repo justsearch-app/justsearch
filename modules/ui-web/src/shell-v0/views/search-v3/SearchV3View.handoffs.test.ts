@@ -21,7 +21,7 @@ import { createNavigationHandler } from '../../router/navigationHandler.js';
 import { createIntentRouter } from '../../router/intentRouter.js';
 import { deactivateProjection } from '../../router/URLProjector.js';
 import * as contextMenus from '../../components/ContextMenu.js';
-import { setPendingSelection, setPendingForceShape, takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../../utils/compose.js';
+import { setPendingSelection, takePendingSelection, } from '../../utils/compose.js';
 
 type ElementView = HTMLElement & { updateComplete: Promise<unknown> };
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -78,8 +78,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   deactivateProjection();
-  takePendingSelection(); takePendingForceShape(); takePendingAutoRun();
-  document.body.replaceChildren();
+  takePendingSelection(); document.body.replaceChildren();
   // Disconnect closes the window's subscriptions and stream; settle its outstanding promises.
   await new Promise<void>(resolve => setTimeout(resolve, 0));
   resetSearchState(); __resetAiStateForTest(); __resetAgentSessionStore();
@@ -96,7 +95,6 @@ it('HO1 HO2 a cold address query arrives intact and is consumed from the address
 });
 it.each(['core.rag-ask', 'core.summarize', 'core.extract'])('HO3 HO4 HO5 %s prepares the chosen files and waits', async shape => {
   const view = await mount();
-  setPendingForceShape(shape);
   await navigate({ query: 'Describe risks', forceShapeId: shape, docIds: ['chosen.md'] });
   await drain(view); const c = await composer(view);
   expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('Describe risks');
@@ -110,13 +108,11 @@ it.each(['core.rag-ask', 'core.summarize', 'core.extract'])('HO3 HO4 HO5 %s prep
     expect(body.selection).toEqual({ kind: 'result-set', items: [{ id: 'chosen.md', kind: 'doc' }] });
   }
   else expect(body.selection).toEqual({ kind: 'result-set', items: [{ id: 'chosen.md', kind: 'doc' }] });
-  expect(takePendingForceShape()).toBeNull();
 });
 it('HO3 HO5 HO9 a selection is local to its prepared turn', async () => {
   const view = await mount();
   const selection = { kind: 'text-range', address: { coords: 'canonical', docId: 'chosen.md', startChar: 2, endChar: 7 }, selectionText: 'slice', hostEntity: { kind: 'doc', id: 'chosen.md' } } as const;
-  setPendingSelection(selection); setPendingForceShape('core.summarize');
-  await navigate({ query: 'Summarize the passage', forceShapeId: 'core.summarize' });
+  setPendingSelection(selection); await navigate({ query: 'Summarize the passage', forceShapeId: 'core.summarize' });
   await drain(view);
   expect(takePendingSelection()).toBeNull();
   expect((await send(view)).selection).toEqual(selection);
@@ -213,7 +209,6 @@ it('HO11 an answer link ignores agent affordance and conversation and waits', as
   expect(c.getAttribute('tier')).toBe('ask');
   expect(dispatches()).toHaveLength(0);
   expect(fetchMock.mock.calls.some(c => String(c[0]).includes('/api/chat/agent'))).toBe(false);
-  expect(takePendingAutoRun()).toBe(false);
   expect(c.shadowRoot!.textContent).toContain('Ask');
 });
 it('HO13 an empty file hand-off cannot widen to the whole index', async () => {
@@ -492,8 +487,7 @@ it('merge model action after a no-match hand-off preserves the prepared draft an
     return previous(...args);
   });
   const selected = {kind: 'search-trace', scope: 'hit', summary: 'sparse #1 0.75'} as const;
-  setPendingSelection(selected);setPendingForceShape('core.rag-ask');
-  await navigate({query: 'no matching files', forceShapeId: 'core.rag-ask'});
+  setPendingSelection(selected);await navigate({query: 'no matching files', forceShapeId: 'core.rag-ask'});
   const view = await mount();await send(view);
   const c = await composer(view);const draft = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value;
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as ElementView;await main.updateComplete;
@@ -522,8 +516,7 @@ it('merge an unscoped Summarize input failure is not a no-matching-files result'
 
 it.each([{label:'inline trace',instruction:'Explain in one sentence. Trace: sparse #2 12.40'},{label:'shortened',instruction:'Briefly.'},{label:'different question',instruction:'Why did this rank first?'},{label:'emptied',instruction:''}])('HO5 edited Explain keeps selection identity before send: $label', async ({instruction}) => {
   const selection = {kind: 'search-trace' as const, scope: 'hit' as const, summary: 'sparse #2 12.40', docId: 'docs/a.md'};
-  setPendingSelection(selection);setPendingForceShape('core.summarize');
-  await navigate({query:'Explain this result.\n\nRanking trace:\nsparse #2 12.40',forceShapeId:'core.summarize',docIds:[]});
+  setPendingSelection(selection);await navigate({query:'Explain this result.\n\nRanking trace:\nsparse #2 12.40',forceShapeId:'core.summarize',docIds:[]});
   const view=await mount();const c=await composer(view);const input=q<HTMLTextAreaElement>(c,'sv3-composer-input')!;
   input.value=instruction;input.dispatchEvent(new Event('input',{bubbles:true,composed:true}));await drain(view);
   if(instruction==='') {

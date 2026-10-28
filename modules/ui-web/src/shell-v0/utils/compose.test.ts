@@ -23,11 +23,7 @@ vi.mock('../state/aiStateStore.js', () => ({
 import {
   compose,
   takePendingSelection,
-  setPendingAutoRun,
-  takePendingAutoRun,
   resolveShape,
-  resolveDispatchShape,
-  wireSelectionKind,
 } from './compose.js';
 import type { SelectionPayload } from '../../api/types/selection.js';
 
@@ -166,51 +162,5 @@ describe('resolveShape — an explicit operation is not overridden by ambient se
 
   it('core.summarize is unconditional', () => {
     expect(resolveShape('core.summarize', 'item', 'extract')).toBe('core.summarize');
-  });
-});
-
-describe('resolveDispatchShape / wireSelectionKind — the ONE chip-and-send computation', () => {
-  it('extract mode dispatches core.extract whether or not something is selected', () => {
-    expect(resolveDispatchShape('extract', 'none')).toBe('core.extract');
-    expect(resolveDispatchShape('extract', 'item')).toBe('core.extract');
-    expect(resolveDispatchShape('extract', 'result-set')).toBe('core.extract');
-  });
-
-  it('the agent affordance is the action plane, not an answer-plane shape', () => {
-    expect(resolveDispatchShape('agent', 'none')).toBe('core.free-chat');
-  });
-
-  it('FE-only item kinds narrow to the wire `item` kind; unknown kinds read as no selection', () => {
-    expect(wireSelectionKind('search-hit')).toBe('item');
-    expect(wireSelectionKind('browse-node')).toBe('item');
-    expect(wireSelectionKind('plugin-item')).toBe('item');
-    expect(wireSelectionKind('text-range')).toBe('text-range');
-    expect(wireSelectionKind('citation')).toBe('citation');
-    expect(wireSelectionKind('result-set')).toBe('result-set');
-    expect(wireSelectionKind(undefined)).toBe('none');
-    expect(wireSelectionKind('health-condition')).toBe('none');
-  });
-});
-
-describe('pendingAutoRun one-shot (548 §4.5)', () => {
-  beforeEach(() => {
-    // Drain any leftover flag from a previous test.
-    takePendingAutoRun();
-  });
-
-  it('defaults to false', () => {
-    expect(takePendingAutoRun()).toBe(false);
-  });
-
-  it('returns true once after set, then resets to false (one-shot)', () => {
-    setPendingAutoRun(true);
-    expect(takePendingAutoRun()).toBe(true);
-    expect(takePendingAutoRun()).toBe(false);
-  });
-
-  it('compose() does NOT set the auto-run flag (askAi prefills, waits for Send)', () => {
-    setupShell();
-    compose({ operation: 'core.ask', source: 'BUTTON', userPrompt: 'hi' });
-    expect(takePendingAutoRun()).toBe(false);
   });
 });

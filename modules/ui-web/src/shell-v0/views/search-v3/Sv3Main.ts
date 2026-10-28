@@ -817,6 +817,8 @@ export class Sv3Main extends JfElement {
          margin (the F8 pane lesson), which is why the shared component's 0.5rem is neutralised from
          here rather than edited inside an authority three windows render through. */
       .sv3-citations {
+        /* Sources metadata must remain readable on the hovered card's secondary wash. */
+        --text-secondary: color-mix(in srgb, var(--secondary-label) 90%, var(--foreground));
         display: block;
         margin: var(--space-2) 0 0;
         overflow-wrap: anywhere;
@@ -2058,7 +2060,7 @@ export class Sv3Main extends JfElement {
           : html`
               ${this.rewriteNote(turn)}${this.reasoningBlocks(turn, streaming)}
               <div class="answer" data-testid="sv3-turn-answer" data-item-id=${`${turn.id}:a`}>
-                ${empty && turn.kind === 'model' && turn.status !== 'complete' ? nothing : empty && !streaming
+                ${empty && (turn.kind === 'model' || turn.shapeId === 'core.extract') && turn.status !== 'complete' ? nothing : empty && !streaming
                   ? html`<span class="answer-empty" data-testid="sv3-turn-answer-empty"
                       >${TURN_EMPTY_ANSWER}</span
                     >`
@@ -3201,9 +3203,11 @@ export class Sv3Main extends JfElement {
       >`;
     }
     const broken = turn.status === 'failed' || turn.status === 'refused';
-    const fallback = retrievalFallbackPhrase(
-      turn.evidence?.retrievalModeReason ?? '', turn.evidence?.retrievalModeCause ?? '',
-    );
+    const fallback = turn.evidence?.retrievalMode === 'FULLTEXT_FALLBACK'
+      ? 'Full-document retrieval — document too small for chunking'
+      : retrievalFallbackPhrase(
+        turn.evidence?.retrievalModeReason ?? '', turn.evidence?.retrievalModeCause ?? '',
+      );
     if (turn.kind === 'agent') {
       return html`<span
         class="tail-note"

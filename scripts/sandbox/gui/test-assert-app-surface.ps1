@@ -78,15 +78,15 @@ function Test-ExpectThrow {
 }
 
 # --- Case A: real round-15 shape -- most recent nav is an effect/navigate row
-# targeting core.unified-chat-surface. Must resolve via "subject", not
+# targeting core.search-v3-surface. Must resolve via "subject", not
 # "targetSurface" (which this row does not have).
 [void](Test-ExpectPass "effect/navigate row resolves the correct surface (bare id)" {
-    Assert-AppSurface -ExpectedSurface "core.unified-chat-surface" -Entries $allEntries
+    Assert-AppSurface -ExpectedSurface "core.search-v3-surface" -Entries $allEntries
 })
 
 # --- Case B: -ExpectedSurface accepts the full justsearch://surface/<id> form too.
 [void](Test-ExpectPass "effect/navigate row resolves the correct surface (full URI form)" {
-    Assert-AppSurface -ExpectedSurface "justsearch://surface/core.unified-chat-surface" -Entries $allEntries
+    Assert-AppSurface -ExpectedSurface "justsearch://surface/core.search-v3-surface" -Entries $allEntries
 })
 
 # --- Case C: the MOST RECENT navigation wins, not just "any navigation entry
@@ -103,7 +103,7 @@ $noNavEntries = @($allEntries | Where-Object {
         $_.id -eq "op-1" -or $_.id -eq "fe-effect:3"
     })
 Test-ExpectThrow "zero navigation entries throws 'no navigation entries'" {
-    Assert-AppSurface -ExpectedSurface "core.unified-chat-surface" -Entries $noNavEntries
+    Assert-AppSurface -ExpectedSurface "core.search-v3-surface" -Entries $noNavEntries
 } -MessageContains "no navigation entries"
 
 # --- Case E: backward compatibility -- the OLD kind=="navigation"/targetSurface
@@ -115,13 +115,19 @@ $legacyOnly = @($allEntries | Where-Object { $_.id -eq "nav-legacy-1" })
     Assert-AppSurface -ExpectedSurface "core.library-surface" -Entries $legacyOnly
 })
 
+# Intentional legacy-id input: ledger parsing preserves an old address; this does not prove navigation.
+[void](Test-ExpectPass "legacy surface token is parsed without rewriting" {
+    $old = [pscustomobject]@{kind="effect"; effectKind="navigate"; subject="justsearch://surface/core.unified-chat-surface"}
+    if ((Get-AppSurfaceFromLedgerEntry -Entry $old) -ne "core.unified-chat-surface") { throw "legacy parsing changed" }
+})
+
 # --- Case F: Get-AppSurfaceFromLedgerEntry unit-level checks (the extraction
 # helper itself), including the "not a navigation at all" -> $null case.
 $effectEntry = $allEntries | Where-Object { $_.id -eq "fe-effect:2" } | Select-Object -First 1
 $legacyEntry = $allEntries | Where-Object { $_.id -eq "nav-legacy-1" } | Select-Object -First 1
 $opEntry = $allEntries | Where-Object { $_.id -eq "op-1" } | Select-Object -First 1
 
-if ((Get-AppSurfaceFromLedgerEntry -Entry $effectEntry) -ne "core.unified-chat-surface") {
+if ((Get-AppSurfaceFromLedgerEntry -Entry $effectEntry) -ne "core.search-v3-surface") {
     Write-Host "FAIL: Get-AppSurfaceFromLedgerEntry did not extract the surface from an effect/navigate row"
     [void]$failures.Add("Get-AppSurfaceFromLedgerEntry effect row")
 }

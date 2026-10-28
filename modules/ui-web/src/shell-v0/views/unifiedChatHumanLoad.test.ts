@@ -31,9 +31,9 @@ describe('unifiedChatRequest — Spec A step 9 allowLoad', () => {
   });
 
   it('the chat window marks its /api/chat/dispatch body before it sends it', () => {
-    const source = readFileSync(resolve(here, 'UnifiedChatView.ts'), 'utf8');
+    const source = readFileSync(resolve(here, 'search-v3/sv3-ask.ts'), 'utf8');
     const marked = source.indexOf('withHumanLoad(body);');
-    const dispatch = source.indexOf("'/api/chat/dispatch'");
+    const dispatch = source.indexOf('await consumeShapeStream(');
     expect(marked).toBeGreaterThan(-1);
     expect(dispatch).toBeGreaterThan(marked);
     expect(source.split('withHumanLoad(body)').length - 1).toBe(1);

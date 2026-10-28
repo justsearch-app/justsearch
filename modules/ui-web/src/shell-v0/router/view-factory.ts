@@ -21,6 +21,7 @@
  * verbatim; HMR survival is a single-test residual check during C0 dev work.
  */
 
+import { canonicalComponentTag } from '../renderers/componentIdentity.js';
 import type { ConversationShapeRef } from '../../api/types/conversation-shape.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 
@@ -73,7 +74,7 @@ export function stampViewFactory<S extends ConversationShapeRef>(
     __viewBrand: VIEW_DISPATCH_BRAND,
     shapeRef,
     mount(opts?: ViewMountOpts): HTMLElement {
-      const ctor = customElements.get(mountTag);
+      const ctor = customElements.get(canonicalComponentTag(mountTag));
       if (!ctor) {
         throw new Error(
           `ViewFactory.mount: custom element '${mountTag}' is not registered for shape '${shapeRef}'. ` +

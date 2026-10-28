@@ -19,7 +19,6 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../../primitives/JfElement.js';
 import { authorizedFetch } from '../../api/authorizedFetch.js';
 import '../Control.js';
-import { setMenuAnchor } from '../../utils/selectionAnchor.js';
 // Tempdoc 565 §29 Tier-3 — open the cited LOCAL file (the uniquely-local citation affordance).
 import { openLocalFile } from '../../plugin-api/capabilities/platform.js';
 // Tempdoc 822 citation-mark presentation §5.4 — the FAR SIDE of the inline mark's selection. The
@@ -493,19 +492,7 @@ export class CitationsPanel extends JfElement {
     return this.unavailable.has(docId);
   }
 
-  private onSourceClick(source: AnswerEvidenceSource, e: MouseEvent): void {
-    // Tempdoc 526 §17 T1A — publish the citation button's bounding rect to
-    // the F9 menu anchor register BEFORE dispatching the event. The menu
-    // subscribes to both selectionState and selectionAnchor; the citation
-    // SelectionItem will be published shortly after by Shell.onCitationSelect.
-    const target = (e.currentTarget as HTMLElement | null)
-      ?? ((e.target as HTMLElement | null)?.closest('.source') as HTMLElement | null);
-    if (target) {
-      const rect = target.getBoundingClientRect();
-      if (rect.width > 0 || rect.height > 0) {
-        setMenuAnchor({ top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right });
-      }
-    }
+  private onSourceClick(source: AnswerEvidenceSource): void {
     // Tempdoc 822 §5.4 — mark this source the cross-surface selection BEFORE the existing deep-link
     // dispatch, exactly as its sibling `components/SourcesPane.ts:130` already does. That is the line
     // this panel was missing; adding it is what makes the binding two-ended, which is the only thing
@@ -612,7 +599,7 @@ export class CitationsPanel extends JfElement {
           ?data-selected=${selected}
           aria-current=${selected ? 'true' : nothing}
           aria-description=${this.observeAvailability && this.unavailable.has(s.parentDocId) ? 'No longer available' : nothing}
-          @click=${(e: MouseEvent) => this.onSourceClick(s, e)}
+          @click=${() => this.onSourceClick(s)}
         >
           ${this.observeAvailability ? html`<span class="source-availability" role="status" aria-live="polite"
             >${this.unavailable.has(s.parentDocId) ? 'No longer available' : nothing}</span>` : nothing}

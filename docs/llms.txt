@@ -112,7 +112,7 @@ halves share objects.
 - [Platform Lifecycle Evidence Policy](reference/platform-lifecycle-policy.md): Typed lifecycle evidence, live-pin extraction, and advisory review policy for pinned build and runtime platforms.
 - [runtime-contract](reference/runtime-contract.md): JustSearch Runtime Contract — versions, compatibility matrix, stability policy, and the public-contract / reference-client / internal surface classification. The deliberately narrow promise covers the runtime manifest, schema-2 health/status lifecycle subset, and MCP endpoint plus curated tools.
 - [Search Quality Register](reference/search-quality-register.md): Shared decision register for search quality. Read before starting search work. Update before finishing.
-- [Search UI Behavioral Reference](reference/search-ui-behavior.md): Search UI behavioral specification (zones, filters, selection, status deck).
+- [Search UI Behavioral Reference](reference/search-ui-behavior.md): Search window, composer modes, results, evidence and document reader.
 - [Secondary Views Behavioral Reference](reference/secondary-views-behavior.md): Secondary view behavioral specification (Library, Brain, Health, Settings, Help).
 - [Threat Model](reference/security/threat-model.md): STRIDE threat model for local processing, outbound connections, update trust, and the loopback API boundary.
 - [Test Intent Rules](reference/testing/test-intent.md): Agent-facing rules for the test-intent gate: what it flags, the entry classes, sources of intent, execution evidence and the acceptance record.

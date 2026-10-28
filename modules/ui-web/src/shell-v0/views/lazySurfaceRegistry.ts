@@ -14,9 +14,8 @@
  * into its own async chunk, loaded on first navigation. A navigated view
  * legitimately shows a brief loading state, so there is no UX regression.
  *
- * NOT lazy: the always-present chrome (`UnifiedChatView` — the default landing view via its
- * retrieve tier, so first paint never flashes a loader — plus `Shell`) and shared components,
- * imported eagerly via `chrome/Shell.ts` → `index.ts`. (Search Thread S5b — the standalone
+ * NOT lazy: the always-present chrome (`SearchV3View`, the default landing view, plus `Shell`)
+ * and shared components, imported eagerly via `chrome/Shell.ts` → `index.ts`. (Search Thread S5b — the standalone
  * `jf-search-surface` that used to hold this "kept eager in index.ts" exception is retired.)
  */
 
@@ -56,10 +55,6 @@ const LOADERS: ReadonlyMap<string, () => Promise<unknown>> = new Map<
   ['jf-api-explorer-view', () => import('./ApiExplorerView.js')],
   // Tempdoc 851 (owner decision 2026-08-19): the `jf-search-v2` row is retired with its window —
   // 818 never reached its §5 cutover, so nothing resolves that tag any more.
-  // Tempdoc 822 slice 1 — the Search v3 window, rebuilt on a new design system.
-  // DEVELOPER/DEEPLINK, no rail entry; reachable only at
-  // #justsearch://surface/core.search-v3-surface while the geometry is calibrated.
-  ['jf-sv3-window', () => import('./search-v3/SearchV3View.js')],
 ]);
 
 /** In-flight (and resolved) loads, deduped by tag. Cleared on failure so a

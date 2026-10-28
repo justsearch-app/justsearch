@@ -403,7 +403,6 @@ const source = (relative: string): string => readFileSync(join(HERE, '..', '..',
 
 /** file → the number of `<jf-markdown-block>` call sites it renders (the table above). */
 const SHIPPED_CONSUMERS: ReadonlyArray<readonly [string, number]> = [
-  ['views/UnifiedChatView.ts', 7],
   ['views/SummarizeView.ts', 1],
   ['views/NavigateView.ts', 1],
   ['components/chat/ReasoningBlock.ts', 1],
@@ -427,9 +426,9 @@ describe('the shipped consumer inventory is closed', () => {
     expect(text.match(/<jf-markdown-block/g)?.length ?? 0).toBe(count);
   });
 
-  it('counts ten shipped call sites in total — an eleventh must claim its coverage row', () => {
+  it('counts three shipped geometry call sites in total — another must claim its coverage row', () => {
     const total = SHIPPED_CONSUMERS.reduce((sum, [, count]) => sum + count, 0);
-    expect(total).toBe(10);
+    expect(total).toBe(3);
   });
 
   it('gives every citation-passing call site the source list those citations are labelled against', () => {
@@ -446,29 +445,6 @@ describe('the shipped consumer inventory is closed', () => {
         expect(template, `${file} passes .citations without .sourceCount`).toContain('.sourceCount=');
       }
     }
-  });
-
-  it('gives the LIVE agent block both halves of "this run, and still streaming" (869 F5)', () => {
-    // The one block that renders text the model is STILL WRITING, and it was missing both facts
-    // that make the citation passes safe there. It bound `.sourceCount` straight off
-    // `answerSources.length` — a list `onDone` writes, so mid-stream it is the PREVIOUS run's, and
-    // its length is exactly the range the mute's predicate calls "resolvable". And it carried no
-    // `?is-streaming`, so the renderer treated a half-written answer as settled and wove marks into
-    // prose the model had not finished. Source-level for the T-sites reason: a forgotten binding is
-    // invisible to any DOM test of the renderer.
-    const view = source('views/UnifiedChatView.ts');
-    const live = (view.match(/<jf-markdown-block\s[\s\S]*?<\/jf-markdown-block>/g) ?? []).filter(
-      (t) => t.includes('ctrl.streamingText'),
-    );
-    expect(live, 'the live agent streaming block').toHaveLength(1);
-    // The binding is asserted WHOLE, not just present: `?is-streaming=${…}` with anything at all
-    // inside it passes a hard-coded `false`, and a live block bound to a constant is exactly the
-    // defect this row exists for. It must read the controller's own flag, because `streamingText`
-    // outlives `isStreaming` between a terminal event and the commit that clears the buffer.
-    expect(live[0], 'a live block that renders as settled').toContain(
-      '?is-streaming=${ctrl.isStreaming}',
-    );
-    expect(live[0], 'a live count read off the previous run').toMatch(/answerEvidenceIsThisRun\(\)/);
   });
 
   it('gives the Search v3 blocks the frame their own tail line words', () => {

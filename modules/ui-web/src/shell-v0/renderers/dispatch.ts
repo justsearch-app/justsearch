@@ -22,6 +22,7 @@
  * render tests.)
  */
 
+import { canonicalComponentTag } from './componentIdentity.js';
 import type { JsonSchema, UISchemaElement } from '@jsonforms/core';
 import type { RendererEntry, RendererTester } from './rendererTypes.js';
 import type { RendererUserConfig } from './userConfig.js';
@@ -78,7 +79,7 @@ export function dispatchRenderer(
 ): string | null {
   const override = lookupRendererOverride(uischema, userConfig);
   if (override) {
-    return override;
+    return canonicalComponentTag(override);
   }
   let bestRank = -1;
   let bestTag: string | null = null;
@@ -89,7 +90,7 @@ export function dispatchRenderer(
       bestTag = entry.tag;
     }
   }
-  return bestRank >= 0 ? bestTag : null;
+  return bestRank >= 0 && bestTag !== null ? canonicalComponentTag(bestTag) : null;
 }
 
 /**

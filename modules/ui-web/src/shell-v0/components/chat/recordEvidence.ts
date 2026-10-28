@@ -45,7 +45,7 @@ export function readScorer(payload: unknown): string | null {
  * is a reader for user data under its old key, not a compatibility shim for wrong values — and no
  * migration is needed. `-1` = absent.
  */
-export function readSourceIndex(m: Record<string, unknown>): number {
+function readSourceIndex(m: Record<string, unknown>): number {
   if (typeof m.sourceIndex === 'number') return m.sourceIndex;
   if (typeof m.chunkIndex === 'number') return m.chunkIndex;
   return -1;
@@ -146,7 +146,7 @@ export function matchesFromRecord(claimMatches: unknown): CitationMatch[] {
 
 
 /** Tempdoc 836 S2S3-A.1 — read the per-source examination facts off a payload or a record. */
-export function readSourceCoverage(payload: unknown): SourceCoverage[] {
+function readSourceCoverage(payload: unknown): SourceCoverage[] {
   if (!payload || typeof payload !== 'object') return [];
   const raw = (payload as { sourceCoverage?: unknown }).sourceCoverage;
   if (!Array.isArray(raw)) return [];

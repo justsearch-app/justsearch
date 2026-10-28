@@ -16,7 +16,7 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { registerCoreStores } from '../../router/bootstrap.js';
 import { createNavigationHandler } from '../../router/navigationHandler.js';
 import { deactivateProjection } from '../../router/URLProjector.js';
-import { takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../../utils/compose.js';
+import { takePendingSelection, } from '../../utils/compose.js';
 
 type ElementView = HTMLElement & { updateComplete: Promise<unknown> };
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -73,8 +73,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   deactivateProjection();
-  takePendingSelection(); takePendingForceShape(); takePendingAutoRun();
-  document.body.replaceChildren();
+  takePendingSelection(); document.body.replaceChildren();
   // Disconnect closes the window's subscriptions and stream; settle its outstanding promises.
   await new Promise<void>(resolve => setTimeout(resolve, 0));
   resetSearchState(); __resetAiStateForTest(); __resetAgentSessionStore();
