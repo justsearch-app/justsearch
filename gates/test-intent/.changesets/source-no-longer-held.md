@@ -313,3 +313,25 @@ longer sufficient evidence that the index has no record.
   "note": "Codex recheck-1 (separate session) on eea6f7cb96: focus repair before 4 fail / after 16 pass, merge integrity, full checks; accepts sha256:7030ee6e…e0c0"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1801a-b4af-7d13-93b9-312a0b0adda8",
+  "verdict": "accept",
+  "digest": "sha256:2cf46934f711c57ad1d76c22e04fb97b9b029fd3b47b4e6792d6ecbcba2e4f19",
+  "note": "Codex acceptor-3 (separate session) on 663492faa0: six entries satisfy their classes; CitationsPanel New/repaired fails before by assertion, 13 pass after; 123 frontend / 70 JVM tests pass"
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1801a-a8dd-7fe2-a698-ea88c9e37fac",
+  "verdict": "reject",
+  "digest": "sha256:2cf46934f711c57ad1d76c22e04fb97b9b029fd3b47b4e6792d6ecbcba2e4f19",
+  "note": "Codex auditor-3: the revised accessibility oracle still rejects valid names/descriptions and accepts an overridden description; the other five entries satisfy their classes"
+}
+```
