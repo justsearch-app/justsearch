@@ -14,7 +14,18 @@ PROMOTED crash and once the root or permissions return; S2 with its unit superse
 S4a/S4b/S4c; S6; S7a with the delete-after-sync S7b order; P6 and P7), the F1 checks (a DELETE a
 later sync restores, beside a projection, in the S7 restart and in the mixed unit settlement) and
 the all-or-nothing acknowledgement checks (partialAcknowledgementLeavesEverySelectedReceiptForTheRetry
-and partialMixedAcknowledgementLeavesEverySelectedReceiptForTheRetry) failing before and passing after. Since the merge of origin/main (#998, Forget), the before
+and partialMixedAcknowledgementLeavesEverySelectedReceiptForTheRetry, and their file-receipt-only
+variants partialFileAcknowledgementLeavesEverySelectedReceiptForTheRetry and
+partialMixedFileAcknowledgementLeavesEverySelectedReceiptForTheRetry) failing before and passing
+after, and the S2 policy control allowedSourceUnderALaterRootSyncSettlesWithoutCertification. On
+the before state the SYNC_ROOT checks fail at their retry, because origin/main refuses a SYNC_ROOT
+before it acknowledges anything; the two variants hold no SYNC_ROOT, so origin/main settles them
+and its count-checked removal loses the receipt it did remove (the "stays too" assertion). The
+exclusion check ExcludedReceiptUnderRootSyncTest#excludedSourceUnderALaterRootSyncNeedsTheFinalOwner
+has its own evidence, `gates/test-intent/evidence/e74253-native-sync-root-policy.json`, before
+78042b4117: there the file-only route settled an excluded receipt a later SYNC_ROOT covers without
+the final committed-acknowledgement owner (the "missing final owner" assertion); the mixed route
+already refused it and passes on both. Since the merge of origin/main (#998, Forget), the before
 state is origin/main b744db8744 with the volume seam overlaid: 9e492f703f lacks the
 KnowledgeServer policy constructor the merged S5 child uses. S5 also holds a forgotten (FILE
 literal) and an excluded (glob) file under the retained SYNC_ROOT's root, with the Engine's

@@ -217,6 +217,44 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
     }
   }
 
+  @Test
+  void partialFileAcknowledgementLeavesEverySelectedReceiptForTheRetry() throws Exception {
+    String first = file("first.txt");
+    String second = file("second.txt");
+    try (var queue = queue()) {
+      delete(queue, B, first);
+      delete(queue, B, second);
+      var retained = queue.listSwitchBufferOpsStrict();
+      var runtime = fileRuntime();
+      refuseRemoval(true, "OLD.key = 'path:" + second + "'");
+
+      assertFalse(settle(queue, runtime, B), "the second DELETE's removal was refused");
+      assertEquals(retained, queue.listSwitchBufferOpsStrict(), "the first DELETE stays too");
+      refuseRemoval(false, null);
+      assertTrue(settle(queue, runtime, B));
+      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+    }
+  }
+
+  @Test
+  void partialMixedFileAcknowledgementLeavesEverySelectedReceiptForTheRetry() throws Exception {
+    String gone = file("gone.txt");
+    var later = projectionAt("later", 1, "notes", file("notes/later.md"));
+    try (var queue = queue(); var runtime = luceneRuntime()) {
+      index(runtime, later);
+      delete(queue, B, gone);
+      queue.admitProjectionForGeneration(B, later.encode());
+      var retained = queue.listSwitchBufferOpsStrict();
+      refuseDeleteRemoval(true);
+
+      assertFalse(settle(queue, runtime, B, List.of(SOURCE)), "the DELETE's removal was refused");
+      assertEquals(retained, queue.listSwitchBufferOpsStrict(), "the projection receipt stays too");
+      refuseDeleteRemoval(false);
+      assertTrue(settle(queue, runtime, B, List.of(SOURCE)));
+      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+    }
+  }
+
   // ---- S7: a broad-delete snapshot with a SYNC_ROOT is still refused when B disagrees ----
 
   @Test
@@ -355,10 +393,15 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
 
   /** While refused, SQLite ignores the removal of any DELETE receipt, as a vanished row would be. */
   private void refuseDeleteRemoval(boolean refused) throws Exception {
+    refuseRemoval(refused, "OLD.op = 'DELETE'");
+  }
+
+  /** While refused, SQLite ignores the removal of every receipt the condition selects. */
+  private void refuseRemoval(boolean refused, String condition) throws Exception {
     try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
         var statement = connection.createStatement()) {
       statement.execute(refused ? "CREATE TRIGGER refuse_delete_removal BEFORE DELETE ON switch_buffer"
-          + " WHEN OLD.op = 'DELETE' BEGIN SELECT RAISE(IGNORE); END" : "DROP TRIGGER refuse_delete_removal");
+          + " WHEN " + condition + " BEGIN SELECT RAISE(IGNORE); END" : "DROP TRIGGER refuse_delete_removal");
     }
   }
 

@@ -848,7 +848,8 @@ public final class KnowledgeServerMigrationOps {
    * acknowledges the selected receipts together or not at all.
    * A SYNC_ROOT was replayed onto B before its pointer moved: its exact receipt is validated and
    * acknowledged with the others in accepted order, never walked again. On either path, a file
-   * receipt a later SYNC_ROOT covers is checked as a receipt only.
+   * receipt a later SYNC_ROOT covers is checked as a receipt only, unless the exclusion policy
+   * excludes its source: that receipt is certified as an uncovered one is.
    */
   public static boolean settleCommittedNativeFileWitnesses(
       JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log) {
@@ -904,7 +905,7 @@ public final class KnowledgeServerMigrationOps {
       for (int i = 0; i < effects.size(); i++) {
         var effect = effects.get(i);
         // A superseded survivor stays an accepted exception to the broad deletes before it.
-        if (superseded.contains(effect.op())) continue;
+        if (superseded.contains(effect.op()) && !policyExcludes(policy, effect.op())) continue;
         if (survivors.contains(effect)) {
           if (!certifyCommittedSurvivor(scoped, active, effects, deleteIndexes, i, policy)) return false;
         } else if (effect.id() != null
@@ -1154,7 +1155,7 @@ public final class KnowledgeServerMigrationOps {
       Set<SwitchBufferCapableQueue.SwitchBufferOp> superseded = supersededByRootSync(selected);
       for (var op : selected) {
         if (op.payload() == null || op.payload().isBlank()) return false;
-        if ("SYNC_ROOT".equals(op.op()) || superseded.contains(op)) {
+        if ("SYNC_ROOT".equals(op.op()) || superseded.contains(op) && !policyExcludes(policy, op)) {
           // B's commit holds the later root sync's walk over this path; only the receipt is checked.
           // A retained SYNC_ROOT is in the snapshot B committed: promoteServingSuccessor holds
           // beginFinalFence from before B's commit until finishPromotedSwitchReplay removes the
@@ -1215,6 +1216,17 @@ public final class KnowledgeServerMigrationOps {
       List<SwitchBufferCapableQueue.SwitchBufferOp> selected) {
     return scoped instanceof SqliteJobQueue sqlite ? sqlite.removeEveryReplayedSwitchBufferOp(selected)
         : scoped.removeReplayedSwitchBufferOps(selected) == selected.size();
+  }
+
+  /**
+   * A later root walk skips an excluded source, so only the policy's omission proof, confirmed by
+   * the final owner, settles that source's receipt.
+   */
+  private static boolean policyExcludes(io.justsearch.indexerworker.services.NativePolicyReplay policy,
+      SwitchBufferCapableQueue.SwitchBufferOp op) {
+    if (policy == null || !"UPSERT".equals(op.op())) return false;
+    var file = SwitchBufferUpsert.decode(op.payload());
+    return policy.excludes(Path.of(file.path()), file.ingestionRoot(), file.collection());
   }
 
   /** File receipts whose path a SYNC_ROOT accepted after them walked again before B committed. */
