@@ -116,3 +116,14 @@ The orchestrator produces D4 execution evidence and obtains independent acceptan
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a184e4-b48d-7902-8598-42c3ece720e9",
+  "verdict": "accept",
+  "digest": "sha256:7493c2791745ae1e36c60918d6ee9b10719a1da72c38bfaaad84d0016aad79d1",
+  "note": "Codex verifier-2 PASS: delegated-choice sources and execution support the expectations; repair checks fail before by assertion"
+}
+```
