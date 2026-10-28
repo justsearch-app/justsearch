@@ -127,3 +127,14 @@ are used. Relaunch and post-start reconciliation on installed Windows/Linux rema
   "note": "Verifier of d0895c8587. Adaptation: removed assertions in updater.rs/commit-delivery tests are only v1->v2 URL inputs and reformatting; no oracle weakened. ci.yml only adds the supervisor-conformance binary tests and v2 producer/sequence suites; nothing removed. New checks pass on the candidate per evidence; Linux S8 checked end to end on an Ubuntu 24.04 VM (cancel resumes and re-offers; accepted 0.4.0->0.4.1 relaunches and commits). Delegation quotes not checked against the task record (not available to the verifier)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-ka8rebaa",
+  "verdict": "accept",
+  "digest": "sha256:9e3396666c571ad85ef4af3f03ca898f5d4ffb2bcdc8793395d75ecc872d7f4f",
+  "note": "Delta review of eba4c31c28 relative to previously accepted 3d0cd9a1cf. Windows entire shell job is byte-identical to main a0022c79f1; Linux binary tests and all existing selections survive. Windows-only handoff test references a helper in the library test crate, absent from the binary root (source inspection; Windows not run). Structural rule and whySurvives are accurate against main. All other entries and cited evidence are unchanged from the accepted head; Rust/VM behavior was not rerun in this delta review. Section 10.7 body is byte-identical after relocation; size gate fails before at 809 and passes after at 771. Gate has only this stale acceptance before appending. Node subprocess stdin pipes receive sandbox EPERM; checks use a saved harness transporting the same stdin bytes through private files, with normal error propagation. Independent session; only the Codex model family is available here."
+}
+```
