@@ -624,6 +624,28 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
+    fn linux_desktop_uri_argv_is_available_to_the_cold_launch_reader() {
+        use tauri_plugin_deep_link::DeepLinkExt;
+        // MockRuntime creates no GTK window and registers no desktop handler.
+        // Use the real plugin and the shipped scheme configuration, as getCurrent
+        // in TauriDeepLinkSource does after a desktop Exec=JustSearch %u launch.
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_deep_link::init())
+            .build(tauri::generate_context!())
+            .unwrap();
+        let url = "justsearch://surface/core.help-surface";
+        app.deep_link()
+            .handle_cli_arguments(["JustSearch", url].into_iter());
+        let current = app.deep_link().get_current().unwrap().unwrap();
+        assert_eq!(current[0].as_str(), url);
+        let forwarded = LaunchRequest::from_args(&["JustSearch".into(), url.into()]);
+        assert!(forwarded.show_window);
+        assert!(!forwarded.focus_search);
+        assert_eq!(forwarded.deep_links, [url]);
+    }
+
+    #[test]
     fn sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination() {
         let args = |values: &[&str]| values.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         let focus = LaunchRequest::from_args(&args(&["app", "--minimized", "--focus-search"]));

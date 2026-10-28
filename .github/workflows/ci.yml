@@ -1947,7 +1947,7 @@ jobs:
       # regardless of quality).
       - name: Build the supervisor conformance driver
         working-directory: modules/shell/src-tauri
-        run: cargo build --bin supervisor-conformance --locked
+        run: cargo build --bin supervisor-conformance --features supervisor-conformance --locked
 
       - name: Supervisor conformance (Tauri adapter)
         shell: pwsh

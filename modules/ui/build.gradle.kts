@@ -237,6 +237,7 @@ val buildWeb by tasks.registering(conventions.NpmBuildTask::class) {
   scriptName.set("build")
   sourceFiles.from(
     uiWebDir.dir("src"),
+    uiWebDir.dir("scripts"),
     uiWebDir.file("package.json"),
     uiWebDir.file("package-lock.json"),
     uiWebDir.file("vite.config.js")
