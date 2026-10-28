@@ -3344,16 +3344,6 @@ public class InferenceLifecycleManager
     return OnlineModeOps.formatContextAsNumberedPassages(rawContext);
   }
 
-  @SuppressWarnings("unused") // Called from LlamaServerUsageParsingTest, OnlineModeOpsTest
-  static AiUsage extractUsageFromChatChunk(JsonNode root) {
-    return OnlineModeOps.extractUsageFromChatChunk(root);
-  }
-
-  @SuppressWarnings("unused") // Package-private delegation for test access (UtilsTest)
-  static Integer asIntOrNull(JsonNode node) {
-    return InferenceHttpHelpers.asIntOrNull(node);
-  }
-
   // ==================== Token Counting (Phase 2 RAG) — delegated to TokenEndpointOps ====================
 
   // Each token operation holds one AUX lease from the tracker for its whole exchange
@@ -3420,16 +3410,6 @@ public class InferenceLifecycleManager
   @SuppressWarnings("unused") // Called from ServerPropsOpsTest, PropsInsightsTest
   void updateFromPropsBestEffort(JsonNode root) {
     serverOps.updateFromPropsBestEffort(root);
-  }
-
-  @SuppressWarnings("unused") // Called from LlamaServerPropsParsingTest
-  static Integer extractContextTokensFromProps(JsonNode root) {
-    return ServerPropsOps.extractContextTokensFromProps(root);
-  }
-
-  @SuppressWarnings("unused") // Called from InferenceLifecycleManagerUtilsTest
-  static Integer asPositiveInt(JsonNode node) {
-    return ServerPropsOps.asPositiveInt(node);
   }
 
   /**

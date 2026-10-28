@@ -5,10 +5,6 @@ Method io.justsearch.adapters.lucene.runtime.RunningRuntime.session() is never r
 Method io.justsearch.agent.AgentLoopService.forTesting(io.justsearch.app.api.OnlineAiService, io.justsearch.agent.api.registry.OperationCatalog, io.justsearch.agent.api.registry.OperationDispatcher, io.justsearch.agent.api.registry.AgentToolEmitter, io.justsearch.agent.tools.FileOperationLog, java.util.function.Function, io.justsearch.agent.AgentRunStore, io.justsearch.agent.AgentTelemetry) is never referenced
 Method io.justsearch.agent.AgentRetryPolicy$RetryDecision.action() is never referenced
 Method io.justsearch.app.engine.EngineRoot.liveMigrationStartCompletionForTests(java.lang.String) is never referenced
-Method io.justsearch.app.inference.InferenceLifecycleManager.asIntOrNull(tools.jackson.databind.JsonNode) is never referenced
-Method io.justsearch.app.inference.InferenceLifecycleManager.asPositiveInt(tools.jackson.databind.JsonNode) is never referenced
-Method io.justsearch.app.inference.InferenceLifecycleManager.extractContextTokensFromProps(tools.jackson.databind.JsonNode) is never referenced
-Method io.justsearch.app.inference.InferenceLifecycleManager.extractUsageFromChatChunk(tools.jackson.databind.JsonNode) is never referenced
 Method io.justsearch.app.inference.InferenceLifecycleManager.handlePeriodicHealthFailure(java.lang.String, boolean) is never referenced
 Method io.justsearch.app.inference.InferenceLifecycleManager.isUsingExternalServer() is never referenced
 Method io.justsearch.app.inference.InferenceLifecycleManager.setUsingExternalServerForTest(boolean) is never referenced
