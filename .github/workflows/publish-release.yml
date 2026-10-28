@@ -1,0 +1,51 @@
+name: Publish Release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Qualified draft tag; dispatch only after the owner authorizes publication
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY }}
+      JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID }}
+      JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY }}
+      JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID }}
+    steps:
+      - name: Validate dispatch ref and tag
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.14.0'
+      - name: Download exact candidate from draft
+        run: |
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir dist/candidate
+          echo "JUSTSEARCH_RELEASE_EXPECTED_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+          echo "JUSTSEARCH_RELEASE_EXPECTED_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Stage public metadata key
+        env:
+          METADATA_PUBLIC_KEY_PEM: ${{ vars.JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM }}
+        run: |
+          printf '%s' "$METADATA_PUBLIC_KEY_PEM" > "$RUNNER_TEMP/metadata-public.pem"
+          echo "JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PATH=$RUNNER_TEMP/metadata-public.pem" >> "$GITHUB_ENV"
+      - name: Verify hashes, signatures and provenance, then promote exact bytes
+        run: node scripts/release/release-candidate.mjs publish dist/candidate
