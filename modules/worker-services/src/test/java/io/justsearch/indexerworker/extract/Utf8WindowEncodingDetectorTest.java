@@ -39,7 +39,7 @@ class Utf8WindowEncodingDetectorTest {
     assertEquals(222, REFERENCE_HEBREW.getBytes(StandardCharsets.UTF_8).length);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "completeMultibyteCodePointSelectsUtf8({arguments})")
   @ValueSource(strings = {"א", "€", "😀", "\u0080", "\u07ff", "\u0800", "\ud7ff", "\ue000", "\uffff", "\udbff\udfff"})
   void completeMultibyteCodePointSelectsUtf8(String text) throws Exception {
     assertUtf8(text.getBytes(StandardCharsets.UTF_8));

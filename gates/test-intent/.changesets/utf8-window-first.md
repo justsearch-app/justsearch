@@ -35,7 +35,7 @@ with results reported in the handback. Formal evidence and acceptance remain the
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
-          "delegationLocation": "task t-20261026-8f2d61 owner instruction, 2026-10-26",
+          "delegationLocation": "task t-20261026-8f2d61 request",
           "delegationScope": "Text extraction correctness and preservation while repairing misdecoded valid UTF-8.",
           "choice": "Prefer strict valid non-ASCII UTF-8 in the first 16,384 bytes after existing HTML declarations and BOM-less UTF-16; keep the existing chain on rejection.",
           "label": "agent choice"
@@ -71,7 +71,7 @@ with results reported in the handback. Formal evidence and acceptance remain the
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
-          "delegationLocation": "task t-20261026-8f2d61 owner instruction, 2026-10-26",
+          "delegationLocation": "task t-20261026-8f2d61 request",
           "delegationScope": "Text extraction correctness and preservation while repairing misdecoded valid UTF-8.",
           "choice": "Preserve today's encoding, declaration, routing and old stored-state behavior outside valid non-ASCII UTF-8 windows, as settled in P1-P7.",
           "label": "agent choice"
@@ -107,7 +107,7 @@ with results reported in the handback. Formal evidence and acceptance remain the
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
-          "delegationLocation": "task t-20261026-8f2d61 owner instruction, 2026-10-26",
+          "delegationLocation": "task t-20261026-8f2d61 request",
           "delegationScope": "Text extraction correctness and preservation while repairing misdecoded valid UTF-8.",
           "choice": "Move deterministic extraction policy identities from v4 to v5 for default, blank/null fallback and configured limits because valid UTF-8 is now preferred. Parent and sandbox child must agree; old stored policy identities stay untouched.",
           "label": "agent choice"

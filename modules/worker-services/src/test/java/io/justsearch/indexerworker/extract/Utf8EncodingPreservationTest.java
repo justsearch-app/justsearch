@@ -34,7 +34,7 @@ class Utf8EncodingPreservationTest {
         Arguments.of("Korean", "한국어 문장입니다. 오늘 우리는 도서관에서 새로운 책을 읽습니다."));
   }
 
-  @ParameterizedTest(name = "P1 {0}")
+  @ParameterizedTest(name = "otherUtf8ScriptsKeepCharsetAndText(P1 {0})")
   @MethodSource("scripts")
   void otherUtf8ScriptsKeepCharsetAndText(String name, String prose) throws Exception {
     try (var structured = new StructuredContentExtractor(); var flat = new ContentExtractor()) {
@@ -97,7 +97,7 @@ class Utf8EncodingPreservationTest {
         Arguments.of("Big5", "這是一篇中文文章，今天我們在臺北的圖書館閱讀新的書籍。孩子們和朋友一起學習，發現許多有趣的故事。"));
   }
 
-  @ParameterizedTest(name = "P2 {0}: {1}")
+  @ParameterizedTest(name = "legacyProseKeepsTodaysCharsetAndExactText(P2 {0}: {1})")
   @MethodSource("legacyProse")
   void legacyProseKeepsTodaysCharsetAndExactText(String encoding, String prose) throws Exception {
     Charset charset = Charset.forName(encoding);

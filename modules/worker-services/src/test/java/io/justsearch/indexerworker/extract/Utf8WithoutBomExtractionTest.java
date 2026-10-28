@@ -52,7 +52,7 @@ class Utf8WithoutBomExtractionTest extends io.justsearch.adapters.lucene.runtime
             .map(count -> Arguments.of(extension, count)));
   }
 
-  @ParameterizedTest(name = "H1 {0}, length multiplier {1}")
+  @ParameterizedTest(name = "hebrewAcrossFormatsAndReaders(H1 {0}, length multiplier {1})")
   @MethodSource("hebrewFiles")
   void hebrewAcrossFormatsAndReaders(String extension, int count) throws Exception {
     String body = count == -1 ? REFERENCE_HEBREW : count == 0 ? SHORT_HEBREW : HEBREW.repeat(count);
@@ -88,7 +88,7 @@ class Utf8WithoutBomExtractionTest extends io.justsearch.adapters.lucene.runtime
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "childReuseAndReplacementKeepUtf8TextAndPolicyIdentity({arguments})")
   @ValueSource(booleans = {false, true})
   @Timeout(90)
   void childReuseAndReplacementKeepUtf8TextAndPolicyIdentity(boolean configured) throws Exception {
@@ -182,7 +182,7 @@ class Utf8WithoutBomExtractionTest extends io.justsearch.adapters.lucene.runtime
     assertTrue(metadata.get(Metadata.CONTENT_TYPE).startsWith("text/csv"));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "inlineMailBodiesAndArchiveAttachmentKeepHebrew({arguments})")
   @ValueSource(strings = {"plain", "html", "zip"})
   void inlineMailBodiesAndArchiveAttachmentKeepHebrew(String kind) throws Exception {
     Path file;
