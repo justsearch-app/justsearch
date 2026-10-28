@@ -589,10 +589,16 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     String building = startMigration
         ? generations.startMigration("candidate-root-test").building_generation() : null;
     ReadPathOps reads = mock(ReadPathOps.class);
-    List<LuceneRuntimeTypes.SearchHit> hits = java.util.Arrays.stream(indexedPaths)
-        .map(path -> new LuceneRuntimeTypes.SearchHit(
-            path, 1.0f, Map.of(SchemaFields.PATH, path)))
-        .toList();
+    var hits = new java.util.ArrayList<LuceneRuntimeTypes.SearchHit>();
+    for (String path : indexedPaths) {
+      var fields = new java.util.HashMap<String, String>(Map.of(SchemaFields.PATH, path));
+      Path file = Path.of(path);
+      if (Files.isRegularFile(file)) {
+        fields.put(SchemaFields.SIZE_BYTES, String.valueOf(Files.size(file)));
+        fields.put(SchemaFields.MODIFIED_AT, String.valueOf(Files.getLastModifiedTime(file).toMillis()));
+      }
+      hits.add(new LuceneRuntimeTypes.SearchHit(path, 1.0f, fields));
+    }
     when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
         .thenReturn(new LuceneRuntimeTypes.SearchResult(hits, hits.size(), 0L));
 
