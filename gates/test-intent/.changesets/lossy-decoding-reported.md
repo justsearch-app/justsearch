@@ -190,7 +190,7 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java"
       ],
       "class": "New",
-      "behaviour": "I1: default and blank fallback ids are tika-default-v7, configured limits are tika-config-v7-<chars>-<bytes>. Existing expectations change only those id strings; all extraction, limits, routing, sandbox and format fixture oracles remain unchanged. Three plain identity checks pin all forms; no migration or re-extraction is introduced. The classifier seam law now includes decoding loss.",
+      "behaviour": "I1: default and blank fallback ids are tika-default-v7, configured limits are tika-config-v7-<chars>-<bytes>. Existing expectations change only those id strings; all extraction, limits, routing, sandbox and format fixture oracles remain unchanged. Main's existing identity checks pin all forms; no migration or re-extraction is introduced. The classifier seam law now includes decoding loss.",
       "sources": [
         {
           "kind": "defect-source",
@@ -209,10 +209,7 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
       "evidence": "gates/test-intent/evidence/lossy-decoding-policy-id.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java#modeSwitchSelectsTheSandbox",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java#realChildExtractsFileContent",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#defaultPolicyIdentityIsV7",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#blankPolicyIdentityFallsBackToV7",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#configuredPolicyIdentityIsV7"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java#realChildExtractsFileContent"
       ],
       "repaired": true
     }

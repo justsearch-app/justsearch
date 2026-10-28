@@ -596,14 +596,15 @@ class LossyDecodingExtractionTest {
   void utf8WithoutBomIsClean() throws Exception {
     clean("utf8.txt", "Valid words café € 😀".getBytes(StandardCharsets.UTF_8), "UTF-8", TEXT_PARSER);
   }
-  @ParameterizedTest
+
+  @ParameterizedTest(name = "utf8WithoutBomAfterLongAsciiStartIsClean({0})")
   @ValueSource(ints = {16_384, 65_536, 1_048_576})
   void utf8WithoutBomAfterLongAsciiStartIsClean(int prefixLength) throws Exception {
     clean("ascii-first.txt", ("a".repeat(prefixLength) + "café € 😀")
         .getBytes(StandardCharsets.UTF_8), "UTF-8", TEXT_PARSER);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "malformedUtf8AfterLongAsciiStartKeepsLegacyAudit({0})")
   @ValueSource(ints = {0xff, 0x81})
   void malformedUtf8AfterLongAsciiStartKeepsLegacyAudit(int invalid) throws Exception {
     byte[] bytes = concat(("a".repeat(16_384) + "é").getBytes(StandardCharsets.UTF_8),
