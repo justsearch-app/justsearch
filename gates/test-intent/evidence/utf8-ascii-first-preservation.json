@@ -1,0 +1,554 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T10:01:14.425Z",
+  "revision": "fae13802c93630072313197e3a7c73b6137416a9",
+  "tree": "cccce5c8c73f3afd131b439f52c0fcb9bea0313a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.pureAsciiKeepsTextAndCharset\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.legacySuffixKeepsLiteralTextAndCharset\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.invalidSnapshotSuffixKeepsDefault\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.validWindowStillWinsOverInvalidSnapshotSuffix\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.firstCompleteSequenceAndEarlyCaptureBoundaryKeepUtf8\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.copiedMetadataAndSequentialDocumentsNeverInheritSnapshotFact\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.embeddedBodiesKeepTodaysText\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.rootCarrierDoesNotDisplaceDeclarationsOrBoms\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.completedUtf8WindowKeepsTodaysXmlDeclarationOutcome\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.parserPassesRootMetadataUncopied\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.captureReadFailureDeletesSpilledSnapshot\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.completeLegacyXmlDeclarationKeepsTodaysOutcome\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.declarationClosingBeyondWindowKeepsTodaysOutcome\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.unfinishedWindowDeclarationKeepsDetectorFallback\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4543
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.AsciiFirstUtf8QueuedRestartTest.oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5982
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#pureAsciiKeepsTextAndCharset",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pureAsciiKeepsTextAndCharset(length 1)",
+          "status": "passed"
+        },
+        {
+          "name": "pureAsciiKeepsTextAndCharset(length 16384)",
+          "status": "passed"
+        },
+        {
+          "name": "pureAsciiKeepsTextAndCharset(length 16385)",
+          "status": "passed"
+        },
+        {
+          "name": "pureAsciiKeepsTextAndCharset(length 1048577)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#legacySuffixKeepsLiteralTextAndCharset",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacySuffixKeepsLiteralTextAndCharset(windows-1252)",
+          "status": "passed"
+        },
+        {
+          "name": "legacySuffixKeepsLiteralTextAndCharset(KOI8-R)",
+          "status": "passed"
+        },
+        {
+          "name": "legacySuffixKeepsLiteralTextAndCharset(windows-1251)",
+          "status": "passed"
+        },
+        {
+          "name": "legacySuffixKeepsLiteralTextAndCharset(ISO-8859-8)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#invalidSnapshotSuffixKeepsDefault",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(1)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(2)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(3)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(4)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(5)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(6)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(7)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(8)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(9)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(10)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(11)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(12)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(13)",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSnapshotSuffixKeepsDefault(14)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#validWindowStillWinsOverInvalidSnapshotSuffix",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validWindowStillWinsOverInvalidSnapshotSuffix()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#firstCompleteSequenceAndEarlyCaptureBoundaryKeepUtf8",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "firstCompleteSequenceAndEarlyCaptureBoundaryKeepUtf8()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#copiedMetadataAndSequentialDocumentsNeverInheritSnapshotFact",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "copiedMetadataAndSequentialDocumentsNeverInheritSnapshotFact()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#embeddedBodiesKeepTodaysText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "embeddedBodiesKeepTodaysText(zip)",
+          "status": "passed"
+        },
+        {
+          "name": "embeddedBodiesKeepTodaysText(attachment)",
+          "status": "passed"
+        },
+        {
+          "name": "embeddedBodiesKeepTodaysText(plain)",
+          "status": "passed"
+        },
+        {
+          "name": "embeddedBodiesKeepTodaysText(html)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#rootCarrierDoesNotDisplaceDeclarationsOrBoms",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(html-meta)",
+          "status": "passed"
+        },
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(html-alias)",
+          "status": "passed"
+        },
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(html-metadata)",
+          "status": "passed"
+        },
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(xml)",
+          "status": "passed"
+        },
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(xml-alias)",
+          "status": "passed"
+        },
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(xhtml)",
+          "status": "passed"
+        },
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(xhtml-alias)",
+          "status": "passed"
+        },
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(utf8-bom)",
+          "status": "passed"
+        },
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(utf16le)",
+          "status": "passed"
+        },
+        {
+          "name": "rootCarrierDoesNotDisplaceDeclarationsOrBoms(utf16be)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#completedUtf8WindowKeepsTodaysXmlDeclarationOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedUtf8WindowKeepsTodaysXmlDeclarationOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#parserPassesRootMetadataUncopied",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "parserPassesRootMetadataUncopied(txt)",
+          "status": "passed"
+        },
+        {
+          "name": "parserPassesRootMetadataUncopied(md)",
+          "status": "passed"
+        },
+        {
+          "name": "parserPassesRootMetadataUncopied(csv)",
+          "status": "passed"
+        },
+        {
+          "name": "parserPassesRootMetadataUncopied(json)",
+          "status": "passed"
+        },
+        {
+          "name": "parserPassesRootMetadataUncopied(py)",
+          "status": "passed"
+        },
+        {
+          "name": "parserPassesRootMetadataUncopied(html)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#captureReadFailureDeletesSpilledSnapshot",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "captureReadFailureDeletesSpilledSnapshot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:83efe101cbf27cc456cefe3417d3c29ef3d229f8c12e4bb20da0fc195bc88645",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#completeLegacyXmlDeclarationKeepsTodaysOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completeLegacyXmlDeclarationKeepsTodaysOutcome(html, ISO-8859-1)",
+          "status": "passed"
+        },
+        {
+          "name": "completeLegacyXmlDeclarationKeepsTodaysOutcome(html, windows-1252)",
+          "status": "passed"
+        },
+        {
+          "name": "completeLegacyXmlDeclarationKeepsTodaysOutcome(txt, ISO-8859-1)",
+          "status": "passed"
+        },
+        {
+          "name": "completeLegacyXmlDeclarationKeepsTodaysOutcome(txt, windows-1252)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#declarationClosingBeyondWindowKeepsTodaysOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "declarationClosingBeyondWindowKeepsTodaysOutcome(html, ISO-8859-1)",
+          "status": "passed"
+        },
+        {
+          "name": "declarationClosingBeyondWindowKeepsTodaysOutcome(html, UTF-8)",
+          "status": "passed"
+        },
+        {
+          "name": "declarationClosingBeyondWindowKeepsTodaysOutcome(html, utf8)",
+          "status": "passed"
+        },
+        {
+          "name": "declarationClosingBeyondWindowKeepsTodaysOutcome(txt, ISO-8859-1)",
+          "status": "passed"
+        },
+        {
+          "name": "declarationClosingBeyondWindowKeepsTodaysOutcome(txt, UTF-8)",
+          "status": "passed"
+        },
+        {
+          "name": "declarationClosingBeyondWindowKeepsTodaysOutcome(txt, utf8)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#unfinishedWindowDeclarationKeepsDetectorFallback",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3eb083f8b73c6492d332c02aa0ebcfcc043555ea1f728f5408d8152e1ab9637f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unfinishedWindowDeclarationKeepsDetectorFallback(html, ISO-8859-1)",
+          "status": "passed"
+        },
+        {
+          "name": "unfinishedWindowDeclarationKeepsDetectorFallback(html, UTF-8)",
+          "status": "passed"
+        },
+        {
+          "name": "unfinishedWindowDeclarationKeepsDetectorFallback(html, utf8)",
+          "status": "passed"
+        },
+        {
+          "name": "unfinishedWindowDeclarationKeepsDetectorFallback(txt, ISO-8859-1)",
+          "status": "passed"
+        },
+        {
+          "name": "unfinishedWindowDeclarationKeepsDetectorFallback(txt, UTF-8)",
+          "status": "passed"
+        },
+        {
+          "name": "unfinishedWindowDeclarationKeepsDetectorFallback(txt, utf8)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "9faa90b111",
+    "revision": "9faa90b111a899414521209fb62269a133258d03",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.pureAsciiKeepsTextAndCharset\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.legacySuffixKeepsLiteralTextAndCharset\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.invalidSnapshotSuffixKeepsDefault\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.validWindowStillWinsOverInvalidSnapshotSuffix\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.firstCompleteSequenceAndEarlyCaptureBoundaryKeepUtf8\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.copiedMetadataAndSequentialDocumentsNeverInheritSnapshotFact\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.embeddedBodiesKeepTodaysText\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.rootCarrierDoesNotDisplaceDeclarationsOrBoms\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.completedUtf8WindowKeepsTodaysXmlDeclarationOutcome\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.parserPassesRootMetadataUncopied\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.captureReadFailureDeletesSpilledSnapshot\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.completeLegacyXmlDeclarationKeepsTodaysOutcome\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.declarationClosingBeyondWindowKeepsTodaysOutcome\" --tests \"io.justsearch.indexerworker.extract.AsciiFirstUtf8PreservationTest.unfinishedWindowDeclarationKeepsDetectorFallback\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 6138
+      },
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.AsciiFirstUtf8QueuedRestartTest.oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 6381
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#pureAsciiKeepsTextAndCharset",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#legacySuffixKeepsLiteralTextAndCharset",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#invalidSnapshotSuffixKeepsDefault",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#validWindowStillWinsOverInvalidSnapshotSuffix",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#firstCompleteSequenceAndEarlyCaptureBoundaryKeepUtf8",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#copiedMetadataAndSequentialDocumentsNeverInheritSnapshotFact",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#embeddedBodiesKeepTodaysText",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#rootCarrierDoesNotDisplaceDeclarationsOrBoms",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#completedUtf8WindowKeepsTodaysXmlDeclarationOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#parserPassesRootMetadataUncopied",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#captureReadFailureDeletesSpilledSnapshot",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#completeLegacyXmlDeclarationKeepsTodaysOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#declarationClosingBeyondWindowKeepsTodaysOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#unfinishedWindowDeclarationKeepsDetectorFallback",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:a9d7ed90ac94ca614ff4024476b98fe9c3ee43e176bf0cfaad2740ee2527d646"
+}

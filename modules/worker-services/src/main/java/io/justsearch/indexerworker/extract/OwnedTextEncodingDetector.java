@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.apache.tika.detect.CompositeEncodingDetector;
 import org.apache.tika.detect.EncodingDetector;
 import org.apache.tika.metadata.Metadata;
@@ -21,8 +22,15 @@ import org.apache.tika.mime.MediaType;
 public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
   private static final long serialVersionUID = 1L;
   private static final int UTF16_WINDOW_BYTES = 8192;
-  private static final int UTF8_WINDOW_BYTES = 16_384;
+  static final int UTF8_WINDOW_BYTES = 16_384;
   private static final Charset WINDOWS_1252 = Charset.forName("windows-1252");
+  // XML 1.0 [23] XMLDecl with the optional EncodingDecl present. XML S is deliberately
+  // narrower than Java's whitespace classes; each attribute must use matching quotes.
+  private static final Pattern XML_DECLARATION = Pattern.compile(
+      "\\A<\\?xml[ \\t\\r\\n]+version[ \\t\\r\\n]*=[ \\t\\r\\n]*(?:'1\\.[0-9]+'|\"1\\.[0-9]+\")"
+          + "[ \\t\\r\\n]+encoding[ \\t\\r\\n]*=[ \\t\\r\\n]*(['\"])([A-Za-z][A-Za-z0-9._-]*)\\1"
+          + "(?:[ \\t\\r\\n]+standalone[ \\t\\r\\n]*=[ \\t\\r\\n]*(?:'yes'|'no'|\"yes\"|\"no\"))?"
+          + "[ \\t\\r\\n]*\\?>");
   // The types handled by Tika's HTML parser; ordinary XML keeps its own declaration handling.
   private static final Set<String> HTML_TYPES = Set.of(
       "text/html", "application/xhtml+xml", "application/vnd.wap.xhtml+xml", "application/x-asp");
@@ -53,7 +61,7 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
       }
     }
     if (charset == null) {
-      charset = detectUtf8(input);
+      charset = detectUtf8(input, metadata);
       if (charset != null) {
         metadata.set(TikaCoreProperties.ENCODING_DETECTOR, getClass().getName() + "#detectUtf8");
       }
@@ -72,7 +80,7 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
     return charset;
   }
 
-  private static Charset detectUtf8(InputStream input) throws IOException {
+  private static Charset detectUtf8(InputStream input, Metadata metadata) throws IOException {
     if (input == null || !input.markSupported()) {
       return null;
     }
@@ -116,8 +124,24 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
       }
     }
     // Only completed multi-byte sequences consume more bytes than UTF-16 code units.
-    // An ASCII window ending in the prefix of its first such sequence stays on today's path.
-    return bytes.position() > chars.position() ? StandardCharsets.UTF_8 : null;
+    if (bytes.position() > chars.position()) return StandardCharsets.UTF_8;
+    // Only these inconclusive windows may consult the complete top-level snapshot. BOMs,
+    // malformed windows and read failures returned above; existing UTF-8 window wins unchanged.
+    if (!PreparedExtractionInput.isNonAsciiUtf8(metadata)) return null;
+    // A declaration still valid but unfinished at a fully decoded window edge keeps the
+    // existing path, whatever it names. An undecoded multi-byte prefix makes it malformed.
+    // A complete UTF-8 declaration (including aliases) agrees with the fact.
+    chars.flip();
+    var declaration = XML_DECLARATION.matcher(chars);
+    if (declaration.lookingAt()) {
+      String encoding = declaration.group(2);
+      if (!Charset.isSupported(encoding) || !StandardCharsets.UTF_8.equals(Charset.forName(encoding))) {
+        return null;
+      }
+    } else if (declaration.hitEnd() && !bytes.hasRemaining()) {
+      return null;
+    }
+    return StandardCharsets.UTF_8;
   }
 
   private static Charset detectBomlessUtf16(InputStream input) throws IOException {
