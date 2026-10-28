@@ -248,3 +248,13 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
   "digest": "sha256:5604f4fa8a00ea4cce471b8ecf55c18ed3fc8a79827e4242f932c6cc65fe12a9"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18269-09c0-7122-a276-e9d5c0c5d914",
+  "verdict": "accept",
+  "digest": "sha256:97d31b719319b57651e71a2042432cef716e892e1e07657d520322c987c3a8ee"
+}
+```
