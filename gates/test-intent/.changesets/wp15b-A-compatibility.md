@@ -90,3 +90,14 @@ SA15 compatibility implementation. D4 files and independent acceptance are left 
   "note": "Codex verifier PASS on WP1.5c: refreshed wp15b-eager-search evidence reviewed (refresh only)"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a184b9-f209-7de1-a977-bdc41f590b2c",
+  "verdict": "accept",
+  "digest": "sha256:d382874e3e794b0686da9a0f6111eb28c0e35d266da90601c66843d0481211aa",
+  "note": "Refresh only: the unchanged eager-registration check passes before and after, and its digest matches current source."
+}
+```
