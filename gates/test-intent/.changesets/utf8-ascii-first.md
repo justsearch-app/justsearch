@@ -51,7 +51,8 @@ Evidence paths are reserved for the independent verifier. The builder does not r
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#newlyIndexedAsciiFirstUtf8SurvivesRestart",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java#unfinishedXmlPrefixUsesSnapshotUtf8",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java#malformedXmlDeclarationUsesSnapshotUtf8",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java#completeUtf8XmlDeclarationUsesSnapshotUtf8"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java#completeUtf8XmlDeclarationUsesSnapshotUtf8",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#concurrentDocumentsKeepIndependentFacts"
       ],
       "repaired": true
     },
@@ -80,7 +81,6 @@ Evidence paths are reserved for the independent verifier. The builder does not r
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#validWindowStillWinsOverInvalidSnapshotSuffix",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#firstCompleteSequenceAndEarlyCaptureBoundaryKeepUtf8",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#copiedMetadataAndSequentialDocumentsNeverInheritSnapshotFact",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#concurrentDocumentsKeepIndependentFacts",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#embeddedBodiesKeepTodaysText",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#rootCarrierDoesNotDisplaceDeclarationsOrBoms",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#completedUtf8WindowKeepsTodaysXmlDeclarationOutcome",
