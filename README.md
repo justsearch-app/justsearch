@@ -1,6 +1,6 @@
 # JustSearch
 
-**JustSearch finds what is inside your files, fast and accurately, whether you know exactly what you are looking for or only vaguely. It is for anyone, and designed to be easy to use as your main search app and as a tool inside other apps and AI agents through MCP. Its on-device AI assistant provides cited answers about your files. Hybrid search (BM25 + dense vectors + learned-sparse + reranking) plus grounded Q&A, summarization, and extraction over your documents — with indexing, search, and built-in AI on your machine. Windows installer; on Linux, runs from source.**
+**JustSearch finds what is inside your files, fast and accurately, whether you know exactly what you are looking for or only vaguely. It is for anyone, and designed to be easy to use as your main search app and as a tool inside other apps and AI agents through MCP. Hybrid search (BM25 + dense vectors + learned-sparse + reranking) combines with an on-device AI assistant for grounded Q&A with citations, summarization, and extraction over your documents — with indexing, search, and built-in AI on your machine. Windows installer; on Linux, runs from source.**
 
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)

@@ -1,13 +1,11 @@
 ---
 status: stable
-description: The JustSearch Runtime Contract — the small, versioned local surface external AI agents target. Public center = the local runtime; the desktop app is its first-party reference client. Defines the v1 stable core (health/status lifecycle subset + MCP endpoint/tools + runtime manifest), discovered through the manifest's runtimeContract descriptor. Matrix + policy + surface classification live in docs/reference/runtime-contract.md.
+description: The JustSearch Runtime Contract — the small, versioned local surface external apps and AI agents target; the desktop app is its first-party client. Defines the v1 stable core (health/status lifecycle subset + MCP endpoint/tools + runtime manifest), discovered through the manifest's runtimeContract descriptor. Matrix + policy + surface classification live in docs/reference/runtime-contract.md.
 ---
 
 # The JustSearch Runtime Contract
 
-JustSearch's public center is a **reusable local knowledge runtime that AI
-agents can target**. The desktop app is the runtime's **first-party
-reference client** — it demonstrates the runtime, it does not define it.
+JustSearch exposes a **reusable local runtime** for apps and AI agents. The desktop app uses that runtime as its first-party client.
 
 External tools need *one stable object* to build against, not a bundle of
 strong-but-scattered subsystems. The **Runtime Contract** is that object: a
@@ -60,7 +58,7 @@ promise is cheap to add later and expensive to retract, so v1 under-promises.
 
 ## Product shapes
 
-Because the runtime is the center, the ways to run it are official product
+For integrations targeting the runtime, the ways to run it are official product
 shapes rather than loose launch modes: a shape is a supported way to run the
 Runtime Contract, distinguished by which reference-client and optional
 capabilities it bundles — **not** by a different contract. All shapes advertise

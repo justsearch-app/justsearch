@@ -31,8 +31,7 @@ described below.
   downloads models and runtimes from `github.com` and `huggingface.co` with consent. Trace export is off by
   default; only if you enable tracing and set an OTLP endpoint are traces sent there. They can include paths
   and document excerpts. These network paths and external integrations are described in [Privacy](README.md#privacy).
-- **No cloud inference or hosted service.** JustSearch runs on *your* machine; cloud components, accounts,
-  and server-side processing of your documents are out of scope for the same reason.
+- **No cloud inference or JustSearch-hosted service.** JustSearch runs on *your* machine; operating cloud components or account services, and processing your documents server-side, are out of scope for the same reason.
 - **We don't train on your data**, and we never upload your files. Retrieval and inference are local.
   Today, connected AI clients and tools receive the data you pass to them; an enabled trace exporter receives
   paths and document excerpts included in traces.
