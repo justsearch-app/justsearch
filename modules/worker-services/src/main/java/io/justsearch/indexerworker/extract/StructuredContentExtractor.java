@@ -14,6 +14,7 @@ import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.ParseRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.SAXException;
@@ -132,7 +133,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           e);
       return new StructuredExtractionResult(
           new ContentExtractor(maxContentLength).extract(input, context, budget),
-          false,
+          context.get(ParseRecord.class).isWriteLimitReached(),
           StructuredDocumentSummary.empty(), budget.resources(), budget.maxDepth());
     }
   }
