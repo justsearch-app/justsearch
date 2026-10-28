@@ -78,7 +78,7 @@ class WriteTests(unittest.TestCase):
 
     def test_snapshot_continuation_is_not_fresh_qualification_in_rerun_mode(self):
         with tempfile.TemporaryDirectory() as temp:
-            report = {'journeys': [{'id': 'J7', 'checks': [{'status': 'passed', 'evidence': ['focus.json']}]}],
+            report = {'journeys': [{'id': 'J7', 'checks': [{'name': 'shortcut', 'status': 'passed', 'evidence': ['focus.json']}]}],
                       'writeVolume': {'writtenBytes': 1024}}
             args = SimpleNamespace(session='wayland', mode='rerun', journeys=['J7'])
             wrapper.combine(args, Path(temp), {'rerun': report})

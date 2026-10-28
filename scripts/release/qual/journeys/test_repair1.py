@@ -36,13 +36,10 @@ class RepairTests(unittest.TestCase):
 
     def test_warm_link_uses_library_title_even_when_body_ocr_misses_button(self):
         run = Mock(work='/tmp/own-run')
-        run.native.screen_text.return_value = 'Search v3 orchid lighthouse'
-        run.native.app_text.side_effect = ['Search v3 orchid lighthouse', 'Library']
+        run.native.matching_text.return_value = 'Library'
         run.native.app_window.return_value = {'pid': 1, 'rect': {'x': 0, 'y': 0, 'width': 1024, 'height': 700}}
-        with patch.object(linux, 'require_candidate'), patch.object(linux, 'wait_for', once), \
-             patch.object(linux, 'interaction_observation'):
-            result = linux.deep_links(run)
-        self.assertIn('Library', json.dumps(result['warm']))
+        result = linux.native_library_destination(run)
+        self.assertIn('Library', json.dumps(result))
         self.assertFalse(run.wd.execute.called)
 
     def test_restart_bookmark_stays_in_normal_restarted_process(self):
@@ -58,6 +55,7 @@ class RepairTests(unittest.TestCase):
             events.append(name)
             return next(texts)
         run.native.app_text.side_effect = app_text
+        run.native.matching_text.return_value = 'Library just now'
         run.native.key.side_effect = lambda key: events.append(key)
         with patch.object(linux, 'assert_state', return_value={'retained': True}), \
              patch.object(linux, 'interaction_observation'), patch.object(linux, 'wait_for', once):
@@ -73,7 +71,7 @@ class RepairTests(unittest.TestCase):
             run.target.vm = None
             run.target.run.return_value = SimpleNamespace(returncode=100, stdout='',
                 stderr='E: Failed to fetch http://archive.ubuntu.com/pool/curl.deb Could not connect to 127.0.0.1:9 (Connection refused)')
-            with self.assertRaises(Infrastructure) as raised:
+            with patch.object(linux, 'require_disposable_host'), self.assertRaises(Infrastructure) as raised:
                 linux.apt(run, '--download-only', '--reinstall', 'install', 'curl')
             self.assertEqual(classify(raised.exception), 'failed-infrastructure')
             self.assertIn('Failed to fetch', next(Path(temp).glob('apt-*.log')).read_text())
@@ -84,7 +82,7 @@ class RepairTests(unittest.TestCase):
             run.target.vm = None
             run.target.run.return_value = SimpleNamespace(returncode=100, stdout='',
                 stderr='just-search post-installation script subprocess returned error exit status 1')
-            with self.assertRaises(AssertionError):
+            with patch.object(linux, 'require_disposable_host'), self.assertRaises(AssertionError):
                 linux.apt(run, 'install', '/tmp/own.deb')
 
     def test_j3_downloaded_but_inactive_models_cannot_pass(self):

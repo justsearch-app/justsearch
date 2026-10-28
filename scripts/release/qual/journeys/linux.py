@@ -12,7 +12,7 @@ import time
 import zipfile
 
 from corpus import generate, OPEN_FILE, QUERY, OCR_QUERY
-from runner import HERE, Infrastructure, Unavailable, digest, wait_for
+from runner import HERE, Infrastructure, Unavailable, digest, wait_for, require_disposable_host
 
 
 def apt(run, *args):
@@ -21,7 +21,7 @@ def apt(run, *args):
                                  'apt-get', '-y', *args],
                                 input=run.target.vm.config()['password'] + '\n', timeout=900, check=False)
     else:
-        # Only for disposable hosted machines, never the release owner's host.
+        require_disposable_host()
         result = run.target.run(['sudo', '-n', 'env', 'DEBIAN_FRONTEND=noninteractive',
                                  'apt-get', '-y', *args], timeout=900, check=False)
     (run.out / f'apt-{time.time_ns()}.log').write_text(result.stdout + result.stderr)
@@ -106,9 +106,7 @@ def first_run(run):
     if not run.binary:
         raise Unavailable('Package installation did not complete')
     run.normal_launch()
-    text = wait_for(lambda: (v if 'JustSearch' in v or 'What are you looking for?' in v else None)
-                    if (v := run.native.screen_text('J1-normal-launch')) else None,
-                    'Packaged window visible', seconds=60, error=Infrastructure)
+    wait_for(run.native.app_window, 'Packaged window visible', seconds=60)
     run.evidence('J1-normal-ready', run.ready())
     run.start_ui()
     wait_for(lambda: run.wd.execute("return all(document,'jf-shell').length > 0"),
@@ -474,9 +472,9 @@ def restart(run):
         raise Infrastructure('Normal restarted app lost focus before bookmark click')
     run.native.click(window['rect']['x'] + geometry['button']['x'],
                      window['rect']['y'] + geometry['button']['y'])
-    text = wait_for(lambda: (s if 'Library' in s else None)
-                    if (s := run.native.app_text('J4-restarted-bookmark', geometry['popup'])) else None,
-                    'Authored Library bookmark visible in normal restarted popup', seconds=30)
+    text = wait_for(lambda: run.native.matching_text('J4-restarted-bookmark', r'\bLibrary\b', geometry['popup']),
+                    'Authored Library bookmark visible in normal restarted popup; retained app state contains the bookmark, OCR absence uncorroborated',
+                    seconds=30, error=Infrastructure)
     run.evidence('J4-native-bookmark', {'before': before, 'after': text, 'geometry': geometry,
                                        'automationAttached': False})
     run.native.shot('J4-restarted-bookmark')
@@ -582,7 +580,7 @@ def update_success(run):
              'PolicyKit prompt', seconds=180, error=Infrastructure)
     run.native.type(run.target.vm.config()['password'])
     run.native.key('enter')
-    expected = run.args.package.removeprefix('JustSearch_').split('_')[0]
+    expected = run.require('initialVersion')
     wait_for(lambda: installed_version(run) == expected, 'Candidate installed by updater', seconds=420)
     # No WebDriver relaunch: the production updater must perform this itself.
     run.wd = None
@@ -598,12 +596,38 @@ def update_success(run):
         same = run.target.py('import json,os,sys;from pathlib import Path;a=json.loads(sys.argv[1]);print(os.path.samestat(Path("/proc/"+str(a[0])+"/exe").stat(),Path(a[1]).stat()))',
                              [shell['pid'], run.binary]).strip()
         assert same == 'True', 'Relaunched shell is not executing the installed candidate binary'
+    engine = candidate_engine(run)
     state = assert_state(run)
     run.native.shot('J5-normal-updater-relaunch')
     verify = run.target.run(['dpkg', '--verify', 'just-search'], check=False)
     assert verify.returncode == 0 and not verify.stdout.strip(), 'Updated installed payload checksum mismatch'
     run.facts['updated'] = True
-    return {'installedVersion': installed_version(run), 'state': state, 'relaunchedShells': shells}
+    return {'installedVersion': installed_version(run), 'state': state, 'relaunchedShells': shells, 'engine': engine}
+
+
+def candidate_engine(run):
+    # api() validates the live manifest PID, instance and ownership first.
+    live = run.api('/api/runtime/live')
+    paths = run.target.run(['dpkg-query', '-L', 'just-search']).stdout.splitlines()
+    java = next(p for p in paths if p.endswith('/runtime/bin/java'))
+    jar = next(p for p in paths if p.endswith('/ui-headless.jar'))
+    observed = run.target.json("""
+import json,os,sys
+from pathlib import Path
+a=json.loads(sys.argv[1]); proc=Path('/proc')/str(a['pid'])
+def same(path, installed):
+ try:return os.path.samestat(path.stat(),Path(installed).stat())
+ except FileNotFoundError:return False
+fds=list((proc/'fd').iterdir())
+print(json.dumps({'pid':a['pid'],'executableMatches':same(proc/'exe',a['java']),
+ 'jarMatches':any(same(fd,a['jar']) for fd in fds),
+ 'executable':os.readlink(proc/'exe'),'jar':a['jar']}))
+""", {'pid': live['pid'], 'java': java, 'jar': jar})
+    run.evidence('J5-running-engine', observed)
+    assert installed_version(run) == run.require('initialVersion'), 'Engine candidate package version differs'
+    assert observed['executableMatches'], 'Running Engine is not executing the installed candidate JVM'
+    assert observed['jarMatches'], 'Running Engine has not loaded the installed candidate jar'
+    return observed
 
 
 def update_lock(run):
@@ -693,17 +717,41 @@ def desktop_entry(run):
 def deep_links(run):
     require_candidate(run)
     run.require('folder')
+    query = 'link ' + hashlib.sha256(run.run_id.encode()).hexdigest()[:10]
+    # The composer position changes with restored conversations. Measure it in
+    # the installed UI, then retain only geometry for the normal cold launch.
+    run.start_ui()
+    run.nav('Search')
+    # Incoming query links dock the composer even when the restored draft was
+    # centred. Measure the same layout first, using only an existing query.
+    run.wd.keys('textarea[data-testid="sv3-composer-input"]', QUERY + '\ue007')
+    regions = wait_for(lambda: run.wd.execute("""
+const composer=all(document,'jf-sv3-composer[state="docked"]').find(e=>e.getBoundingClientRect().height>0);
+if(!composer) return null;
+const input=all(composer,'textarea[data-testid="sv3-composer-input"]').find(e=>e.getBoundingClientRect().height>0);
+if(!input) return null;
+const r=input.getBoundingClientRect();
+return [{x:160,y:0,width:innerWidth-160,height:40,viewportWidth:innerWidth,viewportHeight:innerHeight},
+ {x:Math.floor(r.x),y:Math.floor(r.y),width:Math.ceil(r.width),height:Math.ceil(r.height),viewportWidth:innerWidth,viewportHeight:innerHeight}];
+"""), 'Docked deep-link destination composer measured', seconds=30, error=Infrastructure)
+    before = run.wd.execute("return all(document,'*').map(e=>(e.textContent||'')+' '+(e.value||'')).join('\\n');")
+    if query in before:
+        raise Infrastructure('Unique deep-link query already appears before dispatch')
+    run.evidence('J7-cold-before', {'query': query, 'absent': True, 'regions': regions})
     run.stop_app()
-    run.desktop_spawn(['xdg-open', 'justsearch://query?q=orchid%20lighthouse'], run.work + '/cold-deep-link.log')
+    from urllib.parse import quote
+    run.desktop_spawn(['xdg-open', 'justsearch://query?q=' + quote(query)], run.work + '/cold-deep-link.log')
     run.observe_window('cold-deep-link')
     run.ready()
-    cold = wait_for(lambda: (s if 'orchid' in s.lower() and 'Search v3' in s else None)
-                    if (s := run.native.app_text('J7-deep-link-cold')) else None,
-                    'Cold OS deep link search destination', seconds=45)
+    cold = wait_for(lambda: next((text for i, region in enumerate(regions)
+                    if (text := run.native.matching_text('J7-deep-link-cold-' + str(i),
+                        re.escape(query), region))), None),
+                    'Cold OS deep link unique query in top bar or composer; OCR absence uncorroborated',
+                    seconds=45, error=Infrastructure)
     interaction_observation(run, 'J7-warm-dispatch')
     run.desktop_spawn(['xdg-open', 'justsearch://surface/core.library-surface'], run.work + '/warm-deep-link.log')
     warm = wait_for(lambda: native_library_destination(run),
-                    'Warm OS deep link Library destination', seconds=45)
+                    'Warm OS deep link Library destination; OCR absence uncorroborated', seconds=45, error=Infrastructure)
     return {'cold': cold, 'warm': warm}
 
 
@@ -716,8 +764,8 @@ def native_library_destination(run):
     rect = window['rect']
     region = {'x': 160, 'y': 0, 'width': min(400, rect['width'] - 160), 'height': 40,
               'viewportWidth': rect['width'], 'viewportHeight': rect['height']}
-    text = run.native.app_text('J7-deep-link-warm', region)
-    return {'topBar': text, 'window': window} if re.search(r'\bLibrary\b', text) else None
+    text = run.native.matching_text('J7-deep-link-warm', r'\bLibrary\b', region)
+    return {'topBar': text, 'window': window} if text else None
 
 
 def shortcut(run):
@@ -776,13 +824,13 @@ def shortcut(run):
                  seconds=30, error=Infrastructure)
     wait_for(lambda: shortcut_receiver(run),
              'Physical shortcut foregrounded search', seconds=30,
-             error=AssertionError if wayland else Infrastructure)
+             error=AssertionError)
     run.native.key('ctrl+a')
     query = QUERY + ' shortcut receiver'
     run.native.type(query)
     observed = wait_for(lambda: shortcut_receiver(run, query),
                         'Physical shortcut focuses search', seconds=30,
-                        error=AssertionError if wayland else Infrastructure)
+                        error=AssertionError)
     run.native.shot('J7-physical-shortcut-search')
     return {'settings': section, 'physicalInput': observed}
 

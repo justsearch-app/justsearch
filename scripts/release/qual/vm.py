@@ -36,8 +36,8 @@ STATE = ROOT / 'running.json'
 MEMORY_MIB = 12288
 
 
-def wait_host_memory():
-    deadline = time.monotonic() + 900
+def wait_host_memory(seconds=900):
+    deadline = time.monotonic() + seconds
     announced = False
     while True:
         try:
@@ -48,7 +48,7 @@ def wait_host_memory():
         if available_kib >= 14 * 1024 * 1024:
             return
         if time.monotonic() >= deadline:
-            raise RuntimeError(f'VM requires host MemAvailable >= 14 GiB; only {available_kib / 1024 / 1024:.2f} GiB available after 900 seconds; refusing launch')
+            raise RuntimeError(f'VM requires host MemAvailable >= 14 GiB; only {available_kib / 1024 / 1024:.2f} GiB available after {seconds} seconds; refusing launch')
         if not announced:
             print('Waiting up to 900 seconds for host MemAvailable >= 14 GiB before VM launch',
                   file=sys.stderr, flush=True)
@@ -277,7 +277,7 @@ def launch(os_name, disk, variables, visible=False, installer=None, lease=None):
     ensure_free(check_lock=False)
     if lease is None:
         raise RuntimeError('launch requires the VM lifetime lock')
-    wait_host_memory()
+    wait_host_memory(seconds=0)  # Recheck without waiting while holding the lease.
     cpus = sorted(os.sched_getaffinity(0))[:8]
     if len(cpus) != 8:
         raise RuntimeError('Eight allowed host threads are required')
@@ -416,6 +416,7 @@ def stop():
 def start(os_name, visible=False):
     owner()
     ensure_free()
+    wait_host_memory()
     with locked() as lock:
         ensure_free(check_lock=False)
         folder = ROOT / os_name
@@ -514,6 +515,7 @@ def build(os_name):
     started = time.time()
     iso = download(os_name)
     seed(os_name, iso, cfg)
+    wait_host_memory()
     with locked() as lock:
         ensure_free(check_lock=False)
         run('qemu-img', 'create', '-q', '-f', 'qcow2', folder / 'install.qcow2', OS[os_name]['size'])
@@ -551,6 +553,7 @@ def build(os_name):
             raise RuntimeError('Installer exceeded three hours; inspect serial/QEMU logs and screen')
         if not stop():
             raise RuntimeError('Guest required forced stop; installation disk preserved, base not sealed')
+        wait_host_memory()
         with locked() as lock:
             # Boot the installed disk without installation media, still before sealing.
             launch(os_name, folder / 'install.qcow2', folder / 'install-vars.fd', lease=lock.fileno())
@@ -662,6 +665,7 @@ def prepare_owner(os_name, package=None, corpus=None):
             # This keeps setup work off the owner's display.
             if not stop():
                 raise RuntimeError('Preparation required forced shutdown; refusing owner handoff')
+            wait_host_memory()
             with locked() as lock:
                 folder = ROOT / os_name
                 data = launch(os_name, folder / 'run.qcow2', folder / 'run-vars.fd',

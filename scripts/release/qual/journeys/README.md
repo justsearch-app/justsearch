@@ -28,7 +28,10 @@ preinstalled JDK packages; its wrapper also removes JDK-specific PATH entries.
 A remaining `javac` on PATH fails the clean-install prerequisite.
 
 The hosted entry point is for disposable runners only: it runs apt and changes
-that user's text-file association. **Do not run it on the release owner's host.**
+that user's text-file association. It refuses to run unless `GITHUB_ACTIONS=true`
+or a root-owned guest marker written by the VM wrapper is present. The apt
+adapter enforces this too, including direct runner invocations.
+**Do not run it on the release owner's host.**
 
 ```sh
 xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
@@ -43,7 +46,9 @@ joins the graphical session's display/runtime/D-Bus environment, caps native
 thread pools at eight, and stops only the VM run it started on every outcome.
 Default guest memory is 12288 MiB for every lane, with eight pinned threads.
 Before launch, vm.py waits up to 15 minutes for host `/proc/meminfo`
-MemAvailable to reach 14 GiB, then refuses with a diagnostic if it remains lower.
+MemAvailable to reach 14 GiB before taking the shared VM lock, then refuses
+with a diagnostic if it remains lower. Launch rechecks without waiting under
+the lock.
 J3 and J5 exhausted 6144 MiB; J5 recovery at 8192 MiB wrote 12.58 GB to swap.
 The nondefault `--memory-mib 8192` requires `--memory-reason` with journey evidence.
 It installs tools **inside the guest**. No host sudo, desktop window or GPU is used.
@@ -186,7 +191,9 @@ private signing key is needed or used for these tests.
   invoked GNOME Wayland `--focus-search` binding (Ctrl+Super+J, avoiding the
   default input-source switch chord), and scanned-PDF OCR. Cold and
   warm OS links run without WebDriver; the receiving app must be focused and
-  its cropped top bar must name the destination. Shortcut input stays in a
+  its measured top bar or composer must contain a query derived from this run
+  ID for the cold link. That query must be absent before dispatch. The warm
+  link must name Library in the cropped top bar. Shortcut input stays in a
   WebDriver session, where compositor focus, document focus, the actual focused
   search control, and its exact newly typed value must agree. The Wayland binding
   runs a wrapper that records invocation before executing `--focus-search`. Missing
@@ -218,7 +225,12 @@ whole-screen OCR cannot certify navigation or focus.
 and text reports, CSV, HTML, email, DOCX and an image-only PDF. The unique open
 fixture is `JustSearch-journey-orchid-open.txt`; only the scanned PDF contains
 `cobalt marmalade`. Per-run corpus hashes are retained. No external documents,
-personal information, models or generated binary fixture files are committed.
+personal information, models or generated corpus binary files are committed.
+The small retained screenshot in `fixtures/predecessor-bookmark-ocr.png` is a
+regression fixture from the independent W4a verifier: block segmentation reads
+“Ubrary”, while sparse segmentation reads “Library”. Native destination OCR
+retries sparse segmentation on a miss. Missing OCR text without corroborating
+app state is infrastructure, rather than a product absence verdict.
 
 ## Results and tests
 
@@ -228,7 +240,10 @@ prerequisites stay unavailable. Assertions about product outcomes fail as
 product failures; driver, focus, tool and transport failures are infrastructure.
 Unknown harness exceptions also stay infrastructure. Skips and unavailability
 never add a pass. An empty or incomplete report cannot report `passed: true`.
-The process exits nonzero for an applicable failure or unavailable check;
+The summary passes only with at least one passed check, every check applicable
+to the full lane present, and no failed or unavailable checks. Decision skips
+do not prevent a full lane from passing. The process exits nonzero whenever
+that verdict is false, including a successful partial development rerun;
 settled VM-only omissions in the hosted lane remain explicit decision skips.
 
 `summary.json` includes asset hashes, exact scenario wording, scope and all
@@ -242,6 +257,7 @@ python3 -m unittest discover -s scripts/release/qual/journeys -p 'test_*.py' -v
 python3 -m unittest discover -s scripts/release/qual -p 'test_*.py' -v
 ```
 
-These isolated tests never touch the shared VM data, a display, running app,
+The OCR fixture check requires Tesseract. These isolated tests never touch
+the shared VM data, a display, running app,
 network service or installed package. Before-state tests belong in a shared
 clone under `$TMPDIR`; do not stash or revert the worktree for a baseline check.

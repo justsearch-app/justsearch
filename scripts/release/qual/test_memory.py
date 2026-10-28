@@ -24,12 +24,12 @@ class MemoryTests(unittest.TestCase):
             vm.wait_host_memory()
         sleep.assert_called_once_with(10)
 
-    def test_low_memory_refuses_launch_after_fifteen_minutes(self):
+    def test_low_memory_recheck_refuses_launch_without_waiting_under_lease(self):
         with patch.object(vm, 'owner', return_value='own-run'), patch.object(vm, 'ensure_free'), \
              patch.object(Path, 'read_text', return_value='MemAvailable: 14680063 kB\n'), \
              patch.object(vm.time, 'monotonic', side_effect=[0, 900]), \
              patch.object(vm.time, 'sleep') as sleep, patch.object(vm.subprocess, 'Popen') as spawn:
-            with self.assertRaisesRegex(RuntimeError, '14 GiB.*900'):
+            with self.assertRaisesRegex(RuntimeError, '14 GiB.*after 0 seconds'):
                 vm.launch('ubuntu', Path('own.qcow2'), Path('own.fd'), lease=123)
         spawn.assert_not_called()
         sleep.assert_not_called()

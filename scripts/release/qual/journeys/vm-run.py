@@ -20,7 +20,7 @@ import time
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import vm
-from runner import Native, Target, digest, verify_assets, preparation_failure, summarize, wait_for, Infrastructure
+from runner import Native, Target, digest, verify_assets, preparation_failure, summarize, full_selection, wait_for, Infrastructure
 from writes import COUNTERS
 
 
@@ -95,6 +95,7 @@ def pins(args, phase):
 def start_snapshot(snapshot):
     # Use the same ownership, ports, lifetime lock and resource limits as vm.start.
     vm.ensure_free()
+    vm.wait_host_memory()
     with vm.locked() as lock:
         vm.ensure_free(check_lock=False)
         folder = vm.ROOT / 'ubuntu'
@@ -120,6 +121,8 @@ def seal_snapshot(out, started, inode, args, phase):
         disk = Path(started['disk'])
         if disk.stat().st_ino != inode:
             raise Infrastructure('Run disk changed before snapshot sealing')
+        if disk.stat().st_dev != out.stat().st_dev:
+            raise Infrastructure('Snapshot sealing requires the evidence and VM disk on the same filesystem; refusing a cross-filesystem rename')
         snapshot.mkdir()
         # Rename, never copy/rebase/flatten the gigabytes already written.
         disk.rename(snapshot / 'disk.qcow2')
@@ -228,18 +231,30 @@ def prepare_desktop(args, out):
         # Disposable guest only: Looking Glass enables read-only compositor
         # queries over its debugger. Never enable this on the owner's desktop.
         native = Native(target, out)
-        native.key('escape')
-        native.key('alt+f2')
-        wait_for(lambda: 'Run a Command' in native.screen_text('compositor-command', psm=6),
-                 'GNOME command dialog', seconds=20, error=Infrastructure)
-        native.type('lg')
-        native.key('enter')
-        wait_for(lambda: 'Evaluator' in native.screen_text('compositor-debugger', psm=6),
-                 'Disposable compositor debugger', seconds=20, error=Infrastructure)
-        native.type('global.context.unsafe_mode = true')
-        native.key('enter')
-        native.key('escape')
-        native.focused_window()  # Fail preparation if the observation channel is unavailable.
+        for attempt in range(2):
+            try:
+                wait_for(lambda: native.screen_text('desktop-ready-' + str(attempt)),
+                         'Logged-in desktop is visible', seconds=60, error=Infrastructure)
+                native.key('escape')
+                native.key('alt+f2')
+                wait_for(lambda: 'Run a Command' in native.screen_text('compositor-command', psm=6),
+                         'GNOME command dialog', seconds=20, error=Infrastructure)
+                native.type('lg')
+                native.key('enter')
+                wait_for(lambda: 'Evaluator' in native.screen_text('compositor-debugger', psm=6),
+                         'Disposable compositor debugger', seconds=20, error=Infrastructure)
+                native.type('global.context.unsafe_mode = true')
+                native.key('enter')
+                native.key('escape')
+                native.focused_window()
+                break
+            except Infrastructure:
+                if attempt:
+                    raise
+                vm.guest_root('ubuntu', 'systemctl restart gdm3')
+                ready()
+                with vm.QMP('ubuntu') as qmp:
+                    screen.key(qmp, 'ctrl+alt+f2')
     target.run(['systemctl', '--user', 'mask', '--now', 'tracker-miner-fs-3.service'], check=False)
 
 
@@ -275,7 +290,7 @@ def execute(args, out, phase, journeys, snapshot):
         command += ['--journeys', *journeys]
         with (out / 'run.log').open('wb') as log:
             result = vm.ssh('ubuntu', shlex.join(command), stdout=log, stderr=subprocess.STDOUT, timeout=4800)
-        vm.ssh('ubuntu', 'tar -cf /home/qual/journey-evidence.tar -C ' + remote + ' evidence-' + out.name, check=True)
+        vm.ssh('ubuntu', 'tar -cf /home/qual/journey-evidence.tar -C ' + remote + ' ' + shlex.quote('evidence-' + out.name), check=True)
         subprocess.run(['scp', *vm.ssh_args('ubuntu'), '-P', str(vm.OS['ubuntu']['ssh']),
                         'qual@127.0.0.1:/home/qual/journey-evidence.tar', str(out / 'evidence.tar')], check=True)
         extract_evidence(out / 'evidence.tar', out, 'evidence-' + out.name)
@@ -323,6 +338,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         started = vm.require_owner('ubuntu')
         inode = Path(started['disk']).stat().st_ino
         vm.wait_ssh('ubuntu', timeout=600)
+        vm.guest_root('ubuntu', "printf 'justsearch-vm\\n' > /run/justsearch-qualification-guest; chmod 644 /run/justsearch-qualification-guest")
         vm.guest_root('ubuntu', 'sysctl -w vm.swappiness=1')
         if not snapshot:
             provision(args, out)
@@ -336,7 +352,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         if isinstance(exc, AssertionError):
             report['journeys'][0]['checks'][0].update(status='failed-product',
                 evidence=['../guest-crashes.json', '../guest-crashes.tar'])
-            report.update(summarize(report['journeys']))
+            report.update(summarize(report['journeys'], report.get('fullSelection', False)))
         (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
         (out / 'wrapper-error.txt').write_text(repr(exc) + '\n')
         return 1
@@ -350,7 +366,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
                     'name': 'guest-crashes', 'status': 'failed-product' if isinstance(exc, AssertionError)
                     else 'failed-infrastructure', 'reason': str(exc),
                     'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
-                report.update(summarize(report['journeys']))
+                report.update(summarize(report['journeys'], report.get('fullSelection', False)))
                 (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
             try:
                 volume = Target('ubuntu').json(COUNTERS, desktop=False)
@@ -379,12 +395,12 @@ def combine(args, out, sources):
     rows = []
     for name, source in sources.items():
         for row in source['journeys']:
-            if name.startswith('predecessor') and row['id'] not in ('J5', 'J6', 'preparation', 'cleanup'):
-                continue  # Preparation evidence stays in its own exact report.
+            if name.startswith('predecessor') and row['id'] in ('J1', 'J2', 'J3', 'J4'):
+                continue  # Only predecessor preparation journeys are outside candidate scope.
             row = json.loads(json.dumps(row))
             for check in row['checks']:
                 prefix = name + ('/evidence/' if args.session == 'hosted' else '/run/')
-                check['evidence'] = [prefix + path for path in check['evidence']]
+                check['evidence'] = [os.path.normpath(prefix + path) for path in check['evidence']]
             rows.append(row)
     report = dict(next(iter(sources.values())))
     total = sum(s.get('writeVolume', {}).get('writtenBytes', 0) for s in sources.values())
@@ -394,9 +410,10 @@ def combine(args, out, sources):
                     'complete': all('writtenBytes' in s.get('writeVolume', {}) for s in sources.values())},
                   execution={'mode': args.mode, 'requestedJourneys': args.journeys,
                              'releaseQualification': args.mode == 'fresh' and not args.journeys},
-                  **summarize(rows))
+                  **summarize(rows, full_selection(rows,
+                      'hosted-linux-x11' if args.session == 'hosted' else 'vm-linux-' + args.session)))
     (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
-    return int(any(report['counts'][s] for s in ('failed-product', 'failed-infrastructure', 'unavailable')))
+    return int(not report['passed'])
 
 
 def main():

@@ -11,7 +11,7 @@ from pathlib import Path
 import zipfile
 
 OPEN_FILE = 'JustSearch-journey-orchid-open.txt'
-QUERY = 'orchid lighthouse'
+QUERY = 'lighthouse'
 OCR_QUERY = 'cobalt marmalade'
 
 

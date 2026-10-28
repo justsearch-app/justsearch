@@ -41,14 +41,34 @@ def classify(exc):
     return 'failed-product' if isinstance(exc, AssertionError) else 'failed-infrastructure'
 
 
-def summarize(journeys):
+def require_disposable_host():
+    marker = Path('/run/justsearch-qualification-guest')
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        return
+    if (not marker.is_symlink() and marker.is_file() and marker.stat().st_uid == 0
+            and marker.read_text() == 'justsearch-vm\n'):
+        return
+    raise Infrastructure('Hosted lane requires GITHUB_ACTIONS=true or the VM guest marker')
+
+
+def full_selection(journeys, lane, definition=None):
+    if definition is None:
+        definition = json.loads((HERE / 'journeys.json').read_text())
+    expected = {(j['id'], c['id']) for j in definition['journeys'] for c in j['checks']
+                if lane in c['lanes']}
+    observed = {(j['id'], c['name']) for j in journeys for c in j['checks']}
+    return bool(expected) and expected <= observed
+
+
+def summarize(journeys, full_selection=True):
     counts = dict.fromkeys(STATUSES, 0)
     for journey in journeys:
         for check in journey['checks']:
             if check['status'] not in counts:
                 raise ValueError(f"Unknown check status: {check['status']}")
             counts[check['status']] += 1
-    return {'counts': counts, 'passed': counts['passed'] > 0 and sum(counts.values()) == counts['passed']}
+    return {'counts': counts, 'fullSelection': full_selection, 'passed': full_selection and counts['passed'] > 0
+            and not any(counts[s] for s in ('failed-product', 'failed-infrastructure', 'unavailable'))}
 
 
 def preparation_failure(lane, reason):
@@ -101,11 +121,14 @@ def wait_for(fn, description, seconds=90, interval=1, error=AssertionError):
     while time.monotonic() < deadline:
         try:
             value = fn()
+            last = None
             if value:
                 return value
         except (OSError, KeyError, ValueError, urllib.error.URLError, Infrastructure) as exc:
-            last = str(exc)
+            last = exc
         time.sleep(interval)
+    if last is not None:
+        error = Infrastructure
     raise error(f'{description} timed out after {seconds}s; last observation: {last}')
 
 
@@ -149,6 +172,8 @@ class Target:
         return json.loads(self.py(source, value, **kwargs))
 
     def prepare(self, lane, run_id):
+        if not self.vm:
+            require_disposable_host()
         if self.vm:
             env = self.json("""
 import json,os,subprocess
@@ -398,6 +423,15 @@ print(json.dumps(result))
         return subprocess.check_output(['tesseract', str(self.evidence / (name + '-ocr.png')),
                                         'stdout', '--psm', str(psm)], stderr=subprocess.DEVNULL, text=True, timeout=30)
 
+    def matching_text(self, name, pattern, region=None):
+        # Retry segmentation on the same measured region; neither OCR mode alone
+        # establishes a product failure when the app cannot corroborate it.
+        for psm in (6, 11):
+            text = self.app_text(name + '-psm' + str(psm), region, psm=psm)
+            if re.search(pattern, text, re.I):
+                return text
+        return None
+
     def shot(self, name):
         path = self.evidence / (name + '.png')
         if self.target.vm:
@@ -446,7 +480,8 @@ class Run:
         report = {'schemaVersion': 1, 'lane': self.args.lane, 'runId': self.run_id,
                   'scenarios': self.definition['scenarios'], 'assets': self.facts.get('assets', {}),
                   'scope': self.definition.get('scope', {}),
-                  'journeys': self.results, **summarize(self.results),
+                  'journeys': self.results, **summarize(self.results,
+                      full_selection(self.results, self.args.lane, self.definition)),
                   'execution': {'mode': 'development-rerun' if getattr(self.args, 'resume', None) else 'fresh',
                                 'requestedJourneys': getattr(self.args, 'journeys', None)}}
         self.evidence('summary', report)
@@ -546,14 +581,13 @@ with opener.open(req,timeout=30) as r: print(json.dumps(json.load(r)))
     def observe_window(self, name):
         name = name + '-' + str(time.time_ns())
         started = time.monotonic()
-        text = wait_for(lambda: (s if 'JustSearch' in s or 'Search v3' in s else None)
-                        if (s := self.native.screen_text('window-shown-' + name)) else None,
-                        'Installed app window shown', seconds=60, error=Infrastructure)
+        window = wait_for(self.native.app_window, 'Installed app window shown', seconds=60)
+        self.native.shot('window-shown-' + name)
         self.facts['windowShownAt'] = time.monotonic()
         self.facts['windowShownEvidence'] = 'window-shown-' + name + '.json'
-        self.evidence('window-shown-' + name, {'text': text,
+        self.evidence('window-shown-' + name, {'window': window,
                       'secondsToObserve': round(time.monotonic() - started, 3),
-                      'signal': 'Native screenshot OCR contains JustSearch or Search v3'})
+                      'signal': "Focused window belongs to this run's installed JustSearch process"})
 
     def desktop_spawn(self, command, logfile):
         if not self.target.vm:
@@ -714,7 +748,7 @@ def main():
     print(json.dumps(report['counts'], indent=2), flush=True)
     # VM-only omissions are explicitly scoped decisions, never passes. Applicable
     # unavailable/failing checks always fail the lane even if earlier checks passed.
-    return int(any(report['counts'][key] for key in ('failed-product', 'failed-infrastructure', 'unavailable')))
+    return int(not report['passed'])
 
 
 if __name__ == '__main__':

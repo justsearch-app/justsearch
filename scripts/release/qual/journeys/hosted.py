@@ -16,6 +16,8 @@ import tempfile
 
 
 def main():
+    from runner import require_disposable_host
+    require_disposable_host()
     if not os.environ.get('DISPLAY') or not os.environ.get('DBUS_SESSION_BUS_ADDRESS'):
         raise SystemExit('Run under xvfb-run dbus-run-session; no graphical session detected')
     parser = argparse.ArgumentParser(add_help=False)

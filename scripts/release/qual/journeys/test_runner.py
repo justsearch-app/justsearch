@@ -90,7 +90,7 @@ class RunnerTests(unittest.TestCase):
     def test_steps_keep_both_failure_families_and_write_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = types.SimpleNamespace(evidence=str(Path(tmp) / 'evidence'), vm=None, lane='hosted-linux-x11')
-            run = self.r.Run(args, {'scenarios': {}})
+            run = self.r.Run(args, json.loads(Path(__file__).with_name('journeys.json').read_text()))
             row = {'id': 'J2', 'checks': []}
             run.results.append(row)
             def fail(exc):
