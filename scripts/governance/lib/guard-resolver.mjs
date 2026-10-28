@@ -135,42 +135,6 @@ export function testFileExists(root, name) {
 }
 
 /**
- * Check whether a class name appears as a `<className><ext>` file under any test root.
- * Suffix match against `**\/src\/test\/**\/<className><ext>` (default ext `.java`).
- */
-export function classFileExists(sourceRoot, testRoots, className, ext = '.java') {
-  const target = `${className}${ext}`;
-  for (const root of testRoots) {
-    if (findFileSuffix(resolve(sourceRoot, root), target, 0)) return true;
-  }
-  return false;
-}
-
-function findFileSuffix(dir, target, depth) {
-  if (depth > 12) return false; // safety cap
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return false;
-  }
-  for (const ent of entries) {
-    const full = join(dir, ent.name);
-    if (ent.isDirectory()) {
-      // Restrict to src/test paths for speed.
-      if (depth === 0 && !ent.name.startsWith('.')) {
-        if (findFileSuffix(full, target, depth + 1)) return true;
-      } else if (ent.name === 'src' || ent.name === 'test' || ent.name === 'java' || depth > 1) {
-        if (findFileSuffix(full, target, depth + 1)) return true;
-      }
-    } else if (ent.isFile() && ent.name === target) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
  * Resolve a single parsed guard token against the repo. Returns `{ resolved, reason }`.
  *   - gate:<id>      → id must exist in the registry's gate ids
  *   - test:<Name>    → a *<Name>*.{java,py,ts,tsx} file must exist under modules/ or scripts/

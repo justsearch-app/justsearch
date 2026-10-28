@@ -252,25 +252,12 @@ rule for weekly hosted CodeQL; it also narrows
 
 ## Amendment 2026-10-24: Measured axe becomes required
 
-The advisory decision is superseded: `measured-axe` reports as **Measured axe** and is
-included in the CI signal policy's required checks. Since 2026-10-21 it passed all 59
-selected PR runs in the promotion record, with zero failures. This satisfies the stable
-advisory record required by ADR-0026 and ADR-0044. Serious and critical accessibility
-violations block merges.
+See [ADR-0053’s Measured axe amendment](0053-one-pr-ci-run-and-squash-auto-merge.md#amendment-2026-10-24-measured-axe-becomes-required)
+for the required accessibility check, selection and enforcement rules.
 
-Selection is unchanged: affected frontend inputs on PRs, always on main pushes and manual
-dispatch. An unselected PR reports the literal job as skipped, matching `jseval Python suite`.
-No merge-group trigger is added. The gate still fails on every new rule regardless of impact,
-on serious/critical violations even in baselined rules, and on missing, null or errored scans;
-its job and gate step do not continue on error.
-
-Required-lane bookkeeping includes the local reproduction entry, a measured wall-clock policy
-row and `ci-walltime.needs` dependency. Read-only hosted job timings from the latest attempts
+Read-only hosted job timings from the latest attempts
 of PR and main-push CI runs created since 2026-10-21 yielded 104 successful axe jobs
 (72 PR, 32 main-push), median 177s, minimum 145s and maximum 927s. The current wall-clock
 policy uses ceilings covering the observed distribution; padding the maximum by 25% and
 rounding up to a minute gives a 1200s advisory ceiling, with 20% headroom below the unchanged
 1500s hard timeout. The policy row records the separate sample and exclusions.
-The dated advisory history above remains historical.
-Branch protection is updated by the maintainer after this change merges; repository settings
-are outside this change.
