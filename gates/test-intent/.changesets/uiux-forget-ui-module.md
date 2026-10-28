@@ -26,7 +26,7 @@ raw check results are in tmp/verify/forget-round10-report.md.
           "kind": "delegated-choice",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
           "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
-          "delegationScope": "Round 10: preserve 400 INVALID_REQUEST for invalid exclusion saves, saved settings and keep-out semantics; assert both Forget schema names and count 23.",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
           "choice": "Agent-adopted round 10 checks cover real loopback HTTP, the production core.reconfigure dispatcher and direct settings front, private settings and SQLite operations, byte-identical durable files after refusal, no operations/preparations or recovery issue, and a subsequent valid save and reload. The schema inventory retains every existing member assertion and adds both declared Forget schemas.",
           "label": "agent choice"
         }
@@ -48,7 +48,7 @@ raw check results are in tmp/verify/forget-round10-report.md.
           "kind": "delegated-choice",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
           "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
-          "delegationScope": "Round 10: preserve 400 INVALID_REQUEST for invalid exclusion saves, saved settings and keep-out semantics; assert both Forget schema names and count 23.",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
           "choice": "Agent-adopted round 10 checks cover real loopback HTTP, the production core.reconfigure dispatcher and direct settings front, private settings and SQLite operations, byte-identical durable files after refusal, no operations/preparations or recovery issue, and a subsequent valid save and reload. The schema inventory retains every existing member assertion and adds both declared Forget schemas.",
           "label": "agent choice"
         }
@@ -65,13 +65,13 @@ raw check results are in tmp/verify/forget-round10-report.md.
       ],
       "class": "Structural rule kept",
       "rule": "servedNamesIncludeKnownSchemas enumerates every expected served schema and requires the exact inventory size.",
-      "whySurvives": "The round 10 brief names the two new inventory members, forget-outcome.v1.json and forget-page.v1.json. All 21 existing name assertions remain, both named members are added, and the exact count becomes 23. No other test or oracle changes.",
+      "whySurvives": "The round 10 brief names the two new inventory members, forget-outcome.v1.json and forget-page.v1.json. All existing name assertions remain, including main's document-presence-response.v1.json (#985); both Forget members are added, and the exact count becomes 24 (22 on main plus the two Forget schemas). No other test or oracle changes.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
           "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
-          "delegationScope": "Round 10: preserve 400 INVALID_REQUEST for invalid exclusion saves, saved settings and keep-out semantics; assert both Forget schema names and count 23.",
+          "delegationScope": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
           "choice": "Agent-adopted round 10 checks cover real loopback HTTP, private settings and SQLite operations, byte-identical durable files after refusal, no operations/preparations or recovery issue, and a subsequent valid save and reload. The schema inventory retains every existing member assertion and adds both declared Forget schemas.",
           "label": "agent choice"
         }
