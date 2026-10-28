@@ -41,6 +41,11 @@ For the release host's clean VMs, first read the parent [harness README](../READ
 The wrapper waits for the harness, owns one fresh headless overlay at a time,
 joins the graphical session's display/runtime/D-Bus environment, caps native
 thread pools at eight, and stops only the VM run it started on every outcome.
+Default guest memory remains 6144 MiB. `--memory-mib 8192` or `12288` requires a
+`--memory-reason` naming the journey and its evidence: J3 activation exhausted
+the default memory and the kernel killed Java and the GNOME session in W4a.
+J5 recovery at 8192 MiB wrote 12.58 GB to swap; the bounded 12288 MiB
+comparison keeps swap enabled and records whether this reduces writes.
 It installs tools **inside the guest**. No host sudo, desktop window or GPU is used.
 Supply a tauri-driver 2.0.4 binary built separately as qualification tooling.
 Between overlays it waits up to 90 seconds for the stopped guest's ports to be
@@ -57,12 +62,14 @@ python3 scripts/release/qual/journeys/vm-run.py \
   --registry /path/to/tagged/server.json \
   --predecessor /path/to/parent/JustSearch_0.3.0_amd64.deb \
   --mirror /path/to/signed-mirror-tree \
-  --driver /path/to/tauri-driver --evidence /path/to/new-wayland-evidence
+  --driver /path/to/tauri-driver --evidence /path/to/new-wayland-evidence \
+  --memory-mib 12288 --memory-reason 'J3/J5: measured OOM at 6 GiB and multi-GB swap at 8 GiB; W4a evidence'
 ```
 
 Repeat sequentially with `--session x11` and a new evidence directory; that
-lane runs J1 only and does not require `--predecessor` or `--mirror`. To run
-the hosted equivalent locally without installing anything on the host, use the
+lane runs J1 only. Omit `--predecessor`, `--mirror`, and the memory override and
+reason: X11 J1 uses the harness default.
+For the hosted equivalent locally without installing anything on the host, use the
 same wrapper with `--session hosted` and omit `--predecessor`/`--mirror`. This
 runs the exact hosted entry point under Xvfb and D-Bus in a fresh Ubuntu VM.
 The default VM runs use QMP through the existing `screen.py`; the hosted run
@@ -78,6 +85,54 @@ install-over and retained data. No candidate data is moved aside or reused by
 the predecessor. Each overlay retains its own summary; the wrapper combines the
 candidate observations and predecessor update/retention observations into one
 Wayland summary. Predecessor preparation remains separately recorded.
+
+Fresh qualification (`--mode fresh`, the default) starts from the clean OS
+base and uses production downloads. After J1–J3 (J1–J4 for the predecessor),
+the wrapper stops the guest cleanly and renames its overlay into a setup
+snapshot, without copying or flattening its data. Remaining journeys run in
+a thin overlay backed by that snapshot. The fresh setup observations are part
+of that same qualification report; predecessor setup stays separately recorded.
+Snapshots contain generated corpus, installed package, downloaded models and
+stopped runner state. Their manifests pin asset checksums, predecessor,
+registry, driver, session, phase and OS base. Keep snapshot and base paths in
+place while their child overlays exist. No base image is edited.
+
+Development reruns reuse one such snapshot, with the same package/tool/mirror
+arguments and **explicit** journey IDs, for example:
+
+```sh
+python3 scripts/release/qual/journeys/vm-run.py \
+  --session wayland --mode rerun --journeys J7 \
+  --snapshot /path/to/fresh-evidence/candidate-setup/snapshot \
+  --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+  --registry /path/to/tagged/server.json \
+  --predecessor /path/to/JustSearch_0.3.0_amd64.deb --mirror /path/to/mirror \
+  --driver /path/to/tauri-driver --evidence /path/to/new-rerun-evidence
+```
+
+Only the named journeys run; prerequisites are restored from the stopped
+checkpoint, never silently rerun. Candidate snapshots support J4/J7/J8;
+predecessor snapshots support J5/J6. The experimental cached J3 path is
+unverified: reboot status can transiently report installedFully before changing
+to activation_required, causing the resume path to skip activation. Its timeout
+must not be attributed to the product. Use fresh J3 for acceptance. J1/J2 require a fresh lane
+(`--mode fresh --journeys J1 J2 J3`, with exactly the prerequisites required
+by that selection). Named fresh subsets and snapshot reruns set
+`execution.releaseQualification` to false. A failed setup assertion remains a
+failure in its source report; using its state cannot certify that assertion.
+The hosted VM uses persistent, isolated XDG directories for these two stages;
+the actual hosted workflow keeps its temporary XDG directories.
+
+Guest-only provisioning masks Snap refresh, firmware update, APT timers and
+the desktop file indexer, and sets swappiness to 1 to prefer reclaiming file
+cache over writing anonymous pages. Journald and swap remain enabled.
+Every journey records synced whole-device write and swap-counter deltas,
+without double-counting disk partitions. Overlay summaries record boot through
+pre-shutdown guest counters, QMP counters and QEMU's host process I/O; the top
+summary totals guest bytes across overlays. These counters describe writes,
+unlike qcow2 allocated size. Shutdown writes are outside the measured interval;
+unavailable measurements are explicit. Use one driver at a time and reuse
+setup snapshots for infrastructure reruns instead of redoing full sets.
 
 For local test builds, build the predecessor from the candidate's **parent** in
 a shared clone inside `$TMPDIR`, with a separate build directory. Use the same
@@ -99,14 +154,19 @@ private signing key is needed or used for these tests.
   process's `/proc/<pid>/cmdline` or open file descriptor, plus a screenshot.
   The process must belong to this run. Window titles and maximization do not
   determine which file was opened.
-- J3: default production downloads, CPU search plan and receipts, search, and
-  the plan's chat-unavailable explanation in the UI. Downloads are not seeded.
+- J3: default production downloads, then **Activate downloaded models** and the
+  UI's typed authorization when requested (immediate operation acceptance is
+  also observed). All four reported retrieval models must be active
+  and installation fully complete. A semantic vector query must return the
+  fixture with a dense-only execution trace, without keyword fallback. The CPU
+  plan and chat-unavailable explanation are also checked. Downloads are not seeded.
 - J4: a UI-authored bookmark and theme, normal restart, retained settings,
   watched folder, indexed fixture, authored records and model file hashes.
-  Escape closes existing popovers before one bookmarks click, with a wait for
-  none open. A repeated failure records a suspected product defect and one
-  plain-browser reproduction (or the concrete reason it could not run), then
-  continues the remaining checks.
+  After normal restart, wait for restored Settings to mount, then Escape and
+  confirm it closed. A physical click at the
+  previously DOM-measured bookmarks control opens the popup in that same normal
+  process. The focused window must belong to this run; OCR is restricted to the
+  previously measured popup area and must transition from no Library to Library.
 - J5 (VM): parent-state preparation, signed HTTPS update offer, cancelled
   PolicyKit prompt with old Engine recovery and re-offer, the **real 300-second
   dpkg lock timeout**, then accepted elevation and automatic candidate relaunch.
@@ -118,7 +178,12 @@ private signing key is needed or used for these tests.
   claiming a re-offer. The observed time and readiness signal are recorded.
 - J6 (VM): reinstall, apt remove, retained app data, reinstall and state checks.
 - J7: menu entry, cold/warm OS deep links, X11 registration or the physically
-  invoked GNOME Wayland `--focus-search` binding, and scanned-PDF OCR.
+  invoked GNOME Wayland `--focus-search` binding (Ctrl+Super+J, avoiding the
+  default input-source switch chord), and scanned-PDF OCR. Cold and
+  warm OS links run without WebDriver; the receiving app must be focused and
+  its cropped top bar must name the destination. Shortcut input stays in a
+  WebDriver session, where compositor focus, document focus, the actual focused
+  search control, and its exact newly typed value must agree.
 - J8: release MCPB and tagged registry version/URL/checksum/platform checks;
   pinned Inspector CLI over stdio through the **extracted release bridge** for
   tools/list, status and a fixture-returning search.
@@ -130,10 +195,16 @@ screenshots. Full-screen OCR uses sparse-text segmentation; screenshots remain
 the primary evidence for diagnosing missed text and focus. Startup, persistence,
 deep links and updater relaunch are also checked without WebDriver automation.
 Native screenshots record when each new app window is first observed. J4's
-bookmarks click and J7's warm OS dispatch record elapsed time from that
-observation, the production operating-indexing state and worker queue/enrichment
-snapshot. These observations add no indexing-idle prerequisite and retain the
-30-second bookmarks and 45-second deep-link assertions.
+bookmarks click and J7's warm OS dispatch record elapsed time, indexing and worker
+state. These observations add no indexing-idle prerequisite.
+
+On the disposable Wayland guest only, the wrapper opens GNOME Looking Glass and
+sets `global.context.unsafe_mode = true` to query focused-window PID and geometry
+through the compositor debugger. This changes no product state and disappears
+with the overlay. Never enable it on the owner's desktop. X11 reads the focused
+window from xdotool. A window counts as the app only when its PID is an owned
+JustSearch process. Native OCR crops are saved with their window identity;
+whole-screen OCR cannot certify navigation or focus.
 
 `corpus.py` generates eight small, original CC0 documents: text, long Markdown
 and text reports, CSV, HTML, email, DOCX and an image-only PDF. The unique open

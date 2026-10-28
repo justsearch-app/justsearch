@@ -187,34 +187,6 @@ class RunnerTests(unittest.TestCase):
         run.target.stop.assert_called_once_with([viewer])
         self.assertNotIn('alt+f4', [c.args[0] for c in run.native.key.call_args_list])
 
-    def test_restart_closes_popovers_before_single_bookmark_click(self):
-        import linux
-        from unittest.mock import Mock
-        run = Mock()
-        calls = []
-        run.wd.click.side_effect = lambda *a: calls.append('click')
-        with patch.object(linux, 'assert_state', return_value={}), \
-             patch.object(linux, 'interaction_observation', create=True), \
-             patch.object(linux, 'close_popovers', create=True, side_effect=lambda r: calls.append('close')), \
-             patch.object(linux, 'bookmark_text', return_value='Library'):
-            linux.restart(run)
-        self.assertEqual(calls, ['close', 'click'])
-
-    def test_restart_bookmarks_failure_reports_product_and_attempts_browser_once(self):
-        import linux
-        from unittest.mock import Mock
-        run = Mock()
-        with patch.object(linux, 'assert_state', return_value={}), \
-             patch.object(linux, 'interaction_observation', create=True), \
-             patch.object(linux, 'close_popovers', create=True), \
-             patch.object(linux, 'browser_bookmarks', create=True,
-                          return_value={'status': 'unavailable', 'reason': 'No HTTP UI'}) as browser, \
-             patch.object(linux, 'bookmark_text', side_effect=linux.Infrastructure('popover not visible')):
-            with self.assertRaisesRegex(AssertionError, 'Suspected product defect'):
-                linux.restart(run)
-        browser.assert_called_once_with(run)
-        run.wd.click.assert_called_once_with('button[aria-label="View bookmarks"]')
-
     def test_update_starts_from_banner_action(self):
         import linux
         from unittest.mock import Mock
@@ -261,16 +233,6 @@ class RunnerTests(unittest.TestCase):
                 result = linux.interaction_observation(run, 'click')
             self.assertEqual(result['secondsSinceWindowShown'], 2.5)
             self.assertIs(result['indexingRunning'], expected)
-
-    def test_plain_browser_reproduction_records_absent_installed_http_ui(self):
-        import linux
-        from unittest.mock import Mock
-        run = Mock()
-        run.target.json.return_value = {'url': 'http://127.0.0.1:8080/', 'status': 404}
-        result = linux.browser_bookmarks(run)
-        self.assertEqual(result['status'], 'unavailable')
-        self.assertEqual(result['httpProbe']['status'], 404)
-        run.desktop_spawn.assert_not_called()
 
     def test_candidate_overlay_excludes_update_and_retention(self):
         self.assertEqual(self.r.phase_journeys('candidate'), {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'})

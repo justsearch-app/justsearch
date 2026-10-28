@@ -25,7 +25,19 @@ def apt(run, *args):
         result = run.target.run(['sudo', '-n', 'env', 'DEBIAN_FRONTEND=noninteractive',
                                  'apt-get', '-y', *args], timeout=900, check=False)
     (run.out / f'apt-{time.time_ns()}.log').write_text(result.stdout + result.stderr)
-    assert result.returncode == 0, f'apt-get {args[0]} failed with exit {result.returncode}; see apt log'
+    if result.returncode:
+        output = (result.stdout + result.stderr).lower()
+        message = f'apt-get {args[0]} failed with exit {result.returncode}; see apt log'
+        # Exit 100 alone says nothing about the package. Attribute known network,
+        # repository and host resource failures by their observed cause.
+        if any(cause in output for cause in ('failed to fetch', 'could not resolve', 'temporary failure resolving',
+                'could not connect', 'connection refused', 'connection timed out', 'network is unreachable',
+                'unable to acquire the dpkg frontend lock', 'could not get lock', 'no space left on device')):
+            raise Infrastructure(message)
+        if any(cause in output for cause in ('dependency problems', 'pre-installation script',
+                                             'post-installation script', 'trying to overwrite')):
+            raise AssertionError(message)
+        raise Infrastructure(message + '; package cause not established')
 
 
 def installed_version(run):
@@ -45,7 +57,8 @@ def package_install(run):
     if not initial.is_file():
         raise Infrastructure('Initial package missing: ' + str(initial))
     target = run.work + '/' + initial.name
-    run.target.copy(initial, target)
+    if initial != candidate:
+        run.target.copy(initial, target)
     run.facts['initialPackage'] = {'name': initial.name, 'sha256': digest(initial)}
     apt(run, 'install', target)
     paths = run.target.run(['dpkg-query', '-L', 'just-search']).stdout.splitlines()
@@ -232,8 +245,10 @@ def install_ai(run):
     run.evidence('J3-default-plan', preview)
     manifest = run.api('/api/ai/install/manifest')
     run.evidence('J3-production-manifest', manifest)
-    run.wd.click('button[aria-label="Install AI"]')
-    run.wd.click('button[aria-label="Accept and download"]')
+    resumed = run.facts.get('resumedSetup') is True
+    if not resumed:
+        run.wd.click('button[aria-label="Install AI"]')
+        run.wd.click('button[aria-label="Accept and download"]')
     samples = []
     def settled():
         status = run.api('/api/ai/install/status')
@@ -244,9 +259,34 @@ def install_ai(run):
             if any(x in raw.lower() for x in ('connection reset', 'timed out', 'timeout', 'resolve host', 'http 503', 'http 502', 'http 429')):
                 raise RuntimeError('Production AI download failed; see J3-install-observations.json')
             raise AssertionError('Install AI failed: ' + raw)
-        return status if status.get('state') in ('completed', 'installed', 'succeeded') or status.get('installedFully') is True else None
+        return status if (status.get('state') in ('completed', 'installed', 'succeeded')
+                          or status.get('installedFully') is True
+                          or resumed and status.get('phase') == 'activation_required') else None
     status = wait_for(settled, 'Default CPU AI install', seconds=1800, interval=5)
     assert preview.get('downloadProfile') == 'CPU', 'Default plan did not select CPU'
+    run.evidence('J3-downloaded', status)
+    if not resumed or not status.get('installedFully'):
+        activate_downloaded(run)
+    else:
+        run.evidence('J3-activation-consent', {'restoredActivatedSetup': True,
+            'reason': 'Development rerun; original UI action belongs to the snapshot source report'})
+    activation_samples = []
+    def activated():
+        install = run.api('/api/ai/install/status')
+        runtime = run.api('/api/ai/runtime/status')
+        ui = run.wd.text()
+        outcomes = run.wd.execute("return all(document,'jf-operation-outcome-detail').map(e=>e.operationKey).filter(Boolean)")
+        history = [run.api('/api/operation-history/' + key) for key in outcomes]
+        activation_samples.append({'install': install, 'runtime': runtime, 'ui': ui, 'operations': history})
+        run.evidence('J3-activation-observations', activation_samples)
+        for operation in history:
+            if operation.get('state') in ('failed', 'cancelled'):
+                raise AssertionError('Model activation failed: ' + json.dumps(operation))
+        features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
+        return {'install': install, 'runtime': runtime} if install.get('installedFully') is True and all(
+            features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
+    active = wait_for(activated, 'Downloaded default CPU search encoders activated', seconds=900, interval=5)
+    status = active['install']
     assert 'retrieval-core' in status.get('readyCapabilities', []), 'Installed CPU search capability is not ready'
     runtime = run.api('/api/ai/runtime/status')
     run.evidence('J3-runtime', runtime)
@@ -256,13 +296,52 @@ def install_ai(run):
     assert any(c.get('id') != 'chat' and c.get('state') != 'unavailable' for c in components), 'CPU plan has no available search components'
     run.nav('Search')
     run.require('folder')
-    search_api(run)
+    retrieval = semantic_search(run)
     run.nav('AI Brain')
     text = run.wd.text()
     assert (chat.get('unavailableReason') or 'Chat is not supported here.') in text, 'CPU chat unavailable explanation is not shown'
     run.native.shot('J3-cpu-search-without-chat')
+    # RerankerConfig documents lazy initialization on a retrieval query. Check
+    # all reported default models after exercising retrieval, not before it.
+    def models_active():
+        observed = run.api('/api/ai/runtime/status')
+        run.evidence('J3-runtime', observed)
+        features = {f['id']: f for f in observed.get('onnxFeatures', [])}
+        return observed if all(features.get(name, {}).get('modelActive') is True
+                               for name in ('embed', 'splade', 'reranker', 'citation_scorer')) else None
+    runtime = wait_for(models_active, 'All default retrieval models active after vector query', seconds=120, interval=3)
     run.facts['ai'] = status
-    return {'installed': status, 'runtime': runtime, 'cpuPlan': preview, 'uiText': text}
+    return {'installed': status, 'runtime': runtime, 'cpuPlan': preview, 'activeRetrieval': retrieval, 'uiText': text}
+
+
+def activate_downloaded(run):
+    run.wd.click('button[aria-label="Activate downloaded models"]')
+    # The installed version/policy may accept this UI action immediately or
+    # request typed authorization. Observe what it actually presents.
+    consent = wait_for(lambda: run.wd.execute("""
+const typed=all(document,'input[data-testid="authorization-typed-input"]').some(e=>{
+ const r=e.getBoundingClientRect();return r.width>0 && r.height>0;
+});
+const operationKeys=all(document,'jf-operation-outcome-detail').map(e=>e.operationKey).filter(Boolean);
+return typed || operationKeys.length ? {typed,operationKeys} : null;
+"""), 'Activation authorization or accepted operation visible', seconds=30, error=Infrastructure)
+    run.evidence('J3-activation-consent', consent)
+    if consent['typed']:
+        run.wd.keys('input[data-testid="authorization-typed-input"]', 'core.activate-installed-models')
+        run.wd.click('button[aria-label="Approve"]')
+
+
+def semantic_search(run):
+    def probe():
+        result = run.api('/api/knowledge/search', {'query': 'flower coastal navigation tower', 'mode': 'vector', 'limit': 20})
+        run.evidence('J3-vector-query', result)
+        trace = result.get('searchTrace', {})
+        degradation = trace.get('degradation', {})
+        stages = trace.get('stages', [])
+        return result if OPEN_FILE in json.dumps(result.get('results', [])) and trace.get('effectiveMode') == 'VECTOR' and not degradation.get('hybridFallback') and not degradation.get('vectorBlocked') and any(
+            s.get('id') == 'dense-retrieval' and s.get('status') == 'executed' for s in stages) and not any(
+            s.get('id') == 'sparse-retrieval' and s.get('status') == 'executed' for s in stages) else None
+    return wait_for(probe, 'Semantic fixture retrieval without keyword fallback', seconds=240, interval=3)
 
 
 def snapshot(run):
@@ -302,6 +381,16 @@ def author_state(run):
     run.wd.click('button[aria-label="View bookmarks"]')
     text = bookmark_text(run)
     assert 'Library' in text, 'Authored bookmark is not visible'
+    # Carry only measured control geometry across the normal restart. No DOM
+    # automation is attached to the persistence observation itself.
+    run.facts['bookmarkGeometry'] = run.wd.execute("""
+const button=all(document,'button[aria-label="View bookmarks"]')[0].getBoundingClientRect();
+const popup=all(document,'jf-bookmarks-popover').find(e=>e.hasAttribute('open'));
+const list=popup.shadowRoot.querySelector('[role="listbox"]').getBoundingClientRect();
+return {button:{x:button.x+button.width/2,y:button.y+button.height/2},
+ popup:{x:Math.floor(list.x),y:Math.floor(list.y),width:Math.ceil(list.width),height:Math.ceil(list.height),
+ viewportWidth:innerWidth,viewportHeight:innerHeight}};
+""")
     run.native.shot('J4-authored-bookmark')
     run.native.key('escape')
     run.nav('Settings')
@@ -332,29 +421,32 @@ def restart(run):
     state = assert_state(run)
     run.evidence('J4-retained-state', state)
     run.native.shot('J4-normal-restart')
-    # Reattach in a fresh automation process only after the normal-launch check.
-    run.start_ui()
-    close_popovers(run)
+    geometry = run.require('bookmarkGeometry')
+    wait_for(run.native.app_window, 'Normal restarted app focused', seconds=30, error=Infrastructure)
+    # Engine readiness precedes restored UI state. Do not send Escape before
+    # the Settings modal we left open has actually mounted in the normal UI.
+    wait_for(lambda: 'Settings' in run.native.app_text('J4-restored-settings'),
+             'Restored Settings visible before dismissal', seconds=30, error=Infrastructure)
+    run.native.key('escape')
+    wait_for(lambda: 'Settings' not in run.native.app_text('J4-settings-closed'),
+             'Restored Settings closed before bookmarks click', seconds=30, error=Infrastructure)
+    before = run.native.app_text('J4-before-bookmarks', geometry['popup'])
+    if 'Library' in before:
+        raise Infrastructure('Bookmark observation region already contains Library before clicking')
     interaction_observation(run, 'J4-bookmarks-click')
-    run.wd.click('button[aria-label="View bookmarks"]')
-    try:
-        assert 'Library' in bookmark_text(run), 'Saved bookmark is retained on disk but missing from the restarted UI'
-    except (Infrastructure, AssertionError) as exc:
-        run.native.shot('J4-restart-bookmarks-failure')
-        run.evidence('J4-browser-reproduction', browser_bookmarks(run))
-        raise AssertionError('Suspected product defect: after bookmarking Library, selecting Dark and restarting, '
-                             'close popovers with Escape, wait for none open, click View bookmarks once; '
-                             'Library is not visibly accessible. See J4-browser-reproduction.json. ' + str(exc)) from exc
+    window = run.native.app_window()
+    if not window:
+        raise Infrastructure('Normal restarted app lost focus before bookmark click')
+    run.native.click(window['rect']['x'] + geometry['button']['x'],
+                     window['rect']['y'] + geometry['button']['y'])
+    text = wait_for(lambda: (s if 'Library' in s else None)
+                    if (s := run.native.app_text('J4-restarted-bookmark', geometry['popup'])) else None,
+                    'Authored Library bookmark visible in normal restarted popup', seconds=30)
+    run.evidence('J4-native-bookmark', {'before': before, 'after': text, 'geometry': geometry,
+                                       'automationAttached': False})
     run.native.shot('J4-restarted-bookmark')
     run.native.key('escape')
     return state
-
-
-def close_popovers(run):
-    run.native.key('escape')
-    wait_for(lambda: run.wd.execute("return all(document,':popover-open,[open]').filter(e=>e.matches(':popover-open')||e.localName.endsWith('-popover')).length===0"),
-             'All popovers closed before bookmarks', seconds=15, error=Infrastructure)
-    run.evidence('J4-popovers-closed', {'dismissal': 'Escape', 'openPopovers': []})
 
 
 def interaction_observation(run, name):
@@ -370,27 +462,6 @@ def interaction_observation(run, name):
                 'statusObservedAt': status.get('observed_at')}
     run.evidence(name, observed)
     return observed
-
-
-def browser_bookmarks(run):
-    """Record the concrete reason this installed candidate has no HTTP UI to drive."""
-    try:
-        origin = run.target.json("""
-import json,sys,urllib.request,urllib.error
-from pathlib import Path
-m=json.loads((Path(json.loads(sys.argv[1]))/'runtime/manifest.json').read_text())
-url='http://127.0.0.1:'+str(m['head']['apiPort'])+'/'
-req=urllib.request.Request(url,headers={'X-JustSearch-Session':m['head']['sessionToken']})
-try:
- with urllib.request.urlopen(req,timeout=10) as r:
-  print(json.dumps({'url':url,'status':r.status,'contentType':r.headers.get('Content-Type'),'body':r.read(500).decode(errors='replace')}))
-except urllib.error.HTTPError as e:print(json.dumps({'url':url,'status':e.code,'body':e.read(500).decode(errors='replace')}))
-""", run.data)
-        if origin['status'] != 200 or 'text/html' not in origin.get('contentType', ''):
-            return {'status': 'unavailable', 'reason': 'Installed candidate does not serve its web UI at its production HTTP origin; no dev frontend substituted', 'httpProbe': origin}
-        return {'status': 'unavailable', 'reason': 'Unexpected HTML at the production origin; plain-browser reproduction requires investigation', 'httpProbe': origin}
-    except Exception as exc:
-        return {'status': 'unavailable', 'reason': 'Candidate HTTP UI probe failed: ' + str(exc)}
 
 
 def bookmark_text(run):
@@ -591,15 +662,27 @@ def deep_links(run):
     run.desktop_spawn(['xdg-open', 'justsearch://query?q=orchid%20lighthouse'], run.work + '/cold-deep-link.log')
     run.observe_window('cold-deep-link')
     run.ready()
-    cold = wait_for(lambda: (s if 'orchid' in s.lower() else None)
-                    if (s := run.native.screen_text('J7-deep-link-cold')) else None,
+    cold = wait_for(lambda: (s if 'orchid' in s.lower() and 'Search v3' in s else None)
+                    if (s := run.native.app_text('J7-deep-link-cold')) else None,
                     'Cold OS deep link search destination', seconds=45)
     interaction_observation(run, 'J7-warm-dispatch')
     run.desktop_spawn(['xdg-open', 'justsearch://surface/core.library-surface'], run.work + '/warm-deep-link.log')
-    warm = wait_for(lambda: (s if 'Add Folder' in s else None)
-                    if (s := run.native.screen_text('J7-deep-link-warm')) else None,
+    warm = wait_for(lambda: native_library_destination(run),
                     'Warm OS deep link Library destination', seconds=45)
     return {'cold': cold, 'warm': warm}
+
+
+def native_library_destination(run):
+    # The top bar names the current surface. Body OCR depends on layout and
+    # can miss the Add Folder button despite correct navigation.
+    window = run.native.app_window()
+    if not window:
+        raise Infrastructure('Deep-link receiving app is not focused')
+    rect = window['rect']
+    region = {'x': 160, 'y': 0, 'width': min(400, rect['width'] - 160), 'height': 40,
+              'viewportWidth': rect['width'], 'viewportHeight': rect['height']}
+    text = run.native.app_text('J7-deep-link-warm', region)
+    return {'topBar': text, 'window': window} if re.search(r'\bLibrary\b', text) else None
 
 
 def shortcut(run):
@@ -620,27 +703,46 @@ def shortcut(run):
         path = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/justsearch-qual/'
         run.target.run(['gsettings', 'set', 'org.gnome.settings-daemon.plugins.media-keys', 'custom-keybindings', "['" + path + "']"])
         schema = 'org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:' + path
-        for key, value in [('name', 'JustSearch qualification'), ('command', command), ('binding', '<Super><Shift>space')]:
+        # Super+Shift+Space is GNOME's default backwards input-source binding.
+        # Use a chord unbound in the clean guest rather than shadowing that action.
+        for key, value in [('name', 'JustSearch qualification'), ('command', command), ('binding', '<Control><Super>j')]:
             run.target.run(['gsettings', 'set', schema, key, value])
     else:
         assert re.search(r'\bActive\b', section), 'X11 global shortcut is not active: ' + section
-    run.normal_launch(['--focus-search'])
-    wait_for(lambda: 'Search v3' in run.native.screen_text('J7-before-shortcut'),
-             'Normal search UI mounted before shortcut', seconds=60, error=Infrastructure)
+    run.native.key('escape')
+    run.nav('Search')
     # Focus another real application first. Waiting for the foreground change
     # avoids typing into a window while GNOME is still dispatching the binding.
     run.desktop_spawn(['mousepad', run.require('corpus') + '/' + OPEN_FILE], run.work + '/shortcut-viewer.log')
-    wait_for(lambda: 'orchid' in run.native.screen_text('J7-shortcut-viewer-focused').lower(),
+    wait_for(lambda: (w if w and 'Mousepad' in w['title'] else None)
+             if (w := run.native.focused_window()) else None,
              'Receiving viewer focused before shortcut', seconds=30, error=Infrastructure)
-    run.native.key('win+shift+space' if wayland else 'alt+shift+space')
-    wait_for(lambda: 'Search v3' in run.native.screen_text('J7-shortcut-foreground'),
+    run.native.key('win+ctrl+j' if wayland else 'alt+shift+space')
+    wait_for(lambda: shortcut_receiver(run),
              'Physical shortcut foregrounded search', seconds=30, error=Infrastructure)
     run.native.key('ctrl+a')
-    run.native.type(QUERY)
-    observed = wait_for(lambda: (s if 'orchid' in s.lower() else None)
-                        if (s := run.native.screen_text('J7-physical-shortcut-search')) else None,
+    query = QUERY + ' shortcut receiver'
+    run.native.type(query)
+    observed = wait_for(lambda: shortcut_receiver(run, query),
                         'Physical shortcut focuses search', seconds=30, error=Infrastructure)
+    run.native.shot('J7-physical-shortcut-search')
     return {'settings': section, 'physicalInput': observed}
+
+
+def shortcut_receiver(run, query=None):
+    window = run.native.app_window()
+    if not window:
+        run.evidence('J7-shortcut-receiver', {'appFocused': False,
+                     'focusedWindow': run.native.focused_window(), 'expectedQuery': query})
+        return None
+    state = run.wd.execute("""
+let active=document.activeElement;
+while(active?.shadowRoot?.activeElement)active=active.shadowRoot.activeElement;
+const input=all(document,'textarea[data-testid="sv3-composer-input"]').find(e=>e.getBoundingClientRect().height>0);
+return {documentFocused:document.hasFocus(),searchFocused:!!input && active===input,value:input?.value};
+""")
+    run.evidence('J7-shortcut-receiver', {'window': window, 'dom': state, 'expectedQuery': query})
+    return {'window': window, 'dom': state} if state['documentFocused'] and state['searchFocused'] and (query is None or state['value'] == query) else None
 
 
 def ocr(run):

@@ -331,6 +331,73 @@ class Native:
         else:
             self.target.run(['xdotool', 'type', '--clearmodifiers', '--delay', '30', text])
 
+    def click(self, x, y):
+        if self.target.vm:
+            import screen
+            self.target.vm.require_owner(self.target.name)
+            with self.target.vm.QMP(self.target.name) as qmp:
+                screen.perform(qmp, 'click', {'x': round(x), 'y': round(y), 'button': 'left'})
+        else:
+            self.target.run(['xdotool', 'mousemove', str(round(x)), str(round(y)), 'click', '1'])
+
+    def focused_window(self):
+        """Ask the compositor/X server, never infer foreground identity from OCR."""
+        return self.target.json("""
+import json,os,subprocess
+if os.environ.get('WAYLAND_DISPLAY'):
+ from gi.repository import Gio,GLib
+ proxy=Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION,0,None,'org.gnome.Shell','/org/gnome/Shell','org.gnome.Shell',None)
+ script='(()=>{let w=global.display.focus_window;if(!w)return null;let r=w.get_frame_rect();return {pid:w.get_pid(),title:w.get_title(),rect:{x:r.x,y:r.y,width:r.width,height:r.height}}})()'
+ ok,raw=proxy.call_sync('Eval',GLib.Variant('(s)',(script,)),0,5000,None).unpack()
+ if not ok:raise RuntimeError('GNOME window observation unavailable; prepare the disposable compositor debugger')
+ result=json.loads(raw)
+else:
+ def x(*args):return subprocess.check_output(['xdotool',*args],text=True).strip()
+ window=x('getwindowfocus')
+ geo=dict(line.split('=',1) for line in x('getwindowgeometry','--shell',window).splitlines())
+ result={'pid':int(x('getwindowpid',window)),'title':x('getwindowname',window),
+         'rect':{k:int(geo[v]) for k,v in [('x','X'),('y','Y'),('width','WIDTH'),('height','HEIGHT')]}}
+print(json.dumps(result))
+""")
+
+    def app_window(self):
+        window = self.focused_window()
+        if not window:
+            return None
+        return window if any(row['pid'] == window['pid'] and row['exe'].endswith('/JustSearch')
+                             for row in self.target.owned()) else None
+
+    def app_text(self, name, region=None, psm=6):
+        """OCR only the focused, owned app, optionally a viewport-relative region."""
+        window = self.app_window()
+        if not window:
+            raise Infrastructure('Focused window is not this run\'s JustSearch')
+        rect = window['rect']
+        box = dict(rect)
+        if region:
+            if (rect['width'], rect['height']) != (region['viewportWidth'], region['viewportHeight']):
+                raise Infrastructure('Native window size differs from the measured UI viewport')
+            box.update(x=rect['x'] + region['x'], y=rect['y'] + region['y'],
+                       width=region['width'], height=region['height'])
+        shot = self.shot(name)
+        from PIL import Image
+        with Image.open(shot) as source:
+            if box['width'] <= 0 or box['height'] <= 0 or box['x'] < 0 or box['y'] < 0 or box['x'] + box['width'] > source.width or box['y'] + box['height'] > source.height:
+                raise Infrastructure('App crop is outside the native screenshot')
+            crop = source.crop((box['x'], box['y'], box['x'] + box['width'], box['y'] + box['height']))
+            crop.save(self.evidence / (name + '-app.png'))
+            # Small native labels (12px in the top bar) need enough pixels for
+            # OCR to distinguish Library from Ubrary. Keep the original crop.
+            if region:
+                crop = crop.resize((crop.width * 3, crop.height * 3))
+            crop.save(self.evidence / (name + '-ocr.png'))
+        # Recheck focus after capture so another foreground window cannot qualify.
+        if self.app_window() != window:
+            raise Infrastructure('Focus changed during app observation')
+        (self.evidence / (name + '-window.json')).write_text(json.dumps(window, indent=2) + '\n')
+        return subprocess.check_output(['tesseract', str(self.evidence / (name + '-ocr.png')),
+                                        'stdout', '--psm', str(psm)], stderr=subprocess.DEVNULL, text=True, timeout=30)
+
     def shot(self, name):
         path = self.evidence / (name + '.png')
         if self.target.vm:
@@ -379,7 +446,9 @@ class Run:
         report = {'schemaVersion': 1, 'lane': self.args.lane, 'runId': self.run_id,
                   'scenarios': self.definition['scenarios'], 'assets': self.facts.get('assets', {}),
                   'scope': self.definition.get('scope', {}),
-                  'journeys': self.results, **summarize(self.results)}
+                  'journeys': self.results, **summarize(self.results),
+                  'execution': {'mode': 'development-rerun' if getattr(self.args, 'resume', None) else 'fresh',
+                                'requestedJourneys': getattr(self.args, 'journeys', None)}}
         self.evidence('summary', report)
         return report
 
@@ -524,9 +593,12 @@ with opener.open(req,timeout=30) as r: print(json.dumps(json.load(r)))
     def finish(self):
         errors = []
         try:
-            for name in ('driver.log', 'normal.log', 'cold-deep-link.log', 'warm-deep-link.log'):
+            logs = [(name, self.work + '/' + name) for name in
+                    ('driver.log', 'normal.log', 'cold-deep-link.log', 'warm-deep-link.log')]
+            logs.append(('engine.log', self.data + '/logs/engine.log'))
+            for name, source in logs:
                 try:
-                    content = self.target.py('import json,sys;from pathlib import Path;p=Path(json.loads(sys.argv[1]));print(p.read_text(errors="replace")[-4000000:] if p.exists() else "not created")', self.work + '/' + name)
+                    content = self.target.py('import json,sys;from pathlib import Path;p=Path(json.loads(sys.argv[1]));print(p.read_text(errors="replace")[-4000000:] if p.exists() else "not created")', source)
                     content = re.sub(r'("sessionToken"\s*:\s*")[^"]+', r'\1<redacted>', content)
                     (self.out / name).write_text(content)
                 except Exception as exc:
@@ -560,12 +632,17 @@ def main():
     parser.add_argument('--mirror', type=Path)
     parser.add_argument('--driver', default='tauri-driver')
     parser.add_argument('--evidence', required=True, help='new, non-existing directory')
+    parser.add_argument('--journeys', nargs='+', help='Run only these journey IDs; no implicit dependencies')
+    parser.add_argument('--resume', type=Path, help='Development only: restore a stopped setup checkpoint')
+    parser.add_argument('--checkpoint', type=Path, help='Save stopped setup state for the VM wrapper')
     args = parser.parse_args()
     if bool(args.vm) != args.lane.startswith('vm-'):
         parser.error('VM lanes require --vm; hosted lane runs inside its own Xvfb session')
     sys.modules['runner'] = sys.modules[__name__]
     from linux import CHECKS
     definition = json.loads((HERE / 'journeys.json').read_text())
+    if args.journeys and not set(args.journeys) <= {j['id'] for j in definition['journeys']}:
+        parser.error('Unknown journey ID')
     run = Run(args, definition)
     try:
         setup_error = None
@@ -574,11 +651,20 @@ def main():
             run.evidence('journey-source-sha256', {p.name: digest(p) for p in HERE.iterdir()
                                                    if p.suffix in ('.py', '.json')})
             run.target.prepare(args.lane, run.run_id)
-            run.work = run.target.py('import tempfile;print(tempfile.mkdtemp(prefix="justsearch-journey-"))').strip()
+            run.work = run.target.py('import tempfile;from pathlib import Path;p=Path.home()/".cache/justsearch-journeys";p.mkdir(parents=True,exist_ok=True);print(tempfile.mkdtemp(prefix="run-",dir=p))').strip()
             run.data = run.target.py('import os;from pathlib import Path;print(Path(os.environ.get("XDG_DATA_HOME",str(Path.home()/".local/share")))/"io.justsearch.shell")').strip()
-            existing = run.target.py('from pathlib import Path;import sys,json;print(Path(json.loads(sys.argv[1])).exists())', run.data).strip()
-            if existing != 'False':
-                raise Infrastructure('Fresh lane requires a clean app data folder; refusing inherited saved state')
+            if args.resume:
+                state = json.loads(args.resume.read_text())
+                if state['assets'] != run.facts['assets'] or state['lane'] != args.lane or state['phase'] != args.phase:
+                    raise Infrastructure('Setup checkpoint does not match the selected assets, lane and phase')
+                run.work, run.data, run.binary = (state[k] for k in ('work', 'data', 'binary'))
+                run.facts.update(state['facts'])
+                run.facts['resumedSetup'] = True
+                run.start_ui()
+            else:
+                existing = run.target.py('from pathlib import Path;import sys,json;print(Path(json.loads(sys.argv[1])).exists())', run.data).strip()
+                if existing != 'False':
+                    raise Infrastructure('Fresh lane requires a clean app data folder; refusing inherited saved state')
             run.evidence('environment', {'session': run.target.env.get('XDG_SESSION_TYPE'),
                          'wayland': bool(run.target.env.get('WAYLAND_DISPLAY')), 'display': run.target.env.get('DISPLAY'),
                          'os': run.target.run(['cat', '/etc/os-release']).stdout,
@@ -586,10 +672,18 @@ def main():
         except Exception as exc:
             setup_error = exc
         for journey in definition['journeys']:
+            if args.journeys and journey['id'] not in args.journeys:
+                continue
             if journey['id'] not in phase_journeys(args.phase) and args.vm and args.lane != 'vm-linux-x11':
                 continue
             row = {'id': journey['id'], 'title': journey['title'], 'scenarioIds': journey['scenarioIds'], 'checks': []}
             run.results.append(row)
+            from writes import COUNTERS, difference
+            before_writes = None
+            try:
+                before_writes = run.target.json(COUNTERS)
+            except Exception as exc:
+                row['writeVolume'] = {'unavailable': str(exc)}
             for check in journey['checks']:
                 if args.lane not in check['lanes']:
                     row['checks'].append({'name': check['id'], 'status': 'skipped-by-decision',
@@ -599,12 +693,23 @@ def main():
                                           'reason': 'setup: ' + str(setup_error), 'evidence': []})
                 else:
                     run.check(row, check['id'], lambda c=check: CHECKS[c['id']](run))
+            if before_writes is not None:
+                try:
+                    row['writeVolume'] = difference(before_writes, run.target.json(COUNTERS))
+                except Exception as exc:
+                    row['writeVolume'] = {'unavailable': str(exc)}
             run.save()
     finally:
         if run.work:
             run.finish()
         else:
             run.save()
+    if args.checkpoint and not setup_error and run.binary and run.facts.get('folder'):
+        # finish() has stopped every owned app/driver. Only durable facts cross
+        # the disk snapshot; a new process gets a new ownership marker.
+        args.checkpoint.write_text(json.dumps({'assets': run.facts['assets'], 'lane': args.lane,
+            'phase': args.phase, 'work': run.work, 'data': run.data, 'binary': run.binary,
+            'facts': {k: v for k, v in run.facts.items() if k not in ('ui', 'ready')}}, indent=2) + '\n')
     report = run.save()
     print(json.dumps(report['counts'], indent=2), flush=True)
     # VM-only omissions are explicitly scoped decisions, never passes. Applicable

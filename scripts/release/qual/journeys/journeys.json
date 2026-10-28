@@ -27,7 +27,7 @@
       {"id": "folder-picker", "lanes": ["vm-linux-wayland"], "applicability": "Round-two decision: native picker is tested on the Wayland VM; hosted uses the production HTTP API; X11 runs J1 only"},
       {"id": "folder-api", "lanes": ["hosted-linux-x11"], "applicability": "Round-two decision: hosted folder addition uses the production HTTP API; VM exercises the native picker"},
       {"id": "search-open", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux default viewer; round-two decision: X11 runs J1 only"}]},
-    {"id": "J3", "title": "Default production AI downloads on CPU", "scenarioIds": ["S3", "S7", "S22"], "checks": [
+    {"id": "J3", "title": "Default production AI installation and activation on CPU", "scenarioIds": ["S3", "S7", "S22"], "checks": [
       {"id": "cpu-ai", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "CPU: search only; chat unavailable; round-two decision: X11 runs J1 only"}]},
     {"id": "J4", "title": "Authored state and normal-launch persistence", "scenarioIds": ["S3", "S7"], "checks": [
       {"id": "author-state", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux; round-two decision: X11 runs J1 only"},
