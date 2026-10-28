@@ -138,3 +138,14 @@ are used. Relaunch and post-start reconciliation on installed Windows/Linux rema
   "note": "Delta review of eba4c31c28 relative to previously accepted 3d0cd9a1cf. Windows entire shell job is byte-identical to main a0022c79f1; Linux binary tests and all existing selections survive. Windows-only handoff test references a helper in the library test crate, absent from the binary root (source inspection; Windows not run). Structural rule and whySurvives are accurate against main. All other entries and cited evidence are unchanged from the accepted head; Rust/VM behavior was not rerun in this delta review. Section 10.7 body is byte-identical after relocation; size gate fails before at 809 and passes after at 771. Gate has only this stale acceptance before appending. Node subprocess stdin pipes receive sandbox EPERM; checks use a saved harness transporting the same stdin bytes through private files, with normal error propagation. Independent session; only the Codex model family is available here."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-ug7ys9vf",
+  "verdict": "accept",
+  "digest": "sha256:86c4b36ba56fd2e12969910492a34419f3b9027095868a51897f6967b3fc6d80",
+  "note": "Delta acceptance of aa94ff13faecfa72b3063aa51b55faf9e0e2bb25 relative to accepted e0bf131af5. Exact delta: Linux-only cfg plus comment for the Debian Tauri downloader test and regenerated evidence; same seven checks and unchanged assertions. All seven focused checks executed and passed without skips on baseline and candidate after building each checkout own native helper as CI does. Searched branch Rust additions and all crate sources for AppHandle, tauri, mock apps, plugins, handle, updater and emit references and followed changed test helper paths; no other new Windows-test-reachable Tauri runtime use found. The download test explicitly verifies Linux Debian bytes; unguarded v2 parser and format tests retain Windows coverage. Windows execution and STATUS_ENTRYPOINT_NOT_FOUND repair are unverified because no Windows runner is available. Initial full Linux suite: 210 passed, 52 failed, 1 ignored due to missing native helper and denied X11 socket setup; retained as failed evidence, not a full-suite pass. Acceptance is for this test-intent delta, not release sign-off. Separate verifier session; only the Codex model family is available. Supplied owner quote checked against this brief; private task records were not accessed."
+}
+```
