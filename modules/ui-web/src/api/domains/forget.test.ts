@@ -11,7 +11,6 @@ interface Consent { summary: string; typed: boolean; operationId: string }
 interface ForgetApi {
   createForgetAttempt(path: string, scope: 'FILE' | 'FOLDER'): Attempt;
   executeForget(base: string, attempt: Attempt, consent: (prompt: Consent) => Promise<boolean>): Promise<Outcome | null>;
-  readForget(base: string, key: string): Promise<Outcome>;
   readUnfinishedForgets(base: string, afterId?: number, signal?: AbortSignal, limit?: number): Promise<unknown>;
   forgetContainsPath(path: string, scope: 'FILE' | 'FOLDER', candidate: string): boolean;
   forgetParentFolder(path: string): string | null;

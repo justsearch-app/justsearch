@@ -40,7 +40,7 @@ function outcomeFor(value: unknown, key: string, target?: Pick<ForgetAttempt, 'p
 }
 
 /** Unlike an ordinary display projection, malformed removal evidence cannot establish success. */
-export async function readForget(base: string, key: string, signal?: AbortSignal): Promise<ForgetOutcome> {
+async function readForget(base: string, key: string, signal?: AbortSignal): Promise<ForgetOutcome> {
   const outcome = outcomeFor(await request(base, `/api/indexing/forgets/${encodeURIComponent(key)}`, { signal, retries: 1 }), key);
   if (outcome === null) throw new Error('The forget observation does not establish this intent');
   return outcome;
