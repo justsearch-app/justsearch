@@ -34,7 +34,7 @@ public final class MigrationTransitionBarrier {
       "migration-after-first-projection-replay", "migration-after-first-prune-removal",
       "migration-refusal-after-source-commit", "migration-refusal-after-journal-ack",
       "migration-refusal-after-abandonment", "migration-refusal-after-retirement",
-      "committed-boot-replay-settled");
+      "committed-boot-root-syncs-reconciled");
   /** Points inside an ordered replay: only a process halt there leaves a meaningful state. */
   private static final Set<String> REPLAY_HALT_POINTS = Set.of(
       "migration-after-first-projection-replay", "migration-after-first-prune-removal",

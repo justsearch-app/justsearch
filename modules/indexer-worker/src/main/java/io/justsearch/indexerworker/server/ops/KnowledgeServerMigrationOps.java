@@ -805,9 +805,8 @@ public final class KnowledgeServerMigrationOps {
    * replay exact DELETEs on B in accepted order, then durably commit and verify their absence.
    * Mixed projection and broad-delete snapshots certify B's final accepted effects without
    * replaying destructive mutations. Conditional removal retains concurrent replacement rows.
-   * A SYNC_ROOT was walked onto B before its pointer moved, and the committed boot reconciles
-   * every declared root with current disk before publication; its exact receipt is validated
-   * and acknowledged with the others, never walked again.
+   * A SYNC_ROOT receipt is validated here and stays retained: the committed boot reconciles its
+   * root with current disk on B and only then acknowledges that exact revision.
    */
   public static boolean settleCommittedNativeFileWitnesses(
       JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log) {
@@ -864,9 +863,9 @@ public final class KnowledgeServerMigrationOps {
           if (!certifyCommittedDeleteScope(queue, active, effects, survivors, i, List.of())) return false;
         }
       }
-      if (scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) return false;
-      return scoped.listSwitchBufferOpsStrict().stream()
-          .noneMatch(op -> generation.equals(op.generation()));
+      List<SwitchBufferCapableQueue.SwitchBufferOp> settled = withoutRootSyncs(selected);
+      if (scoped.removeReplayedSwitchBufferOps(settled) != settled.size()) return false;
+      return onlyRootSyncsRemain(queue, generation);
     } catch (IOException | RuntimeException unavailable) {
       log.warn("Committed native mutation witnesses remain unresolved", unavailable);
       return false;
@@ -1133,14 +1132,42 @@ public final class KnowledgeServerMigrationOps {
           }
         }
       }
-      if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
+      List<SwitchBufferCapableQueue.SwitchBufferOp> settled = withoutRootSyncs(selected);
+      if (!settled.isEmpty() && scoped.removeReplayedSwitchBufferOps(settled) != settled.size()) {
         return false;
       }
-      return switchBufferEmptyStrict(queue, generation);
+      return onlyRootSyncsRemain(queue, generation);
     } catch (IOException | RuntimeException unavailable) {
       log.warn("Committed native file witnesses remain unresolved", unavailable);
       return false;
     }
+  }
+
+  private static List<SwitchBufferCapableQueue.SwitchBufferOp> withoutRootSyncs(
+      List<SwitchBufferCapableQueue.SwitchBufferOp> ops) {
+    return ops.stream().filter(op -> !"SYNC_ROOT".equals(op.op())).toList();
+  }
+
+  /** Every receipt but {@code generation}'s own SYNC_ROOTs, which root reconciliation settles, is gone. */
+  private static boolean onlyRootSyncsRemain(JobQueue queue, String generation) {
+    if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
+    try {
+      return strictReplayOps(sbq, generation).stream()
+          .allMatch(op -> "SYNC_ROOT".equals(op.op()) && generation.equals(op.generation()));
+    } catch (RuntimeException unreadable) {
+      return false;
+    }
+  }
+
+  /**
+   * The root a committed native generation's retained SYNC_ROOT receipt asks to sync, once its
+   * key names exactly that root; a malformed or mismatched receipt throws and is never settled.
+   */
+  public static Path committedRootSyncPath(SwitchBufferCapableQueue.SwitchBufferOp op) {
+    if (!"SYNC_ROOT".equals(op.op())) throw new IllegalArgumentException("Not a root sync receipt");
+    decodeCommittedNativeEffect(op, Set.of());
+    return Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath())
+        .toAbsolutePath().normalize();
   }
 
   /** No post-snapshot versions may remain while the final mutation admission fence is held. */

@@ -7579,6 +7579,10 @@ public final class KnowledgeServer implements Closeable {
    * convergence check so every other root is served, and this generation's root reconciliation
    * stays unsettled, which keeps the previous generation until {@link #settleDeferredBootRoots}
    * has reconciled the root on its returned volume. Every other failure fails the boot as before.
+   *
+   * <p>A native B's retained SYNC_ROOT receipt adds the root it names (or the watched or configured
+   * root holding it) to the reconciled set. Its exact revision is removed only once that root
+   * converged and was committed; a root whose receipt stays retained is deferred the same way.
    */
   private void settleCommittedBootRoots(String expectedActive) throws IOException {
     if (!bootRootBindingsBound) {
@@ -7651,13 +7655,20 @@ public final class KnowledgeServer implements Closeable {
         }
       }
     }
-    // Receipts are acknowledged; the retained predecessor alone makes the next boot reconcile.
-    migrationTransitionForPublication("committed-boot-replay-settled");
     for (int attempt = 0; attempt < 3; attempt++) {
       if (closeStarted || System.nanoTime() >= deadline) break;
+      // A retained SYNC_ROOT asks for its root to be synced on B; that root is reconciled with
+      // the declared roots and its exact receipt is acknowledged only once B matches its disk.
+      List<SwitchBufferCapableQueue.SwitchBufferOp> rootSyncs =
+          nativeOwner ? retainedRootSyncs(expectedActive) : List.of();
+      List<RootBinding> reconciling = new ArrayList<>(bootRootBindings);
+      for (var rootSync : rootSyncs) {
+        RootBinding binding = rootSyncBinding(rootSync);
+        if (!reconciling.contains(binding)) reconciling.add(binding);
+      }
       List<RootBinding> settling = new ArrayList<>();
       List<RootBinding> deferred = new ArrayList<>();
-      for (RootBinding binding : bootRootBindings) {
+      for (RootBinding binding : reconciling) {
         if (producer.ingestService().reconcileCommittedBootRoot(
             binding, () -> closeStarted || System.nanoTime() >= deadline)) {
           settling.add(binding);
@@ -7715,6 +7726,8 @@ public final class KnowledgeServer implements Closeable {
               if (!fence.releaseCurrentOwnerIfReplayCertain()) {
                 throw new IOException("Committed successor watcher failed at final release");
               }
+              // A root whose receipt is still retained is retried by the deferred-root check.
+              deferred.addAll(acknowledgeRootSyncs(expectedActive, rootSyncs, settling));
               if (deferred.isEmpty()) {
                 rootReconciliationSettledGeneration = expectedActive;
               } else {
@@ -7740,7 +7753,8 @@ public final class KnowledgeServer implements Closeable {
     deferredBootRootsGeneration = expectedActive;
     deferredBootRootsRemovalMark = removalMark;
     deferredBootRoots = List.copyOf(deferred);
-    log.warn("Committed boot deferred {} root(s) not on the volume first seen at their path: {};"
+    log.warn("Committed boot deferred {} root(s) not on the volume first seen at their path"
+            + " or with a root sync still retained: {};"
             + " the previous generation is kept until they are reconciled on that volume",
         deferred.size(), deferred.stream().map(RootBinding::path).toList());
     // The server's own maintenance scheduler, opened before the boot reconcile, runs the check
@@ -7802,8 +7816,14 @@ public final class KnowledgeServer implements Closeable {
       for (RootBinding binding : declared) {
         if (reconcileReturnedBootRoot(producer, binding, removalMark)) converging.add(binding);
       }
-      List<RootBinding> settled = converging.isEmpty()
+      List<RootBinding> committed = converging.isEmpty()
           ? List.of() : commitReturnedBootRoots(producer, active, converging);
+      List<RootBinding> unacknowledged =
+          acknowledgeRootSyncs(expectedActive, retainedRootSyncsOrEmpty(expectedActive), committed);
+      // A root whose retained SYNC_ROOT did not settle is reconciled again on the next check.
+      unacknowledged.forEach(reconciledDeferredBootRoots::remove);
+      List<RootBinding> settled = committed.stream()
+          .filter(binding -> !unacknowledged.contains(binding)).toList();
       List<RootBinding> remaining = withoutRemovedBootRoots(producer,
           declared.stream().filter(binding -> !settled.contains(binding)).toList(), removalMark);
       settled.forEach(reconciledDeferredBootRoots::remove);
@@ -7819,6 +7839,76 @@ public final class KnowledgeServer implements Closeable {
       runtimeSwapLock.unlock();
     }
     if (allSettled) retryCommittedGenerationRetirement();
+  }
+
+  /** The committed native generation's retained SYNC_ROOT receipts, in accepted order. */
+  private List<SwitchBufferCapableQueue.SwitchBufferOp> retainedRootSyncs(String generation)
+      throws IOException {
+    if (!(jobQueue instanceof SwitchBufferCapableQueue journal)) {
+      throw new IOException("Committed root syncs require a generation journal");
+    }
+    return journal.listSwitchBufferOpsStrictForGeneration(generation).stream()
+        .filter(op -> "SYNC_ROOT".equals(op.op())).toList();
+  }
+
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // an unreadable journal is retried
+  private List<SwitchBufferCapableQueue.SwitchBufferOp> retainedRootSyncsOrEmpty(String generation) {
+    try {
+      return retainedRootSyncs(generation);
+    } catch (IOException | RuntimeException unreadable) {
+      log.warn("Retained root syncs of {} are unreadable (will retry): {}", generation,
+          unreadable.toString());
+      return List.of();
+    }
+  }
+
+  /**
+   * The root whose reconciliation delivers a retained SYNC_ROOT: the watched root holding it,
+   * else the configured collection root or help folder holding it, else the synced folder.
+   */
+  private RootBinding rootSyncBinding(SwitchBufferCapableQueue.SwitchBufferOp rootSync) {
+    Path root = KnowledgeServerMigrationOps.committedRootSyncPath(rootSync);
+    for (RootBinding binding : bootRootBindings) {
+      if (root.startsWith(binding.path().toAbsolutePath().normalize())) return binding;
+    }
+    for (Path configured : configuredRoots(startupConfiguration.collections())) {
+      Path declared = configured.toAbsolutePath().normalize();
+      if (root.startsWith(declared)) return new RootBinding(declared, release030Collection(declared));
+    }
+    return new RootBinding(root, release030Collection(root));
+  }
+
+  /**
+   * Removes the exact SYNC_ROOT revisions whose roots are reconciled and committed on B. Returns
+   * the reconciled roots that still have a retained receipt for this generation (a removal that
+   * failed or a replacement revision accepted meanwhile); those keep the predecessor.
+   */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // a failed removal stays retryable
+  private List<RootBinding> acknowledgeRootSyncs(String generation,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> rootSyncs, List<RootBinding> reconciled) {
+    List<RootBinding> remaining = new ArrayList<>();
+    try {
+      List<SwitchBufferCapableQueue.SwitchBufferOp> delivered = new ArrayList<>();
+      for (var rootSync : rootSyncs) {
+        if (reconciled.contains(rootSyncBinding(rootSync))) delivered.add(rootSync);
+      }
+      if (!delivered.isEmpty()) {
+        migrationTransitionForPublication("committed-boot-root-syncs-reconciled");
+        ((SwitchBufferCapableQueue) jobQueue)
+            .removeReplayedSwitchBufferOpsForGeneration(generation, delivered);
+      }
+      for (var rootSync : retainedRootSyncs(generation)) {
+        RootBinding binding = rootSyncBinding(rootSync);
+        if (reconciled.contains(binding) && !remaining.contains(binding)) remaining.add(binding);
+      }
+    } catch (IOException | RuntimeException failure) {
+      log.warn("Retained root syncs of {} stay for another reconciliation: {}", generation,
+          failure.toString());
+      for (RootBinding binding : reconciled) {
+        if (!remaining.contains(binding)) remaining.add(binding);
+      }
+    }
+    return remaining;
   }
 
   /** {@code bindings} without the roots the person removed after {@code removalMark}. */

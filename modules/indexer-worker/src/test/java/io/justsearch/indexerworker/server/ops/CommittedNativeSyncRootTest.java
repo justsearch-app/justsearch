@@ -5,18 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.adapters.lucene.runtime.CommitOps;
-import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
@@ -40,10 +35,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 /**
- * A native boot after a pointer-before-acknowledgement stop settles B's retained SYNC_ROOT
- * receipt with the rest of B's snapshot, through the real settlement entry point and a real
- * journal: acknowledged exactly, never walked again, and never a reason to accept anything the
- * existing certification refuses.
+ * A retained SYNC_ROOT in B's snapshot, after a pointer-before-acknowledgement stop, is never a
+ * reason for the real settlement entry point to accept anything the existing certification
+ * refuses. What a real boot then settles is covered by the real-process crash-recovery test.
  */
 final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
   private static final String B = "g-20261028-000000";
@@ -53,98 +47,7 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
 
   @TempDir Path temp;
 
-  // ---- S4b: an interrupted settlement keeps retryable evidence ----
-
-  @Test
-  void failedDeleteCommitKeepsEveryReceiptAndTheRetrySettlesThem() throws Exception {
-    try (var queue = queue()) {
-      String gone = file("gone.txt");
-      syncRoot(queue, B, temp, true);
-      delete(queue, B, gone);
-      var retained = queue.listSwitchBufferOpsStrict();
-      var runtime = fileRuntime();
-      var commits = runtime.commitOps();
-      doThrow(new IllegalStateException("injected commit failure")).doNothing()
-          .when(commits).commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
-
-      assertFalse(settle(queue, runtime, B), "a failed commit cannot acknowledge B's receipts");
-      assertEquals(retained, queue.listSwitchBufferOpsStrict(), "every receipt stays for the retry");
-
-      assertTrue(settle(queue, runtime, B), "the retry settles the same receipts");
-      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
-      verify(runtime.indexingCoordinator(), org.mockito.Mockito.times(2)).deleteByIdAndChunks(gone);
-    }
-  }
-
-  @Test
-  void failedReceiptRemovalKeepsEveryReceiptAndTheRetrySettlesThem() throws Exception {
-    try (var real = queue()) {
-      var queue = spy(real);
-      syncRoot(queue, B, temp, false);
-      delete(queue, B, file("gone.txt"));
-      var retained = queue.listSwitchBufferOpsStrict();
-      doThrow(new IllegalStateException("injected removal failure")).doCallRealMethod()
-          .when(queue).removeReplayedSwitchBufferOps(anyList());
-
-      assertFalse(settle(queue, fileRuntime(), B));
-      assertEquals(retained, queue.listSwitchBufferOpsStrict());
-
-      assertTrue(settle(queue, fileRuntime(), B));
-      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
-    }
-  }
-
-  @Test
-  void replacementRootRevisionAcceptedDuringRemovalSurvivesAndSettlesNext() throws Exception {
-    try (var real = queue()) {
-      var queue = spy(real);
-      syncRoot(queue, B, temp, false);
-      String unrelated = file("unrelated-backlog.txt");
-      Files.writeString(Path.of(unrelated), "pending");
-      assertEquals(1, queue.enqueue(List.of(Path.of(unrelated))), "unrelated backlog stays pending");
-      var original = queue.listSwitchBufferOpsStrict().get(0);
-      doAnswer(invocation -> {
-        syncRoot(real, B, temp, true);
-        return invocation.callRealMethod();
-      }).doCallRealMethod().when(queue).removeReplayedSwitchBufferOps(anyList());
-
-      assertFalse(settle(queue, fileRuntime(), B), "a newer revision is not acknowledged unseen");
-      var remaining = queue.listSwitchBufferOpsStrict();
-      assertEquals(1, remaining.size());
-      assertEquals(original.key(), remaining.get(0).key());
-      assertFalse(original.revision().equals(remaining.get(0).revision()),
-          "the replacement revision survives the exact cleanup");
-      assertTrue(SwitchBufferSyncRoot.decode(remaining.get(0).payload()).force());
-
-      assertTrue(settle(queue, fileRuntime(), B), "the next attempt settles the replacement");
-      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
-    }
-  }
-
-  // ---- S7: mixed certification still owns projection and broad-delete receipts ----
-
-  @Test
-  void syncRootBesideProjectionAndBroadDeletesCertifiesWithoutDestructiveReplay() throws Exception {
-    String prefix = QueryFilterBuilder.normalizePathPrefix(temp.resolve("removed-root").toString());
-    // Accepted after both broad deletes and inside both scopes: replaying either would remove it.
-    var later = projectionAt("later", 3, "archive", prefix + "later.md");
-    try (var queue = queue(); var runtime = luceneRuntime()) {
-      index(runtime, later);
-      queue.putSwitchBufferForGeneration(B, sourceKey(), "PROJECTION_SOURCE", SOURCE);
-      prefixDelete(queue, prefix);
-      syncRoot(queue, B, temp.resolve("watched"), true);
-      queue.putSwitchBufferForGeneration(B, "collection:archive", "DELETE_COLLECTION", "archive");
-      queue.admitProjectionForGeneration(B, later.encode());
-      assertEquals(List.of("PROJECTION_SOURCE", "DELETE_PREFIX", "SYNC_ROOT", "DELETE_COLLECTION",
-          "PROJECTION"), queue.listSwitchBufferOpsStrict().stream().map(op -> op.op()).toList());
-
-      assertTrue(settle(queue, runtime, B, List.of(SOURCE)));
-      assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
-      assertEquals(later.indexId(), runtime.documentFieldOps()
-          .getDocumentFieldOrThrow(later.indexId(), SchemaFields.DOC_ID),
-          "the later accepted projection is certified, not deleted by a replayed broad delete");
-    }
-  }
+  // ---- S7: a broad-delete snapshot with a SYNC_ROOT is still refused when B disagrees ----
 
   @Test
   void unexpectedDocumentInDeletedPrefixStillRefusesASnapshotWithSyncRoot() throws Exception {
@@ -320,9 +223,5 @@ final class CommittedNativeSyncRootTest extends LuceneExecutorTestBase {
     return new AcceptedProjection(SOURCE, id, revision, AcceptedProjection.Kind.UPSERT,
         "{\"collection\":\"" + collection + "\",\"content\":\"projected body\",\"path\":\""
             + path.replace("\\", "\\\\") + "\"}");
-  }
-
-  private static String sourceKey() {
-    return "projection-source:" + SOURCE.length() + ":" + SOURCE;
   }
 }

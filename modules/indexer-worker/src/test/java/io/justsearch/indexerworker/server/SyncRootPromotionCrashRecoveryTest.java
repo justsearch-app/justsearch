@@ -6,6 +6,8 @@ import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizati
 import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.search;
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.justsearch.app.api.indexing.AcceptedProjection;
+import io.justsearch.app.api.indexing.ProjectionSeedSource;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.core.execution.TestEngineExecutors;
@@ -59,9 +61,17 @@ final class SyncRootPromotionCrashRecoveryTest {
       Map.entry("addedtoken", "watched/added.txt"), Map.entry("removedtoken", "watched/remove-me.txt"),
       Map.entry("oldchangetoken", "watched/change-me.txt"),
       Map.entry("newchangetoken", "watched/change-me.txt"),
-      Map.entry("awaytoken", "watched/while-away.txt"), Map.entry("aftercuttoken", "watched/after-cut.txt"));
+      Map.entry("awaytoken", "watched/while-away.txt"), Map.entry("aftercuttoken", "watched/after-cut.txt"),
+      Map.entry("archivekeeptoken", "archive/keep.txt"), Map.entry("archiveaddedtoken", "archive/added.txt"),
+      Map.entry("archiveremovedtoken", "archive/remove-me.txt"),
+      Map.entry("archiveoldtoken", "archive/change-me.txt"), Map.entry("archivenewtoken", "archive/change-me.txt"),
+      Map.entry("earlyprojectiontoken", "-"), Map.entry("laterprojectiontoken", "-"));
+  private static final String PROJECTION_SOURCE = "memory";
 
-  /** S1, with S3 for a force=true receipt: B's only retained receipt is its SYNC_ROOT. */
+  /**
+   * S1, with S3 for force=true receipts: B's only retained receipts are SYNC_ROOTs, one for a
+   * watched root and one for a configured collection root.
+   */
   @Test
   void nativeBootPublishesReplayedRootAfterPointerCrash(@TempDir Path root) throws Exception {
     migrateAndCut(root, "NATIVE", "root-only", AFTER_POINTER);
@@ -74,6 +84,7 @@ final class SyncRootPromotionCrashRecoveryTest {
         () -> assertHits(restart, "oldchangetoken"),
         () -> assertHits(restart, "removedtoken"),
         () -> assertHits(restart, "keeptoken", "watched/keep.txt"));
+    assertCollectionRootMatchesDisk("S3 force=true", restart);
   }
 
   /** P1: the recorded owner's PROMOTED boot still acknowledges the same retained state. */
@@ -106,32 +117,45 @@ final class SyncRootPromotionCrashRecoveryTest {
         () -> assertHits(restart, "newchangetoken", "watched/change-me.txt"),
         () -> assertHits(restart, "oldchangetoken"),
         () -> assertHits(restart, "removedtoken"));
+    assertCollectionRootMatchesDisk("S3 force=false", restart);
   }
 
-  /** S4a: a second abrupt stop once the new settlement acknowledged B's receipts. */
+  /**
+   * S4a: a second abrupt stop once the roots are reconciled, before the SYNC_ROOT receipts are
+   * removed. S4b: on the next boot the first removal fails and a replacement revision is accepted
+   * during the retried removal; it survives that cleanup and is settled by the next check.
+   */
   @Test
-  void secondStopAfterReceiptAcknowledgementStillReconcilesOnTheNextBoot(@TempDir Path root)
+  void interruptedSettlementKeepsRetryableEvidenceAndSettlesOnRetry(@TempDir Path root)
       throws Exception {
     migrateAndCut(root, "NATIVE", "root-only", AFTER_POINTER);
     Process interrupted = child(root, "NATIVE", "root-only", "restart-cut");
     try {
-      awaitMarker(interrupted, root.resolve("replay-settled"), STARTUP_SECONDS);
+      awaitMarker(interrupted, root.resolve("roots-reconciled"), STARTUP_SECONDS);
     } finally {
       kill(interrupted);
     }
     System.out.println("CRASH-RECOVERY NATIVE restart-cut evidence:\n" + evidence(log(root, "restart-cut")));
-    assertTrue(Files.exists(root.resolve("replay-settled")),
-        "S4a: the first restart must settle B's receipts before root reconciliation");
+    assertTrue(Files.exists(root.resolve("roots-reconciled")),
+        "S4a: the first restart must reconcile the roots before it acknowledges their syncs");
     var state = new IndexGenerationManager(root.resolve("data/index")).readStateBestEffort();
     assertAll("S4a: retryable evidence after the second stop",
         () -> assertEquals(Files.readString(root.resolve("building")), state.active_generation()),
         () -> assertNotNull(state.previous_generation(), "the predecessor keeps the next boot committed"),
-        () -> assertEquals(List.of(), retained(root, state.active_generation()), "receipts were acknowledged"));
-    // Only the retained predecessor can make the next boot reconcile this change.
-    Files.writeString(root.resolve("watched/after-cut.txt"), "aftercuttoken");
-    var restart = restart(root, "NATIVE", "root-only", "restart", STARTUP_SECONDS);
-    assertRootReplayRecovered("S4a", restart);
-    assertHits(restart, "aftercuttoken", "watched/after-cut.txt");
+        () -> assertEquals(List.of("SYNC_ROOT", "SYNC_ROOT"), retained(root, state.active_generation()),
+            "the root syncs stay retained until their acknowledgement"));
+    changeRootWhileStopped(root);
+    var restart = restart(root, "NATIVE", "root-only", "restart-fault", STARTUP_SECONDS);
+    assertRootReplayRecovered("S4", restart);
+    assertCollectionRootMatchesDisk("S4", restart);
+    assertAll("S4b: the failed removal and the replacement revision are retried, not lost",
+        () -> assertHits(restart, "addedtoken", "watched/added.txt"),
+        () -> assertHits(restart, "removedtoken"),
+        () -> assertEquals("true", restart.hits().getProperty("@removal-failed"), "the fault was injected"),
+        () -> assertEquals("true", restart.hits().getProperty("@replacement-survived"),
+            "the replacement revision survives the cleanup of the revision it replaced"),
+        () -> assertEquals("true", restart.hits().getProperty("@previous-retired"),
+            "the predecessor is retired once every root sync settled"));
   }
 
   /** S5: the SYNC_ROOT's root is on another volume at restart and comes back while running. */
@@ -142,8 +166,10 @@ final class SyncRootPromotionCrashRecoveryTest {
     var restart = restart(root, "NATIVE", "unavailable", "restart", STARTUP_SECONDS);
     assertAll("S5: boot serves while the root is away",
         () -> assertTrue(restart.published(), "boot must publish within " + STARTUP_SECONDS + "s"),
-        () -> assertTrue(restart.settled(), "B's receipts must settle"),
+        () -> assertEquals("[SYNC_ROOT " + PathNormalizer.normalizePathPrefix(root.resolve("watched").toString()) + "]",
+            restart.deferred().getProperty("retained"), "only the away root's sync stays retained"),
         () -> assertHits(restart, "controltoken", "other/control.txt"),
+        () -> assertHits(restart, "archivekeeptoken", "archive/keep.txt"),
         () -> assertHits(restart, "keeptoken", "watched/keep.txt"),
         () -> assertHits(restart, TOKEN, "watched/replayed.txt"),
         () -> assertHits(restart, "awaytoken"),
@@ -152,6 +178,7 @@ final class SyncRootPromotionCrashRecoveryTest {
     var returned = restart.returned();
     assertAll("S5: the returned volume reconciles without another restart",
         () -> assertEquals("true", returned.getProperty("previousRetired")),
+        () -> assertEquals("[]", returned.getProperty("retained"), "the away root's sync settled"),
         () -> assertEquals(key(root.resolve("watched/while-away.txt")), returned.getProperty("awaytoken")),
         () -> assertEquals(key(root.resolve("watched/keep.txt")), returned.getProperty("keeptoken")));
   }
@@ -161,6 +188,27 @@ final class SyncRootPromotionCrashRecoveryTest {
   void nativeBootPublishesReplayedRootAfterPublicationCrash(@TempDir Path root) throws Exception {
     migrateAndCut(root, "NATIVE", "root-only", AFTER_PUBLICATION);
     assertRootReplayRecovered("S6", restart(root, "NATIVE", "root-only", "restart", STARTUP_SECONDS));
+  }
+
+  /**
+   * S7: B retains a SYNC_ROOT beside projection and broad-delete receipts. A projection accepted
+   * after both broad deletes and inside both scopes survives (no destructive replay), the one
+   * accepted before them stays deleted, and B publishes with the synced root.
+   */
+  @Test
+  void syncRootBesideProjectionAndBroadDeletesPublishesCertifiedContent(@TempDir Path root)
+      throws Exception {
+    migrateAndCut(root, "NATIVE", "projection", AFTER_POINTER);
+    var retained = retained(root, Files.readString(root.resolve("building")));
+    assertTrue(retained.containsAll(List.of("DELETE_PREFIX", "DELETE_COLLECTION", "PROJECTION")), retained::toString);
+    var restart = restart(root, "NATIVE", "projection", "restart", STARTUP_SECONDS);
+    assertRootReplayRecovered("S7", restart);
+    assertAll("S7: certified projection and broad-delete effects",
+        () -> assertEquals("", restart.hits().getProperty("earlyprojectiontoken"),
+            "the projection deleted by both broad deletes stays deleted"),
+        () -> assertEquals(restart.hits().getProperty("@later-id"),
+            restart.hits().getProperty("laterprojectiontoken"), "the later accepted projection survives"),
+        () -> assertHits(restart, "keeptoken", "watched/keep.txt"));
   }
 
   // ---- parent side ----
@@ -198,11 +246,30 @@ final class SyncRootPromotionCrashRecoveryTest {
     }
   }
 
-  /** S3: one file added, one removed and one changed while no Engine runs. */
+  /**
+   * S3: in the watched root and in the configured collection root, one file added, one removed
+   * and one changed while no Engine runs. The collection root's change keeps size and mtime.
+   */
   private static void changeRootWhileStopped(Path root) throws IOException {
     Files.writeString(root.resolve("watched/added.txt"), "addedtoken");
     Files.delete(root.resolve("watched/remove-me.txt"));
     Files.writeString(root.resolve("watched/change-me.txt"), "newchangetoken");
+    Files.writeString(root.resolve("archive/added.txt"), "archiveaddedtoken");
+    Files.delete(root.resolve("archive/remove-me.txt"));
+    Path changed = root.resolve("archive/change-me.txt");
+    var modified = Files.getLastModifiedTime(changed);
+    Files.writeString(changed, "archivenewtoken");
+    Files.setLastModifiedTime(changed, modified);
+  }
+
+  /** S3 for the configured collection root: B matches its current disk. */
+  private static void assertCollectionRootMatchesDisk(String scenario, Restart restart) {
+    assertAll(scenario + ": the configured collection root matches its disk",
+        () -> assertHits(restart, "archiveaddedtoken", "archive/added.txt"),
+        () -> assertHits(restart, "archivenewtoken", "archive/change-me.txt"),
+        () -> assertHits(restart, "archiveoldtoken"),
+        () -> assertHits(restart, "archiveremovedtoken"),
+        () -> assertHits(restart, "archivekeeptoken", "archive/keep.txt"));
   }
 
   private static Restart restart(Path root, String mode, String scenario, String phase, long observe)
@@ -329,6 +396,7 @@ final class SyncRootPromotionCrashRecoveryTest {
     Path indexBase = dataDir.resolve("index");
     Path watched = root.resolve("watched");
     Path other = root.resolve("other");
+    Path archive = root.resolve("archive");
     if (phase.equals("migrate")) seedRoots(root, scenario.equals("mixed"));
     if (scenario.equals("unavailable") && !phase.equals("migrate")) {
       NoVolumeIdentityExtension.installVolumeLookupWithFolderAway(watched,
@@ -341,7 +409,9 @@ final class SyncRootPromotionCrashRecoveryTest {
         "justsearch.ai.embed.enabled", "false",
         "justsearch.splade.enabled", "false",
         "justsearch.ner.enabled", "false",
-        "justsearch.extraction.sandbox.mode", "IN_PROCESS"));
+        "justsearch.extraction.sandbox.mode", "IN_PROCESS",
+        "index.collections", "[{\"name\":\"archive\",\"roots\":[\""
+            + archive.toString().replace("\\", "\\\\") + "\"]}]"));
     Files.writeString(dataDir.resolve("watched_roots.json"), new tools.jackson.databind.ObjectMapper()
         .writeValueAsString(Map.of("schemaVersion", 1, "roots", List.of(
             Map.of("path", watched.toString()), Map.of("path", other.toString())))));
@@ -352,6 +422,12 @@ final class SyncRootPromotionCrashRecoveryTest {
         .startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
     server.bindBootRootBindings(List.of(new RootBinding(watched, null), new RootBinding(other, null)));
     server.bindExclusionRoots(() -> List.of(watched, other));
+    if (scenario.equals("projection")) server.installProjectionSeedSources(List.of(new ProjectionSeedSource() {
+      @Override public String sourceId() { return PROJECTION_SOURCE; }
+      @Override public void enumerate(java.util.function.Consumer<AcceptedProjection> sink) {
+        sink.accept(projection(root, "early", 1, "earlyprojectiontoken"));
+      }
+    }));
     if (phase.equals("migrate")) {
       migrate(root, mode, scenario, server, watched, other);
     } else {
@@ -366,6 +442,7 @@ final class SyncRootPromotionCrashRecoveryTest {
   private static void seedRoots(Path root, boolean files) throws IOException {
     Path watched = Files.createDirectories(root.resolve("watched"));
     Path other = Files.createDirectories(root.resolve("other"));
+    Files.createDirectories(root.resolve("archive"));
     if (!files) return;
     seedRootFiles(watched, other);
     Files.writeString(watched.resolve("d-before.txt"), "dbeforetoken");
@@ -373,7 +450,12 @@ final class SyncRootPromotionCrashRecoveryTest {
     Files.writeString(other.resolve("o-delete.txt"), "odeletetoken");
   }
 
+  /** The configured collection root "archive" is a sibling of the watched roots. */
   private static void seedRootFiles(Path watched, Path other) throws IOException {
+    Path archive = watched.resolveSibling("archive");
+    Files.writeString(archive.resolve("keep.txt"), "archivekeeptoken");
+    Files.writeString(archive.resolve("change-me.txt"), "archiveoldtoken");
+    Files.writeString(archive.resolve("remove-me.txt"), "archiveremovedtoken");
     Files.writeString(watched.resolve("keep.txt"), "keeptoken");
     Files.writeString(watched.resolve("change-me.txt"), "oldchangetoken");
     Files.writeString(watched.resolve("remove-me.txt"), "removedtoken");
@@ -415,9 +497,9 @@ final class SyncRootPromotionCrashRecoveryTest {
       assertTrue(server.beginRecordedBuildingLiveAsync(OPERATION,
           () -> { throw new AssertionError("live recorded migration fell back"); }).get(30, TimeUnit.SECONDS));
     } else {
-      var started = server.appServices().ingestService().startMigration(
-          MigrationStartRequest.newBuilder().setReason("manual").setProjectionSourceIdsPresent(true).build(),
-          CallContext.none());
+      var request = MigrationStartRequest.newBuilder().setReason("manual").setProjectionSourceIdsPresent(true);
+      if (scenario.equals("projection")) request.addProjectionSourceIds(PROJECTION_SOURCE);
+      var started = server.appServices().ingestService().startMigration(request.build(), CallContext.none());
       assertTrue(started.getAccepted(), started::getError);
       building = started.getBuildingGenerationId();
       Files.writeString(root.resolve("building"), building);
@@ -435,6 +517,22 @@ final class SyncRootPromotionCrashRecoveryTest {
   private static void journal(String scenario, SqliteJobQueue queue, String building, Path watched,
       Path other) throws IOException {
     boolean mixed = scenario.equals("mixed");
+    Path archive = watched.resolveSibling("archive");
+    if (scenario.equals("projection")) {
+      // As the unit-level mixed certification: both broad deletes cover "early", accepted before
+      // them, and "later", accepted after them.
+      String prefix = PathNormalizer.normalizePathPrefix(watched.resolveSibling("removed-root").toString());
+      assertTrue(queue.putSwitchBufferForGeneration(building, "prefix:" + prefix, "DELETE_PREFIX",
+          new io.justsearch.adapters.lucene.runtime.PathPrefixScope(prefix, List.of()).encode()));
+      seedRootFiles(watched, other);
+      Files.writeString(watched.resolve("replayed.txt"), TOKEN);
+      syncRoot(queue, building, watched, true);
+      assertTrue(queue.putSwitchBufferForGeneration(building, "collection:scratch", "DELETE_COLLECTION", "scratch"));
+      queue.admitProjectionForGeneration(building, projection(watched.getParent(), "later", 1, "laterprojectiontoken").encode());
+      System.out.println("CRASH-RECOVERY journaled generation=" + building + " receipts="
+          + queue.listSwitchBufferOpsStrict().stream().map(op -> op.op() + " " + op.key()).toList());
+      return;
+    }
     if (mixed) {
       upsert(queue, building, watched, write(watched.resolve("u-before.txt"), "ubeforetoken"));
       upsert(queue, building, other, write(other.resolve("o-upsert.txt"), "oupserttoken"));
@@ -442,10 +540,8 @@ final class SyncRootPromotionCrashRecoveryTest {
     }
     if (!mixed) seedRootFiles(watched, other); // without receipts: only reconciliation sees other/
     Files.writeString(watched.resolve("replayed.txt"), TOKEN);
-    // IngestSwitchBufferOps.bufferSyncDirectoryDuringSwitching
-    String normalized = PathNormalizer.normalizePathPrefix(watched.toString());
-    assertTrue(queue.putSyncRootForGeneration(building, "sync_root:" + normalized,
-        new SwitchBufferSyncRoot(normalized, !mixed, null)));
+    syncRoot(queue, building, watched, !mixed);
+    syncRoot(queue, building, archive, !mixed);
     if (mixed) {
       upsert(queue, building, watched, write(watched.resolve("u-after.txt"), "uaftertoken"));
       Files.delete(watched.resolve("d-after.txt"));
@@ -455,6 +551,21 @@ final class SyncRootPromotionCrashRecoveryTest {
     }
     System.out.println("CRASH-RECOVERY journaled generation=" + building + " receipts="
         + queue.listSwitchBufferOpsStrict().stream().map(op -> op.op() + " " + op.key()).toList());
+  }
+
+  /** IngestSwitchBufferOps.bufferSyncDirectoryDuringSwitching. */
+  private static void syncRoot(SqliteJobQueue queue, String building, Path root, boolean force) {
+    String normalized = PathNormalizer.normalizePathPrefix(root.toString());
+    assertTrue(queue.putSyncRootForGeneration(building, "sync_root:" + normalized,
+        new SwitchBufferSyncRoot(normalized, force, null)));
+  }
+
+  /** A projection in the deletable "scratch" collection, under the removed prefix. */
+  private static AcceptedProjection projection(Path root, String id, long revision, String token) {
+    String path = root.resolve("removed-root/" + id + ".md").toString();
+    return new AcceptedProjection(PROJECTION_SOURCE, id, revision, AcceptedProjection.Kind.UPSERT,
+        "{\"collection\":\"scratch\",\"content\":\"" + token + "\",\"path\":\""
+            + path.replace("\\", "\\\\") + "\"}");
   }
 
   private static Path write(Path file, String content) throws IOException {
@@ -478,15 +589,17 @@ final class SyncRootPromotionCrashRecoveryTest {
   private static void restart(Path root, String mode, String phase, KnowledgeServer server)
       throws Exception {
     long started = System.nanoTime();
+    var evidence = new Properties();
     if (phase.equals("restart-cut")) {
       server.installMigrationBarrierForTests(transition -> {
-        if (!transition.point().equals("committed-boot-replay-settled")) return;
+        if (!transition.point().equals("committed-boot-root-syncs-reconciled")) return;
         System.out.println("CRASH-RECOVERY " + mode + " stop at " + transition.point() + " active="
             + transition.sourceGeneration());
-        mark(root, "replay-settled");
+        mark(root, "roots-reconciled");
         while (true) Thread.sleep(1_000);
       });
     }
+    if (phase.equals("restart-fault")) installRemovalFaults(root, server, evidence);
     var disposition = KnowledgeServer.class.getDeclaredField("generationBootDisposition");
     disposition.setAccessible(true);
     var observer = new Thread(() -> {
@@ -526,25 +639,69 @@ final class SyncRootPromotionCrashRecoveryTest {
     }
     System.out.println("CRASH-RECOVERY " + mode + " search " + TOKEN + " -> " + search(server, TOKEN));
     if (search(server, TOKEN).contains(replayed)) mark(root, "searched");
-    while (queue.listSwitchBufferOpsStrict().stream().anyMatch(op -> active.equals(op.generation()))
+    boolean away = Files.exists(root.resolve("watched/while-away.txt"));
+    // A retried removal settles on the deferred-root check; a root away keeps its sync retained.
+    boolean retried = phase.equals("restart-fault");
+    deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(away ? 0 : retried ? 60 : 30);
+    while ((!retained(queue, active).isEmpty()
+        || retried && manager.readStateBestEffort().previous_generation() != null)
         && System.nanoTime() < deadline) Thread.sleep(100);
-    var remaining = queue.listSwitchBufferOpsStrict();
-    System.out.println("CRASH-RECOVERY " + mode + " remaining receipts="
-        + remaining.stream().map(op -> op.op() + " " + op.generation() + " " + op.key()).toList());
-    if (remaining.stream().noneMatch(op -> active.equals(op.generation()))) mark(root, "settled");
-    store(root.resolve("hits.properties"), hits(server));
-    if (Files.exists(root.resolve("watched/while-away.txt"))) awaitReturnedVolume(root, server, manager);
+    System.out.println("CRASH-RECOVERY " + mode + " remaining receipts=" + queue.listSwitchBufferOpsStrict().stream()
+        .map(op -> op.op() + " " + op.generation() + " " + op.key()).toList());
+    if (retained(queue, active).isEmpty()) mark(root, "settled");
+    var hits = hits(server);
+    evidence.forEach((name, value) -> hits.setProperty("@" + name, (String) value));
+    hits.setProperty("@previous-retired", Boolean.toString(manager.readStateBestEffort().previous_generation() == null));
+    hits.setProperty("@later-id", projection(root, "later", 1, "").indexId());
+    store(root.resolve("hits.properties"), hits);
+    if (away) awaitReturnedVolume(root, server, manager, queue, active);
     mark(root, "verified");
     Runtime.getRuntime().halt(0);
   }
 
+  /**
+   * S4b fault seam at the acknowledgement of reconciled root syncs: the first removal fails; the
+   * retried removal meets a replacement revision accepted meanwhile; the next check settles it.
+   */
+  private static void installRemovalFaults(Path root, KnowledgeServer server, Properties evidence) {
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    var replacement = new java.util.concurrent.atomic.AtomicReference<String>();
+    server.installMigrationBarrierForTests(transition -> {
+      if (!transition.point().equals("committed-boot-root-syncs-reconciled")) return;
+      var queue = (SqliteJobQueue) server.jobQueueForTests();
+      String active = transition.sourceGeneration();
+      switch (calls.incrementAndGet()) {
+        case 1 -> {
+          evidence.setProperty("removal-failed", "true");
+          throw new IOException("injected receipt removal failure");
+        }
+        case 2 -> {
+          syncRoot(queue, active, root.resolve("archive"), false);
+          replacement.set(queue.listSwitchBufferOpsStrictForGeneration(active).stream()
+              .filter(op -> op.key().endsWith(PathNormalizer.normalizePathPrefix(root.resolve("archive").toString())))
+              .findFirst().orElseThrow().revision());
+        }
+        default -> evidence.setProperty("replacement-survived", Boolean.toString(
+            queue.listSwitchBufferOpsStrictForGeneration(active).stream()
+                .anyMatch(op -> op.revision().equals(replacement.get()))));
+      }
+      System.out.println("CRASH-RECOVERY fault seam call " + calls.get() + " " + evidence);
+    });
+  }
+
+  private static List<String> retained(SqliteJobQueue queue, String generation) {
+    return queue.listSwitchBufferOpsStrictForGeneration(generation).stream()
+        .map(op -> op.op() + " " + op.key().substring(op.key().indexOf(':') + 1)).toList();
+  }
+
   /** S5: evidence while the root is away, then after its volume returns to the running Engine. */
-  private static void awaitReturnedVolume(Path root, KnowledgeServer server, IndexGenerationManager manager)
-      throws Exception {
+  private static void awaitReturnedVolume(Path root, KnowledgeServer server, IndexGenerationManager manager,
+      SqliteJobQueue queue, String active) throws Exception {
     var away = manager.readStateBestEffort();
     var deferred = new Properties();
     deferred.setProperty("previousKept", Boolean.toString(away.previous_generation() != null
         && Files.isDirectory(manager.resolveGenerationPathStrict(away.previous_generation()))));
+    deferred.setProperty("retained", retained(queue, active).toString());
     store(root.resolve("deferred.properties"), deferred);
     mark(root, "volume-returned");
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(90);
@@ -556,6 +713,7 @@ final class SyncRootPromotionCrashRecoveryTest {
     var returned = hits(server);
     returned.setProperty("previousRetired",
         Boolean.toString(manager.readStateBestEffort().previous_generation() == null));
+    returned.setProperty("retained", retained(queue, active).toString());
     store(root.resolve("returned.properties"), returned);
   }
 
