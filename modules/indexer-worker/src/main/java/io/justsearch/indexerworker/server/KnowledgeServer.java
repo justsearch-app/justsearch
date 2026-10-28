@@ -9877,7 +9877,8 @@ public final class KnowledgeServer implements Closeable {
 
   /**
    * Provably empty: the captured walk closed complete with no planned unit, no recorded claim
-   * was issued, no queue row is pending or claimed, no projection source seeds the candidate,
+   * was issued, the enumerator queued no file (including help), no queue row is pending,
+   * claimed or failed, no projection source seeds the candidate,
    * every accepted journal obligation for B is a removal (which leaves an empty B empty; the
    * refusal cleanup still settles it on A before acknowledging it), and B holds no document.
    * An UPSERT, projection, VDU result or root sync could add content, so it is never empty.
@@ -9889,6 +9890,7 @@ public final class KnowledgeServer implements Closeable {
         || (recordedCandidateInPlace && recordedCandidate == null) || buildingIndexPath == null
         || !indexGenerationManager.resolveGenerationPathStrict(candidate).equals(buildingIndexPath)
         || !migrationEnumeratorDone || migrationEnumeratorRunning.get()
+        || migrationEnumeratorFilesEnqueued.get() != 0L
         || !expectedProjectionSourceIds().isEmpty()) return false;
     var walk = jobQueue.recordedWalk(recorded.operationKey()).orElse(null);
     if (walk == null || !walk.capturedPlan()
@@ -9896,7 +9898,7 @@ public final class KnowledgeServer implements Closeable {
         || walk.plannedUnits() == null || walk.plannedUnits() != 0L
         || jobQueue.hasIssuedRecordedClaims(recorded.operationKey())) return false;
     var counts = jobQueue.jobStateCountsStrict();
-    if (counts.pendingCount() != 0 || counts.processingCount() != 0
+    if (counts.pendingCount() != 0 || counts.processingCount() != 0 || counts.failedCount() != 0
         || !(jobQueue instanceof SwitchBufferCapableQueue journal)
         || !journal.listSwitchBufferOpsStrictForGeneration(candidate).stream()
             .allMatch(op -> REMOVAL_JOURNAL_OPS.contains(op.op()))) return false;
@@ -10203,6 +10205,10 @@ public final class KnowledgeServer implements Closeable {
                               || !replay.orElseThrow().nativePolicy().reproveBeforePointer())) {
                         throw new IOException("Native policy omission proof changed before pointer commitment");
                       }
+                      // Keep this proof exact under publication. Its SQLite reads take only
+                      // the queue lock (walk callbacks run after unlock); Lucene refresh takes
+                      // the SearcherManager refresh lock. NrtReopenStats/ChunkSetCompleteness
+                      // never capture a serving view or take the publication read lock.
                       if (installerEmpty && (!installerCandidateProvablyEmpty(recorded)
                           || !verifyGreenCommitMetadataBestEffort(true))) {
                         throw new IOException("Installer empty proof changed before pointer commitment");

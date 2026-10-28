@@ -265,7 +265,7 @@ class RecordedMigrationRestartRecoveryTest {
 
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(strings = {"document", "planned-unit", "issued-claim",
-      "pending-row", "processing-row", "running-enumerator", "unfinished-enumerator", "incomplete-walk",
+      "pending-row", "processing-row", "failed-row", "help-enqueued", "running-enumerator", "unfinished-enumerator", "incomplete-walk",
       "uncaptured-walk", "unreadable-count", "upsert", "projection", "projection-source", "replay-uncertain"})
   void installerEmptyExceptionRequiresEachProof(String missing, @TempDir Path tempDir) throws Exception {
     Switching switching = new Switching(tempDir, "current-model", true,
@@ -279,6 +279,10 @@ class RecordedMigrationRestartRecoveryTest {
             .thenReturn(new JobQueue.JobStateCounts(1, 0, 0, 0, 0));
         case "processing-row" -> when(switching.queue.jobStateCountsStrict())
             .thenReturn(new JobQueue.JobStateCounts(0, 0, 1, 0, 0));
+        case "failed-row" -> when(switching.queue.jobStateCountsStrict())
+            .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 1));
+        case "help-enqueued" -> ((java.util.concurrent.atomic.AtomicLong)
+            field(switching.server, "migrationEnumeratorFilesEnqueued")).set(1L);
         case "running-enumerator" -> ((AtomicBoolean) field(switching.server, "migrationEnumeratorRunning")).set(true);
         case "unfinished-enumerator" -> setField(switching.server, "migrationEnumeratorDone", false);
         case "incomplete-walk" -> when(switching.queue.recordedWalk(OPERATION))
