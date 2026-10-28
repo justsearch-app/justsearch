@@ -307,7 +307,7 @@ public final class JobBatchExtractor {
                 ? claim.recordedForce() : forcedPaths.remove(normalizedPath));
         // Skip isUnmodified() on empty index — every doc is new (312 item 10).
         if (!forceReindex && !indexEmptyForBatch) {
-          if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs())
+          if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs(), envelope.sizeBytes())
               && Objects.equals(collection == null || collection.isBlank() ? null : collection,
                   documentFieldOps.getDocumentFieldOrThrow(normalizedPath, SchemaFields.COLLECTION))) {
             log.debug("File unchanged, skipping: {}", filePath);
