@@ -45,7 +45,7 @@ def _measure_file(tmp_path, elements: dict[str, int]):
     """Write a minimal `<step>.measure.json` with the given {selector: heightPx}
     geometry; return its path."""
     p = tmp_path / "step.measure.json"
-    geometry = {"elements": {sel: {"rect": {"h": h}} for sel, h in elements.items()}}
+    geometry = {"elements": {sel: {"visible": True, "rect": {"w": 100, "h": h}} for sel, h in elements.items()}}
     p.write_text(json.dumps({"geometry": geometry}), encoding="utf-8")
     return str(p)
 
@@ -166,7 +166,7 @@ def _rect_measure_file(tmp_path, rects: dict[str, dict[str, int]]):
     """Write a `<step>.measure.json` with full x/y/w/h geometry; return its path."""
     p = tmp_path / "rects.measure.json"
     p.write_text(
-        json.dumps({"geometry": {"elements": {s: {"rect": r} for s, r in rects.items()}}}),
+        json.dumps({"geometry": {"elements": {s: {"visible": True, "rect": r} for s, r in rects.items()}}}),
         encoding="utf-8",
     )
     return str(p)
@@ -511,8 +511,8 @@ class TestRegisterAndCaptureAgreeOnSelectors:
 
         sels = ui_measure._find_proportion_baseline().get("chat-occlusion") or []
         assert ".toast" in sels
-        assert ".header" in sels, "the overlap counterpart must be captured, not just named"
-        assert ".conversation" in sels
+        assert '[data-testid="sv3-topbar"]' in sels, "the overlap counterpart must be captured, not just named"
+        assert '[data-testid="sv3-main-scroller"]' in sels
 
     def test_registered_selectors_have_no_duplicates(self):
         from jseval import ui_measure
@@ -543,7 +543,7 @@ class TestNonScrollableSelectors:
     def test_non_scrolling_element_is_clean(self, monkeypatch, tmp_path):
         self._step(monkeypatch, nonScrollableSelectors=[".evidence-rail"])
         mf = self._scroll_measure_file(
-            tmp_path, {".evidence-rail": {"rect": {"h": 300}, "scrollable": False, "scrollDelta": 0}}
+            tmp_path, {".evidence-rail": {"visible": True, "rect": {"w": 300, "h": 300}, "scrollable": False, "scrollDelta": 0}}
         )
         report = ui_proportion_gate.evaluate(lambda step: _cap(mf))
         assert report["exit_code"] == 0
@@ -553,7 +553,7 @@ class TestNonScrollableSelectors:
     def test_a_scrolling_element_is_a_violation(self, monkeypatch, tmp_path):
         self._step(monkeypatch, nonScrollableSelectors=[".evidence-rail"])
         mf = self._scroll_measure_file(
-            tmp_path, {".evidence-rail": {"rect": {"h": 300}, "scrollable": True, "scrollDelta": 210}}
+            tmp_path, {".evidence-rail": {"visible": True, "rect": {"w": 300, "h": 300}, "scrollable": True, "scrollDelta": 210}}
         )
         report = ui_proportion_gate.evaluate(lambda step: _cap(mf))
         assert report["exit_code"] == 1
@@ -572,7 +572,7 @@ class TestNonScrollableSelectors:
     def test_a_capture_without_the_flag_is_an_error(self, monkeypatch, tmp_path):
         # A stale ui_measure probe must report a capture ERROR, never a silent pass.
         self._step(monkeypatch, nonScrollableSelectors=[".evidence-rail"])
-        mf = self._scroll_measure_file(tmp_path, {".evidence-rail": {"rect": {"h": 300}}})
+        mf = self._scroll_measure_file(tmp_path, {".evidence-rail": {"visible": True, "rect": {"w": 300, "h": 300}}})
         report = ui_proportion_gate.evaluate(lambda step: _cap(mf))
         assert report["exit_code"] == 2
         assert report["rows"][0]["status"] == "ERROR"
@@ -590,12 +590,13 @@ class TestNonScrollableSelectors:
         from jseval import ui_measure
 
         sels = ui_measure._find_proportion_baseline().get("chat-evidence-rail") or []
-        assert ".evidence-rail" in sels
+        assert '[data-testid="sv3-turn-citations"]' in sels
 
 
 def _role_measure_file(tmp_path, elements: dict[str, dict]):
     """A `<step>.measure.json` carrying each element's rect PLUS its own `chPx` / `fontSize` —
     the per-element font facts tempdoc 816's role bounds resolve `ch` against."""
+    elements = {s: {"visible": True, **e, "rect": {"h": 100, **e.get("rect", {})}} for s, e in elements.items()}
     p = tmp_path / "role.measure.json"
     p.write_text(
         json.dumps({"geometry": {"elements": elements}}), encoding="utf-8",
@@ -642,7 +643,7 @@ class TestMaxWidthCeiling:
 
     def test_missing_width_is_exit_2(self, monkeypatch, tmp_path):
         _register(monkeypatch, [{"selector": ".control-row", "maxWidthPx": 800}])
-        mf = _measure_file(tmp_path, {".control-row": 32})  # height only — no rect.w
+        mf = _rect_measure_file(tmp_path, {".control-row": {"h": 32}})  # incomplete rect
         report = ui_proportion_gate.evaluate(lambda step: _cap(mf))
         assert report["exit_code"] == 2
         assert report["rows"][0]["status"] == "ERROR"
@@ -733,7 +734,7 @@ class TestInlineSizeRole:
         # element that rendered at 0 width — precisely the regression a width bound exists to catch.
         self._roles(monkeypatch, {"prose": {"maxInlineSizeCh": 88}})
         _register(monkeypatch, [{"selector": ".conversation", "inlineSizeRole": "prose"}])
-        mf = _role_measure_file(tmp_path, {".conversation": {"rect": {"w": 0}, "chPx": 7}})
+        mf = _role_measure_file(tmp_path, {".conversation": {"rect": {"w": 600}, "chPx": 7}})
         report = ui_proportion_gate.evaluate(lambda step: _cap(mf))
         assert report["exit_code"] == 2
         assert "minWidthPx floor" in report["rows"][0]["error"]
@@ -782,9 +783,8 @@ class TestInlineSizeRole:
         mf = _role_measure_file(tmp_path, {".conversation": {"rect": {"h": 500}, "chPx": 7}})
         report = ui_proportion_gate.evaluate(lambda step: _cap(mf))
         assert report["exit_code"] == 2
-        assert report["rows"][0]["constraint"] == "inlineSizeRole"
         assert report["rows"][0]["status"] == "ERROR"
-        assert report["rows"][0]["error"] == "captured geometry has no rect.w"
+        assert "positive width/height" in report["rows"][0]["error"]
 
 
 class TestRoleTokenEquality:
@@ -863,7 +863,7 @@ class TestShippedRolesMatchTheRenderedTokens:
         assert not violation, f"register/tokens.css drift: {[r for r in rows if r['status'] != 'ok']}"
         assert not error, f"role token rows errored: {[r for r in rows if r['status'] == 'ERROR']}"
 
-    def test_every_role_bound_row_carries_a_floor(self):
+    def test_every_inline_bound_row_carries_a_floor(self):
         # The register's anti-vacuity rule, asserted against the SHIPPED rows rather than a fixture:
         # a role-bound row with neither the role's `minInlineSizeCh` nor its own `minWidthPx` is an
         # ERROR at gate time, so it must not be possible to ship one.
@@ -873,6 +873,9 @@ class TestShippedRolesMatchTheRenderedTokens:
             for el in step.get("elements") or []:
                 role_name = el.get("inlineSizeRole")
                 if role_name is None:
+                    if el.get("maxWidthPx") is not None:
+                        assert el.get("minWidthPx", 0) > 0, "physical reading measure needs a positive floor"
+                        bound += 1
                     continue
                 role = roles.get(role_name)
                 assert role is not None, f"{step.get('uiShotStep')}/{el.get('selector')}: unknown role {role_name!r}"
@@ -886,4 +889,4 @@ class TestShippedRolesMatchTheRenderedTokens:
                 bound += 1
         # Anti-vacuity for this test itself: a register that bound NO rows would pass the loop above
         # without checking anything.
-        assert bound > 0, "no register row binds an inlineSizeRole — this test asserted nothing"
+        assert bound > 0, "no register row bounds reading width — this test asserted nothing"

@@ -648,7 +648,7 @@ function Assert-AppSurface {
   # toWireRow's `case ActionEvent.Effect` branch: m.put("effectKind", ...),
   # m.put("subject", ...) -- there is no "targetSurface" on an Effect row).
   # A round-15 GUI click observed exactly this shape:
-  # {"kind":"effect","effectKind":"navigate","subject":"justsearch://surface/core.unified-chat-surface"}
+  # {"kind":"effect","effectKind":"navigate","subject":"justsearch://surface/core.search-v3-surface"}
   # -- the old kind=="navigation"-only predicate found ZERO matching entries
   # for every GUI-driven navigation and threw "no navigation entries in
   # action-ledger" on clicks that had genuinely succeeded. Both shapes are

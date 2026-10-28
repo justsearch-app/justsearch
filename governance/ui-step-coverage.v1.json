@@ -22,11 +22,5 @@
     { "surfaceId": "core.health-surface", "step": "health", "source": "modules/ui-web/src/shell-v0/views/HealthSurface.ts" },
     { "surfaceId": "core.help-surface", "step": "help", "source": "modules/ui-web/src/shell-v0/views/HelpSurface.ts" }
   ],
-  "exempt": [
-    {
-      "surfaceId": "core.unified-chat-surface",
-      "reason": "Interaction surface is exercised via the chat-mode + qa-response chain steps, not a standalone nav-view screenshot.",
-      "source": "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts"
-    }
-  ]
+  "exempt": []
 }

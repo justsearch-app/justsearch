@@ -199,3 +199,24 @@ class TestStatusFactsVisibility:
         # The pre-existing leaf-only guarantee must survive the visibility filter.
         html = "<div><p><span>Over budget +3</span></p></div>"
         assert _count_phrases(html, ["Over budget"])["Over budget"] == 1
+
+
+def test_geometry_rejects_hidden_and_closed_details_and_does_not_count_their_scrollers():
+    from jseval.ui_measure import _JS_GEOMETRY
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as runtime:
+        browser = runtime.chromium.launch(headless=True, args=["--disable-gpu"])
+        try:
+            page = browser.new_page()
+            page.set_content("""<style>.scroll {height:50px;width:100px;overflow:auto}.tall {height:200px}</style>
+                <div id="visible" class="scroll"><div class="tall">Visible</div></div>
+                <div style="display:none"><div id="hidden" class="scroll"><div class="tall">Hidden</div></div></div>
+                <details><summary>Closed</summary><div id="closed" class="scroll"><div class="tall">Closed</div></div></details>
+                <div id="zero" style="width:0;height:0"></div>""")
+            geometry = page.evaluate(_JS_GEOMETRY, ["#visible", "#hidden", "#closed", "#zero"])
+            assert geometry["elements"]["#visible"]["visible"] is True
+            for selector in ("#hidden", "#closed", "#zero"):
+                assert geometry["elements"][selector]["visible"] is False
+            assert geometry["scrollableCount"] == 1
+        finally:
+            browser.close()
