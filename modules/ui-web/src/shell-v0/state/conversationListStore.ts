@@ -7,6 +7,7 @@
  */
 
 import { subscribeProfileSwitch } from './UserStateDocument.js';
+import { subscribeProfiles, getActiveProfileId as getWorkspaceProfileId } from '../substrates/profiles/index.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { startUserActivity } from '../utils/userActivity.js';
 import { subscribeStatus } from '../utils/statusPoll.js';
@@ -377,7 +378,18 @@ let listProfileEpoch = 0;
 let stopListProfileWatch: (() => void) | null = null;
 
 export async function loadConversations(): Promise<boolean> {
-  stopListProfileWatch ??= subscribeProfileSwitch(() => { listProfileEpoch += 1; });
+  if (!stopListProfileWatch) {
+    const invalidate = (): void => { listProfileEpoch += 1; };
+    const stopUserProfile = subscribeProfileSwitch(invalidate);
+    let workspaceProfile = getWorkspaceProfileId();
+    const stopWorkspaceProfile = subscribeProfiles(() => {
+      const next = getWorkspaceProfileId();
+      if (next === workspaceProfile) return;
+      workspaceProfile = next;
+      invalidate();
+    });
+    stopListProfileWatch = () => { stopUserProfile(); stopWorkspaceProfile(); };
+  }
   watchOtherWindowsLegacyTitles();
   const request = ++listRequests;
   const profileEpoch = listProfileEpoch;

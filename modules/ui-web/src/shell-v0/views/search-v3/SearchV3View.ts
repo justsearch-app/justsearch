@@ -46,6 +46,7 @@
  * Side-effect registers <jf-sv3-window> and its four regions.
  */
 import { subscribeProfileSwitch } from '../../state/UserStateDocument.js';
+import { subscribeProfiles, getActiveProfileId as getWorkspaceProfileId } from '../../substrates/profiles/index.js';
 import type { Sv3RecentItem } from './Sv3Composer.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
 import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
@@ -698,6 +699,12 @@ export class SearchV3View extends JfElement {
         inset-inline: 0;
         inset-block-end: 0;
         z-index: var(--z-sticky);
+        max-block-size: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      :host([composer-state='docked']) .dock > jf-sv3-composer {
+        min-block-size: 0;
       }
       /* THE VEIL (859 §B / D12). Below the glass box there is the composer host's own
          --floating-content-inset of clear space, through which UNBLURRED transcript would slide
@@ -1002,6 +1009,7 @@ export class SearchV3View extends JfElement {
   private boxObserver: ResizeObserver | null = null;
   /** 859 §B — the dock's own box watcher, and the node it is currently bound to. */
   private dockObserver: ResizeObserver | null = null;
+  private observedRecentList: HTMLElement | null = null;
   private observedDock: HTMLElement | null = null;
   private aiUnsubscribe: (() => void) | null = null;
   private uiModeUnsubscribe: (() => void) | null = null;
@@ -1845,7 +1853,7 @@ export class SearchV3View extends JfElement {
         this.followStoreConversation(state.activeId);
       }
     });
-    this.recentProfileUnsubscribe = subscribeProfileSwitch(() => {
+    const resetProfileRecents = (): void => {
       this.recentEpoch += 1;
       this.recentSearches = [];
       this.recentClearTime = -Infinity;
@@ -1853,7 +1861,16 @@ export class SearchV3View extends JfElement {
       this.composer?.closeRecents();
       resetSearchState();
       void this.refreshRecents();
+    };
+    const stopUserProfile = subscribeProfileSwitch(resetProfileRecents);
+    let workspaceProfile = getWorkspaceProfileId();
+    const stopWorkspaceProfile = subscribeProfiles(() => {
+      const next = getWorkspaceProfileId();
+      if (next === workspaceProfile) return;
+      workspaceProfile = next;
+      resetProfileRecents();
     });
+    this.recentProfileUnsubscribe = () => { stopUserProfile(); stopWorkspaceProfile(); };
     void loadConversations();
     window.addEventListener('sv3-handoff', this.receiveHandoff);
     if (!this.receiveHandoff()) {
@@ -2008,6 +2025,7 @@ export class SearchV3View extends JfElement {
     this.dockObserver?.disconnect();
     this.dockObserver = null;
     this.observedDock = null;
+    this.observedRecentList = null;
     this.removeEventListener('keydown', this.onHostKeydown, true);
     this.removeEventListener('focusout', this.onHostFocusOut);
     window.removeEventListener('jf-focus-composer', this.onFocusComposerEvent);
@@ -2071,6 +2089,7 @@ export class SearchV3View extends JfElement {
     this.boxObserver = new ResizeObserver(() => {
       this.paneOverlay = !sv3PaneIsInline(this.availableWidth());
       this.reflowSidebar();
+      this.composer?.keepRecentSelectionVisible();
     });
     this.boxObserver.observe(this);
   }
@@ -2088,16 +2107,25 @@ export class SearchV3View extends JfElement {
    */
   private syncDockObserver(): void {
     const dock = this.shadowRoot?.querySelector<HTMLElement>('.dock') ?? null;
-    if (dock === null || this.observedDock === dock) return;
-    this.dockObserver?.disconnect();
-    this.observedDock = dock;
-    if (typeof ResizeObserver === 'function') {
-      this.dockObserver = new ResizeObserver(() => this.publishOcclusion());
-      this.dockObserver.observe(dock);
+    if (dock === null) return;
+    if (this.observedDock !== dock) {
+      this.dockObserver?.disconnect();
+      this.observedDock = dock;
+      this.observedRecentList = null;
+      if (typeof ResizeObserver === 'function') {
+        this.dockObserver = new ResizeObserver(() => this.publishOcclusion());
+        this.dockObserver.observe(dock);
+      }
+      // Also publish before the first ResizeObserver delivery (and in DOM-only tests).
+      this.publishOcclusion();
     }
-    // Publish once at bind time as well: a DOM without the API still gets a correct band on the
-    // first render, and happy-dom defines a ResizeObserver that never fires.
-    this.publishOcclusion();
+    // Hero's dock has zero height; its inner list can resize without changing that box.
+    const list = this.composer?.shadowRoot?.getElementById('sv3-recent-list') ?? null;
+    if (list !== this.observedRecentList) {
+      if (this.observedRecentList) this.dockObserver?.unobserve(this.observedRecentList);
+      this.observedRecentList = list;
+      if (list) this.dockObserver?.observe(list);
+    }
   }
 
   /**
@@ -2126,6 +2154,7 @@ export class SearchV3View extends JfElement {
    * keystroke that changed the band.
    */
   private publishOcclusion(): void {
+    this.composer?.keepRecentSelectionVisible();
     const current = this.style.getPropertyValue(OCCLUSION_VAR);
     if (this.composerState !== 'hero') {
       const px = this.observedDock?.getBoundingClientRect().height ?? 0;
@@ -2194,6 +2223,10 @@ export class SearchV3View extends JfElement {
     // 859 §B — the dock exists only after a render, and the hero↔docked morph changes what the
     // band MEANS, not just how tall it is (see publishOcclusion's two zeroes).
     this.syncDockObserver();
+    // Child rendering creates/removes the list after this parent's update.
+    void this.composer?.updateComplete.then(() => {
+      if (this.isConnected) this.syncDockObserver();
+    });
     if (changed.has('composerState')) this.publishOcclusion();
     // The restored draft reaches the composer on the first update that produced one. Once only: a
     // later re-application would clobber what the reader has typed since.

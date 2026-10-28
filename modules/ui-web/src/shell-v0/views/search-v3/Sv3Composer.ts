@@ -35,7 +35,7 @@
  *
  * Side-effect registers <jf-sv3-composer>.
  */
-import { html, css, nothing, type TemplateResult } from 'lit';
+import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
 import { JfElement } from '../../primitives/JfElement.js';
 import { icon, type IconName } from '../../components/Icon.js';
 // The product's ONE operability primitive (tempdoc 559 Authority V; 852 parity ledger row 11). The
@@ -222,7 +222,9 @@ export class Sv3Composer extends JfElement {
          region; docked rides the floating '.dock' wrapper), so the declaration described a layout
          that no longer exists. */
       :host {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
         padding: var(--floating-content-inset);
         font-family: var(--font-sans);
       }
@@ -238,7 +240,7 @@ export class Sv3Composer extends JfElement {
         inset: var(--workspace-topbar-height) 0 0 0;
         z-index: var(--z-overlay);
         display: flex;
-        align-items: center;
+        justify-content: center;
         pointer-events: none;
       }
 
@@ -258,7 +260,10 @@ export class Sv3Composer extends JfElement {
          the glass edge. Unconditional rather than hero-only, because docked is an overlay too. */
       .recents { margin-block-start: var(--space-2); padding: var(--space-2);
         border: 1px solid var(--border); border-radius: var(--radius-lg);
-        background: var(--background); color: var(--foreground); font-size: var(--font-size-sv3-sm); }
+        background: var(--background); color: var(--foreground); font-size: var(--font-size-sv3-sm);
+        min-block-size: 0; display: flex; flex-direction: column; }
+      .recents [role="listbox"] { min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
+      .recents > :not([role="listbox"]) { flex-shrink: 0; }
       .recent-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
       .recents button { font: inherit; color: inherit; background: transparent; border: 0;
         border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); cursor: pointer; text-align: start; }
@@ -278,7 +283,14 @@ export class Sv3Composer extends JfElement {
         max-inline-size: var(--measure-prose);
         margin-inline: auto;
         pointer-events: auto;
+        min-block-size: 0;
       }
+      .band:has(.recents) {
+        display: flex;
+        flex-direction: column;
+        max-block-size: 100%;
+      }
+      .band:has(.recents) > :not(.recents) { flex-shrink: 0; }
 
       /* The hero INTRO — headline plus the corpus line under it (tempdoc 822 Phase F7, inventory
          E10). It sits directly above the composer box, which is the shipped landing's own placement
@@ -692,6 +704,20 @@ export class Sv3Composer extends JfElement {
       :host([state='docked']) textarea {
         min-block-size: var(--composer-field-min-docked);
       }
+      /* At the minimum window height the empty hero uses the existing compact field
+         spacing, leaving a row below the heading/bar. Recent may cover the introduction. */
+      @media (max-height: 600px) {
+        :host([state='hero']) .band:has(.recents) .field {
+          padding: var(--space-2) var(--space-3) var(--space-1);
+        }
+        :host([state='hero']) .band:has(.recents) textarea {
+          min-block-size: var(--composer-field-min-docked);
+        }
+        :host([state='hero']) .band:has(.recents) .landing {
+          padding-bottom: var(--space-2);
+        }
+        :host([state='hero']) .band:has(.recents) .corpus { display: none; }
+      }
       /* The placeholder is a real overlaid element rather than the input pseudo-element: that pseudo
          is an ambient facet this window may not re-author, and the spec overlays an element too. */
       .placeholder {
@@ -718,6 +744,11 @@ export class Sv3Composer extends JfElement {
       }
       :host([state='docked']) .footer {
         padding: 0 var(--space-3) var(--space-2);
+      }
+      @media (max-height: 600px) {
+        :host([state='hero']) .band:has(.recents) .footer {
+          padding: 0 var(--space-3) var(--space-2);
+        }
       }
       /* The control row is the ANCHOR for the control's menu, which is why it is positioned: the
          menu opens upward from a composer that sits at the bottom of the window. Still true of the
@@ -1257,6 +1288,22 @@ export class Sv3Composer extends JfElement {
     this.catalogUnsubscribe = null;
     this.closeRecents();
     super.disconnectedCallback();
+  }
+
+  override updated(changed: PropertyValues): void {
+    super.updated(changed);
+    if (changed.has('recentIndex') || changed.has('recentItems')) this.keepRecentSelectionVisible();
+  }
+
+  keepRecentSelectionVisible(): void {
+    if (!this.recentsOpen) return;
+    const list = this.shadowRoot?.getElementById('sv3-recent-list');
+    const option = this.shadowRoot?.getElementById(`sv3-recent-${this.recentIndex}`);
+    if (list && option) {
+      // Scroll only the list: scrollIntoView also scrolls the clipped workspace ancestors.
+      const box = list.getBoundingClientRect(), row = option.getBoundingClientRect();
+      list.scrollTop += Math.min(0, row.top - box.top) + Math.max(0, row.bottom - box.bottom);
+    }
   }
 
   closeRecents(): void { this.recentsOpen = false; this.recentIndex = -1; }

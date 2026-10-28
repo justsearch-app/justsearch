@@ -58,7 +58,8 @@
     "chat-composer-small", "chat-evidence-rail", "chat-activity-rail-open",
     "chat-wide-docked", "chat-mode", "qa-response",
     "chat-budget", "chat-model-only", "chat-structured",
-    "sv3-recents-hero-normal-dark", "sv3-recents-hero-normal-light", "sv3-recents-hero-normal-forced", "sv3-recents-hero-narrow-dark", "sv3-recents-hero-narrow-light", "sv3-recents-hero-narrow-forced", "sv3-recents-docked-normal-dark", "sv3-recents-docked-normal-light", "sv3-recents-docked-normal-forced", "sv3-recents-docked-narrow-dark", "sv3-recents-docked-narrow-light", "sv3-recents-docked-narrow-forced"
+    "sv3-recents-hero-normal-dark", "sv3-recents-hero-normal-light", "sv3-recents-hero-normal-forced", "sv3-recents-hero-narrow-dark", "sv3-recents-hero-narrow-light", "sv3-recents-hero-narrow-forced", "sv3-recents-docked-normal-dark", "sv3-recents-docked-normal-light", "sv3-recents-docked-normal-forced", "sv3-recents-docked-narrow-dark", "sv3-recents-docked-narrow-light", "sv3-recents-docked-narrow-forced",
+    "sv3-recents-hero-1280x720-dark", "sv3-recents-hero-1280x720-light", "sv3-recents-hero-1280x720-forced", "sv3-recents-hero-760x720-dark", "sv3-recents-hero-760x720-light", "sv3-recents-hero-760x720-forced", "sv3-recents-hero-600x400-dark", "sv3-recents-hero-600x400-light", "sv3-recents-hero-600x400-forced", "sv3-recents-docked-1280x720-dark", "sv3-recents-docked-1280x720-light", "sv3-recents-docked-1280x720-forced", "sv3-recents-docked-760x720-dark", "sv3-recents-docked-760x720-light", "sv3-recents-docked-760x720-forced", "sv3-recents-docked-600x400-dark", "sv3-recents-docked-600x400-light", "sv3-recents-docked-600x400-forced"
   ],
   "shell-v0/views/search-v3/Sv3Composer.ts": [
     "sv3-composer-occlusion", "sv3-search-results", "chat-chip-yield",
@@ -67,7 +68,8 @@
     "chat-activity-rail-open", "chat-wide-docked", "chat-mode",
     "qa-response", "chat-budget", "chat-model-only",
     "chat-structured",
-    "sv3-recents-hero-normal-dark", "sv3-recents-hero-normal-light", "sv3-recents-hero-normal-forced", "sv3-recents-hero-narrow-dark", "sv3-recents-hero-narrow-light", "sv3-recents-hero-narrow-forced", "sv3-recents-docked-normal-dark", "sv3-recents-docked-normal-light", "sv3-recents-docked-normal-forced", "sv3-recents-docked-narrow-dark", "sv3-recents-docked-narrow-light", "sv3-recents-docked-narrow-forced"
+    "sv3-recents-hero-normal-dark", "sv3-recents-hero-normal-light", "sv3-recents-hero-normal-forced", "sv3-recents-hero-narrow-dark", "sv3-recents-hero-narrow-light", "sv3-recents-hero-narrow-forced", "sv3-recents-docked-normal-dark", "sv3-recents-docked-normal-light", "sv3-recents-docked-normal-forced", "sv3-recents-docked-narrow-dark", "sv3-recents-docked-narrow-light", "sv3-recents-docked-narrow-forced",
+    "sv3-recents-hero-1280x720-dark", "sv3-recents-hero-1280x720-light", "sv3-recents-hero-1280x720-forced", "sv3-recents-hero-760x720-dark", "sv3-recents-hero-760x720-light", "sv3-recents-hero-760x720-forced", "sv3-recents-hero-600x400-dark", "sv3-recents-hero-600x400-light", "sv3-recents-hero-600x400-forced", "sv3-recents-docked-1280x720-dark", "sv3-recents-docked-1280x720-light", "sv3-recents-docked-1280x720-forced", "sv3-recents-docked-760x720-dark", "sv3-recents-docked-760x720-light", "sv3-recents-docked-760x720-forced", "sv3-recents-docked-600x400-dark", "sv3-recents-docked-600x400-light", "sv3-recents-docked-600x400-forced"
   ],
   "shell-v0/views/search-v3/Sv3ContextBar.ts": [
     "sv3-composer-occlusion", "chat-proportion", "chat-bands-detailed"

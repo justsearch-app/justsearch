@@ -909,6 +909,636 @@
         "[data-testid=\"sv3-recents\"]",
         "jf-sv3-composer"
       ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-1280x720-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-1280x720-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-1280x720-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-760x720-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-760x720-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-760x720-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-600x400-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-600x400-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-600x400-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-1280x720-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-1280x720-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-1280x720-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-760x720-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-760x720-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-760x720-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-600x400-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-600x400-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-600x400-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
     }
   ]
 }

@@ -12,6 +12,7 @@ import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
 import { resetSearchState, setQuery, submitSearch, getSearchState } from '../../state/searchState.js';
 import { __resetSearchFiltersForTest, toggleFacetValue } from '../../state/searchFiltersState.js';
 import { __resetUserStateForTest, createProfile, setActiveProfileId, getActiveProfileId } from '../../state/UserStateDocument.js';
+import { __resetProfilesForTest, createProfileFromCurrent, activateProfile, getActiveProfileId as getWorkspaceProfileId } from '../../substrates/profiles/index.js';
 import { __seedForTest } from '../../../i18n/resourceCatalog.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
 
@@ -60,7 +61,8 @@ async function search(el: SearchV3View, text: string): Promise<void> { await typ
 function clear(el: SearchV3View): void { list(el)!.querySelector<HTMLButtonElement>('[data-testid=sv3-recent-clear]')!.click(); }
 const writes = (): unknown[][] => http.mock.calls.filter(c => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(c[1]?.method)));
 
-beforeEach(() => {
+beforeEach(async () => {
+  await __resetProfilesForTest();
   localStorage.clear(); sessionStorage.clear(); __resetConversationListForTest(); __resetUserStateForTest();
   __resetDraftProvidersForTest(); __resetDraftKeptForTest(); __resetAiStateForTest(); __resetSearchFiltersForTest(); resetSearchState();
   rows = []; searches = []; heldLists = []; holdLists = false; heldSearches = []; holdSearches = false; historyStatus = 200;
@@ -191,6 +193,29 @@ it('Y5 fresh windows forget searches and Clear while profile ABA drops pending r
   const fresh = await mount(); await focusEmpty(fresh); expect(labels(fresh, 'search')).toEqual([]); expect(labels(fresh, 'conversation')).toEqual(['fresh']);
 });
 
+it('R5a Settings workspace profile activation resets searches and Clear and drops pending replies', async () => {
+  createProfileFromCurrent('workspace-a', 'Workspace A'); await activateProfile('workspace-a');
+  const el = await mount(); await search(el, 'workspace A private search'); await focusEmpty(el);
+  expect(labels(el, 'search')).toEqual(['workspace A private search']);
+  createProfileFromCurrent('workspace-b', 'Workspace B'); await settle(el);
+  // Registry edits are not switches.
+  expect(labels(el, 'search')).toEqual(['workspace A private search']);
+  clear(el); await search(el, 'workspace A pending');
+  rows = [row('stale workspace A')]; holdLists = true; const pending = loadConversations();
+  await settle(el); const oldLists = heldLists.splice(0);
+  holdSearches = true; await search(el, 'late workspace search');
+  await activateProfile('workspace-b'); await activateProfile('workspace-a'); await settle(el);
+  expect(getWorkspaceProfileId()).toBe('workspace-a');
+  oldLists.forEach(release => release()); await pending; await settle(el);
+  expect(getConversationListState().conversations.map(c => c.id)).not.toContain('stale workspace A');
+  holdLists = false; rows = [row('fresh workspace')]; await loadConversations();
+  heldLists.splice(0).forEach(release => release()); await pending;
+  holdSearches = false; heldSearches.splice(0).forEach(release => release()); await settle(el); await focusEmpty(el);
+  expect(labels(el, 'search')).toEqual([]);
+  expect(labels(el, 'conversation')).toEqual(['fresh workspace']);
+  expect(getSearchState().query).toBe('');
+});
+
 it('Y6 observed lock hides cached optimistic and legacy labels and pre-lock responses until unlock refresh', async () => {
   localStorage.setItem('jf-conversation-titles', JSON.stringify({ legacy: 'Legacy secret' }));
   rows = [row('named', 100, 'Secret'), row('legacy', 99, null), row('untitled', 98, null)];
@@ -220,6 +245,25 @@ it('Y7 exposes a named list and active descendant in hero, docked and narrow the
     const id = field(el).getAttribute('aria-activedescendant'); expect(composer(el).shadowRoot!.getElementById(id!)?.textContent).toContain('readable');
     expect(list(el)!.querySelector('[role=listbox]')?.getAttribute('aria-labelledby')).toBe('sv3-recent-heading');
   }
+});
+
+it('R1a keyboard selection scrolls the Recent list without scrolling workspace ancestors', async () => {
+  rows = Array.from({ length: 5 }, (_, i) => row(`conversation-${i}`));
+  const el = await mount();
+  for (let i = 0; i < 8; i++) await search(el, `search-${i}`);
+  await focusEmpty(el);
+  const scroller = list(el)!.querySelector<HTMLElement>('[role=listbox]')!;
+  vi.spyOn(scroller, 'getBoundingClientRect').mockImplementation(() => ({ top: 100, bottom: 150 }) as DOMRect);
+  for (const [index, option] of options(el).entries()) {
+    vi.spyOn(option, 'getBoundingClientRect').mockImplementation(() => ({
+      top: 100 + index * 25 - scroller.scrollTop, bottom: 125 + index * 25 - scroller.scrollTop,
+    }) as DOMRect);
+  }
+  for (let i = 0; i < 13; i++) await key(el, 'ArrowDown');
+  expect(scroller.scrollTop).toBe(275);
+  expect(options(el)[12]!.getAttribute('aria-selected')).toBe('true');
+  await key(el, 'ArrowDown'); expect(scroller.scrollTop).toBe(0);
+  expect(el.shadowRoot!.querySelector('.column')!.scrollTop).toBe(0);
 });
 
 it('Y8 keeps saved conversations and historical SEARCH readable without writing events', async () => {

@@ -40,6 +40,70 @@ class AppNotMountedError(Exception):
     """The served app never mounted within the deadline. Carries the best-available reason."""
 
 
+async def assert_recents_fit(page, state: str) -> None:
+    """R1a/Y7a: real clipping boxes and every keyboard/pointer-reachable row."""
+    async def fully_visible(locator):
+        return await locator.evaluate("""el => {
+            const r = el.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0 || r.top < -1 || r.bottom > innerHeight + 1) return false;
+            for (let a = el.parentElement ?? el.getRootNode().host; a;
+                 a = a.parentElement ?? a.getRootNode().host) {
+                const c = getComputedStyle(a), b = a.getBoundingClientRect();
+                if (['hidden','clip','auto','scroll'].includes(c.overflowY) &&
+                    (r.top < b.top - 1 || r.bottom > b.bottom + 1)) return false;
+            }
+            return true;
+        }""")
+
+    recent = page.locator('[data-testid="sv3-recents"]')
+    for selector in ['[data-testid="sv3-composer-shell"]', '[data-testid="sv3-recent-clear"]'] + (
+            ['[data-testid="sv3-composer-headline"]'] if state == 'hero' else []):
+        assert await fully_visible(page.locator(selector)), f"R1a/Y7a clipped heading/bar/control: {selector}"
+    assert await fully_visible(recent), "R1a/Y7a Recent extends outside its clipping column"
+    options = recent.locator('[role="option"]')
+    assert await options.count() == 13, "R1a/Y7a requires all eight searches and five conversations"
+    field = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
+    for index in range(13):
+        await field.press('ArrowDown')
+        selected = recent.locator('[aria-selected="true"]')
+        await selected.wait_for(state='visible')
+        assert await selected.get_attribute('id') == f'sv3-recent-{index}'
+        assert await fully_visible(selected), f"R1a/Y7a keyboard row {index} clipped/unreachable"
+    original_viewport = page.viewport_size
+    alternate = {"width": 600, "height": 400} if original_viewport['height'] > 400 else {"width": 1280, "height": 720}
+    for viewport in (alternate, original_viewport):
+        await page.set_viewport_size(viewport)
+        await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+        # Resizing crosses the existing animated sidebar breakpoint. Judge the settled
+        # layout after its finite transitions, then let ResizeObserver publish geometry.
+        await page.evaluate("""async () => {
+            await Promise.all(document.getAnimations().filter(a =>
+                a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        }""")
+        await page.locator('jf-sv3-sidebar').first.evaluate("""async el => {
+            await Promise.all(el.getAnimations().map(a => a.finished.catch(() => {})));
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        }""")
+        assert await fully_visible(selected), "R1a/Y7a resizing hides the active option"
+    # Pointer scrolling must work without asking Playwright to auto-scroll the target row.
+    await recent.locator('[role="listbox"]').evaluate('el => { el.scrollTop = 0; }')
+    await recent.hover()
+    await page.mouse.wheel(0, 10000)
+    await page.wait_for_timeout(100)
+    assert await fully_visible(options.last), "R1a/Y7a last row unreachable by pointer"
+    extra_scrollers = await recent.evaluate("""el => {
+        let count = 0;
+        for (let a = el.parentElement ?? el.getRootNode().host; a;
+             a = a.parentElement ?? a.getRootNode().host) {
+            const c = getComputedStyle(a);
+            if (['auto','scroll'].includes(c.overflowY) && a.scrollHeight > a.clientHeight + 1) count++;
+        }
+        return count;
+    }""")
+    assert extra_scrollers == 0, "R1a/Y7a added a scroller outside Recent"
+
+
 async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
     """Block until the app shell has mounted (rail button visible), else raise
     AppNotMountedError with the best-available reason (Vite stderr tail / error-overlay
@@ -1277,7 +1341,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.keyboard.press("Tab")
         await _settle_focus_marks(page)
 
-    def setup_sv3_recents(state, narrow):
+    def setup_sv3_recents(state, narrow, viewport=None):
         async def setup(page):
             # A full list: eight accepted explicit searches and five saved conversations.
             async def conversations(route):
@@ -1288,7 +1352,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                                   "shapeId": "core.rag-ask", "messageCount": 2} for i in range(5)]
                 }))
             await page.route("**/api/chat/conversations?limit=20", conversations)
-            await page.set_viewport_size({"width": 760 if narrow else 1280, "height": 800})
+            await page.set_viewport_size(viewport or {"width": 760 if narrow else 1280, "height": 800})
             await _open_sv3_window(page)
             field = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
             for query in ["notes", "budget", "title:report", '"exact phrase"', "Ada", "forecast", "plan", "latest"]:
@@ -1304,7 +1368,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await field.blur()
             await field.focus()
             await page.locator('[data-testid="sv3-recents"] [role="option"]').nth(12).wait_for(state="visible")
-            await field.press("ArrowDown")
+            if viewport is not None:
+                await assert_recents_fit(page, state)
+            else:
+                await field.press("ArrowDown")
             if await page.evaluate("matchMedia('(forced-colors: active)').matches"):
                 selected = page.locator('[data-testid="sv3-recents"] [aria-selected="true"]')
                 assert await selected.evaluate("el => getComputedStyle(el).forcedColorAdjust") == "none"
@@ -2023,6 +2090,12 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                color_scheme="light" if theme == "light" else "dark",
                forced_colors="active" if theme == "forced" else None)
           for state in ("hero", "docked") for width in ("normal", "narrow")
+          for theme in ("dark", "light", "forced")],
+        *[Step(f"sv3-recents-{state}-{width}x{height}-{theme}",
+               setup=setup_sv3_recents(state, False, {"width": width, "height": height}), isolated=True,
+               color_scheme="light" if theme == "light" else "dark",
+               forced_colors="active" if theme == "forced" else None)
+          for state in ("hero", "docked") for width, height in ((1280, 720), (760, 720), (600, 400))
           for theme in ("dark", "light", "forced")],
         Step("sv3-search-results", setup=setup_sv3_search_results, isolated=True,
              fixtures_variant="sv3-results"),

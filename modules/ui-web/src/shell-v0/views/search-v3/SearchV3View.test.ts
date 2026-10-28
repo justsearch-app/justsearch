@@ -634,7 +634,7 @@ describe('the window never scrolls; one inner region does', () => {
     }
   });
 
-  it('keeps the ONE transcript scroller and only the bounded recovery data row may scroll separately', async () => {
+  it('keeps one transcript scroller and bounds separate recovery data and Recent contents', async () => {
     localStorage.setItem('justsearch.draft.search-v3.composer', 'Recover this draft');
     const el = await mount();
     const main = await region(el, 'jf-sv3-main');
@@ -642,10 +642,17 @@ describe('the window never scrolls; one inner region does', () => {
     expect(scroller).toBeTruthy();
     expect(scroller?.classList.contains('sv3-scroller')).toBe(true);
 
-    // Native schema text and recovery data own only their bounded contents, never the transcript.
+    // Native schema text, recovery data and Recent own only their bounded contents, never the transcript.
     const schemaRule = own(Sv3Composer).match(/:host \.schema-field \[id='sv3-schema'\]\s*\{[^}]*\}/)?.[0];
     expect(schemaRule).toContain('max-block-size: 8rem');
     expect(schemaRule).toContain('overflow: auto');
+    const recentRules = own(Sv3Composer).match(/\.recents \[role="listbox"\]\s*\{[^}]*\}/g) ?? [];
+    expect(recentRules).toHaveLength(1);
+    const recentRule = recentRules[0]!;
+    expect(recentRule).toContain('min-block-size: 0');
+    expect(recentRule).toContain('overflow-y: auto');
+    expect(recentRule).toContain('overscroll-behavior: contain');
+    expect(own(Sv3Composer)).toMatch(/\.band:has\(\.recents\)\s*\{[^}]*max-block-size: 100%/);
     const recoveryRules = own(SearchV3View).match(/^\s*\.column > \.recovery-notice\s*\{[^}]*\}/gm) ?? [];
     expect(recoveryRules).toHaveLength(1);
     const recoveryRule = recoveryRules[0]!;
@@ -663,7 +670,8 @@ describe('the window never scrolls; one inner region does', () => {
     expect(el.shadowRoot!.querySelector('.dock')?.contains(recovery)).toBe(false);
     for (const ctor of [SearchV3View, Sv3Sidebar, Sv3Topbar, Sv3Composer]) {
       const styles = own(ctor).replace(ctor === Sv3Composer ? schemaRule ?? '' : '', '')
-        .replace(ctor === SearchV3View ? recoveryRule : '', '');
+        .replace(ctor === SearchV3View ? recoveryRule : '', '')
+        .replace(ctor === Sv3Composer ? recentRule : '', '');
       expect(styles).not.toContain('overflow-y: auto');
       expect(styles).not.toContain('overflow: auto');
       expect(styles).not.toContain('overflow: scroll');
