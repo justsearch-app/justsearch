@@ -180,11 +180,12 @@ longer sufficient evidence that the index has no record.
   "entries": [
     {
       "items": [
-        "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability.test.ts"
+        "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability.test.ts",
+        "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability-lockdown.test.ts"
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "A focused confirmed-absent source button exposes No longer available through its explicit name or description and keeps one polite status node. Present and unknown sources keep the same explicit name and description. All prior availability assertions remain intact.",
+      "behaviour": "Real Chromium computes the focused source button's accessible name and description before and after the presence response. Confirmed absence exposes No longer available in that name or description and changes one polite status node once, with no repeat on a later render. Present and unknown sources keep the same browser-computed name and description and an empty status. The happy-dom test retains its status and other availability assertions without approximating accessible names or descriptions.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -197,7 +198,7 @@ longer sufficient evidence that the index has no record.
       ],
       "evidence": "gates/test-intent/evidence/source-no-longer-held/ui-accessibility.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability.test.ts"
+        "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability-lockdown.test.ts"
       ]
     },
     {

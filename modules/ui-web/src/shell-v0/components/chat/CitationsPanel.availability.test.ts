@@ -24,31 +24,16 @@ async function mount(ids = ['/docs/held.md', '/docs/gone.md'], observe = true) {
 }
 const cards = (el: CitationsPanel) => [...el.renderRoot.querySelectorAll('.source-card')];
 const response = (states: Record<string, string>) => new Response(JSON.stringify({ states }));
-// The button's explicit name and description, which a screen reader announces on focus. The name
-// computed from content is left out: happy-dom cannot compute it, and real Chromium did not announce
-// the inner status text on focus (WP5.8 verifier 1).
-function nameAndDescription(button: Element) {
-  const root = button.getRootNode() as Document | ShadowRoot;
-  const referenced = (attribute: string) => (button.getAttribute(attribute) ?? '').split(/\s+/).filter(Boolean)
-    .map(id => root.getElementById(id)?.textContent ?? '');
-  const labelledBy = referenced('aria-labelledby');
-  const name = labelledBy.length ? labelledBy.join(' ') : button.getAttribute('aria-label') ?? '';
-  return [name, button.getAttribute('aria-description') ?? '', ...referenced('aria-describedby')]
-    .map(part => part.replace(/\s+/g, ' ').trim()).join(' | ');
-}
 afterEach(() => { document.body.replaceChildren(); vi.resetAllMocks(); });
 describe('WP5.8 source availability', () => {
-  it.each(['present', 'unknown', 'absent'])('includes only confirmed absence in the source button name or description (%s)', async (state) => {
+  it.each(['present', 'unknown', 'absent'])('keeps one polite status node for source availability (%s)', async (state) => {
     let release!: (value: Response) => void;
     fetchPresence.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
     const el = await mount(['/docs/source.md']);
     const button = cards(el)[0]!.querySelector('button.source')!;
-    const original = nameAndDescription(button);
     const status = button.querySelector('[role="status"]')!;
     release(response({ '/docs/source.md': state }));
     await settle(el);
-    if (state === 'absent') expect(nameAndDescription(button)).toContain('No longer available');
-    else expect(nameAndDescription(button)).toBe(original);
     expect(button.querySelectorAll('[role="status"]')).toHaveLength(1);
     expect(button.querySelector('[role="status"]')).toBe(status);
     expect(status.getAttribute('aria-live')).toBe('polite');
