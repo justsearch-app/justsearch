@@ -52,6 +52,14 @@ test('v2 rejects tampered bytes and the wrong metadata root', async () => {
   await assert.rejects(verifyReleaseAssets(f), /metadata signature verification failed/);
 });
 
+for (const [field, value] of [['artifactKeyId', 'wrong-artifact-id'], ['artifactPublicKey', 'wrong-artifact-key']]) {
+  test(`v2 verification rejects a descriptor using a different compiled ${field}`, async () => {
+    const f = await fixture();
+    f.targets['linux-x86_64'][field] = value;
+    await assert.rejects(verifyReleaseAssets(f), /artifact signing key does not match the compiled key/);
+  });
+}
+
 test('v2 producer refuses a mismatched artifact signature, missing signing input and qualification mode', async () => {
   const f = await fixture();
   await writeFile(f.targets['linux-x86_64'].artifactSignaturePath,

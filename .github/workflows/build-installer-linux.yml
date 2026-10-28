@@ -2,6 +2,10 @@ name: Build Linux Installer
 
 on:
   workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
   workflow_dispatch:
   pull_request:
     paths:
@@ -16,9 +20,28 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
+env:
+  JUSTSEARCH_RELEASE_DESCRIPTOR_URL: https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json
+  JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY }}
+  JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID }}
+  JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY }}
+  JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID }}
 jobs:
+  cached:
+    runs-on: ubuntu-24.04
+    outputs:
+      exists: ${{ steps.cache.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/packaging-smoke.mjs cached linux-installer-${{ github.run_id }}
   build-linux-installer:
+    needs: cached
+    if: needs.cached.outputs.exists != 'true'
     name: Ubuntu 24.04 Debian package
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -42,7 +65,14 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf build-essential binutils libssl-dev pkg-config
+      - name: Test pins for unsigned packaging smoke
+        if: ${{ !inputs.release }}
+        run: node scripts/ci/packaging-smoke.mjs pins
       - name: Build and audit Debian package
+        env:
+          JUSTSEARCH_SIGN_UPDATER: ${{ inputs.release && '1' || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY_PASSWORD }}
         run: bash scripts/ci/package-installer-linux.sh
       - name: Check packaging scripts
         run: |
@@ -50,11 +80,16 @@ jobs:
           node --test scripts/ci/sync-version.test.mjs
       - name: Check MCPB consistency
         run: node scripts/ci/check-mcpb-consistency.mjs
-      - name: Upload package and audit
-        if: always()
+      - name: Install and smoke the Debian package
+        run: |
+          packages=(dist/installer-linux/*.deb)
+          test "${#packages[@]}" = 1
+          sudo apt-get install --no-install-recommends -y "./${packages[0]}"
+          python3 scripts/ci/verify-installer-linux.py "${packages[0]}" --evidence dist/installer-linux/smoke-linux.json
+      - name: Upload package, audit and successful packaged smoke
         uses: actions/upload-artifact@v7
         with:
-          name: linux-installer
+          name: linux-installer-${{ github.run_id }}
           path: dist/installer-linux/*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14

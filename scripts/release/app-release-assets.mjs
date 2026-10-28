@@ -245,6 +245,10 @@ export async function verifyReleaseAssets(options) {
       || artifact?.size !== installer.length) {
       throw new Error('installer digest or size does not match release descriptor');
     }
+    if ((input.artifactKeyId != null && artifact.keyId !== input.artifactKeyId)
+      || (input.artifactPublicKey != null && artifact.publicKey !== input.artifactPublicKey.trim())) {
+      throw new Error('artifact signing key does not match the compiled key');
+    }
     verifyTauriArtifactSignature(installer, artifactSignature, artifact.publicKey);
     const platform = latest.platforms[target];
     if (descriptor.version !== latest.version || artifact.url !== platform.url

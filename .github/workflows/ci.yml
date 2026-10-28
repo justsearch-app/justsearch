@@ -254,7 +254,7 @@ jobs:
         run: node scripts/ci/check-ui-step-coverage.mjs
 
       - name: Release asset compatibility tests
-        run: node --test scripts/release/app-release-assets.test.mjs scripts/release/updater-v2.test.mjs scripts/ci/derive-release-sequence-v2.test.mjs
+        run: node --test scripts/release/app-release-assets.test.mjs scripts/release/updater-v2.test.mjs scripts/release/release-candidate.test.mjs scripts/ci/packaging-smoke.test.mjs scripts/ci/derive-release-sequence-v2.test.mjs
 
       - name: Test module dependencies, logging, prerequisites and ORT native assets
         run: >-

@@ -19,7 +19,7 @@ export CARGO_TARGET_DIR="$PWD/modules/shell/src-tauri/target"
 bundle_dir=modules/shell/src-tauri/target/release/bundle/deb
 rm -rf "$bundle_dir"
 mkdir -p dist/installer-linux
-rm -f dist/installer-linux/*.deb dist/installer-linux/elf-audit.json
+rm -f dist/installer-linux/*.deb dist/installer-linux/*.deb.sig dist/installer-linux/elf-audit.json
 npm --prefix modules/shell run tauri -- build --config src-tauri/tauri.linux.conf.json --ci
 shopt -s nullglob
 packages=("$bundle_dir"/*.deb)
@@ -30,3 +30,12 @@ package="dist/installer-linux/$(basename "${packages[0]}")"
 dpkg-deb --info "$package"
 stat --format='%n: %s bytes' "$package"
 sha256sum "$package"
+# Debian updater artifacts use the same Tauri/Minisign key as Windows. A .deb is
+# not one of Tauri's automatic updater bundles, so sign the exact copied bytes.
+if [[ ${JUSTSEARCH_SIGN_UPDATER:-} == 1 ]]; then
+  : "${TAURI_SIGNING_PRIVATE_KEY:?TAURI_SIGNING_PRIVATE_KEY is required}"
+  npm --prefix modules/shell run tauri -- signer sign \
+    --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
+    --password "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" "$PWD/$package"
+  [[ -s "$package.sig" ]] || { echo 'Missing Debian updater signature' >&2; exit 1; }
+fi
