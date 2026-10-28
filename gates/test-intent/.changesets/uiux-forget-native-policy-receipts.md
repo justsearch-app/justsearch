@@ -84,3 +84,16 @@ Agent-adopted under the owner’s design delegation. Named portable component ev
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18082-5046-72e3-af24-c3e868091c78",
+  "verdict": "accept",
+  "digest": "sha256:30395daf3892967130ccd01ccc34e8850b1d0e51fe0dd5da3b37829e78865284",
+  "note": "Separate Codex acceptor on fd4239f034: signature adaptation preserves the oracle; both New entries have valid evidence matching current source; 24 watcher cases need a real volume (passed 39/39 on the host's ext4)"
+}
+```
