@@ -1082,6 +1082,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 start_phase = "ready";
                 publish!(None);
                 supervisor.observe(Event::Ready, None);
+                locked_retry = false;
                 incarnation_running = true;
                 not_ready_since = Some(actuator.monotonic_ms());
                 next_health_poll =

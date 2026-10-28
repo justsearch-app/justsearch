@@ -7,6 +7,7 @@ import io.justsearch.app.api.runtime.RuntimeManifest;
 import io.justsearch.app.api.runtime.RuntimeManifestBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestHeadInfoBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestWorkerInfoBuilder;
+import io.justsearch.app.api.runtime.child.LedgerReconciler;
 import io.justsearch.app.api.runtime.containment.EngineContainment;
 import io.justsearch.app.services.lifecycle.LifecycleProjection;
 import io.justsearch.core.component.EngineComponentSnapshot;
@@ -171,7 +172,16 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
                     .orElse(OptionalLong.empty()));
     this.uncleanPreviousShutdown = previous.unclean();
     this.previousInstancePid = previous.pid();
-    this.childRegistry.seed(readPredecessorChildren(manifestPath, mapper));
+    List<ManagedChild> predecessors = new ArrayList<>(readPredecessorChildren(manifestPath, mapper));
+    try {
+      for (ManagedChild child : LedgerReconciler.predecessorChildren(dataDir)) {
+        if (predecessors.stream().noneMatch(existing -> existing.pid() == child.pid()
+            && existing.startedAt().equals(child.startedAt()))) predecessors.add(child);
+      }
+    } catch (IOException failure) {
+      throw new IllegalStateException("PREDECESSOR_LEDGER_UNREADABLE", failure);
+    }
+    this.childRegistry.seed(predecessors);
     this.childRegistry.installWriter(this::publishChildren);
     if (previous.unclean()) {
       log.info(
@@ -193,17 +203,39 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     try {
       if (!Files.isRegularFile(path)) return List.of();
       JsonNode root = mapper.readTree(Files.readString(path));
-      int version = root.path("schemaVersion").asInt(1);
+      if (root == null || !root.isObject()) {
+        throw new IllegalStateException("PREDECESSOR_MANIFEST_MALFORMED: expected an object");
+      }
+      JsonNode schema = root.get("schemaVersion");
+      if (schema != null && (!schema.isIntegralNumber() || !schema.canConvertToInt()
+          || schema.asInt() < 1)) {
+        throw new IllegalStateException("PREDECESSOR_MANIFEST_MALFORMED: invalid schemaVersion");
+      }
+      int version = schema == null ? 1 : schema.asInt();
       if (version > RuntimeManifest.CURRENT_SCHEMA_VERSION) {
-        throw new IllegalStateException("runtime manifest schema " + version + " is from a future release");
+        throw new IllegalStateException("PREDECESSOR_MANIFEST_FUTURE_SCHEMA: " + version);
       }
       JsonNode children = root.get("children");
-      if (children == null || !children.isArray()) return List.of();
+      if (children == null && version == 1) return List.of();
+      if (children == null || !children.isArray()) {
+        throw new IllegalStateException("PREDECESSOR_MANIFEST_INVALID_CHILDREN: expected an array");
+      }
       List<ManagedChild> records = new ArrayList<>();
-      for (JsonNode child : children) records.add(mapper.treeToValue(child, ManagedChild.class));
+      for (JsonNode child : children) {
+        try {
+          ManagedChild record = mapper.treeToValue(child, ManagedChild.class);
+          if (record == null || !Path.of(record.executable()).isAbsolute()) {
+            throw new IllegalArgumentException("child executable must be absolute");
+          }
+          java.time.format.DateTimeFormatter.ISO_INSTANT.parse(record.startedAt());
+          records.add(record);
+        } catch (RuntimeException invalid) {
+          throw new IllegalStateException("PREDECESSOR_MANIFEST_INVALID_CHILDREN", invalid);
+        }
+      }
       return List.copyOf(records);
-    } catch (IOException e) {
-      throw new UncheckedIOException("could not read predecessor managed-child ownership", e);
+    } catch (IOException | tools.jackson.core.JacksonException e) {
+      throw new IllegalStateException("PREDECESSOR_MANIFEST_MALFORMED: cannot read ownership", e);
     }
   }
 
@@ -265,19 +297,27 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
       }
       OptionalLong liveStart = pidStartMillis.apply(leftoverPid);
       if (liveStart.isEmpty()) {
-        return new PreviousShutdown(true, OptionalLong.of(leftoverPid)); // PID dead → predecessor crashed
+        return predecessorVerdict(root, leftoverPid);
       }
       // PID alive: only a *reused* PID means the predecessor is gone — compare start instants.
       OptionalLong manifestStart = parseEpochMillis(root.get("startedAt"));
       if (manifestStart.isPresent()
           && Math.abs(liveStart.getAsLong() - manifestStart.getAsLong()) > 1000L) {
-        return new PreviousShutdown(true, OptionalLong.of(leftoverPid)); // PID recycled → crashed
+        return predecessorVerdict(root, leftoverPid);
       }
       return PreviousShutdown.clean(); // same live process (shouldn't outlive the lock) — no false alarm
     } catch (Exception e) {
       log.debug("Previous-shutdown classification failed (treating as clean): {}", e.getMessage());
       return PreviousShutdown.clean();
     }
+  }
+
+  private static PreviousShutdown predecessorVerdict(JsonNode root, long predecessorPid) {
+    if ("ready".equals(root.path("shutdownHandoff").path("state").asText())
+        && root.path("children").isArray() && root.path("children").isEmpty()) {
+      return PreviousShutdown.clean();
+    }
+    return new PreviousShutdown(true, OptionalLong.of(predecessorPid));
   }
 
   private static OptionalLong parseEpochMillis(JsonNode node) {
@@ -867,10 +907,13 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     }
     appendStartLog("publisher-close (clean shutdown)");
     RuntimeManifest manifest = current.get();
+    // Construction does not transfer ownership. Boot failure/quit before the first publication
+    // must preserve the predecessor exactly as it was found.
+    if (manifest == null) return;
     if (closeDisposition == CloseDisposition.PENDING
         || closeDisposition == CloseDisposition.RETAIN
         || !children.isEmpty()
-        || (manifest != null && manifest.children() != null && !manifest.children().isEmpty())) {
+        || (manifest.children() != null && !manifest.children().isEmpty())) {
       return;
     }
     try {

@@ -84,10 +84,10 @@ export async function watchSupervisor({ statePath, predicate, timeoutMs, io, see
       if (state) {
         const key = `${state.state}:${state.incarnation}:${state.reason ?? ''}${state.phase ? `:${state.phase}` : ''}`;
         if (!seen.has(key)) seen.set(key, state);
-        // Lifecycle cases may wait for a later incarnation. They still witness the first RUNNING
-        // identity on the way there, so release its fixture fault just as the actuator cases do.
-        if (faultGatePath && state.state === 'running' && state.incarnation === 1
-            && !fs.existsSync(faultGatePath)) {
+        // Lifecycle cases may wait for a later incarnation. Witness each RUNNING identity so
+        // explicitly gated recovery faults can wait for that incarnation's readiness as well.
+        if (faultGatePath && state.state === 'running'
+            && io.readJsonIfPresent(faultGatePath)?.incarnation !== state.incarnation) {
           fs.writeFileSync(faultGatePath, JSON.stringify({
             pid: state.pid, instanceId: state.instanceId, incarnation: state.incarnation,
           }));

@@ -578,6 +578,7 @@ function createSupervisionLoop({
   const enterRunning = async () => {
     const action = decide({ event: 'ready', state: STATES.STARTING }, policy);
     if (action.action !== ACTIONS.ENTER_RUNNING) return;
+    lockedRetried = false;
     s.readyAt = new Date(wallClock()).toISOString();
     s.runningSince = clockNow();
     s.notReadySince = s.runningSince;

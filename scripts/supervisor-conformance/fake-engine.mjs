@@ -445,18 +445,19 @@ function start() {
     }
 
     // An adapter may require a witnessed RUNNING state before injecting the first fault. This is
-    // fixture control only: no subject code reads the gate, and subsequent boot failures keep their
-    // original timing. Identity prevents a stale or unrelated acknowledgment from releasing it.
+    // fixture control only: no subject code reads the gate. Later ready incarnations can opt in;
+    // boot failures keep their original timing. Identity rejects stale or unrelated acknowledgments.
     const gatePath = env.JUSTSEARCH_FAKE_ENGINE_FAULT_GATE;
-    if (!gatePath || behaviour.incarnation !== 1) {
+    if (!gatePath || (behaviour.incarnation !== 1 && !behaviour.waitForRunning)) {
       armFaults();
     } else {
       const gateTimer = setInterval(() => {
         let gate;
         try { gate = JSON.parse(fs.readFileSync(gatePath, 'utf8')); } catch { return; }
-        if (gate.pid !== process.pid || gate.instanceId !== instanceId || gate.incarnation !== 1) return;
+        if (gate.pid !== process.pid || gate.instanceId !== instanceId
+            || gate.incarnation !== behaviour.incarnation) return;
         clearInterval(gateTimer);
-        log('first-incarnation fault gate released after adapter observed running');
+        log(`${behaviour.incarnation === 1 ? 'first-incarnation' : 'incarnation'} fault gate released after adapter observed running`);
         armFaults();
       }, 25);
     }
