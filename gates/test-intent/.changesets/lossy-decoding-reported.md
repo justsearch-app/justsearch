@@ -37,7 +37,7 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
           "delegationQuote": "proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
           "delegationLocation": "task t-20261026-8f2d61 request",
           "delegationScope": "Investigate, design and implement text extraction decoding fixes and their regression safeguards.",
-          "choice": "Audit the complete prepared snapshot strictly with fixed-size decoder buffers and the content encoding reported by the actual whole-file text parser (explicit allowlist), after structured or flat extraction. Carry one decoding-loss warning in the existing artifact/sandbox warnings transport; classify nonblank lossy or truncated content as partial, keep blank output empty, derive independent loss-only/combined/truncation-only reasons for documents and ledger groups while preserving document dropout overrides, retry/recovery and historical data. Add the two readable summary labels. Move all extraction policy id forms from v3 to v4 without automatic re-extraction.",
+          "choice": "Audit the complete prepared snapshot strictly with fixed-size decoder buffers and the content encoding reported by the actual whole-file text parser (explicit allowlist), after structured or flat extraction. Carry one decoding-loss warning in the existing artifact/sandbox warnings transport; classify nonblank lossy or truncated content as partial, keep blank output empty, derive independent loss-only/combined/truncation-only reasons for documents and ledger groups while preserving document dropout overrides, retry/recovery and historical data. Add the two readable summary labels. Move all extraction policy id forms from v6 to v7 without automatic re-extraction.",
           "label": "agent choice"
         }
       ],
@@ -99,7 +99,8 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DecodingLossJournalTest.java#mixedPartialReasonsSurviveIndividualRetryAndReopen",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DecodingLossJournalTest.java#mixedPartialReasonsSurviveAbandonedClaimRecovery",
         "modules/ui-web/src/shell-v0/components/IngestionSummary.test.ts#distinguishes decoding loss from truncation in the rendered summary",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#pdfNamedTextIsAuditedByTextParser"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#pdfNamedTextIsAuditedByTextParser",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#malformedUtf8AfterLongAsciiStartKeepsLegacyAudit"
       ],
       "repaired": true
     },
@@ -122,7 +123,7 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
           "delegationQuote": "proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
           "delegationLocation": "task t-20261026-8f2d61 request",
           "delegationScope": "Investigate, design and implement text extraction decoding fixes and their regression safeguards.",
-          "choice": "Audit the complete prepared snapshot strictly with fixed-size decoder buffers and the content encoding reported by the actual whole-file text parser (explicit allowlist), after structured or flat extraction. Carry one decoding-loss warning in the existing artifact/sandbox warnings transport; classify nonblank lossy or truncated content as partial, keep blank output empty, derive independent loss-only/combined/truncation-only reasons for documents and ledger groups while preserving document dropout overrides, retry/recovery and historical data. Add the two readable summary labels. Move all extraction policy id forms from v3 to v4 without automatic re-extraction.",
+          "choice": "Audit the complete prepared snapshot strictly with fixed-size decoder buffers and the content encoding reported by the actual whole-file text parser (explicit allowlist), after structured or flat extraction. Carry one decoding-loss warning in the existing artifact/sandbox warnings transport; classify nonblank lossy or truncated content as partial, keep blank output empty, derive independent loss-only/combined/truncation-only reasons for documents and ledger groups while preserving document dropout overrides, retry/recovery and historical data. Add the two readable summary labels. Move all extraction policy id forms from v6 to v7 without automatic re-extraction.",
           "label": "agent choice"
         }
       ],
@@ -168,7 +169,9 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#samePdfNamedPdfIsNotAudited",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#cleanAsciiAuditIsNotLossy",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validUtf8AcrossAuditBufferInMemory",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validUtf8AcrossAuditBufferSpilled"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validUtf8AcrossAuditBufferSpilled",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8WithoutBomAfterLongAsciiStartIsClean",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#asciiFirstFlatFallbackRetainsSnapshotFactAndIsClean"
       ],
       "repaired": false
     },
@@ -179,10 +182,15 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java",
         "modules/worker-services/src/test/resources/fixtures/format-capability/expected-state.v1.json",
-        "modules/worker-services/src/testFixtures/java/io/justsearch/indexerworker/fixtures/FormatCapabilityExpectedState.java"
+        "modules/worker-services/src/testFixtures/java/io/justsearch/indexerworker/fixtures/FormatCapabilityExpectedState.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PolicyTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Utf8QueuedRestartTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java"
       ],
       "class": "New",
-      "behaviour": "I1: default and blank fallback ids are tika-default-v4, configured limits are tika-config-v4-<chars>-<bytes>. Existing expectations change only those id strings; all extraction, limits, routing, sandbox and format fixture oracles remain unchanged. Three plain identity checks pin all forms; no migration or re-extraction is introduced. The classifier seam law now includes decoding loss.",
+      "behaviour": "I1: default and blank fallback ids are tika-default-v7, configured limits are tika-config-v7-<chars>-<bytes>. Existing expectations change only those id strings; all extraction, limits, routing, sandbox and format fixture oracles remain unchanged. Three plain identity checks pin all forms; no migration or re-extraction is introduced. The classifier seam law now includes decoding loss.",
       "sources": [
         {
           "kind": "defect-source",
@@ -194,7 +202,7 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
           "delegationQuote": "proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
           "delegationLocation": "task t-20261026-8f2d61 request",
           "delegationScope": "Investigate, design and implement text extraction decoding fixes and their regression safeguards.",
-          "choice": "Audit the complete prepared snapshot strictly with fixed-size decoder buffers and the content encoding reported by the actual whole-file text parser (explicit allowlist), after structured or flat extraction. Carry one decoding-loss warning in the existing artifact/sandbox warnings transport; classify nonblank lossy or truncated content as partial, keep blank output empty, derive independent loss-only/combined/truncation-only reasons for documents and ledger groups while preserving document dropout overrides, retry/recovery and historical data. Add the two readable summary labels. Move all extraction policy id forms from v3 to v4 without automatic re-extraction.",
+          "choice": "Audit the complete prepared snapshot strictly with fixed-size decoder buffers and the content encoding reported by the actual whole-file text parser (explicit allowlist), after structured or flat extraction. Carry one decoding-loss warning in the existing artifact/sandbox warnings transport; classify nonblank lossy or truncated content as partial, keep blank output empty, derive independent loss-only/combined/truncation-only reasons for documents and ledger groups while preserving document dropout overrides, retry/recovery and historical data. Add the two readable summary labels. Move all extraction policy id forms from v6 to v7 without automatic re-extraction.",
           "label": "agent choice"
         }
       ],
@@ -202,9 +210,9 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java#modeSwitchSelectsTheSandbox",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java#realChildExtractsFileContent",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#defaultPolicyIdentityIsV4",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#blankPolicyIdentityFallsBackToV4",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#configuredPolicyIdentityIsV4"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#defaultPolicyIdentityIsV7",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#blankPolicyIdentityFallsBackToV7",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#configuredPolicyIdentityIsV7"
       ],
       "repaired": true
     }
