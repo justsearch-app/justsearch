@@ -472,7 +472,7 @@ class StatusIsolationHttpTest {
       var healthy = get(f, "");
       assertEquals(clock.get(), healthy.path("meta").path("workerRpcAtMs").asLong());
       assertEquals(10L, healthy.path("worker").path("core").path("indexedDocuments").asLong());
-      VerifierStatusIsolationTest.assertWorkerTimes(healthy, clock.get(), false, projectionStartedMs,
+      StatusIsolationFixtureSupport.assertWorkerTimes(healthy, clock.get(), false, projectionStartedMs,
           f.requestStartedMs, f.requestCompletedMs, java.util.Map.of());
       assertFalse(healthy.path("meta").path("workerRpcStale").asBoolean());
       long healthyAt = clock.get();
@@ -495,8 +495,8 @@ class StatusIsolationHttpTest {
         f.drainPublications("worker");
         var stale = get(f, "");
         assertEquals(healthyAt, stale.path("meta").path("workerRpcAtMs").asLong());
-        VerifierStatusIsolationTest.assertWorkerTimes(stale, healthyAt, true, projectionStartedMs,
-            f.requestStartedMs, f.requestCompletedMs, VerifierStatusIsolationTest.contactLaneAges(f.work, clock.get()));
+        StatusIsolationFixtureSupport.assertWorkerTimes(stale, healthyAt, true, projectionStartedMs,
+            f.requestStartedMs, f.requestCompletedMs, StatusIsolationFixtureSupport.contactLaneAges(f.work, clock.get()));
         assertTrue(stale.path("meta").path("workerRpcStale").asBoolean(),
             "recovery must start from a positively observed stale Worker");
       } catch (Exception | Error phaseError) { phaseFailure = phaseError; throw phaseError; } finally {
@@ -520,7 +520,7 @@ class StatusIsolationHttpTest {
       assertTrue(f.calls.get() > oldCalls, "recovery must invoke the source after old work ended");
       assertSame(recoveryInput, f.consumedWorker.get(), "the new invocation consumed exactly Worker11");
       var recovered=get(f, ""); assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
-      VerifierStatusIsolationTest.assertWorkerTimes(recovered, clock.get(), false, projectionStartedMs,
+      StatusIsolationFixtureSupport.assertWorkerTimes(recovered, clock.get(), false, projectionStartedMs,
           f.requestStartedMs, f.requestCompletedMs, java.util.Map.of());
       assertEquals(clock.get(), recovered.path("meta").path("workerRpcAtMs").asLong());
       assertTrue(recovered.path("meta").path("workerRpcAtMs").asLong() > healthyAt);
@@ -539,7 +539,7 @@ class StatusIsolationHttpTest {
         var next = get(f, "");
         newer = next.path("meta").path("workerRpcAtMs").asLong() == freshAt
             && next.path("worker").path("core").path("indexedDocuments").asLong() == 12L;
-        if (newer) VerifierStatusIsolationTest.assertWorkerTimes(next, freshAt, false, freshProjectionStartedMs,
+        if (newer) StatusIsolationFixtureSupport.assertWorkerTimes(next, freshAt, false, freshProjectionStartedMs,
             f.requestStartedMs, f.requestCompletedMs, java.util.Map.of());
       }
       assertTrue(newer,"fresh request must eventually publish the exact new Worker value and source timestamp");
