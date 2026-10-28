@@ -32,9 +32,6 @@ The orchestrator produces D4 execution evidence and obtains independent acceptan
       "repaired": true,
       "evidence": "gates/test-intent/evidence/wp24b-recents.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#/conversations/",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#/",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#/",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y1 opens only for an empty focused Search bar and owns selection and dismiss keys",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y2 records only accepted explicit Search actions with exact dedup and an eight item cap",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts#Y3 replays operators with current restrictions and selects conversations through navigation",
