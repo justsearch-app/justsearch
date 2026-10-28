@@ -69,7 +69,8 @@ def config():
 def owner():
     value = os.environ.get('QUAL_OWNER', '').strip()
     if not value:
-        raise RuntimeError('QUAL_OWNER is required (use the same token for the whole session)')
+        data = read_state()
+        raise RuntimeError(f"QUAL_OWNER is required (VM owner {data.get('owner', 'unknown')}; use the same token for the whole session)")
     return value
 
 
@@ -286,26 +287,43 @@ def launch(os_name, disk, variables, visible=False, installer=None, lease=None):
                      '-append', 'boot=casper autoinstall ds=nocloud console=tty0 console=ttyS0,115200n8 ---']
     else:
         args += ['-boot', 'order=c']
-    with (ROOT / f'{os_name}-qemu.log').open('a') as log:
+    log_path = ROOT / f'{os_name}-qemu.log'
+    with log_path.open('a') as log:
+        log_start = log.tell()
         proc = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                                 start_new_session=True, pass_fds=(lease,))
     data = {'os': os_name, 'owner': token, 'pid': proc.pid, 'start_ticks': identity(proc.pid),
             'disk': str(disk), 'visible': visible, 'installing': bool(installer), 'cpus': cpus}
-    save(STATE, data)
-    deadline = time.monotonic() + 30
-    while time.monotonic() < deadline:
-        if proc.poll() is not None:
-            raise RuntimeError(f'QEMU exited {proc.returncode}: {(ROOT / f"{os_name}-qemu.log").read_text()}')
-        try:
-            with QMP(os_name) as q:
-                q.command('query-status')
-            print(json.dumps(data), flush=True)
-            return data
-        except (OSError, RuntimeError):
-            time.sleep(.25)
-    proc.terminate()
-    proc.wait(timeout=10)
-    raise RuntimeError('QMP did not become ready')
+    try:
+        save(STATE, data)
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if proc.poll() is not None:
+                with log_path.open() as log:
+                    log.seek(log_start)
+                    error = log.read().strip()
+                raise RuntimeError(f'QEMU exited {proc.returncode}: {error}')
+            try:
+                with QMP(os_name) as q:
+                    q.command('query-status')
+                print(json.dumps(data), flush=True)
+                return data
+            except (OSError, RuntimeError):
+                time.sleep(.25)
+        raise RuntimeError('QMP did not become ready')
+    except BaseException:
+        # Reap only this launch's process before releasing its reservation. If it
+        # cannot be stopped, preserve the record and disks for investigation.
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=10)
+        if read_state() == data:
+            STATE.unlink()
+        raise
 
 
 def resources(data):
@@ -384,10 +402,18 @@ def start(os_name, visible=False):
             raise RuntimeError(f'Build {os_name} base first')
         config()
         overlay = folder / 'run.qcow2'
+        variables = folder / 'run-vars.fd'
         overlay.unlink(missing_ok=True)
-        run('qemu-img', 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', folder / 'base.qcow2', overlay)
-        shutil.copyfile(folder / 'base-vars.fd', folder / 'run-vars.fd')
-        return launch(os_name, overlay, folder / 'run-vars.fd', visible, lease=lock.fileno())
+        variables.unlink(missing_ok=True)
+        try:
+            run('qemu-img', 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', folder / 'base.qcow2', overlay)
+            shutil.copyfile(folder / 'base-vars.fd', variables)
+            return launch(os_name, overlay, variables, visible, lease=lock.fileno())
+        except BaseException:
+            if not current():
+                overlay.unlink(missing_ok=True)
+                variables.unlink(missing_ok=True)
+            raise
 
 
 def ssh_args(os_name):
@@ -621,8 +647,14 @@ def prepare_owner(os_name, package=None, corpus=None):
                               visible=True, lease=lock.fileno())
             print(f"Ready for owner {data['owner']}: {os_name}, visible, app not started", flush=True)
             return data
-        except BaseException:
-            stop()
+        except BaseException as exc:
+            # A failed visible relaunch has already cleaned up its own record.
+            # Do not mask its QEMU diagnostic with a second cleanup error.
+            if current():
+                try:
+                    stop()
+                except Exception as cleanup:
+                    exc.add_note(f'Preparation cleanup failed: {cleanup}')
             raise
 
 
@@ -723,14 +755,13 @@ def main():
         with locked('control.lock'):
             prepare_owner(args.os, args.package, args.corpus)
     else:
-        with locked('control.lock'):
-            require_owner(args.os)
-            if args.action == 'ssh':
-                sys.exit(ssh(args.os, args.cmd).returncode)
-            elif args.action == 'copy-in':
-                copy_in(args.os, args.src, args.dst)
-            elif args.action == 'mirror':
-                mirror(args.os, args.folder, args.remove, args.untrusted)
+        require_owner(args.os)
+        if args.action == 'ssh':
+            sys.exit(ssh(args.os, args.cmd).returncode)
+        elif args.action == 'copy-in':
+            copy_in(args.os, args.src, args.dst)
+        elif args.action == 'mirror':
+            mirror(args.os, args.folder, args.remove, args.untrusted)
 
 
 if __name__ == '__main__':

@@ -53,6 +53,80 @@ class HarnessTest(unittest.TestCase):
         with patch.object(vm, 'live_reasons', return_value=[]):
             yield
 
+    def test_owner_commands_work_during_cli_ssh(self):
+        data = self.record(owner='test-owner')
+        folder = screen.queue_path(data)
+        folder.mkdir(parents=True)
+        request = folder / ('a' * 32 + '.request')
+        request.write_text(json.dumps({'owner': 'test-owner', 'action': 'key', 'values': {'combo': 'ret'}}))
+
+        def during_ssh(*args, **kwargs):
+            with patch.object(sys, 'argv', ['screen.py', 'key', 'ubuntu', 'ret']), patch.object(screen, 'QMP'):
+                screen.main()
+            with patch.object(sys, 'argv', ['vm.py', 'copy-in', 'ubuntu', 'source', 'dest']), patch.object(vm, 'copy_in') as copy:
+                vm.main()
+                copy.assert_called_once()
+            with patch.object(vm, 'current', side_effect=[data, data, None]), patch.object(vm, 'live_reasons', return_value=['live']), patch.object(screen, 'require_owner', return_value=data), patch.object(screen, 'QMP'), patch.object(screen.time, 'sleep'):
+                screen.broker('ubuntu')
+            reply = json.loads(request.with_suffix('.reply').read_text())
+            self.assertEqual(reply, {'result': 'ok'})
+            return Mock(returncode=0)
+
+        with patch.object(sys, 'argv', ['vm.py', 'ssh', 'ubuntu', 'sleep 30']), patch.object(vm, 'ssh', side_effect=during_ssh):
+            with self.assertRaises(SystemExit) as exit:
+                vm.main()
+        self.assertEqual(exit.exception.code, 0)
+
+    def test_failed_qemu_cleans_its_record_and_reports_current_error(self):
+        proc = Mock(pid=123, returncode=1)
+        proc.poll.return_value = 1
+        log = self.root / 'ubuntu-qemu.log'
+        log.write_text('OLD unrelated error\n')
+        def spawn(*args, **kwargs):
+            with log.open('a') as output:
+                output.write('gtk initialization failed\n')
+            return proc
+        with self.no_live(), patch.object(vm.os, 'sched_getaffinity', return_value=set(range(8))), patch.object(vm, 'identity', return_value='123'), patch.object(vm.socket, 'socket'), patch.object(vm.subprocess, 'Popen', side_effect=spawn):
+            with vm.locked() as lock:
+                with self.assertRaisesRegex(RuntimeError, '^QEMU exited 1: gtk initialization failed$'):
+                    vm.launch('ubuntu', self.root / 'ubuntu/run.qcow2', self.root / 'ubuntu/run-vars.fd', visible=True, lease=lock.fileno())
+        self.assertFalse(vm.STATE.exists())
+        self.assertEqual((self.root / 'ubuntu/run.qcow2').read_bytes(), b'LIVE DISK')
+
+    def test_failed_start_removes_only_new_run_files(self):
+        untouched = self.root / 'ubuntu/base-vars.fd'
+        with self.no_live(), patch.object(vm, 'config'), patch.object(vm, 'run'), patch.object(vm, 'launch', side_effect=RuntimeError('bad image')):
+            with self.assertRaisesRegex(RuntimeError, 'bad image'):
+                vm.start('ubuntu')
+        self.assertFalse((self.root / 'ubuntu/run.qcow2').exists())
+        self.assertFalse((self.root / 'ubuntu/run-vars.fd').exists())
+        self.assertEqual(untouched.read_bytes(), b'BASE VARIABLES')
+        self.assertEqual((self.root / 'windows/run.qcow2').read_bytes(), b'LIVE DISK')
+
+    def test_prepare_preserves_visible_launch_error(self):
+        package = self.root / 'package.deb'
+        package.touch()
+        def stopped():
+            if not vm.STATE.exists():
+                return True
+            if self.data.get('visible'):
+                raise RuntimeError('Stale running.json')
+            vm.STATE.unlink()
+            return True
+        def failed_launch(*args, **kwargs):
+            self.record(owner='test-owner', visible=True)
+            raise RuntimeError('gtk initialization failed')
+        with patch.object(vm, 'start', side_effect=lambda *a: self.record(owner='test-owner')), patch.object(vm, 'wait_ssh'), patch.object(vm, 'copy_in'), patch.object(vm, 'guest_root'), patch.object(vm, 'ssh'), patch.object(vm, 'stop', side_effect=stopped), patch.object(vm, 'launch', side_effect=failed_launch):
+            with self.assertRaisesRegex(RuntimeError, 'gtk initialization failed'):
+                vm.prepare_owner('ubuntu', package)
+
+    def test_missing_owner_names_recorded_owner(self):
+        self.record()
+        with patch.dict(os.environ, {'QUAL_OWNER': ''}):
+            for operation in (lambda: vm.require_owner('ubuntu'), lambda: vm.QMP('ubuntu')):
+                with self.assertRaisesRegex(RuntimeError, 'QUAL_OWNER is required.*owner someone-else'):
+                    operation()
+
     def test_stale_start_preserves_disk_and_variables(self):
         self.record()
         before = self.snapshot()
@@ -275,6 +349,34 @@ class HarnessTest(unittest.TestCase):
         self.record()
         with self.assertRaisesRegex(RuntimeError, 'owner someone-else'):
             vm.mirror('ubuntu', '/tmp/no')
+
+
+class MirrorCleanupTest(unittest.TestCase):
+    def test_three_cycles_restore_hosts_bytes_and_refresh_cert_links(self):
+        import importlib.util
+        import tarfile
+        spec = importlib.util.spec_from_file_location('mirror_guest', vm.HERE / 'mirror-guest.py')
+        guest = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(guest)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            guest.ROOT, guest.INPUT = root / 'state', root / 'input'
+            guest.CA, guest.HOSTS = root / 'ca.crt', root / 'hosts'
+            for original in (b'127.0.0.1 localhost\n', b'127.0.0.1 localhost'):
+                guest.HOSTS.write_bytes(original)
+                for cycle in range(3):
+                    guest.INPUT.mkdir()
+                    for name in ('ca.crt', 'server.crt', 'server.key'):
+                        (guest.INPUT / name).write_text('test')
+                    with tarfile.open(guest.INPUT / 'files.tar.gz', 'w:gz'):
+                        pass
+                    with patch.object(guest.subprocess, 'run') as run, patch.object(guest.subprocess, 'Popen', return_value=Mock(pid=123, poll=Mock(return_value=None))), patch.object(guest, 'identity', return_value=None), patch.object(guest.socket, 'create_connection'):
+                        guest.setup(False)
+                        self.assertIn(guest.MARKER.encode(), guest.HOSTS.read_bytes())
+                        guest.remove()
+                    self.assertEqual(guest.HOSTS.read_bytes(), original)
+                    self.assertFalse(guest.CA.exists())
+                    self.assertEqual(run.call_args.args[0], ['update-ca-certificates', '--fresh'])
 
 
 if __name__ == '__main__':

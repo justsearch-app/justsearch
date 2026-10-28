@@ -41,9 +41,13 @@ def remove():
             if data['ticks'] and identity(data['pid']) == data['ticks']:
                 raise RuntimeError('Mirror server did not stop; state preserved')
         state.unlink()
-    HOSTS.write_text(''.join(line for line in HOSTS.read_text().splitlines(keepends=True) if MARKER not in line))
+    original_hosts = ROOT / 'hosts.before'
+    if original_hosts.exists():
+        HOSTS.write_bytes(original_hosts.read_bytes())
+    else:
+        HOSTS.write_text(''.join(line for line in HOSTS.read_text().splitlines(keepends=True) if MARKER not in line))
     CA.unlink(missing_ok=True)
-    subprocess.run(['update-ca-certificates'], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(['update-ca-certificates', '--fresh'], check=True, stdout=subprocess.DEVNULL)
     if ROOT.exists():
         shutil.rmtree(ROOT)
     if INPUT.exists():
@@ -68,8 +72,10 @@ def setup(untrusted):
     for line in HOSTS.read_text().splitlines():
         if 'github.com' in line.split('#', 1)[0].split()[1:]:
             raise RuntimeError('Existing github.com hosts entry; refusing to replace it')
-    with HOSTS.open('a') as hosts:
-        hosts.write('\n127.0.0.1 github.com ' + MARKER + '\n')
+    original = HOSTS.read_bytes()
+    (ROOT / 'hosts.before').write_bytes(original)
+    HOSTS.write_bytes(original + (b'\n' if original and not original.endswith(b'\n') else b'')
+                     + ('127.0.0.1 github.com ' + MARKER + '\n').encode())
     if not untrusted:
         shutil.copyfile(ROOT / 'ca.crt', CA)
         CA.chmod(0o644)

@@ -160,11 +160,10 @@ def broker(os_name):
                         job = json.loads(request.read_text())
                         if set(job) != {'owner', 'action', 'values'} or job['owner'] != data['owner']:
                             raise ValueError(f"VM belongs to owner {data['owner']}")
-                        with vm.locked('control.lock'):
-                            if require_owner(os_name) != data:
-                                raise RuntimeError('VM run changed')
-                            with QMP(os_name) as qmp:
-                                result = perform(qmp, job['action'], job['values'], folder / (name + '.png'), exclusive=True)
+                        if require_owner(os_name) != data:
+                            raise RuntimeError('VM run changed')
+                        with QMP(os_name) as qmp:
+                            result = perform(qmp, job['action'], job['values'], folder / (name + '.png'), exclusive=True)
                         response = {'result': result}
                     except (OSError, RuntimeError, ValueError, TypeError, KeyError) as exc:
                         response = {'error': str(exc)}
@@ -235,9 +234,8 @@ def main():
     if args.broker:
         print(via_broker(args.os, args.action, values, getattr(args, 'out', None)))
     else:
-        with vm.locked('control.lock'):
-            with QMP(args.os) as qmp:
-                print(perform(qmp, args.action, values, getattr(args, 'out', None)))
+        with QMP(args.os) as qmp:
+            print(perform(qmp, args.action, values, getattr(args, 'out', None)))
 
 
 if __name__ == '__main__':

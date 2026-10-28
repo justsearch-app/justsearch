@@ -109,7 +109,11 @@ python3 vm.py start ubuntu
 Never use another session's token without its owner's agreement. `running.json`
 records the token. `stop`, `reset`, `ssh`, `copy-in`, mirror setup/removal, and
 all screen commands refuse a different or missing token and name the owner.
-A collaborating exploring session deliberately uses the same token.
+A missing token reports `QUAL_OWNER is required (VM owner X; ...)`; when no
+record exists the owner is `unknown`. A collaborating exploring session
+deliberately uses the same token. Owner SSH, file copies, screen commands and
+broker requests can run concurrently, including during a long SSH command.
+Exclusive control locks are reserved for harness state changes.
 
 `start` checks both guests before changing config, disks or firmware: the VM's
 lifetime flock (inherited and retained by QEMU), the running record, connect
@@ -119,8 +123,12 @@ This protects a VM even when a sandbox hides its process. `status` reports
 `running (owner X, process not visible)` when other signals remain. Run status
 on the host for complete diagnostics; a sandbox's denied probes are reported.
 
-A running record always blocks a new start, including after a crash. Nothing
-implicitly clears it. After investigating a stale record, run on the host:
+A running record always blocks a new start, including after a crash. A failed
+launch reaps its own QEMU process, removes its own running record, and reports
+that launch's QEMU error. A failed fresh start also removes its newly created
+run disk and firmware; a failed visible preparation boot keeps the prepared
+disk and firmware. Crash records are never implicitly cleared. After
+investigating a stale record, run on the host:
 
 ```sh
 python3 vm.py clear-stale
@@ -204,7 +212,10 @@ and is deleted; only the server key and public CA enter the guest. Files retain
 their URL paths. Server state and access logs are in
 `/var/lib/justsearch-qual-mirror/`. Removal stops only the recorded server
 identity, removes the marked hosts entry and test CA, refreshes the system
-trust store, and deletes the mirror files. The base is never changed.
+trust store with `update-ca-certificates --fresh` to remove test-CA symlinks,
+restores the saved hosts-file bytes, and deletes the mirror files. Repeated
+setup/removal cycles leave hosts and certificate contents unchanged. The base
+is never changed.
 
 Exploring sessions in restricted sandboxes
 ------------------------------------------
