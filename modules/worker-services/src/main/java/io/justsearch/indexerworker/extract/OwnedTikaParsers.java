@@ -58,7 +58,9 @@ final class OwnedTikaParsers {
           </encodingDetectors>
           <parsers><parser class="org.apache.tika.parser.DefaultParser">
           <parser-exclude class="org.apache.tika.parser.ocr.TesseractOCRParser"/>
-          </parser></parsers></properties>
+          </parser>
+          <parser class="org.apache.tika.parser.csv.SurrogateSafeTextAndCSVParser"/>
+          </parsers></properties>
           """.formatted(OwnedTextEncodingDetector.class.getName());
       try {
         TikaConfig config = new TikaConfig(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));

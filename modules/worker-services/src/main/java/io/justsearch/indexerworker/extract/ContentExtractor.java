@@ -139,15 +139,22 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
       org.apache.tika.sax.BodyContentHandler handler =
           new org.apache.tika.sax.BodyContentHandler(maxContentLength);
       context.set(org.apache.tika.parser.Parser.class, tika.getParser());
+      boolean writeLimitReached = false;
       try {
         tika.getParser().parse(is, handler, metadata, context);
       } catch (org.xml.sax.SAXException e) {
         if (!org.apache.tika.exception.WriteLimitReachedException.isWriteLimitReached(e)) {
           throw new TikaException("Flat extraction failed", e);
         }
+        writeLimitReached = true;
       }
       budget.check();
       String content = handler.toString();
+      // Tika's WriteOutContentHandler counts UTF-16 units and may stop inside a pair.
+      if (writeLimitReached && !content.isEmpty()
+          && Character.isHighSurrogate(content.charAt(content.length() - 1))) {
+        content = content.substring(0, content.length() - 1);
+      }
       String mimeType = metadata.get(Metadata.CONTENT_TYPE);
       String title = metadata.get(TikaCoreProperties.TITLE);
       // Fallback: extract title from YAML frontmatter (Tika doesn't parse markdown frontmatter)
