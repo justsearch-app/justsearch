@@ -2348,7 +2348,33 @@ fn reconcile_intent(
         }
     }
     write_json_atomic(path, &intent)?;
+    cleanup_committed_package(staging_root, &intent);
     Ok(intent)
+}
+
+fn cleanup_committed_package(staging_root: &Path, intent: &UpgradeIntent) {
+    if intent.phase != UpgradePhase::Committed {
+        return;
+    }
+    // COMMITTED is already durable. A failed cleanup cannot undo reconciliation or turn a
+    // healthy installation into repair-required; startup retries it from the committed intent.
+    let result = (|| -> Result<(), String> {
+        let package = match fs::canonicalize(&intent.staged_artifact.path) {
+            Ok(path) => path,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(format!("Failed to resolve committed package: {error}")),
+        };
+        let root = fs::canonicalize(staging_root)
+            .map_err(|error| format!("Failed to resolve installer staging root: {error}"))?;
+        if !package.starts_with(root) {
+            return Err("Committed package escaped the shell-owned staging root".into());
+        }
+        fs::remove_file(package)
+            .map_err(|error| format!("Failed to delete committed update package: {error}"))
+    })();
+    if let Err(error) = result {
+        eprintln!("[updater] {error}");
+    }
 }
 
 /// The Head PID recorded on the intent at commit-shutdown time.
@@ -2634,6 +2660,7 @@ fn persist_intent_at(
     intent: &UpgradeIntent,
 ) -> Result<(), String> {
     write_json_atomic(&root.join("intent.v1.json"), intent)?;
+    cleanup_committed_package(&root.join("staged"), intent);
     set_intent_status(coordinator, intent);
     Ok(())
 }
@@ -3163,6 +3190,111 @@ mod tests {
         )
         .unwrap();
         assert_eq!(reconciled.phase, UpgradePhase::Committed);
+    }
+
+    #[test]
+    fn committed_reconciliation_removes_only_its_staged_package() {
+        for name in ["JustSearch-update.deb", "JustSearch-update-setup.exe"] {
+            let fixture = evidence_fixture(UpgradePhase::Reconciling);
+            let root = fixture.intent_path.parent().unwrap();
+            let coordinator = UpdateCoordinator::default();
+            let mut intent = fixture.intent;
+            let package = Path::new(&intent.staged_artifact.path).with_file_name(name);
+            fs::rename(&intent.staged_artifact.path, &package).unwrap();
+            intent.staged_artifact.path = package.to_string_lossy().into_owned();
+            let other_package = fixture.staging_root.join("other-attempt.deb");
+            fs::write(&other_package, fixture_installer_bytes()).unwrap();
+            persist_intent_at(root, &coordinator, &intent).unwrap();
+            assert!(package.exists(), "reconciliation is not yet committed");
+            apply_reconciliation_outcome(&mut intent, Ok(())).unwrap();
+            persist_intent_at(root, &coordinator, &intent).unwrap();
+            assert_eq!(
+                read_intent(&fixture.intent_path).unwrap().unwrap().phase,
+                UpgradePhase::Committed
+            );
+            assert_eq!(
+                package.exists(),
+                false,
+                "the durably committed update package must be deleted: {name}"
+            );
+            assert!(other_package.exists(), "other attempts must not be swept");
+            assert!(fixture.witness_path.exists(), "keep the launch evidence");
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn startup_retries_committed_package_cleanup() {
+        let fixture = evidence_fixture(UpgradePhase::Committed);
+        let package = fixture.intent.staged_artifact.path.clone();
+        let root = fixture.intent_path.parent().unwrap();
+        let reconciled = reconcile_intent(
+            &fixture.intent_path,
+            &fixture.witness_path,
+            &fixture.staging_root,
+            "1.1.0",
+            fixture.intent,
+        )
+        .unwrap();
+        assert_eq!(reconciled.phase, UpgradePhase::Committed);
+        assert_eq!(
+            Path::new(&package).exists(),
+            false,
+            "startup retries cleanup after a crash following durable commit"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn uncommitted_or_repair_required_packages_remain_available() {
+        for phase in [
+            UpgradePhase::Prepared,
+            UpgradePhase::HeadStopped,
+            UpgradePhase::EngineUnrecoverable,
+            UpgradePhase::InstallLaunching,
+            UpgradePhase::InstallLaunched,
+            UpgradePhase::Reconciling,
+            UpgradePhase::RepairRequired,
+            UpgradePhase::Cancelled,
+        ] {
+            let fixture = evidence_fixture(phase);
+            let root = fixture.intent_path.parent().unwrap();
+            persist_intent_at(root, &UpdateCoordinator::default(), &fixture.intent).unwrap();
+            assert!(
+                Path::new(&fixture.intent.staged_artifact.path).exists(),
+                "retain package in {:?}",
+                fixture.intent.phase
+            );
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn failed_commit_write_keeps_the_staged_package() {
+        let fixture = evidence_fixture(UpgradePhase::Reconciling);
+        let root = fixture.intent_path.parent().unwrap();
+        fs::remove_file(&fixture.intent_path).unwrap();
+        fs::create_dir(&fixture.intent_path).unwrap();
+        let mut intent = fixture.intent;
+        apply_reconciliation_outcome(&mut intent, Ok(())).unwrap();
+        assert!(persist_intent_at(root, &UpdateCoordinator::default(), &intent).is_err());
+        assert!(Path::new(&intent.staged_artifact.path).exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn committed_cleanup_never_follows_a_package_outside_staging() {
+        let fixture = evidence_fixture(UpgradePhase::Committed);
+        let root = fixture.intent_path.parent().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let package = outside.path().join("manual-reinstall.deb");
+        fs::write(&package, fixture_installer_bytes()).unwrap();
+        fs::remove_file(&fixture.intent.staged_artifact.path).unwrap();
+        std::os::unix::fs::symlink(&package, &fixture.intent.staged_artifact.path).unwrap();
+        persist_intent_at(root, &UpdateCoordinator::default(), &fixture.intent).unwrap();
+        assert!(package.exists());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

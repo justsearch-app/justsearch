@@ -1,0 +1,88 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T00:38:15.006Z",
+  "revision": "914c6243db7bca6a3cf2cb72e1c3da96a603bbe0",
+  "tree": "26f044bd0a9c954e9f02549767a7437b10988e54",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::uncommitted_or_repair_required_packages_remain_available\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2823
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::failed_commit_write_keeps_the_staged_package\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2180
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::committed_cleanup_never_follows_a_package_outside_staging\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2206
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::uncommitted_or_repair_required_packages_remain_available",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:a349e2830aaec5eef2c6fb345ecf5376c7252be82dfb7b986233c7b319f4320d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::uncommitted_or_repair_required_packages_remain_available",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::failed_commit_write_keeps_the_staged_package",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:a349e2830aaec5eef2c6fb345ecf5376c7252be82dfb7b986233c7b319f4320d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::failed_commit_write_keeps_the_staged_package",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::committed_cleanup_never_follows_a_package_outside_staging",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:a349e2830aaec5eef2c6fb345ecf5376c7252be82dfb7b986233c7b319f4320d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::committed_cleanup_never_follows_a_package_outside_staging",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:6bc73519a284d710f9d0ce1cbbb4c59e11976e213dc8227d20c9cbf95f850f73"
+}

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { isTauriRuntime } from '../utils/tauriRuntime.js';
-import { installSupervisorStateBridge, isTerminal } from '../api/supervisorState.js';
+import { installSupervisorStateBridge, isTerminal, type SupervisorState } from '../api/supervisorState.js';
 import type { EngineRecovery } from '../shell-v0/components/EngineRecovery.js';
 import { installBackendRestartBridge } from '../api/backendRestart.js';
 import { resolveBootApiBase } from './apiBase.js';
@@ -11,11 +11,18 @@ const recoverySurfaces = new WeakMap<HTMLElement, {
   teardown: () => void;
 }>();
 
-/** Keep terminal supervisor presentation authoritative while asynchronous shell boot finishes. */
+function needsRecovery(state: SupervisorState | null): boolean {
+  // Linux keeps this webview alive while apt runs, including its lock wait. Windows hands
+  // presentation to NSIS and exits, so preserve its existing upgrade-stop presentation.
+  return isTerminal(state) || !!state?.notReady
+    || (/Linux/.test(navigator.platform) && state?.state === 'stopped' && state.reason === 'upgrade');
+}
+
+/** Keep supervisor recovery presentation authoritative while asynchronous shell boot finishes. */
 export function mountBootApplication(root: HTMLElement, application: HTMLElement): void {
   const owner = recoverySurfaces.get(root);
   let presentation = application;
-  if (owner && (isTerminal(owner.recovery.supervisor) || !!owner.recovery.supervisor?.notReady)) {
+  if (owner && needsRecovery(owner.recovery.supervisor)) {
     owner.teardown();
     presentation = owner.recovery;
   }
@@ -48,7 +55,7 @@ export async function resolveBootWithRecovery(
   let waitingForApi = false;
   await installSupervisorStateBridge((state) => {
     recovery.supervisor = state;
-    if (isTerminal(state) || state.notReady) {
+    if (needsRecovery(state)) {
       // Store-owned subscriptions outlive shell listeners, so release them explicitly.
       teardown();
       if (recovery.parentElement !== root) root.replaceChildren(recovery);
@@ -60,7 +67,7 @@ export async function resolveBootWithRecovery(
   });
   await installBackendRestartBridge(() => window.location.reload());
   const base = await resolveBootApiBase();
-  if (base && !isTerminal(recovery.supervisor) && !recovery.supervisor?.notReady) recovery.remove();
+  if (base && !needsRecovery(recovery.supervisor)) recovery.remove();
   else waitingForApi = true;
   return base;
 }
