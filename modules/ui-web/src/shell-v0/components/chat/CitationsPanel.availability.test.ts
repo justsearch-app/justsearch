@@ -29,9 +29,11 @@ const response = (states: Record<string, string>) => new Response(JSON.stringify
 // the inner status text on focus (WP5.8 verifier 1).
 function nameAndDescription(button: Element) {
   const root = button.getRootNode() as Document | ShadowRoot;
-  const describedBy = (button.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+  const referenced = (attribute: string) => (button.getAttribute(attribute) ?? '').split(/\s+/).filter(Boolean)
     .map(id => root.getElementById(id)?.textContent ?? '');
-  return [button.getAttribute('aria-label') ?? '', button.getAttribute('aria-description') ?? '', ...describedBy]
+  const labelledBy = referenced('aria-labelledby');
+  const name = labelledBy.length ? labelledBy.join(' ') : button.getAttribute('aria-label') ?? '';
+  return [name, button.getAttribute('aria-description') ?? '', ...referenced('aria-describedby')]
     .map(part => part.replace(/\s+/g, ' ').trim()).join(' | ');
 }
 afterEach(() => { document.body.replaceChildren(); vi.resetAllMocks(); });
