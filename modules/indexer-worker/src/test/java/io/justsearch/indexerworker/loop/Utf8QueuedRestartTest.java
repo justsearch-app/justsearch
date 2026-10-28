@@ -142,7 +142,7 @@ class Utf8QueuedRestartTest extends LuceneExecutorTestBase {
         assertEquals(SOURCE, runtime.documentFieldOps().getDocumentContent(id).strip());
         assertEquals(TITLE, runtime.documentFieldOps().getDocumentField(id, SchemaFields.TITLE));
         assertEquals("מרים", runtime.documentFieldOps().getDocumentField(id, SchemaFields.META_AUTHOR));
-        assertEquals("tika-default-v4", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
+        assertEquals("tika-default-v5", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
         // An explicitly BOM-marked UTF-8 control supplies known-good derived fields on both trees.
         Path control = Files.writeString(tempDir.resolve("control.md"), "\uFEFF" + SOURCE);
         var expected = buildDocument(file, parser.extract(control)).fields();

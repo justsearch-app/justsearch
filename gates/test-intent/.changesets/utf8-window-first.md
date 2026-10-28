@@ -102,23 +102,23 @@ with results reported in the handback. Formal evidence and acceptance remain the
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java"
       ],
       "class": "New",
-      "behaviour": "The extraction policy version advances to v4 in default, blank/null/empty fallback and configured-limits identities; literal policy-id expectations and format-capability provenance fixtures advance with it. Existing policy-only files retain every other expectation; entry 1 accounts for the new extraction checks. A real reused and replaced child returns both the default and configured v4 identities and validates against the parent policy.",
+      "behaviour": "The extraction policy version advances to v5 in default, blank/null/empty fallback and configured-limits identities; literal policy-id expectations and format-capability provenance fixtures advance with it. Existing policy-only files retain every other expectation; entry 1 accounts for the new extraction checks. A real reused and replaced child returns both the default and configured v4 identities and validates against the parent policy.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with investigating and designing the fixes and improvements for the ideal state of that area",
           "delegationLocation": "task t-20261026-8f2d61 owner instruction, 2026-10-26",
           "delegationScope": "Text extraction correctness and preservation while repairing misdecoded valid UTF-8.",
-          "choice": "Move deterministic extraction policy identities from v3 to v4 for default, blank/null fallback and configured limits because valid UTF-8 is now preferred. Parent and sandbox child must agree; old stored policy identities stay untouched.",
+          "choice": "Move deterministic extraction policy identities from v4 to v5 for default, blank/null fallback and configured limits because valid UTF-8 is now preferred. Parent and sandbox child must agree; old stored policy identities stay untouched.",
           "label": "agent choice"
         }
       ],
       "repaired": true,
       "evidence": "gates/test-intent/evidence/utf8-window-first-policy.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#defaultPolicyIdentityIsV4",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#blankOrNullPolicyIdentityFallsBackToV4",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#configuredPolicyIdentityIsV4",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#defaultPolicyIdentityIsV5",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#blankOrNullPolicyIdentityFallsBackToV5",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#configuredPolicyIdentityIsV5",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java#childReuseAndReplacementKeepUtf8TextAndPolicyIdentity"
       ]
     }
@@ -138,12 +138,12 @@ GRADLE_OPTS was retained. No `.agents/preflight` exists in this checkout.
 
 | Check | Before | After |
 | --- | --- | --- |
-| `Utf8WithoutBomExtractionTest` | All 52 cases failed by assertion: Hebrew mojibake, missing native-word hit, GB18030 instead of UTF-8, or v3 instead of v4 for the two policy transport cases | All 52 passed |
+| `Utf8WithoutBomExtractionTest` | All 52 cases failed by assertion: Hebrew mojibake, missing native-word hit, GB18030 instead of UTF-8, or v4 instead of v5 for the two policy transport cases | All 52 passed |
 | `Utf8WindowEncodingDetectorTest` | All 14 repair cases failed by assertion (charset or new-step attribution); all 6 preservation cases passed | All 20 passed |
 | `Utf8EncodingPreservationTest` | All 21 passed | All 21 passed |
 | `Utf8QueuedRestartTest` | Unchanged queued restart passed; forced reindex failed at literal Hebrew content assertion | Both passed |
-| Default, blank/null/empty fallback and configured identity checks in `Utf16WithoutBomExtractionTest` | All 3 methods failed by assertion, v3 versus v4 | All 3 passed |
-| Other existing policy expectations/format-capability fixtures | All changed expectations failed by assertion, v3 versus v4 | Passed in the full extraction suite |
+| Default, blank/null/empty fallback and configured identity checks in `Utf16WithoutBomExtractionTest` | All 3 methods failed by assertion, v4 versus v5 | All 3 passed |
+| Other existing policy expectations/format-capability fixtures | All changed expectations failed by assertion, v4 versus v5 | Passed in the full extraction suite |
 | Full `:modules:worker-services:test --tests 'io.justsearch.indexerworker.extract.*'` | Broad baseline run had only the expected repair/policy assertion failures; the final focused baseline run above verified the corrected short fixture | 627 discovered: 621 passed, 6 existing skips, no failures/errors |
 | `:modules:indexer-worker:test --tests 'io.justsearch.indexerworker.loop.Utf8QueuedRestartTest'` | Expected forced-reindex assertion failure as above | 2 passed, no skips |
 | `:modules:worker-services:pmdMain :modules:worker-services:pmdTest :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest` | Not required/run | All ran, zero violations; worker-services pmdTest reran after the last test edit |
