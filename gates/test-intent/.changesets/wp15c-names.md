@@ -62,3 +62,14 @@ The cutover script self-tests and e2e replay label adaptation are outside produc
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a183d3-0fd4-7a61-a8d0-73ceba0e387b",
+  "verdict": "accept",
+  "digest": "sha256:4c25a0ac9673f21ba3327103f26c9be067741153f929ed8da87143b0d742dc9d",
+  "note": "Codex verifier PASS on WP1.5c (delegated-choice sources checked against owner-request.md; W7 and SearchWindowNameTest fail before by assertion, pass after)"
+}
+```
