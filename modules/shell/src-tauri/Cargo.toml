@@ -2,7 +2,7 @@
 name = "shell"
 default-run = "shell"
 version = "0.3.0"
-description = "A Tauri App"
+description = "Private desktop search and AI answers over your files"
 authors = ["JustSearch Contributors"]
 license = "Apache-2.0"
 edition = "2021"
@@ -22,6 +22,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [[bin]]
 name = "supervisor-conformance"
 path = "src/bin/supervisor_conformance.rs"
+# Keep this test harness out of Tauri installer binary discovery.
+required-features = ["supervisor-conformance"]
+
+[features]
+supervisor-conformance = []
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

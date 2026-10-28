@@ -29,6 +29,29 @@ For the decision rationale (NSIS over MSI/WiX, per-user install, download-on-dem
 - **Tauri config**: `modules/shell/src-tauri/tauri.conf.json`
 - **Custom hooks**: `modules/shell/src-tauri/nsis/installer-hooks.nsh`
 
+### Building the Linux Debian package
+
+On Ubuntu 24.04 x86_64, install the Tauri build prerequisites (Rust, Node 24,
+JDK 25, the GTK 3/WebKitGTK 4.1 and Ayatana AppIndicator development libraries,
+OpenSSL development headers, librsvg, patchelf, binutils and a C compiler), then
+run `bash scripts/ci/package-installer-linux.sh` from the repository root. Gradle
+uses the repository wrapper. The script synchronizes versions from
+`gradle.properties`, installs locked npm dependencies, stages the bundled Java
+runtime and Engine, builds with `tauri.linux.conf.json`, and audits every shipped
+ELF, including natives inside JARs. The package and `elf-audit.json` land in
+`dist/installer-linux/`; the script prints the package size and SHA-256.
+
+To repeat just the audit, run
+`python3 scripts/ci/audit-linux-elf.py path/to/JustSearch_0.3.0_amd64.deb elf-audit.json`.
+It rejects requirements above GLIBC 2.39 or GLIBCXX 3.4.33, and unresolved libraries
+other than GPU-pack dependencies and ORT's Java-loaded `libonnxruntime.so.1`.
+Foreign JAR variants are listed as ignored. Library resolution uses the audit
+host plus packaged siblings/JVM libraries; clean Ubuntu desktop qualification
+is separate. Builds on newer systems must still pass these fixed ABI ceilings.
+OCR depends on system Tesseract and English data. Linux carries no CPU chat
+runtime. The reusable `build-installer-linux.yml` workflow builds on Ubuntu 24.04
+and uploads the package and audit without publishing a release.
+
 ### 1.2 Tauri shell (native container)
 
 - **Binary name**: `JustSearch.exe` (configured via `mainBinaryName` in `tauri.conf.json`)

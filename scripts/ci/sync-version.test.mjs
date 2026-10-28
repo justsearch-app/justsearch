@@ -1,0 +1,73 @@
+#!/usr/bin/env node
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { test } from 'node:test';
+
+const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+function fixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'js-version-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  for (const rel of ['gradle.properties', 'modules/shell/package.json',
+    'modules/shell/src-tauri/tauri.conf.json', 'modules/shell/src-tauri/Cargo.toml',
+    'scripts/ci/pack-mcpb.mjs', 'packaging/mcpb']) {
+    const dest = path.join(root, rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.cpSync(path.join(repo, rel), dest, { recursive: true });
+  }
+  return root;
+}
+function sync(root, ...args) {
+  return spawnSync(process.execPath, [path.join(repo, 'scripts/ci/sync-version.mjs'),
+    '--repo-root', root, ...args], { encoding: 'utf8' });
+}
+const read = (root, rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+const json = (root, rel) => JSON.parse(read(root, rel));
+function setVersion(root, version) {
+  const p = path.join(root, 'gradle.properties');
+  fs.writeFileSync(p, read(root, 'gradle.properties').replace(/^version=.*$/m, `version=${version}`));
+}
+
+test('Linux sync stamps app, Windows branding and both MCPB versions, URL and hash; second run is stable', (t) => {
+  const root = fixture(t);
+  setVersion(root, '1.2.3-rc.2');
+  const result = sync(root, '--require-release-semver');
+  assert.equal(result.status, 0, result.stderr);
+  console.log(result.stdout.trim());
+  assert.equal(json(root, 'modules/shell/package.json').version, '1.2.3-rc.2');
+  const tauri = json(root, 'modules/shell/src-tauri/tauri.conf.json');
+  assert.equal(tauri.version, '1.2.3-rc.2');
+  assert.equal(tauri.bundle.copyright, 'JustSearch 1.2.3-rc.2 - Copyright (c) JustSearch');
+  assert.match(read(root, 'modules/shell/src-tauri/Cargo.toml'), /^version = "1.2.3-rc.2"$/m);
+  assert.equal(json(root, 'packaging/mcpb/manifest.json').version, '1.2.3-rc.2');
+  const server = json(root, 'packaging/mcpb/server.json');
+  assert.equal(server.version, '1.2.3-rc.2');
+  assert.match(server.packages[0].identifier, /\/v1\.2\.3-rc\.2\/justsearch-mcp.mcpb$/);
+  const check = spawnSync(process.execPath, [path.join(repo, 'scripts/ci/check-mcpb-consistency.mjs'),
+    '--release-version', '1.2.3-rc.2'], { env: { ...process.env, CHECK_MCPB_ROOT: root }, encoding: 'utf8' });
+  assert.equal(check.status, 0, check.stderr);
+  const before = read(root, 'packaging/mcpb/server.json');
+  assert.equal(sync(root).status, 0);
+  assert.equal(read(root, 'packaging/mcpb/server.json'), before);
+  // The temporary fixture is removed by t.after; the working tree is never bumped.
+});
+
+test('WhatIf leaves every projection unchanged; release mode rejects SNAPSHOT before writing', (t) => {
+  const root = fixture(t);
+  const before = read(root, 'modules/shell/src-tauri/tauri.conf.json');
+  const manifest = read(root, 'packaging/mcpb/manifest.json');
+  const server = read(root, 'packaging/mcpb/server.json');
+  setVersion(root, '8.9.0');
+  assert.equal(sync(root, '--what-if').status, 0);
+  assert.equal(read(root, 'modules/shell/src-tauri/tauri.conf.json'), before);
+  assert.equal(read(root, 'packaging/mcpb/manifest.json'), manifest);
+  assert.equal(read(root, 'packaging/mcpb/server.json'), server);
+  setVersion(root, '8.9.0-SNAPSHOT');
+  const result = sync(root, '--require-release-semver');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /without SNAPSHOT/);
+  assert.equal(read(root, 'modules/shell/src-tauri/tauri.conf.json'), before);
+});
