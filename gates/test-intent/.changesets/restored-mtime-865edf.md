@@ -73,3 +73,14 @@ orchestrator after committing the candidate. The existing test edits below prese
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-865edf-claude",
+  "verdict": "accept",
+  "digest": "sha256:44ec49d0a5ef2366d0b5034936791620d61dd996e144319db238e3a7cf6870c1",
+  "note": "Claude verifier on 6915784cac: new checks fail on b744db8744 for the reason under test and pass on the candidate (3 modules, 5931 tests, 0 failed). On the real dev stack the candidate serves new text after a watcher event (3 s), a restart (shrink) and a second change, skips unchanged files as UNCHANGED, keeps an unreadable file's content; the baseline serves old text. All 7 single-protection reverts are caught. Equal-size change with restored mtime remains the recorded gap."
+}
+```
