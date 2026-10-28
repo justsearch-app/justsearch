@@ -1,9 +1,8 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { expect, it } from 'vitest';
-import { projectUnifiedThread, type ThreadEvent, type UnifiedTurnItem } from './unifiedThreadProjection.js';
+import { projectUnifiedThread, type ThreadEvent, } from './unifiedThreadProjection.js';
 import { projectSv3RecordTurns } from './search-v3/sv3-record.js';
-import './UnifiedChatView.js';
 
 const userId = 'fadd5f39-7d64-4c8c-b872-21d9d9865f98';
 const errorId = 'd91f2f04-7736-46af-aa68-253f12e8a2f4';
@@ -30,15 +29,6 @@ it('a fast saved no-evidence outcome remains one complete record turn, not an or
   const turns = projectSv3RecordTurns(events('2026-10-23T02:04:45.355494108Z', '2026-10-23T02:04:45.355915929Z'));
   expect(turns).toHaveLength(1);
   expect(turns[0]).toMatchObject({ recordId: userId, assistantRecordId: errorId, status: 'no-evidence' });
-});
-
-it('the old window keeps precise record order when merging its transcript (NE10)', () => {
-  const view = document.createElement('jf-unified-chat-view') as unknown as {
-    affordance: string; unifiedEvents: ThreadEvent[]; mergedTimeline(): UnifiedTurnItem[];
-  };
-  view.affordance = 'none';
-  view.unifiedEvents = events('2026-10-23T02:04:45.355494108Z', '2026-10-23T02:04:45.355915929Z');
-  expect(view.mergedTimeline().map(item => item.id)).toEqual([userId, errorId]);
 });
 
 it('preserves the existing stable id tiebreak for genuinely equal instants (HN8)', () => {

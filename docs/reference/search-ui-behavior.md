@@ -2,8 +2,8 @@
 title: Search UI Behavioral Reference
 type: reference
 status: stable
-updated: 2026-06-13
-description: "Search UI behavioral specification (zones, filters, selection, status deck)."
+updated: 2026-10-28
+description: "Search window, composer modes, results, evidence and document reader."
 ---
 
 # Search UI Behavioral Reference
@@ -12,38 +12,37 @@ Behavioral specification for the JustSearch search experience. Covers every surf
 
 For design philosophy and architecture, see `docs/explanation/10-ui-ux-design.md`.
 
-> **Post-rewrite status (2026-06-13):** the frontend moved to Lit web components
-> (ADR-0032); the React stack named in older revisions is retired. Implementation
-> anchors were re-pointed to the `shell-v0` Lit surfaces. **Live-verified (ui-shot
-> demo, 2026-06-13):** the search shell renders with Zone A (command input), Zone B
-> (activity rail), Zone C (stage empty-state + Modified date filters), and Zone E
-> (status deck). **Live-verified against the real backend + local LLM
-> (Meta-Llama-3.1-8B, 2026-06-13):** typed search returns populated results with
-> highlighted snippets, facet filters (Type/Format/Language with counts), result
-> count + timing, and the "Keyword search · AI-expanded query" retrieval-mode badge;
-> clicking a result opens a tabless document-reading pane inside the Search conversation
-> zone; grounded Q&A stays in the same thread through **Ask**, with inline citations and
-> source chips. **Spot-unverified (lower-value nuances):** arrow-key cursor
-> vs `Enter`-to-inspect, multi-select checkboxes, and citation hover-cards — re-check
-> against `shell-v0/views/UnifiedChatView.ts` (retrieve tier) + `shell-v0/components/searchResults/ResultsCard.ts`
-> if a specific claim matters (Search Thread S5b: the standalone `SearchSurface.ts` this
-> pointed at is retired). (Tracked: tempdoc 579.)
+Search v3 is the production main window: `core.search-v3-surface`, mounted as
+`jf-sv3-window` (`shell-v0/views/search-v3/SearchV3View.ts`). The rail and catalog label
+is **Search**. The retired unified-chat, Search and Agent surface ids resolve directly
+to it; there is one interaction window.
 
----
+## 1. Window layout and modes
 
-## 1. Layout and Zones
+The Shell rail surrounds Search's session sidebar, main reading column and composer.
+The initial hero composer starts in Search mode. Enter searches files. After results
+or an answer arrive the composer docks below the reading column, with space reserved
+so the final result or source stays reachable at the end of scrolling. At wide widths
+the composer and prose retain Search's reading measure rather than stretching across
+the monitor.
 
-The search interface uses a five-zone layout:
+The mode control offers Search, Ask, Structured and Delegate. Ask can also answer
+without files. AI actions display their availability reason when unavailable; Search
+continues to retrieve files. A prepared answer link waits for Send. Structured exposes
+a schema editor. Delegate runs an agent and shows its activity in the transcript;
+expandable tool cards reveal details. Workflow runs have no picker or shipped entry
+point. Their compatibility links show an unavailable notice and do not start a run.
 
-| Zone | Name | Position | Purpose |
-|------|------|----------|---------|
-| A | Command Bar | Top | Search input, syntax toggle, autocomplete, history |
-| B | Rail | Left edge | View switcher (Search, Library, Brain, System, Settings). Search is the one interaction window: `retrieve` is its base tier, **Ask** requests a cited answer, and **Delegate** starts multi-step agent work. |
-| C | Stage | Center | Result list + filters, or Launchpad home |
-| D | Document pane | Right | Tabless document reading inside the Search conversation zone; Q&A remains in the thread |
-| E | Status Deck | Bottom | System readiness, result count, processing time, AI mode, hints |
+A result or source opens the document reader. Wide layouts place it beside the reading
+column; narrow layouts use an overlay. Answers disclose evidence through Sources beneath
+the turn. Search has no old three-zone conversation allocation or run-spine minimap.
+The composer owns its compact or detailed degradation notice; the indexing banner stays
+quiet. Shared Shell status authorities own announcements.
 
-Focus cycles through zones via Tab / Shift+Tab. Cmd/Ctrl+K always returns focus to Zone A (search input).
+Implementation anchors are `SearchV3View.ts`, `Sv3Composer.ts`, `Sv3Main.ts`,
+`Sv3Results.ts`, `Sv3Pane.ts` and shared `components/searchResults/ResultsCard.ts`.
+The detailed result behavior below includes older observations; those are not a claim
+that every historical shortcut has been reverified on Search.
 
 ---
 
@@ -63,7 +62,7 @@ Focus cycles through zones via Tab / Shift+Tab. Cmd/Ctrl+K always returns focus 
 
 ### Query Correction
 
-The backend returns `correctedQuery` and `correctionApplied` fields when automatic query correction occurs. (Search Thread S5b: the standalone `SearchSurface.ts` this section pointed at is retired — the retrieve tier now lives in `shell-v0/views/UnifiedChatView.ts` + `shell-v0/components/searchResults/ResultsCard.ts`; this correction-banner behavior predates that migration and was not found live in either — pre-existing doc/code drift, logged for a fuller pass.)
+The backend returns `correctedQuery` and `correctionApplied` fields when automatic query correction occurs. (The standalone `SearchSurface.ts` is retired; Search mode lives in `shell-v0/views/search-v3/Sv3Results.ts` + `shell-v0/components/searchResults/ResultsCard.ts`; this correction-banner behavior predates that migration and was not found live in either — pre-existing doc/code drift, logged for a fuller pass.)
 
 ### Zero Results
 
@@ -305,7 +304,7 @@ Three selection concepts coexist, but cursor and selection are synchronized:
 | **Multi-selection** | Checkbox click, Space, Ctrl/Cmd+click | Amber background tint, checked checkbox with glow | Batch operations (AI summarize, ask question) |
 | **Range selection** | Shift+Click | Selects all items between anchor and target | Contiguous multi-select (desktop convention) |
 
-- Arrow keys move cursor AND selection simultaneously — they are kept in sync within the search results presentation (Search Thread S5b: `shell-v0/views/SearchSurface.ts` is retired; the retrieve tier lives in `shell-v0/views/UnifiedChatView.ts` + `shell-v0/components/searchResults/ResultsCard.ts`). Separate `cursorFileId` and `selectedFileId` state fields are maintained, but in practice they stay in sync.
+- Arrow keys move cursor AND selection simultaneously — they are kept in sync within the search results presentation (`shell-v0/views/SearchSurface.ts` is retired; Search mode lives in `shell-v0/views/search-v3/Sv3Results.ts` + `shell-v0/components/searchResults/ResultsCard.ts`). Separate `cursorFileId` and `selectedFileId` state fields are maintained, but in practice they stay in sync.
 - Clicking a row sets selection (opens Inspector) AND moves cursor
 - Clicking the same row again deselects it and closes the Inspector (toggle behavior)
 - Space toggles multi-selection on the current item

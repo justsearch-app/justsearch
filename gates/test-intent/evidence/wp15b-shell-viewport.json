@@ -1,0 +1,50 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T17:09:30.686Z",
+  "revision": "edf31674779d432098809d29f711951d64110cf1",
+  "tree": "d46e3b8722857469079a8d7a9922032012fb3569",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/responsiveState.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2915322-1793207369994.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 690
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/responsiveState.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/responsiveState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2ac10a1a3509004062948692ffdd9a36f2fcf26dbe9c575b593c1884ac1d3cfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA15 Shell viewport authority follows matchMedia changes and removes departed subscribers",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 Shell viewport authority keeps the existing wide fallback without matchMedia",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e8b1b1703d0001e3918ebefb9be9f5c1fcf57e3efa32c32f534bacaed9f1941d"
+}

@@ -307,6 +307,14 @@ def _full_rect(rect: dict[str, Any] | None) -> bool:
     return rect is not None and all(rect.get(k) is not None for k in ("x", "y", "w", "h"))
 
 
+def _visible_element(elements: dict[str, Any], selector: str) -> bool:
+    captured = elements.get(selector) or {}
+    rect = captured.get("rect") or {}
+    return (captured.get("visible") is True
+            and all(isinstance(rect.get(k), (int, float)) and not isinstance(rect[k], bool)
+                    and rect[k] > 0 for k in ("w", "h")))
+
+
 def evaluate(capture_fn: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
     """Run the gate. ``capture_fn(step)`` captures a step (fixtures on) and returns the
     ui-shot result dict (with ``ok`` and a ``measure`` summary carrying ``measure_path``).
@@ -414,10 +422,10 @@ def evaluate(capture_fn: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
                 continue
             captured_el = geo_elements.get(selector)
             rect = _rect_of(geo_elements, selector)
-            if rect is None:
+            if rect is None or not _visible_element(geo_elements, selector):
                 any_error = True
                 rows.append({"step": step, "selector": selector, "status": "ERROR",
-                             "error": "selector not found in captured geometry"})
+                             "error": "selector missing, hidden or without positive width/height"})
                 continue
 
             if max_height_px is not None:
@@ -583,7 +591,8 @@ def evaluate(capture_fn: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
 
             if not_overlap is not None:
                 other = _rect_of(geo_elements, not_overlap)
-                if not _full_rect(rect) or not _full_rect(other):
+                if (not _full_rect(rect) or not _full_rect(other)
+                        or not _visible_element(geo_elements, not_overlap)):
                     any_error = True
                     rows.append({"step": step, "selector": selector,
                                  "constraint": "mustNotOverlapSelector", "status": "ERROR",
@@ -607,7 +616,8 @@ def evaluate(capture_fn: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
                 other = _rect_of(geo_elements, other_selector)
                 measured_height = rect.get("h")
                 other_height = (other or {}).get("h")
-                if (measured_height is None or other is None or other_height is None
+                if (not _visible_element(geo_elements, other_selector)
+                        or measured_height is None or other is None or other_height is None
                         or floor is None or other_selector is None):
                     any_error = True
                     rows.append({"step": step, "selector": selector,
@@ -661,6 +671,11 @@ def evaluate(capture_fn: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
         # --- Step-level checks (tempdoc 814 D7.2/D7.3): not per-element, read off the
         # whole capture doc rather than a single registered selector's rect. ---
 
+        if absent_selectors and not any(_visible_element(geo_elements, sel) for sel in required_selectors):
+            any_error = True
+            rows.append({"step": step, "constraint": "absentSelectors", "status": "ERROR",
+                         "error": "absence requires a visible positive requiredSelectors witness in this step"})
+
         for sel in absent_selectors:
             present = _rect_of(geo_elements, sel) is not None
             any_violation = any_violation or present
@@ -670,7 +685,7 @@ def evaluate(capture_fn: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
             })
 
         for sel in required_selectors:
-            present = _rect_of(geo_elements, sel) is not None
+            present = _visible_element(geo_elements, sel)
             any_violation = any_violation or not present
             rows.append({
                 "step": step, "selector": sel, "constraint": "requiredSelectors",
@@ -684,7 +699,7 @@ def evaluate(capture_fn: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
         # on that walk's truncated description string.
         for sel in non_scrollable_selectors:
             captured = geo_elements.get(sel)
-            if captured is None:
+            if not _visible_element(geo_elements, sel):
                 any_violation = True
                 rows.append({
                     "step": step, "selector": sel, "constraint": "nonScrollableSelectors",

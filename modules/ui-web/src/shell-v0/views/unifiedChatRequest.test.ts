@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildRequestBody, SHAPE_LABELS } from './unifiedChatRequest.js';
+import { buildRequestBody, } from './unifiedChatRequest.js';
 import type { SelectionPayload } from '../../api/types/selection.js';
 
 describe('buildRequestBody (tempdoc 621 Phase 2 — extracted request shaping)', () => {
@@ -43,9 +43,5 @@ describe('buildRequestBody (tempdoc 621 Phase 2 — extracted request shaping)',
     expect('selection' in buildRequestBody('core.free-chat', 't', 's', '', [])).toBe(false);
   });
 
-  it('SHAPE_LABELS covers every interaction shape', () => {
-    expect(Object.keys(SHAPE_LABELS).sort()).toEqual(
-      ['core.agent-run', 'core.extract', 'core.free-chat', 'core.rag-ask', 'core.workflow-run'].sort(),
-    );
-  });
+
 });

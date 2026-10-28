@@ -12,7 +12,7 @@ import type { NavigationHandler } from './navigationHandler.js';
 import type { InvocationHandler } from './invocationHandler.js';
 import type { ResolutionResult, Suggestion } from './resolution.js';
 import { interactivePolicy, type RecoveryPolicy } from './recoveryPolicy.js';
-import { setPendingForceShape, setPendingAutoRun, setPendingSelection } from '../utils/compose.js';
+import { setPendingSelection } from '../utils/compose.js';
 
 export interface RouterConfig {
   navigationHandler: NavigationHandler;
@@ -257,9 +257,7 @@ export function createIntentRouter(config: RouterConfig): IntentRouter {
           // configured hosts retain their old behavior until their implementation is retired.
           const parkAnswerRun = (): void => {
             if (searchTarget) setPendingSelection(null);
-            setPendingForceShape(intent.address.kind === 'answer' ? intent.address.shape : null);
-            setPendingAutoRun(!searchTarget);
-          };
+            };
           switch (action.kind) {
             case 'proceed':
               parkAnswerRun();

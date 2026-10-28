@@ -435,6 +435,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
    * without one too.
    */
   let usage: Sv3ContextUsage | null = null;
+  let acceptedStructuredResult = false;
 
   let checking = false;
   const setChecking = (next: boolean): void => {
@@ -451,7 +452,10 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
       usage = readSv3ContextUsage(payload);
       if (req.schema !== undefined) {
         const final = (payload as { finalResponse?: unknown } | null)?.finalResponse;
-        if (typeof final === 'string') sink.onDelta(final);
+        if (typeof final === 'string' && final !== '') {
+          acceptedStructuredResult = true;
+          sink.onDelta(final);
+        }
       }
     },
     onReasoningChunk(payload: unknown) {
@@ -579,6 +583,10 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     setChecking(false);
   }
 
+  if (req.schema !== undefined && !acceptedStructuredResult) {
+    sink.onFailed('No result was returned.', 'NO_CONTENT');
+    return;
+  }
   sink.onDone(usage);
 }
 

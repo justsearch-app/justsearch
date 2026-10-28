@@ -44,7 +44,7 @@
  * checkpoint that actually does something.
  */
 
-import { parkSearchV3Handoff, peekSearchV3Handoff, takeSearchV3Handoff, takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../utils/compose.js';
+import { parkSearchV3Handoff, peekSearchV3Handoff, takeSearchV3Handoff, takePendingSelection, } from '../utils/compose.js';
 import { coerceAndValidate } from './stateValidator.js';
 import { getSurfaceStateSchema, resolveSurfaceStateSchema } from './surfaceSchemas.js';
 import type { StoreAdapter } from './storeRegistry.js';
@@ -214,8 +214,7 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       } else {
         takeSearchV3Handoff();
         if (addr.target !== 'core.unified-chat-surface') {
-          takePendingForceShape(); takePendingSelection(); takePendingAutoRun();
-        }
+          takePendingSelection(); }
       }
 
       // 1. Distribute state to registered StoreAdapters per the schema.

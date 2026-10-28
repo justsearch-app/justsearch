@@ -633,8 +633,9 @@ describe('the surface is registered as the main Search window', () => {
     expect(v3?.placement).not.toBe('DEEPLINK');
   });
 
-  it('loads lazily on its first activation', () => {
-    expect(isLazySurface('jf-sv3-window')).toBe(true);
+  it('registers eagerly as the landing window without a lazy loader', () => {
+    expect(isLazySurface('jf-sv3-window')).toBe(false);
+    expect(customElements.get('jf-sv3-window')).toBeDefined();
   });
 
   it('is in the component vocabulary, with every region it composes', () => {

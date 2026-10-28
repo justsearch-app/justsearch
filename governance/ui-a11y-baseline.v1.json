@@ -1,7 +1,7 @@
 {
   "$schema": "./ui-a11y-baseline.schema.json",
   "version": 1,
-  "description": "Shared a11y known-violation baseline (tempdoc 615 §13 Move 2). ONE authority for the per-surface axe rules accepted in the DETERMINISTIC route-mock capture state (jseval ui-shot --fixtures). Consumed by the Python ui-shot measurement and ui-a11y gate, which flag NEW-vs-known violations. knownRules = accepted debt; a violation NOT listed is NEW and must be investigated. Regenerate via scripts/jseval/experiments/regen_a11y_baseline.py after a deliberate change.",
+  "description": "Shared a11y known-violation baseline (tempdoc 615 \u00a713 Move 2). ONE authority for the per-surface axe rules accepted in the DETERMINISTIC route-mock capture state (jseval ui-shot --fixtures). Consumed by the Python ui-shot measurement and ui-a11y gate, which flag NEW-vs-known violations. knownRules = accepted debt; a violation NOT listed is NEW and must be investigated. Regenerate via scripts/jseval/experiments/regen_a11y_baseline.py after a deliberate change. WP1.5b: compatibility-chat-component rows now exercise Search directly. chat-spine-single/multi retired: Search has no minimap; recorded Delegate activity is covered by chat-bands and chat-activity-rail-open, and its budget by chat-budget. No duplicate spine substitute or accepted axe debt.",
   "captureState": "route-mock-fixtures (no backend, deterministic)",
   "surfaces": [
     {
@@ -65,39 +65,34 @@
       "knownRules": []
     },
     {
-      "surface": "compatibility-chat-component",
+      "surface": "search",
       "uiShotStep": "chat-proportion",
-      "knownRules": []
+      "knownRules": [],
+      "note": "Real registered Search state after WP1.5b; no compatibility-plugin mount."
     },
     {
-      "surface": "compatibility-chat-component",
+      "surface": "search",
       "uiShotStep": "chat-occlusion",
-      "knownRules": []
+      "knownRules": [],
+      "note": "Real registered Search state after WP1.5b; no compatibility-plugin mount."
     },
     {
-      "surface": "compatibility-chat-component",
+      "surface": "search",
       "uiShotStep": "chat-bands",
-      "knownRules": []
+      "knownRules": [],
+      "note": "Real registered Search state after WP1.5b; no compatibility-plugin mount."
     },
     {
-      "surface": "compatibility-chat-component",
+      "surface": "search",
       "uiShotStep": "chat-bands-detailed",
-      "knownRules": []
+      "knownRules": [],
+      "note": "Real registered Search state after WP1.5b; no compatibility-plugin mount."
     },
     {
-      "surface": "compatibility-chat-component",
+      "surface": "search",
       "uiShotStep": "chat-composer-small",
-      "knownRules": []
-    },
-    {
-      "surface": "compatibility-chat-component",
-      "uiShotStep": "chat-spine-single",
-      "knownRules": []
-    },
-    {
-      "surface": "compatibility-chat-component",
-      "uiShotStep": "chat-spine-multi",
-      "knownRules": []
+      "knownRules": [],
+      "note": "Real registered Search state after WP1.5b; no compatibility-plugin mount."
     },
     {
       "surface": "search",
@@ -108,13 +103,168 @@
       "surface": "search-v3",
       "uiShotStep": "sv3-composer-occlusion",
       "knownRules": [],
-      "note": "Tempdoc 859 live-leg — the FIRST Search v3 surface in this register. Until now `ui-a11y-gate` covered no sv3 step at all, so the window the product is being rebuilt around had zero axe coverage in the deterministic state; the independent measured audit that found it also ran axe against this capture and got 0 violations, which is why the row lands with an EMPTY knownRules list rather than accepted debt. `sv3-composer-occlusion` is the step to register because it is the only sv3 capture deterministic enough for the proportion register too (1280x800, `sv3-sources` fixtures variant, Sources disclosure open, scrolled to max), so both gates read the same rendered state."
+      "note": "Tempdoc 859 live-leg \u2014 the FIRST Search v3 surface in this register. Until now `ui-a11y-gate` covered no sv3 step at all, so the window the product is being rebuilt around had zero axe coverage in the deterministic state; the independent measured audit that found it also ran axe against this capture and got 0 violations, which is why the row lands with an EMPTY knownRules list rather than accepted debt. `sv3-composer-occlusion` is the step to register because it is the only sv3 capture deterministic enough for the proportion register too (1280x800, `sv3-sources` fixtures variant, Sources disclosure open, scrolled to max), so both gates read the same rendered state."
     },
     {
       "surface": "search-v3",
       "uiShotStep": "sv3-search-results",
       "knownRules": [],
-      "note": "WP1.1 — Search mode's result list (the shared `jf-results-card` inside `jf-sv3-results`) at 760x720 with the `sv3-results` fixtures variant's 24 hits, scrolled to the end under the floating composer. Lands with an EMPTY knownRules list: the first capture measured 0 axe violations."
+      "note": "WP1.1 \u2014 Search mode's result list (the shared `jf-results-card` inside `jf-sv3-results`) at 760x720 with the `sv3-results` fixtures variant's 24 hits, scrolled to the end under the floating composer. Lands with an EMPTY knownRules list: the first capture measured 0 axe violations."
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "home-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-mode",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-mode-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "qa-response",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "qa-response-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-proportion-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-occlusion-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-bands-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-bands-detailed-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-composer-small-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-wide-docked",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-wide-docked-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-evidence-rail",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-evidence-rail-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-activity-rail-open",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-activity-rail-open-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-budget",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-budget-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-chip-yield-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "sv3-composer-occlusion-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "sv3-search-results-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "sv3-hero-forced-colors",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "sv3-hero-forced-colors-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "sv3-docked-forced-colors",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "sv3-docked-forced-colors-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "sv3-palette-forced-colors",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "sv3-palette-forced-colors-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-model-only",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-model-only-light",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-structured",
+      "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "chat-structured-light",
+      "knownRules": []
     }
   ]
 }

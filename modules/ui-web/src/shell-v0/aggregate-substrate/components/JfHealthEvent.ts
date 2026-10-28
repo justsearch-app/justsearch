@@ -32,7 +32,6 @@ import {
   setSingleSelection,
   DEFAULT_CAPABILITIES_BY_KIND,
 } from '../../state/selectionState.js';
-import { setMenuAnchor } from '../../utils/selectionAnchor.js';
 
 export class JfHealthEvent extends JfElement {
   static override properties = {
@@ -76,10 +75,6 @@ export class JfHealthEvent extends JfElement {
     // — those have their own handlers and should not double as selection.
     const target = e.target as HTMLElement | null;
     if (target && target.closest('button')) return;
-    const rect = this.getBoundingClientRect();
-    if (rect.width > 0 || rect.height > 0) {
-      setMenuAnchor({ top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right });
-    }
     const ev = this.event as unknown as {
       readonly id?: string;
       readonly severity?: string;

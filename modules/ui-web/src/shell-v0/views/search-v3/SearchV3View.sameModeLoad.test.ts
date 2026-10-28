@@ -15,7 +15,7 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { registerCoreStores } from '../../router/bootstrap.js';
 import { createNavigationHandler } from '../../router/navigationHandler.js';
 import { deactivateProjection } from '../../router/URLProjector.js';
-import { takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../../utils/compose.js';
+import { takePendingSelection, } from '../../utils/compose.js';
 
 type Activation = 'pointer' | 'keyboard';
 const question = 'What is the chosen project code? Answer briefly.';
@@ -74,8 +74,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', http);
 });
 afterEach(async () => {
-  deactivateProjection(); takePendingSelection(); takePendingForceShape(); takePendingAutoRun();
-  document.body.replaceChildren(); await new Promise<void>(resolve => setTimeout(resolve, 0));
+  deactivateProjection(); takePendingSelection(); document.body.replaceChildren(); await new Promise<void>(resolve => setTimeout(resolve, 0));
   resetSearchState(); __resetAiStateForTest(); __resetAgentSessionStore();
   vi.unstubAllGlobals(); vi.restoreAllMocks();
 });

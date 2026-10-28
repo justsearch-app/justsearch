@@ -10,6 +10,8 @@
  * register via {@link registerXUiRenderer}. Lookups are case-sensitive on the hint name.
  */
 
+import { canonicalComponentTag } from '../componentIdentity.js';
+
 const _hintRegistry = new Map<string, string>();
 const _listeners = new Set<() => void>();
 
@@ -42,7 +44,8 @@ export function unregisterXUiRenderer(hint: string): boolean {
 
 /** Look up the mount tag for an x-ui-renderer hint, or undefined. */
 export function getXUiRendererTag(hint: string): string | undefined {
-  return _hintRegistry.get(hint);
+  const tag = _hintRegistry.get(hint);
+  return tag === undefined ? undefined : canonicalComponentTag(tag);
 }
 
 /** All registered hint names (sorted) — for diagnostics + tests. */

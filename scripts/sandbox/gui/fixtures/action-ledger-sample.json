@@ -35,7 +35,7 @@
       "originator": "user",
       "transport": "FE_EFFECT",
       "effectKind": "navigate",
-      "subject": "justsearch://surface/core.unified-chat-surface"
+      "subject": "justsearch://surface/core.search-v3-surface"
     },
     {
       "id": "fe-effect:3",

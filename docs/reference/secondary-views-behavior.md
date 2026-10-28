@@ -10,7 +10,7 @@ description: "Secondary view behavioral specification (Library, Brain, Health, S
 
 [`search-ui-behavior.md`](search-ui-behavior.md) documents the search experience (Zones A, C, D, E). This document covers the secondary views accessed through Zone B (the ActivityRail), plus the ActivityRail itself. Together they form the complete UI behavioral reference.
 
-> **Search-thread unification:** **Search** is the one rail window for the `retrieve` → Ask → Delegate progression. The retired `core.search-surface` aliases to `core.unified-chat-surface` for compatibility. Mode-specific Ask, free-chat, and extract IDs remain deep-link addresses but are not independent rail or split-pane destinations. The nav-items table below also carries pre-578 taxonomy + React-era styling drift tracked by tempdoc 579 — verify the live rail against `CoreSurfaceCatalog.java` + `ShellRail.ts`.
+> **Current main window:** Search (`core.search-v3-surface`, `jf-sv3-window`) owns Search, Ask, Structured and Delegate. The retired `core.unified-chat-surface`, `core.search-surface` and `core.agent-surface` ids alias directly to it. Mode-specific Ask, free-chat and extract addresses prepare this window and wait for Send. Workflow addresses show an unavailable notice. Library pairs with Search in a split.
 
 Source files (Lit surfaces under `modules/ui-web/src/shell-v0/`): the rail chrome
 `chrome/ShellRail.ts`, and the view surfaces `views/LibrarySurface.ts`,
@@ -42,7 +42,7 @@ Six items, split into two groups by a thin horizontal divider:
 
 | # | ID | Icon | Label | Tint color | Group |
 |---|-----|------|-------|------------|-------|
-| 1 | `unified-chat` | MessageSquare | Search | teal | Primary | _(the one interaction window — retrieve/Ask/Delegate)_ |
+| 1 | `core.search-v3-surface` | Search | Search | teal | Primary |
 | 2 | `library` | Library | Library | amber | Primary |
 | 3 | `brain` | Brain | AI Brain | teal | Primary |
 | 4 | `health` | Activity | Health | emerald | Primary |

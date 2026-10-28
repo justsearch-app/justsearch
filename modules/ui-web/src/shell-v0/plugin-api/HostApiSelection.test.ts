@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createHostApi } from './HostApiImpl.js';
 import { __feedForTest, __feedContactForTest, __resetAiStateForTest } from '../state/aiStateStore.js';
-import { takePendingSelection, takePendingForceShape, takePendingAutoRun } from '../utils/compose.js';
+import { takePendingSelection, } from '../utils/compose.js';
 import {
   __resetSelectionForTest,
   getSelection,
@@ -42,9 +42,8 @@ it('C5 plugin compose captures its chosen passage before navigation clears selec
   try {
     expect(host.selection.compose!({ operation: 'core.ask', userPrompt: 'Chosen question' })).toBe(true);
     expect(takePendingSelection()).toEqual({ kind: 'item', itemKind: 'browse-node', itemId: 'chosen.md' });
-    expect(takePendingForceShape()).toBe('core.rag-ask');
-  } finally {
-    takePendingSelection(); takePendingForceShape(); takePendingAutoRun(); __resetAiStateForTest();
+} finally {
+    takePendingSelection(); __resetAiStateForTest();
     await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
 });
