@@ -77,6 +77,14 @@ final class SyncDirectoryOps {
     userExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
   }
 
+  private java.util.function.BiPredicate<Path, Path> retirementExclusions = (file, root) -> {
+    throw new IllegalStateException("Retirement exclusion policy owner is unavailable");
+  };
+
+  void setRetirementExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
+    retirementExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
+  }
+
   private boolean excludedRecoveryPath(Path file, Path root) {
     return IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root);
   }
@@ -205,6 +213,13 @@ final class SyncDirectoryOps {
   RootDifference discoverCandidateDifference(
       String rootPath, boolean force, java.util.function.BooleanSupplier cancelled)
       throws IOException {
+    return discoverCandidateDifference(rootPath, force, cancelled, null, null);
+  }
+
+  /** Native-only strict snapshot; ordinary maintenance/recorded walks keep their existing path. */
+  RootDifference discoverCandidateDifference(String rootPath, boolean force,
+      java.util.function.BooleanSupplier cancelled, NativePolicyReplay nativePolicy, String collection)
+      throws IOException {
     checkCancelled(cancelled);
     Path root;
     try {
@@ -229,6 +244,8 @@ final class SyncDirectoryOps {
                 throws IOException {
               checkCancelled(cancelled);
               if (scope.excludes(dir.toString())) return FileVisitResult.SKIP_SUBTREE;
+              if (!dir.equals(root) && nativePolicy != null
+                  && nativePolicy.excludesDirectory(dir, root, collection)) return FileVisitResult.SKIP_SUBTREE;
               if (!Files.isReadable(dir)) {
                 throw new IOException("Reconciliation directory is unreadable: " + dir);
               }
@@ -254,10 +271,16 @@ final class SyncDirectoryOps {
               if (!seenDiskPaths.add(normalized)) return FileVisitResult.CONTINUE;
               budget.retain(normalized.length());
               requireBelowCap(seenDiskPaths.size(), "disk");
+              // A known UI omission does not read content or require readability. Its
+              // retained receipt, if any, is proved separately by WatcherReplay.
+              if (nativePolicy != null && nativePolicy.excludes(file, root, collection)) {
+                return FileVisitResult.CONTINUE;
+              }
               if (!Files.isReadable(file)) {
                 throw new IOException("Reconciliation file is unreadable: " + file);
               }
-              if (!IngestionSkipPolicy.shouldSkipWithinRoot(file, root) && !isCloudPlaceholder(file)) {
+              if ((nativePolicy == null ? !IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
+                      : nativePolicy.allows(file, root, collection)) && !isCloudPlaceholder(file)) {
                 // Conservatively account for the Path's spelling and component storage as well
                 // as the separately retained normalized disk key.
                 budget.retain(2L * file.toString().length());
@@ -270,6 +293,11 @@ final class SyncDirectoryOps {
             public FileVisitResult visitFileFailed(Path file, IOException failure)
                 throws IOException {
               checkCancelled(cancelled);
+              // An inaccessible directory may reach this callback before preVisitDirectory.
+              // Only the same proven subtree authority can omit it without opening it.
+              if (!file.equals(root) && nativePolicy != null
+                  && nativePolicy.excludesDirectory(file, root, collection)
+                  && Files.isDirectory(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return FileVisitResult.CONTINUE;
               throw new IOException("Reconciliation walk could not read: " + file, failure);
             }
 
@@ -573,6 +601,44 @@ final class SyncDirectoryOps {
     return execute(rootPath, force, provenance, cancelled, collection, AdmissionMode.DEFAULT);
   }
 
+  @SuppressWarnings("ReturnValueIgnored") // Validate policy even when A and the ROOT are empty.
+  private void requireRetirementPolicy(Path root, java.util.function.BooleanSupplier cancelled)
+      throws IOException {
+    // A forgotten file can be absent on disk but still indexed. Stream A before any prune;
+    // ordinary forced ROOT replay has no retained-path cap or whole-index heap census.
+    retirementExclusions.test(root, root);
+    if (readPathOps == null) throw new IOException("Serving index read path is unavailable");
+    var scope = prefixScopeFactory.apply(root);
+    var query = io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.excludingSubtrees(
+        new org.apache.lucene.search.PrefixQuery(new org.apache.lucene.index.Term(
+            SchemaFields.PATH, PathNormalizer.normalizePathPrefix(root.toString()))),
+        scope.excludedSubtrees());
+    String cursor = null;
+    do {
+      checkCancelled(cancelled);
+      var page = readPathOps.search(query, 256,
+          Set.of(SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID),
+          LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, cursor);
+      if (page == null) throw new IOException("Serving index path scan returned no result");
+      for (var hit : page.hits()) {
+        checkCancelled(cancelled);
+        if (hit.fields().get(SchemaFields.PROJECTION_SOURCE_ID) != null) continue;
+        String stored = hit.fields().get(SchemaFields.PATH);
+        if (stored == null) throw new IOException("Serving file path metadata is unavailable");
+        Path file = Path.of(stored);
+        if (!file.isAbsolute() || !stored.equals(PathNormalizer.normalizeKey(file))
+            || !scope.contains(stored)) throw new IOException("Serving file path is not canonical under ROOT");
+        if (retirementExclusions.test(file, root))
+          throw new IOException(WorkerIngestService.RETIREMENT_EXCLUDED_INDEXED);
+      }
+      String next = page.nextCursor();
+      if (next != null && !next.isBlank() && next.equals(cursor))
+        throw new IOException("Serving index path scan repeated its cursor");
+      cursor = next;
+    } while (cursor != null && !cursor.isBlank());
+    checkCancelled(cancelled);
+  }
+
   /** Admission only: rebuilding CURRENT Q membership never publishes a prune/walk certificate. */
   SyncDirectoryResponse enumerateRetirementRoot(String rootPath,String collection,
       java.util.function.BooleanSupplier cancelled,boolean automatic,
@@ -581,6 +647,7 @@ final class SyncDirectoryOps {
     Path root=resolveSyncRoot(rootPath);
     if(root==null)return syncDirectoryErrorResponse("ROOT enumeration unavailable");
     try {
+      requireRetirementPolicy(root, cancelled);
       var result=walkAndEnqueueMissingFiles(root,true,Set.of(),
           io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.payload()).provenance(),
           cancelled,collection,automatic?AdmissionMode.UPGRADE_RECOVERY:AdmissionMode.RETIREMENT_REPLAY,
@@ -631,6 +698,7 @@ final class SyncDirectoryOps {
     int filesDeleted = 0;
 
     try {
+      if (originalRoot != null) requireRetirementPolicy(root, cancelled);
       var scope = prefixScopeFactory.apply(root);
       if (upgradeRecovery && recoveryAdmission.applyAsInt(() -> 1) != 1) {
         return syncDirectoryErrorResponse("Upgrade recovery root was removed or is no longer declared");
@@ -836,6 +904,9 @@ final class SyncDirectoryOps {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (prefixScopeFactory.apply(root).excludes(file.toString())) return FileVisitResult.CONTINUE;
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
+              if (originalRoot != null && retirementExclusions.test(file, root)) {
+                return FileVisitResult.CONTINUE;
+              }
               if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
                 return FileVisitResult.CONTINUE;
               }
@@ -914,6 +985,7 @@ final class SyncDirectoryOps {
             var admitted = entries.stream()
                 .filter(entry -> !admissionScope.excludes(entry.path().toString()))
                 .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
+                .filter(entry -> originalRoot == null || !retirementExclusions.test(entry.path(), root))
                 .map(entry -> entry.withinRoot(root))
                 .toList();
             if (originalRoot != null) {

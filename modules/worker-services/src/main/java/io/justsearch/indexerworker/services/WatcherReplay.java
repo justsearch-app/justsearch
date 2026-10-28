@@ -31,6 +31,8 @@ public final class WatcherReplay implements AutoCloseable {
   private final List<WorkerMutationAdmission.RootUncertainty> uncertainties;
   private final SyncDirectoryOps.RootDifference difference;
   private final BooleanSupplier cancelled;
+  private final NativePolicyReplay nativePolicy;
+  private final java.util.Set<String> policyOmitted = new LinkedHashSet<>();
   // Empty string is a freshly confirmed absence, never an unspecified outcome.
   private final Map<String, String> outcomes = new LinkedHashMap<>();
   private boolean committed;
@@ -42,6 +44,14 @@ public final class WatcherReplay implements AutoCloseable {
       WorkerIngestService publisher, IndexingPacing pacing,
       List<ResolvedConfig.FileSource> declarations, List<String> admittedPaths,
       BooleanSupplier cancelled) throws IOException {
+    this(debt, target, queue, publisher, pacing, declarations, admittedPaths, cancelled, null);
+  }
+
+  public WatcherReplay(WatcherRootReconciliation debt, RunningRuntime target, JobQueue queue,
+      WorkerIngestService publisher, IndexingPacing pacing,
+      List<ResolvedConfig.FileSource> declarations, List<String> admittedPaths,
+      BooleanSupplier cancelled, NativePolicyReplay nativePolicy) throws IOException {
+    this.nativePolicy = nativePolicy;
     this.debt = debt;
     this.target = Objects.requireNonNull(target);
     this.queue = queue;
@@ -69,7 +79,7 @@ public final class WatcherReplay implements AutoCloseable {
         .filter(path -> !path.equals(root) && path.startsWith(root)).map(Path::toString).toList());
     var discovery = new SyncDirectoryOps(target.readPathOps(), null, null, queue, pacing);
     discovery.setPrefixScopeFactory(ignored -> scope);
-    difference = discovery.discoverCandidateDifference(debt.root(), true, cancelled);
+    difference = discovery.discoverCandidateDifference(debt.root(), true, cancelled, nativePolicy, debt.collection());
     try {
       requireIdentity();
       var paths = new LinkedHashSet<String>();
@@ -83,7 +93,10 @@ public final class WatcherReplay implements AutoCloseable {
         }
         paths.add(path);
       }
-      for (String path : paths) outcomes.put(path, observe(path));
+      for (String path : paths) {
+        if (excluded(path)) policyOmitted.add(path);
+        else outcomes.put(path, observe(path));
+      }
       requireIdentity();
     } catch (IOException | RuntimeException failure) {
       difference.close();
@@ -95,10 +108,17 @@ public final class WatcherReplay implements AutoCloseable {
   public void prepare(String generation,
       List<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp> frozen,
       io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp rootReceipt) throws IOException {
+    bind(generation, frozen, rootReceipt);
+    prepare();
+  }
+
+  /** Bind before a broad deletion asks for a read-only omitted-path proof. */
+  public void bind(String generation,
+      List<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp> frozen,
+      io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp rootReceipt) {
     candidate = generation;
     journal = List.copyOf(frozen);
     receipt = rootReceipt;
-    prepare();
   }
 
   /** Writers can defer a stale source during a drain; re-probe uncommitted roots each time. */
@@ -107,8 +127,12 @@ public final class WatcherReplay implements AutoCloseable {
   }
 
   public boolean covers(String path, String collection) {
-    return outcomes.containsKey(path)
-        && Objects.equals(rootOwnerCollection(collection), rootOwnerCollection(debt.collection()));
+    if (!Objects.equals(rootOwnerCollection(collection), rootOwnerCollection(debt.collection()))) return false;
+    if (policyOmitted.contains(path)) {
+      try { return proveOmission(path, false); }
+      catch (IOException | RuntimeException unknown) { return false; }
+    }
+    return outcomes.containsKey(path);
   }
 
   /** Candidate survivor names only; callers must verify each selected path before using it. */
@@ -135,8 +159,18 @@ public final class WatcherReplay implements AutoCloseable {
     if (journal == null || !(queue instanceof io.justsearch.indexerworker.queue.SwitchBufferCapableQueue conditional)) {
       throw new IOException("Watcher reconciliation has no frozen journal owner");
     }
-    for (var outcome : outcomes.entrySet()) {
-      String path = outcome.getKey();
+    var paths = new LinkedHashSet<>(outcomes.keySet());
+    paths.addAll(policyOmitted);
+    for (String path : paths) {
+      if (excluded(path)) {
+        if (!proveOmission(path, orderedApply)) {
+          throw new IOException("Watcher policy omission lacks its exact current owner: " + path);
+        }
+        outcomes.remove(path);
+        policyOmitted.add(path);
+        continue;
+      }
+      policyOmitted.remove(path);
       try {
         java.util.function.Supplier<Boolean> transition = () -> {
           try {
@@ -154,7 +188,7 @@ public final class WatcherReplay implements AutoCloseable {
             };
             boolean applied = conditional.reconcileWatcherFile(file, proof,
                 () -> target.indexingCoordinator().deleteByIdAndChunks(path));
-            outcome.setValue(source);
+            outcomes.put(path, source);
             return applied;
           } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
         };
@@ -176,6 +210,9 @@ public final class WatcherReplay implements AutoCloseable {
         throw new IOException("Watcher reconciliation lacks a committed path outcome: " + outcome.getKey());
       }
     }
+    for (String path : policyOmitted) {
+      if (!proveOmission(path, true)) throw new IOException("Watcher policy omission changed: " + path);
+    }
     requireIdentity();
     committed = true;
     if (publisher != null) {
@@ -193,8 +230,31 @@ public final class WatcherReplay implements AutoCloseable {
   /** A later accepted deletion may supersede this outcome; the replay caller judges ordering. */
   public boolean verifies(String path, String collection) throws IOException {
     requireIdentity();
-    return committed && covers(path, collection)
-        && outcomes.get(path).equals(observe(path)) && matches(path, outcomes.get(path));
+    if (!committed || !covers(path, collection)) return false;
+    if (policyOmitted.contains(path)) return proveOmission(path, true);
+    return outcomes.get(path).equals(observe(path)) && matches(path, outcomes.get(path));
+  }
+
+  private boolean excluded(String path) {
+    return nativePolicy != null && nativePolicy.excludes(Path.of(path), Path.of(debt.root()), debt.collection());
+  }
+
+  private boolean proveOmission(String path, boolean orderedApply) throws IOException {
+    requireIdentity();
+    if (!excluded(path) || candidate == null || journal == null || receipt == null
+        || !(queue instanceof io.justsearch.indexerworker.queue.SwitchBufferCapableQueue conditional)) return false;
+    if (publisher == null) return false;
+    return publisher.tryNativePolicyFileProof(() -> {
+      try {
+        requireIdentity();
+        target.commitOps().maybeRefreshBlocking();
+        if (!excluded(path) || target.indexCountOps().countByIdAndChunksStrict(path) != 0) return false;
+        var expected = conditional.watcherReconciliationRow(path);
+        var file = new io.justsearch.indexerworker.queue.WatcherReconciliationFile(candidate,
+            journal, receipt, path, null, 0, orderedApply, true, expected, true);
+        return nativePolicy.certifyRoot(file, difference.rootIdentity());
+      } catch (IOException | RuntimeException unknown) { return false; }
+    });
   }
 
   private boolean matches(String path, String source) throws IOException {
@@ -214,8 +274,10 @@ public final class WatcherReplay implements AutoCloseable {
     if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("Watcher reconciliation source is unreadable or not regular: " + path);
     }
-    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
-            file, Path.of(debt.root())) || SyncDirectoryOps.isCloudPlaceholder(file)) {
+    if ((nativePolicy == null
+            ? io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, Path.of(debt.root()))
+            : !nativePolicy.allows(file, Path.of(debt.root()), debt.collection()))
+        || SyncDirectoryOps.isCloudPlaceholder(file)) {
       throw new IOException("Watcher reconciliation cannot certify an ineligible source: " + path);
     }
     return SourceContentHash.sha256(file);
@@ -223,6 +285,7 @@ public final class WatcherReplay implements AutoCloseable {
 
   private void requireIdentity() throws IOException {
     SyncDirectoryOps.checkCancelled(cancelled);
+    if (nativePolicy != null && !nativePolicy.current()) throw new IOException("Published native policy changed");
     difference.requireCurrentRootIdentity();
     if (difference.rootIdentity().volume() == null
         || !difference.rootIdentity().matchesReceipt(debt.rootIdentity())) {

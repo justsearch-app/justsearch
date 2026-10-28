@@ -45,6 +45,48 @@ public interface OperationAttemptRunner {
     throw new UnsupportedOperationException("Durable attempt handoff is unavailable");
   }
 
+  /** End this bounded FORGET segment without terminalizing its durable intent or holding capacity. */
+  default void parkForget(OperationRecordHandle handle, ForgetProgress progress) {
+    throw new UnsupportedOperationException("Forget segments are unavailable");
+  }
+
+  /** Explicit owner retry/withdrawal only; no scheduling loop and no replay of caller arguments. */
+  default Result resumeForget(String key, Function<OperationRecordHandle, OperationExecution> body) {
+    throw new UnsupportedOperationException("Forget segments are unavailable");
+  }
+
+  default java.util.Optional<OperationRecord> requestForgetWithdrawal(String key) {
+    throw new UnsupportedOperationException("Forget withdrawal is unavailable");
+  }
+
+  /** Runner owns the conditional terminal write; caller publishes only after ALL physical locks. */
+  default OperationStore.DeferredForgetCompletion finishForget(OperationRecordHandle handle,
+      Long expectedAcceptanceSequence, OperationState terminalState, OperationReceipt receipt) {
+    throw new UnsupportedOperationException("Forget completion is unavailable");
+  }
+
+  default io.justsearch.app.api.settings.SettingsCommitOwner.PreparedForgetProjection
+      prepareForgetProjection(OperationRecordHandle handle) {
+    throw new UnsupportedOperationException("Forget settings projection is unavailable");
+  }
+
+  /** Explicit retry may resolve an armed settings step before attempting another segment. */
+  default boolean reconcileForgetProjection(OperationRecordHandle handle) {
+    throw new UnsupportedOperationException("Forget settings projection is unavailable");
+  }
+
+  default void preflightForget(ForgetPlan plan) {
+    throw new UnsupportedOperationException("Forget policy authority is unavailable");
+  }
+
+  default io.justsearch.app.api.settings.SettingsCommitOwner.ForgetPolicy forgetPolicy(OperationRecordHandle handle) {
+    return io.justsearch.app.api.settings.SettingsCommitOwner.ForgetPolicy.UNKNOWN;
+  }
+
+  default io.justsearch.app.api.settings.SettingsCommitOwner.ForgetPolicy observeForgetPolicy(String key) {
+    return io.justsearch.app.api.settings.SettingsCommitOwner.ForgetPolicy.UNKNOWN;
+  }
+
   record Request(String key, OperationDescriptor descriptor, EngineContext context,
       InvocationProvenance provenance, OperationHistoryMode historyMode) {
     public Request {

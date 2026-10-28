@@ -6,7 +6,7 @@ import java.sql.Statement;
 
 /** The operations database's independent version ladder; jobs.db keeps its own identity. */
 public final class OperationSchema {
-  public static final int VERSION = 5;
+  public static final int VERSION = 6;
 
   static final String CREATE_OPERATIONS = """
       CREATE TABLE operations (

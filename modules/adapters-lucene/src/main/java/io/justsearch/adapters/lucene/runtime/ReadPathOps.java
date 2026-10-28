@@ -68,6 +68,203 @@ public final class ReadPathOps {
     return new SearcherBridge(session).withSearcher(operation);
   }
 
+  /**
+   * Complete metadata-only inspection of one live reader. The caller must exclude all writers
+   * through use of the result; a sequence witness additionally rejects owner-thread replay writes.
+   * Stored-only ownership markers and legal lexical PATH aliases cannot be selected by postings.
+   */
+  public NativeOwnership inspectNativeOwnership(Set<String> paths, java.util.function.Predicate<String> reservedIdentity, long deadlineNanos) throws IOException {
+    return session.indexingCoordinator.inspectNativeOwnership(paths, reservedIdentity, deadlineNanos);
+  }
+
+  NativeOwnership inspectNativeOwnershipUnderWriterExclusion(Set<String> paths,
+      java.util.function.Predicate<String> reservedIdentity, long deadlineNanos) throws IOException {
+    var lifecycle = session.snapshot;
+    if (lifecycle == null || lifecycle.searcherManager() == null
+        || lifecycle.writer() != null && !lifecycle.writer().isOpen()) {
+      throw new IOException("Native ownership runtime is unavailable");
+    }
+    var writer = lifecycle.writer();
+    // Read-only A has no in-process writer. An upgrade replaces the lifecycle snapshot and
+    // invalidates this proof; writable A/B additionally reject every completed owner write.
+    lifecycle.searcherManager().maybeRefreshBlocking();
+    Long sequence = writer == null ? null : writer.getMaxCompletedSequenceNumber();
+    Set<String> selected = Set.copyOf(paths);
+    NativeMembership membership = new SearcherBridge(session).withSearcherNoRefresh(searcher -> {
+      Set<String> blocked = new HashSet<>();
+      Set<String> fields = Set.of(idField, SchemaFields.PATH, SchemaFields.COLLECTION,
+          SchemaFields.PARENT_DOC_ID, SchemaFields.PROJECTION_SOURCE_ID);
+      for (var leaf : searcher.getIndexReader().leaves()) {
+        var live = leaf.reader().getLiveDocs();
+        var stored = leaf.reader().storedFields();
+        for (int doc = 0; doc < leaf.reader().maxDoc(); doc++) {
+          if (System.nanoTime() >= deadlineNanos || Thread.currentThread().isInterrupted()) {
+            throw new IOException("Native ownership inspection is incomplete");
+          }
+          if (live != null && !live.get(doc)) continue;
+          var metadata = nativeMetadata(searcher, leaf.docBase + doc, stored.document(doc, fields), fields);
+          String id = requiredNativeIdentity(metadata.get(idField));
+          Set<String> associations = new HashSet<>();
+          nativeAssociation(associations, id);
+          nativeAssociation(associations, metadata.get(SchemaFields.PATH));
+          boolean protectedOwner = protectedNativeOwner(metadata, id, reservedIdentity);
+          Set<String> visited = new HashSet<>();
+          visited.add(id);
+          String associatedPath = nativeKey(metadata.get(SchemaFields.PATH));
+          boolean consistent = true;
+          String parent = metadata.get(SchemaFields.PARENT_DOC_ID);
+          while (parent != null) {
+            if (System.nanoTime() >= deadlineNanos) throw new IOException("Native ownership join is incomplete");
+            requiredNativeIdentity(parent);
+            if (!visited.add(parent) || visited.size() > 64) {
+              throw new IOException("Native ownership parent chain is incomplete");
+            }
+            nativeAssociation(associations, parent);
+            var hits = searcher.search(new TermQuery(new Term(idField, parent)), 2);
+            if (hits.scoreDocs.length != 1) throw new IOException("Native ownership parent is missing or ambiguous");
+            var ancestor = nativeMetadata(searcher, hits.scoreDocs[0].doc,
+                searcher.storedFields().document(hits.scoreDocs[0].doc, fields), fields);
+            if (!java.util.Objects.equals(metadata.get(SchemaFields.COLLECTION), ancestor.get(SchemaFields.COLLECTION))) consistent = false;
+            if (!parent.equals(ancestor.get(idField))) throw new IOException("Native ownership parent identity changed");
+            String parentPath = nativeKey(ancestor.get(SchemaFields.PATH));
+            if (parentPath != null) {
+              if (associatedPath != null && !associatedPath.equals(parentPath)) consistent = false;
+              associatedPath = parentPath;
+            }
+            nativeAssociation(associations, ancestor.get(SchemaFields.PATH));
+            protectedOwner |= protectedNativeOwner(ancestor, parent, reservedIdentity);
+            parent = ancestor.get(SchemaFields.PARENT_DOC_ID);
+          }
+          associations.retainAll(selected);
+          if (associations.isEmpty()) continue;
+          // Multiple physical associations or a non-file identity cannot prove ordinary ownership.
+          String source = metadata.get(SchemaFields.PATH);
+          String parentId = metadata.get(SchemaFields.PARENT_DOC_ID);
+          String ordinary = nativeKey(parentId == null ? id : parentId);
+          if (protectedOwner || !consistent || ordinary == null
+              || associatedPath != null && !associatedPath.equals(ordinary)
+              || source != null && !java.util.Objects.equals(nativeKey(source), ordinary)
+              || associations.stream().anyMatch(key -> !key.equals(ordinary))) {
+            blocked.addAll(associations);
+          }
+        }
+      }
+      Set<String> absent = new HashSet<>();
+      for (String path : selected) {
+        if (System.nanoTime() >= deadlineNanos) throw new IOException("Native absence inspection is incomplete");
+        if (searcher.count(IndexCountOps.idAndChunksQuery(path)) == 0) absent.add(path);
+      }
+      return new NativeMembership(Set.copyOf(blocked), Set.copyOf(absent));
+    });
+    if (Thread.currentThread().isInterrupted() || System.nanoTime() >= deadlineNanos || session.snapshot != lifecycle
+        || writer != null && sequence.longValue() != writer.getMaxCompletedSequenceNumber()) {
+      throw new IOException("Native ownership changed during inspection");
+    }
+    return new NativeOwnership(lifecycle, sequence, deadlineNanos, selected, membership);
+  }
+
+  private org.apache.lucene.document.Document nativeMetadata(IndexSearcher searcher, int doc,
+      org.apache.lucene.document.Document metadata, Set<String> fields) throws IOException {
+    requireNativeMetadata(metadata);
+    var leaves = searcher.getIndexReader().leaves();
+    var leaf = leaves.get(ReaderUtil.subIndex(doc, leaves));
+    int local = doc - leaf.docBase;
+    for (String field : fields) {
+      var info = leaf.reader().getFieldInfos().fieldInfo(field);
+      if (info == null || info.getDocValuesType() == org.apache.lucene.index.DocValuesType.NONE) continue;
+      String value = null;
+      // Scalar control metadata must not use the general projection's best-effort fallback
+      // for an incompatible column. Read the actual column strictly in this same reader.
+      switch (info.getDocValuesType()) {
+        case SORTED -> {
+          var column = DocValues.getSorted(leaf.reader(), field);
+          if (column.advanceExact(local)) value = column.lookupOrd(column.ordValue()).utf8ToString();
+        }
+        case SORTED_SET -> {
+          var column = DocValues.getSortedSet(leaf.reader(), field);
+          if (column.advanceExact(local)) {
+            if (column.docValueCount() != 1) throw new IOException("Native ownership metadata is not scalar");
+            value = column.lookupOrd(column.nextOrd()).utf8ToString();
+          }
+        }
+        default -> throw new IOException("Native ownership metadata column has an incompatible type");
+      }
+      if (value == null) continue;
+      String stored = metadata.get(field);
+      if (stored != null && !stored.equals(value)) {
+        throw new IOException("Native ownership stored and doc-values metadata disagree");
+      }
+      if (stored == null) metadata.add(new org.apache.lucene.document.StoredField(field, value));
+    }
+    return metadata;
+  }
+
+  private void requireNativeMetadata(org.apache.lucene.document.Document metadata) throws IOException {
+    for (String field : List.of(idField, SchemaFields.PATH, SchemaFields.COLLECTION, SchemaFields.PARENT_DOC_ID)) {
+      if (metadata.getFields(field).length > 1) throw new IOException("Native ownership metadata is ambiguous");
+      var value = metadata.getField(field);
+      if (value != null && value.stringValue() == null) throw new IOException("Native ownership metadata is not text");
+    }
+  }
+
+  private static String requiredNativeIdentity(String id) throws IOException {
+    if (id == null || id.isBlank()) throw new IOException("Native ownership identity is missing");
+    return id;
+  }
+
+  private static boolean protectedNativeOwner(org.apache.lucene.document.Document metadata, String id,
+      java.util.function.Predicate<String> reservedIdentity) {
+    return metadata.getField(SchemaFields.PROJECTION_SOURCE_ID) != null
+        || reservedIdentity.test(id)
+        || io.justsearch.configuration.InternalCollections.isReserved(metadata.get(SchemaFields.COLLECTION));
+  }
+
+  private static void nativeAssociation(Set<String> associations, String value) {
+    String key = nativeKey(value);
+    if (key != null) associations.add(key);
+  }
+
+  private static String nativeKey(String value) {
+    if (value == null || value.isBlank()) return null;
+    try {
+      var path = java.nio.file.Path.of(value);
+      if (!path.isAbsolute()) return null;
+      String key = path.normalize().toString();
+      return io.justsearch.configuration.PlatformPaths.isWindows()
+          ? key.toLowerCase(java.util.Locale.ROOT) : key;
+    } catch (java.nio.file.InvalidPathException nonFile) { return null; }
+  }
+
+  private record NativeMembership(Set<String> protectedPaths, Set<String> absent) {}
+
+  /** Attempt-local only: no reader/commit epoch is treated as an all-write permission. */
+  public final class NativeOwnership {
+    private final LifecycleSnapshot lifecycle;
+    private final Long sequence;
+    private final long deadlineNanos;
+    private final Set<String> selected;
+    private final NativeMembership membership;
+
+    private NativeOwnership(LifecycleSnapshot lifecycle, Long sequence, long deadlineNanos,
+        Set<String> selected, NativeMembership membership) {
+      this.lifecycle = lifecycle; this.sequence = sequence; this.deadlineNanos = deadlineNanos;
+      this.selected = selected; this.membership = membership;
+    }
+
+    public boolean ordinary(String path) {
+      return current() && selected.contains(path) && !membership.protectedPaths().contains(path);
+    }
+
+    /** Same exact ID/chunk query as IndexCountOps, evaluated during preparation, never publication. */
+    public boolean absent(String path) { return current() && membership.absent().contains(path); }
+
+    private boolean current() {
+      return !Thread.currentThread().isInterrupted() && System.nanoTime() < deadlineNanos && session.snapshot == lifecycle
+          && (sequence == null ? lifecycle.writer() == null : lifecycle.writer().isOpen()
+              && lifecycle.writer().getMaxCompletedSequenceNumber() == sequence.longValue());
+    }
+  }
+
   org.apache.lucene.search.ScoreDoc decodeSearchAfterCursor(
       IndexSearcher searcher, String token, RuntimeSearchSort expectedSort) {
     SearchAfterCursorHelper.DecodedCursor decoded = SearchAfterCursorHelper.decode(token);

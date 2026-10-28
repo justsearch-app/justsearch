@@ -62,6 +62,9 @@ public final class CoreOperationCatalog implements OperationCatalog {
   public static final OperationRef BULK_REINDEX = new OperationRef("core.bulk-reindex");
   public static final OperationRef ACCEPT_GAPS = new OperationRef("core.accept-gaps");
   public static final OperationRef CANCEL_REINDEX = new OperationRef("core.cancel-reindex");
+  public static final OperationRef FORGET_INDEXED_PATH = new OperationRef("core.forget-indexed-path");
+  public static final OperationRef RETRY_FORGET = new OperationRef("core.retry-forget");
+  public static final OperationRef WITHDRAW_FORGET = new OperationRef("core.withdraw-forget");
   /**
    * Slice 447-followup-bulk-reindex-recovery (Option A) + §X.11.5 Phase 7: parameterless
    * full-corpus rebuild wrapper. {@link #BULK_REINDEX} requires a {@code corpusIds}
@@ -346,6 +349,9 @@ public final class CoreOperationCatalog implements OperationCatalog {
       acceptGaps(),
       rebuildIndex(),
       cancelReindex(),
+      forgetIndexedPath(),
+      forgetDecision(RETRY_FORGET),
+      forgetDecision(WITHDRAW_FORGET),
       pingBackend(),
       clearFailedJobs(),
       reindex(),
@@ -476,6 +482,35 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false),
         OperationAvailability.empty(), OperationLineage.empty(), Binding.of(CANCEL_REINDEX),
         Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.OPERATOR);
+  }
+
+  private static Operation forgetIndexedPath() {
+    return new Operation(FORGET_INDEXED_PATH,
+        Presentation.forId(FORGET_INDEXED_PATH, Optional.of("warning"), Optional.of("destructive")),
+        Interface.inputsOnly("""
+            {"type":"object","additionalProperties":false,"properties":{
+              "path":{"type":"string","minLength":1},
+              "scope":{"type":"string","enum":["FILE","FOLDER"]}},"required":["path","scope"]}
+            """),
+        new OperationPolicy(RiskTier.HIGH, ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.FORGET)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(FORGET_INDEXED_PATH),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.USER);
+  }
+
+  private static Operation forgetDecision(OperationRef ref) {
+    return new Operation(ref,
+        Presentation.forId(ref, Optional.of("warning"), Optional.of("destructive")),
+        Interface.inputsOnly("""
+            {"type":"object","additionalProperties":false,"properties":{
+              "forgetKey":{"type":"string","minLength":36,"maxLength":36}},"required":["forgetKey"]}
+            """),
+        new OperationPolicy(RiskTier.HIGH, ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(ref),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.USER);
   }
 
   /**

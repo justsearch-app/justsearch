@@ -87,7 +87,34 @@
         "excludePatterns" : {
           "type" : [ "array", "null" ],
           "items" : {
-            "type" : "string"
+            "anyOf" : [ {
+              "type" : "string"
+            }, {
+              "type" : "object",
+              "properties" : {
+                "literal" : {
+                  "type" : "object",
+                  "properties" : {
+                    "id" : {
+                      "type" : "string"
+                    },
+                    "path" : {
+                      "type" : "string"
+                    },
+                    "scope" : {
+                      "type" : "string",
+                      "enum" : [ "FILE", "FOLDER" ]
+                    },
+                    "version" : {
+                      "type" : "integer",
+                      "const" : 1
+                    }
+                  },
+                  "required" : [ "id", "path", "scope", "version" ]
+                }
+              },
+              "required" : [ "literal" ]
+            } ]
           }
         },
         "hasSeenTrustLoopNudge" : {

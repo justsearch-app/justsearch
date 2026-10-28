@@ -1,0 +1,383 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T15:50:25.382Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "d661d52c066f6f51a95d170d71bda2bc1c53873d",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorExclusionStillCannotCertifyAProjectionOwner\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.allCommittedAckConsumersRetainAReplayedProjectionOwner\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorOperatorExclusionNeverInventsUiOmissionAuthority\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 61000,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-security-9536809b/run-3.log",
+      "outputDigest": "sha256:bae7883ffb622bd5139d0683efa04a39c1acf5e18c24c1b417f90fc4d8d57bfc"
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest.declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority\" --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest.folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12939,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-security-9536809b/run-4.log",
+      "outputDigest": "sha256:e0f4ece1bb56fefd7dee07973b42c4058d37a1248671a7cd8f3bcd188456e65b"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,target)",
+          "status": "passed"
+        },
+        {
+          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,serving)",
+          "status": "passed"
+        },
+        {
+          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,both)",
+          "status": "passed"
+        },
+        {
+          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(dot,target)",
+          "status": "passed"
+        },
+        {
+          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(dot,serving)",
+          "status": "passed"
+        },
+        {
+          "name": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(dotdot,target)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(declared)",
+          "status": "passed"
+        },
+        {
+          "name": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(subscribed)",
+          "status": "passed"
+        },
+        {
+          "name": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(awaiting)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(parent)",
+          "status": "passed"
+        },
+        {
+          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(missing-parent)",
+          "status": "passed"
+        },
+        {
+          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(blank-marker)",
+          "status": "passed"
+        },
+        {
+          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(reserved-id)",
+          "status": "passed"
+        },
+        {
+          "name": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(late-alias)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ancestorExclusionStillCannotCertifyAProjectionOwner",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ancestorExclusionStillCannotCertifyAProjectionOwner()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#allCommittedAckConsumersRetainAReplayedProjectionOwner",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "allCommittedAckConsumersRetainAReplayedProjectionOwner(simple)",
+          "status": "passed"
+        },
+        {
+          "name": "allCommittedAckConsumersRetainAReplayedProjectionOwner(mixed)",
+          "status": "passed"
+        },
+        {
+          "name": "allCommittedAckConsumersRetainAReplayedProjectionOwner(root)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ancestorOperatorExclusionNeverInventsUiOmissionAuthority",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b78103b77f4e56983c4ca5f78f20ad8c8d5f13abc2b177550a5668ab0a17c343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ancestorOperatorExclusionNeverInventsUiOmissionAuthority()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NativePolicyReplayBoundaryTest.java#declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NativePolicyReplayBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc400fd7ea26d026358b7884749be16d699ac6f2db17c81d2a1636ce2591166c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NativePolicyReplayBoundaryTest.java#folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NativePolicyReplayBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc400fd7ea26d026358b7884749be16d699ac6f2db17c81d2a1636ce2591166c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d320fb3f13",
+    "revision": "d320fb3f130cb6c707a27c835e4a655e79c2168c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorExclusionStillCannotCertifyAProjectionOwner\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.allCommittedAckConsumersRetainAReplayedProjectionOwner\" --tests \"io.justsearch.indexerworker.services.NativePolicyReadmissionCallerTest.ancestorOperatorExclusionNeverInventsUiOmissionAuthority\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 41451,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-security-9536809b/run-1.log",
+        "outputDigest": "sha256:5cf295f9eadde39bfe60a775accca39f099fc16921bde937f3ae8c865c74da4e"
+      },
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest.declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority\" --tests \"io.justsearch.indexerworker.services.NativePolicyReplayBoundaryTest.folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 56615,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-security-9536809b/run-2.log",
+        "outputDigest": "sha256:82d7b1525203f544aa09d9c0d0659a495c4616993bab3abd4ec2d53747685904"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership",
+        "classification": "assertion",
+        "detail": "ordinaryLabelsCannotBorrowProtectedPhysicalOrProjectionOwnership(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission",
+        "classification": "assertion",
+        "detail": "replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyPermission(canonical,target): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)&#10;&#9;org.opentest4j.AssertionFailedError: indexed canonical projection/alias cannot certify ordinary omission ==> expected: <false> but was: <true>&#10;&#9;org.opentest4j.AssertionFailedError: indexed canonical projection/alias | replayedCanonicalStoredProjectionAndLegalAliasesBlockNativePolicyP"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder",
+        "classification": "assertion",
+        "detail": "subscribedAncestorGlobMakesTwoNativeAttemptsWithoutContentHashOrFreshOrder(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)&#10;&#9;org.opentest4j.AssertionFailedError: ancestor exclusion cannot mint a pending revision ==> expected: <false> but was: <true>&#10;&#9;org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;SourceContentHash.class.sh"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision",
+        "classification": "assertion",
+        "detail": "completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(declared): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true> | completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(subscribed): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true> | completeAncestorScopeOmitsWithoutHashingAndRetainsExactReceiptUntilFinalDecision(awaiting): org."
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission",
+        "classification": "assertion",
+        "detail": "storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(parent): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true> | storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(missing-parent): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected java.io.IOException to be thrown, but nothing was thrown. | storedParentAndLateOwnershipNeverBecomeOrdinaryFilePermission(blank-marker): org.opentest4j.Asserti"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ancestorExclusionStillCannotCertifyAProjectionOwner",
+        "classification": "assertion",
+        "detail": "ancestorExclusionStillCannotCertifyAProjectionOwner(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy",
+        "classification": "assertion",
+        "detail": "ancestorMembershipAbaInvalidatesAttemptAndUnregisteredAncestorNeverSuppliesPolicy(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication",
+        "classification": "assertion",
+        "detail": "ownerThreadUncommittedReplayInvalidatesPreparedOwnershipBeforePublication(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: owner-thread replay cannot reuse a prepared reader or durable-epoch witness ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence",
+        "classification": "assertion",
+        "detail": "realProjectionProducerNeedsTheFinalFenceAsWellAsTheFileFence(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a resumed producer invalidates the earlier permission ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#allCommittedAckConsumersRetainAReplayedProjectionOwner",
+        "classification": "assertion",
+        "detail": "allCommittedAckConsumersRetainAReplayedProjectionOwner(simple): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: actual ACK consumer cannot erase an unproved omission ==> expected: <false> but was: <true> | allCommittedAckConsumersRetainAReplayedProjectionOwner(mixed): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: actual ACK consumer cannot erase an unproved omission ==> expected: <false> but was: <true> | allCommittedAckConsumersRetainAReplayed"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#ancestorOperatorExclusionNeverInventsUiOmissionAuthority",
+        "classification": "assertion",
+        "detail": "ancestorOperatorExclusionNeverInventsUiOmissionAuthority(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NativePolicyReplayBoundaryTest.java#declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority",
+        "classification": "assertion",
+        "detail": "declaredAncestorDirectoryGlobPrunesOnlyWithTheExistingDescendantAuthority(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NativePolicyReplayBoundaryTest.java#folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot",
+        "classification": "assertion",
+        "detail": "folderProofCanPruneItsSubtreeButCannotHideAnUnreadableRoot(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.io.IOException: Reconciliation walk could not read: /home/elias/.cache/am/4t4brn6h/tmp/evidence-before-security/before/modules/worker-services/build/tmp/test-jvm/test/junit-9523497181553879875/root/private"
+      }
+    ]
+  },
+  "digest": "sha256:288770cd69f5c68a9695e940a9d7dd9b41aae727eacd0c2021ad5ade46041ecc"
+}

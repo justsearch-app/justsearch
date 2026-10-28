@@ -25,6 +25,8 @@ import { readLastViewedConversation } from '../controllers/lastViewedConversatio
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
+import { completedForget, FORGET_COMPLETED_EVENT,
+  type IndexedForgetCompletion } from '../../api/domains/forget.js';
 import { startSurfaceTransition } from './viewTransition.js';
 import '../components/RecentsMenu.js';
 import {
@@ -3107,6 +3109,35 @@ export class Stage extends JfElement {
    * in connect, tear down in disconnect.
    */
   private _surfaceElCache = new Map<string, HTMLElement>();
+  private forgetApiOwner: object = {};
+
+  protected override willUpdate(changed: Map<string, unknown>): void {
+    super.willUpdate(changed);
+    if (changed.has('apiBase')) {
+      // An old asynchronous response cannot become current again after an API-base ABA.
+      this.forgetApiOwner = {};
+      for (const element of this._surfaceElCache.values()) {
+        if (element.localName === 'jf-sv3-window' || element.localName === 'jf-library-surface') {
+          (element as HTMLElement & { forgetCompletionOwner?: object }).forgetCompletionOwner = this.forgetApiOwner;
+        }
+      }
+    }
+  }
+
+  private onForgetCompleted(originId: string, origin: HTMLElement, event: Event): void {
+    const detail = (event as CustomEvent<IndexedForgetCompletion>).detail;
+    if (event.target !== origin || this._surfaceElCache.get(originId) !== origin
+        || !detail || detail.owner !== this.forgetApiOwner || detail.apiBase !== this.apiBase
+        || (origin.getAttribute('api-base') ?? '') !== this.apiBase
+        || completedForget(detail.outcome) === null) return;
+    for (const element of this._surfaceElCache.values()) {
+      // Initial card completion already reconciled its originating window. Library has no
+      // Search state of its own. Detached nodes remain owned here without global subscriptions.
+      if (element === origin || element.localName !== 'jf-sv3-window') continue;
+      (element as HTMLElement & { reconcileConfirmedForget?(detail: IndexedForgetCompletion): void })
+        .reconcileConfirmedForget?.(detail);
+    }
+  }
 
   /**
    * Tempdoc 609 §R (P1) — retention-cache size cap (memory backstop). Mutable (not `readonly`) so unit
@@ -3314,11 +3345,19 @@ export class Stage extends JfElement {
       } else {
         el = mountSurface(surface, { apiBase: this.apiBase, host_: this.hostApi_ ?? undefined });
         if (el !== null) {
+          const origin = el;
+          if (origin.localName === 'jf-sv3-window' || origin.localName === 'jf-library-surface') {
+            origin.addEventListener(FORGET_COMPLETED_EVENT,
+              event => this.onForgetCompleted(surface.id, origin, event));
+          }
           this._surfaceElCache.set(surface.id, el);
           this.evictDormantLru();
         }
       }
       if (el !== null) {
+        if (el.localName === 'jf-sv3-window' || el.localName === 'jf-library-surface') {
+          (el as HTMLElement & { forgetCompletionOwner?: object }).forgetCompletionOwner = this.forgetApiOwner;
+        }
         // Set every render (not just on mint) so live shell dependencies propagate to cached
         // elements without reconstructing them — the whole point of the M2 cache.
         if (this.apiBase) {

@@ -65,6 +65,8 @@ public final class SchemaController {
           "indexing-job-view.v1.json",
           "operation-history-entry.v1.json",
           "operation-outcome-view.v1.json",
+          "forget-outcome.v1.json",
+          "forget-page.v1.json",
           "operation.v1.json",
           "prompt.v1.json",
           "resource.v1.json",

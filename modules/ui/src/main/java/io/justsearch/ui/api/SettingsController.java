@@ -104,6 +104,22 @@ public class SettingsController {
       return;
     }
     try {
+      // Refuse exclusion syntax/capacity before either front can record an operation.
+      // Saved legacy syntax may still be retained; literal authority stays with the owner.
+      if (incoming.ui() != null && incoming.ui().excludePatterns() != null) {
+        var patterns = incoming.ui().excludePatterns();
+        io.justsearch.configuration.excludes.ExclusionPatterns.validateCapacity(patterns);
+        var invalid = io.justsearch.configuration.excludes.ExclusionPatterns
+            .fromPatterns(patterns).invalidPatterns();
+        if (!invalid.isEmpty()) {
+          var saved = settingsStore.inspect().settings().getExcludePatterns();
+          for (String pattern : invalid) {
+            if (!saved.contains(pattern.trim())) {
+              throw new IllegalArgumentException("Invalid exclude pattern: " + pattern);
+            }
+          }
+        }
+      }
       OperationResult response;
       String state;
       Long operationRecordId = null;

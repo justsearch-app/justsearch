@@ -17,7 +17,7 @@ final class SettingsPatch {
 
   /** Normalize only supplied values through the same setters used for the actual mutation. */
   static SettingsV2 normalize(SettingsV2 input) {
-    UiSettings normalized = merge(new UiSettings(), input, true);
+    UiSettings normalized = merge(new UiSettings(), input, true, false);
     UiSettingsV2 ui = input.ui();
     if (ui != null) {
       ui = new UiSettingsV2(
@@ -54,6 +54,11 @@ final class SettingsPatch {
 
   /** Merges an incoming {@link SettingsV2} into the existing {@link UiSettings}. */
   static UiSettings merge(UiSettings base, SettingsV2 incoming, boolean applyMode) {
+    return merge(base, incoming, applyMode, true);
+  }
+
+  private static UiSettings merge(UiSettings base, SettingsV2 incoming, boolean applyMode,
+      boolean validateLiteralAuthority) {
     if (incoming == null) {
       return base;
     }
@@ -79,7 +84,24 @@ final class SettingsPatch {
       if (applyMode && ui.mode() != null) base.setMode(ui.mode());
       if (ui.hasSeenTrustLoopNudge() != null) base.setTrustLoopNudgeSeen(ui.hasSeenTrustLoopNudge());
       if (ui.excludePatterns() != null) {
-        io.justsearch.configuration.excludes.ExclusionPatterns.validateSavedPatterns(ui.excludePatterns());
+        if (validateLiteralAuthority) {
+          for (Object entry : ui.excludePatterns()) {
+            if (entry instanceof String || entry == null) continue;
+            var literal = io.justsearch.configuration.excludes.LiteralExclusion.fromEntry(entry);
+            if (!base.getExcludePatterns().contains(literal)) {
+              throw new IllegalArgumentException("Exact-path entries may only be retained or removed");
+            }
+          }
+        }
+        io.justsearch.configuration.excludes.ExclusionPatterns.validateCapacity(ui.excludePatterns());
+        if (validateLiteralAuthority) {
+          for (String invalid : io.justsearch.configuration.excludes.ExclusionPatterns
+              .fromPatterns(ui.excludePatterns()).invalidPatterns()) {
+            if (!base.getExcludePatterns().contains(invalid)) {
+              throw new IllegalArgumentException("Invalid exclude pattern: " + invalid);
+            }
+          }
+        }
         base.setExcludePatterns(ui.excludePatterns());
       }
       if (ui.chatEnabled() != null) base.setChatEnabled(ui.chatEnabled());

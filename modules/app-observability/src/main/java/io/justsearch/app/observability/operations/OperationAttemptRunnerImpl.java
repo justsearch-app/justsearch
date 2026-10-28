@@ -126,6 +126,116 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     }
   }
 
+  private Control requireForgetBody(OperationRecordHandle handle) {
+    if (!(handle instanceof Control control) || control.owner != this
+        || control.kind != OperationKind.FORGET || control.bodyThread != Thread.currentThread()
+        || active.get(control.id) != control || control.done.isDone()) {
+      throw new IllegalArgumentException("Forget step requires this runner's live owner segment");
+    }
+    return control;
+  }
+
+  @Override public void parkForget(OperationRecordHandle handle,
+      io.justsearch.app.api.operations.ForgetProgress progress) {
+    Control control = requireForgetBody(handle);
+    control.checkpoint(progress.cursor(), 0, 0);
+    control.forgetParked = true;
+  }
+
+  @Override public Result resumeForget(String key,
+      Function<OperationRecordHandle, OperationExecution> body) {
+    requireRecoveryOwner(OperationKind.FORGET);
+    OperationRecord row = store.find(key).orElseThrow(() -> new IllegalArgumentException("Forget intent is unavailable"));
+    if (row.descriptor().kind() != OperationKind.FORGET
+        || !io.justsearch.app.api.operations.ForgetPlan.OPERATION_ID.equals(row.descriptor().operationRef())) {
+      throw new IllegalArgumentException("Retry requires an accepted forget intent");
+    }
+    Control control = controlFor(row);
+    if (row.state().terminal() || !control.started.compareAndSet(false, true)) return existingResult(control);
+    return execute(control, Objects.requireNonNull(body, "body"), true);
+  }
+
+  @Override public Optional<OperationRecord> requestForgetWithdrawal(String key) {
+    requireRecoveryOwner(OperationKind.FORGET);
+    var row = store.requestForgetWithdrawal(key);
+    row.ifPresent(found -> publishIfTerminal(controlFor(found), found));
+    return row;
+  }
+
+  @Override public OperationStore.DeferredForgetCompletion finishForget(OperationRecordHandle handle,
+      Long expectedAcceptanceSequence, OperationState terminalState, OperationReceipt receipt) {
+    Control control = requireForgetBody(handle);
+    OperationStore.DeferredForgetCompletion completion = store.finishForget(
+        control.id, expectedAcceptanceSequence, terminalState, receipt);
+    if (completion.record().isPresent()) control.forgetCompletionPrepared = true;
+    return new OperationStore.DeferredForgetCompletion() {
+      private final AtomicBoolean published = new AtomicBoolean();
+      @Override public Optional<OperationRecord> record() { return completion.record(); }
+      @Override public void publish() {
+        if (!published.compareAndSet(false, true)) return;
+        completion.publish();
+        completion.record().ifPresent(row -> publishIfTerminal(control, row));
+      }
+    };
+  }
+
+  @Override public SettingsCommitOwner.PreparedForgetProjection prepareForgetProjection(OperationRecordHandle handle) {
+    Control control = requireForgetBody(handle);
+    if (settingsOwner == null) throw new IllegalStateException("Fixed settings owner is unavailable");
+    OperationRecord row = current(control);
+    return settingsOwner.prepareForgetProjection(row, store.acceptedPreparation(row.id()).orElseThrow(),
+        new SettingsCommitOwner.ForgetControl() {
+          @Override public void arm(SettingsWitness expected,
+              io.justsearch.app.api.operations.ForgetProgress progress) {
+            requireForgetBody(handle);
+            if (!store.armForgetSettingsRevision(control.id, expected.acceptedRevision(), progress)) {
+              throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
+            }
+          }
+          @Override public void settled(io.justsearch.app.api.operations.ForgetProgress progress) {
+            requireForgetBody(handle);
+            if (!store.settleForgetSettingsRevision(control.id, progress)) {
+              throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
+            }
+          }
+        });
+  }
+
+  @Override public boolean reconcileForgetProjection(OperationRecordHandle handle) {
+    return reconcileForgetProjection(current(requireForgetBody(handle)));
+  }
+
+  @Override public void preflightForget(io.justsearch.app.api.operations.ForgetPlan plan) {
+    if (settingsOwner == null) throw new IllegalStateException("Fixed settings authority is unavailable");
+    settingsOwner.preflightForget(plan);
+  }
+
+  @Override public SettingsCommitOwner.ForgetPolicy forgetPolicy(OperationRecordHandle handle) {
+    Control control = requireForgetBody(handle);
+    if (settingsOwner == null) return SettingsCommitOwner.ForgetPolicy.UNKNOWN;
+    OperationRecord row = current(control);
+    return settingsOwner.forgetPolicy(row, store.acceptedPreparation(row.id()).orElseThrow());
+  }
+
+  @Override public SettingsCommitOwner.ForgetPolicy observeForgetPolicy(String key) {
+    if (settingsOwner == null) return SettingsCommitOwner.ForgetPolicy.UNKNOWN;
+    OperationRecord row = store.find(key).orElseThrow();
+    return settingsOwner.forgetPolicy(row, store.acceptedPreparation(row.id()).orElseThrow());
+  }
+
+  private boolean reconcileForgetProjection(OperationRecord row) {
+    if (row.expectedSettingsRevision() == null) return true;
+    if (settingsOwner == null) return false;
+    var resolved = settingsOwner.reconcileForgetProjection(row,
+        store.acceptedPreparation(row.id()).orElseThrow());
+    if (resolved.isEmpty()) return false;
+    if (!store.settleForgetSettingsRevision(row.id(), resolved.orElseThrow())) {
+      throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
+    }
+    settingsOwner.releaseForgetProjection(row.id());
+    return true;
+  }
+
   /** Construct synchronously before the index fork; kind ownership is declared before the sweep. */
   public OperationAttemptRunnerImpl(OperationStore store, Clock clock, Set<OperationKind> ownedKinds) {
     this(store, clock, ownedKinds, null);
@@ -183,6 +293,12 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     if (!settingsOwner.recoverCommittedComposition()) return false;
     reconcileOwned(OperationKind.SETTINGS_APPLY, settingsOwner::reconcile);
     reconcileOwned(OperationKind.RECONFIGURE, settingsOwner::reconcile);
+    for (OperationRecord previous : interrupted) {
+      if (previous.descriptor().kind() != OperationKind.FORGET) continue;
+      var row = store.find(previous.key());
+      if (row.isPresent() && !row.orElseThrow().state().terminal()
+          && !reconcileForgetProjection(row.orElseThrow())) return false;
+    }
     return true;
   }
 
@@ -537,9 +653,12 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       if (closing) throw new IllegalStateException("Operation execution refused during process shutdown");
       liveExecutions++;
     }
+    control.bodyExited = false;
+    control.forgetParked = false;
+    control.forgetCompletionPrepared = false;
     var released = new AtomicBoolean();
     Runnable release = () -> {
-      if (control.bodyExited && (control.done.isDone() || control.handedOff)
+      if (control.bodyExited && (control.done.isDone() || control.handedOff || control.forgetParked)
           && released.compareAndSet(false, true)) {
         synchronized (executionLock) {
           liveExecutions--;
@@ -554,6 +673,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     } finally {
       control.bodyExited = true;
       release.run();
+      if (control.forgetParked) control.started.set(false);
     }
   }
 
@@ -587,6 +707,19 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       failObservation(control, fatal);
       throw fatal;
     } catch (RuntimeException failure) {
+      if (control.kind == OperationKind.FORGET) {
+        // An owner segment's exception is not evidence that a partially committed intent ended.
+        // Retain the row, exact checkpoint and any armed settings witness for explicit inspection.
+        if (failure instanceof OperationStoreException) {
+          persistenceFailed(control, OperationState.RUNNING, failure);
+          throw failure;
+        }
+        control.forgetParked = true;
+        return new Result(current(control), OperationResult.failure(
+            "Forget remains unfinished; its current removal state could not be confirmed",
+            "FORGET_UNKNOWN", Map.of("operationKey", control.key, "state", "RUNNING"), true),
+            control.done.minimalCompletionStage());
+      }
       if (control.settingsUncertain) {
         persistenceFailed(control, OperationState.RUNNING, failure);
         throw failure;
@@ -609,6 +742,15 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
             storageFailure);
       }
       throw failure;
+    }
+    if (control.kind == OperationKind.FORGET) {
+      if (!control.forgetParked && !control.forgetCompletionPrepared) {
+        control.forgetParked = true;
+        return new Result(current(control), OperationResult.failure(
+            "Forget remains unfinished; removal has not been durably confirmed", "FORGET_UNKNOWN",
+            Map.of("operationKey", control.key, "state", "RUNNING"), true), control.done.minimalCompletionStage());
+      }
+      return new Result(current(control), execution.response(), control.done.minimalCompletionStage());
     }
     // The settings transaction is synchronous. Its fixed owner's verdict is final when the
     // body returns; an unrelated pending adapter stage cannot retain the bounded witness forever.
@@ -797,7 +939,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private static boolean settingsOwned(OperationRecord row) {
-    return settingsKind(row.descriptor().kind()) || row.descriptor().kind() == OperationKind.REINDEX
+    return settingsKind(row.descriptor().kind()) || row.descriptor().kind() == OperationKind.FORGET
+        || row.descriptor().kind() == OperationKind.REINDEX
         && io.justsearch.app.api.operations.RecordedInstallerGenerationPlan.OPERATION_ID
             .equals(row.descriptor().operationRef());
   }
@@ -1068,6 +1211,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     private final CompletableFuture<OperationRecord> done = new CompletableFuture<>();
     private volatile boolean bodyExited;
     private volatile boolean handedOff;
+    private volatile boolean forgetParked;
+    private volatile boolean forgetCompletionPrepared;
     private volatile Runnable releaseBody;
     private Control(OperationRecord row) {
       id = row.id(); key = row.key(); kind = row.descriptor().kind();
@@ -1084,7 +1229,11 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         faultHook.accept(new FaultBoundary("after-effect", parent.descriptor().kind(), parentKey,
             key, id, cursor, completed, failed));
       }
-      if (!store.checkpoint(id, cursor, completed, failed)) {
+      boolean recorded = kind == OperationKind.FORGET
+          ? completed == 0 && failed == 0 && store.checkpointForget(id,
+              io.justsearch.app.api.operations.ForgetProgress.read(cursor))
+          : store.checkpoint(id, cursor, completed, failed);
+      if (!recorded) {
         throw new IllegalStateException("Checkpoint refused for a terminal, unstarted or newer operation");
       }
     }

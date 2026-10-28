@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T19:02:01.124Z",
+  "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+  "tree": "e3ac863b5c052473fb3c1e03949ff04892fca27d",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetHonestyTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 98087,
+      "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/evidence-honesty/run-2.log",
+      "outputDigest": "sha256:ef60b8a12c2be09cd1b4e148e3ced62fbe67c1fb3221c43a1a1e0d79695584a5"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetHonestyTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetHonestyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d0ba1be0716b2b929d2fd08679e5a01bc4b16d62cc507cfed1a8ba7aa408bcb4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "neverIndexedAndAlreadyForgottenTargetsDescribeAbsenceWithoutClaimingARemoval()",
+          "status": "passed"
+        },
+        {
+          "name": "watchedFoldersAndProtectedSourcesRefuseWithTheirSpecificReasonsBeforeAnyConsent()",
+          "status": "passed"
+        },
+        {
+          "name": "removingTheOnlyRepeatedFileEntryAllowsTheExistingForceReindexPathToAdmitItAgain()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedExactTargetHasOneEntryAndRemovingItReleasesTheEffectivePolicy()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+    "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetHonestyTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 32159,
+        "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/evidence-honesty/run-1.log",
+        "outputDigest": "sha256:2c259cd02da5ef242bb2eb43c72260275fbff86d0282d203a3055be7c85d4a6d"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetHonestyTest.java",
+        "classification": "assertion",
+        "detail": "neverIndexedAndAlreadyForgottenTargetsDescribeAbsenceWithoutClaimingARemoval(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Removal from the search index completed. Original files and retained answers, logs and backups were not erased. ==> expected: <true> but was: <false> | watchedFoldersAndProtectedSourcesRefuseWithTheirSpecificReasonsBeforeAnyConsent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: The exact forget target is invalid, pro"
+      }
+    ]
+  },
+  "digest": "sha256:7d9fa8217bfb74a1854faff92fc5a2040b4ef63865eab721c8d0bc35ad43ee3c"
+}

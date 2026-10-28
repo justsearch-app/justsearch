@@ -193,6 +193,18 @@ final class ValidatorRunnerTest {
         CoreOperationCatalog.REPAIR_AI_INSTALL,
         new io.justsearch.app.services.registry.operations.handlers.RepairAiInstallHandler(
             () -> null));
+    // Mirror the three production Forget bindings; all validator assertions remain unchanged.
+    handlers.register(CoreOperationCatalog.FORGET_INDEXED_PATH,
+        new io.justsearch.app.services.registry.operations.handlers.ForgetIndexedPathHandler(
+            io.justsearch.app.api.operations.ForgetService::unavailable));
+    handlers.register(CoreOperationCatalog.RETRY_FORGET,
+        new io.justsearch.app.services.registry.operations.handlers.ForgetDecisionHandler(
+            io.justsearch.app.api.operations.ForgetService::unavailable,
+            io.justsearch.app.services.registry.operations.handlers.ForgetDecisionHandler.Decision.RETRY));
+    handlers.register(CoreOperationCatalog.WITHDRAW_FORGET,
+        new io.justsearch.app.services.registry.operations.handlers.ForgetDecisionHandler(
+            io.justsearch.app.api.operations.ForgetService::unavailable,
+            io.justsearch.app.services.registry.operations.handlers.ForgetDecisionHandler.Decision.WITHDRAW));
     // Slice 3a-2-c BrainPackImport policy cluster.
     handlers.register(
         CoreOperationCatalog.CREATE_USER_POLICY,

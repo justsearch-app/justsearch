@@ -481,7 +481,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       return new CallContext(
           traceId,
           requestId,
-          signal, engineContext, enqueueProvenance(engineContext),
+          new CallContext.CancelSignal() {
+            @Override public boolean isCancelled() {
+              Outcome actual = outcome.get();
+              // Caller completion precedes signal handlers. A surviving publisher must already
+              // observe the decided outcome during that interval.
+              return actual == Outcome.CANCELLED || actual == Outcome.EXPIRED || signal.isCancelled();
+            }
+            @Override public void onCancel(Runnable handler) { signal.onCancel(handler); }
+          }, engineContext, enqueueProvenance(engineContext),
           Objects.requireNonNull(childLifetime, "unary childLifetime"), deadlineNanos, startNanos);
     }
 

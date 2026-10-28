@@ -10,7 +10,7 @@ final class ExcludeMatcher {
 
   private ExcludeMatcher(ExclusionPatterns patterns) { this.patterns = patterns; }
   static ExcludeMatcher empty() { return new ExcludeMatcher(ExclusionPatterns.empty()); }
-  List<String> patterns() { return patterns.patterns(); }
+  List<String> patterns() { return patterns.legacyGlobPatterns(); }
   boolean isEmpty() { return patterns.isEmpty(); }
 
   static ExcludeMatcher fromRawJson(String rawJson, boolean windows) {

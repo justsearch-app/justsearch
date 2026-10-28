@@ -1,0 +1,54 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T04:49:42.746Z",
+  "revision": "a4292a9054726131382787a2a3c95dcd0d2ed7eb",
+  "tree": "462e13efc0e0b76ee9e15ce512ece4e7d1345cfd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ExclusionSaveStateHttpTest.refusalsLeaveNoDurableStateAndFollowingValidSaveSucceeds\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3948
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ExclusionSaveStateHttpTest.java#refusalsLeaveNoDurableStateAndFollowingValidSaveSucceeds",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ExclusionSaveStateHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bcbe7eefa4157ef19aa62c07617110c45294b453519176dff17a27af63fef47a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusalsLeaveNoDurableStateAndFollowingValidSaveSucceeds(input-capacity)",
+          "status": "passed"
+        },
+        {
+          "name": "refusalsLeaveNoDurableStateAndFollowingValidSaveSucceeds(expanded-capacity)",
+          "status": "passed"
+        },
+        {
+          "name": "refusalsLeaveNoDurableStateAndFollowingValidSaveSucceeds(syntax)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f52e8eccae7397399838740f7786e86365d1cfd0f6855008cd9d20f1d2bad20e"
+}

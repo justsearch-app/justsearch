@@ -44,13 +44,16 @@ const SKELETON_ROWS = 3;
 export class Sv3Results extends JfElement {
   static properties = {
     view: { attribute: false },
+    forgetAvailable: { type: Boolean, attribute: false },
   };
 
   declare view: Sv3ResultsView;
+  declare forgetAvailable: boolean;
 
   constructor() {
     super();
     this.view = SV3_RESULTS_IDLE;
+    this.forgetAvailable = false;
   }
 
   private emit<T>(name: string, detail?: T): void {
@@ -166,6 +169,7 @@ export class Sv3Results extends JfElement {
       .facetSelections=${view.facetSelections}
       .selectedIds=${view.selectedIds}
       .askAvailability=${null}
+      .forgetAvailable=${this.forgetAvailable}
     ></jf-results-card>`;
   }
 

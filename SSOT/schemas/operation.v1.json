@@ -270,7 +270,7 @@
             "type" : "null"
           }, {
             "type" : "string",
-            "enum" : [ "operation", "reconfigure", "reindex", "ingest", "settings-apply", "accept-gaps", "scheduled-run", "memory", "note" ]
+            "enum" : [ "operation", "reconfigure", "reindex", "ingest", "settings-apply", "accept-gaps", "scheduled-run", "memory", "note", "forget" ]
           } ]
         },
         "requiredCapabilities" : {

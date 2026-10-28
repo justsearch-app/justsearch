@@ -96,6 +96,14 @@ public final class OperationHandlerRegistrations {
     handlers.register(CoreOperationCatalog.ACCEPT_GAPS, new AcceptGapsHandler(recordedIngestion));
     handlers.register(CoreOperationCatalog.CANCEL_REINDEX,
         new io.justsearch.app.services.registry.operations.handlers.CancelReindexHandler(recordedIngestion));
+    handlers.register(CoreOperationCatalog.FORGET_INDEXED_PATH,
+        new io.justsearch.app.services.registry.operations.handlers.ForgetIndexedPathHandler(lateBindings::forgetService));
+    handlers.register(CoreOperationCatalog.RETRY_FORGET,
+        new io.justsearch.app.services.registry.operations.handlers.ForgetDecisionHandler(lateBindings::forgetService,
+            io.justsearch.app.services.registry.operations.handlers.ForgetDecisionHandler.Decision.RETRY));
+    handlers.register(CoreOperationCatalog.WITHDRAW_FORGET,
+        new io.justsearch.app.services.registry.operations.handlers.ForgetDecisionHandler(lateBindings::forgetService,
+            io.justsearch.app.services.registry.operations.handlers.ForgetDecisionHandler.Decision.WITHDRAW));
     handlers.register(
         CoreOperationCatalog.REBUILD_INDEX,
         new BulkReindexHandler(io.justsearch.app.api.operations.RecordedBulkPlan.Profile.RECOVERY_REBUILD,

@@ -295,6 +295,9 @@ public final class SqliteOperationStore implements OperationStore {
         }
         if (version <= 4) {
           OperationSchema.migrateV4(statement);
+        }
+        // v6 changes the closed kind/recovery interpretation, retaining the existing tables.
+        if (version < OperationSchema.VERSION) {
           statement.execute("PRAGMA user_version = " + OperationSchema.VERSION);
         }
         try (var update = connection.prepareStatement(
@@ -824,6 +827,188 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   @Override
+  public boolean armForgetSettingsRevision(long id, long expectedRevision,
+      io.justsearch.app.api.operations.ForgetProgress progress) {
+    if (expectedRevision < 0 || expectedRevision == Long.MAX_VALUE || !progress.admitted()
+        || progress.phase() != io.justsearch.app.api.operations.ForgetProgress.Phase.POLICY_ARMED
+            && progress.phase() != io.justsearch.app.api.operations.ForgetProgress.Phase.WITHDRAWAL_ARMED
+        || progress.settingsBase() == null
+        || progress.settingsBase().acceptedRevision() != expectedRevision) {
+      throw new IllegalArgumentException("Invalid forget settings marker");
+    }
+    return locked(() -> {
+      var exact = preserveForgetWithdrawal(id, progress);
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET accepted_settings_revision = ?, checkpoint_cursor = ?, updated_at = ?
+          WHERE id = ? AND state = 'RUNNING' AND kind = 'forget'
+            AND operation_ref = 'core.forget-indexed-path' AND accepted_settings_revision IS NULL
+            AND preparation_nonce IS NOT NULL AND preparation_sealed = 0
+            AND json_valid(preparation_payload)
+            AND json_extract(preparation_payload, '$.preparation.replaySchema') = 'forget-plan.v1'
+          """)) {
+        update.setLong(1, expectedRevision); update.setString(2, exact.cursor());
+        update.setLong(3, clock.millis()); update.setLong(4, id);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  @Override
+  public boolean settleForgetSettingsRevision(long id,
+      io.justsearch.app.api.operations.ForgetProgress progress) {
+    if (!progress.admitted()
+        || progress.phase() == io.justsearch.app.api.operations.ForgetProgress.Phase.POLICY_ARMED
+        || progress.phase() == io.justsearch.app.api.operations.ForgetProgress.Phase.WITHDRAWAL_ARMED) {
+      throw new IllegalArgumentException("Forget settings settlement needs resolved step evidence");
+    }
+    return locked(() -> {
+      var exact = preserveForgetWithdrawal(id, progress);
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET accepted_settings_revision = NULL, checkpoint_cursor = ?, updated_at = ?
+          WHERE id = ? AND state = 'RUNNING' AND kind = 'forget'
+            AND operation_ref = 'core.forget-indexed-path' AND accepted_settings_revision IS NOT NULL
+          """)) {
+        update.setString(1, exact.cursor()); update.setLong(2, clock.millis()); update.setLong(3, id);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  private io.justsearch.app.api.operations.ForgetProgress preserveForgetWithdrawal(long id,
+      io.justsearch.app.api.operations.ForgetProgress progress) throws SQLException {
+    OperationRecord row = rowById(id);
+    if (row.descriptor().kind() != OperationKind.FORGET
+        || !io.justsearch.app.api.operations.ForgetPlan.OPERATION_ID.equals(row.descriptor().operationRef())) {
+      throw new IllegalArgumentException("Forget checkpoint requires its fixed owner");
+    }
+    var prior = io.justsearch.app.api.operations.ForgetProgress.read(row.checkpointCursor());
+    if (prior.admitted() && !progress.admitted()
+        || prior.installedToken() != null && !Objects.equals(prior.installedToken(), progress.installedToken())) {
+      throw new IllegalArgumentException("Forget checkpoint cannot discard established ownership evidence");
+    }
+    return prior.withdrawalRequested() ? progress.requestWithdrawal() : progress;
+  }
+
+  @Override public boolean checkpointForget(long id, io.justsearch.app.api.operations.ForgetProgress progress) {
+    return locked(() -> {
+      OperationRecord row = rowById(id);
+      if (row.expectedSettingsRevision() != null) {
+        var armed = io.justsearch.app.api.operations.ForgetProgress.read(row.checkpointCursor());
+        if (progress.phase() != armed.phase()
+            || !Objects.equals(progress.settingsBase(), armed.settingsBase())
+            || !Objects.equals(progress.priorFileWitness(), armed.priorFileWitness())
+            || !Objects.equals(progress.installedFileWitness(), armed.installedFileWitness())) {
+          throw new IllegalArgumentException("An armed forget settings step must be resolved before advancing");
+        }
+      }
+      var exact = preserveForgetWithdrawal(id, progress);
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET checkpoint_cursor = ?, updated_at = ?
+          WHERE id = ? AND kind = 'forget' AND state = 'RUNNING'
+          """)) {
+        update.setString(1, exact.cursor()); update.setLong(2, clock.millis()); update.setLong(3, id);
+        return update.executeUpdate() == 1;
+      }
+    });
+  }
+
+  @Override public java.util.Optional<OperationRecord> requestForgetWithdrawal(String key) {
+    return locked(() -> {
+      var retained = findRow(key);
+      if (retained.isEmpty()) return retained;
+      OperationRecord row = retained.orElseThrow();
+      if (row.descriptor().kind() != OperationKind.FORGET
+          || !io.justsearch.app.api.operations.ForgetPlan.OPERATION_ID.equals(row.descriptor().operationRef())) {
+        throw new IllegalArgumentException("Withdrawal requires an accepted forget intent");
+      }
+      if (row.state().terminal()) return retained;
+      String cursor = io.justsearch.app.api.operations.ForgetProgress.read(row.checkpointCursor())
+          .requestWithdrawal().cursor();
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET checkpoint_cursor = ?, updated_at = ?
+          WHERE id = ? AND kind = 'forget' AND state IN ('ACCEPTED','RUNNING')
+          """)) {
+        update.setString(1, cursor); update.setLong(2, clock.millis()); update.setLong(3, row.id());
+        if (update.executeUpdate() != 1) throw new SQLException("Forget withdrawal checkpoint was not persisted");
+      }
+      return java.util.Optional.of(rowById(row.id()));
+    });
+  }
+
+  @Override
+  public ForgetAuthoritySnapshot captureForgetAuthority() {
+    return locked(() -> transaction(() -> {
+      long sequence = acceptanceSequence();
+      List<OperationRecord> rows = new java.util.ArrayList<>();
+      boolean complete = true;
+      try (Statement query = connection.createStatement(); ResultSet result = query.executeQuery("""
+          SELECT * FROM operations WHERE state IN ('ACCEPTED','RUNNING','COMPLETE_WITH_GAPS')
+          ORDER BY id LIMIT 1025
+          """)) {
+        while (result.next()) {
+          if (rows.size() == 1024) { complete = false; break; }
+          rows.add(readRecord(result));
+        }
+      }
+      return new ForgetAuthoritySnapshot(sequence, rows, complete);
+    }));
+  }
+
+  private long acceptanceSequence() throws SQLException {
+    try (Statement query = connection.createStatement(); ResultSet result = query.executeQuery(
+        "SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'operations'), 0)")) {
+      if (!result.next()) throw new SQLException("Operation acceptance sequence unavailable");
+      return result.getLong(1);
+    }
+  }
+
+  @Override
+  public DeferredForgetCompletion finishForget(long id, Long expectedAcceptanceSequence,
+      OperationState terminalState, OperationReceipt receipt) {
+    Objects.requireNonNull(receipt, "receipt");
+    if (!terminalState.terminal()) throw new IllegalArgumentException("Forget requires a terminal state");
+    String resultJson = JSON.writeValueAsString(receipt);
+    java.util.Optional<OperationRecord> completed = locked(() -> transaction(() -> {
+      OperationRecord row = rowById(id);
+      if (row.descriptor().kind() != OperationKind.FORGET
+          || !io.justsearch.app.api.operations.ForgetPlan.OPERATION_ID.equals(row.descriptor().operationRef())
+          || row.state() != OperationState.RUNNING || row.expectedSettingsRevision() != null) {
+        return java.util.Optional.<OperationRecord>empty();
+      }
+      var progress = io.justsearch.app.api.operations.ForgetProgress.read(row.checkpointCursor());
+      if (terminalState == OperationState.COMPLETE
+          && (!progress.admitted() || progress.withdrawalRequested()
+              || progress.phase() != io.justsearch.app.api.operations.ForgetProgress.Phase.READY
+              || expectedAcceptanceSequence == null && progress.installedToken() == null)
+          || terminalState == OperationState.FAILED && progress.admitted()
+          || terminalState == OperationState.CANCELLED
+              && progress.phase() != io.justsearch.app.api.operations.ForgetProgress.Phase.WITHDRAWN
+              && progress.phase() != io.justsearch.app.api.operations.ForgetProgress.Phase.SUPERSEDED
+          || expectedAcceptanceSequence != null && expectedAcceptanceSequence != acceptanceSequence()) {
+        return java.util.Optional.<OperationRecord>empty();
+      }
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET state = ?, completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?,
+            history_pending = CASE WHEN history_mode = 'NONE' THEN 0 ELSE 1 END
+          WHERE id = ? AND state = 'RUNNING' AND kind = 'forget'
+          """)) {
+        long now = clock.millis();
+        update.setString(1, terminalState.name()); update.setLong(2, now); update.setLong(3, now);
+        update.setString(4, resultJson); update.setString(5,
+            terminalState == OperationState.COMPLETE ? null : receipt.code()); update.setLong(6, id);
+        return update.executeUpdate() == 1 ? java.util.Optional.of(rowById(id)) : java.util.Optional.<OperationRecord>empty();
+      }
+    }));
+    return new DeferredForgetCompletion() {
+      private final java.util.concurrent.atomic.AtomicBoolean published = new java.util.concurrent.atomic.AtomicBoolean();
+      @Override public java.util.Optional<OperationRecord> record() { return completed; }
+      @Override public void publish() {
+        if (published.compareAndSet(false, true)) completed.ifPresent(SqliteOperationStore.this::publishCompletion);
+      }
+    };
+  }
+
+  @Override
   public boolean resume(long id) {
     return locked(() -> {
       try (var update = connection.prepareStatement("""
@@ -869,6 +1054,7 @@ public final class SqliteOperationStore implements OperationStore {
       try (var update = connection.prepareStatement("""
           UPDATE operations SET checkpoint_cursor = ?, units_completed = ?, units_failed = ?, updated_at = ?
           WHERE id = ? AND state IN ('RUNNING', 'COMPLETE_WITH_GAPS')
+            AND kind != 'forget'
             AND units_completed <= ? AND units_failed <= ?
           """)) {
         update.setString(1, cursor); update.setLong(2, unitsCompleted); update.setLong(3, unitsFailed);
@@ -1217,7 +1403,7 @@ public final class SqliteOperationStore implements OperationStore {
       try (var update = connection.prepareStatement("""
           UPDATE operations SET state = ?, completed_at = ?, updated_at = ?, result_json = ?, failure_reason = ?,
             history_pending = CASE WHEN history_mode = 'NONE' THEN 0 ELSE 1 END
-          WHERE id = ? AND state IN ('ACCEPTED', 'RUNNING', 'COMPLETE_WITH_GAPS')
+          WHERE id = ? AND state IN ('ACCEPTED', 'RUNNING', 'COMPLETE_WITH_GAPS') AND kind != 'forget'
           """)) {
         long now = clock.millis();
         update.setString(1, terminalState.name()); update.setLong(2, now); update.setLong(3, now);

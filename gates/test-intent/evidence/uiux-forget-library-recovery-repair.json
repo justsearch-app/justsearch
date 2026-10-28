@@ -1,0 +1,123 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T15:52:35.943Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "55d187604343b8a3fb5cd6945c2b984714ba7d0f",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run --configLoader runner \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-24098-1793116336267.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8790,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-library-6d3af28d/run-2.log",
+      "outputDigest": "sha256:dbd663b4fdc148aced0abffdb15e9e58b0bc4bac61fc9a53e26a4a8b2c71f561"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2c60ffd2429a93dc93d6a55d1ed461459cf1078d713d402022180b412950e4de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=false)",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=true)",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 Library REFUSED never reconciles unconfirmed target state",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 Library INCOMPLETE never reconciles unconfirmed target state",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 Library UNKNOWN never reconciles unconfirmed target state",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 mismatched receipt path cannot report completion or reconcile another target",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 mismatched receipt scope cannot report completion or reconcile another target",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 mismatched receipt key cannot report completion or reconcile another target",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 initial card completion keeps its established target-specific behavior inside Stage",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 late Library completion reaches its retained owner without clearing a new unrelated draft or scope",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 late old-API completion cannot regain authority after API-base ABA",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 evicted completion origin cannot remint itself or change another retained surface",
+          "status": "passed"
+        },
+        {
+          "name": "LR56 duplicate observed completion preserves the new unrelated pane, query and prepared scope",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "31f6dbb2276b2bbba77e346b2301b455ada836b5",
+    "revision": "31f6dbb2276b2bbba77e346b2301b455ada836b5",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run --configLoader runner \"src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-24098-1793116347672.json\"",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 8264,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-library-6d3af28d/run-1.log",
+        "outputDigest": "sha256:1d0fe4a7fe3d3ece3c1f3494a14843c373f1a8e1a902a4241dcc59dc2f01bd48"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts",
+        "classification": "assertion",
+        "detail": "LR56 Library Retry reconciles actual retained or alongside Search (alongside=false):  AssertionError: expected 3 to be 2 // Object.is equality\n    at /home/elias/.cache/am/4t4brn6h/tmp/evidence-before-library/before/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.libraryRetry.test.ts:191:37\n    at file:///home/elias/.cache/am/4t4brn6h/tmp/evidence-before-library/before/modul | LR56 Library Retry reconciles actual retained or alongside Search (alongside=true):  AssertionError: expected 3"
+      }
+    ]
+  },
+  "digest": "sha256:e1a4b73429552af18c828837eb6ef879c2808a285d9264da48c863832a695b55"
+}

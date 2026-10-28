@@ -36,22 +36,31 @@ public final class ExcludesServiceImpl implements ExcludesService {
 
   @Override
   public ExcludesPolicy effectivePolicy() {
+    return capturePolicy().projection();
+  }
+
+  private record PolicySnapshot(ExcludesPolicy projection, ExcludeGlobs matcher) {}
+
+  private PolicySnapshot capturePolicy() {
     ConfigStore store = ConfigStore.globalOrNull();
-    if (store == null) return new ExcludesPolicy("default", null, List.of());
+    if (store == null) return new PolicySnapshot(
+        new ExcludesPolicy("default", null, List.of()), ExcludeGlobs.empty());
     var config = store.get();
     var source = config.resolution("justsearch.ui.exclude_patterns");
-    return new ExcludesPolicy(source == null ? "unknown" : source.sourceName(),
+    ExcludeGlobs matcher = ExcludeGlobs.fromRawJsonArray(config.ui().excludePatterns());
+    return new PolicySnapshot(new ExcludesPolicy(source == null ? "unknown" : source.sourceName(),
         source == null ? null : source.sourceDetail(),
-        ExcludeGlobs.fromRawJsonArray(config.ui().excludePatterns()).patterns());
+        matcher.patterns()), matcher);
   }
 
   @Override
   public ExcludesResult applyExcludes(boolean dryRun, EngineContext engineContext) throws Exception {
     IndexingService indexing = indexingServiceSupplier.get();
     // Read patterns and winning-source trace from the same resolved snapshot.
-    ExcludesPolicy policy = effectivePolicy();
-    ExcludeGlobs excludes = ExcludeGlobs.fromPatterns(policy.patterns());
-    List<String> effectivePatterns = policy.patterns();
+    PolicySnapshot snapshot = capturePolicy();
+    ExcludesPolicy policy = snapshot.projection();
+    ExcludeGlobs excludes = snapshot.matcher();
+    List<String> effectivePatterns = excludes.patterns();
     if (excludes.isEmpty()) {
       return new ExcludesResult(dryRun, 0, 0, 0, 0, 0, List.of(), false,
           "No exclude patterns configured", 0, List.of(), policy);

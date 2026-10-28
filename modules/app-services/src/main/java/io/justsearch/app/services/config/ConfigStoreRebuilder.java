@@ -259,7 +259,7 @@ public final class ConfigStoreRebuilder {
     if (settings.getContextLength() > 0) {
       builder.putSettings("justsearch.context.size", String.valueOf(settings.getContextLength()));
     }
-    List<String> excludePatterns = settings.getExcludePatterns();
+    List<Object> excludePatterns = settings.getExcludePatterns();
     if (excludePatterns != null && !excludePatterns.isEmpty()) {
       try {
         builder.putSettings(

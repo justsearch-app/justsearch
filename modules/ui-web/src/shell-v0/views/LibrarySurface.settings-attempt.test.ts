@@ -32,6 +32,7 @@ function fixture() {
   // Policy observation is independent of the retained settings-attempt transport.
   let savedPatterns: string[] = [];
   const fetchPolicy: PluginHostApi['data']['fetch'] = async (path, init) => {
+    if (path.startsWith('/api/indexing/forgets?')) return json({ items: [], complete: true, nextId: null });
     if (path === '/api/indexing/excludes') return json({ source: 'settings.json', sourceDetail: null, patterns: savedPatterns });
     const response = await send(path, init);
     const body = await response.clone().json();
@@ -49,6 +50,77 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => { document.body.innerHTML = ''; vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('Library retained-base exclusions', () => {
+  it('RF55 exact rows visibly distinguish trailing whitespace, control characters and slash pairs', async () => {
+    const { library, send } = fixture();
+    const paths = ['/docs/name', '/docs/name ', '/docs/back\\name', '/docs/back/name', '/docs/tab\t',
+      '/docs/name\u00a0', '/docs/name\u200b'];
+    const entries = paths.map((path, index) => ({ literal: { version: 1,
+      id: `aa10bcec-4102-47f8-a26d-d02346c8a21${index}`, path, scope: 'FILE' } }));
+    send.mockResolvedValueOnce(json({ ui: { excludePatterns: entries }, witness: observed }))
+      .mockResolvedValue(json({}));
+    await library.loadExcludes();
+    expect(library.excludesLoaded).toBe(true);
+    document.body.appendChild(library);
+    await library.updateComplete;
+    const names = Array.from(library.shadowRoot?.querySelectorAll('section[aria-label="Exact paths kept out"] code') ?? [],
+      (node) => node.textContent);
+    expect(names).toEqual(['"/docs/name"', '"/docs/name " (1 trailing whitespace character)',
+      '"/docs/back\\\\name"', '"/docs/back/name"', '"/docs/tab\\t" (1 trailing whitespace character)',
+      '"/docs/name\\u00a0" (1 trailing whitespace character)', '"/docs/name\\u200b"']);
+    expect(new Set(names).size).toBe(paths.length);
+    expect(library.excludesText).toBe('');
+    library.remove();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('RF55 keeps exact path objects out of the glob editor and retains their bytes on a glob save', async () => {
+    const { library, send } = fixture();
+    const literal = { literal: { version: 1, id: 'aa10bcec-4102-47f8-a26d-d02346c8a210',
+      path: '/docs/report\\name[1].txt ', scope: 'FILE' } };
+    send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['*.log', literal] }, witness: observed }))
+      .mockImplementation(async (_, init) => init?.method === 'POST' ? complete(init) : json({}));
+    await library.loadExcludes();
+    expect(library.excludesLoaded, 'typed exact entries must load as a policy').toBe(true);
+    document.body.appendChild(library);
+    await library.updateComplete;
+    expect(library.excludesText).toBe('*.log');
+    expect(library.shadowRoot?.querySelector('section[aria-label="Exact paths kept out"] code')?.textContent)
+      .toBe('"/docs/report\\\\name[1].txt " (1 trailing whitespace character)');
+    library.excludesText = '*.log\n*.tmp';
+    await library.handleSaveExcludes();
+    const write = send.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(JSON.parse(String(write?.[1]?.body)).ui.excludePatterns)
+      .toEqual(['*.log', '*.tmp', literal]);
+    library.remove();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('RF55 removes a precise keep-out only through the witnessed save without editing glob text', async () => {
+    const { library, send } = fixture();
+    const literal = { literal: { version: 1, id: 'aa10bcec-4102-47f8-a26d-d02346c8a211',
+      path: '/docs/folder ', scope: 'FOLDER' } };
+    send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['*.log', literal] }, witness: observed }))
+      .mockImplementation(async (_, init) => init?.method === 'POST' ? complete(init) : json({}));
+    await library.loadExcludes();
+    expect(library.excludesLoaded).toBe(true);
+    document.body.appendChild(library);
+    await library.updateComplete;
+    const remove = library.shadowRoot?.querySelector('section[aria-label="Exact paths kept out"] jf-button') as
+      HTMLElement & { onActivate: () => void };
+    expect(remove).toBeTruthy();
+    remove.onActivate();
+    expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+    await library.handleSaveExcludes();
+    const write = send.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(JSON.parse(String(write?.[1]?.body)).ui.excludePatterns).toEqual(['*.log']);
+    expect(library.excludesText).toBe('*.log');
+    library.remove();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('AX1 editor preserves the saved list and names every literal fallback warning', async () => {
     const { library, send } = fixture();
     const patterns = ['[legacy', 'private', '{broken'];

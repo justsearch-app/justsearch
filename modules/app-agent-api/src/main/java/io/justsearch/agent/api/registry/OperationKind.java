@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum OperationKind {
   OPERATION("operation"), RECONFIGURE("reconfigure"), REINDEX("reindex"), INGEST("ingest"),
   SETTINGS_APPLY("settings-apply"), ACCEPT_GAPS("accept-gaps"), SCHEDULED_RUN("scheduled-run"),
-  MEMORY("memory"), NOTE("note");
+  MEMORY("memory"), NOTE("note"), FORGET("forget");
 
   private final String wireValue;
   OperationKind(String wireValue) { this.wireValue = wireValue; }

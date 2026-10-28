@@ -29,6 +29,10 @@ public final class FileMutationFence {
     lock.lock();
   }
 
+  /** FORGET never waits here while holding outer runtime/configuration owners. */
+  public boolean tryLock() { return lock.tryLock(); }
+  public boolean isHeldByCurrentThread() { return lock.isHeldByCurrentThread(); }
+
   public void unlock() {
     lock.unlock();
   }

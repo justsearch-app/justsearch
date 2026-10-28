@@ -98,6 +98,29 @@ public final class IndexingCoordinator {
     }
   }
 
+  /** Buffered writes also use dispatchLock; the outer producer fence alone does not drain them. */
+  ReadPathOps.NativeOwnership inspectNativeOwnership(java.util.Set<String> paths,
+      java.util.function.Predicate<String> reservedIdentity, long deadlineNanos) throws IOException {
+    try {
+      if (!session.writeBarrier.readLock().tryLock(Math.max(0, deadlineNanos - System.nanoTime()),
+          java.util.concurrent.TimeUnit.NANOSECONDS)) {
+        throw new IOException("Native ownership writer exclusion timed out");
+      }
+      try {
+        if (!dispatchLock.tryLock(Math.max(0, deadlineNanos - System.nanoTime()),
+            java.util.concurrent.TimeUnit.NANOSECONDS)) {
+          throw new IOException("Native ownership writer exclusion timed out");
+        }
+        try {
+          return session.readPathOps.inspectNativeOwnershipUnderWriterExclusion(paths, reservedIdentity, deadlineNanos);
+        } finally { dispatchLock.unlock(); }
+      } finally { session.writeBarrier.readLock().unlock(); }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Native ownership writer exclusion interrupted", interrupted);
+    }
+  }
+
   // ==========================================================================
   // Tempdoc 402: write-op dispatch
   // ==========================================================================

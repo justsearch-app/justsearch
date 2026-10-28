@@ -82,6 +82,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -205,7 +206,7 @@ public final class WorkerIngestService {
     this.indexingLoop = indexingLoop;
     this.forcedPathSink = paths -> this.indexingLoop.markForced(paths);
     this.indexingPacing =
-        java.util.Objects.requireNonNull(indexingPacing, "indexingPacing");
+        Objects.requireNonNull(indexingPacing, "indexingPacing");
     this.ingestLifecycle = ingestLifecycle;
     this.ingestIsServing = ingestLifecycle != null && ingestLifecycle == searchLifecycle;
     this.hasServingRuntime = searchLifecycle != null;
@@ -271,6 +272,7 @@ public final class WorkerIngestService {
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.syncOps.setPruneWriterFence(pruneWriterFence);
     this.syncOps.setUserExclusions(this::isUserExcluded);
+    this.syncOps.setRetirementExclusions(this::isUserExcludedForRetirement);
     this.syncOps.setPrefixScopeFactory(root -> prefixScope(root.toString()));
     this.candidateDiscoveryOps = new SyncDirectoryOps(
         searchLifecycle != null ? searchLifecycle.readPathOps() : null,
@@ -310,8 +312,8 @@ public final class WorkerIngestService {
   /** Bound once by the composing Worker owner before any request is published. */
   public void setMutationAdmission(WorkerMutationAdmission admission, Object owner) {
     if (mutationAdmission != null) throw new IllegalStateException("Mutation admission already bound");
-    mutationAdmission = java.util.Objects.requireNonNull(admission, "admission");
-    mutationOwner = java.util.Objects.requireNonNull(owner, "owner");
+    mutationAdmission = Objects.requireNonNull(admission, "admission");
+    mutationOwner = Objects.requireNonNull(owner, "owner");
   }
 
   private WorkerMutationAdmission.Lease mutationLease() {
@@ -324,20 +326,20 @@ public final class WorkerIngestService {
 
   /** The composing owner routes force-reindex marks, so a service set without a loop keeps them. */
   public void setForcedPathSink(java.util.function.Consumer<java.util.Collection<String>> sink) {
-    forcedPathSink = java.util.Objects.requireNonNull(sink, "sink");
+    forcedPathSink = Objects.requireNonNull(sink, "sink");
   }
 
   /** The composing owner supplies the serving mode used by admitted no-file writes. */
   public void setProjectionSemanticDeferralSupplier(java.util.function.BooleanSupplier supplier) {
-    projectionSemanticDeferral = java.util.Objects.requireNonNull(supplier, "supplier");
+    projectionSemanticDeferral = Objects.requireNonNull(supplier, "supplier");
   }
 
   /** D1-9 no-file port. Durable receipts remain refused until D2-5's covering-commit owner lands. */
   public io.justsearch.app.api.indexing.ProjectionReceipt applyProjection(
       io.justsearch.app.api.indexing.AcceptedProjection projection,
       io.justsearch.app.api.indexing.ProjectionDurability durability, CallContext ctx) {
-    java.util.Objects.requireNonNull(projection, "projection");
-    java.util.Objects.requireNonNull(durability, "durability");
+    Objects.requireNonNull(projection, "projection");
+    Objects.requireNonNull(durability, "durability");
     if (durability == io.justsearch.app.api.indexing.ProjectionDurability.DURABLE) {
       throw WorkerServiceException.failedPrecondition(
           "Durable projection receipt requires the D2-5 covering-commit owner");
@@ -441,6 +443,159 @@ public final class WorkerIngestService {
     return withFileMutationFence(mutation);
   }
 
+  RootWatcherRegistry.PolicyRoots nativePolicyRoots() {
+    return rootWatcherRegistry.current().policyRoots();
+  }
+
+  boolean nativePolicyRootScopeCurrent(RootWatcherRegistry.PolicyRoots captured, Path path, Path root) {
+    return captured != null && rootWatcherRegistry.current() == captured.owner() && captured.current(path, root);
+  }
+
+  io.justsearch.indexerworker.loop.FileMutationFence holdNativePolicyFileWriter() throws IOException {
+    var file = fileMutationFence();
+    if (mutationAdmission == null || mutationAdmission.finalFenceScope() == null || file == null) {
+      throw new IOException("Native ownership lacks its final producer fence");
+    }
+    file.lock();
+    return file;
+  }
+
+  /** Both physical runtimes, under the actual final producer and file-writer exclusions. */
+  NativePolicyOwnership nativePolicyOwnership(Set<String> paths,
+      io.justsearch.adapters.lucene.runtime.RunningRuntime expectedTarget, long deadlineNanos) throws IOException {
+    var file = fileMutationFence();
+    if (mutationAdmission == null || mutationAdmission.finalFenceScope() == null
+        || file == null || !file.isHeldByCurrentThread()
+        || ingestLifecycle == null || ingestLifecycle != expectedTarget || searchLifecycle == null) {
+      throw new IOException("Native ownership lacks continuous writer exclusion");
+    }
+    Object scope = mutationAdmission.finalFenceScope();
+    var ingest = ingestLifecycle.readPathOps().inspectNativeOwnership(paths,
+        io.justsearch.app.api.indexing.AcceptedProjection::isProjectionIndexId, deadlineNanos);
+    var serving = searchLifecycle == ingestLifecycle ? ingest
+        : searchLifecycle.readPathOps().inspectNativeOwnership(paths,
+            io.justsearch.app.api.indexing.AcceptedProjection::isProjectionIndexId, deadlineNanos);
+    java.util.function.BooleanSupplier held = () -> mutationAdmission.finalFenceScope() == scope && file.isHeldByCurrentThread();
+    return new NativePolicyOwnership(path -> held.getAsBoolean() && ingest.ordinary(path) && serving.ordinary(path),
+        path -> held.getAsBoolean() && ingest.absent(path));
+  }
+
+  record NativePolicyOwnership(java.util.function.Predicate<String> ordinary,
+      java.util.function.Predicate<String> targetAbsent) {
+    boolean ordinary(String path) { return ordinary.test(path); }
+    boolean targetAbsent(String path) { return targetAbsent.test(path); }
+  }
+
+  /** Native policy certification never waits on a file writer under publication ownership. */
+  public boolean tryNativePolicyFileProof(java.util.function.BooleanSupplier proof) {
+    var file = fileMutationFence();
+    if (file == null || !file.tryLock()) return false;
+    try { return proof.getAsBoolean(); }
+    finally { file.unlock(); }
+  }
+
+  /** Read-only proof uses the same real registered root, without waiting on a file writer. */
+  public boolean tryNativePolicyFileProof(Path root, String collection, java.util.function.BooleanSupplier proof) {
+    return tryNativePolicyFileProof(() -> {
+      try {
+        var registry = rootWatcherRegistry.current();
+        var subscription = registry.subscription(root);
+        requireCandidateSubscription(registry, root, subscription);
+        if (!Objects.equals(WatcherReplay.rootOwnerCollection(collection),
+            WatcherReplay.rootOwnerCollection(subscription.collection()))) return false;
+        try (var held = RootIdentity.hold(root)) {
+          if (!held.identity().equals(subscription.rootIdentity())) return false;
+          requireNativePolicyVolume(root, held.identity());
+          held.requireCurrent();
+          boolean matched = proof.getAsBoolean();
+          held.requireCurrent();
+          requireNativePolicyVolume(root, held.identity());
+          requireCandidateSubscription(registry, root, subscription);
+          return matched;
+        }
+      } catch (IOException | RuntimeException unknown) { return false; }
+    });
+  }
+
+  /** The live registered directory/volume and actual writer own this short ordinary admission. */
+  public <T> T withNativePolicyReadmissionRoot(Path root, String collection, Supplier<T> action)
+      throws IOException {
+    var registry = rootWatcherRegistry.current();
+    var subscription = registry.subscription(root);
+    requireCandidateSubscription(registry, root, subscription);
+    if (!Objects.equals(WatcherReplay.rootOwnerCollection(collection),
+        WatcherReplay.rootOwnerCollection(subscription.collection()))) {
+      throw new IOException("Native policy readmission root owner is unavailable");
+    }
+    try (var held = RootIdentity.hold(root)) {
+      requireNativePolicyVolume(root, held.identity());
+      if (!held.identity().equals(subscription.rootIdentity())) {
+        throw new IOException("Native policy readmission needs its registered directory and volume");
+      }
+      try {
+        return underFileMutationFence(() -> {
+          try {
+            held.requireCurrent();
+            requireNativePolicyVolume(root, held.identity());
+            requireCandidateSubscription(registry, root, subscription);
+            T result = action.get();
+            held.requireCurrent();
+            requireNativePolicyVolume(root, held.identity());
+            requireCandidateSubscription(registry, root, subscription);
+            return result;
+          } catch (IOException changed) { throw new java.io.UncheckedIOException(changed); }
+        });
+      } catch (java.io.UncheckedIOException changed) { throw changed.getCause(); }
+    }
+  }
+
+  /** CURRENT UI/index omission of an admitted pathname, never historical DELETE/root absence. */
+  public boolean tryCommittedBootNativePolicyOmission(Path root, java.util.function.BooleanSupplier proof) {
+    if (mutationAdmission == null || indexingLoop == null || ingestLifecycle == null
+        || ingestLifecycle != searchLifecycle || !ingestLifecycle.isAcceptingWrites()) return false;
+    return tryNativePolicyFileProof(() -> {
+      try (var held = RootIdentity.hold(root)) {
+        held.requireCurrent();
+        requireNativePolicyVolume(root, held.identity());
+        boolean matched = proof.getAsBoolean();
+        held.requireCurrent();
+        requireNativePolicyVolume(root, held.identity());
+        return matched;
+      } catch (IOException | RuntimeException unknown) { return false; }
+    });
+  }
+
+  /** No subscription is invented: committed boot's bound declarations own PRESENT additions only. */
+  public <T> T withCommittedBootNativePolicyRoot(Path root, Supplier<T> action) throws IOException {
+    if (mutationAdmission == null || indexingLoop == null || ingestLifecycle == null
+        || ingestLifecycle != searchLifecycle || !ingestLifecycle.isAcceptingWrites()) {
+      throw new IOException("Native boot readmission lacks its committed writable producer");
+    }
+    try (var held = RootIdentity.hold(root)) {
+      requireNativePolicyVolume(root, held.identity());
+      try {
+        return underFileMutationFence(() -> {
+          try {
+            held.requireCurrent();
+            requireNativePolicyVolume(root, held.identity());
+            T result = action.get();
+            held.requireCurrent();
+            requireNativePolicyVolume(root, held.identity());
+            return result;
+          } catch (IOException changed) { throw new java.io.UncheckedIOException(changed); }
+        });
+      } catch (java.io.UncheckedIOException changed) { throw changed.getCause(); }
+    }
+  }
+
+  private void requireNativePolicyVolume(Path root, RootIdentity held) throws IOException {
+    String known = held.volume();
+    var recorded = rootVolumes.recordedFor(root);
+    if (known == null || recorded.isEmpty() || !known.equals(recorded.orElseThrow())) {
+      throw new IOException("Native policy root lacks fresh equality to its recorded known volume");
+    }
+  }
+
   /** {@link #confirmedAbsent} under the root that holds the path; an invalid path is not. */
   private boolean confirmedGone(String normalizedPath) {
     try {
@@ -493,9 +648,10 @@ public final class WorkerIngestService {
    * file-mutation fence.
    */
   public void prunesUnder(WorkerIngestService publisher) {
-    java.util.Objects.requireNonNull(publisher, "publisher");
+    Objects.requireNonNull(publisher, "publisher");
     syncOps.setForcedPathSink(paths -> publisher.forcedPathSink.accept(paths));
     syncOps.setPruneGuardFactory(publisher::pruneGuard);
+    syncOps.setRetirementExclusions(publisher::isUserExcludedForRetirement);
     syncOps.setPruneWriterFence(publisher.pruneWriterFence);
     syncOps.setPrefixScopeFactory(root -> publisher.prefixScope(root.toString()));
     candidateDiscoveryOps.setPrefixScopeFactory(root -> publisher.prefixScope(root.toString()));
@@ -518,8 +674,8 @@ public final class WorkerIngestService {
   public ReplayedPrune replayBufferedPrune(
       io.justsearch.adapters.lucene.runtime.RunningRuntime target, String pathPrefix,
       Runnable firstRemoval) {
-    java.util.Objects.requireNonNull(target, "target");
-    java.util.Objects.requireNonNull(firstRemoval, "firstRemoval");
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(firstRemoval, "firstRemoval");
     Path pruneRoot = pruneRootFor(pathPrefix);
     Set<String> removed = new java.util.LinkedHashSet<>();
     var result = target.pruneOps().pruneByPathPrefix(
@@ -660,8 +816,8 @@ public final class WorkerIngestService {
    */
   public void acceptWatcherEvent(
       RootWatcherRegistry.Subscription witness, Runnable effect) {
-    java.util.Objects.requireNonNull(witness, "witness");
-    java.util.Objects.requireNonNull(effect, "effect");
+    Objects.requireNonNull(witness, "witness");
+    Objects.requireNonNull(effect, "effect");
     try (var ignoredMutation = mutationLease()) {
       RootWatcherRegistry registry = rootWatcherRegistry;
       try (RootWatcherRegistry.EventLease eventLease = registry.enterEvent(witness)) {
@@ -679,7 +835,7 @@ public final class WorkerIngestService {
   /** Live UPSERT retains its registration identity through concrete queue admission. */
   public void acceptWatcherUpsert(
       RootWatcherRegistry.Subscription witness, String collection, Path path) {
-    java.util.Objects.requireNonNull(witness, "witness");
+    Objects.requireNonNull(witness, "witness");
     try (var ignoredMutation = mutationLease()) {
       requireWatcherRootCurrent(witness);
       if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
@@ -710,7 +866,7 @@ public final class WorkerIngestService {
 
   /** The watcher owns its deletion marker; this method owns its routing and effect fence. */
   public void acceptWatcherDelete(String normalizedPath, Runnable directEffect) {
-    java.util.Objects.requireNonNull(directEffect, "directEffect");
+    Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
       acceptWatcherDeleteUnderLease(normalizedPath, directEffect, false, true, null, null);
     }
@@ -721,8 +877,8 @@ public final class WorkerIngestService {
       RootWatcherRegistry.Subscription witness,
       String normalizedPath,
       Runnable directEffect) {
-    java.util.Objects.requireNonNull(witness, "witness");
-    java.util.Objects.requireNonNull(directEffect, "directEffect");
+    Objects.requireNonNull(witness, "witness");
+    Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
       acceptWatcherDeleteUnderLease(
           normalizedPath, directEffect, false, true, witness.root(), witness.rootIdentity());
@@ -837,7 +993,7 @@ public final class WorkerIngestService {
     var subscription = registry.subscription(root);
     if (subscription == null || !registry.isCurrentAndActive(subscription)
         || !subscription.rootIdentity().matchesReceipt(debt.rootIdentity())
-        || !java.util.Objects.equals(WatcherReplay.rootOwnerCollection(subscription.collection()),
+        || !Objects.equals(WatcherReplay.rootOwnerCollection(subscription.collection()),
             WatcherReplay.rootOwnerCollection(debt.collection()))) {
       throw new IOException("Reconciled watcher root is not observed by its declared owner");
     }
@@ -1061,7 +1217,7 @@ public final class WorkerIngestService {
    * first, so the periodic cycle adopts a returning drive without any action (round 8).
    */
   public String rootVolumeRefusal(String rootPath, CallContext ctx) {
-    java.util.Objects.requireNonNull(ctx, "ctx");
+    Objects.requireNonNull(ctx, "ctx");
     Path root = parsedRoot(rootPath);
     if (root == null) {
       return "";
@@ -1584,7 +1740,7 @@ public final class WorkerIngestService {
 
   /** Physical target metadata from the Worker that owns the configured model files. */
   public void setIndexTargetMetadataSupplier(Supplier<Map<String, Object>> supplier) {
-    indexTargetMetadataSupplier = java.util.Objects.requireNonNull(supplier, "supplier");
+    indexTargetMetadataSupplier = Objects.requireNonNull(supplier, "supplier");
   }
 
   private volatile Supplier<Map<String, Object>> indexTargetMetadataSupplier;
@@ -1676,7 +1832,7 @@ public final class WorkerIngestService {
    * but never own its processing policy.
    */
   public void useExclusionRoots(Supplier<java.util.Collection<Path>> roots) {
-    exclusionRoots = java.util.Objects.requireNonNull(roots, "roots");
+    exclusionRoots = Objects.requireNonNull(roots, "roots");
     if (ingestLifecycle != null) {
       ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
     }
@@ -1693,6 +1849,25 @@ public final class WorkerIngestService {
     return false;
   }
 
+  public static final String RETIREMENT_EXCLUDED_INDEXED =
+      "0.3.0 retirement waits on excluded paths still indexed";
+
+  /** Retirement must keep old content when the live policy cannot be read or parsed. */
+  public boolean isUserExcludedForRetirement(Path file, Path root) {
+    var store = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    if (store == null) throw new IllegalStateException("Retirement exclusion policy is unavailable");
+    var snapshot = store.currentSnapshot();
+    var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.fromRawJsonStrict(
+        snapshot.ui().excludePatterns(), io.justsearch.configuration.PlatformPaths.isWindows());
+    if (!patterns.invalidPatterns().isEmpty())
+      throw new IllegalStateException("Retirement exclusion policy is invalid");
+    boolean excluded = isUserExcluded(file, root);
+    if (store != io.justsearch.configuration.resolved.ConfigStore.globalOrNull()
+        || snapshot != store.currentSnapshot())
+      throw new IllegalStateException("Retirement exclusion policy changed during observation");
+    return excluded;
+  }
+
   private boolean sourceProcessingAllowed(String source) {
     if (source == null || source.isBlank()) return true;
     try {
@@ -1701,6 +1876,148 @@ public final class WorkerIngestService {
       return !file.isAbsolute() || !isUserExcluded(file, file);
     } catch (InvalidPathException nonFile) {
       return true;
+    }
+  }
+
+  /** Trusted index/control metadata, never the result hit's collection label or a disk stat. */
+  public void validateForgetTarget(Path target,
+      io.justsearch.configuration.excludes.LiteralExclusion.Scope scope) {
+    var supplier = resolvedConfigSupplier;
+    var current = supplier == null ? null : supplier.get();
+    if (current == null || ingestLifecycle == null) {
+      throw WorkerServiceException.unavailable("The indexed target cannot be verified");
+    }
+    Path path = target.toAbsolutePath().normalize();
+    var internal = new ArrayList<Path>();
+    internal.add(current.paths().dataDir().resolve("agent-history").toAbsolutePath().normalize());
+    var help = current.collections().bundledHelp();
+    if (help != null) internal.add(help.path().toAbsolutePath().normalize());
+    for (var collection : current.collections().items()) {
+      if (io.justsearch.configuration.InternalCollections.isReserved(collection.name())) {
+        for (Path protectedRoot : collection.roots()) internal.add(protectedRoot.toAbsolutePath().normalize());
+      }
+    }
+    for (Path protectedRoot : internal) {
+      if (path.startsWith(protectedRoot)
+          || scope == io.justsearch.configuration.excludes.LiteralExclusion.Scope.FOLDER
+              && protectedRoot.startsWith(path)) {
+        throw WorkerServiceException.invalidArgument("Help and agent-history content is managed by its own data controls");
+      }
+    }
+    String key = PathNormalizer.normalizeKey(path);
+    var membership = new org.apache.lucene.search.BooleanQuery.Builder();
+    if (scope == io.justsearch.configuration.excludes.LiteralExclusion.Scope.FILE) {
+      membership.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(
+          SchemaFields.DOC_ID, key)), org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+      membership.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(
+          SchemaFields.PARENT_DOC_ID, key)), org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+    } else {
+      membership.add(new org.apache.lucene.search.PrefixQuery(new org.apache.lucene.index.Term(
+          SchemaFields.PATH,
+          io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(key))),
+          org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+      membership.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(
+          SchemaFields.PATH, key)), org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+    }
+    var reserved = new org.apache.lucene.search.BooleanQuery.Builder();
+    for (String collection : io.justsearch.configuration.InternalCollections.RESERVED) {
+      reserved.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(
+          SchemaFields.COLLECTION, collection)), org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+    }
+    try {
+      ingestLifecycle.commitOps().maybeRefreshBlocking();
+      if (ingestLifecycle.indexCountOps().countQueryOrThrow(new org.apache.lucene.search.BooleanQuery.Builder()
+          .add(membership.build(), org.apache.lucene.search.BooleanClause.Occur.FILTER)
+          .add(reserved.build(), org.apache.lucene.search.BooleanClause.Occur.FILTER).build()) > 0) {
+        throw WorkerServiceException.invalidArgument("Help and agent-history content cannot be forgotten here");
+      }
+    } catch (IOException unreadable) {
+      throw WorkerServiceException.unavailable("The indexed target's ownership could not be verified");
+    }
+  }
+
+  public boolean ownsForgetQueue(JobQueue expected) { return expected != null && jobQueue == expected; }
+
+  /** Must be checked before entering Head roots or server physical ownership. */
+  public boolean forgetEntryAllowed() {
+    return jobQueue.forgetEntryAllowed() && indexingLoop != null
+        && !indexingLoop.fileMutationFence().isHeldByCurrentThread();
+  }
+
+  /** TRY both inner owners: never wait behind a writer/callback while holding runtime/config. */
+  public java.util.Optional<ForgetMutation> tryBeginForgetMutation() {
+    if (!forgetEntryAllowed() || mutationAdmission == null
+        || ingestLifecycle != searchLifecycle
+        || !(ingestLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime runtime)
+        || !runtime.isAcceptingWrites()) return java.util.Optional.empty();
+    var file = indexingLoop.fileMutationFence();
+    if (!file.tryLock()) return java.util.Optional.empty();
+    boolean retained = false;
+    try {
+      var queue = jobQueue.tryForgetQueueFence();
+      if (queue.isEmpty()) return java.util.Optional.empty();
+      retained = true;
+      return java.util.Optional.of(new ForgetMutation(file, queue.orElseThrow(), runtime));
+    } finally { if (!retained) file.unlock(); }
+  }
+
+  public final class ForgetMutation {
+    private final io.justsearch.indexerworker.loop.FileMutationFence file;
+    private final JobQueue.ForgetQueueFence queue;
+    private final io.justsearch.adapters.lucene.runtime.RunningRuntime runtime;
+    private final Thread holder = Thread.currentThread();
+    private boolean fileReleased;
+    private boolean queueReleased;
+    private ForgetMutation(io.justsearch.indexerworker.loop.FileMutationFence file,
+        JobQueue.ForgetQueueFence queue, io.justsearch.adapters.lucene.runtime.RunningRuntime runtime) {
+      this.file = file; this.queue = queue; this.runtime = runtime;
+    }
+
+    /** Existing exact/prefix delete/claim invalidation, then strict queue/index absence proof. */
+    public boolean removeAndVerify(io.justsearch.app.api.operations.ForgetPlan plan) {
+      requireHolder();
+      if (fileReleased || queueReleased) throw new IllegalStateException("Forget mutation owners are released");
+      String key = PathNormalizer.normalizeKey(Path.of(plan.path()));
+      boolean folder = plan.scope() == io.justsearch.configuration.excludes.LiteralExclusion.Scope.FOLDER;
+      // A FOLDER literal includes equality. A former file at this path can still own parent,
+      // chunk and queue rows after the physical path has become a directory.
+      runtime.indexingCoordinator().deleteByIdAndChunks(key);
+      if (folder) runtime.indexingCoordinator().deleteByPathPrefix(key);
+      if (jobQueue.deleteByExactPath(key) < 0
+          || folder && jobQueue.deleteByPathPrefix(key) < 0) {
+        throw new IllegalStateException("Forget queue removal did not complete");
+      }
+      runtime.commitOps().commitAndTrack(folder ? CommitReason.GRPC_DELETE_BY_PATH : CommitReason.GRPC_DELETE_BY_ID);
+      runtime.commitOps().maybeRefreshBlocking();
+      try {
+        return runtime.indexCountOps().countByIdAndChunksStrict(key) == 0
+            && (!folder || runtime.indexCountOps().countPathPrefixExcludingAcceptedSurvivorsStrict(
+                key, List.of(), List.of()) == 0)
+            && jobQueue.forgetJobsAbsent(key, folder);
+      } catch (IOException unknown) {
+        throw new java.io.UncheckedIOException("Forget index absence could not be verified", unknown);
+      }
+    }
+
+    /** Release file before unwinding configuration/generation/runtime/root; retain queue throughout. */
+    public void releaseFile() {
+      requireHolder();
+      if (fileReleased) return;
+      fileReleased = true;
+      file.unlock();
+    }
+
+    /** Guaranteed caller finally AFTER all outer owners. Existing queue deliveries run here. */
+    public void afterOwnersReleased() {
+      requireHolder();
+      if (!fileReleased) throw new IllegalStateException("Release the file and outer owners before queue delivery");
+      if (queueReleased) return;
+      queueReleased = true;
+      queue.close();
+    }
+
+    private void requireHolder() {
+      if (Thread.currentThread() != holder) throw new IllegalStateException("Forget mutation is synchronous and thread-owned");
     }
   }
 
@@ -1758,7 +2075,7 @@ public final class WorkerIngestService {
         if (request.getRootAdded()) {
           // Round 8b (decision 1): an explicit ingest request is a deliberate add and records the
           // volume of each file's folder; a batch without the marker records nothing.
-          validPaths.stream().map(Path::getParent).filter(java.util.Objects::nonNull).distinct()
+          validPaths.stream().map(Path::getParent).filter(Objects::nonNull).distinct()
               .forEach(rootWitness::recordExplicitFileFolder);
         }
 
@@ -2566,7 +2883,7 @@ public final class WorkerIngestService {
 
   /** The composition root supplies its boot/configuration policy for fresh public ROOTs. */
   public void useCreatorRootCollection(java.util.function.Function<Path,String> policy) {
-    creatorRootCollection = java.util.Objects.requireNonNull(policy);
+    creatorRootCollection = Objects.requireNonNull(policy);
   }
 
   private String creatorRootCollection(String rootPath) {
@@ -2789,7 +3106,7 @@ public final class WorkerIngestService {
       RootWatcherRegistry registry = rootWatcherRegistry;
       RootWatcherRegistry.Subscription subscription = registry.subscription(root);
       requireCandidateSubscription(registry, root, subscription);
-      if (!java.util.Objects.equals(subscription.collection(),
+      if (!Objects.equals(subscription.collection(),
           binding.collection() == null || binding.collection().isBlank() ? null : binding.collection())) {
         throw new IOException("Committed boot root collection changed");
       }
@@ -2826,7 +3143,7 @@ public final class WorkerIngestService {
     String indexedCollection = fields.getDocumentField(
         id, SchemaFields.COLLECTION);
     return io.justsearch.indexerworker.loop.SourceContentHash.sha256(file).equals(source)
-        && java.util.Objects.equals(normalizeRootCollection(collection),
+        && Objects.equals(normalizeRootCollection(collection),
             normalizeRootCollection(indexedCollection));
   }
 
@@ -3386,18 +3703,26 @@ public final class WorkerIngestService {
             io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(oldPath);
         String newPathHash =
             io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(newPath);
-        var identityRekey =
-            documentIdentityStore.rekey(oldPathHash, newPathHash, System.currentTimeMillis());
-
-        // Inside the file-mutation fence: a prune applying a batch never sees a rename half done.
-        boolean settled = withFileMutationFence(() -> moveRowsUnderFence(oldPath, newPath));
+        // Policy, identity and Lucene publication share the deletion fence. A keep-out installed
+        // after the optimistic check above must prevent BOTH indexed authorities from moving.
+        boolean settled = withFileMutationFence(() -> {
+          // The physical file operation can finish after its caller's bounded index update
+          // returns. Never let that surviving old call recreate a path after a later forget.
+          if (ctx.cancelled() || ctx != CallContext.none()
+              && System.nanoTime() - ctx.deadlineNanos() >= 0) return false;
+          if (isUserExcluded(destination, destination)) return false;
+          var identityRekey = documentIdentityStore.rekey(
+              oldPathHash, newPathHash, System.currentTimeMillis());
+          boolean rowsSettled = moveRowsUnderFence(oldPath, newPath);
+          return identityRekey
+              != io.justsearch.indexerworker.identity.DocumentIdentityStore.RekeyResult.NOT_FOUND
+              || rowsSettled;
+        });
         // Green may not contain the document yet while Blue still serves it. Moving the durable
         // identity is therefore a successful rename even when this generation has no Lucene row.
         // Store-first is deliberate: if Lucene throws after the move, the RPC fails and retry or
         // boot reconciliation converges from the store-authoritative uid without ever re-minting.
-        if (identityRekey
-                != io.justsearch.indexerworker.identity.DocumentIdentityStore.RekeyResult.NOT_FOUND
-            || settled) {
+        if (settled) {
           updatedCount++;
         } else {
           failedPaths.add(mapping.getOldPath());
@@ -3649,7 +3974,7 @@ public final class WorkerIngestService {
    * issues a {@code WatchRoot}.
    */
   public void setRootWatcherRegistry(RootWatcherRegistry registry) {
-    this.rootWatcherRegistry = java.util.Objects.requireNonNull(registry, "registry");
+    this.rootWatcherRegistry = Objects.requireNonNull(registry, "registry");
   }
 
   /**
@@ -3714,8 +4039,8 @@ public final class WorkerIngestService {
       String operationKey, long epoch, String expectedGeneration, boolean singleFile, List<Path> excludedSubtrees,
       RecordedScanMode mode) {
     public RecordedRootScan {
-      java.util.Objects.requireNonNull(request, "request");
-      java.util.Objects.requireNonNull(mode, "mode");
+      Objects.requireNonNull(request, "request");
+      Objects.requireNonNull(mode, "mode");
       if (mode == RecordedScanMode.CAPTURED
           && (singleFile || request.getMode() != io.justsearch.ipc.ScanMode.SCAN_MODE_FORCE_REINDEX)) {
         throw new IllegalArgumentException("Captured bulk requires forced directory traversal");
@@ -3754,7 +4079,7 @@ public final class WorkerIngestService {
   /** Synchronous actual enumeration; the Engine supplies the admitted owner and bounded executor. */
   public void scanRecordedRoot(RecordedRootScan recorded,
       java.util.function.Consumer<io.justsearch.ipc.ScanRootProgress> sink, CallContext ctx) {
-    java.util.Objects.requireNonNull(recorded, "recorded");
+    Objects.requireNonNull(recorded, "recorded");
     if (ctx.cancelled()) {
       throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED, "Generation capture cancelled");
     }
@@ -3874,7 +4199,7 @@ public final class WorkerIngestService {
         // The marks go through the same sink as submitBatch's, so a forced scan admitted by a
         // read-only (deferred) service set reaches the loop its writer upgrade creates.
         new WorkerScanOps(jobQueue, queueDepth, isCancelled, paths -> forcedPathSink.accept(paths),
-            () -> validateRecordedGeneration(java.util.Objects.requireNonNull(recorded), ctx),
+            () -> validateRecordedGeneration(Objects.requireNonNull(recorded), ctx),
             switchBufferOps::buildingGenerationForFileAdmission)
             .scan(scanRequest, sink);
       } catch (IOException e) {

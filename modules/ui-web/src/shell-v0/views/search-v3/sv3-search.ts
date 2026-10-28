@@ -37,6 +37,7 @@ import {
 import { FACET_LABELS } from '../../components/searchResults/facetChips.js';
 import { clearSelection, getSelection, setSelection, DEFAULT_CAPABILITIES_BY_KIND } from '../../state/selectionState.js';
 import type { Availability } from '../../state/availability.js';
+import { forgetContainsPath, type ForgetScope } from '../../../api/domains/forget.js';
 
 /** The files one Ask is limited to — document PATHS, which is what the backend's filter matches. */
 export interface Sv3AskScope {
@@ -343,6 +344,23 @@ export class Sv3SearchController implements ReactiveController {
     this.selected = sv3PruneSelection(new Set(ids), this.snapshot?.results ?? []);
     this.publishSelection();
     this.host.requestUpdate();
+  }
+
+  /** Confirmed removal changes only the live choice/prepared Ask; saved turn scopes stay intact. */
+  reconcileForgotten(path: string, scope: ForgetScope): boolean {
+    const forgotten = new Set((this.snapshot?.results ?? [])
+      .filter(hit => forgetContainsPath(path, scope, hit.path)).map(hit => hit.id));
+    this.selected = new Set([...this.selected].filter(id => !forgotten.has(id)));
+    this.publishSelection();
+    let clearedScope = false;
+    if (this.pendingScope !== null) {
+      const paths = this.pendingScope.paths.filter(candidate => !forgetContainsPath(path, scope, candidate));
+      clearedScope = paths.length === 0;
+      this.pendingScope = paths.length ? { paths } : null;
+    }
+    this.host.requestUpdate();
+    this.rerun(); // The current query/filter store re-reads real results, counts and facets.
+    return clearedScope;
   }
 
   private clearPublishedSelection(): void {
