@@ -58,7 +58,8 @@ function stripInlineComment(line) {
     if ((ch === '"' || ch === "'") && line[i - 1] !== '\\') {
       quote = quote === ch ? null : quote ?? ch;
     }
-    if (ch === '#' && quote === null) {
+    // YAML starts a comment only at line start or after whitespace (`a#b` is plain text).
+    if (ch === '#' && quote === null && (i === 0 || /\s/.test(line[i - 1]))) {
       return line.slice(0, i);
     }
   }
@@ -198,6 +199,126 @@ export function usesSelfHostedRunner(lines) {
   return finishBlock();
 }
 
+// Environment deployment rules are the authorization boundary for production
+// signing. Keep this independent of the editable trigger allowlist.
+function signingSecretErrors(lines, rel, repoRoot) {
+  const errors = [];
+  const releaseWorkflows = ['build-installer', 'build-installer-windows', 'build-installer-linux',
+    'publish-release', 'packaging-smoke'].map(name => `.github/workflows/${name}.yml`);
+  const releaseWorkflow = releaseWorkflows.includes(rel);
+  const privateName = 'JUSTSEARCH_(?:CODESIGN_\\w+|TAURI_UPDATER_PRIVATE_KEY\\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)';
+  const reference = new RegExp(`secrets\\s*(?:\\.\\s*${privateName}\\b|\\[\\s*['"]${privateName}['"]\\s*\\])`, 'i');
+  const anchors = new Map();
+  for (let i = 0; i < lines.length; i++) {
+    const match = /(?:[:]|-)\s*&([\w-]+)/.exec(stripInlineComment(lines[i]));
+    if (!match) continue;
+    const block = [lines[i]];
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j].trim() && leadingSpaces(lines[j]) <= leadingSpaces(lines[i])) break;
+      block.push(stripInlineComment(lines[j]));
+    }
+    anchors.set(match[1], block);
+  }
+  const referencesPrivateKey = (line, seen = new Set()) => {
+    // Only an exact presence expression may cross into a non-signing step.
+    if (releaseWorkflow && /^\s*HAS_\w+:\s*\$\{\{\s*secrets(?:\.[A-Z_]+|\[['"][A-Z_]+['"]\])\s*!=\s*''\s*\}\}\s*$/i.test(line)) return false;
+    if (reference.test(line)) return true;
+    const alias = /(?:[:]|-)\s*\*([\w-]+)\s*$/.exec(line)?.[1];
+    if (!alias || seen.has(alias)) return false;
+    return (anchors.get(alias) ?? []).some(value => referencesPrivateKey(value, new Set([...seen, alias])));
+  };
+  let inJobs = false;
+  let job = [];
+  const check = () => {
+    if (!job.length) return;
+    if (releaseWorkflow && job.some(({ line }) => /^    secrets:\s*['"]?inherit['"]?\s*$/i.test(line))) {
+      const calledWorkflow = job.find(({ line }) => /^    uses:/.test(line));
+      const destination = calledWorkflow && stripOuterQuotes(parseMappingEntry(calledWorkflow.line.trim()).rest);
+      if (!releaseWorkflows.some(file => destination === `./${file}`)) errors.push({ rel,
+        lineNumber: job.find(({ line }) => /^    secrets:/i.test(line)).lineNumber,
+        message: 'signing secrets may be inherited only by a per-release workflow' });
+    }
+    let environment;
+    let environmentBlock = false;
+    for (const { line } of job) {
+      if (leadingSpaces(line) === 4) {
+        const entry = parseMappingEntry(line.trim());
+        environmentBlock = entry?.key === 'environment' && !entry.rest.trim();
+        if (entry?.key === 'environment') environment = stripOuterQuotes(entry.rest);
+      } else if (environmentBlock && leadingSpaces(line) === 6) {
+        const entry = parseMappingEntry(line.trim());
+        if (entry?.key === 'name') environment = stripOuterQuotes(entry.rest);
+      }
+    }
+    let inSteps = false;
+    for (const { line, lineNumber } of job) {
+      if (leadingSpaces(line) === 4) inSteps = parseMappingEntry(line.trim())?.key === 'steps';
+      if (!inSteps && referencesPrivateKey(line)) errors.push({ rel, lineNumber,
+        message: 'production signing secrets must be scoped to a single release-signing step' });
+    }
+    if (environment !== 'release-signing') {
+      for (const { line, lineNumber } of job) {
+        if (referencesPrivateKey(line)) errors.push({ rel, lineNumber, message: 'production signing secrets require the release-signing environment' });
+      }
+    }
+    if (!releaseWorkflow) { job = []; return; }
+    const expand = (line, seen = new Set()) => {
+      const alias = /(?:[:]|-)\s*\*([\w-]+)\s*$/.exec(line)?.[1];
+      if (!alias || seen.has(alias)) return [line];
+      const block = anchors.get(alias) ?? [];
+      const offset = leadingSpaces(line) - leadingSpaces(block[0] ?? '');
+      return block.flatMap(value => expand(' '.repeat(Math.max(0, offset)) + value, new Set([...seen, alias])));
+    };
+    const expanded = job.flatMap(({ line, lineNumber }) => expand(line).map(value => ({ line: value, lineNumber })));
+    let step = [];
+    const checkStep = () => {
+      if (!step.some(({ line }) => referencesPrivateKey(line))) { step = []; return; }
+      const text = step.map(({ line }) => line).join('\n');
+      const lineNumber = step[0].lineNumber;
+      // These are the existing signing entry points, not names supplied by a workflow author.
+      const run = text.match(/^(?:      - |        )run:([^\n]*(?:\n          [^\n]*)*)/m)?.[1] ?? '';
+      const signingCommand = /^\s*(?:node\s+scripts\/release\/release-candidate\.mjs\s+build\b|(?:&\s+)?\.[\\/]scripts[\\/]ci[\\/]build-installer-windows\.ps1\b|npm\s+--prefix\s+modules\/shell\s+run\s+tauri\s+--\s+signer\s+sign\b)/;
+      const signingLines = run.split('\n').filter(line => signingCommand.test(line));
+      const signs = signingLines.length > 0;
+      if (!signs || /(?:^|\n)\s*(?:-\s*)?uses:/.test(text)) errors.push({ rel, lineNumber,
+        message: 'production signing secrets may be referenced only by the step that signs, never by an action' });
+      let source = run;
+      for (const match of signingLines.join('\n').matchAll(/scripts[\/\\][\w./\\-]+\.(?:mjs|ps1|sh)\b/g)) {
+        const file = path.resolve(repoRoot, match[0].replaceAll('\\', '/'));
+        if (fs.existsSync(file)) source += '\n' + fs.readFileSync(file, 'utf8');
+      }
+      if (/GITHUB_(?:ENV|OUTPUT)/.test(source)) errors.push({ rel, lineNumber,
+        message: 'a signing-secret step must not export secret-derived values or paths to GITHUB_ENV or GITHUB_OUTPUT' });
+      step = [];
+    };
+    for (const entry of expanded) {
+      if (/^      -/.test(entry.line)) checkStep();
+      if (step.length || /^      -/.test(entry.line)) step.push(entry);
+    }
+    checkStep();
+    job = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = stripInlineComment(lines[i]).trimEnd();
+    if (!line.trim()) continue;
+    if (releaseWorkflow && (/\btoJSON\s*\(\s*secrets\s*\)/i.test(line)
+      || /\bsecrets\s*\[(?!\s*['"][A-Z_][A-Z_0-9]*['"]\s*\])/i.test(line))) {
+      errors.push({ rel, lineNumber: i + 1,
+        message: 'release workflows must use literal secret names, never computed lookups or toJSON(secrets)' });
+    }
+    const indent = leadingSpaces(line);
+    if (indent === 0) {
+      check();
+      inJobs = parseMappingEntry(line)?.key === 'jobs';
+    }
+    if (inJobs && indent === 2 && parseMappingEntry(line.trim())) check();
+    if (inJobs && indent >= 2) job.push({ line, lineNumber: i + 1 });
+    else if (referencesPrivateKey(line)) errors.push({ rel, lineNumber: i + 1, message: 'production signing secrets must be scoped to a single release-signing step' });
+  }
+  check();
+  return errors;
+}
+
 export function scanWorkflow(file, repoRoot) {
   const rel = normalizeRel(path.relative(repoRoot, file));
   const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
@@ -252,7 +373,7 @@ export function scanWorkflow(file, repoRoot) {
     }
   }
 
-  return { rel, sawOn, events, selfHosted };
+  return { rel, sawOn, events, selfHosted, signingErrors: signingSecretErrors(lines, rel, repoRoot) };
 }
 
 function workflowEntries(policy) {
@@ -285,6 +406,7 @@ export function validateWorkflows({ repoRoot, policy }) {
   const seen = new Set();
   for (const file of files) {
     const scanned = scanWorkflow(file, repoRoot);
+    errors.push(...scanned.signingErrors);
     seen.add(scanned.rel);
 
     // HARD invariant (policy-independent, tempdoc 747 P-D): a self-hosted job
