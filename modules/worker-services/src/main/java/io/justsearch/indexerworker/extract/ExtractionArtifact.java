@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.extract;
 
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
+import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import java.util.List;
 import java.util.Objects;
 
@@ -103,6 +104,27 @@ public record ExtractionArtifact(
       cut--;
     }
     return value.substring(0, cut);
+  }
+
+  public ExtractionArtifact withDecodingLoss(boolean lossy) {
+    if (!lossy) return this;
+    var updatedWarnings = new java.util.ArrayList<>(warnings);
+    if (!updatedWarnings.contains(IngestionReasonCodes.TEXT_LOST_WHILE_DECODING)) {
+      updatedWarnings.add(IngestionReasonCodes.TEXT_LOST_WHILE_DECODING);
+    }
+    return new ExtractionArtifact(
+        ExtractionOutcomeClassifier.classify(result.content(), truncated, true), result,
+        policyId, parserId, truncated, updatedWarnings, embeddedResourceCount, maxEmbeddedDepth,
+        visualExtractionEvidenceJson);
+  }
+
+  /** Artifact-derived partial reason, before document dropout marking overrides its own reason. */
+  public String partialReasonCode() {
+    if (warnings.contains(IngestionReasonCodes.TEXT_LOST_WHILE_DECODING)) {
+      return truncated ? IngestionReasonCodes.TEXT_LOST_WHILE_DECODING_AND_TRUNCATED
+          : IngestionReasonCodes.TEXT_LOST_WHILE_DECODING;
+    }
+    return IngestionReasonCodes.SUCCESS_PARTIAL;
   }
 
   public ExtractionArtifact withVisualExtractionEvidence(VisualExtractionEvidence evidence) {

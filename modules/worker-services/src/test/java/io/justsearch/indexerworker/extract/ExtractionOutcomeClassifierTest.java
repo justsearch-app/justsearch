@@ -17,6 +17,13 @@ import org.junit.jupiter.api.Test;
 class ExtractionOutcomeClassifierTest {
 
   @Test
+  void intentionalReplacementAndControlsDoNotImplyLoss() {
+    assertEquals(ExtractionStatus.SUCCESS_FULL, ExtractionOutcomeClassifier.classify("\uFFFD", false));
+    assertEquals(ExtractionStatus.SUCCESS_FULL, ExtractionOutcomeClassifier.classify("valid words\u0000", false));
+    assertEquals(ExtractionStatus.SUCCESS_EMPTY, ExtractionOutcomeClassifier.classify(" \n", true));
+  }
+
+  @Test
   @DisplayName("blank content maps to SUCCESS_EMPTY regardless of truncated")
   void blankContentMapsToSuccessEmpty() {
     assertEquals(ExtractionStatus.SUCCESS_EMPTY, ExtractionOutcomeClassifier.classify("", false));

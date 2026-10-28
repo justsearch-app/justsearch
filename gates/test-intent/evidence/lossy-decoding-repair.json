@@ -1,0 +1,1222 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T12:06:11.249Z",
+  "revision": "1c52a2fcc8650da76c5b72ca674fde6d18453330",
+  "tree": "996572967931523f71112af2790fc609749d0d5d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8InvalidLeadBytesAreLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8OverlongFormsAreLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8EncodedSurrogatesAreLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8CodePointsAboveUnicodeMaximumAreLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inlineImageCannotDisableHtmlLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inlineImageCannotDisableCombinedHtmlLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxInlineImageCannotDisableHtmlLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxInlineImageCannotDisableCombinedHtmlLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlParserMetaCannotDisableLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8AuditMatchesJdkStrictDecoderOnGeneratedBytes\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.malformedUtf8AcrossAuditBufferInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.malformedUtf8AcrossAuditBufferSpilled\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.incompleteUtf8AfterFullAuditBufferInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.incompleteUtf8AfterFullAuditBufferSpilled\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidUtf8ByteInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidUtf8ByteSpilled\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidAsciiByteInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidAsciiByteSpilled\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.genericUtf16BomSelectsByteOrderForIncompleteSurrogate\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.iso2022JpShiftStateSurvivesAuditReads\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlEncodingMetaCannotHideLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.flatFallbackPreservesLossAndTruncation\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.invalidUtf8SequenceMidFileIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.invalidUtf8ByteIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.truncatedUtf8SequenceMidFileIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.incompleteUtf8AtRealEofIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.undefinedWindows1252ByteIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.loneUtf16LowSurrogateIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossAfterDetectorWindowIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.undeclaredUtf8LossAfterDetectorWindowIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.declaredHtmlLossIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlBomWinsConflictingDeclaration\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lateHtmlDeclarationReportsLossInActualWindows1252\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.xhtmlThroughHtmlParserReportsLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossBeforeContentLimitIsPartialAndTruncated\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossAfterContentLimitIsPartialAndTruncated\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.markupHeavyHtmlLossAfterLimitIsPartialAndTruncated\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.structuredFailureFlatFallbackStillReportsLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxRoutesReuseAndReplacementKeepLossIsolated\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxPreservesCombinedLossAndTruncationForTextAndHtml\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyMarkdownIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyJsonIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossySourceCodeIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyCsvIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyTsvIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.replacementOnlyArtifactIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.oneAlphanumericArtifactIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.twoAlphanumericArtifactIsPartial\" --tests \"io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest.realUtf8LossIsPartialOnDocumentAndLedger\" --tests \"io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest.dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters\" --tests \"io.justsearch.indexerworker.loop.LossyDecodingStoredDocumentTest.lossSurvivesReopenAndFileRepairClearsReason\" --tests \"io.justsearch.indexerworker.loop.LossyDecodingStoredDocumentTest.combinedSurvivesReopenAndFileRepairKeepsTruncationReason\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.pdfNamedTextIsAuditedByTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.malformedUtf8AfterLongAsciiStartKeepsLegacyAudit\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12867
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.DecodingLossJournalTest.mixedPartialReasonsSurviveIndividualRetryAndReopen\" --tests \"io.justsearch.indexerworker.loop.DecodingLossJournalTest.mixedPartialReasonsSurviveAbandonedClaimRecovery\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3311
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/components/IngestionSummary.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1765546-1793189144060.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1237
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8InvalidLeadBytesAreLossy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf8InvalidLeadBytesAreLossy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8OverlongFormsAreLossy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf8OverlongFormsAreLossy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8EncodedSurrogatesAreLossy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf8EncodedSurrogatesAreLossy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8CodePointsAboveUnicodeMaximumAreLossy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf8CodePointsAboveUnicodeMaximumAreLossy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#inlineImageCannotDisableHtmlLossAudit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inlineImageCannotDisableHtmlLossAudit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#inlineImageCannotDisableCombinedHtmlLossAudit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inlineImageCannotDisableCombinedHtmlLossAudit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sandboxInlineImageCannotDisableHtmlLossAudit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sandboxInlineImageCannotDisableHtmlLossAudit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sandboxInlineImageCannotDisableCombinedHtmlLossAudit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sandboxInlineImageCannotDisableCombinedHtmlLossAudit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlParserMetaCannotDisableLossAudit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "htmlParserMetaCannotDisableLossAudit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8AuditMatchesJdkStrictDecoderOnGeneratedBytes",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "utf8AuditMatchesJdkStrictDecoderOnGeneratedBytes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#malformedUtf8AcrossAuditBufferInMemory",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedUtf8AcrossAuditBufferInMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#malformedUtf8AcrossAuditBufferSpilled",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedUtf8AcrossAuditBufferSpilled()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#incompleteUtf8AfterFullAuditBufferInMemory",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "incompleteUtf8AfterFullAuditBufferInMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#incompleteUtf8AfterFullAuditBufferSpilled",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "incompleteUtf8AfterFullAuditBufferSpilled()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#longAsciiRunBeforeInvalidUtf8ByteInMemory",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "longAsciiRunBeforeInvalidUtf8ByteInMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#longAsciiRunBeforeInvalidUtf8ByteSpilled",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "longAsciiRunBeforeInvalidUtf8ByteSpilled()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#longAsciiRunBeforeInvalidAsciiByteInMemory",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "longAsciiRunBeforeInvalidAsciiByteInMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#longAsciiRunBeforeInvalidAsciiByteSpilled",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "longAsciiRunBeforeInvalidAsciiByteSpilled()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#genericUtf16BomSelectsByteOrderForIncompleteSurrogate",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "genericUtf16BomSelectsByteOrderForIncompleteSurrogate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#iso2022JpShiftStateSurvivesAuditReads",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "iso2022JpShiftStateSurvivesAuditReads()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlEncodingMetaCannotHideLoss",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "htmlEncodingMetaCannotHideLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#flatFallbackPreservesLossAndTruncation",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "flatFallbackPreservesLossAndTruncation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#invalidUtf8SequenceMidFileIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidUtf8SequenceMidFileIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#invalidUtf8ByteIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidUtf8ByteIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#truncatedUtf8SequenceMidFileIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "truncatedUtf8SequenceMidFileIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#incompleteUtf8AtRealEofIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "incompleteUtf8AtRealEofIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#undefinedWindows1252ByteIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "undefinedWindows1252ByteIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#loneUtf16LowSurrogateIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loneUtf16LowSurrogateIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossAfterDetectorWindowIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossAfterDetectorWindowIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#undeclaredUtf8LossAfterDetectorWindowIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "undeclaredUtf8LossAfterDetectorWindowIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#declaredHtmlLossIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "declaredHtmlLossIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlBomWinsConflictingDeclaration",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "htmlBomWinsConflictingDeclaration()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lateHtmlDeclarationReportsLossInActualWindows1252",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lateHtmlDeclarationReportsLossInActualWindows1252()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#xhtmlThroughHtmlParserReportsLoss",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "xhtmlThroughHtmlParserReportsLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossBeforeContentLimitIsPartialAndTruncated",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossBeforeContentLimitIsPartialAndTruncated()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossAfterContentLimitIsPartialAndTruncated",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossAfterContentLimitIsPartialAndTruncated()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#markupHeavyHtmlLossAfterLimitIsPartialAndTruncated",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "markupHeavyHtmlLossAfterLimitIsPartialAndTruncated()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#structuredFailureFlatFallbackStillReportsLoss",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "structuredFailureFlatFallbackStillReportsLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sandboxRoutesReuseAndReplacementKeepLossIsolated",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sandboxRoutesReuseAndReplacementKeepLossIsolated()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sandboxPreservesCombinedLossAndTruncationForTextAndHtml",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sandboxPreservesCombinedLossAndTruncationForTextAndHtml()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossyMarkdownIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossyMarkdownIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossyJsonIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossyJsonIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossySourceCodeIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossySourceCodeIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossyCsvIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossyCsvIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossyTsvIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossyTsvIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#replacementOnlyArtifactIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "replacementOnlyArtifactIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#oneAlphanumericArtifactIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oneAlphanumericArtifactIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#twoAlphanumericArtifactIsPartial",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "twoAlphanumericArtifactIsPartial()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java#realUtf8LossIsPartialOnDocumentAndLedger",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f7c5bb6dd5c06abbfdb01eca398be297d896df195097eda6908006c2119709c3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realUtf8LossIsPartialOnDocumentAndLedger()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java#dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f7c5bb6dd5c06abbfdb01eca398be297d896df195097eda6908006c2119709c3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LossyDecodingStoredDocumentTest.java#lossSurvivesReopenAndFileRepairClearsReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LossyDecodingStoredDocumentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8aa8f48ba5ceb89505922a49f581634a8616eaa717965bb6f1cce503f569de43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lossSurvivesReopenAndFileRepairClearsReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LossyDecodingStoredDocumentTest.java#combinedSurvivesReopenAndFileRepairKeepsTruncationReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LossyDecodingStoredDocumentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8aa8f48ba5ceb89505922a49f581634a8616eaa717965bb6f1cce503f569de43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "combinedSurvivesReopenAndFileRepairKeepsTruncationReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DecodingLossJournalTest.java#mixedPartialReasonsSurviveIndividualRetryAndReopen",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DecodingLossJournalTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:058e188bff01dcdc2f22d6d94809b96721a1203ce8c2ee49823a7928374f2100",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mixedPartialReasonsSurviveIndividualRetryAndReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DecodingLossJournalTest.java#mixedPartialReasonsSurviveAbandonedClaimRecovery",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DecodingLossJournalTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:058e188bff01dcdc2f22d6d94809b96721a1203ce8c2ee49823a7928374f2100",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mixedPartialReasonsSurviveAbandonedClaimRecovery()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IngestionSummary.test.ts#distinguishes decoding loss from truncation in the rendered summary",
+      "file": "modules/ui-web/src/shell-v0/components/IngestionSummary.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6bf4d7af029f120c82c3f400bf53160d4730898e274124a4df7bcb88ca75001f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IngestionSummary: real component transport and presentation distinguishes decoding loss from truncation in the rendered summary",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#pdfNamedTextIsAuditedByTextParser",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pdfNamedTextIsAuditedByTextParser()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#malformedUtf8AfterLongAsciiStartKeepsLegacyAudit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c1ee7a78564e9e86679905fa04b34cdd877eb886d088fa09658cc386da5a91a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedUtf8AfterLongAsciiStartKeepsLegacyAudit(255)",
+          "status": "passed"
+        },
+        {
+          "name": "malformedUtf8AfterLongAsciiStartKeepsLegacyAudit(129)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7a6ab81ea1",
+    "revision": "7a6ab81ea11279008a853fa5574b11da4b051c02",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/compatibility/lossy-decoding-before.patch",
+        "contentDigest": "sha256:e02d7d67846e6d5b8455880ac46e94f562ab843e20a358dd9d59b6ca2a33dafc"
+      }
+    ],
+    "runs": [
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8InvalidLeadBytesAreLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8OverlongFormsAreLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8EncodedSurrogatesAreLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8CodePointsAboveUnicodeMaximumAreLossy\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inlineImageCannotDisableHtmlLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inlineImageCannotDisableCombinedHtmlLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxInlineImageCannotDisableHtmlLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxInlineImageCannotDisableCombinedHtmlLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlParserMetaCannotDisableLossAudit\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8AuditMatchesJdkStrictDecoderOnGeneratedBytes\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.malformedUtf8AcrossAuditBufferInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.malformedUtf8AcrossAuditBufferSpilled\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.incompleteUtf8AfterFullAuditBufferInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.incompleteUtf8AfterFullAuditBufferSpilled\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidUtf8ByteInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidUtf8ByteSpilled\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidAsciiByteInMemory\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidAsciiByteSpilled\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.genericUtf16BomSelectsByteOrderForIncompleteSurrogate\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.iso2022JpShiftStateSurvivesAuditReads\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlEncodingMetaCannotHideLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.flatFallbackPreservesLossAndTruncation\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.invalidUtf8SequenceMidFileIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.invalidUtf8ByteIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.truncatedUtf8SequenceMidFileIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.incompleteUtf8AtRealEofIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.undefinedWindows1252ByteIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.loneUtf16LowSurrogateIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossAfterDetectorWindowIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.undeclaredUtf8LossAfterDetectorWindowIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.declaredHtmlLossIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlBomWinsConflictingDeclaration\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lateHtmlDeclarationReportsLossInActualWindows1252\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.xhtmlThroughHtmlParserReportsLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossBeforeContentLimitIsPartialAndTruncated\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossAfterContentLimitIsPartialAndTruncated\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.markupHeavyHtmlLossAfterLimitIsPartialAndTruncated\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.structuredFailureFlatFallbackStillReportsLoss\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxRoutesReuseAndReplacementKeepLossIsolated\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxPreservesCombinedLossAndTruncationForTextAndHtml\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyMarkdownIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyJsonIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossySourceCodeIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyCsvIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyTsvIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.replacementOnlyArtifactIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.oneAlphanumericArtifactIsPartial\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.twoAlphanumericArtifactIsPartial\" --tests \"io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest.realUtf8LossIsPartialOnDocumentAndLedger\" --tests \"io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest.dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters\" --tests \"io.justsearch.indexerworker.loop.LossyDecodingStoredDocumentTest.lossSurvivesReopenAndFileRepairClearsReason\" --tests \"io.justsearch.indexerworker.loop.LossyDecodingStoredDocumentTest.combinedSurvivesReopenAndFileRepairKeepsTruncationReason\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.pdfNamedTextIsAuditedByTextParser\" --tests \"io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.malformedUtf8AfterLongAsciiStartKeepsLegacyAudit\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 12625,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:worker-services:test --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8InvalidLeadBytesAreLossy --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8OverlongFormsAreLossy --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8EncodedSurrogatesAreLossy --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8CodePointsAboveUnicodeMaximumAreLossy --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inlineImageCannotDisableHtmlLossAudit --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.inlineImageCannotDisableCombinedHtmlLossAudit --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxInlineImageCannotDisableHtmlLossAudit --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxInlineImageCannotDisableCombinedHtmlLossAudit --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlParserMetaCannotDisableLossAudit --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.utf8AuditMatchesJdkStrictDecoderOnGeneratedBytes --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.malformedUtf8AcrossAuditBufferInMemory --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.malformedUtf8AcrossAuditBufferSpilled --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.incompleteUtf8AfterFullAuditBufferInMemory --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.incompleteUtf8AfterFullAuditBufferSpilled --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidUtf8ByteInMemory --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidUtf8ByteSpilled --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidAsciiByteInMemory --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.longAsciiRunBeforeInvalidAsciiByteSpilled --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.genericUtf16BomSelectsByteOrderForIncompleteSurrogate --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.iso2022JpShiftStateSurvivesAuditReads --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlEncodingMetaCannotHideLoss --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.flatFallbackPreservesLossAndTruncation --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.invalidUtf8SequenceMidFileIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.invalidUtf8ByteIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.truncatedUtf8SequenceMidFileIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.incompleteUtf8AtRealEofIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.undefinedWindows1252ByteIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.loneUtf16LowSurrogateIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossAfterDetectorWindowIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.undeclaredUtf8LossAfterDetectorWindowIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.declaredHtmlLossIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.htmlBomWinsConflictingDeclaration --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lateHtmlDeclarationReportsLossInActualWindows1252 --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.xhtmlThroughHtmlParserReportsLoss --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossBeforeContentLimitIsPartialAndTruncated --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossAfterContentLimitIsPartialAndTruncated --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.markupHeavyHtmlLossAfterLimitIsPartialAndTruncated --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.structuredFailureFlatFallbackStillReportsLoss --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxRoutesReuseAndReplacementKeepLossIsolated --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.sandboxPreservesCombinedLossAndTruncationForTextAndHtml --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyMarkdownIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyJsonIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossySourceCodeIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyCsvIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.lossyTsvIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.replacementOnlyArtifactIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.oneAlphanumericArtifactIsPartial --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.twoAlphanumericArtifactIsPartial --tests io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest.realUtf8LossIsPartialOnDocumentAndLedger --tests io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest.dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters --tests io.justsearch.indexerworker.loop.LossyDecodingStoredDocumentTest.lossSurvivesReopenAndFileRepairClearsReason --tests io.justsearch.indexerworker.loop.LossyDecodingStoredDocumentTest.combinedSurvivesReopenAndFileRepairKeepsTruncationReason --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.pdfNamedTextIsAuditedByTextParser --tests io.justsearch.indexerworker.extract.LossyDecodingExtractionTest.malformedUtf8AfterLongAsciiStartKeepsLegacyAudit --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin FROM-CACHE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors\n> Task :build-logic:processResources\n> Task :build-logic:classes\n> Task :build-logic:jar\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:174)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:49)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:89)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$13$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:102)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:168)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:215)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:203)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:224)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:232)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:248)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:273)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:322)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:353)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:374)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:479)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:496)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:551)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:633)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:698)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:749)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:847)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:888)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:961)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:980)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1044)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1097)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1163)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1218)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1284)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1371)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1432)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1556)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1581)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:127)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:worker-services:processTestFixturesResources NO-SOURCE\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:adapters-lucene:processTestFixturesResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:telemetry:processTestFixturesResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractProto\n> Task :modules:adapters-lucene:syncSsotCatalogs\n> Task :modules:ipc-common:extractProto\n> Task :modules:ai-backend:processResources\n> Task :modules:configuration:processResources\n> Task :modules:extension-substrate:compileJava FROM-CACHE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:adapters-lucene:processResources\n> Task :modules:worker-services:processTestResources\n> Task :modules:ipc-common:processProtoResources\n> Task :modules:ipc-common:processResources\n> Task :modules:extension-substrate:jar\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos\n> Task :modules:core-contracts:compileJava FROM-CACHE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core-contracts:jar\n> Task :modules:api-contract-projection-java:processProtoResources\n> Task :modules:api-contract-projection-java:processResources\n> Task :modules:core:compileJava FROM-CACHE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractIncludeProto\n> Task :modules:core:jar\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:telemetry:compileJava FROM-CACHE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:indexing:compileJava FROM-CACHE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:core:testFixturesJar\n> Task :modules:telemetry:compileTestFixturesJava FROM-CACHE\n> Task :modules:telemetry:testFixturesClasses UP-TO-DATE\n> Task :modules:telemetry:testFixturesJar\n> Task :modules:indexing:jar\n> Task :modules:telemetry:jar\n> Task :modules:configuration:compileJava FROM-CACHE\n> Task :modules:configuration:classes\n> Task :modules:api-contract-projection-java:generateProto FROM-CACHE\n> Task :modules:configuration:jar\n> Task :modules:app-agent-api:compileJava FROM-CACHE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:ort-common:compileJava FROM-CACHE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:app-api:buildLinuxBoundExec\n> Task :modules:app-api:processResources\n> Task :modules:app-agent-api:jar\n> Task :modules:ort-common:jar\n> Task :modules:adapters-lucene:compileJava FROM-CACHE\n> Task :modules:adapters-lucene:classes\n> Task :modules:reranker:compileJava FROM-CACHE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:reranker:jar\n> Task :modules:adapters-lucene:compileTestFixturesJava FROM-CACHE\n> Task :modules:adapters-lucene:testFixturesClasses UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesJar\n> Task :modules:ipc-common:extractIncludeProto\n> Task :modules:adapters-lucene:jar\n> Task :modules:ipc-common:generateProto FROM-CACHE\n> Task :modules:api-contract-projection-java:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:classes\n> Task :modules:api-contract-projection-java:jar\n> Task :modules:app-api:compileJava FROM-CACHE\n> Task :modules:app-api:classes\n> Task :modules:ai-backend:compileJava FROM-CACHE\n> Task :modules:ai-backend:classes\n> Task :modules:app-api:jar\n> Task :modules:ai-backend:jar\n> Task :modules:worker-core:compileJava FROM-CACHE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:worker-core:jar\n> Task :modules:ipc-common:compileJava FROM-CACHE\n> Task :modules:ipc-common:classes\n> Task :modules:ipc-common:jar\n> Task :modules:worker-services:compileJava FROM-CACHE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:compileTestFixturesJava FROM-CACHE\n> Task :modules:worker-services:testFixturesClasses UP-TO-DATE\n> Task :modules:worker-services:testFixturesJar\n> Task :modules:worker-services:jar\n> Task :modules:worker-services:compileTestJava FROM-CACHE\n> Task :modules:worker-services:testClasses\n\n> Task :modules:worker-services:test\n\nLossyDecodingExtractionTest > lossyMarkdownIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > lossyTsvIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > inlineImageCannotDisableCombinedHtmlLossAudit() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:373\n\nLossyDecodingExtractionTest > lossySourceCodeIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > xhtmlThroughHtmlParserReportsLoss() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > lateHtmlDeclarationReportsLossInActualWindows1252() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\n\n> Task :modules:worker-services:test\n\nLossyDecodingExtractionTest > longAsciiRunBeforeInvalidAsciiByteSpilled() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > declaredHtmlLossIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > utf8AuditMatchesJdkStrictDecoderOnGeneratedBytes() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:210\n\nAdversarialCorpusIngestionTest > realUtf8LossIsPartialOnDocumentAndLedger() FAILED\n    org.opentest4j.AssertionFailedError at AdversarialCorpusIngestionTest.java:113\n\nAdversarialCorpusIngestionTest > dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters() FAILED\n    org.opentest4j.AssertionFailedError at AdversarialCorpusIngestionTest.java:127\n\nLossyDecodingExtractionTest > structuredFailureFlatFallbackStillReportsLoss() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > utf8EncodedSurrogatesAreLossy() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > longAsciiRunBeforeInvalidAsciiByteInMemory() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > lossAfterContentLimitIsPartialAndTruncated() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:816\n\nLossyDecodingExtractionTest > pdfNamedTextIsAuditedByTextParser() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > malformedUtf8AfterLongAsciiStartKeepsLegacyAudit(int) > malformedUtf8AfterLongAsciiStartKeepsLegacyAudit(129) FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > utf8CodePointsAboveUnicodeMaximumAreLossy() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > htmlParserMetaCannotDisableLossAudit() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > malformedUtf8AcrossAuditBufferInMemory() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > lossBeforeContentLimitIsPartialAndTruncated() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:816\n\nLossyDecodingExtractionTest > longAsciiRunBeforeInvalidUtf8ByteSpilled() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > markupHeavyHtmlLossAfterLimitIsPartialAndTruncated() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:816\n\nLossyDecodingExtractionTest > oneAlphanumericArtifactIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingStoredDocumentTest > combinedSurvivesReopenAndFileRepairKeepsTruncationReason() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingStoredDocumentTest.java:91\n\nLossyDecodingStoredDocumentTest > lossSurvivesReopenAndFileRepairClearsReason() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingStoredDocumentTest.java:90\n\nLossyDecodingExtractionTest > sandboxPreservesCombinedLossAndTruncationForTextAndHtml() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:816\n\nLossyDecodingExtractionTest > longAsciiRunBeforeInvalidUtf8ByteInMemory() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > incompleteUtf8AfterFullAuditBufferSpilled() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > incompleteUtf8AfterFullAuditBufferInMemory() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > truncatedUtf8SequenceMidFileIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > undeclaredUtf8LossAfterDetectorWindowIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > lossyCsvIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > iso2022JpShiftStateSurvivesAuditReads() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > replacementOnlyArtifactIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > sandboxInlineImageCannotDisableCombinedHtmlLossAudit() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:373\n\nLossyDecodingExtractionTest > flatFallbackPreservesLossAndTruncation() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:432\n\nLossyDecodingExtractionTest > incompleteUtf8AtRealEofIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > undefinedWindows1252ByteIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > malformedUtf8AcrossAuditBufferSpilled() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > htmlBomWinsConflictingDeclaration() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > inlineImageCannotDisableHtmlLossAudit() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:373\n\nLossyDecodingExtractionTest > invalidUtf8ByteIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > invalidUtf8SequenceMidFileIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > sandboxRoutesReuseAndReplacementKeepLossIsolated() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > htmlEncodingMetaCannotHideLoss() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > twoAlphanumericArtifactIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > utf8OverlongFormsAreLossy() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > genericUtf16BomSelectsByteOrderForIncompleteSurrogate() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\nLossyDecodingExtractionTest > sandboxInlineImageCannotDisableHtmlLossAudit() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:373\n\nLossyDecodingExtractionTest > lossAfterDetectorWindowIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > loneUtf16LowSurrogateIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > lossyJsonIsPartial() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:814\n\nLossyDecodingExtractionTest > utf8InvalidLeadBytesAreLossy() FAILED\n    org.opentest4j.AssertionFailedError at LossyDecodingExtractionTest.java:240\n\n> Task :modules:worker-services:test FAILED\n> Task :modules:worker-services:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///tmp/test-intent-before-UB1S1S/build/reports/problems/problems-report.html\n64 actionable tasks: 40 executed, 24 from cache\nConfiguration cache entry stored.\n\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n55 tests completed, 54 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:worker-services:test'.\n> There were failing tests. See the report at: file:///tmp/test-intent-before-UB1S1S/modules/worker-services/build/reports/tests/test/index.html\n\nBUILD FAILED in 12s\n"
+      },
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.DecodingLossJournalTest.mixedPartialReasonsSurviveIndividualRetryAndReopen\" --tests \"io.justsearch.indexerworker.loop.DecodingLossJournalTest.mixedPartialReasonsSurviveAbandonedClaimRecovery\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8578,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:indexer-worker:test --tests io.justsearch.indexerworker.loop.DecodingLossJournalTest.mixedPartialReasonsSurviveIndividualRetryAndReopen --tests io.justsearch.indexerworker.loop.DecodingLossJournalTest.mixedPartialReasonsSurviveAbandonedClaimRecovery --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin UP-TO-DATE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors UP-TO-DATE\n> Task :build-logic:processResources UP-TO-DATE\n> Task :build-logic:classes UP-TO-DATE\n> Task :build-logic:jar UP-TO-DATE\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:174)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:49)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:89)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$13$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:102)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:168)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:215)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:203)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:224)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:232)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:248)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:273)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:322)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:353)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:374)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:479)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:496)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:551)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:633)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:698)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:749)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:847)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:888)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:961)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:980)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1044)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1097)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1163)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1218)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1284)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1371)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1432)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1556)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1581)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:127)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nSkipping ui-web build/copy (skipWebBuild=true).\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:adapters-lucene:processTestFixturesResources NO-SOURCE\n> Task :modules:indexer-worker:processResources NO-SOURCE\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:app-api:buildLinuxBoundExec UP-TO-DATE\n> Task :modules:adapters-lucene:syncSsotCatalogs UP-TO-DATE\n> Task :modules:ai-backend:processResources UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProto UP-TO-DATE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:configuration:processResources UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:ipc-common:extractProto UP-TO-DATE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractIncludeProto UP-TO-DATE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:adapters-lucene:processResources UP-TO-DATE\n> Task :modules:extension-substrate:compileJava UP-TO-DATE\n> Task :modules:app-api:processResources UP-TO-DATE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:ipc-common:processProtoResources UP-TO-DATE\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:ort-common:processTestFixturesResources NO-SOURCE\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:core-contracts:compileJava UP-TO-DATE\n> Task :modules:extension-substrate:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos UP-TO-DATE\n> Task :modules:ipc-common:processResources UP-TO-DATE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core-contracts:jar UP-TO-DATE\n> Task :modules:app-observability:processResources\n> Task :modules:api-contract-projection-java:processProtoResources UP-TO-DATE\n> Task :modules:app-engine:processResources\n> Task :modules:api-contract-projection-java:processResources UP-TO-DATE\n> Task :modules:ipc-common:extractIncludeProto UP-TO-DATE\n> Task :modules:infra-core:compileJava FROM-CACHE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:app-services:processResources\n> Task :modules:infra-core:jar\n> Task :modules:indexer-worker:processTestResources\n> Task :modules:prompt-support:compileJava FROM-CACHE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:prompt-support:jar\n> Task :modules:core:compileJava UP-TO-DATE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:core:jar UP-TO-DATE\n> Task :modules:core:compileTestFixturesJava UP-TO-DATE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core:testFixturesJar UP-TO-DATE\n> Task :modules:ui:syncSsotSchemas\n> Task :modules:indexing:compileJava UP-TO-DATE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:indexing:jar UP-TO-DATE\n> Task :modules:configuration:compileJava UP-TO-DATE\n> Task :modules:configuration:classes UP-TO-DATE\n> Task :modules:configuration:jar UP-TO-DATE\n> Task :modules:telemetry:compileJava UP-TO-DATE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:configuration:compileTestFixturesJava FROM-CACHE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:telemetry:jar UP-TO-DATE\n> Task :modules:app-config:compileJava FROM-CACHE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:configuration:testFixturesJar\n> Task :modules:app-util:compileJava FROM-CACHE\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:app-config:jar\n> Task :modules:app-util:jar\n> Task :modules:ui:processResources\n> Task :modules:ort-common:compileJava UP-TO-DATE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:ort-common:jar UP-TO-DATE\n> Task :modules:ort-common:compileTestFixturesJava FROM-CACHE\n> Task :modules:ort-common:testFixturesClasses UP-TO-DATE\n> Task :modules:reranker:compileJava UP-TO-DATE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:reranker:jar UP-TO-DATE\n> Task :modules:ort-common:testFixturesJar\n> Task :modules:api-contract-projection-java:generateProto UP-TO-DATE\n> Task :modules:ipc-common:generateProto UP-TO-DATE\n> Task :modules:adapters-lucene:compileJava UP-TO-DATE\n> Task :modules:adapters-lucene:classes UP-TO-DATE\n> Task :modules:adapters-lucene:jar UP-TO-DATE\n> Task :modules:adapters-lucene:compileTestFixturesJava UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesClasses UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesJar UP-TO-DATE\n> Task :modules:app-agent-api:compileJava UP-TO-DATE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:app-agent-api:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:jar UP-TO-DATE\n> Task :modules:app-api:compileJava UP-TO-DATE\n> Task :modules:app-api:classes UP-TO-DATE\n> Task :modules:app-api:jar UP-TO-DATE\n> Task :modules:ai-backend:compileJava UP-TO-DATE\n> Task :modules:ai-backend:classes UP-TO-DATE\n> Task :modules:ai-backend:jar UP-TO-DATE\n> Task :modules:gpu-bridge:compileJava FROM-CACHE\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:gpu-bridge:jar\n> Task :modules:worker-core:compileJava UP-TO-DATE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:worker-core:jar UP-TO-DATE\n> Task :modules:app-agent:compileJava FROM-CACHE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:ipc-common:compileJava UP-TO-DATE\n> Task :modules:ipc-common:classes UP-TO-DATE\n> Task :modules:ipc-common:jar UP-TO-DATE\n> Task :modules:app-inference:compileJava FROM-CACHE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:app-agent:jar\n> Task :modules:worker-services:compileJava UP-TO-DATE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:jar UP-TO-DATE\n> Task :modules:app-inference:jar\n> Task :modules:app-observability:compileJava FROM-CACHE\n> Task :modules:app-observability:classes\n> Task :modules:app-observability:jar\n> Task :modules:indexer-worker:compileJava FROM-CACHE\n> Task :modules:indexer-worker:classes UP-TO-DATE\n> Task :modules:indexer-worker:jar\n> Task :modules:app-services:compileJava FROM-CACHE\n> Task :modules:app-services:classes\n> Task :modules:app-engine:compileJava FROM-CACHE\n> Task :modules:app-engine:classes\n> Task :modules:app-services:jar\n> Task :modules:app-engine:jar\n> Task :modules:indexer-worker:compileTestJava FROM-CACHE\n> Task :modules:indexer-worker:testClasses\n> Task :modules:ui:compileJava FROM-CACHE\n> Task :modules:ui:classes\n> Task :modules:ui:jar\n\n> Task :modules:indexer-worker:test\n\nDecodingLossJournalTest > mixedPartialReasonsSurviveAbandonedClaimRecovery() FAILED\n    org.opentest4j.AssertionFailedError at DecodingLossJournalTest.java:104\n\nDecodingLossJournalTest > mixedPartialReasonsSurviveIndividualRetryAndReopen() FAILED\n    org.opentest4j.AssertionFailedError at DecodingLossJournalTest.java:104\n\n> Task :modules:indexer-worker:test FAILED\n> Task :modules:indexer-worker:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///tmp/test-intent-before-UB1S1S/build/reports/problems/problems-report.html\n93 actionable tasks: 21 executed, 15 from cache, 57 up-to-date\nConfiguration cache entry stored.\n\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n2 tests completed, 2 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:indexer-worker:test'.\n> There were failing tests. See the report at: file:///tmp/test-intent-before-UB1S1S/modules/indexer-worker/build/reports/tests/test/index.html\n\nBUILD FAILED in 8s\n"
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/components/IngestionSummary.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1765546-1793189167780.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2986,
+        "output": "JSON report written to /tmp/test-intent-vitest-1765546-1793189167780.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8InvalidLeadBytesAreLossy",
+        "classification": "assertion",
+        "detail": "utf8InvalidLeadBytesAreLossy(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8OverlongFormsAreLossy",
+        "classification": "assertion",
+        "detail": "utf8OverlongFormsAreLossy(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8EncodedSurrogatesAreLossy",
+        "classification": "assertion",
+        "detail": "utf8EncodedSurrogatesAreLossy(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8CodePointsAboveUnicodeMaximumAreLossy",
+        "classification": "assertion",
+        "detail": "utf8CodePointsAboveUnicodeMaximumAreLossy(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#inlineImageCannotDisableHtmlLossAudit",
+        "classification": "assertion",
+        "detail": "inlineImageCannotDisableHtmlLossAudit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <TEXT_LOST_WHILE_DECODING> but was: <SUCCESS_PARTIAL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#inlineImageCannotDisableCombinedHtmlLossAudit",
+        "classification": "assertion",
+        "detail": "inlineImageCannotDisableCombinedHtmlLossAudit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <TEXT_LOST_WHILE_DECODING_AND_TRUNCATED> but was: <SUCCESS_PARTIAL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sandboxInlineImageCannotDisableHtmlLossAudit",
+        "classification": "assertion",
+        "detail": "sandboxInlineImageCannotDisableHtmlLossAudit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <TEXT_LOST_WHILE_DECODING> but was: <SUCCESS_PARTIAL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sandboxInlineImageCannotDisableCombinedHtmlLossAudit",
+        "classification": "assertion",
+        "detail": "sandboxInlineImageCannotDisableCombinedHtmlLossAudit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <TEXT_LOST_WHILE_DECODING_AND_TRUNCATED> but was: <SUCCESS_PARTIAL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlParserMetaCannotDisableLossAudit",
+        "classification": "assertion",
+        "detail": "htmlParserMetaCannotDisableLossAudit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8AuditMatchesJdkStrictDecoderOnGeneratedBytes",
+        "classification": "assertion",
+        "detail": "utf8AuditMatchesJdkStrictDecoderOnGeneratedBytes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: generated sample 3 ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#malformedUtf8AcrossAuditBufferInMemory",
+        "classification": "assertion",
+        "detail": "malformedUtf8AcrossAuditBufferInMemory(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#malformedUtf8AcrossAuditBufferSpilled",
+        "classification": "assertion",
+        "detail": "malformedUtf8AcrossAuditBufferSpilled(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#incompleteUtf8AfterFullAuditBufferInMemory",
+        "classification": "assertion",
+        "detail": "incompleteUtf8AfterFullAuditBufferInMemory(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#incompleteUtf8AfterFullAuditBufferSpilled",
+        "classification": "assertion",
+        "detail": "incompleteUtf8AfterFullAuditBufferSpilled(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#longAsciiRunBeforeInvalidUtf8ByteInMemory",
+        "classification": "assertion",
+        "detail": "longAsciiRunBeforeInvalidUtf8ByteInMemory(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#longAsciiRunBeforeInvalidUtf8ByteSpilled",
+        "classification": "assertion",
+        "detail": "longAsciiRunBeforeInvalidUtf8ByteSpilled(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#longAsciiRunBeforeInvalidAsciiByteInMemory",
+        "classification": "assertion",
+        "detail": "longAsciiRunBeforeInvalidAsciiByteInMemory(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#longAsciiRunBeforeInvalidAsciiByteSpilled",
+        "classification": "assertion",
+        "detail": "longAsciiRunBeforeInvalidAsciiByteSpilled(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#genericUtf16BomSelectsByteOrderForIncompleteSurrogate",
+        "classification": "assertion",
+        "detail": "genericUtf16BomSelectsByteOrderForIncompleteSurrogate(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#iso2022JpShiftStateSurvivesAuditReads",
+        "classification": "assertion",
+        "detail": "iso2022JpShiftStateSurvivesAuditReads(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlEncodingMetaCannotHideLoss",
+        "classification": "assertion",
+        "detail": "htmlEncodingMetaCannotHideLoss(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#flatFallbackPreservesLossAndTruncation",
+        "classification": "assertion",
+        "detail": "flatFallbackPreservesLossAndTruncation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <TEXT_LOST_WHILE_DECODING_AND_TRUNCATED> but was: <SUCCESS_PARTIAL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#invalidUtf8SequenceMidFileIsPartial",
+        "classification": "assertion",
+        "detail": "invalidUtf8SequenceMidFileIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#invalidUtf8ByteIsPartial",
+        "classification": "assertion",
+        "detail": "invalidUtf8ByteIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#truncatedUtf8SequenceMidFileIsPartial",
+        "classification": "assertion",
+        "detail": "truncatedUtf8SequenceMidFileIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#incompleteUtf8AtRealEofIsPartial",
+        "classification": "assertion",
+        "detail": "incompleteUtf8AtRealEofIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#undefinedWindows1252ByteIsPartial",
+        "classification": "assertion",
+        "detail": "undefinedWindows1252ByteIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#loneUtf16LowSurrogateIsPartial",
+        "classification": "assertion",
+        "detail": "loneUtf16LowSurrogateIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossAfterDetectorWindowIsPartial",
+        "classification": "assertion",
+        "detail": "lossAfterDetectorWindowIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#undeclaredUtf8LossAfterDetectorWindowIsPartial",
+        "classification": "assertion",
+        "detail": "undeclaredUtf8LossAfterDetectorWindowIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#declaredHtmlLossIsPartial",
+        "classification": "assertion",
+        "detail": "declaredHtmlLossIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlBomWinsConflictingDeclaration",
+        "classification": "assertion",
+        "detail": "htmlBomWinsConflictingDeclaration(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lateHtmlDeclarationReportsLossInActualWindows1252",
+        "classification": "assertion",
+        "detail": "lateHtmlDeclarationReportsLossInActualWindows1252(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#xhtmlThroughHtmlParserReportsLoss",
+        "classification": "assertion",
+        "detail": "xhtmlThroughHtmlParserReportsLoss(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossBeforeContentLimitIsPartialAndTruncated",
+        "classification": "assertion",
+        "detail": "lossBeforeContentLimitIsPartialAndTruncated(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: artifact must carry decoding loss across the sandbox ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossAfterContentLimitIsPartialAndTruncated",
+        "classification": "assertion",
+        "detail": "lossAfterContentLimitIsPartialAndTruncated(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: artifact must carry decoding loss across the sandbox ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#markupHeavyHtmlLossAfterLimitIsPartialAndTruncated",
+        "classification": "assertion",
+        "detail": "markupHeavyHtmlLossAfterLimitIsPartialAndTruncated(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: artifact must carry decoding loss across the sandbox ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#structuredFailureFlatFallbackStillReportsLoss",
+        "classification": "assertion",
+        "detail": "structuredFailureFlatFallbackStillReportsLoss(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sandboxRoutesReuseAndReplacementKeepLossIsolated",
+        "classification": "assertion",
+        "detail": "sandboxRoutesReuseAndReplacementKeepLossIsolated(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#sandboxPreservesCombinedLossAndTruncationForTextAndHtml",
+        "classification": "assertion",
+        "detail": "sandboxPreservesCombinedLossAndTruncationForTextAndHtml(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: artifact must carry decoding loss across the sandbox ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossyMarkdownIsPartial",
+        "classification": "assertion",
+        "detail": "lossyMarkdownIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossyJsonIsPartial",
+        "classification": "assertion",
+        "detail": "lossyJsonIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossySourceCodeIsPartial",
+        "classification": "assertion",
+        "detail": "lossySourceCodeIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossyCsvIsPartial",
+        "classification": "assertion",
+        "detail": "lossyCsvIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#lossyTsvIsPartial",
+        "classification": "assertion",
+        "detail": "lossyTsvIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#replacementOnlyArtifactIsPartial",
+        "classification": "assertion",
+        "detail": "replacementOnlyArtifactIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#oneAlphanumericArtifactIsPartial",
+        "classification": "assertion",
+        "detail": "oneAlphanumericArtifactIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#twoAlphanumericArtifactIsPartial",
+        "classification": "assertion",
+        "detail": "twoAlphanumericArtifactIsPartial(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java#realUtf8LossIsPartialOnDocumentAndLedger",
+        "classification": "assertion",
+        "detail": "realUtf8LossIsPartialOnDocumentAndLedger(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java#dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters",
+        "classification": "assertion",
+        "detail": "dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <TEXT_LOST_WHILE_DECODING> but was: <SUCCESS>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LossyDecodingStoredDocumentTest.java#lossSurvivesReopenAndFileRepairClearsReason",
+        "classification": "assertion",
+        "detail": "lossSurvivesReopenAndFileRepairClearsReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LossyDecodingStoredDocumentTest.java#combinedSurvivesReopenAndFileRepairKeepsTruncationReason",
+        "classification": "assertion",
+        "detail": "combinedSurvivesReopenAndFileRepairKeepsTruncationReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <TEXT_LOST_WHILE_DECODING_AND_TRUNCATED> but was: <SUCCESS_PARTIAL>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DecodingLossJournalTest.java#mixedPartialReasonsSurviveIndividualRetryAndReopen",
+        "classification": "assertion",
+        "detail": "mixedPartialReasonsSurviveIndividualRetryAndReopen(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <3> but was: <1>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DecodingLossJournalTest.java#mixedPartialReasonsSurviveAbandonedClaimRecovery",
+        "classification": "assertion",
+        "detail": "mixedPartialReasonsSurviveAbandonedClaimRecovery(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <3> but was: <1>"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IngestionSummary.test.ts#distinguishes decoding loss from truncation in the rendered summary",
+        "classification": "assertion",
+        "detail": "IngestionSummary: real component transport and presentation distinguishes decoding loss from truncation in the rendered summary:  AssertionError: expected '3 Indexed partially Reason not recogn…' to contain 'Content indexed; some characters coul…'\n    at /tmp/test-intent-before-UB1S1S/modules/ui-web/src/shell-v0/components/IngestionSummary.test.ts:98:21\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uq-loss/modules"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#pdfNamedTextIsAuditedByTextParser",
+        "classification": "assertion",
+        "detail": "pdfNamedTextIsAuditedByTextParser(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#malformedUtf8AfterLongAsciiStartKeepsLegacyAudit",
+        "classification": "assertion",
+        "detail": "malformedUtf8AfterLongAsciiStartKeepsLegacyAudit(129): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SUCCESS_PARTIAL> but was: <SUCCESS_FULL>"
+      }
+    ]
+  },
+  "digest": "sha256:9a8518b24365282e39e1d878f7534cf8b3518ff26e3b3f60a6c6578c39102b04"
+}

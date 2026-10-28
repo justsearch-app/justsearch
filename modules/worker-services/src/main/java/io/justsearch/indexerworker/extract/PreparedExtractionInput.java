@@ -11,6 +11,9 @@ import java.io.SequenceInputStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -239,6 +242,12 @@ final class PreparedExtractionInput implements AutoCloseable {
     List<InputStream> streams = new ArrayList<>(chunks.size());
     for (byte[] chunk : chunks) streams.add(new ByteArrayInputStream(chunk));
     return new SequenceInputStream(Collections.enumeration(streams));
+  }
+
+  /** Bulk replay of the captured bytes, without spilling an in-memory snapshot to disk. */
+  ReadableByteChannel openChannel() throws IOException {
+    if (snapshot != null) return FileChannel.open(snapshot);
+    return Channels.newChannel(openStream());
   }
 
   /** Materialize once from captured bytes for consumers that require a private file. */

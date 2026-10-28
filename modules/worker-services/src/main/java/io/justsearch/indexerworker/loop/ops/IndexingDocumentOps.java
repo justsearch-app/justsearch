@@ -422,8 +422,7 @@ public final class IndexingDocumentOps {
    * status. SUCCESS_FULL paths leave the field unset (null = "the implicit success case"); any
    * non-full success — SUCCESS_PARTIAL or SUCCESS_EMPTY (tempdoc 671, Long-term design part 2)
    * — surfaces the matching reason constant so search-side callers can distinguish "got
-   * everything" from "got the prefix Tika handed us before we cut it off" or "got nothing at
-   * all." Failure statuses (FAILED, TIMED_OUT, BUDGET_EXCEEDED) never reach {@code buildDocument}
+   * everything" from truncated or lossy text, or "got nothing at all." Failure statuses (FAILED, TIMED_OUT, BUDGET_EXCEEDED) never reach {@code buildDocument}
    * in production — they short-circuit in {@code IndexingLoop} and produce a ledger event
    * without a document — so the explicit cases here are defense-in-depth.
    *
@@ -439,7 +438,7 @@ public final class IndexingDocumentOps {
     }
     return switch (artifact.status()) {
       case SUCCESS_FULL -> null;
-      case SUCCESS_PARTIAL -> IngestionReasonCodes.SUCCESS_PARTIAL;
+      case SUCCESS_PARTIAL -> artifact.rawArtifact().partialReasonCode();
       case SUCCESS_EMPTY -> IngestionReasonCodes.SUCCESS_EMPTY;
       case FAILED, TIMED_OUT, BUDGET_EXCEEDED -> null;
     };

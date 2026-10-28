@@ -106,6 +106,32 @@ final class AdversarialCorpusIngestionTest {
   }
 
   @Test
+  void realUtf8LossIsPartialOnDocumentAndLedger() throws Exception {
+    Path file = tempDir.resolve("loss.txt");
+    Files.write(file, new byte[] {(byte) 0xef, (byte) 0xbb, (byte) 0xbf, 'v', 'a', 'l', 'i', 'd', ' ', 'w', 'o', 'r', 'd', 's', (byte) 0xff});
+    invokeExtractAndDrain(file);
+    assertEquals(IngestionOutcomeClass.SUCCESS_PARTIAL, queue.lastOutcome.outcomeClass());
+    assertEquals("TEXT_LOST_WHILE_DECODING", queue.lastOutcome.reasonCode());
+    var document = ArgumentCaptor.forClass(IndexDocument.class);
+    verify(queue.indexingCoordinator).indexSingle(document.capture());
+    assertEquals("SUCCESS_PARTIAL", document.getValue().fields().get(SchemaFields.EXTRACTION_STATUS));
+    assertEquals("TEXT_LOST_WHILE_DECODING", document.getValue().fields().get(SchemaFields.EXTRACTION_REASON_CODE));
+    assertTrue(document.getValue().fields().get(SchemaFields.CONTENT).toString().contains("valid words"));
+  }
+
+  @Test
+  void dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters() throws Exception {
+    Path file = tempDir.resolve("dropout.txt");
+    Files.write(file, new byte[] {(byte) 0xef, (byte) 0xbb, (byte) 0xbf, 'a', (byte) 0xff});
+    invokeExtractAndDrain(file);
+    assertEquals("TEXT_LOST_WHILE_DECODING", queue.lastOutcome.reasonCode());
+    var document = ArgumentCaptor.forClass(IndexDocument.class);
+    verify(queue.indexingCoordinator).indexSingle(document.capture());
+    assertEquals(IngestionReasonCodes.EXTRACTION_DROPOUT_UNRECOVERED,
+        document.getValue().fields().get(SchemaFields.EXTRACTION_REASON_CODE));
+  }
+
+  @Test
   @DisplayName("single very long line admits within policy and reaches SUCCESS_FULL")
   void longSingleLineAdmits() throws Exception {
     Path file = tempDir.resolve("long-line.txt");

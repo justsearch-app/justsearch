@@ -19,6 +19,8 @@ export type IngestionRollup = z.infer<typeof ingestionSummarySchema>['rollups'][
 export const INGESTION_REASON_LABELS: Readonly<Record<string, string>> = {
   SUCCESS: 'Content indexed',
   SUCCESS_PARTIAL: 'Content indexed up to the extraction limit',
+  TEXT_LOST_WHILE_DECODING: 'Content indexed; some characters could not be decoded',
+  TEXT_LOST_WHILE_DECODING_AND_TRUNCATED: 'Content indexed up to the extraction limit; some characters could not be decoded',
   SUCCESS_EMPTY: 'No usable content extracted',
   EXTRACTION_DROPOUT_PENDING_FALLBACK: 'No text extracted; another extraction method is queued',
   EXTRACTION_DROPOUT_UNRECOVERED: 'No text recovered by the available extraction methods',

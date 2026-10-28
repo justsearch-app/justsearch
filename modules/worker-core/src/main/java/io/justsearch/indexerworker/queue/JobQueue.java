@@ -906,7 +906,14 @@ public interface JobQueue extends Closeable {
       String policyId,
       String parserId,
       String originator,
-      String transport) {
+      String transport,
+      String artifactReasonCode) {
+    public IngestionLedgerEntry(String pathHash, String collection, Long sourceSizeBytes,
+        Long sourceModifiedAtMs, String sourceKind, String artifactStatus, String policyId,
+        String parserId, String originator, String transport) {
+      this(pathHash, collection, sourceSizeBytes, sourceModifiedAtMs, sourceKind, artifactStatus,
+          policyId, parserId, originator, transport, null);
+    }
     /** Explicitly unknown attribution for legacy entries; never replaced by a later admission. */
     public IngestionLedgerEntry(String pathHash, String collection, Long sourceSizeBytes,
         Long sourceModifiedAtMs, String sourceKind, String artifactStatus, String policyId,
@@ -920,6 +927,7 @@ public interface JobQueue extends Closeable {
       collection = capField(collection);
       sourceKind = capField(sourceKind);
       artifactStatus = capField(artifactStatus);
+      artifactReasonCode = capField(artifactReasonCode);
       policyId = capField(policyId);
       parserId = capField(parserId);
       originator = capField(originator);

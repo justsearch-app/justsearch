@@ -159,24 +159,30 @@ public final class IngestionOutcomeJournal {
     markDoneSpan.setAttribute("paths.count", (long) pendingMarkDone.size());
     try {
       List<JobQueue.IngestionLedgerTransition> fullSuccess = new ArrayList<>();
-      List<JobQueue.IngestionLedgerTransition> partialSuccess = new ArrayList<>();
+      var partialSuccess = new java.util.LinkedHashMap<String, List<JobQueue.IngestionLedgerTransition>>();
       List<JobQueue.IngestionLedgerTransition> emptySuccess = new ArrayList<>();
       for (JobQueue.IngestionLedgerTransition transition : pendingMarkDone) {
         switch (classifyTransition(transition)) {
-          case PARTIAL -> partialSuccess.add(transition);
+          case PARTIAL -> {
+            String reason = transition.entry().artifactReasonCode();
+            if (reason == null) reason = IngestionReasonCodes.SUCCESS_PARTIAL;
+            partialSuccess.computeIfAbsent(reason, ignored -> new ArrayList<>()).add(transition);
+          }
           case EMPTY -> emptySuccess.add(transition);
           case FULL -> fullSuccess.add(transition);
         }
       }
       drainGroup(fullSuccess, fullSuccess());
-      drainGroup(partialSuccess, partialSuccess());
+      for (var group : partialSuccess.entrySet()) {
+        drainGroup(group.getValue(), partialSuccess(group.getKey()));
+      }
       drainGroup(emptySuccess, emptySuccess());
-      // Value-equal records can carry different live claims. A stale transition discarded by
-      // fallback must not remove the current claim whose outcome write rolled back.
+      // Value-equal records can carry different live claims. Failed individual writes are
+      // removed from their group and retained in pendingMarkDone for the next drain.
       java.util.Set<JobQueue.IngestionLedgerTransition> drained =
           java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
       drained.addAll(fullSuccess);
-      drained.addAll(partialSuccess);
+      for (var group : partialSuccess.values()) drained.addAll(group);
       drained.addAll(emptySuccess);
       pendingMarkDone.removeIf(drained::contains);
     } finally {
@@ -264,11 +270,19 @@ public final class IngestionOutcomeJournal {
   }
 
   public IngestionOutcome partialSuccess() {
-    return outcome(
-        IngestionOutcomeClass.SUCCESS_PARTIAL,
-        IngestionReasonCodes.SUCCESS_PARTIAL,
-        IngestionRetryPolicy.NONE,
-        "Indexed successfully (extracted text was truncated to fit the policy cap)");
+    return partialSuccess(IngestionReasonCodes.SUCCESS_PARTIAL);
+  }
+
+  private IngestionOutcome partialSuccess(String reasonCode) {
+    String reason = reasonCode == null ? IngestionReasonCodes.SUCCESS_PARTIAL : reasonCode;
+    String diagnostic = switch (reason) {
+      case IngestionReasonCodes.TEXT_LOST_WHILE_DECODING ->
+          "Indexed successfully (some characters could not be decoded)";
+      case IngestionReasonCodes.TEXT_LOST_WHILE_DECODING_AND_TRUNCATED ->
+          "Indexed successfully (extracted text was truncated; some characters could not be decoded)";
+      default -> "Indexed successfully (extracted text was truncated to fit the policy cap)";
+    };
+    return outcome(IngestionOutcomeClass.SUCCESS_PARTIAL, reason, IngestionRetryPolicy.NONE, diagnostic);
   }
 
   /** Tempdoc 671, Long-term design part 2 — extends the closed factory set (line 39-42 above). */
