@@ -395,8 +395,11 @@ async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identity
           process.execPath, '-e', 'setInterval(() => {}, 60000)',
         ]),
         JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
-        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '15000',
-        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '15000',
+        // Generous like the conformance adapter's: on a loaded Windows runner the job host can take
+        // most of 15 s to start the root, and a startup timeout there asks the fake engine to stop
+        // (exit 0) before its planned crash (exit 1), so the test would no longer test a crash.
+        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '60000',
+        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '60000',
         CI: '',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -410,7 +413,7 @@ async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identity
 
   try {
     const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
-    const deadline = Date.now() + 40_000;
+    const deadline = Date.now() + 120_000;
     let state = null;
     for (;;) {
       try {
@@ -442,7 +445,8 @@ async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identity
     );
     assert.equal(stopReport.runId, runJson.runId, 'stop-report runId must equal run.json runId');
     assert.equal(stopReport.incarnation, 1);
-    assert.equal(stopReport.backendExitCode, 1, 'the crash exit code is recorded, not inferred');
+    assert.equal(stopReport.backendExitCode, 1,
+      `the crash exit code is recorded, not inferred\n${JSON.stringify(stopReport)}\n${stderr.slice(-2000)}`);
 
     // (2) The run id and the LEASE survive the child. This is design 7.6's dev-runner sentence, and
     //     it is what stops another session reading a recovering stack as an abandoned one.
