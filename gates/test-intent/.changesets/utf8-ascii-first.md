@@ -20,7 +20,7 @@ Evidence paths are reserved for the independent verifier. The builder does not r
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java"
       ],
       "class": "New",
-      "behaviour": "R1: literal text and parser charset across six formats, five language/script tails and exact 16,384/16,385/65,536/1,048,576-byte ASCII prefixes; structured, flat, policy and real child routes, structured-failure fallback, native-word search and early character cap. R2: explicit zero-based 16 KiB first-sequence edges. R3: state across 8,192-byte reads, three-byte short reads and spill. R4: new correct content/preview/title/frontmatter/status/policy survives restart; forcing a v5 mojibake fixture with its real content SHA repairs text and chunk revision without changing source SHA or historical ledger. I1: v6 default, null/blank fallback and configured identity.",
+      "behaviour": "R1: literal text and parser charset across six formats, five language/script tails and exact 16,384/16,385/65,536/1,048,576-byte ASCII prefixes; structured, flat, policy and real child routes, structured-failure fallback, native-word search and early character cap. R2: explicit zero-based 16 KiB first-sequence edges. R3: state across 8,192-byte reads, three-byte short reads and spill. R4: new correct content/preview/title/frontmatter/status/policy survives restart; forcing a v5 mojibake fixture with its real content SHA repairs text and chunk revision without changing source SHA or historical ledger. I1: v6 default, null/blank fallback and configured identity. P5a repair: unfinished or malformed XML-like prefixes keep the whole-snapshot UTF-8 decision; complete declarations naming UTF-8 or its Java alias utf8 also read as UTF-8, through HTML and plain-text parsers. Reuse one persistent sandbox for the original format/prefix/language cases, asserting one child and no restarts alongside every per-document content/status/policy assertion.",
       "sources": [
         {
           "kind": "defect-source",
@@ -48,7 +48,10 @@ Evidence paths are reserved for the independent verifier. The builder does not r
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PolicyTest.java#blankOrNullIdentityUsesVersionSix",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PolicyTest.java#defaultAndConfiguredIdentitiesUseVersionSix",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#forcedReindexRepairsHebrewAndSurvivesAnotherRestart",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#newlyIndexedAsciiFirstUtf8SurvivesRestart"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#newlyIndexedAsciiFirstUtf8SurvivesRestart",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java#unfinishedXmlPrefixUsesSnapshotUtf8",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java#malformedXmlDeclarationUsesSnapshotUtf8",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java#completeUtf8XmlDeclarationUsesSnapshotUtf8"
       ],
       "repaired": true
     },
@@ -58,7 +61,7 @@ Evidence paths are reserved for the independent verifier. The builder does not r
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java"
       ],
       "class": "New",
-      "behaviour": "P1–P7/P9: literal pre-change text and charset for ASCII and legacy suffixes, malformed and EOF-truncated suffixes beyond the window and character cap, valid windows despite invalid later bytes, previously complete first-window sequences, declarations/aliases/BOMs/BOM-less UTF-16, embedded ZIP/mail attachment/inline bodies, copied metadata, sequential/concurrent documents, non-enumerable carrier, parser object identity and spill cleanup after capture read failure. Old v5 stored fields, chunks and ledger remain identical across restart and unchanged queued work. Existing #997 and preparation/limit tests are rerun unchanged except the separate policy-id edits. P8 is left to independent measurement.",
+      "behaviour": "P1–P7/P9: literal pre-change text and charset for ASCII and legacy suffixes, malformed and EOF-truncated suffixes beyond the window and character cap, valid windows despite invalid later bytes, previously complete first-window sequences, declarations/aliases/BOMs/BOM-less UTF-16, embedded ZIP/mail attachment/inline bodies, copied metadata, sequential/concurrent documents, non-enumerable carrier, parser object identity and spill cleanup after capture read failure. Old v5 stored fields, chunks and ledger remain identical across restart and unchanged queued work. Existing #997 and preparation/limit tests are rerun unchanged except the separate policy-id edits. P8 is left to independent measurement. P5a preservation: complete ISO-8859-1 and windows-1252 declarations before ASCII-first UTF-8 bodies keep literal Windows-1252 mojibake and charset in HTML and plain text. Concurrent valid roots must explicitly detect UTF-8 while invalid roots detect Windows-1252; fresh metadata keeps the old decision.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -83,7 +86,8 @@ Evidence paths are reserved for the independent verifier. The builder does not r
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#completedUtf8WindowKeepsTodaysXmlDeclarationOutcome",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#parserPassesRootMetadataUncopied",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#captureReadFailureDeletesSpilledSnapshot",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PreservationTest.java#completeLegacyXmlDeclarationKeepsTodaysOutcome"
       ],
       "repaired": false
     },

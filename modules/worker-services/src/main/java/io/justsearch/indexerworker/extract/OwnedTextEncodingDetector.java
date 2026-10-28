@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.io.input.XmlStreamReader;
+import java.util.regex.Pattern;
 import org.apache.tika.detect.CompositeEncodingDetector;
 import org.apache.tika.detect.EncodingDetector;
 import org.apache.tika.metadata.Metadata;
@@ -24,6 +24,13 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
   private static final int UTF16_WINDOW_BYTES = 8192;
   private static final int UTF8_WINDOW_BYTES = 16_384;
   private static final Charset WINDOWS_1252 = Charset.forName("windows-1252");
+  // XML 1.0 [23] XMLDecl with the optional EncodingDecl present. XML S is deliberately
+  // narrower than Java's whitespace classes; each attribute must use matching quotes.
+  private static final Pattern XML_DECLARATION = Pattern.compile(
+      "\\A<\\?xml[ \\t\\r\\n]+version[ \\t\\r\\n]*=[ \\t\\r\\n]*(?:'1\\.[0-9]+'|\"1\\.[0-9]+\")"
+          + "[ \\t\\r\\n]+encoding[ \\t\\r\\n]*=[ \\t\\r\\n]*(['\"])([A-Za-z][A-Za-z0-9._-]*)\\1"
+          + "(?:[ \\t\\r\\n]+standalone[ \\t\\r\\n]*=[ \\t\\r\\n]*(?:'yes'|'no'|\"yes\"|\"no\"))?"
+          + "[ \\t\\r\\n]*\\?>");
   // The types handled by Tika's HTML parser; ordinary XML keeps its own declaration handling.
   private static final Set<String> HTML_TYPES = Set.of(
       "text/html", "application/xhtml+xml", "application/vnd.wap.xhtml+xml", "application/x-asp");
@@ -121,10 +128,17 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
     // Only these inconclusive windows may consult the complete top-level snapshot. BOMs,
     // malformed windows and read failures returned above; existing UTF-8 window wins unchanged.
     if (!PreparedExtractionInput.isNonAsciiUtf8(metadata)) return null;
-    // Declared XML/XHTML keeps its existing reader/detector path, including charset aliases.
-    // Reuse Commons IO's XML-prolog grammar rather than interpreting declarations a second way.
+    // Only a complete XML declaration can override the snapshot fact. A declaration naming
+    // UTF-8 (including aliases) agrees with it; other declarations keep their existing path.
     chars.flip();
-    return XmlStreamReader.ENCODING_PATTERN.matcher(chars).lookingAt() ? null : StandardCharsets.UTF_8;
+    var declaration = XML_DECLARATION.matcher(chars);
+    if (declaration.lookingAt()) {
+      String encoding = declaration.group(2);
+      if (!Charset.isSupported(encoding) || !StandardCharsets.UTF_8.equals(Charset.forName(encoding))) {
+        return null;
+      }
+    }
+    return StandardCharsets.UTF_8;
   }
 
   private static Charset detectBomlessUtf16(InputStream input) throws IOException {

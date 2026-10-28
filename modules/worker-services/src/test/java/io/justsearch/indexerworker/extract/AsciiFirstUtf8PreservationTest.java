@@ -143,7 +143,7 @@ class AsciiFirstUtf8PreservationTest {
               var prepared = factory.prepare(file, TikaExtractionPolicy.defaults());
               var input = new java.io.BufferedInputStream(prepared.openStream())) {
             Charset root = detector.detect(input, prepared.metadata());
-            if (!valid) assertEquals(Charset.forName("windows-1252"), root);
+            assertEquals(valid ? StandardCharsets.UTF_8 : Charset.forName("windows-1252"), root);
             return detector.detect(new ByteArrayInputStream(
                 ("a".repeat(16_384) + "é").getBytes(StandardCharsets.UTF_8)), new Metadata());
           }
@@ -252,6 +252,42 @@ class AsciiFirstUtf8PreservationTest {
     try (var flat = new ContentExtractor(); var structured = new StructuredContentExtractor()) {
       assertEquals("é", flat.extract(file).content().strip());
       assertEquals("é", structured.extract(file).content().strip());
+    }
+  }
+
+  static Stream<Arguments> declaredLegacyCharsets() {
+    return Stream.of("html", "txt").flatMap(extension -> Stream.of("ISO-8859-1", "windows-1252")
+        .map(encoding -> Arguments.of(extension, encoding)));
+  }
+
+  @ParameterizedTest(name = "completeLegacyXmlDeclarationKeepsTodaysOutcome({0}, {1})")
+  @MethodSource("declaredLegacyCharsets")
+  void completeLegacyXmlDeclarationKeepsTodaysOutcome(String extension, String encoding) throws Exception {
+    String declaration = "<?xml version=\"1.0\" encoding=\"" + encoding + "\"?>";
+    String padding = "a".repeat(16_384);
+    String source = declaration + "<html><body>" + padding + "ספרים</body></html>";
+    String expected = padding + "×¡×¤×¨×™×�";
+    Path file = Files.writeString(tempDir.resolve("declared." + extension), source);
+    try (var factory = new PreparedExtractionInput.Factory();
+        var prepared = factory.prepare(file, TikaExtractionPolicy.defaults());
+        var input = new java.io.BufferedInputStream(prepared.openStream());
+        var flat = new ContentExtractor(); var structured = new StructuredContentExtractor()) {
+      var metadata = prepared.metadata();
+      metadata.set(Metadata.CONTENT_TYPE, "html".equals(extension) ? "text/html" : "text/plain");
+      assertEquals(Charset.forName("windows-1252"), detector().detect(input, metadata));
+      if ("txt".equals(extension)) {
+        var handler = new org.apache.tika.sax.BodyContentHandler(-1);
+        OwnedTikaParsers.create((stream, meta) -> org.apache.tika.mime.MediaType.TEXT_PLAIN)
+            .parse(input, handler, metadata, new org.apache.tika.parser.ParseContext());
+        assertEquals(declaration + "<html><body>" + padding + "×¡×¤×¨×™×�</body></html>",
+            handler.toString().strip());
+      }
+      String flatText = flat.extract(file).content().strip();
+      String structuredText = structured.extract(file).content().strip();
+      assertTrue(expected.equals(flatText), () -> extension + " flat tail: "
+          + flatText.substring(Math.max(0, flatText.length() - 80)));
+      assertTrue(expected.equals(structuredText), () -> extension + " structured tail: "
+          + structuredText.substring(Math.max(0, structuredText.length() - 80)));
     }
   }
 
