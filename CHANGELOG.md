@@ -14,11 +14,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 ## [Unreleased]
 
 ### Changed
+- Search is now the main window. The old chat window is gone; its links, bookmarks and plugins open Search.
+- Answer and extraction links prepare the request and wait for you to send it.
+- Workflow-run links open Search with the notice “Workflow runs are not available here”.
 - Production API reads and streams now require the per-boot token except the six public Runtime Contract reads. Native clients read the owner-only runtime manifest; `/api/mcp/token` and stdout token emission are removed. Update MCPB to 0.3.1: older bridges fail with HTTP 401 against this Engine. The updated bridge also works with the previous Engine release. Explicit port overrides require `JUSTSEARCH_SESSION_TOKEN`.
 - `POST /api/settings/v2` writes now require the latest GET witness and a fresh canonical UUIDv7 operation key
 - `POST /api/worker/restart` returns HTTP 410; use `POST /api/engine/components/index/recover`
 
 ### Removed
+- The pins panel is removed. Stored pins are kept, and plugins can still read them.
+- The old window’s automatic search-history events and pin-run updates stop. Existing history records and pin data are kept.
 - `/api/inference/reload`; inference refresh now uses the accepted `core.reconfigure` operation
 
 ## [0.3.0] - 2026-09-07

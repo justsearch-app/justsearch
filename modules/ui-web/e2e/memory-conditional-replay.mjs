@@ -211,7 +211,7 @@ try {
     text: el.shadowRoot.textContent, locked: el.locked, loadError: el.loadError, busy: el.busy,
   }));
   const surfaceResults = [];
-  for (const surface of ['Brain', 'Search v3']) {
+  for (const surface of ['Brain', 'Search']) {
     for (const scenario of ['removed', 'absent', 'conflict', 'refresh failure', 'locked', 'second replacement', 'navigation', 'double activation']) {
       failMemoryReads = false; afterDelete = undefined;
       await call('/same', { method: 'DELETE' });

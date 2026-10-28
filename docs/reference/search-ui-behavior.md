@@ -12,7 +12,7 @@ Behavioral specification for the JustSearch search experience. Covers every surf
 
 For design philosophy and architecture, see `docs/explanation/10-ui-ux-design.md`.
 
-Search v3 is the production main window: `core.search-v3-surface`, mounted as
+Search is the production main window: `core.search-v3-surface`, mounted as
 `jf-sv3-window` (`shell-v0/views/search-v3/SearchV3View.ts`). The rail and catalog label
 is **Search**. The retired unified-chat, Search and Agent surface ids resolve directly
 to it; there is one interaction window.

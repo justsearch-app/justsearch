@@ -1,29 +1,30 @@
 ---
 number: 852
 title: The window cutover — promoting Search v3 to the one interaction surface
-status: "IN PROGRESS — S0 (merged, #493); S1 (merged, #495); S2 (merged, #503); S3 (merged, #505). S2 and S3 both CONFIRMED LIVE 2026-08-19 (see each slice's live-round section); S4 PARTIAL (this PR — the Q1-independent half); S4's remainder + S5-S11 pending"
+status: "COMPLETE — WP1.5a compatibility and main-window promotion; WP1.5b old-window retirement; WP1.5c names, release notes and cutover marker"
 created: 2026-08-19
-updated: 2026-08-19
-scope-of-this-file: S0, S1, S2, S3 and S4-partial. The full program charter (target end state, the parity ledger,
-  the slice DAG S1-S11, the open questions) lives with the orchestrator and lands here as the
-  program's later slices land. This file exists so each slice's code has its design of record
-  in-repo rather than only in a PR body.
-forcing-function: "`check-window-cutover` (shipped with 851) is report-only since 2026-10-20: an incomplete promotion warns at every date (the 2026-11-30 failure was removed because finishing the promotion is an estimated 16–32 h product change not yet scheduled; see 851), keyed on (a) `core.search-v3-surface` audience USER in CorePlugin.ts and (b) the `governance/window-cutover.done` marker the program's final slice writes. A restored search-v2 window or an unreadable registration still fails."
+updated: 2026-10-28
+scope-of-this-file: Completed promotion program and dated slice history. WP1.5a/b/c supersede
+  the original S4-rest through S11 plan; the historical implementation notes below are retained.
+forcing-function: "`check-window-cutover` reports completion from `core.search-v3-surface` audience USER in CorePlugin.ts and `governance/window-cutover.done`. Incomplete promotion remains report-only; a restored search-v2 window or unreadable registration still fails."
 related: "847 (citation correctness — S1-S3 shipped in #488; 852-S1 is sequenced strictly behind 847-S3, which owns `Sv3Turn.recordId` and the identity-keyed merge), 848 (reasoning parity), 846 (markdown substrate), 849 (evidence reader), 822 (the Search v3 window itself: Phases F1-F10), 610 (the context set), 513 (stable message ids + branch), 629/734 (the conversation-store lock)"
 ---
 
 ## Status
 
-| Slice | What | State |
+The cutover is complete. **Search** is the one main interaction window; its established
+`core.search-v3-surface` identity and saved-state keys remain stable.
+
+| Slice | Delivered behaviour | State |
 |---|---|---|
-| **S0** | FE↔Java surface-parity leg on `check-surface-composition` | **implemented (merged, #493)** |
-| **S1** | Turn identity + the `/history` companion load. No UI. | **implemented (merged, #495)** |
-| **S2** | The tempdoc-610 context set (floor / clear / compact / summary-edit / message-exclude) | **implemented (merged, #503) · CONFIRMED LIVE 2026-08-19** |
-| **S3** | Branch + version pager + edit/retry/resend + cascade-aware delete | **implemented (merged, #505) · CONFIRMED LIVE 2026-08-19** |
-| **S4 (partial)** | Composer MODE control + light-theme wiring (ledger 14) + `jf-control` adoption (ledger 11) | **implemented (this PR)** |
-| S4 (rest) | The extract tier (ledger 2) + `deriveAffordance` / intent-tier vocabulary adoption | pending — **Q1-gated** |
-| S5-S7 | Retrieve tier, flip prerequisites | pending |
-| S8-S11 | The flip, the sweep, the marker, the renames | pending |
+| **WP1.5a** | Search is the USER/RAIL landing window. Old addresses, bookmarks, restored navigation, drafts and preferences reach it. Answer/extraction hand-offs prepare and wait for Send; workflow-run links show the unavailable notice. | implemented |
+| **WP1.5b** | The old chat window and its mounts are retired. Surviving interaction coverage, captures and current docs use Search. Stored pins/history stay; their old automatic events and pin-run updates stop. | implemented |
+| **WP1.5c** | Rail, title band and catalog say Search; the catalog describes searching files and asking about them. Release notes describe compatibility and removed UI, and the explicit cutover marker closes the promotion check. | implemented |
+
+The original S0–S4 slice notes and dated verification below are history, retained as
+written. WP1.5a/b/c completed the remaining flip, sweep and marker work in place of
+the original S4-rest–S11 schedule. Current behaviour is described in
+[`search-ui-behavior.md`](../reference/search-ui-behavior.md).
 
 S0's second half — recording that record-attribute hydration lives in
 `modules/ui-web/src/shell-v0/components/chat/` (adopting 847-S1's location) — is a decision

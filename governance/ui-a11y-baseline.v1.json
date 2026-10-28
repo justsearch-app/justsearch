@@ -103,7 +103,7 @@
       "surface": "search-v3",
       "uiShotStep": "sv3-composer-occlusion",
       "knownRules": [],
-      "note": "Tempdoc 859 live-leg \u2014 the FIRST Search v3 surface in this register. Until now `ui-a11y-gate` covered no sv3 step at all, so the window the product is being rebuilt around had zero axe coverage in the deterministic state; the independent measured audit that found it also ran axe against this capture and got 0 violations, which is why the row lands with an EMPTY knownRules list rather than accepted debt. `sv3-composer-occlusion` is the step to register because it is the only sv3 capture deterministic enough for the proportion register too (1280x800, `sv3-sources` fixtures variant, Sources disclosure open, scrolled to max), so both gates read the same rendered state."
+      "note": "Tempdoc 859 live-leg \u2014 the FIRST Search surface in this register. Until now `ui-a11y-gate` covered no sv3 step at all, so the window the product is being rebuilt around had zero axe coverage in the deterministic state; the independent measured audit that found it also ran axe against this capture and got 0 violations, which is why the row lands with an EMPTY knownRules list rather than accepted debt. `sv3-composer-occlusion` is the step to register because it is the only sv3 capture deterministic enough for the proportion register too (1280x800, `sv3-sources` fixtures variant, Sources disclosure open, scrolled to max), so both gates read the same rendered state."
     },
     {
       "surface": "search-v3",

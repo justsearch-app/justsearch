@@ -160,6 +160,9 @@ for (const scenario of cases) {
       const cli = spawnSync(process.execPath, [checker, '--now', now], { cwd: root, encoding: 'utf8' });
       ok(`${label}: CLI exit status`, cli.status === (scenario.errors ? 1 : 0));
       ok(`${label}: CLI warning visibility`, cli.stderr.includes('check-window-cutover: WARN') === Boolean(scenario.warnings));
+      if (!scenario.errors) {
+        ok(`${label}: CLI completion status`, cli.stdout.includes('OK — cutover complete') === !scenario.warnings);
+      }
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

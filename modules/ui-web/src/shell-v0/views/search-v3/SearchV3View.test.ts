@@ -10,6 +10,21 @@
  * has (the global fetch) is stubbed for every case.
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import '../../chrome/Shell.js'; // registers the real rail, even when Rail is only a type
+import type { Rail } from '../../chrome/Shell.js';
+import { present } from '../../display/present.js';
+import { CORE_PROVENANCE } from '../../primitives/provenance.js';
+import {
+  __seedForTest as seedSurfaces,
+  __resetForTest as resetSurfaces,
+} from '../../../api/registry/SurfaceCatalogClient.js';
+import {
+  __seedForTest as seedMessages,
+  __resetForTest as resetMessages,
+  localizeResourceKey,
+} from '../../../i18n/resourceCatalog.js';
 import { resetSearchState } from '../../state/searchState.js';
 import {
   __feedContactForTest,
@@ -84,6 +99,8 @@ afterEach(() => {
   document.documentElement.removeAttribute(SV3_MORPH_ROOT_ATTR);
   delete (document as unknown as { startViewTransition?: unknown }).startViewTransition;
   // The stores are module singletons; a search one case ran would otherwise be the next case's state.
+  resetSurfaces();
+  resetMessages();
   resetSearchState();
   __resetAiStateForTest();
   vi.unstubAllGlobals();
@@ -123,7 +140,7 @@ describe('the window mounts with its five regions', () => {
     const el = await mount();
     const topbar = await region(el, 'jf-sv3-topbar');
     expect(topbar.shadowRoot?.querySelector('[data-testid="sv3-topbar-title"]')?.textContent).toBe(
-      'Search v3',
+      'Search',
     );
     expect(topbar.shadowRoot?.querySelectorAll('[data-testid="sv3-topbar-control"]')).toHaveLength(
       0,
@@ -131,6 +148,51 @@ describe('the window mounts with its five regions', () => {
     const live = [...(topbar.shadowRoot?.querySelectorAll('button') ?? [])];
     expect(live).toHaveLength(1);
     expect(live[0]?.getAttribute('data-testid')).toBe('sv3-topbar-palette');
+  });
+
+  it('W7 renders Search in the title band and rail using the real catalog message bundle', async () => {
+    const contribution = createCorePluginManifest().capabilities.surfaces!
+      .find(s => s.id === 'core.search-v3-surface')!;
+    // Read the shipped bundle rather than inventing a translation in a test fixture. The
+    // selected properties are single-line plain text; Java's real Properties loader is also
+    // checked by SearchWindowNameTest in app-api.
+    const bundle = readFileSync(resolve(
+      '../app-api/src/main/resources/messages/registry-surface.en.properties',
+    ), 'utf8');
+    const messages = Object.fromEntries(bundle.split(/\r?\n/)
+      .filter(line => line.startsWith('registry-surface.search-v3-surface.'))
+      .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
+    seedMessages(messages);
+    expect(localizeResourceKey(contribution.labelKey)).toBe('Search');
+    expect(localizeResourceKey(contribution.descriptionKey)).toBe(
+      'Search your files and ask questions about them.',
+    );
+    const surface = {
+      id: contribution.id,
+      presentation: { labelKey: contribution.labelKey, descriptionKey: contribution.descriptionKey },
+      audience: contribution.audience,
+      placement: contribution.placement,
+      mountTag: contribution.mountTag,
+      consumes: { resources: [], operations: [], prompts: [], diagnosticChannels: [] },
+      provenance: CORE_PROVENANCE,
+    };
+    seedSurfaces({ schemaVersion: '1', catalogVersion: 1, namespace: 'core',
+      primitive: 'Surface', entries: [surface] });
+    expect(present({ kind: 'surface', id: surface.id }).label).toBe('Search');
+
+    const el = await mount();
+    const topbar = await region(el, 'jf-sv3-topbar');
+    expect(topbar.shadowRoot?.querySelector('[data-testid="sv3-topbar-title"]')?.textContent)
+      .toBe('Search');
+    const rail = document.createElement('jf-rail') as Rail;
+    rail.surfaces = [surface];
+    rail.expanded = true;
+    document.body.appendChild(rail);
+    await rail.updateComplete;
+    const entry = rail.shadowRoot!.querySelector('[data-surface-id="core.search-v3-surface"]')!;
+    expect(entry.querySelector('.rail-label')?.textContent).toBe('Search');
+    expect(entry.getAttribute('aria-label')).toBe('Search');
+    expect(entry.getAttribute('title')).toBe('Search');
   });
 
   it('opens with an empty sidebar: no sessions until this window has searched', async () => {
