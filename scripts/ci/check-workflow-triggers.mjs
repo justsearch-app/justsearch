@@ -58,7 +58,8 @@ function stripInlineComment(line) {
     if ((ch === '"' || ch === "'") && line[i - 1] !== '\\') {
       quote = quote === ch ? null : quote ?? ch;
     }
-    if (ch === '#' && quote === null) {
+    // YAML starts a comment only at line start or after whitespace (`a#b` is plain text).
+    if (ch === '#' && quote === null && (i === 0 || /\s/.test(line[i - 1]))) {
       return line.slice(0, i);
     }
   }

@@ -186,6 +186,10 @@ for (const name of ['build-installer', 'build-installer-windows', 'build-install
         .some(e => /literal secret names/.test(e.message)));
     });
   }
+  test(`workflow policy sees a secret after a # that YAML keeps as text in ${name}`, t => {
+    const { check } = policyFixture(t, name);
+    assert(check('run: echo check-only', 'KEY: a#${{ secrets.JUSTSEARCH_CODESIGN_COMMAND }}').some(e => /step that signs/.test(e.message)));
+  });
   test(`workflow policy matches signing secret names case-insensitively in ${name}`, t => {
     const { check } = policyFixture(t, name);
     for (const secret of ['justsearch_codesign_command', 'JustSearch_Tauri_Updater_Private_Key', 'justsearch_release_metadata_private_key_pem']) {
