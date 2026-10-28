@@ -79,12 +79,12 @@ final class AiInstallServicePackageStateTest {
 
   /**
    * INS-005 regression: a multi-package run where one asset fails but the rest succeed must report
-   * {@code state == "completed"} with an honest count and {@code installedFully == false} — never
-   * {@code failed}, and no package left {@code pending}. Exercises the extracted
+   * {@code state == "failed"} with an honest count and {@code installedFully == false};
+   * successful packages are retained and no package is left {@code pending}. Exercises the extracted
    * {@code applyCompletionState()} terminal decision.
    */
   @Test
-  void partialFailure_reportsCompletedNotFailed_andHonestCount() throws Exception {
+  void partialFailure_reportsFailed_andHonestCount() throws Exception {
     AiInstallService svc = new AiInstallService(null, null, null, null, tmp);
     AiInstallStatus status = statusOf(svc);
     for (int i = 0; i < 23; i++) {
@@ -94,7 +94,7 @@ final class AiInstallServicePackageStateTest {
 
     applyCompletionStateBookkeepingOnly(svc);
 
-    assertEquals("completed", status.state);
+    assertEquals("failed", status.state);
     assertFalse(status.installedFully);
     assertTrue(status.message.contains("23/24"), "message should report 23/24: " + status.message);
     assertTrue(status.message.contains("1 failed"), "message should name the failure count");

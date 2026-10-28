@@ -1338,14 +1338,6 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         return;
       }
 
-      // Check for failures
-      long failedCount = countPackagesByState("failed");
-      long totalCount = status.packages.size();
-      if (failedCount > 0 && failedCount == totalCount) {
-        fail("ALL_DOWNLOADS_FAILED", "All packages failed to install.");
-        return;
-      }
-
       // ---- The run's bill of materials -----------------------------------------------------
       placement.writeContract(buildContract(plan, registry, hardware), homeDir);
 
@@ -1382,12 +1374,15 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         return;
       }
 
-      applyCompletionState();
-      // Generation-changing ONNX assets are staged successfully, but their paths must be
-      // published by the separately approved recorded activation operation. Keep the acquisition
-      // result truthful and leave the ordinary settings owner untouched until that operation runs.
-      if (hasGenerationChangingAcquisition()) {
-        markActivationRequired();
+      // Candidate hashing can take several seconds. Keep the run in progress until both the
+      // completion verdict and activation obligation are known, then publish them together.
+      InstallCompleteness diskTruth = recomputeCompletenessFromDiskBestEffort();
+      boolean activationRequired = hasGenerationChangingAcquisition();
+      synchronized (lock) {
+        applyCompletionState(diskTruth);
+        if ("completed".equals(status.state) && activationRequired) {
+          markActivationRequired();
+        }
       }
     } finally {
       if (acquisitionFreeze != null) {
@@ -1791,14 +1786,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
   }
 
-  /**
-   * Terminal honesty decision, extracted so a regression test can pin the INS-005 property (a
-   * multi-package run where some assets fail must still report {@code state == "completed"} with an
-   * accurate count, never {@code failed}) without staging real downloads — mirroring why {@link
-   * #applyInstalledFromPlan} was made package-private. Reads the already-populated {@code
-   * status.packages}: a per-package {@code failed} keeps {@code installedFully} false but the run
-   * completed; {@code skipped} (hardware/policy) is distinguished from {@code failed}.
-   */
+  /** Reconciles the run against disk before publishing its terminal outcome. */
   void applyCompletionState() {
     applyCompletionState(recomputeCompletenessFromDiskBestEffort());
   }
@@ -1858,35 +1846,26 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // the run's bookkeeping while disk says the install is complete. Counting it as failed in the
     // message would deny the flag printed beside it. When disk cannot answer, the bookkeeping is the
     // only authority for both, so they still agree.
-    long messageFailedCount = failedCount;
-    boolean optionalFilesMissing = false;
-    if (diskTruth != null) {
-      // A HashSet, not the returned immutable List: this runs on the terminal-state path, and
-      // List.copyOf(...).contains(null) THROWS rather than answering false.
-      Set<String> requiredGapPackages = new HashSet<>(diskTruth.packagesWithMissingRequiredFiles());
-      messageFailedCount =
-          status.packages.stream()
-              .filter(ps -> "failed".equals(ps.state))
-              .filter(ps -> requiredGapPackages.contains(ps.packageId))
-              .count();
-      optionalFilesMissing = !diskTruth.optionalGaps().isEmpty();
-    }
+    boolean optionalFilesMissing = diskTruth != null && !diskTruth.optionalGaps().isEmpty();
     String optionalNote = optionalFilesMissing ? "; optional files missing" : "";
 
-    if (messageFailedCount > 0) {
-      long installed = totalCount - messageFailedCount - skippedCount;
-      updateState(
-          "completed",
-          "done",
-          "AI installed ("
-              + installed
-              + "/"
-              + totalCount
-              + " packages; "
-              + messageFailedCount
-              + " failed"
-              + optionalNote
-              + ").");
+    List<String> missingRequired = diskTruth == null
+        ? status.packages.stream().filter(ps -> "failed".equals(ps.state))
+            .map(ps -> ps.packageId).toList()
+        : diskTruth.packagesWithMissingRequiredFiles();
+    if (!missingRequired.isEmpty()) {
+      String failures = missingRequired.stream().map(id -> {
+        var ps = findPackageStatus(id);
+        return id + (ps == null || ps.error == null || ps.error.isBlank()
+            ? ": required files are missing; retry installation."
+            : ": " + ps.error);
+      }).collect(java.util.stream.Collectors.joining("; "));
+      long installed = status.packages.stream()
+          .filter(ps -> "installed".equals(ps.state) && !missingRequired.contains(ps.packageId)).count();
+      long planned = totalCount - skippedCount;
+      fail(installed == 0 ? "ALL_DOWNLOADS_FAILED" : "REQUIRED_DOWNLOADS_FAILED",
+          "AI installation failed (" + installed + "/" + planned + " packages installed; "
+              + missingRequired.size() + " failed). " + failures);
     } else if (limitingSkippedCount > 0) {
       // Partial-success path: state is still "completed" (Install AI ran to
       // termination), but installedFully is false so the Brain UI can show
@@ -2054,7 +2033,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private record InstallHardware(HardwareProfile effective, HardwareProfile policyExcluded) {}
 
   private InstallHardware buildInstallHardware() {
-    HardwareProfile detected = detectHardwareProfile();
+    HardwareProfile detected = InstallPlanner.hardwareForPlan(getManifest(), detectHardwareProfile());
     return gpuAccelerationAllowed()
         ? new InstallHardware(detected, null)
         : new InstallHardware(HardwareProfile.cpuOnly(), detected);
@@ -2070,7 +2049,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         declinedPackages(), modelsDir, homeDir, hardware.policyExcluded());
   }
 
-  private HardwareProfile detectHardwareProfile() {
+  HardwareProfile detectHardwareProfile() {
     // Tempdoc 587: read every GPU fact from the ONE composition seam (GpuCapabilityResolver),
     // which folds the CUDA driver-API probe into the NVML/nvidia-smi VRAM+device merge. This
     // replaces the prior split — a direct GpuDriverApiProbe call for cudaFunctional plus a

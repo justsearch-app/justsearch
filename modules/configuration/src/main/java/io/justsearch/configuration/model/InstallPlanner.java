@@ -36,6 +36,21 @@ public final class InstallPlanner {
 
   private InstallPlanner() {}
 
+  /** Hardware the target's shipped or downloadable runtime can actually support. */
+  public static HardwareProfile hardwareForPlan(ModelRegistry registry, HardwareProfile detected) {
+    var target = io.justsearch.configuration.NativeTargets.current();
+    // Windows' bundled runtime and CUDA supplement keep their existing selection. On Linux the
+    // ORT provider alone cannot run: its CUDA/cuDNN dependencies need a target-specific pack.
+    boolean cudaSupplied = target.hasCpuBaselineRuntime()
+        || registry.packages().stream().noneMatch(pkg -> pkg.tier() == CapabilityTier.RUNTIME
+            && pkg.requiresCuda())
+        || registry.packages().stream().anyMatch(pkg -> !pkg.devOnly()
+            && pkg.tier() == CapabilityTier.RUNTIME && pkg.requiresCuda()
+            && (pkg.nativeTarget() == null || target.targetId().equals(pkg.nativeTarget())));
+    return cudaSupplied ? detected
+        : new HardwareProfile(detected.gpuDetected(), false, detected.vramBytes());
+  }
+
   /** The staging path a partially-downloaded {@code finalTarget} occupies. */
   public static Path partialPathFor(Path finalTarget) {
     return finalTarget.resolveSibling(finalTarget.getFileName() + PARTIAL_SUFFIX);
@@ -184,6 +199,7 @@ public final class InstallPlanner {
     DownloadProfile excludedProfile = policyExcludedHardware == null
         ? DownloadProfile.CPU : policyExcludedHardware.downloadProfile();
     Set<String> declinedIds = declined == null ? Set.of() : declined;
+    hardware = hardwareForPlan(registry, hardware);
     DownloadProfile profile = hardware.downloadProfile();
     List<InstallPlan.PlannedDownload> downloads = new ArrayList<>();
     List<InstallPlan.SkippedPackage> skipped = new ArrayList<>();
@@ -513,7 +529,7 @@ public final class InstallPlanner {
   public static boolean isIncludedByPlan(
       ModelPackage pkg, ModelRegistry registry, InstallIntent intent, Set<String> declined,
       HardwareProfile hardware) {
-    return isIncludedByPlan(pkg, intent, declined, hardware)
+    return isIncludedByPlan(pkg, intent, declined, hardwareForPlan(registry, hardware))
         && platformExclusion(pkg, registry) == null;
   }
 

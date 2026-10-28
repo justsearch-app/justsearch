@@ -40,7 +40,9 @@ final class LinuxSearchOnlyInstallTest {
     NativeTargets linux = NativeTargets.forTarget("linux-x86_64");
     var previousConfig = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
     io.justsearch.configuration.resolved.ConfigStore config = null;
-    try (var target = mockStatic(NativeTargets.class, CALLS_REAL_METHODS)) {
+    try (var gpu = hardware(-1);
+         var target = mockStatic(NativeTargets.class, CALLS_REAL_METHODS)) {
+      assertNotNull(gpu);
       target.when(NativeTargets::current).thenReturn(linux);
       String sha = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
       var search = new ModelPackage("embedding", "Search", "Search fixture", "search", List.of(
@@ -60,7 +62,7 @@ final class LinuxSearchOnlyInstallTest {
       io.justsearch.configuration.resolved.ConfigStore.setGlobal(config);
       var service = spy(new AiInstallService(null, settings, null, null, home));
       doReturn(registry).when(service).getManifest();
-      doReturn(HardwareProfile.cpuOnly()).when(service).buildHardwareProfile();
+      doReturn(HardwareProfile.cpuOnly()).when(service).detectHardwareProfile();
       var leases = new io.justsearch.app.services.lease.RecordingOperationLeaseService();
       service.setOperationLeaseService(leases);
       var preview = service.previewInstallPlan();
@@ -112,18 +114,21 @@ final class LinuxSearchOnlyInstallTest {
       target.when(NativeTargets::current).thenReturn(linux);
       var hardware = HardwareProfile.gpuFull(12_000_000_000L);
       var service = spy(new AiInstallService(null, null, null, null, home));
-      doReturn(hardware).when(service).buildHardwareProfile();
       // Planner checks do not probe or use a GPU.
       var registry = service.getManifest();
       var preview = service.previewInstallPlan();
-      assertEquals("GPU_FULL", preview.downloadProfile);
+      assertEquals("CPU", preview.downloadProfile);
+      assertEquals(HardwareProfile.gpuDetectedNoCuda(12_000_000_000L), service.buildHardwareProfile());
       for (String id : List.of("cuda-runtime", "chat")) {
         var component = preview.components.stream().filter(c -> c.id.equals(id)).findFirst().orElseThrow();
         assertEquals("unavailable", component.state, id);
         assertFalse(component.unavailableReason.isBlank());
       }
       var plan = InstallPlanner.plan(registry, hardware, service.modelsDir());
+      assertEquals(DownloadProfile.CPU, plan.profile());
       assertTrue(plan.downloads().stream().anyMatch(d -> d.packageId().equals("embedding")));
+      var cpu = InstallPlanner.plan(registry, HardwareProfile.cpuOnly(), service.modelsDir());
+      assertEquals(cpu.downloads(), plan.downloads(), "Linux ships no CUDA dependency pack");
       assertFalse(plan.downloads().stream().anyMatch(d -> d.packageId().equals("chat")),
           "Linux has no runtime package that can run this chat model");
       assertFalse(InstallPlanner.isIncludedByPlan(registry.findPackage("cuda-runtime"),
