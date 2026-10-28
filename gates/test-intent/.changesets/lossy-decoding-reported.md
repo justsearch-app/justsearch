@@ -65,7 +65,6 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#iso2022JpShiftStateSurvivesAuditReads",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#htmlEncodingMetaCannotHideLoss",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#flatFallbackPreservesLossAndTruncation",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#flatFallbackPreservesCleanTruncation",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#invalidUtf8SequenceMidFileIsPartial",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#invalidUtf8ByteIsPartial",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#truncatedUtf8SequenceMidFileIsPartial",
@@ -171,7 +170,8 @@ The UTF-8 validator optimization adds fixed loss checks for invalid leads, overl
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validUtf8AcrossAuditBufferInMemory",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#validUtf8AcrossAuditBufferSpilled",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#utf8WithoutBomAfterLongAsciiStartIsClean",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#asciiFirstFlatFallbackRetainsSnapshotFactAndIsClean"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#asciiFirstFlatFallbackRetainsSnapshotFactAndIsClean",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java#flatFallbackPreservesCleanTruncation"
       ],
       "repaired": false
     },
