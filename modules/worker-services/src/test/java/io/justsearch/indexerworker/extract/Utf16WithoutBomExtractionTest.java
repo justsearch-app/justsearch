@@ -99,10 +99,12 @@ class Utf16WithoutBomExtractionTest {
   }
 
   @Test
-  void blankPolicyIdentityFallsBackToV4() throws Exception {
-    var policy = new TikaExtractionPolicy(" ", 48, 1024, 1024, 128, 128, 4096,
-        0, 0, 100.0d, true, Set.of(), Set.of());
-    assertEquals("tika-default-v4", policy.policyId());
+  void blankOrNullPolicyIdentityFallsBackToV4() throws Exception {
+    for (String id : Arrays.asList(null, "", " ")) {
+      var policy = new TikaExtractionPolicy(id, 48, 1024, 1024, 128, 128, 4096,
+          0, 0, 100.0d, true, Set.of(), Set.of());
+      assertEquals("tika-default-v4", policy.policyId());
+    }
   }
 
   @Test
