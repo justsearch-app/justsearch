@@ -1,6 +1,6 @@
 # JustSearch
 
-**A private retrieval backend for your AI agents — and a neural search engine with a cited, on-device AI assistant for your own files. Hybrid search (BM25 + dense vectors + learned-sparse + reranking) plus grounded Q&A, summarization, and extraction over your documents — with indexing, search, and built-in AI on your machine. Windows installer; on Linux, runs from source.**
+**JustSearch finds what is inside your files, fast and accurately, whether you know exactly what you are looking for or only vaguely. It is for anyone, and designed to be easy to use as your main search app and as a tool inside other apps and AI agents through MCP. Its on-device AI assistant provides cited answers about your files. Hybrid search (BM25 + dense vectors + learned-sparse + reranking) plus grounded Q&A, summarization, and extraction over your documents — with indexing, search, and built-in AI on your machine. Windows installer; on Linux, runs from source.**
 
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -18,7 +18,7 @@
      <p align="center"><img src="docs/assets/hero-search.png" width="820" alt="JustSearch: hybrid search over a local folder, with cited AI answers"></p>
 -->
 
-JustSearch is local-first: it indexes your local documents — PDF, email, Office, and most common document
+Use JustSearch as your main search app to find what is inside your files. It is local-first: it indexes your local documents — PDF, email, Office, and most common document
 formats (text extraction is backed by [Apache Tika](https://tika.apache.org/), plus OCR for scanned PDFs and
 images) — and answers questions over them with cited passages, **with indexing, retrieval, and built-in AI inference on your machine.**
 It combines three retrieval paradigms (keyword, dense-vector, learned-sparse) with a cross-encoder reranker,
