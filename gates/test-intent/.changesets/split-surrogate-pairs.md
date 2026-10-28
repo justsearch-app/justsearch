@@ -35,7 +35,7 @@ remain reserved for independent verification. No evidence generator is run or ev
       "sources": [
         {
           "kind": "defect-source",
-          "safeguard": "The extraction, preview, limit, parser-identity and stored-state checks named below.",
+          "safeguard": "no data loss",
           "reproduction": "On main, plain text with an emoji whose high surrogate is at decoded offset 4095 is stored with two U+FFFD in place of the emoji, for UTF-8 and UTF-16 with BOM, on both routes."
         },
         {
