@@ -259,13 +259,22 @@ def install_ai(run):
             if any(x in raw.lower() for x in ('connection reset', 'timed out', 'timeout', 'resolve host', 'http 503', 'http 502', 'http 429')):
                 raise RuntimeError('Production AI download failed; see J3-install-observations.json')
             raise AssertionError('Install AI failed: ' + raw)
+        if resumed:
+            runtime = run.api('/api/ai/runtime/status')
+            run.evidence('J3-resume-runtime', runtime)
+            features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
+            # installedFully can briefly be true before reboot initialization
+            # publishes activation_required. Only activation/runtime evidence
+            # settles a cached setup; an ambiguous idle state must keep waiting.
+            return status if status.get('phase') == 'activation_required' or all(
+                features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
         return status if (status.get('state') in ('completed', 'installed', 'succeeded')
-                          or status.get('installedFully') is True
-                          or resumed and status.get('phase') == 'activation_required') else None
-    status = wait_for(settled, 'Default CPU AI install', seconds=1800, interval=5)
+                          or status.get('installedFully') is True) else None
+    status = wait_for(settled, 'Default CPU AI install', seconds=900 if resumed else 1800, interval=5,
+                      error=Infrastructure if resumed else AssertionError)
     assert preview.get('downloadProfile') == 'CPU', 'Default plan did not select CPU'
     run.evidence('J3-downloaded', status)
-    if not resumed or not status.get('installedFully'):
+    if not resumed or status.get('phase') == 'activation_required':
         activate_downloaded(run)
     else:
         run.evidence('J3-activation-consent', {'restoredActivatedSetup': True,
@@ -309,7 +318,18 @@ def install_ai(run):
         features = {f['id']: f for f in observed.get('onnxFeatures', [])}
         return observed if all(features.get(name, {}).get('modelActive') is True
                                for name in ('embed', 'splade', 'reranker', 'citation_scorer')) else None
-    runtime = wait_for(models_active, 'All default retrieval models active after vector query', seconds=120, interval=3)
+    try:
+        runtime = wait_for(models_active, 'All default retrieval models active after vector query', seconds=120, interval=3)
+    except AssertionError as exc:
+        observed = run.api('/api/ai/runtime/status')
+        features = {f['id']: f for f in observed.get('onnxFeatures', [])}
+        flags = {name + '.modelActive': features.get(name, {}).get('modelActive')
+                 for name in ('embed', 'splade', 'reranker', 'citation_scorer')}
+        diagnostic = {'flags': flags, 'retrievalTrace': retrieval.get('searchTrace', {}), 'runtime': observed}
+        run.evidence('J3-model-activity-failure', diagnostic)
+        raise AssertionError(str(exc) + '; ' + ', '.join(
+            name + '=' + json.dumps(value) for name, value in flags.items())
+            + '; retrieval trace=' + json.dumps(diagnostic['retrievalTrace'])) from exc
     run.facts['ai'] = status
     return {'installed': status, 'runtime': runtime, 'cpuPlan': preview, 'activeRetrieval': retrieval, 'uiText': text}
 
@@ -698,7 +718,16 @@ def shortcut(run):
     wayland = run.args.lane.endswith('wayland')
     if wayland:
         assert '--focus-search' in section, 'Wayland did not explain the desktop shortcut alternative'
-        command = run.binary + ' --focus-search'
+        marker = run.work + '/shortcut-dispatched.json'
+        wrapper = run.work + '/shortcut-dispatch.sh'
+        script = ('#!/bin/sh\n'
+                  + "printf '{\"pid\":%s}\\n' \"$$\" > " + shlex.quote(marker) + ' || exit 1\n'
+                  + 'exec env ' + shlex.quote('QUAL_JOURNEY_RUN=' + run.run_id) + ' '
+                  + shlex.quote(run.binary) + ' --focus-search\n')
+        run.target.py('import json,sys;from pathlib import Path;v=json.loads(sys.argv[1]);'
+                      'Path(v[0]).unlink(missing_ok=True);p=Path(v[1]);p.write_text(v[2]);p.chmod(0o700)',
+                      [marker, wrapper, script])
+        command = shlex.quote(wrapper)
         # GNOME's supported desktop settings store; disposable guest only.
         path = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/justsearch-qual/'
         run.target.run(['gsettings', 'set', 'org.gnome.settings-daemon.plugins.media-keys', 'custom-keybindings', "['" + path + "']"])
@@ -718,13 +747,27 @@ def shortcut(run):
              if (w := run.native.focused_window()) else None,
              'Receiving viewer focused before shortcut', seconds=30, error=Infrastructure)
     run.native.key('win+ctrl+j' if wayland else 'alt+shift+space')
+    if wayland:
+        def dispatched():
+            invocation = run.target.json('import json,sys;from pathlib import Path;'
+                'p=Path(json.loads(sys.argv[1]));print(p.read_text() if p.exists() else "null")', marker)
+            run.evidence('J7-shortcut-dispatch', {'dispatched': invocation is not None,
+                'invocation': invocation, 'command': command, 'binding': '<Control><Super>j',
+                'compositorSession': {key: run.target.env.get(key) for key in
+                    ('XDG_SESSION_TYPE', 'WAYLAND_DISPLAY', 'XDG_CURRENT_DESKTOP')},
+                'focusedWindow': run.native.focused_window()})
+            return invocation
+        wait_for(dispatched, 'GNOME custom shortcut binding dispatch (wrapper invocation absent)',
+                 seconds=30, error=Infrastructure)
     wait_for(lambda: shortcut_receiver(run),
-             'Physical shortcut foregrounded search', seconds=30, error=Infrastructure)
+             'Physical shortcut foregrounded search', seconds=30,
+             error=AssertionError if wayland else Infrastructure)
     run.native.key('ctrl+a')
     query = QUERY + ' shortcut receiver'
     run.native.type(query)
     observed = wait_for(lambda: shortcut_receiver(run, query),
-                        'Physical shortcut focuses search', seconds=30, error=Infrastructure)
+                        'Physical shortcut focuses search', seconds=30,
+                        error=AssertionError if wayland else Infrastructure)
     run.native.shot('J7-physical-shortcut-search')
     return {'settings': section, 'physicalInput': observed}
 

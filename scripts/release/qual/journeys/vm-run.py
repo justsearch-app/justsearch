@@ -64,8 +64,8 @@ def parse_args():
     parser.add_argument('--mode', choices=['fresh', 'rerun'], default='fresh',
                         help='Fresh release qualification, or development-only snapshot reuse')
     parser.add_argument('--snapshot', type=Path, help='Stopped setup snapshot from an earlier fresh run')
-    parser.add_argument('--memory-mib', type=int, choices=[vm.MEMORY_MIB, 8192, 12288], default=vm.MEMORY_MIB)
-    parser.add_argument('--memory-reason', help='Evidence for a journey needing more than default memory')
+    parser.add_argument('--memory-mib', type=int, choices=[8192, 12288], default=vm.MEMORY_MIB)
+    parser.add_argument('--memory-reason', help='Evidence for a journey using nondefault memory')
     args = parser.parse_args()
     vm.owner()
     if not args.driver.is_file():
@@ -78,7 +78,7 @@ def parse_args():
     if args.mode == 'fresh' and args.snapshot:
         parser.error('Fresh qualification cannot inherit a setup snapshot')
     if args.memory_mib != vm.MEMORY_MIB and not args.memory_reason:
-        parser.error('Extra memory requires --memory-reason with journey evidence')
+        parser.error('Nondefault memory requires --memory-reason with journey evidence')
     if args.session == 'wayland' and args.mode == 'fresh' and (not args.predecessor or not args.mirror):
         parser.error('VM desktop lanes require --predecessor and --mirror for J5')
     return args

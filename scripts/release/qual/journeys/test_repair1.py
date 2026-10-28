@@ -19,7 +19,7 @@ def once(fn, description, *args, error=AssertionError, **kwargs):
 
 class RepairTests(unittest.TestCase):
     def test_shortcut_cannot_pass_when_mousepad_receives_query(self):
-        run = Mock(work='/tmp/own-run', binary='/usr/bin/JustSearch')
+        run = Mock(work='/tmp/own-run', binary='/usr/bin/JustSearch', run_id='own-run')
         run.args.lane = 'vm-linux-wayland'
         run.require.return_value = '/tmp/own-corpus'
         run.wd.execute.return_value = '--focus-search'
@@ -28,8 +28,9 @@ class RepairTests(unittest.TestCase):
         run.native.screen_text.return_value = 'Search v3 orchid lighthouse'
         run.native.focused_window.return_value = {'pid': 42, 'title': 'fixture — Mousepad'}
         run.native.app_window.return_value = None
+        run.target.json.return_value = {'pid': 123}
         with patch.object(linux, 'require_candidate'), patch.object(linux, 'wait_for', once):
-            with self.assertRaises(Infrastructure):
+            with self.assertRaisesRegex(AssertionError, 'foregrounded search'):
                 linux.shortcut(run)
         run.native.type.assert_not_called()
 

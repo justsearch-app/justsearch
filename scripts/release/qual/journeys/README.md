@@ -41,11 +41,11 @@ For the release host's clean VMs, first read the parent [harness README](../READ
 The wrapper waits for the harness, owns one fresh headless overlay at a time,
 joins the graphical session's display/runtime/D-Bus environment, caps native
 thread pools at eight, and stops only the VM run it started on every outcome.
-Default guest memory remains 6144 MiB. `--memory-mib 8192` or `12288` requires a
-`--memory-reason` naming the journey and its evidence: J3 activation exhausted
-the default memory and the kernel killed Java and the GNOME session in W4a.
-J5 recovery at 8192 MiB wrote 12.58 GB to swap; the bounded 12288 MiB
-comparison keeps swap enabled and records whether this reduces writes.
+Default guest memory is 12288 MiB for every lane, with eight pinned threads.
+Before launch, vm.py waits up to 15 minutes for host `/proc/meminfo`
+MemAvailable to reach 14 GiB, then refuses with a diagnostic if it remains lower.
+J3 and J5 exhausted 6144 MiB; J5 recovery at 8192 MiB wrote 12.58 GB to swap.
+The nondefault `--memory-mib 8192` requires `--memory-reason` with journey evidence.
 It installs tools **inside the guest**. No host sudo, desktop window or GPU is used.
 Supply a tauri-driver 2.0.4 binary built separately as qualification tooling.
 Between overlays it waits up to 90 seconds for the stopped guest's ports to be
@@ -62,13 +62,12 @@ python3 scripts/release/qual/journeys/vm-run.py \
   --registry /path/to/tagged/server.json \
   --predecessor /path/to/parent/JustSearch_0.3.0_amd64.deb \
   --mirror /path/to/signed-mirror-tree \
-  --driver /path/to/tauri-driver --evidence /path/to/new-wayland-evidence \
-  --memory-mib 12288 --memory-reason 'J3/J5: measured OOM at 6 GiB and multi-GB swap at 8 GiB; W4a evidence'
+  --driver /path/to/tauri-driver --evidence /path/to/new-wayland-evidence
 ```
 
 Repeat sequentially with `--session x11` and a new evidence directory; that
-lane runs J1 only. Omit `--predecessor`, `--mirror`, and the memory override and
-reason: X11 J1 uses the harness default.
+lane runs J1 only. Omit `--predecessor` and `--mirror`; X11 J1 uses the same
+12288 MiB harness default.
 For the hosted equivalent locally without installing anything on the host, use the
 same wrapper with `--session hosted` and omit `--predecessor`/`--mirror`. This
 runs the exact hosted entry point under Xvfb and D-Bus in a fresh Ubuntu VM.
@@ -112,10 +111,10 @@ python3 scripts/release/qual/journeys/vm-run.py \
 
 Only the named journeys run; prerequisites are restored from the stopped
 checkpoint, never silently rerun. Candidate snapshots support J4/J7/J8;
-predecessor snapshots support J5/J6. The experimental cached J3 path is
-unverified: reboot status can transiently report installedFully before changing
-to activation_required, causing the resume path to skip activation. Its timeout
-must not be attributed to the product. Use fresh J3 for acceptance. J1/J2 require a fresh lane
+predecessor snapshots support J5/J6. Cached J3 waits up to 15 minutes for
+activation_required or active runtime encoders before deciding whether to activate.
+It ignores transient installedFully status for that decision; an unsettled resume
+is an infrastructure failure. Use fresh J3 for acceptance. J1/J2 require a fresh lane
 (`--mode fresh --journeys J1 J2 J3`, with exactly the prerequisites required
 by that selection). Named fresh subsets and snapshot reruns set
 `execution.releaseQualification` to false. A failed setup assertion remains a
@@ -183,7 +182,10 @@ private signing key is needed or used for these tests.
   warm OS links run without WebDriver; the receiving app must be focused and
   its cropped top bar must name the destination. Shortcut input stays in a
   WebDriver session, where compositor focus, document focus, the actual focused
-  search control, and its exact newly typed value must agree.
+  search control, and its exact newly typed value must agree. The Wayland binding
+  runs a wrapper that records invocation before executing `--focus-search`. Missing
+  dispatch is infrastructure failure; dispatch followed by failed app/search focus
+  is product failure, with compositor session and focused-window evidence.
 - J8: release MCPB and tagged registry version/URL/checksum/platform checks;
   pinned Inspector CLI over stdio through the **extracted release bridge** for
   tools/list, status and a fixture-returning search.

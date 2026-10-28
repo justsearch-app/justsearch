@@ -33,7 +33,27 @@ OS = {
                 'sha256': 'bc3f24086ebadc94489066b5ad78089e2cf5c3491e90e790bb81a2b199c10e38'},
 }
 STATE = ROOT / 'running.json'
-MEMORY_MIB = 6144
+MEMORY_MIB = 12288
+
+
+def wait_host_memory():
+    deadline = time.monotonic() + 900
+    announced = False
+    while True:
+        try:
+            values = dict(line.split(':', 1) for line in Path('/proc/meminfo').read_text().splitlines())
+            available_kib = int(values['MemAvailable'].split()[0])
+        except (OSError, KeyError, ValueError, IndexError) as exc:
+            raise RuntimeError('Cannot read host MemAvailable from /proc/meminfo; refusing VM launch') from exc
+        if available_kib >= 14 * 1024 * 1024:
+            return
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f'VM requires host MemAvailable >= 14 GiB; only {available_kib / 1024 / 1024:.2f} GiB available after 900 seconds; refusing launch')
+        if not announced:
+            print('Waiting up to 900 seconds for host MemAvailable >= 14 GiB before VM launch',
+                  file=sys.stderr, flush=True)
+            announced = True
+        time.sleep(10)
 
 
 def run(*args, **kwargs):
@@ -257,6 +277,7 @@ def launch(os_name, disk, variables, visible=False, installer=None, lease=None):
     ensure_free(check_lock=False)
     if lease is None:
         raise RuntimeError('launch requires the VM lifetime lock')
+    wait_host_memory()
     cpus = sorted(os.sched_getaffinity(0))[:8]
     if len(cpus) != 8:
         raise RuntimeError('Eight allowed host threads are required')
