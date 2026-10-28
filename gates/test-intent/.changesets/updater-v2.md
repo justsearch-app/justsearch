@@ -100,7 +100,7 @@ are used. Relaunch and post-start reconciliation on installed Windows/Linux rema
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/updater-v2.json",
+      "evidence": "gates/test-intent/evidence/updater-round4-v2.json",
       "newChecks": [
         "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::producer_bytes_select_both_targets_and_cover_every_installed_store",
         "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::producer_bytes_enforce_metadata_signature_root_identity_and_rollback",

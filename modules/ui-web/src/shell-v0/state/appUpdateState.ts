@@ -101,18 +101,12 @@ async function checkAppUpdate(automatic: boolean): Promise<AppUpdateStatus> {
 export async function installAppUpdate(): Promise<void> {
   const current = snapshot;
   if (current) publish({ ...current, state: 'downloading' });
-  // Linux waits for the package manager (including its lock wait) before this command returns.
-  // Keep the existing recovery status current throughout that wait, without overlapping polls.
-  let pending: Promise<unknown> | undefined;
-  const timer = window.setInterval(() => {
-    pending ??= refreshAppUpdateStatus().finally(() => { pending = undefined; });
-  }, 1_000);
   try {
     await invoke<void>('install_app_update');
-  } finally {
-    window.clearInterval(timer);
-    await pending;
     await refreshAppUpdateStatus();
+  } catch (error) {
+    await refreshAppUpdateStatus();
+    throw error;
   }
 }
 

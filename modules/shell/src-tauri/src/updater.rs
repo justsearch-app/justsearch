@@ -2348,29 +2348,58 @@ fn reconcile_intent(
         }
     }
     write_json_atomic(path, &intent)?;
-    cleanup_committed_package(staging_root, &intent);
+    cleanup_committed_packages(staging_root, &intent);
     Ok(intent)
 }
 
-fn cleanup_committed_package(staging_root: &Path, intent: &UpgradeIntent) {
+fn cleanup_committed_packages(staging_root: &Path, intent: &UpgradeIntent) {
     if intent.phase != UpgradePhase::Committed {
         return;
     }
     // COMMITTED is already durable. A failed cleanup cannot undo reconciliation or turn a
     // healthy installation into repair-required; startup retries it from the committed intent.
     let result = (|| -> Result<(), String> {
-        let package = match fs::canonicalize(&intent.staged_artifact.path) {
-            Ok(path) => path,
+        let attempts = match fs::read_dir(staging_root) {
+            Ok(attempts) => attempts,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-            Err(error) => return Err(format!("Failed to resolve committed package: {error}")),
+            Err(error) => return Err(format!("Failed to read installer staging root: {error}")),
         };
-        let root = fs::canonicalize(staging_root)
-            .map_err(|error| format!("Failed to resolve installer staging root: {error}"))?;
-        if !package.starts_with(root) {
-            return Err("Committed package escaped the shell-owned staging root".into());
+        for attempt in attempts {
+            let attempt = attempt.map_err(|error| error.to_string())?;
+            // Never traverse links to directories outside shell staging.
+            if !attempt
+                .file_type()
+                .map_err(|error| error.to_string())?
+                .is_dir()
+            {
+                continue;
+            }
+            let directory = attempt.path();
+            let result = (|| -> std::io::Result<()> {
+                for name in ["JustSearch-update.deb", "JustSearch-update-setup.exe"] {
+                    // remove_file unlinks a package symlink without touching its target.
+                    match fs::remove_file(directory.join(name)) {
+                        Ok(()) => {}
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(error) => return Err(error),
+                    }
+                }
+                match fs::remove_dir(&directory) {
+                    Ok(()) => Ok(()),
+                    // Retain any unexpected contents; only packages and empty folders are ours
+                    // to remove. Other attempts can still be cleaned if this one fails.
+                    Err(error) if error.kind() == std::io::ErrorKind::DirectoryNotEmpty => Ok(()),
+                    Err(error) => Err(error),
+                }
+            })();
+            if let Err(error) = result {
+                eprintln!(
+                    "[updater] Failed to clean staged attempt {}: {error}",
+                    directory.display()
+                );
+            }
         }
-        fs::remove_file(package)
-            .map_err(|error| format!("Failed to delete committed update package: {error}"))
+        Ok(())
     })();
     if let Err(error) = result {
         eprintln!("[updater] {error}");
@@ -2660,7 +2689,7 @@ fn persist_intent_at(
     intent: &UpgradeIntent,
 ) -> Result<(), String> {
     write_json_atomic(&root.join("intent.v1.json"), intent)?;
-    cleanup_committed_package(&root.join("staged"), intent);
+    cleanup_committed_packages(&root.join("staged"), intent);
     set_intent_status(coordinator, intent);
     Ok(())
 }
@@ -3193,7 +3222,7 @@ mod tests {
     }
 
     #[test]
-    fn committed_reconciliation_removes_only_its_staged_package() {
+    fn committed_reconciliation_removes_all_staged_packages_and_empty_attempts() {
         for name in ["JustSearch-update.deb", "JustSearch-update-setup.exe"] {
             let fixture = evidence_fixture(UpgradePhase::Reconciling);
             let root = fixture.intent_path.parent().unwrap();
@@ -3202,10 +3231,20 @@ mod tests {
             let package = Path::new(&intent.staged_artifact.path).with_file_name(name);
             fs::rename(&intent.staged_artifact.path, &package).unwrap();
             intent.staged_artifact.path = package.to_string_lossy().into_owned();
-            let other_package = fixture.staging_root.join("other-attempt.deb");
+            let old_attempt = fixture.staging_root.join("cancelled-attempt");
+            let failed_attempt = fixture.staging_root.join("failed-attempt");
+            let empty_attempt = fixture.staging_root.join("empty-attempt");
+            for attempt in [&old_attempt, &failed_attempt, &empty_attempt] {
+                fs::create_dir_all(attempt).unwrap();
+            }
+            let other_package = old_attempt.join("JustSearch-update.deb");
+            let failed_package = failed_attempt.join("JustSearch-update-setup.exe");
             fs::write(&other_package, fixture_installer_bytes()).unwrap();
+            fs::write(&failed_package, fixture_installer_bytes()).unwrap();
             persist_intent_at(root, &coordinator, &intent).unwrap();
             assert!(package.exists(), "reconciliation is not yet committed");
+            assert!(other_package.exists(), "keep cancelled packages before commit");
+            assert!(failed_package.exists(), "keep failed packages before commit");
             apply_reconciliation_outcome(&mut intent, Ok(())).unwrap();
             persist_intent_at(root, &coordinator, &intent).unwrap();
             assert_eq!(
@@ -3217,7 +3256,19 @@ mod tests {
                 false,
                 "the durably committed update package must be deleted: {name}"
             );
-            assert!(other_package.exists(), "other attempts must not be swept");
+            assert_eq!(
+                other_package.exists(), false,
+                "delete the older cancelled package"
+            );
+            assert_eq!(
+                failed_package.exists(), false,
+                "delete the older failed package"
+            );
+            for attempt in [
+                package.parent().unwrap(), &old_attempt, &failed_attempt, &empty_attempt,
+            ] {
+                assert_eq!(attempt.exists(), false, "delete empty attempt folders");
+            }
             assert!(fixture.witness_path.exists(), "keep the launch evidence");
             fs::remove_dir_all(root).unwrap();
         }
@@ -3228,6 +3279,13 @@ mod tests {
         let fixture = evidence_fixture(UpgradePhase::Committed);
         let package = fixture.intent.staged_artifact.path.clone();
         let root = fixture.intent_path.parent().unwrap();
+        // A prior cleanup may have deleted the committed package before it was interrupted.
+        fs::remove_file(&package).unwrap();
+        let old_attempt = fixture.staging_root.join("cancelled-attempt");
+        fs::create_dir_all(&old_attempt).unwrap();
+        fs::write(
+            old_attempt.join("JustSearch-update.deb"), fixture_installer_bytes(),
+        ).unwrap();
         let reconciled = reconcile_intent(
             &fixture.intent_path,
             &fixture.witness_path,
@@ -3241,6 +3299,11 @@ mod tests {
             Path::new(&package).exists(),
             false,
             "startup retries cleanup after a crash following durable commit"
+        );
+        assert_eq!(fixture.staging_root.join("attempt-1").exists(), false);
+        assert_eq!(
+            old_attempt.exists(), false,
+            "startup removes older attempts too"
         );
         fs::remove_dir_all(root).unwrap();
     }
@@ -3292,8 +3355,19 @@ mod tests {
         fs::write(&package, fixture_installer_bytes()).unwrap();
         fs::remove_file(&fixture.intent.staged_artifact.path).unwrap();
         std::os::unix::fs::symlink(&package, &fixture.intent.staged_artifact.path).unwrap();
+        let outside_attempt = outside.path().join("attempt-outside");
+        fs::create_dir_all(&outside_attempt).unwrap();
+        let outside_package = outside_attempt.join("JustSearch-update.deb");
+        fs::write(&outside_package, fixture_installer_bytes()).unwrap();
+        std::os::unix::fs::symlink(
+            &outside_attempt, fixture.staging_root.join("linked-attempt"),
+        ).unwrap();
         persist_intent_at(root, &UpdateCoordinator::default(), &fixture.intent).unwrap();
         assert!(package.exists());
+        assert!(
+            outside_package.exists(),
+            "never traverse a linked attempt folder"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -3571,7 +3645,7 @@ mod tests {
             .unwrap()
             .keep();
         let staging_root = directory.join("staged");
-        let staged_path = staging_root.join("attempt-1").join("installer.exe");
+        let staged_path = staging_root.join("attempt-1").join("JustSearch-update-setup.exe");
         fs::create_dir_all(staged_path.parent().unwrap()).unwrap();
         fs::write(&staged_path, fixture_installer_bytes()).unwrap();
         let staged = StagedArtifact {

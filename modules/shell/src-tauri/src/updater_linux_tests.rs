@@ -29,7 +29,7 @@ fn linux_install_exit_classification_preserves_old_engine_only_when_safe() {
                 .unwrap_err();
             assert_eq!(error.repair_required, changed);
             if changed {
-                assert!(error.message.contains("sudo apt install ./update.deb"));
+                assert!(error.message.contains("sudo apt install '/staged/update.deb'"));
             }
         }
     }
@@ -42,6 +42,14 @@ fn linux_install_exit_classification_preserves_old_engine_only_when_safe() {
         .unwrap_err()
         .repair_required
     );
+    let error = classify_install(
+        Ok(ExitStatus::from_raw(100 << 8)),
+        || Ok(false),
+        Path::new("/staged/older attempt's/update.deb"),
+    ).unwrap_err();
+    assert!(error.message.contains(
+        r#"sudo apt install '/staged/older attempt'\''s/update.deb'"#
+    ));
 }
 
 #[test]

@@ -34,13 +34,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it.each(['success', 'cancelled', 'repair'] as const)('routes the running Linux app to its existing updating surface throughout the installer lock wait and stops polling after %s', async (outcome) => {
+it.each(['success', 'cancelled', 'repair'] as const)('routes the running Linux app to its existing updating surface throughout the installer lock wait and exposes the final status after %s', async (outcome) => {
   vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Linux x86_64');
   const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
   let finish!: () => void;
   const waiting = new Promise<void>((resolve) => { finish = resolve; });
   let state = 'available';
-  const repairInstruction = 'Reinstall manually: sudo apt install ./JustSearch-update.deb';
+  const repairInstruction = "Reinstall manually: sudo apt install '/staged/attempt-1/JustSearch-update.deb'";
   mocks.invoke.mockImplementation((command: string) => {
     if (command === 'factory_reset_status') return Promise.resolve({ phase: 'idle', remaining: [] });
     if (command === 'supervisor_state') return Promise.resolve(running);

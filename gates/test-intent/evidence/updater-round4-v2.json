@@ -1,0 +1,172 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T01:46:45.511Z",
+  "revision": "c138996c9e8253e2f5429ed18a723e7f9148cb5e",
+  "tree": "56755be4363c68a4077946c0f86ee07479a3ead3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::producer_bytes_select_both_targets_and_cover_every_installed_store\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5404
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::producer_bytes_enforce_metadata_signature_root_identity_and_rollback\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1971
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::tauri_download_verifies_producer_deb_and_rejects_mismatched_signature\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2361
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::authenticated_deb_bytes_pass_download_validation\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2239
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::linux_installer::tests::linux_install_exit_classification_preserves_old_engine_only_when_safe\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2174
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::linux_installer::tests::deb_format_requires_complete_version_member\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1950
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::linux_fake_pkexec_handoff_records_exact_arguments_and_recovers_or_holds\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 31531
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::producer_bytes_select_both_targets_and_cover_every_installed_store",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:aa67ee577fcd312ac02345bdfc8831488ec74b8c5613e15ce3ea79caedd5debb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::producer_bytes_select_both_targets_and_cover_every_installed_store",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::producer_bytes_enforce_metadata_signature_root_identity_and_rollback",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:aa67ee577fcd312ac02345bdfc8831488ec74b8c5613e15ce3ea79caedd5debb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::producer_bytes_enforce_metadata_signature_root_identity_and_rollback",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::tauri_download_verifies_producer_deb_and_rejects_mismatched_signature",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:aa67ee577fcd312ac02345bdfc8831488ec74b8c5613e15ce3ea79caedd5debb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::tauri_download_verifies_producer_deb_and_rejects_mismatched_signature",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::authenticated_deb_bytes_pass_download_validation",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:aa67ee577fcd312ac02345bdfc8831488ec74b8c5613e15ce3ea79caedd5debb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::authenticated_deb_bytes_pass_download_validation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_linux_tests.rs#updater::linux_installer::tests::linux_install_exit_classification_preserves_old_engine_only_when_safe",
+      "file": "modules/shell/src-tauri/src/updater_linux_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:c4beba7e2f10ea664fda8bc9bfb803413eff94045c14a9374ccb45d9934963f4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::linux_installer::tests::linux_install_exit_classification_preserves_old_engine_only_when_safe",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_linux_tests.rs#updater::linux_installer::tests::deb_format_requires_complete_version_member",
+      "file": "modules/shell/src-tauri/src/updater_linux_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:c4beba7e2f10ea664fda8bc9bfb803413eff94045c14a9374ccb45d9934963f4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::linux_installer::tests::deb_format_requires_complete_version_member",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::linux_fake_pkexec_handoff_records_exact_arguments_and_recovers_or_holds",
+      "file": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f891f3a405bc870e0587345592c74ad76ab87fdff306c86f3e64bef4e7286e9b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::handoff_tests::linux_fake_pkexec_handoff_records_exact_arguments_and_recovers_or_holds",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:333ef7dcd4d3214dc362c1005a6e7d7e576b0edbc8e891c1761863078a702aed"
+}

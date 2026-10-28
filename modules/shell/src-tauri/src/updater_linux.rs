@@ -155,8 +155,8 @@ fn classify_install(
             match unchanged() {
                 Ok(true) => Err(failure.into()),
                 state => Err(InstallerError {
-                    message: format!("{failure}; installed package changed or could not be checked ({state:?}). Reinstall manually: sudo apt install ./{}",
-                        path.file_name().unwrap_or_default().to_string_lossy()),
+                    message: format!("{failure}; installed package changed or could not be checked ({state:?}). Reinstall manually: sudo apt install '{}'",
+                        path.to_string_lossy().replace('\'', "'\\''")),
                     repair_required: true,
                 }),
             }
