@@ -89,3 +89,14 @@ per-file acquisition isolation and optional-only gaps remain covered.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-93q2qotz",
+  "verdict": "accept",
+  "digest": "sha256:1049e3071b7299b847f916123ce649e4defbe2c4082d73eeefb58896e002bc57",
+  "note": "Classifications and repository-wide conflict search independently reviewed. Prior independent baseline/candidate behaviour verification retained as expressly permitted by the brief."
+}
+```
