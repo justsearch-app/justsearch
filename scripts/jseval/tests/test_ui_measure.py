@@ -203,7 +203,9 @@ class TestStatusFactsVisibility:
 
 def test_geometry_rejects_hidden_and_closed_details_and_does_not_count_their_scrollers():
     from jseval.ui_measure import _JS_GEOMETRY
-    from playwright.sync_api import sync_playwright
+    sync_playwright = pytest.importorskip(
+        "playwright.sync_api", reason="playwright (the ui-shot harness dependency) not installed",
+    ).sync_playwright
     with sync_playwright() as runtime:
         browser = runtime.chromium.launch(headless=True, args=["--disable-gpu"])
         try:
