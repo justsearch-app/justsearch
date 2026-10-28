@@ -102,7 +102,7 @@ with results reported in the handback. Formal evidence and acceptance remain the
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java"
       ],
       "class": "New",
-      "behaviour": "The extraction policy version advances to v5 in default, blank/null/empty fallback and configured-limits identities; literal policy-id expectations and format-capability provenance fixtures advance with it. Existing policy-only files retain every other expectation; entry 1 accounts for the new extraction checks. A real reused and replaced child returns both the default and configured v4 identities and validates against the parent policy.",
+      "behaviour": "The extraction policy version advances to v5 in default, blank/null/empty fallback and configured-limits identities; literal policy-id expectations and format-capability provenance fixtures advance with it. Existing policy-only files retain every other expectation; entry 1 accounts for the new extraction checks. A real reused and replaced child returns both the default and configured v5 identities and validates against the parent policy.",
       "sources": [
         {
           "kind": "delegated-choice",
