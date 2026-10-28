@@ -4704,6 +4704,8 @@ export class SearchV3View extends JfElement {
             settle('left');
             return;
           }
+          // A terminal Structured turn without accepted output is final, never a retryable
+          // delivery uncertainty or an answer for the next turn's context.
           if (code === 'NO_CONTENT') this.retireHumanTask(task);
           else { task.saved.delivery = 'unknown'; task.revoked = true; this.saveRecovery(task); }
           const noEvidence = shapeId === SV3_ASK_SHAPE_ID && code === 'NO_CONTENT' && scope === null;

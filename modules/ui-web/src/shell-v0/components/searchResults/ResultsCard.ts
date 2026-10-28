@@ -58,7 +58,6 @@ import {
 } from '../../utils/searchResultFormatters.js';
 import { ReceiptController } from '../../primitives/receiptController.js';
 import { openContextMenu } from '../ContextMenu.js';
-import { setMenuAnchor } from '../../utils/selectionAnchor.js';
 import { recordOpenDisposition } from '../../state/searchState.js';
 import { copyToClipboard } from '../../utils/clipboardCopy.js';
 import { formatRelative } from '../../utils/relativeTime.js';
@@ -309,13 +308,6 @@ export class ResultsCard extends JfElement {
       return;
     }
     if (!explicit) recordOpenDisposition(hit.id);
-    const rowEl = event.currentTarget as HTMLElement | null;
-    if (rowEl) {
-      const rect = rowEl.getBoundingClientRect();
-      if (rect.width > 0 || rect.height > 0) {
-        setMenuAnchor({ top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right });
-      }
-    }
     let nextIds: Set<string>;
     if (event.shiftKey && this.anchorIndex >= 0 && this.anchorIndex < hits.length && clickedIndex >= 0) {
       const start = Math.min(this.anchorIndex, clickedIndex);

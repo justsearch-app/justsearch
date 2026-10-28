@@ -9,7 +9,7 @@ import '../views/SystemSelfView.js';
 import './TaskList.js';
 import './StatusDeck.js';
 import './LivenessReadout.js';
-import '../views/UnifiedChatView.js';
+import '../views/search-v3/SearchV3View.js';
 import './CapabilityMap.js';
 import { __feedForTest, __resetAiStateForTest, __tickClockForTest, getAiState, type AiState, type StatusSnapshot } from '../state/aiStateStore.js';
 import { __resetTasksForTest, upsertMirroredTask } from '../substrates/tasks/index.js';
@@ -87,11 +87,11 @@ function expectedReason(which: Case): string {
 }
 function unconfirmed(which: Case) { return ['age', 'explicit stale', 'Engine gone'].includes(which); }
 
-beforeEach(() => { vi.useFakeTimers(); __resetAiStateForTest(); __resetTasksForTest(); });
+beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => new Response('{}'))); vi.useFakeTimers(); __resetAiStateForTest(); __resetTasksForTest(); });
 afterEach(async () => {
   __resetAiStateForTest(); __resetTasksForTest(); __resetPresentationForTest();
   await Promise.resolve();
-  vi.useRealTimers();
+  document.body.replaceChildren(); vi.unstubAllGlobals(); vi.useRealTimers();
 });
 
 describe('WP3.3 complete surface sweep', () => {
@@ -332,15 +332,27 @@ describe('WP3.3 complete surface sweep', () => {
     }
   });
 
-  it('S33.4 shipped Search banner qualifies index diagnostics on the real renderer', () => {
+  it('S33.4 shipped Search banner qualifies index diagnostics on the real renderer', async () => {
     for (const which of CASES) {
       const state = observe(which);
       state.verdict = { kind: 'degraded', severity: 'warn', reasons: ['index.throughput_stalled'] };
-      const el = harness('jf-unified-chat-view', state);
-      const banner = dom(el.renderDegradationBanner());
+      const banner = await searchBanner(state);
       if (unconfirmed(which)) expect(banner.textContent, which).toContain(UNCONFIRMED);
       else expect(banner.textContent, which).toContain('Semantic search degraded');
     }
   });
 
 });
+
+type MountedSearch = HTMLElement & { updateComplete: Promise<unknown>; requestUpdate(): void };
+async function searchBanner(state: AiState): Promise<HTMLElement> {
+  const view = document.createElement('jf-sv3-window') as MountedSearch;
+  document.body.append(view); await view.updateComplete;
+  Object.assign(view, { aiSnapshot: state }); view.requestUpdate(); await view.updateComplete;
+  const composer = view.shadowRoot!.querySelector('jf-sv3-composer') as MountedSearch;
+  expect(composer, 'positive mounted Search witness').not.toBeNull(); await composer.updateComplete;
+  const banner = composer.shadowRoot!.querySelector<HTMLElement>('[data-testid="sv3-degradation"]');
+  expect(banner).not.toBeNull();
+  expect(banner!.querySelector('[aria-live], [role="status"], [role="alert"]')).toBeNull();
+  view.remove(); return banner!;
+}

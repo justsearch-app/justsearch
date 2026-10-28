@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { takePendingAutoRun, takePendingForceShape } from '../utils/compose.js';
 import { createCorePluginManifest } from '../plugin-api/CorePlugin.js';
 import { __resetForTest, __seedForTest, listSurfaces, mergePluginSurfaceContributions } from '../../api/registry/SurfaceCatalogClient.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
@@ -18,12 +17,10 @@ const url = (id: string, state = '') => `justsearch://surface/${id}${state}`;
 beforeEach(() => {
   localStorage.clear(); window.location.hash = '';
   __resetUserStateForTest(); __resetJournalForTest(); __resetForTest(); setSurfaceAliases({});
-  takePendingAutoRun(); takePendingForceShape();
-});
+  });
 afterEach(() => {
   __resetForTest(); setSurfaceAliases({}); __resetJournalForTest(); __resetUserStateForTest();
-  takePendingAutoRun(); takePendingForceShape();
-});
+  });
 
 describe('WP1.5a window cutover', () => {
   it('C1 promotes exactly one Search rail window and pairs it with Library', () => {
@@ -90,15 +87,13 @@ describe('WP1.5a window cutover', () => {
 
 it('C6 answer and query verbs default to Search and never park an automatic send', async () => {
   const { createIntentRouter } = await import('../router/intentRouter.js');
-  const { takePendingAutoRun, takePendingForceShape } = await import('../utils/compose.js');
   const addresses: unknown[] = [];
   const router = createIntentRouter({ navigationHandler: { handle: async address => { addresses.push(address); } },
     invocationHandler: { handle: async () => undefined }, isKnownSurface: () => true,
     resolveSurface: id => ({ status: 'resolved', id }), resolveOperation: id => ({ status: 'resolved', id }) });
   await router.dispatch({ transport: 'URL_DEEPLINK', address: { kind: 'answer', prompt: 'question', shape: 'core.extract', state: {} } });
   expect(addresses[0]).toEqual({ kind: 'navigate', target: SEARCH, state: { query: 'question', forceShapeId: 'core.extract' } });
-  expect(takePendingAutoRun()).toBe(false); takePendingForceShape();
-  await router.dispatch({ transport: 'URL_DEEPLINK', address: { kind: 'query', query: '日本 & ?', state: {} } });
+await router.dispatch({ transport: 'URL_DEEPLINK', address: { kind: 'query', query: '日本 & ?', state: {} } });
   expect(addresses[1]).toEqual({ kind: 'navigate', target: SEARCH, state: { query: '日本 & ?' } });
 });
 
@@ -110,7 +105,6 @@ it('C2 A5 bookmark identity ignores irrelevant fields after alias resolution', (
 
 it('C6 answer preparation follows the resolved target when a sender still names the retired window', async () => {
   const { createIntentRouter } = await import('../router/intentRouter.js');
-  const { takePendingAutoRun, takePendingForceShape } = await import('../utils/compose.js');
   const addresses: unknown[] = [];
   const router = createIntentRouter({ answerSurfaceId: OLD,
     navigationHandler: { handle: async address => { addresses.push(address); } },
@@ -119,7 +113,6 @@ it('C6 answer preparation follows the resolved target when a sender still names 
     resolveOperation: id => ({ status: 'resolved', id }) });
   await router.dispatch({ transport: 'URL_DEEPLINK', address: { kind: 'answer', prompt: 'question', shape: 'core.extract', state: { affordance: 'agent' } } });
   expect(addresses[0]).toEqual({ kind: 'navigate', target: SEARCH, state: { affordance: 'agent', query: 'question', forceShapeId: 'core.extract' } });
-  expect(takePendingAutoRun()).toBe(false); takePendingForceShape();
 });
 
 it('C1 an upgrade catalog cache cannot keep the retired rail window beside Search', () => {

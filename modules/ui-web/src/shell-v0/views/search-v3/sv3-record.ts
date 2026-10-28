@@ -541,6 +541,9 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
         ? { ...agentDeltaEvidence(turn.groundingDeltas), retrievalMode: '' }
         : null);
     const model = turn.declaredShapeId === 'core.free-chat';
+    // Extract records hold accepted output only; an empty terminal is no successful result.
+    const missingStructuredResult = turn.declaredShapeId === 'core.extract'
+      && turn.answers.every(answer => answer === '');
     const unfinished = !agent && (model || turn.declaredShapeId === 'core.rag-ask')
       && turn.openedByUser && turn.answers.length === 0 && !turn.errored && !turn.noEvidence;
     return {
@@ -561,9 +564,9 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       shapeId: turn.declaredShapeId ?? undefined,
       ...(turn.selectionKind === undefined ? {} : { selectionKind: turn.selectionKind }),
       question: turn.question,
-      answer: turn.answers.join('\n\n'),
+      answer: missingStructuredResult ? '' : turn.answers.join('\n\n'),
       // The same messages, kept apart: what a follow-up's context is built from (S2.0).
-      answerMessages: turn.answerMessages,
+      answerMessages: missingStructuredResult ? [] : turn.answerMessages,
       // Live audit 2026-08-25 (D3) — ONE vocabulary for one run. A cancelled run logs an error entry
       // on its way down, so deriving the status from `errored` alone made the record call it `failed`
       // while the live tail called it `stopped by you` — the same run telling the reader two stories,
@@ -586,11 +589,11 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
         ? 'halted'
         : turn.noEvidence
           ? 'no-evidence'
-          : turn.errored || unfinished
+          : turn.errored || unfinished || missingStructuredResult
           ? 'failed'
           : 'complete',
       evidence,
-      detail: unfinished ? 'No answer was saved. This attempt may be unfinished or interrupted; you can try again.' : turn.errorDetail,
+      detail: missingStructuredResult && !turn.errored ? 'No result was returned.' : unfinished ? 'No answer was saved. This attempt may be unfinished or interrupted; you can try again.' : turn.errorDetail,
       toolCalls: turn.tools,
       // An ASK turn's whole response is its answer text, which the transcript already renders through
       // the shared markdown block — handing it a one-item activity list would mean two ways to draw

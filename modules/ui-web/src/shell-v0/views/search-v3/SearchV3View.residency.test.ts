@@ -743,7 +743,7 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
     const schema = composer(el).shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid=sv3-composer-schema]')!;
     schema.value = '{"type":"object"}'; schema.dispatchEvent(new Event('input')); await settle(el); await send(el, 'A');
     http.mockImplementation(async (url: unknown) => String(url).includes('/load-anyway') ? new Response('{}', { status: 202 })
-      : String(url).includes('/dispatch') ? done() : new Response('{}'));
+      : String(url).includes('/dispatch') ? new Response('event: done\ndata: {"finalResponse":"{}"}\n\n', { headers: { 'content-type': 'text/event-stream' } }) : new Response('{}'));
     clickAction(el, 'sv3-residency-force'); await settle(el);
     expect(dispatches()).toHaveLength(2); expect(body(1)).toMatchObject({ shapeId: 'core.extract', selection: { kind: 'result-set', items: [{ id: '/A.txt', kind: 'doc' }] } });
     expect(composer(el).scopeLabel).toBe('');

@@ -21,6 +21,7 @@
  *    this listener).
  */
 
+import { canonicalComponentTag } from '../../shell-v0/renderers/componentIdentity.js';
 import { canonicalSurfaceId } from '../../shell-v0/router/surfaceIdentity.js';
 import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 import type {
@@ -95,7 +96,7 @@ const VALID_FACTORIES = new WeakSet<SurfaceFactory>();
  * tag string and the unsafeStatic dispatch primitive.
  */
 function mintFactory(entry: Surface): SurfaceFactory {
-  const tag = entry.mountTag;
+  const tag = canonicalComponentTag(entry.mountTag);
   const surfaceId = entry.id;
   // Slice 491 F2: surfaces hosting a chat shape (mountTag === 'jf-chat-shape-mount')
   // declare their consumed shape via consumes.conversationShapes. The factory closes

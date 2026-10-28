@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tempdoc": 553,
-  "tempdoc559": "Elevated by tempdoc 559 Authority IV: the register is now the single authority for which EVIDENCE records exist and who projects them \u2014 SearchTrace (search-ranking 'why') and ContextCitation (RAG-retrieval citations) are sibling registered records (see siblingRecords). They share no field and never co-occur (the RAG ask flow emits no trace), so they are NOT one mega-record; the one authority is one level up \u2014 'what evidence exists + who renders it'. The FE citation UI projects a shared evidence view-model (EvidenceItem / evidenceProjection.ts) with a labeled score; the ranking 'why' projects SearchTrace. A new unaligned *Citation referencer now fails this same gate.",
+  "tempdoc559": "Elevated by tempdoc 559 Authority IV: the register is now the single authority for which EVIDENCE records exist and who projects them — SearchTrace (search-ranking 'why') and ContextCitation (RAG-retrieval citations) are sibling registered records (see siblingRecords). They share no field and never co-occur (the RAG ask flow emits no trace), so they are NOT one mega-record; the one authority is one level up — 'what evidence exists + who renders it'. The FE citation UI projects a shared evidence view-model (EvidenceItem / evidenceProjection.ts) with a labeled score; the ranking 'why' projects SearchTrace. A new unaligned *Citation referencer now fails this same gate.",
   "note": "The execution-surface register (tempdoc 553 pillar c). The SINGLE allowlist of code that may describe 'what the search pipeline did' OR carry/project retrieval evidence (559 Authority IV). Every surface here is a governed projection/consumer of one of the registered records; it is NOT permitted to model execution/evidence independently. New production code that references the canonical SearchTrace type OR the ContextCitation/RetrievalCitation evidence record MUST be added here, or the `execution-surface` gate fails the build. This file is also the discovery oracle: a new agent consults it to find where the trace/evidence is already touched (do not re-author  -  project). HONEST LIMIT (553 section 5): the gate guards this DECLARED seam (canonical-type usage + the named guards); it cannot detect an undeclared fork that re-models execution from scratch without referencing a registered type. That residue is for review + the Phase-3 discovery checkpoint. Lane F F-5: retained worker-services, indexer-worker and worker-core module paths predate the Engine merge and do not imply separate processes.",
   "canonicalRecord": {
     "name": "SearchTrace",
@@ -19,13 +19,13 @@
       "definition": "modules/app-api/src/main/java/io/justsearch/app/api/DocumentService.java",
       "feMirror": "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.ts (RetrievalCitation)",
       "feProjection": "modules/ui-web/src/shell-v0/components/chat/evidenceProjection.ts (EvidenceItem + a labeled EvidenceScore)",
-      "note": "RAG-retrieval evidence \u2014 the citations behind a generated answer (parentDocId, score, excerpt, startLine/endLine/headingText). The sibling of SearchTrace (559 Authority IV): a SECOND evidence record, NOT a SearchTrace projection (no shared field; the RAG ask flow emits no trace). Registered here so it cannot drift unregistered. PRODUCER-OWNED BOUNDARY (559 \u00a75, cross-process follow-up): the excerpt is a backend character window (startChar/endChar) that clips mid-word; the boundary-aware fields (startLine/endLine/headingText) already ride alongside and should drive a clean window at the Worker that mints the record \u2014 the FE never re-windows. Logged in docs/observations.md. TEMPDOC 849 (retrieved-vs-received): the record gained an `inclusion` component (DocumentService.ContextInclusion \u2014 included/partial/dropped, plus ABSENT). It is DERIVED AT THE HEAD'S CUT from two inputs \u2014 ContextBudgeter.Section (which carries the worker's own `truncated` flag, and was built for exactly this: 'Phase 4: structured section tracking for citation filtering on truncation', never consumed for it) AND the head's own budget decision about how many of those sections the prompt could hold. Calling it 'a projection of Section' alone would be wrong: Section cannot know what the head's token budget did to it. What makes it a projection rather than a fork is that it adds no second POSITIONAL authority \u2014 it rides the existing citation record, deliberately not a parallel index-aligned list, which is the fork this register exists to prevent. Constructed ABSENT everywhere (the CHUNK_INDEX_ABSENT idiom: the Worker cannot know it, because the head's cut has not run) and resolved exactly once, at RAGContext's cut, via the immutable withInclusion(...). Absence discipline mirrors SourceExamination (836): an absent state emits NO key on any wire, so a consumer told nothing says nothing rather than assuming 'included'. Containment likewise: a budget fact never feeds a grounding tier, count, or score."
+      "note": "RAG-retrieval evidence — the citations behind a generated answer (parentDocId, score, excerpt, startLine/endLine/headingText). The sibling of SearchTrace (559 Authority IV): a SECOND evidence record, NOT a SearchTrace projection (no shared field; the RAG ask flow emits no trace). Registered here so it cannot drift unregistered. PRODUCER-OWNED BOUNDARY (559 §5, cross-process follow-up): the excerpt is a backend character window (startChar/endChar) that clips mid-word; the boundary-aware fields (startLine/endLine/headingText) already ride alongside and should drive a clean window at the Worker that mints the record — the FE never re-windows. Logged in docs/observations.md. TEMPDOC 849 (retrieved-vs-received): the record gained an `inclusion` component (DocumentService.ContextInclusion — included/partial/dropped, plus ABSENT). It is DERIVED AT THE HEAD'S CUT from two inputs — ContextBudgeter.Section (which carries the worker's own `truncated` flag, and was built for exactly this: 'Phase 4: structured section tracking for citation filtering on truncation', never consumed for it) AND the head's own budget decision about how many of those sections the prompt could hold. Calling it 'a projection of Section' alone would be wrong: Section cannot know what the head's token budget did to it. What makes it a projection rather than a fork is that it adds no second POSITIONAL authority — it rides the existing citation record, deliberately not a parallel index-aligned list, which is the fork this register exists to prevent. Constructed ABSENT everywhere (the CHUNK_INDEX_ABSENT idiom: the Worker cannot know it, because the head's cut has not run) and resolved exactly once, at RAGContext's cut, via the immutable withInclusion(...). Absence discipline mirrors SourceExamination (836): an absent state emits NO key on any wire, so a consumer told nothing says nothing rather than assuming 'included'. Containment likewise: a budget fact never feeds a grounding tier, count, or score."
     },
     {
       "name": "EvidenceSpan",
       "tempdoc": 775,
       "definition": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/evidence/EvidenceSpan.java",
-      "note": "775 step 1: the answer-bearing selection authority \u2014 which window of a document IS the evidence, minted worker-side once at retrieval time by EvidenceSpanSelector at the HighlightingOps.computeExcerptRegions locus (full-content MemoryIndex pass). The THIRD sibling evidence record: a projection substrate UNDER both ExcerptRegion (delivery) and ContextCitation.excerpt (RAG, step 2), NOT a SearchTrace projection \u2014 no shared field, same reasoning that keeps SearchTrace/ContextCitation siblings (decision (a), 775 deferred item: new-sibling not a ContextCitation generalization, since search excerpts have no parentDocId semantics for a chunkless doc). Selection is answer-bearing (query-term AND distinguishing-entity coverage) and D-005-clean (reacts to query + document content, never corpus identity). Fields: parentDocId, charStart/charEnd, lineStart/lineEnd, headingText, text, and selection provenance selectingLegs + entityCoverage. Step 1 wires only the delivery projection (ExcerptRegion); flag-gated (search.evidence_span.enabled, default off \u2014 flag-off reproduces the IDF-only delivery excerpt byte-for-byte)."
+      "note": "775 step 1: the answer-bearing selection authority — which window of a document IS the evidence, minted worker-side once at retrieval time by EvidenceSpanSelector at the HighlightingOps.computeExcerptRegions locus (full-content MemoryIndex pass). The THIRD sibling evidence record: a projection substrate UNDER both ExcerptRegion (delivery) and ContextCitation.excerpt (RAG, step 2), NOT a SearchTrace projection — no shared field, same reasoning that keeps SearchTrace/ContextCitation siblings (decision (a), 775 deferred item: new-sibling not a ContextCitation generalization, since search excerpts have no parentDocId semantics for a chunkless doc). Selection is answer-bearing (query-term AND distinguishing-entity coverage) and D-005-clean (reacts to query + document content, never corpus identity). Fields: parentDocId, charStart/charEnd, lineStart/lineEnd, headingText, text, and selection provenance selectingLegs + entityCoverage. Step 1 wires only the delivery projection (ExcerptRegion); flag-gated (search.evidence_span.enabled, default off — flag-off reproduces the IDF-only delivery excerpt byte-for-byte)."
     }
   ],
   "scan": {
@@ -49,9 +49,9 @@
       ".test.tsx"
     ],
     "executionSpanNameRegex": "search/[a-z_]+",
-    "executionSpanNameNote": "553 Phase B Check 5: any Java-main file emitting a search/* span-name literal must be a registered surface (catches the span-tree fork class that doesn't import the canonical type). String-literal heuristic \u2014 \u00a75 honest limit.",
+    "executionSpanNameNote": "553 Phase B Check 5: any Java-main file emitting a search/* span-name literal must be a registered surface (catches the span-tree fork class that doesn't import the canonical type). String-literal heuristic — §5 honest limit.",
     "expectedMinPopulation": 12,
-    "expectedMinPopulationNote": "tempdoc 576 \u00a75 vacuous-pass guard: the auto-scan must detect >= this many canonical-type-referencing files, else a renamed scan root would let every coverage check pass vacuously. Live count restamped to 28 (2026-08-20, tempdoc 859 \u00a77 amendment 5 \u2014 the `AnswerEvidenceSource` supertype joined the pattern, so a consumer that references only the supertype is no longer invisible to the scan); floor 12 is a conservative ~half-headroom \u2014 catches a renamed-root collapse toward zero, not normal churn. Lower this with any change that legitimately shrinks the population."
+    "expectedMinPopulationNote": "tempdoc 576 §5 vacuous-pass guard: the auto-scan must detect >= this many canonical-type-referencing files, else a renamed scan root would let every coverage check pass vacuously. Live count restamped to 28 (2026-08-20, tempdoc 859 §7 amendment 5 — the `AnswerEvidenceSource` supertype joined the pattern, so a consumer that references only the supertype is no longer invisible to the scan); floor 12 is a conservative ~half-headroom — catches a renamed-root collapse toward zero, not normal churn. Lower this with any change that legitimately shrinks the population."
   },
   "surfaces": [
     {
@@ -59,7 +59,7 @@
       "kind": "source",
       "lang": "java",
       "path": "modules/app-api/src/main/java/io/justsearch/app/api/knowledge/SearchTrace.java",
-      "guard": "exempt:canonical record type \u2014 source of truth, nothing to project-guard",
+      "guard": "exempt:canonical record type — source of truth, nothing to project-guard",
       "note": "The canonical app-api record type."
     },
     {
@@ -75,7 +75,7 @@
       "kind": "carrier",
       "lang": "java",
       "path": "modules/app-api/src/main/java/io/justsearch/app/api/selection/SelectionPayload.java",
-      "guard": "exempt:opaque carrier \u2014 passes the record through, does not project it",
+      "guard": "exempt:opaque carrier — passes the record through, does not project it",
       "note": "Selection substrate (526) carries the trace opaque."
     },
     {
@@ -86,7 +86,7 @@
       "guard": "gate:stage-completeness + test:SearchTraceProjectionConformanceTest",
       "recordId": "SearchTrace",
       "guardKind": "reflective",
-      "note": "Projects the worker slice from (SearchDecision, SearchOutcome). The conformance test (553 Phase C) proves the trace is lossy-DOWNWARD from the SearchOutcome superset slice \u2014 every slice field is classified represented-or-deliberately-dropped."
+      "note": "Projects the worker slice from (SearchDecision, SearchOutcome). The conformance test (553 Phase C) proves the trace is lossy-DOWNWARD from the SearchOutcome superset slice — every slice field is classified represented-or-deliberately-dropped."
     },
     {
       "id": "head-composer",
@@ -126,14 +126,14 @@
       "lang": "ts",
       "path": "modules/ui-web/src/api/generated/schema-types/search-trace.ts",
       "guard": "gate:contract-projection",
-      "note": "Tempdoc 564 Phase 3: the canonical FE SearchTrace type + Zod, generated from the app-api record via JSON-Schema (record\u2192schema\u2192{TS,Zod}). Replaces the retired wire-types.ts typescript-generator barrel AND the knowledge_pb fromJson path \u2014 searchState now validates the raw trace against this generated Zod (the FE is proto-free for SearchTrace)."
+      "note": "Tempdoc 564 Phase 3: the canonical FE SearchTrace type + Zod, generated from the app-api record via JSON-Schema (record→schema→{TS,Zod}). Replaces the retired wire-types.ts typescript-generator barrel AND the knowledge_pb fromJson path — searchState now validates the raw trace against this generated Zod (the FE is proto-free for SearchTrace)."
     },
     {
       "id": "fe-generated-schema-barrel",
       "kind": "source",
       "lang": "ts",
       "path": "modules/ui-web/src/api/generated/schema-types/index.ts",
-      "guard": "exempt:generated re-export barrel \u2014 no logic to guard",
+      "guard": "exempt:generated re-export barrel — no logic to guard",
       "note": "Re-export barrel for the generated schema-types (incl. SearchTrace/TraceStage/HitStage)."
     },
     {
@@ -141,7 +141,7 @@
       "kind": "source",
       "lang": "ts",
       "path": "modules/ui-web/src/api/generated/index.ts",
-      "guard": "exempt:generated re-export barrel \u2014 no logic to guard",
+      "guard": "exempt:generated re-export barrel — no logic to guard",
       "note": "Re-export barrel."
     },
     {
@@ -193,14 +193,14 @@
       "kind": "carrier",
       "lang": "ts",
       "path": "modules/ui-web/src/shell-v0/plugin-api/plugin-types.ts",
-      "guard": "exempt:opaque carrier \u2014 passes the record through, does not project it"
+      "guard": "exempt:opaque carrier — passes the record through, does not project it"
     },
     {
       "id": "fe-citation-types",
       "kind": "carrier",
       "lang": "ts",
       "path": "modules/ui-web/src/shell-v0/components/chat/citationTypes.ts",
-      "guard": "exempt:opaque carrier \u2014 passes the record through, does not project it",
+      "guard": "exempt:opaque carrier — passes the record through, does not project it",
       "note": "FE RetrievalCitation evidence type (sibling record; tempdoc 559 Authority IV). Extracted from CitationsPanel to break an import cycle; registered here during the 564 merge (was previously undeclared). Tempdoc 859 §5b split it: the shared supertype `AnswerEvidenceSource` carries what BOTH answer planes report and leaves the five retrieval-only fields optional, and `RetrievalCitation extends` it re-requiring them — so the delegate plane is representable without zero-filling retrieval facts. Tempdoc 849: mirrors the inclusion component as OPTIONAL `contextInclusion` ('included' | 'partial' | 'dropped') + `contextIncludedChars`. The Java ABSENT member has no mirror on purpose — absence is the field being missing, never a fourth string a consumer would have to interpret."
     },
     {
@@ -209,7 +209,7 @@
       "lang": "ts",
       "path": "modules/ui-web/src/shell-v0/components/chat/citationResolve.ts",
       "guard": "test:citationResolve",
-      "note": "565 \u00a715.B / 559 Authority IV: the ONE RAG claim\u2192Citation resolver \u2014 maps Claims + the RetrievalCitation sources into Citation marks for the shared MarkdownBlock weave (consumed by UnifiedChatView + SummarizeView). Consumes the fe-citation-types RetrievalCitation carrier (was previously undeclared)."
+      "note": "565 §15.B / 559 Authority IV: the ONE RAG claim→Citation resolver — maps Claims + the RetrievalCitation sources into Citation marks for the shared MarkdownBlock weave (consumed by Search + SummarizeView). Consumes the fe-citation-types RetrievalCitation carrier (was previously undeclared)."
     },
     {
       "id": "fe-search-state",
@@ -224,7 +224,7 @@
       "lang": "ts",
       "path": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.ts",
       "guard": "test:ResultsCard.searchTrace.test",
-      "note": "Search Thread S1: the ONE results card \u2014 meta-line mode/latency projection from SearchTrace.effectiveMode + per-hit why-chips (Search Thread S5b: the standalone SearchSurface + its fe-search-surface row retired; this is now the sole FE projection). Register F-052 adds a second meta-line projection: the `cross-encoder` stage's DROP reason, worded from the ONE authority `CROSS_ENCODER_SKIP_WORDING` (searchTraceExplain.ts) \u2014 the retired SearchSurface took the `<jf-search-trace>` explain-panel mount with it, so this card is the only place a per-query trace fact can reach a user."
+      "note": "Search Thread S1: the ONE results card — meta-line mode/latency projection from SearchTrace.effectiveMode + per-hit why-chips (Search Thread S5b: the standalone SearchSurface + its fe-search-surface row retired; this is now the sole FE projection). Register F-052 adds a second meta-line projection: the `cross-encoder` stage's DROP reason, worded from the ONE authority `CROSS_ENCODER_SKIP_WORDING` (searchTraceExplain.ts) — the retired SearchSurface took the `<jf-search-trace>` explain-panel mount with it, so this card is the only place a per-query trace fact can reach a user."
     },
     {
       "id": "sv3-ask-client",
@@ -248,7 +248,7 @@
       "lang": "ts",
       "path": "modules/ui-web/src/shell-v0/components/chat/agentEvidence.ts",
       "guard": "test:agentEvidence.projection",
-      "note": "Tempdoc 859 §3 — the ONE delegate-plane evidence projection, drawn through by its TWO importers — the live Search v3 terminal (`SearchV3View.ts`) and the Search v3 record reader (`sv3-record.ts`). It DERIVES fields from `AgentEvent.AgentSource` / `AgentSentenceCite`: sources map onto `AnswerEvidenceSource` (retrieval-only fields left ABSENT, never zero-filled — §5b), matches are projected from the per-sentence cites with `textSource: CHUNK_LOOKUP` stated (§2/§3a), and BOTH derived surfaces are producer-gated through the shared authorities — marks by `resolveAnswerCitations`, matches by `recordEvidence.admittedMatches` (847 S1), because `sourceGrounding` reads a match's similarity straight into `evidenceTier`. Registering it as a carrier would repeat the false claim §5a just removed from `sv3-record-evidence`. Tempdoc 865 PR-1 widened WHAT it derives, not what it is: (a) `sourceCoverage` — the per-source half of \"an empty match list is not always a verdict\", reporting the sources NO matcher could have read (the 603 D-3 document-level sentinel; `CitationMatchOps.prepareWindows` refuses to look up a negative chunk ordinal and `PassageWindows.prepare` then contributes no window, so the Worker itself reports `windowsScored: 0` for exactly these). It is an UNDER-report by construction — the producer's BUDGET-starved coverage is dropped at `AgentCitationResolver.resolve`'s return and carrying it needs a new `done` wire field — so it can never contradict the producer, only stay silent. (b) `agentDeltaEvidence` — the SAME projection over the per-call grounding deltas, for a run that reached no grounded terminal (cancelled / errored — tempdoc 878 §D.1 routed the MAX_ITERATIONS ceiling through the grounded seam and deleted `AgentDone.ofDisposition`, so that disposition now carries its evidence and reaches this arm only when its finalize established nothing). Both read sites consult it under one stated plane-authority rule: the terminal is authoritative when present, the deltas fill the gap when it is absent, and the two are never accumulated — they are the same set, so adding them would double every source and break the positional index `AgentSentenceCite.sourceIndex` resolves through. HONEST LIMIT: the legacy window (`UnifiedChatView.ts`) is NOT an importer — it received the producer stamp but its source/match derivation was not migrated here (859 design item 9, incomplete), so this is the Search v3 window's one projection, not yet the product's."
+      "note": "Tempdoc 859 §3 — the ONE delegate-plane evidence projection, drawn through by its TWO importers — the live Search v3 terminal (`SearchV3View.ts`) and the Search v3 record reader (`sv3-record.ts`). It DERIVES fields from `AgentEvent.AgentSource` / `AgentSentenceCite`: sources map onto `AnswerEvidenceSource` (retrieval-only fields left ABSENT, never zero-filled — §5b), matches are projected from the per-sentence cites with `textSource: CHUNK_LOOKUP` stated (§2/§3a), and BOTH derived surfaces are producer-gated through the shared authorities — marks by `resolveAnswerCitations`, matches by `recordEvidence.admittedMatches` (847 S1), because `sourceGrounding` reads a match's similarity straight into `evidenceTier`. Registering it as a carrier would repeat the false claim §5a just removed from `sv3-record-evidence`. Tempdoc 865 PR-1 widened WHAT it derives, not what it is: (a) `sourceCoverage` — the per-source half of \"an empty match list is not always a verdict\", reporting the sources NO matcher could have read (the 603 D-3 document-level sentinel; `CitationMatchOps.prepareWindows` refuses to look up a negative chunk ordinal and `PassageWindows.prepare` then contributes no window, so the Worker itself reports `windowsScored: 0` for exactly these). It is an UNDER-report by construction — the producer's BUDGET-starved coverage is dropped at `AgentCitationResolver.resolve`'s return and carrying it needs a new `done` wire field — so it can never contradict the producer, only stay silent. (b) `agentDeltaEvidence` — the SAME projection over the per-call grounding deltas, for a run that reached no grounded terminal (cancelled / errored — tempdoc 878 §D.1 routed the MAX_ITERATIONS ceiling through the grounded seam and deleted `AgentDone.ofDisposition`, so that disposition now carries its evidence and reaches this arm only when its finalize established nothing). Both read sites consult it under one stated plane-authority rule: the terminal is authoritative when present, the deltas fill the gap when it is absent, and the two are never accumulated — they are the same set, so adding them would double every source and break the positional index `AgentSentenceCite.sourceIndex` resolves through. The old window was retired by SA15; Search and its saved-record reader remain the shared projection consumers."
     },
     {
       "id": "agent-tool-search-card",
@@ -272,7 +272,7 @@
       "lang": "python",
       "path": "scripts/jseval/jseval/provenance.py",
       "guard": "test:test_provenance",
-      "note": "Eval reads query signals/decision_kind from the trace JSON (not an import \u2014 declared explicitly)."
+      "note": "Eval reads query signals/decision_kind from the trace JSON (not an import — declared explicitly)."
     },
     {
       "id": "eval-artifacts",
@@ -294,7 +294,7 @@
       "lang": "java",
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchTraceSpanProjection.java",
       "guard": "test:SearchTraceSpanProjectionTest",
-      "note": "553 Phase 4a (SHIPPED): projects the canonical trace onto the root `search` OTel span as record-derived attributes \u2014 the first span-as-projection convergence step. Applied in KnowledgeHttpApiAdapter.search()."
+      "note": "553 Phase 4a (SHIPPED): projects the canonical trace onto the root `search` OTel span as record-derived attributes — the first span-as-projection convergence step. Applied in KnowledgeHttpApiAdapter.search()."
     },
     {
       "id": "otel-worker-span-projection",
@@ -310,7 +310,7 @@
       "lang": "java",
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/execute/SearchExecutor.java",
       "guard": "test:OpenInferenceSpanProjectionTest",
-      "note": "553 Phase A (SHIPPED): the worker search/* tree is now per-leg OpenInference RETRIEVER/RERANKER/CHAIN spans whose document payload (retrieval.documents.* / reranker.output_documents.* incl. content) is projected from the leg/fusion result by OpenInferenceSpanProjection \u2014 a single pure deriver, not hand-authored. Guarded by the pure-helper test + the live recording-tracer assertion in SearchExecutorOtelTopologyTest. Privacy contract amended (owner decision) to allow per-document id/score/content on spans."
+      "note": "553 Phase A (SHIPPED): the worker search/* tree is now per-leg OpenInference RETRIEVER/RERANKER/CHAIN spans whose document payload (retrieval.documents.* / reranker.output_documents.* incl. content) is projected from the leg/fusion result by OpenInferenceSpanProjection — a single pure deriver, not hand-authored. Guarded by the pure-helper test + the live recording-tracer assertion in SearchExecutorOtelTopologyTest. Privacy contract amended (owner decision) to allow per-document id/score/content on spans."
     },
     {
       "id": "otel-spans-head-reranker",
@@ -318,7 +318,7 @@
       "lang": "java",
       "path": "modules/reranker/src/main/java/io/justsearch/reranker/CrossEncoderReranker.java",
       "guard": "test:OpenInferenceSpansProjectionTest",
-      "note": "553 Phase D (head, SHIPPED): the search/rerank span is now an OpenInference RERANKER projecting the CE-scored output (texts + scores) via the SHARED OpenInferenceSpans projector in telemetry \u2014 the same projector the worker search/* spans (otel-spans-worker-structure) and the head search/cross_encoder + search/lambdamart spans (in head-composer) use, so the OpenInference vocabulary lives in one place (no per-module fork). Conformance: OpenInferenceSpansProjectionTest pins the shared projector."
+      "note": "553 Phase D (head, SHIPPED): the search/rerank span is now an OpenInference RERANKER projecting the CE-scored output (texts + scores) via the SHARED OpenInferenceSpans projector in telemetry — the same projector the worker search/* spans (otel-spans-worker-structure) and the head search/cross_encoder + search/lambdamart spans (in head-composer) use, so the OpenInference vocabulary lives in one place (no per-module fork). Conformance: OpenInferenceSpansProjectionTest pins the shared projector."
     },
     {
       "id": "otel-spans-head-engine",
@@ -333,7 +333,7 @@
       "kind": "source",
       "lang": "java",
       "path": "modules/app-api/src/main/java/io/justsearch/app/api/DocumentService.java",
-      "guard": "exempt:canonical record type \u2014 source of truth, nothing to project-guard",
+      "guard": "exempt:canonical record type — source of truth, nothing to project-guard",
       "note": "559 Authority IV: defines the ContextCitation record (the RAG-retrieval evidence sibling). The producer-owned boundary fields (startLine/endLine/headingText) live here."
     },
     {
@@ -384,7 +384,7 @@
       "guard": "test:evidenceProjection",
       "recordId": "ContextCitation",
       "guardKind": "reflective",
-      "note": "559 Authority IV: THE shared FE evidence view-model \u2014 projects RetrievalCitation (\u2190 ContextCitation) into EvidenceItem with a LABELED score (the bare '100%' fix). Conformance: evidenceProjection.test pins it as a total projection of the record. Tempdoc 849: also owns `contextInclusionOf` and EvidenceItem.inclusion \u2014 `null` for an absent OR unrecognised state, never a guessed one, and pinned as never feeding the score or its tier (the same containment SourceExamination carries). Slice 3 landed the WORDS here too, as \u00a77 required: `inclusionBadge` (the retrieved-vs-received badge, `null` for absence), `claimMatch` (the ONE banded score, named by what it measures), `citingTurnLabel`, `suppressGroundingFor`, and `citationHeader`. No consumer may re-word any of it. TWO refusals are the substance and both were review-corrected: (a) there is NO retrieval-score band \u2014 `ContextCitation.score` is the raw Lucene hit score (`RagContextOps.java:395`; the chunk reranker reorders and never writes CE scores back) while the tier thresholds are anchored to the cross-encoder cutoff, so banding it is not merely imprecise but CONSTANT \u2014 RRF-fused hybrid caps near 0.09 (always 'weak'), raw BM25 is unbounded (always 'strong') \u2014 and a mode-constant band is negative information; an earlier draft of this note claimed the band was calibrated per retrieval mode, which was false. (b) A `dropped` passage's grounding label and claim band are WITHHELD (`suppressGroundingFor`): the matcher scores re-fetched chunk text, so 'never sent to the model' and 'Grounds N sentences' are both producible for one source and cannot both be informative."
+      "note": "559 Authority IV: THE shared FE evidence view-model — projects RetrievalCitation (← ContextCitation) into EvidenceItem with a LABELED score (the bare '100%' fix). Conformance: evidenceProjection.test pins it as a total projection of the record. Tempdoc 849: also owns `contextInclusionOf` and EvidenceItem.inclusion — `null` for an absent OR unrecognised state, never a guessed one, and pinned as never feeding the score or its tier (the same containment SourceExamination carries). Slice 3 landed the WORDS here too, as §7 required: `inclusionBadge` (the retrieved-vs-received badge, `null` for absence), `claimMatch` (the ONE banded score, named by what it measures), `citingTurnLabel`, `suppressGroundingFor`, and `citationHeader`. No consumer may re-word any of it. TWO refusals are the substance and both were review-corrected: (a) there is NO retrieval-score band — `ContextCitation.score` is the raw Lucene hit score (`RagContextOps.java:395`; the chunk reranker reorders and never writes CE scores back) while the tier thresholds are anchored to the cross-encoder cutoff, so banding it is not merely imprecise but CONSTANT — RRF-fused hybrid caps near 0.09 (always 'weak'), raw BM25 is unbounded (always 'strong') — and a mode-constant band is negative information; an earlier draft of this note claimed the band was calibrated per retrieval mode, which was false. (b) A `dropped` passage's grounding label and claim band are WITHHELD (`suppressGroundingFor`): the matcher scores re-fetched chunk text, so 'never sent to the model' and 'Grounds N sentences' are both producible for one source and cannot both be informative."
     },
     {
       "id": "evidence-fe-citations-panel",
@@ -443,29 +443,13 @@
       "note": "559 Authority IV: passes citations to the panel."
     },
     {
-      "id": "evidence-fe-unified-chat-view",
-      "kind": "consumer",
-      "lang": "ts",
-      "path": "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
-      "guard": "exempt:consumer reads the canonical type; no projection law to mutate-guard",
-      "note": "559 Authority IV: passes citations to the panel."
-    },
-    {
-      "id": "evidence-fe-unified-chat-request",
-      "kind": "consumer",
-      "lang": "ts",
-      "path": "modules/ui-web/src/shell-v0/views/unifiedChatRequest.ts",
-      "guard": "exempt:consumer reads the canonical type; no projection law to mutate-guard",
-      "note": "Tempdoc 621 Phase 2 \u2014 the ThreadMessage carrier + buildRequestBody extracted from UnifiedChatView.ts; ThreadMessage declares the per-turn citations/sources/claims (consumer of the RetrievalCitation/CitationMatch evidence carrier, like the sibling evidence-fe-unified-chat-view entry)."
-    },
-    {
       "id": "feedback-feature-snapshot",
       "kind": "consumer",
       "lang": "java",
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/feedback/FeatureSnapshots.java",
-      "guard": "exempt:consumer reads the canonical SearchTrace's per-hit scores to capture durable feature snapshots for offline eval; not a live view-model projection, so no projection law to mutate-guard (tempdoc 580 \u00a717)",
+      "guard": "exempt:consumer reads the canonical SearchTrace's per-hit scores to capture durable feature snapshots for offline eval; not a live view-model projection, so no projection law to mutate-guard (tempdoc 580 §17)",
       "recordId": "SearchTrace",
-      "note": "Tempdoc 580 \u00a717 \u2014 captures per-hit trace features (leg scores) before the ephemeral SearchTrace is dropped after the response is sent; persisted to durable NDJSON for offline label/eval projections."
+      "note": "Tempdoc 580 §17 — captures per-hit trace features (leg scores) before the ephemeral SearchTrace is dropped after the response is sent; persisted to durable NDJSON for offline label/eval projections."
     },
     {
       "id": "mcp-evidence-projection",
@@ -473,7 +457,7 @@
       "lang": "java",
       "path": "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpEvidenceProjection.java",
       "guard": "test:McpEvidenceProjectionTest",
-      "note": "Tempdoc 658: THE agent-surface projection \u2014 projects the canonical SearchTrace (justsearch_search) and the ContextCitation evidence sibling (justsearch_answer) onto the MCP structuredContent channel. The reverse-coverage instance the 553/559 registers had not yet closed: MCP carries the query/answer subject but historically dropped the evidence (context-without-evidence). A pure Map/List deriver that reads both canonical records (imports both, so this gate detects+guards it); it re-authors nothing. Guard McpEvidenceProjectionTest asserts totality over the UNION of the projection's declared tiers (tempdoc 770): half (a) asserts that with detail=true every field of every canonical evidence record is projected; half (b) asserts that the default tier is a declared subset omitting exactly {trace, legScores} and nothing else. So no canonical field can silently stop shipping in every tier, and no field can silently leave the default tier. TEMPDOC 849 — TWO VOCABULARIES FOR ONE FACT, DECLARED: this surface projects ContextCitation.inclusion as a NESTED object `inclusion: {state, includedChars}`, whereas the SSE (`rag.citations`) and persisted-record shape (RAGDoneEnricher.toCitationMap) use two FLAT keys `contextInclusion` (string) + `contextIncludedChars` (int). The divergence is deliberate, not drift: the reflective totality guard keys on record-component names, so the MCP map must carry a key literally named `inclusion`, while the FE mirror consumes the flat pair it already reads citations in. Both derive from the one record component and neither is authoritative over the other — but a reader comparing the two payloads will see different names for the same fact, so it is recorded here rather than left to be discovered. Absence is spelled the same way on both: the key is OMITTED, never emitted as a fourth state (pinned by McpEvidenceProjectionTest's ABSENT-fixture assertion, review F2).",
+      "note": "Tempdoc 658: THE agent-surface projection — projects the canonical SearchTrace (justsearch_search) and the ContextCitation evidence sibling (justsearch_answer) onto the MCP structuredContent channel. The reverse-coverage instance the 553/559 registers had not yet closed: MCP carries the query/answer subject but historically dropped the evidence (context-without-evidence). A pure Map/List deriver that reads both canonical records (imports both, so this gate detects+guards it); it re-authors nothing. Guard McpEvidenceProjectionTest asserts totality over the UNION of the projection's declared tiers (tempdoc 770): half (a) asserts that with detail=true every field of every canonical evidence record is projected; half (b) asserts that the default tier is a declared subset omitting exactly {trace, legScores} and nothing else. So no canonical field can silently stop shipping in every tier, and no field can silently leave the default tier. TEMPDOC 849 — TWO VOCABULARIES FOR ONE FACT, DECLARED: this surface projects ContextCitation.inclusion as a NESTED object `inclusion: {state, includedChars}`, whereas the SSE (`rag.citations`) and persisted-record shape (RAGDoneEnricher.toCitationMap) use two FLAT keys `contextInclusion` (string) + `contextIncludedChars` (int). The divergence is deliberate, not drift: the reflective totality guard keys on record-component names, so the MCP map must carry a key literally named `inclusion`, while the FE mirror consumes the flat pair it already reads citations in. Both derive from the one record component and neither is authoritative over the other — but a reader comparing the two payloads will see different names for the same fact, so it is recorded here rather than left to be discovered. Absence is spelled the same way on both: the key is OMITTED, never emitted as a fourth state (pinned by McpEvidenceProjectionTest's ABSENT-fixture assertion, review F2).",
       "description": ". Tempdoc 735: this projection is the tier structured-preferring clients (e.g. Claude Code CLI, observed 2.1.209) deliver to their models verbatim; the product contract is tier equivalence with the text rendering, and delivery tier is captured per-cell as measurement identity."
     },
     {
@@ -482,7 +466,7 @@
       "lang": "java",
       "path": "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java",
       "guard": "test:McpSearchTraceLegibilityTest",
-      "note": "Tempdoc 725 W1: the justsearch_search text block reads SearchTrace.Degradation directly (imports SearchTrace) to render a once-per-response DESCRIPTIVE 'semantic ranking degraded' note (appendDegradationNote), null-safe on trace/degradation. Sibling to mcp-evidence-projection's structuredContent projection of the same canonical record \u2014 this is the human-text rendering half. Guarded by McpSearchTraceLegibilityTest, which also covers the informative-term filter and preview-window helpers in the package-private McpSearchResultFormatter (no independent import of SearchTrace, so not separately registered)."
+      "note": "Tempdoc 725 W1: the justsearch_search text block reads SearchTrace.Degradation directly (imports SearchTrace) to render a once-per-response DESCRIPTIVE 'semantic ranking degraded' note (appendDegradationNote), null-safe on trace/degradation. Sibling to mcp-evidence-projection's structuredContent projection of the same canonical record — this is the human-text rendering half. Guarded by McpSearchTraceLegibilityTest, which also covers the informative-term filter and preview-window helpers in the package-private McpSearchResultFormatter (no independent import of SearchTrace, so not separately registered)."
     },
     {
       "id": "mcp-framing-fusion-scale",
@@ -497,7 +481,7 @@
       "kind": "source",
       "lang": "java",
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/evidence/EvidenceSpan.java",
-      "guard": "exempt:canonical record type \u2014 source of truth, nothing to project-guard",
+      "guard": "exempt:canonical record type — source of truth, nothing to project-guard",
       "note": "775 step 1: defines the EvidenceSpan sibling record (the answer-bearing selection authority)."
     },
     {
@@ -508,7 +492,7 @@
       "guard": "test:EvidenceSpanProjectionConformanceTest",
       "recordId": "EvidenceSpan",
       "guardKind": "reflective",
-      "note": "775 step 1: mints EvidenceSpan (answer-bearing selection \u2014 distinguishing-entity coverage ranks candidate windows above the densest query-term cluster) and projects the delivery ExcerptRegion envelope (toExcerptRegion). The reflective conformance test asserts every EvidenceSpan record component is projected-or-deliberately-dropped onto ExcerptRegion (text/charStart/charEnd/lineStart projected + matchSpans added by the envelope; parentDocId/lineEnd/headingText/selectingLegs/entityCoverage deliberately dropped from the interactive excerpt \u2014 they serve the step-2/3 envelopes + provenance)."
+      "note": "775 step 1: mints EvidenceSpan (answer-bearing selection — distinguishing-entity coverage ranks candidate windows above the densest query-term cluster) and projects the delivery ExcerptRegion envelope (toExcerptRegion). The reflective conformance test asserts every EvidenceSpan record component is projected-or-deliberately-dropped onto ExcerptRegion (text/charStart/charEnd/lineStart projected + matchSpans added by the envelope; parentDocId/lineEnd/headingText/selectingLegs/entityCoverage deliberately dropped from the interactive excerpt — they serve the step-2/3 envelopes + provenance)."
     },
     {
       "id": "evidence-span-delivery-consumer",
@@ -516,7 +500,7 @@
       "lang": "java",
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/respond/SearchResponseBuilder.java",
       "guard": "exempt:consumer projects the delivery envelope via EvidenceSpanSelector.toExcerptRegion; the projection law lives on evidence-span-selector, this is the flag-gated wiring site",
-      "note": "775 step 1: the interactive delivery consumer \u2014 when search.evidence_span.enabled is on it swaps the IDF-only HighlightingOps.computeExcerptRegions call for EvidenceSpanSelector.select + toExcerptRegion. Registered for discovery (do not fork a second selection); it references EvidenceSpanSelector, not EvidenceSpan directly."
+      "note": "775 step 1: the interactive delivery consumer — when search.evidence_span.enabled is on it swaps the IDF-only HighlightingOps.computeExcerptRegions call for EvidenceSpanSelector.select + toExcerptRegion. Registered for discovery (do not fork a second selection); it references EvidenceSpanSelector, not EvidenceSpan directly."
     }
   ]
 }

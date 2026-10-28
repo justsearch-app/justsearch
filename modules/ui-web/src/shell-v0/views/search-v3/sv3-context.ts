@@ -312,6 +312,7 @@ export function sv3FollowUpContext(
     out.push({ role: 'system', content: `${SV3_CONTEXT_SUMMARY_PREFIX}${summary}` });
   }
   turns.forEach((turn, index) => {
+    if (turn.shapeId === 'core.extract' && turn.answer === '') return;
     const context = contexts[index];
     if (turn.question.trim() !== '' && (context?.questionInContext ?? true)) {
       out.push({ role: 'user', content: turn.question });

@@ -47,15 +47,15 @@ import {
   setActiveConversation,
 } from '../state/conversationListStore.js';
 import {
-  resetUnifiedChatState,
-  restoreUnifiedChat,
-} from '../state/unifiedChatState.js';
+  resetAskChatState,
+  restoreAskChat,
+} from '../state/askChatState.js';
 
 import { __resetJournalForTest, recordNavigation, getJournalState, canGoBack, navigateBack, navigateForward } from '../state/NavigationJournal.js';
 
 const SV3 = 'core.search-v3-surface';
-/** The shipped chat window — a live surface with a real wire schema, used as the untouched control. */
-const CHAT = 'core.unified-chat-surface';
+/** Supported plugin-style control bound to the retained Ask adapter. Core Ask now promotes to Search. */
+const CHAT = 'fixture.ask-control';
 
 /** The address a conversation projects to. Asserted literally — the format is the contract. */
 const addressFor = (id: string): string =>
@@ -164,7 +164,7 @@ describe('sv3 conversation identity in the URL (864 PR C)', () => {
     __resetBootstrapForTest();
     __resetConversationListForTest();
     __resetJournalForTest();
-    resetUnifiedChatState();
+    resetAskChatState();
     deactivateProjection();
     history = historyHarness();
     activeSurface = null;
@@ -174,7 +174,7 @@ describe('sv3 conversation identity in the URL (864 PR C)', () => {
     // real adapter rather than a stand-in.
     registerSurfaceStateSchema(CHAT, {
       schema: '{"type":"object","properties":{"query":{"type":"string"}}}',
-      bindings: [{ schemaPath: '/query', storeId: 'unified-chat', storeKey: 'query' }],
+      bindings: [{ schemaPath: '/query', storeId: 'ask', storeKey: 'query' }],
     });
     handler = createNavigationHandler({
       setActiveSurface: (id) => {
@@ -399,7 +399,7 @@ describe('sv3 conversation identity in the URL (864 PR C)', () => {
     expect(history.entries()).toEqual([
       addressFor('conv-a'),
       addressFor('conv-b'),
-      '#justsearch://surface/core.unified-chat-surface',
+      '#justsearch://surface/fixture.ask-control',
     ]);
   });
 
@@ -433,12 +433,12 @@ describe('sv3 conversation identity in the URL (864 PR C)', () => {
     const afterNavigation = pushCalls();
     expect(afterNavigation).toBe(before + 1); // the surface change itself, and nothing else
 
-    restoreUnifiedChat({ query: 'rust ownership' });
+    restoreAskChat({ query: 'rust ownership' });
     __flushPendingWriteForTest();
 
     expect(pushCalls()).toBe(afterNavigation);
     expect(history.current()).toBe(
-      '#justsearch://surface/core.unified-chat-surface?query=rust%20ownership',
+      '#justsearch://surface/fixture.ask-control?query=rust%20ownership',
     );
   });
 });

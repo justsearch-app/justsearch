@@ -143,10 +143,9 @@ function ownStyles(ctor: { styles?: unknown }): string {
 
 /** The `<tag> { … }` bridge block inside a stylesheet. */
 function bridgeFor(cssText: string, tag: string): Map<string, string> {
-  const at = cssText.search(new RegExp(`(^|[\\s}])${tag}\\s*\\{`, 'm'));
-  if (at < 0) throw new Error(`no bridge block for <${tag}>`);
-  const open = cssText.indexOf('{', at);
-  return declarations(cssText.slice(open + 1, cssText.indexOf('\n      }', open)));
+  const blocks = [...cssText.matchAll(new RegExp(`(^|[\\s}])${tag}\\s*\\{([^}]+)\\}`, 'gm'))];
+  if (!blocks.length) throw new Error(`no bridge block for <${tag}>`);
+  return new Map(blocks.flatMap(block => [...declarations(block[2]!)]));
 }
 
 const TOKENS = hostTokens(sv3Tokens.cssText);
@@ -792,3 +791,20 @@ it('HO5 source preview text clears AA in both themes and every card state', () =
     }
   }
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  it(`D-T46 Sources hover breadcrumb and preview detail clear AA with margin in ${theme}`, () => {
+    const source = componentSource('CitationsPanel.ts');
+    const scope = themeScope(theme, bridgeFor(MAIN, '\\.sv3-citations'));
+    const bg = surface(['var(--surface-3)'], scope);
+    const primary = contrastRatio(composite(color('var(--text-primary)', scope), bg), bg);
+    for (const selector of ['.heading-breadcrumb', '.preview .detail']) {
+      const block = source.slice(source.indexOf(selector + ' {')).split('}')[0]!;
+      const ink = block.match(/\bcolor:\s*([^;]+);/)?.[1];
+      expect(ink, selector).toBeDefined();
+      const ratio = contrastRatio(composite(color(ink!, scope), bg), bg);
+      expect(ratio, `${theme} ${selector} hover: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.7);
+      expect(ratio, `${selector} remains below primary ink`).toBeLessThan(primary);
+    }
+  });
+}
