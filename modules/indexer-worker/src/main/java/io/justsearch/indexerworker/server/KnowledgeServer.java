@@ -7579,6 +7579,8 @@ public final class KnowledgeServer implements Closeable {
    * convergence check so every other root is served, and this generation's root reconciliation
    * stays unsettled, which keeps the previous generation until {@link #settleDeferredBootRoots}
    * has reconciled the root on its returned volume. Every other failure fails the boot as before.
+   * Task e74253: a root missing from its path, or whose walk could not read a member, is deferred
+   * the same way, as an ordinary restart neither fails on it nor certifies it.
    */
   private void settleCommittedBootRoots(String expectedActive) throws IOException {
     if (!bootRootBindingsBound) {
@@ -7738,8 +7740,8 @@ public final class KnowledgeServer implements Closeable {
     deferredBootRootsGeneration = expectedActive;
     deferredBootRootsRemovalMark = removalMark;
     deferredBootRoots = List.copyOf(deferred);
-    log.warn("Committed boot deferred {} root(s) not on the volume first seen at their path: {};"
-            + " the previous generation is kept until they are reconciled on that volume",
+    log.warn("Committed boot deferred {} root(s) it cannot reconcile yet: {};"
+            + " the previous generation is kept until they are reconciled",
         deferred.size(), deferred.stream().map(RootBinding::path).toList());
     // The server's own maintenance scheduler, opened before the boot reconcile, runs the check
     // only while something is deferred; it is closed with the reaper.

@@ -2643,6 +2643,11 @@ public final class WorkerIngestService {
    * the root out of its convergence check and keeps the previous generation until the root has
    * been reconciled through {@link #reconcileReturnedBootRoot}. A deferral is not a failure, so
    * it leaves the replay certificate as it was. Any other failure throws as before.
+   *
+   * <p>Task e74253: a root an ordinary restart would not reconcile either is deferred the same
+   * way. A folder missing from its path has its watch held, as {@link #watchRoot} holds it; a
+   * root whose walk could not read a member keeps its watch, and B keeps every file under it, as
+   * an ordinary sync keeps the files it could not verify.
    */
   public boolean reconcileCommittedBootRoot(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
@@ -2688,7 +2693,8 @@ public final class WorkerIngestService {
         // watcher is registered on another volume at the root's path; the watch is held and
         // registered once the recorded volume is back, and the root is deferred rather than
         // failing the boot.
-        if (rootOnAnotherVolume(root.toString()) != null) {
+        if (rootOnAnotherVolume(root.toString()) != null
+            || io.justsearch.configuration.PlatformPaths.isLinux() && !Files.isDirectory(root)) {
           registry.watchWhenVolumeReturns(root, binding.collection());
           return false;
         }
@@ -2710,8 +2716,15 @@ public final class WorkerIngestService {
             + watched.errorMessage());
       }
       RootWatcherRegistry.Subscription subscription = registry.subscription(root);
-      try (SyncDirectoryOps.RootDifference difference =
-          candidateDiscoveryOps.discoverCandidateDifference(root.toString(), true, cancelled)) {
+      SyncDirectoryOps.RootDifference discovered;
+      try {
+        discovered = candidateDiscoveryOps.discoverCandidateDifference(root.toString(), true, cancelled);
+      } catch (SyncDirectoryOps.UnreadableWalkMemberException unreadable) {
+        if (!certifying) throw unreadable;
+        log.warn("Committed boot root {} is deferred: {}", root, unreadable.getMessage());
+        return false;
+      }
+      try (SyncDirectoryOps.RootDifference difference = discovered) {
         requireCandidateSubscription(registry, root, subscription);
         for (Path path : difference.additions()) {
           SyncDirectoryOps.checkCancelled(cancelled);

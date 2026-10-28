@@ -193,6 +193,18 @@ final class SyncDirectoryOps {
   }
 
   /**
+   * A walk member {@link #discoverCandidateDifference} could not read: the walk an ordinary sync
+   * makes keeps going past it and reports delete detection unverified.
+   */
+  static final class UnreadableWalkMemberException extends IOException {
+    private static final long serialVersionUID = 1L;
+
+    UnreadableWalkMemberException(String message, IOException cause) {
+      super(message, cause);
+    }
+  }
+
+  /**
    * Discovers a root difference for candidate-scoped admission.
    *
    * <p>Unlike ordinary maintenance sync, every incomplete observation throws. The caller cannot
@@ -230,7 +242,8 @@ final class SyncDirectoryOps {
               checkCancelled(cancelled);
               if (scope.excludes(dir.toString())) return FileVisitResult.SKIP_SUBTREE;
               if (!Files.isReadable(dir)) {
-                throw new IOException("Reconciliation directory is unreadable: " + dir);
+                throw new UnreadableWalkMemberException(
+                    "Reconciliation directory is unreadable: " + dir, null);
               }
               if (!dir.equals(root)) {
                 String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
@@ -255,7 +268,8 @@ final class SyncDirectoryOps {
               budget.retain(normalized.length());
               requireBelowCap(seenDiskPaths.size(), "disk");
               if (!Files.isReadable(file)) {
-                throw new IOException("Reconciliation file is unreadable: " + file);
+                throw new UnreadableWalkMemberException(
+                    "Reconciliation file is unreadable: " + file, null);
               }
               if (!IngestionSkipPolicy.shouldSkipWithinRoot(file, root) && !isCloudPlaceholder(file)) {
                 // Conservatively account for the Path's spelling and component storage as well
@@ -270,7 +284,8 @@ final class SyncDirectoryOps {
             public FileVisitResult visitFileFailed(Path file, IOException failure)
                 throws IOException {
               checkCancelled(cancelled);
-              throw new IOException("Reconciliation walk could not read: " + file, failure);
+              throw new UnreadableWalkMemberException(
+                  "Reconciliation walk could not read: " + file, failure);
             }
 
             @Override

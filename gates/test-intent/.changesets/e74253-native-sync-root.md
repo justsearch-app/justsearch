@@ -8,10 +8,11 @@ author-session: 7eeab586-99dd-4baf-982b-f4054e53cd21
 # Test-intent entries
 
 The two test classes are isolated new sources; only the shared volume seam is gated. Execution
-evidence: `gates/test-intent/evidence/e74253-native-sync-root.json` records the S1-S7a checks (S1, S3
-and S5 against an uninterrupted migration followed by an ordinary restart; S2 with its unit
-supersession check; S4a/S4b; S6; S7a; P6 and P7) failing before on 9e492f703f with the volume seam
-overlaid, and passing after.
+evidence: `gates/test-intent/evidence/e74253-native-sync-root.json` records the S1-S8 checks (S1, S3,
+S5 and S8 against an uninterrupted migration followed by an ordinary restart, S5b and S8 also with a
+PROMOTED crash and once the root or permissions return; S2 with its unit supersession check;
+S4a/S4b; S6; S7a with the delete-after-sync S7b order; P6 and P7) failing before on 9e492f703f with
+the volume seam overlaid, and passing after.
 Independent acceptance is intentionally absent.
 
 ```json
