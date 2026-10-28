@@ -1,0 +1,10 @@
+--- a/modules/shell/src-tauri/src/updater.rs
++++ b/modules/shell/src-tauri/src/updater.rs
+@@ -3778,3 +3778,7 @@
+ #[cfg(test)]
+ #[path = "updater_v2_tests.rs"]
+ mod v2_tests;
++
++#[cfg(all(test, target_os = "linux"))]
++#[path = "updater_reconciliation_tests.rs"]
++mod reconciliation_tests;

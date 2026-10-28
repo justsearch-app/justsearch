@@ -1,0 +1,140 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-27T18:27:12.982Z",
+  "revision": "bfd625c7eea6591250e5a3d231c25e7884aa4312",
+  "tree": "1c0bbbcdf901ab5f860fdacf88a8b026b1d22eb2",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/chat/CitationsPanel.availability.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.availability.test.ts\" \"src/shell-v0/views/search-v3/Sv3Main.availability.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/mif8de7q/tmp/test-intent-vitest-59-1793125630682.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2299
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e6815c301655bf9861222b12988a0dd3d54cb910c5fbc67c49bd5e62938044bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.8 source availability announces only confirmed absence without changing recorded evidence",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 source availability keeps unknown checks neutral",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 source availability keeps failed checks neutral",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 source availability keeps malformed checks neutral",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 source availability keeps unrecognized checks neutral",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 source availability does not treat an array response as membership for an opaque numeric document ID",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 source availability paints sources before a slow check and pages many sources in bounded batches",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 source availability ignores a late prior conversation and observes returned sources on the next showing",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 source availability uses the resolved Engine address and ignores replies from its previous address",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 source availability does not observe old-window consumers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.availability.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dae51721939b7a5f5ff866b3e4363115b5a267f532fadaa864ae69f65827caf0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.8 opened source availability shows confirmed absence with last-known path, copy and reveal",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 opened source availability keeps an already completed retained preview without another read",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 opened source availability rechecks a retained pane on return and ignores its earlier missing-source reply",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 opened source availability shows a friendly retryable failure for unconfirmed HTTP 404",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 opened source availability shows a friendly retryable failure for unconfirmed HTTP 500",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 opened source availability shows a friendly retryable failure for unconfirmed HTTP 503",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.8 opened source availability shows a friendly retryable failure for unconfirmed HTTP 504",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.availability.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5ea754b90ebb64b3b177c1f12ff3f2d666787904379f0f6f182f252c02e3f348",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rechecks a new conversation even when it inherits the identical turn and source objects",
+          "status": "passed"
+        },
+        {
+          "name": "passes confirmed panel absence to the pane owner for both source-card and inline citation opens",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:96f10fb9a39bf300c37456b5d24cab8eac035881df46a3374bf93e69ed3fbe15"
+}

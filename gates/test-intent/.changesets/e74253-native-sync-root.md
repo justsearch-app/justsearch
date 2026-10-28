@@ -14,8 +14,11 @@ PROMOTED crash and once the root or permissions return; S2 with its unit superse
 S4a/S4b/S4c; S6; S7a with the delete-after-sync S7b order; P6 and P7), the F1 checks (a DELETE a
 later sync restores, beside a projection, in the S7 restart and in the mixed unit settlement) and
 the all-or-nothing acknowledgement checks (partialAcknowledgementLeavesEverySelectedReceiptForTheRetry
-and partialMixedAcknowledgementLeavesEverySelectedReceiptForTheRetry) failing before on 9e492f703f
-with the volume seam overlaid, and passing after. The S4c and both all-or-nothing checks also fail
+and partialMixedAcknowledgementLeavesEverySelectedReceiptForTheRetry) failing before and passing after. Since the merge of origin/main (#998, Forget), the before
+state is origin/main b744db8744 with the volume seam overlaid: 9e492f703f lacks the
+KnowledgeServer policy constructor the merged S5 child uses. S5 also holds a forgotten (FILE
+literal) and an excluded (glob) file under the retained SYNC_ROOT's root, with the Engine's
+native policy owner composed; the recovered boot must publish and neither index nor requeue them. The S4c and both all-or-nothing checks also fail
 on 2d80a943ea with only the two test classes applied (a builder run, not recorded by the script):
 the restored file is missing from search after boot, and a refused DELETE removal leaves the DELETE
 without the SYNC_ROOT that supersedes it. The F1 control
@@ -43,7 +46,7 @@ Independent acceptance is intentionally absent.
         "purpose": "Add one static installer, installVolumeLookupWithFolderAway, so a raw child-process driver can report one folder on another volume until a supplier says it returned. SyncRootPromotionCrashRecoveryTest uses it for S5a. Nothing existing changed.",
         "callersAndStateOwners": "Only SyncRootPromotionCrashRecoveryTest's child JVM (scenario 'roots', restart phase) calls it, before installVolumeLookupIfAbsent, which then leaves it in place. RootIdentity.VOLUME_IDENTITY_LOOKUP and VOLUME_IDENTITY_UNAVAILABLE are the state it sets; that child JVM exits by halt, so no JUnit JVM state is touched. beforeEach, afterEach, installVolumeLookupIfAbsent, withVolumeIdentity and volumeIdentityAvailable are unchanged, as is the worker-services copy of this extension.",
         "indirectBehaviours": "No existing method, constant or default changed; tests that use the extension through @ExtendWith or installVolumeLookupIfAbsent see identical lookups. The new method keeps the PRESENT_VOLUME value for every path outside the folder, and for the folder once the supplier says it returned.",
-        "evidence": "gates/test-intent/evidence/e74253-native-sync-root.json (before 9e492f703f with this file overlaid): retainedRootSyncsRestartAsAnUninterruptedMigrationDoes fails before (boot does not publish) and passes after. After, the crash restart and the control's ordinary restart both run with the away folder on another volume, and the away root's files and the file added to it while away are compared token by token with the control (S5a). The full :modules:indexer-worker:test run covers every existing user of the extension.",
+        "evidence": "gates/test-intent/evidence/e74253-native-sync-root.json (before origin/main b744db8744 with this file overlaid): retainedRootSyncsRestartAsAnUninterruptedMigrationDoes fails before (boot does not publish) and passes after. After, the crash restart and the control's ordinary restart both run with the away folder on another volume, and the away root's files and the file added to it while away are compared token by token with the control (S5a). The full :modules:indexer-worker:test run covers every existing user of the extension.",
         "unresolvedRisks": "The volume string for the away folder is synthesised (':740' in place of ':739'); a real removable volume is not exercised. The supplier is always true here, so the away folder's return is not exercised. Independent acceptance is intentionally absent."
       }
     }

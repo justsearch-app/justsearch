@@ -14,6 +14,7 @@ import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.ParseRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.SAXException;
@@ -122,7 +123,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
       StructuredExtractionResult result = extractStructured(input, context);
       budget.check();
       return new StructuredExtractionResult(result.result(), result.truncated(), result.summary(),
-          budget.resources(), budget.maxDepth());
+          budget.resources(), budget.maxDepth(), result.lossy());
     } catch (Exception e) {
       budget.check();
       if (e instanceof ContentExtractor.BudgetExceededException limit) throw limit;
@@ -130,10 +131,13 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           "Structured extraction failed for {}, falling back to flat extraction",
           file.getFileName(),
           e);
-      return new StructuredExtractionResult(
-          new ContentExtractor(maxContentLength).extract(input, context, budget),
-          false,
-          StructuredDocumentSummary.empty(), budget.resources(), budget.maxDepth());
+      Metadata metadata = input.metadata();
+      try (var flat = new ContentExtractor(maxContentLength)) {
+        var result = flat.extract(input, context, budget, metadata);
+        return new StructuredExtractionResult(result, context.get(ParseRecord.class).isWriteLimitReached(),
+            StructuredDocumentSummary.empty(), budget.resources(), budget.maxDepth(),
+            DecodingLossAudit.isLossy(input, metadata, context));
+      }
     }
   }
 
@@ -160,7 +164,13 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
       boolean truncated,
       StructuredDocumentSummary summary,
       int embeddedResourceCount,
-      int maxEmbeddedDepth) {
+      int maxEmbeddedDepth,
+      boolean lossy) {
+    public StructuredExtractionResult(ContentExtractor.ExtractionResult result,
+        boolean truncated, StructuredDocumentSummary summary, int embeddedResourceCount,
+        int maxEmbeddedDepth) {
+      this(result, truncated, summary, embeddedResourceCount, maxEmbeddedDepth, false);
+    }
     public StructuredExtractionResult(ContentExtractor.ExtractionResult result,
         boolean truncated, StructuredDocumentSummary summary) {
       this(result, truncated, summary, 0, 0);
@@ -228,7 +238,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     return new StructuredExtractionResult(
         new ContentExtractor.ExtractionResult(content, title, mimeType, null, frontmatterMeta),
         handler.isLimitReached() || annotated.truncated(),
-        StructuredDocumentSummary.fromDocument(doc));
+        StructuredDocumentSummary.fromDocument(doc), 0, 0,
+        DecodingLossAudit.isLossy(input, metadata, parseContext));
   }
 
   private static ParseContext parseContextWithMarkedPdfContent() {

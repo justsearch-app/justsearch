@@ -17,6 +17,11 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
+import { describeExactPath, type ExactPathExclusion } from '../../api/exclusionPolicy.js';
+import { decideForget, forgetObservationText, parseForgetPage, publishForgetCompletion } from '../../api/domains/forget.js';
+import { deepActiveElement } from '../utils/keyboardHandler.js';
+import type { ForgetPage, ForgetOutcome } from '../../api/generated/schema-types/index.js';
+import { confirmForget } from '../components/searchResults/forgetConsent.js';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/OpButton.js';
 import { OperationError } from '../operations/OperationClient.js';
@@ -184,6 +189,11 @@ export class LibrarySurface extends JfElement {
     loading: { state: true },
     error: { state: true },
     excludesText: { state: true },
+    excludesLiterals: { state: true },
+    unfinishedForgets: { state: true },
+    forgetReadStatus: { state: true },
+    forgetDecisionKey: { state: true },
+    forgetMessage: { state: true },
     excludesInvalidPatterns: { state: true },
     excludesLoaded: { state: true },
     excludesBusy: { state: true },
@@ -236,10 +246,26 @@ export class LibrarySurface extends JfElement {
   declare private excludesError: string | null;
   declare private excludesNotice: string;
   declare private excludesResult: ExcludesResult | null;
+  private declare unfinishedForgets: ForgetPage | null;
+  /** Ephemeral Stage API-owner identity, captured before an asynchronous decision. */
+  declare forgetCompletionOwner: object | undefined;
+  private declare forgetReadStatus: 'loading' | 'ready' | 'unavailable' | 'unsupported';
+  private declare forgetDecisionKey: string | null;
+  private declare forgetMessage: string;
+  private forgetAfterId = 0;
+  private forgetPlacement = 0;
+  private forgetRead: AbortController | null = null;
+  private forgetConsent: AbortController | null = null;
   declare private excludesConflict: boolean;
   declare private excludesPolicy: ExcludesPolicy | null;
   private excludesWitness: SettingsWitness | null = null;
   private excludesSavedText: string | null = null;
+  declare private excludesLiterals: ExactPathExclusion[];
+  private excludesSavedLiterals: ExactPathExclusion[] = [];
+  private get excludesDirty(): boolean {
+    return this.excludesText !== this.excludesSavedText
+      || JSON.stringify(this.excludesLiterals) !== JSON.stringify(this.excludesSavedLiterals);
+  }
   private excludesAttempt: SettingsAttempt | null = null;
   private excludesLoadStarted = false;
   declare addBusy: boolean;
@@ -352,6 +378,11 @@ export class LibrarySurface extends JfElement {
     this.excludesText = '';
     this.excludesInvalidPatterns = [];
     this.excludesLoaded = false;
+    this.excludesLiterals = [];
+    this.unfinishedForgets = null;
+    this.forgetReadStatus = 'loading';
+    this.forgetDecisionKey = null;
+    this.forgetMessage = '';
     this.excludesBusy = false;
     this.excludesError = null;
     this.excludesNotice = '';
@@ -660,6 +691,7 @@ export class LibrarySurface extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    void this.loadUnfinishedForgets(0);
     // Tempdoc 571 §11 / 578 — if we were reached via a member deep-link (core.browse-surface →
     // redirected here), open that member's tab. Drain a pending intent (host mounting now) AND
     // subscribe (so a member deep-link while THIS host is already active still switches the tab).
@@ -754,6 +786,7 @@ export class LibrarySurface extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.leaveForgetPlacement();
     super.disconnectedCallback();
     this.presentationUnsub?.();
     this.presentationUnsub = null;
@@ -765,6 +798,120 @@ export class LibrarySurface extends JfElement {
       window.clearTimeout(this.previewTimer);
       this.previewTimer = null;
     }
+  }
+
+  protected override updated(changed: Map<string, unknown>): void {
+    super.updated(changed);
+    if (changed.has('apiBase') && changed.get('apiBase') !== undefined
+        || changed.has('activeTab') && changed.get('activeTab') !== undefined) {
+      this.leaveForgetPlacement();
+      if (this.activeTab === 'folders') void this.loadUnfinishedForgets(0);
+    }
+  }
+
+  private leaveForgetPlacement(): void {
+    this.forgetPlacement++;
+    this.forgetRead?.abort();
+    this.forgetConsent?.abort();
+    this.forgetRead = null;
+    this.forgetConsent = null;
+    this.forgetMessage = '';
+  }
+
+  private async loadUnfinishedForgets(afterId: number): Promise<void> {
+    this.forgetRead?.abort();
+    const read = new AbortController();
+    this.forgetRead = read;
+    const base = this.apiBase;
+    const placement = this.forgetPlacement;
+    this.forgetReadStatus = 'loading';
+    try {
+      const response = await this.doFetch(`/api/indexing/forgets?afterId=${afterId}&limit=100`, { signal: read.signal });
+      if (!response.ok) throw Object.assign(new Error('Unfinished forgets are unavailable'), { status: response.status });
+      const page = parseForgetPage(await response.json(), afterId);
+      if (!this.isConnected || read.signal.aborted || this.forgetPlacement !== placement || this.apiBase !== base) return;
+      this.unfinishedForgets = page;
+      this.forgetAfterId = afterId;
+      this.forgetReadStatus = 'ready';
+    } catch (error: unknown) {
+      if (!this.isConnected || read.signal.aborted || this.forgetPlacement !== placement || this.apiBase !== base) return;
+      this.forgetReadStatus = (error as { status?: number })?.status === 404 ? 'unsupported' : 'unavailable';
+    }
+  }
+
+  private async decideUnfinishedForget(item: ForgetOutcome, decision: 'retry' | 'withdraw'): Promise<void> {
+    const key = item.operationKey;
+    if (!key || item.path === null || item.scope === null || this.forgetDecisionKey !== null
+        || this.forgetReadStatus !== 'ready' || decision === 'retry' && item.reason === 'WITHDRAWAL_PENDING') return;
+    const base = this.apiBase;
+    const placement = this.forgetPlacement;
+    const completionOwner = this.forgetCompletionOwner;
+    const current = () => this.isConnected && this.apiBase === base && this.activeTab === 'folders'
+      && this.forgetPlacement === placement;
+    const consent = new AbortController();
+    const focused = deepActiveElement();
+    // jf-control replaces its disabled native button. Retain the enclosing jf-button, whose
+    // focus() delegates to the current native control once the decision controls are enabled.
+    const invoker = focused instanceof HTMLElement
+      ? ((focused.getRootNode() as ShadowRoot).host?.getRootNode() as ShadowRoot)?.host : null;
+    this.forgetConsent = consent;
+    this.forgetDecisionKey = key;
+    this.forgetMessage = 'Preparing the exact saved target…';
+    try {
+      const outcome = await decideForget(base, key, decision, async prompt =>
+        current() && !consent.signal.aborted && await confirmForget(prompt, consent.signal) && current(),
+        { path: item.path, scope: item.scope });
+      // The owning Stage also retains detached Search v3 nodes. This notification does not paint
+      // the departed Library, and carries the exact API owner captured before the request.
+      if (decision === 'retry' && outcome !== null) publishForgetCompletion(this, base, outcome, completionOwner);
+      if (!current()) return;
+      this.forgetMessage = outcome === null ? 'Decision cancelled before approval. This decision changed nothing.'
+        : `${describeExactPath(item.path)}: ${forgetObservationText(outcome)}`;
+      if (outcome === null) {
+        this.forgetDecisionKey = null;
+        await this.updateComplete;
+        await (invoker as HTMLElement & { updateComplete?: Promise<unknown> } | null)?.updateComplete;
+        if (invoker instanceof HTMLElement && invoker.isConnected) invoker.focus();
+      }
+      if (outcome !== null) {
+        await this.loadUnfinishedForgets(this.forgetAfterId);
+        if (outcome.status === 'WITHDRAWN' && !this.excludesDirty) void this.loadExcludes();
+      }
+    } catch {
+      if (current()) this.forgetMessage = 'The decision outcome could not be confirmed. Refresh this list before trying again.';
+    } finally {
+      if (this.forgetConsent === consent) this.forgetConsent = null;
+      this.forgetDecisionKey = null;
+    }
+  }
+
+  private renderUnfinishedForgets(): TemplateResult | typeof nothing {
+    if (this.forgetReadStatus === 'unsupported') return nothing;
+    const busy = this.forgetDecisionKey !== null;
+    const ready = this.forgetReadStatus === 'ready';
+    const page = this.unfinishedForgets;
+    return html`<section aria-label="Unfinished forgets" data-testid="unfinished-forgets">
+      <h3>Unfinished forgets</h3>
+      <p>Review an unfinished removal even after its search result disappears. Withdrawal releases only that intent's own keep-out; prior removal may already have happened and no rows or original files are restored.</p>
+      <div role="status" aria-live="polite">${this.forgetReadStatus === 'loading' ? 'Reading unfinished forgets…'
+        : this.forgetReadStatus === 'unavailable' ? 'Unfinished forgets could not be read. Their outcomes are unknown.'
+          : page?.items.length === 0 ? 'No unfinished forgets on this page.' : ''}</div>
+      <ul>${(page?.items ?? []).map(item => html`<li>
+        <div><code style="white-space:pre-wrap;overflow-wrap:anywhere">${item.path === null ? 'Exact target unavailable' : describeExactPath(item.path)}</code></div>
+        <p>${forgetObservationText(item)}</p>
+        <jf-button label=${`Retry forget for ${item.path === null ? 'unavailable target' : describeExactPath(item.path)}`} .disabled=${busy || !ready || item.path === null || item.scope === null || item.reason === 'WITHDRAWAL_PENDING'}
+          .onActivate=${() => void this.decideUnfinishedForget(item, 'retry')}>Retry</jf-button>
+        <jf-button label=${`${item.reason === 'WITHDRAWAL_PENDING' ? 'Retry withdrawal of' : 'Withdraw'} forget for ${item.path === null ? 'unavailable target' : describeExactPath(item.path)}`} .disabled=${busy || !ready || item.path === null || item.scope === null}
+          .onActivate=${() => void this.decideUnfinishedForget(item, 'withdraw')}>${item.reason === 'WITHDRAWAL_PENDING' ? 'Retry withdrawal' : 'Withdraw'}</jf-button>
+      </li>`)}</ul>
+      <jf-button label="Refresh unfinished forgets" .disabled=${busy || this.forgetReadStatus === 'loading'}
+        .onActivate=${() => void this.loadUnfinishedForgets(this.forgetAfterId)}>Refresh</jf-button>
+      ${this.forgetAfterId > 0 ? html`<jf-button label="First page of unfinished forgets" .disabled=${busy || !ready}
+        .onActivate=${() => void this.loadUnfinishedForgets(0)}>First page</jf-button>` : nothing}
+      ${page?.complete === false && page.nextId !== null ? html`<jf-button label="Next unfinished forgets" .disabled=${busy || !ready}
+        .onActivate=${() => void this.loadUnfinishedForgets(page.nextId!)}>Next unfinished forgets</jf-button>` : nothing}
+      <div role="status" aria-live="polite" data-testid="forget-decision-result">${this.forgetMessage}</div>
+    </section>`;
   }
 
   /**
@@ -1133,7 +1280,10 @@ export class LibrarySurface extends JfElement {
     this.excludesBusy = true;
     try {
       const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
-      this.excludesSavedText = (body.ui?.excludePatterns ?? []).join('\n');
+      const entries = body.ui?.excludePatterns ?? [];
+      this.excludesSavedText = entries.filter((entry) => typeof entry === 'string').join('\n');
+      this.excludesLiterals = entries.filter((entry): entry is ExactPathExclusion => typeof entry !== 'string');
+      this.excludesSavedLiterals = [...this.excludesLiterals];
       if (!keepDraft) this.excludesText = this.excludesSavedText;
       this.excludesConflict = false;
       this.excludesError = null;
@@ -1155,16 +1305,17 @@ export class LibrarySurface extends JfElement {
 
   private async persistExcludes(): Promise<boolean> {
     if (!this.excludesLoaded || !this.excludesWitness) return false;
-    if (!this.excludesAttempt && this.excludesText === this.excludesSavedText) return true;
+    if (!this.excludesAttempt && !this.excludesDirty) return true;
     try {
       if (!this.excludesAttempt) {
         const patterns = this.excludesText.split('\n').map((value) => value.trim()).filter(Boolean);
-        this.excludesAttempt = createSettingsAttempt({ ui: { excludePatterns: patterns } }, this.excludesWitness);
+        this.excludesAttempt = createSettingsAttempt({ ui: { excludePatterns: [...patterns, ...this.excludesLiterals] } }, this.excludesWitness);
       }
       const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), this.excludesAttempt);
       this.excludesWitness = result.witness;
       this.excludesAttempt = null;
       this.excludesSavedText = this.excludesText;
+      this.excludesSavedLiterals = [...this.excludesLiterals];
       this.excludesInvalidPatterns = [];
       await this.loadExcludesPolicy();
       this.excludesNotice = isOverride(this.excludesPolicy)
@@ -1525,7 +1676,7 @@ export class LibrarySurface extends JfElement {
 
   private async invokeExcludes(apply: boolean): Promise<void> {
     if (this.excludesBusy || !this.excludesLoaded || !this.excludesPolicy || this.excludesAttempt
-        || this.excludesText !== this.excludesSavedText) return;
+        || this.excludesDirty) return;
     this.excludesBusy = true;
     this.excludesError = null;
     this.excludesNotice = '';
@@ -1862,6 +2013,7 @@ export class LibrarySurface extends JfElement {
           .onActivate=${() => this.checkReindexOutcome()}>Check reindex outcome</jf-button>` : nothing}
         <p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>
       </div>` : nothing}
+      ${this.renderUnfinishedForgets()}
       ${this.roots.some(root => root.status === 'unavailable')
         ? html`<p>Some watched folders were last observed offline. Reindex cannot cover their files until they are available.</p>` : nothing}
       ${!this.isTauri
@@ -1981,15 +2133,15 @@ export class LibrarySurface extends JfElement {
               Missing or offline files cannot be checked.`}</p>
           </div>
           <div class="actions">
-            <jf-button label="Save patterns" .disabled=${!this.excludesLoaded || this.excludesBusy || (!this.excludesAttempt && this.excludesText === this.excludesSavedText)}
+            <jf-button label="Save patterns" .disabled=${!this.excludesLoaded || this.excludesBusy || (!this.excludesAttempt && !this.excludesDirty)}
               .onActivate=${() => void this.handleSaveExcludes()}>Save patterns</jf-button>
             <jf-button label="Reload saved patterns" .disabled=${this.excludesBusy || this.excludesAttempt !== null}
               .onActivate=${() => void this.loadExcludes()}>Reload saved patterns</jf-button>
-            <jf-button label="Preview" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
+            <jf-button label="Preview" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesDirty}
               .onActivate=${() => void this.handlePreviewExcludes()}
               >Preview</jf-button
             >
-            <jf-button label="Apply" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
+            <jf-button label="Apply" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesDirty}
               .onActivate=${() => void this.handleApplyExcludes()}
               >Apply</jf-button
             >
@@ -1999,11 +2151,21 @@ export class LibrarySurface extends JfElement {
           ? html`<p>Save completion is unknown. Retry Save patterns to check the same save. Your draft is retained.</p>` : nothing}
         ${this.excludesConflict ? html`<jf-button label="Review latest settings, keep draft" .disabled=${this.excludesBusy}
           .onActivate=${() => void this.loadExcludes(true)}>Review latest settings, keep draft</jf-button>` : nothing}
-        ${this.excludesLoaded && this.excludesText !== this.excludesSavedText ? html`<p>Unsaved draft. Save before Preview or Apply.</p>
+        ${this.excludesLoaded && this.excludesDirty ? html`<p>Unsaved draft. Save before Preview or Apply.</p>
           <details><summary>Current saved patterns</summary><pre>${this.excludesSavedText || '(none)'}</pre></details>` : nothing}
         ${this.excludesInvalidPatterns.length > 0
           ? html`<div role="status"><ul>${this.excludesInvalidPatterns.map((pattern) => html`<li>“${pattern}” has invalid pattern syntax and is matched as a literal name. Correct or remove it.</li>`)}</ul></div>`
           : nothing}
+        ${this.excludesLiterals.length ? html`<section aria-label="Exact paths kept out">
+          <h4>Exact paths kept out</h4>
+          <p>These paths are kept out of future indexing. Removing an entry permits a later indexing pass; it does not add a watched folder or index anything automatically. Save patterns to apply your edits.</p>
+          <ul>${this.excludesLiterals.map((entry) => html`<li>
+            <span>${entry.literal.scope === 'FOLDER' ? 'Folder' : 'File'}: </span><code style="white-space:pre-wrap;overflow-wrap:anywhere">${describeExactPath(entry.literal.path)}</code>
+            <jf-button label=${`Remove keep-out for ${describeExactPath(entry.literal.path)}`}
+              .disabled=${this.excludesBusy || this.excludesAttempt !== null}
+              .onActivate=${() => { this.excludesLiterals = this.excludesLiterals.filter((current) => current.literal.id !== entry.literal.id); }}>Remove keep-out</jf-button>
+          </li>`)}</ul>
+        </section>` : nothing}
         <textarea
           aria-label="Exclude patterns"
           aria-busy=${this.excludesBusy}

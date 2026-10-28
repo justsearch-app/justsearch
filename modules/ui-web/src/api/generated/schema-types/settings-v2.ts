@@ -38,7 +38,14 @@ export interface SettingsV2 {
     chatEnabled?: boolean | null;
     defaultAction?: string | null;
     density?: string | null;
-    excludePatterns?: string[] | null;
+    excludePatterns?: ((string | {
+      literal: {
+        id: string;
+        path: string;
+        scope: "FILE" | "FOLDER";
+        version: 1;
+      };
+    }))[] | null;
     hasSeenTrustLoopNudge?: boolean | null;
     highContrast?: boolean | null;
     indexingPause?: {
@@ -85,7 +92,14 @@ export const settingsV2Schema = z.strictObject({
     "chatEnabled": z.boolean().nullable().optional(),
     "defaultAction": z.string().nullable().optional(),
     "density": z.string().nullable().optional(),
-    "excludePatterns": z.array(z.string()).nullable().optional(),
+    "excludePatterns": z.array(z.union([z.string(), z.strictObject({
+      "literal": z.strictObject({
+        "id": z.string(),
+        "path": z.string(),
+        "scope": z.enum(["FILE", "FOLDER"]),
+        "version": z.literal(1),
+      }),
+    })])).nullable().optional(),
     "hasSeenTrustLoopNudge": z.boolean().nullable().optional(),
     "highContrast": z.boolean().nullable().optional(),
     "indexingPause": z.strictObject({

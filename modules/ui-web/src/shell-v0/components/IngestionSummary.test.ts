@@ -87,6 +87,21 @@ describe('IngestionSummary: real component transport and presentation', () => {
     expect(el.shadowRoot!.querySelectorAll('li')).toHaveLength(20);
   });
 
+  it('distinguishes decoding loss from truncation in the rendered summary', async () => {
+    const el = await mount(async () => response([
+      row({ outcomeClass: 'SUCCESS_PARTIAL', reasonCode: 'TEXT_LOST_WHILE_DECODING', count: 3 }),
+      row({ outcomeClass: 'SUCCESS_PARTIAL', reasonCode: 'TEXT_LOST_WHILE_DECODING_AND_TRUNCATED', count: 2 }),
+      row({ outcomeClass: 'SUCCESS_PARTIAL', reasonCode: 'SUCCESS_PARTIAL', count: 1 }),
+    ]));
+    const rows = [...el.shadowRoot!.querySelectorAll('li')].map((li) => li.textContent!.replace(/\s+/g, ' ').trim());
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toContain('Content indexed; some characters could not be decoded');
+    expect(rows[0]).not.toContain('extraction limit');
+    expect(rows[1]).toContain('Content indexed up to the extraction limit; some characters could not be decoded');
+    expect(rows[2]).toContain('Content indexed up to the extraction limit');
+    expect(rows[2]).not.toContain('could not be decoded');
+  });
+
   it('keeps unknown classifications neutral, never displays opaque codes or prototype properties', async () => {
     const el = await mount(async () => response([
       row({ outcomeClass: 'NEW_SUCCESS', reasonCode: 'NEW_SECRET_PATH_REASON' }),

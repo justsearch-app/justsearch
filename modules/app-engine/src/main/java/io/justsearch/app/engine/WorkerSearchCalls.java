@@ -24,6 +24,12 @@ final class WorkerSearchCalls implements SearchServiceCalls {
   }
 
   @Override
+  public java.util.Map<String, io.justsearch.app.api.DocumentService.Presence> checkDocumentPresence(
+      java.util.List<String> docIds) {
+    return service.checkDocumentPresence(docIds, ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.SearchResponse search(io.justsearch.ipc.SearchRequest request) {
     return service.search(request, ctx);
   }

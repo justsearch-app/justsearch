@@ -1,0 +1,203 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T15:06:31.310Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "2f0b31cb0cab5745312e13855ac83618b46d206a",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run --configLoader runner \"src/api/domains/forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-158-1793113584929.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1879,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-receipt-refresh-a3e7150a/run-2.log",
+      "outputDigest": "sha256:eadb8bb6c0c3c0b9cee5869d1960e907adc64dec743c5c18e9abcdb5a1bf6981"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/domains/forget.test.ts",
+      "file": "modules/ui-web/src/api/domains/forget.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:916e7436202fc3492e3b08a986e265accb1744853fafdbc40d5318cb037c2858",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56.2 consent names the exact frozen target and preserves one key and every path byte",
+          "status": "passed"
+        },
+        {
+          "name": "N56 cancellation never approves, replays or reads a fictitious successful outcome",
+          "status": "passed"
+        },
+        {
+          "name": "S56 lost post-approval response observes the original key without another destructive POST",
+          "status": "passed"
+        },
+        {
+          "name": "S56 keeps typed INCOMPLETE separate from success",
+          "status": "passed"
+        },
+        {
+          "name": "S56 keeps typed UNKNOWN separate from success",
+          "status": "passed"
+        },
+        {
+          "name": "N56 malformed completion and an observation for another key remain unknown",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'success' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'success' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'error' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'error' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'lost-response' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'lost-response' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' })",
+          "status": "passed"
+        },
+        {
+          "name": "S56 preparation refusal is truthful and does not become a success through an empty read",
+          "status": "passed"
+        },
+        {
+          "name": "RF55 Unix backslashes and trailing whitespace are not separators or wildcard prefixes",
+          "status": "passed"
+        },
+        {
+          "name": "S56 unfinished pagination is explicit and malformed or failed reads cannot become empty lists",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d7d96cbe3c5ea1ab3c307bb9eaa93d72198cf404ba9b257feab143d7367ff9ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (inside) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (containing) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "3c127854fcb3f3d672c049861a723730de0503b7",
+    "revision": "3c127854fcb3f3d672c049861a723730de0503b7",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run --configLoader runner \"src/api/domains/forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4t4brn6h/tmp/test-intent-vitest-158-1793113589588.json\"",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 1718,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-receipt-refresh-a3e7150a/run-1.log",
+        "outputDigest": "sha256:ae27806521d9a41cf66a116b6eabde779122a791ddf7cf8fe059bb3f968b6cff"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/api/domains/forget.test.ts",
+        "classification": "assertion",
+        "detail": "N56 'success' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' }):  AssertionError: expected 'COMPLETE' to be 'UNKNOWN' // Object.is equality\n    at /home/elias/.cache/am/4t4brn6h/tmp/evidence-before-receipt-refresh/before/modules/ui-web/src/api/domains/forget.test.ts:134:26\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///ho | N56 'success' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' }):  AssertionE"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+        "classification": "assertion",
+        "detail": "submits Add once while waiting and announces its outcome:  AssertionError: expected 'Unfinished forgets could not be read.…' to contain 'Folder added'\n    at /home/elias/.cache/am/4t4brn6h/tmp/evidence-before-receipt-refresh/before/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:110:72\n    at file:///home/elias/.cache/am/4t4brn6h/tmp/ | exposes row removal progress, suppresses repeats and keeps the other row usable:  AssertionError: expected 'Unfinished forgets could not b"
+      }
+    ]
+  },
+  "digest": "sha256:89c92d467a45378c60f0d4c5cd9848b68be89b044a1319926f6cac749bf53bb8"
+}

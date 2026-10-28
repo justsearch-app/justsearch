@@ -2357,6 +2357,38 @@ public final class IndexGenerationManager {
     return eligible ? java.util.Optional.of(active.generationId()) : java.util.Optional.empty();
   }
 
+  /** FORGET admission holds the same owner as both native and recorded START, without repair. */
+  public ForgetNoCandidate beginForgetNoCandidate(Path capturedTarget) throws IOException {
+    StateControlGuard guard = stateControl();
+    try {
+      StrictActiveGeneration active = strictActiveGeneration(capturedTarget);
+      State state = active.state();
+      if (!active.matchesCapturedTarget() || !MigrationState.IDLE.name().equals(state.migration_state())
+          || state.building_generation() != null && !state.building_generation().isBlank()) {
+        throw new IOException("Forget requires an authoritative idle serving generation with no candidate");
+      }
+      return new ForgetNoCandidate(guard);
+    } catch (IOException | RuntimeException | Error failure) {
+      guard.close();
+      throw failure;
+    }
+  }
+
+  public final class ForgetNoCandidate implements AutoCloseable {
+    private final StateControlGuard guard;
+    private final Thread holder = Thread.currentThread();
+    private boolean closed;
+    private ForgetNoCandidate(StateControlGuard guard) { this.guard = guard; }
+    @Override public void close() {
+      if (Thread.currentThread() != holder) {
+        throw new IllegalStateException("Forget admission must leave on its owning thread");
+      }
+      if (closed) return;
+      closed = true;
+      guard.close();
+    }
+  }
+
   private StrictActiveGeneration strictActiveGeneration(Path capturedTarget) throws IOException {
     Objects.requireNonNull(capturedTarget, "capturedTarget");
     State current = JSON.readValue(

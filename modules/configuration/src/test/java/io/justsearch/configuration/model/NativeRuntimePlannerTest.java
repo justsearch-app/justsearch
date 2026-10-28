@@ -46,13 +46,15 @@ class NativeRuntimePlannerTest {
 
   @Test
   @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
-  void shippedRegistryKeepsCudaModelsAndOmitsForeignRuntime() {
+  void shippedLinuxRegistryUsesCpuModelsAndOmitsForeignRuntime() {
     var registry = ModelRegistryLoader.loadFromClasspath("ai/model-registry.v2.json");
     var plan = InstallPlanner.plan(registry, HardwareProfile.gpuFull(12_000_000_000L), root.resolve("models"));
     assertTrue(plan.downloads().stream().anyMatch(d -> d.packageId().equals("embedding") && d.isModelVariant()));
     assertFalse(plan.downloads().stream().anyMatch(d -> d.packageId().equals("cuda-runtime")));
     assertFalse(plan.alreadyInstalled().contains("cuda-runtime"));
-    assertEquals(ExecutionProvider.CUDA, registry.findPackage("embedding").selectVariant(plan.profile()).targetEP());
+    assertEquals(ExecutionProvider.CPU, registry.findPackage("embedding").selectVariant(plan.profile()).targetEP());
+    var cpu = InstallPlanner.plan(registry, HardwareProfile.cpuOnly(), root.resolve("models"));
+    assertEquals(cpu.downloads(), plan.downloads());
     assertTrue(registry.findPackage("embedding").dependsOn().contains("cuda-runtime"));
     assertTrue(plan.skipped().stream().anyMatch(s -> s.packageId().equals("cuda-runtime") && s.cause() == SkipCause.PLATFORM));
   }

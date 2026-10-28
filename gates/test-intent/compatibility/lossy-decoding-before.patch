@@ -1,0 +1,34 @@
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/DecodingLossAudit.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/DecodingLossAudit.java
+new file mode 100644
+index 0000000000..57b70040fc
+--- /dev/null
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/DecodingLossAudit.java
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.extract;
++
++import org.apache.tika.metadata.Metadata;
++import org.apache.tika.parser.ParseContext;
++
++/** Test-intent compatibility scaffolding: before this change no decoding loss was ever detected. */
++final class DecodingLossAudit {
++  private DecodingLossAudit() {}
++
++  static boolean isLossy(PreparedExtractionInput input, Metadata metadata, ParseContext context) {
++    return false;
++  }
++}
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionArtifact.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionArtifact.java
+index 7a8ef0008f..0c290e15f4 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionArtifact.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionArtifact.java
+@@ -261,4 +261,9 @@ public record ExtractionArtifact(
+   private static String trimToNull(String value) {
+     return value == null || value.isBlank() ? null : value.trim();
+   }
++
++  /** Test-intent compatibility scaffolding: before this change every partial meant truncation. */
++  public String partialReasonCode() {
++    return "SUCCESS_PARTIAL";
++  }
+ }

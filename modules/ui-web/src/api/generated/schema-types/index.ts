@@ -3,6 +3,10 @@
  * Barrel for the JSON-Schema-derived wire types + Zod schemas.
  */
 
+export type { ForgetOutcome } from './forget-outcome.js';
+export { forgetOutcomeSchema } from './forget-outcome.js';
+export type { ForgetPage } from './forget-page.js';
+export { forgetPageSchema } from './forget-page.js';
 export type { KnowledgeSearchResponse } from './knowledge-search-response.js';
 export { knowledgeSearchResponseSchema } from './knowledge-search-response.js';
 export type { StatusResponse } from './status-response.js';

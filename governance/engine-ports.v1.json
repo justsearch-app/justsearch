@@ -13,8 +13,8 @@
     "comment": "The gate re-derives the implementation set from source rather than trusting this file: it scans javaMainRoots for classes whose `implements` clause names a registered port interface, and fails on any that is not declared below. That direction is the one that matters — the drift is a NEW binding appearing, not a declared one going missing.",
     "javaMainRoots": ["modules"],
     "javaInclude": "/src/main/java/",
-    "expectedMinImplementations": 5,
-    "expectedMinImplementationsNote": "The source scan counts three direct existing port declarations (KnowledgeClient for SearchPort and IndexingService, plus NoopSearchPort), now plus OperationAttemptRunnerImpl and SqliteOperationStore: floor 5. EngineKnowledgeClient inherits the facade and is validated separately via extends. A lower count requires an explained binding retirement or scan repair."
+    "expectedMinImplementations": 6,
+    "expectedMinImplementationsNote": "The source scan counts KnowledgeClient for SearchPort and IndexingService, NoopSearchPort, OperationAttemptRunnerImpl, SqliteOperationStore and the fixed ForgetCoordinator: floor 6. EngineKnowledgeClient inherits the facade and is validated separately via extends. A lower count requires an explained binding retirement or scan repair."
   },
   "ports": [
     {
@@ -169,6 +169,31 @@
       "note": "This is the existing persistence interface, not a second producer lifecycle. Producers use OperationAttemptRunner; raw lifecycle writes are architecture-restricted. Read/recovery/lifetime consumers carry the store without acquiring terminal-write authority."
     },
 
+    {
+      "id": "indexed-path-forget",
+      "title": "UI indexed-path forget",
+      "kind": "interface",
+      "interface": "io.justsearch.app.api.operations.ForgetService",
+      "interfaceFile": "modules/app-api/src/main/java/io/justsearch/app/api/operations/ForgetService.java",
+      "contractModule": "modules/app-api",
+      "owner": "EngineRoot's fixed bounded FORGET owner, backed by existing operations.db and the fixed settings owner",
+      "implementations": [
+        {
+          "class": "io.justsearch.app.engine.ForgetCoordinator",
+          "file": "modules/app-engine/src/main/java/io/justsearch/app/engine/ForgetCoordinator.java",
+          "boundBy": "io.justsearch.app.engine.EngineRoot; HeadlessApp binds the same owner before UI request admission",
+          "note": "Synchronous EngineRoot-to-KnowledgeServer callback keeps root/runtime/mutation/generation/configuration/file/queue ownership on one thread. Queue releases last through its existing delivery boundary, followed by deferred operation notifications. Parked intent owns no live work capacity; no RPC lease, scheduler or new store. ForgetService.unavailable is the interface's refusing sentinel for hosts without this binding."
+        }
+      ],
+      "consumers": [
+        "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/BootstrapLateBindings.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ForgetIndexedPathHandler.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ForgetDecisionHandler.java",
+        "modules/ui/src/main/java/io/justsearch/ui/api/IndexingController.java",
+        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java"
+      ],
+      "note": "UI-only consented data control. Frozen trusted preparation, bounded cursor and typed literal exclusion entries reuse existing owners. Reads preserve unknown/incomplete outcomes and never replay an effect. Original source files and retained answers/logs/backups are not erased; agents and MCP are not offered this capability."
+    },
     {
       "id": "memory",
       "title": "Memory",

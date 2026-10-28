@@ -56,7 +56,9 @@ class OperationStoreArchitectureTest {
     @Override public void check(JavaClass item, ConditionEvents events) {
       for (var call : item.getCodeUnitAccessesFromSelf()) {
         if (call.getTargetOwner().isAssignableTo(OperationStore.class)
-            && java.util.Set.of("accept", "acceptPrepared", "acceptIngestChild", "start", "resume", "rejectBeforeStart", "finish", "armSettingsRevision")
+            && java.util.Set.of("accept", "acceptPrepared", "acceptIngestChild", "start", "resume", "rejectBeforeStart", "finish", "armSettingsRevision",
+                "armForgetSettingsRevision", "settleForgetSettingsRevision", "checkpointForget",
+                "requestForgetWithdrawal", "finishForget")
                 .contains(call.getName())
             && !item.getFullName().equals(RUNNER) && !item.getFullName().startsWith(RUNNER + "$")) {
           events.add(SimpleConditionEvent.violated(item,
@@ -75,14 +77,25 @@ class OperationStoreArchitectureTest {
         boolean ownerEntry = call.getTargetOwner().isAssignableTo(
             io.justsearch.app.api.settings.SettingsCommitOwner.class)
             && java.util.Set.of("reserve", "reserveReset", "apply", "applyReset", "releaseAfterTerminal", "retainForRestart",
-                "inspectRecovery", "reconcile").contains(call.getName());
+                "inspectRecovery", "reconcile", "prepareForgetProjection", "reconcileForgetProjection",
+                "preflightForget", "forgetPolicy").contains(call.getName());
         boolean commitment = call.getTargetOwner().isAssignableTo(
             io.justsearch.app.api.settings.SettingsCommitOwner.AttemptControl.class)
             && java.util.Set.of("committed", "uncertain").contains(call.getName());
         boolean runner = item.getFullName().equals(RUNNER) || item.getFullName().startsWith(RUNNER + "$" );
         boolean owner = item.getFullName().equals(
             "io.justsearch.app.services.settings.SettingsCommitCoordinator");
-        if ((ownerEntry && !runner) || (commitment && !owner)) {
+        boolean forgetProjection = item.getFullName().equals(
+            "io.justsearch.app.services.settings.SettingsCommitCoordinator$ForgetProjection");
+        boolean forgetCommitment = call.getTargetOwner().isAssignableTo(
+            "io.justsearch.app.api.settings.SettingsCommitOwner$ForgetControl")
+            && java.util.Set.of("arm", "settled").contains(call.getName());
+        boolean forgetRelease = call.getTargetOwner().isAssignableTo(
+            io.justsearch.app.api.settings.SettingsCommitOwner.class)
+            && call.getName().equals("releaseForgetProjection");
+        if ((ownerEntry && !runner) || (commitment && !owner)
+            || (forgetCommitment && !owner && !forgetProjection)
+            || (forgetRelease && !runner && !owner && !forgetProjection)) {
           events.add(SimpleConditionEvent.violated(item,
               item.getFullName() + " bypasses settings commit authority at " + call.getSourceCodeLocation()));
         }

@@ -540,9 +540,11 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       try {
         try {
           Class<?> implementation = Class.forName("io.justsearch.indexerworker.services.WatcherReplay");
-          Object instance = implementation.getConstructors()[0].newInstance(debt, f.runtime, f.queue, null,
-              IndexingPacing.unthrottled(), f.roots, admissions.stream().map(a -> a.path()).toList(),
-              (java.util.function.BooleanSupplier) () -> false);
+          Object instance = implementation.getConstructor(WatcherRootReconciliation.class, RunningRuntime.class,
+              JobQueue.class, WorkerIngestService.class, IndexingPacing.class, List.class, List.class,
+              java.util.function.BooleanSupplier.class).newInstance(debt, f.runtime, f.queue, null,
+                  IndexingPacing.unthrottled(), f.roots, admissions.stream().map(a -> a.path()).toList(),
+                  (java.util.function.BooleanSupplier) () -> false);
           try (var preflight = (AutoCloseable) instance) {
             try {
               implementation.getMethod("prepare", String.class, List.class,

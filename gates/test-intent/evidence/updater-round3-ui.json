@@ -1,0 +1,79 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T01:48:41.900Z",
+  "revision": "c138996c9e8253e2f5429ed18a723e7f9148cb5e",
+  "tree": "69b1279ca7ce902616684782b47c3b1a05857d26",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/boot/desktopRecoveryUpdate.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-689081-1793152116415.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2306
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopRecoveryUpdate.test.ts",
+      "file": "modules/ui-web/src/boot/desktopRecoveryUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ba12893de30a7ebd7f70b61eb3bc6d49d37d63ff2758bd7405bc8e3385e7cc55",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "routes the running Linux app to its existing updating surface throughout the installer lock wait and exposes the final status after success",
+          "status": "passed"
+        },
+        {
+          "name": "routes the running Linux app to its existing updating surface throughout the installer lock wait and exposes the final status after cancelled",
+          "status": "passed"
+        },
+        {
+          "name": "routes the running Linux app to its existing updating surface throughout the installer lock wait and exposes the final status after repair",
+          "status": "passed"
+        },
+        {
+          "name": "preserves the Windows running shell during its installer handoff",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "914c6243db",
+    "revision": "914c6243db7bca6a3cf2cb72e1c3da96a603bbe0",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/boot/desktopRecoveryUpdate.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-689081-1793152120240.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1428,
+        "output": "JSON report written to /tmp/test-intent-vitest-689081-1793152120240.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/boot/desktopRecoveryUpdate.test.ts",
+        "classification": "assertion",
+        "detail": "routes the running Linux app to its existing updating surface throughout the installer lock wait and exposes the final status after success:  AssertionError: an upgrade hold must replace the running shell, not leave its Reconnecting chip: expected null not to be null\n    at /tmp/test-intent-before-HxaOUd/modules/ui-web/src/boot/desktopRecoveryUpdate.test.ts:74:107\n    at file:///home/elias/dev/justsearch/.claude/worktrees/rel-upd/modules/ | routes the running Linux app to its existing updating s"
+      }
+    ]
+  },
+  "digest": "sha256:6f3eca93b5ebad17f6ea7cf064abc462072b62fa9eeac3aa649ac24e117e7a34"
+}

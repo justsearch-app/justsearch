@@ -1,0 +1,171 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T15:50:58.848Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "6a7fecb41008b1a7ca5b6cef2abf007cbe4d3ed2",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.ReadDocumentToolTest.absoluteIndexedIdsPreserveTrailingSpaceAndBackslash\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5227,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-legacy-fe5d584d/run-4.log",
+      "outputDigest": "sha256:404e3faeae3a65f0b6376de789098851abb627ac7b65a5fe54763ebeda751b4a"
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.WorkerMovePublicationFenceTest.RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence\" --tests \"io.justsearch.indexerworker.loop.WorkerMovePublicationFenceTest.MD55ExpiredNonSingletonMoveCannotPublishAtWorkerFence\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4749,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-legacy-fe5d584d/run-5.log",
+      "outputDigest": "sha256:072d68b93540ad82432346b7b5ccd3418e1bd17f6d9d28217ee626448e1f81ea"
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineUnaryCancellationGapTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3851,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-legacy-fe5d584d/run-6.log",
+      "outputDigest": "sha256:7a47b798bb798693cc82fbf2ed045ecd68720e1bbcbb6c156fd0ffd687f51d4c"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/ReadDocumentToolTest.java#absoluteIndexedIdsPreserveTrailingSpaceAndBackslash",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/ReadDocumentToolTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:329759d8b0674cb41d518ee6d5821d37ae7fdde5b59dc1e1f95e70026526843e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absoluteIndexedIdsPreserveTrailingSpaceAndBackslash()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java#RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19b41a3c555817493ecb352d9339a326d81cdcbb17b4e2a2dbbf5537ec2d1f27",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java#MD55ExpiredNonSingletonMoveCannotPublishAtWorkerFence",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19b41a3c555817493ecb352d9339a326d81cdcbb17b4e2a2dbbf5537ec2d1f27",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "MD55ExpiredNonSingletonMoveCannotPublishAtWorkerFence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineUnaryCancellationGapTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineUnaryCancellationGapTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1ab868e036e148107fa1689f0849d3fae7c7c2b0c8c2b293196ea9c75947dc29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "MD55CancellationOutcomePollPrecedesSignalHandlers()",
+          "status": "passed"
+        },
+        {
+          "name": "MD55ExpiryOutcomePollPrecedesSignalHandlers()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "be1f315b50",
+    "revision": "be1f315b50721165cc9ec9c5b4d0ec857e939a2f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.ReadDocumentToolTest.absoluteIndexedIdsPreserveTrailingSpaceAndBackslash\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 3425,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-legacy-fe5d584d/run-1.log",
+        "outputDigest": "sha256:78d1cca778b6e5e8308d2247fcb2f970de5f5a2443cbd2230cb2e8548ef4c7be"
+      },
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.WorkerMovePublicationFenceTest.RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence\" --tests \"io.justsearch.indexerworker.loop.WorkerMovePublicationFenceTest.MD55ExpiredNonSingletonMoveCannotPublishAtWorkerFence\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 5620,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-legacy-fe5d584d/run-2.log",
+        "outputDigest": "sha256:f769eb7f0936893aa45370de597f675307287d150a4ca915c046c5d38c97c199"
+      },
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineUnaryCancellationGapTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 3493,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-legacy-fe5d584d/run-3.log",
+        "outputDigest": "sha256:796cb3d96d3f3a45b38db4ce26d5ec4c8189c5a28bdc8b3b3e469849d41b3a74"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/ReadDocumentToolTest.java#absoluteIndexedIdsPreserveTrailingSpaceAndBackslash",
+        "classification": "assertion",
+        "detail": "absoluteIndexedIdsPreserveTrailingSpaceAndBackslash(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the fetch boundary must receive the exact indexed id ==> expected: </docs/report.md > but was: </docs/report.md>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java#RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence",
+        "classification": "assertion",
+        "detail": "RF55MoveDestinationPolicyAndIdentityAreRecheckedInsideThePublicationFence(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a newly excluded destination cannot publish identity or indexed rows ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerMovePublicationFenceTest.java#MD55ExpiredNonSingletonMoveCannotPublishAtWorkerFence",
+        "classification": "assertion",
+        "detail": "MD55ExpiredNonSingletonMoveCannotPublishAtWorkerFence(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an elapsed non-singleton request cannot publish identity or indexed rows ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineUnaryCancellationGapTest.java",
+        "classification": "assertion",
+        "detail": "MD55CancellationOutcomePollPrecedesSignalHandlers(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an already-decided CANCELLED/EXPIRED outcome must bar a surviving publisher before signal handlers run ==> expected: <true> but was: <false> | MD55ExpiryOutcomePollPrecedesSignalHandlers(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an already-decided CANCELLED/EXPIRED outcome must bar a surviving publisher before signal handlers run ==> expe"
+      }
+    ]
+  },
+  "digest": "sha256:cf396a547ba2bb37fd65f5ee90f1b931ce12fe8d458838a53ecc47e0991a0f8a"
+}

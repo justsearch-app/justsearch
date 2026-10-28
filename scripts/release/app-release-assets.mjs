@@ -9,9 +9,11 @@ import {
   mkdir,
   readFile,
   writeFile,
+  rm,
 } from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { checkRetiredDurableStores } from '../ci/check-store-recoverability.mjs';
 
 const MINISIGN_ED25519_SPKI_PREFIX = Buffer.from(
@@ -33,7 +35,7 @@ export function canonicalJson(value) {
   return JSON.stringify(value);
 }
 
-export async function loadReleaseCompatibility(compatibilityRegisterPath, compatibilityBaselinePath) {
+export async function loadReleaseCompatibility(compatibilityRegisterPath, compatibilityBaselinePath, predecessorRef) {
   const register = JSON.parse(await readFile(compatibilityRegisterPath, 'utf8'));
   if ((register.knownCompatibilityGaps ?? []).length > 0) {
     throw new Error(
@@ -75,8 +77,21 @@ export async function loadReleaseCompatibility(compatibilityRegisterPath, compat
   const retirementFailures = checkRetiredDurableStores(register);
   if (retirementFailures.length) throw new Error(retirementFailures.join(' '));
   const retiredById = new Map((register.retiredDurableStores ?? []).map(store => [store.id, store]));
+  let baseline;
+  if (predecessorRef) {
+    requireNonBlank('compatibility predecessor ref', predecessorRef);
+    const root = fileURLToPath(new URL('../../', import.meta.url));
+    baseline = JSON.parse(execFileSync('git', ['show', '--end-of-options',
+      `${predecessorRef}:governance/store-recoverability.v1.json`], { cwd: root, encoding: 'utf8' }));
+  }
   if (compatibilityBaselinePath) {
-    const baseline = JSON.parse(await readFile(compatibilityBaselinePath, 'utf8'));
+    const supplied = JSON.parse(await readFile(compatibilityBaselinePath, 'utf8'));
+    if (baseline && canonicalJson(baseline) !== canonicalJson(supplied)) {
+      throw new Error('compatibility baseline is not the complete named predecessor register');
+    }
+    baseline = supplied;
+  }
+  if (baseline) {
     if (!Array.isArray(baseline.durableStores) || baseline.durableStores.length === 0) {
       throw new Error('compatibility baseline must contain its installed durable stores');
     }
@@ -118,187 +133,146 @@ export async function loadReleaseCompatibility(compatibilityRegisterPath, compat
   return compatibility;
 }
 
+const TARGETS = ['windows-x86_64', 'linux-x86_64'];
+
+function targetInputs(options) {
+  // Keep the existing Windows CLI usable while the release workflow is combined.
+  return options.targets ?? {
+    'windows-x86_64': {
+      installerPath: options.installerPath,
+      artifactSignaturePath: options.artifactSignaturePath,
+      installerUrl: options.installerUrl,
+      artifactKeyId: options.artifactKeyId,
+      artifactPublicKey: options.artifactPublicKey,
+    },
+  };
+}
+
 export async function buildReleaseAssets(options) {
-  const {
-    installerPath,
-    artifactSignaturePath,
-    metadataPrivateKeyPath,
-    compatibilityRegisterPath,
-    compatibilityBaselinePath,
-    outDir,
-    version,
-    sequence,
-    installerUrl,
-    artifactKeyId,
-    artifactPublicKey,
-    metadataKeyId,
-    publishedAt = new Date().toISOString(),
-    notes = '',
-  } = options;
+  const { metadataPrivateKeyPath, metadataPrivateKeyPem, compatibilityRegisterPath, compatibilityBaselinePath,
+    outDir, version, sequence, metadataKeyId, publishedAt = new Date().toISOString(),
+    notes = '' } = options;
+  if (options.qualificationMode || process.env.JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE === '1') {
+    throw new Error('qualification-mode builds must not produce release metadata');
+  }
   requireNonBlank('version', version);
-  requireNonBlank('installerUrl', installerUrl);
-  requireNonBlank('artifactKeyId', artifactKeyId);
-  requireNonBlank('artifactPublicKey', artifactPublicKey);
   requireNonBlank('metadataKeyId', metadataKeyId);
   if (!Number.isSafeInteger(sequence) || sequence <= 0) {
     throw new Error('sequence must be a positive safe integer');
   }
-
-  const [installer, artifactSignature, privateKeyPem] = await Promise.all([
-    readFile(installerPath),
-    readFile(artifactSignaturePath, 'utf8'),
-    readFile(metadataPrivateKeyPath, 'utf8'),
-  ]);
-  const compatibility = await loadReleaseCompatibility(compatibilityRegisterPath, compatibilityBaselinePath);
-  verifyTauriArtifactSignature(
-    installer,
-    artifactSignature.trim(),
-    artifactPublicKey.trim(),
-  );
-  const descriptor = {
-    schemaVersion: 1,
-    sequence,
-    version,
-    channel: 'stable',
-    target: 'windows-x86_64',
-    metadataKeyId,
-    // v1 deliberately has one compiled root. It is an offline, long-lived trust anchor;
-    // emergency replacement requires a separately designed bridge/dual-root release.
-    metadataRootPolicy: 'OFFLINE_LONG_LIVED_V1',
-    publishedAt,
-    artifact: {
-      url: installerUrl,
-      sha256: createHash('sha256').update(installer).digest('hex'),
-      size: installer.length,
-      signature: artifactSignature.trim(),
-      // Artifact keys may rotate per release because this id+key pair is authenticated by the
-      // long-lived metadata root above.
-      keyId: artifactKeyId,
-      publicKey: artifactPublicKey.trim(),
-    },
-    compatibility,
-  };
+  const targets = {};
+  const platforms = {};
+  for (const [target, input] of Object.entries(targetInputs(options))) {
+    if (!TARGETS.includes(target)) throw new Error(`unsupported release target: ${target}`);
+    for (const field of ['installerUrl', 'artifactKeyId', 'artifactPublicKey']) {
+      requireNonBlank(`${target} ${field}`, input[field]);
+    }
+    if (new URL(input.installerUrl).protocol !== 'https:') throw new Error('artifact URL must use HTTPS');
+    const installer = await readFile(input.installerPath);
+    const signature = (await readFile(input.artifactSignaturePath, 'utf8')).trim();
+    const publicKey = input.artifactPublicKey.trim();
+    verifyTauriArtifactSignature(installer, signature, publicKey);
+    targets[target] = {
+      artifact: { url: input.installerUrl,
+        sha256: createHash('sha256').update(installer).digest('hex'), size: installer.length,
+        signature, keyId: input.artifactKeyId, publicKey },
+      compatibility: await loadReleaseCompatibility(compatibilityRegisterPath,
+        input.compatibilityBaselinePath ?? compatibilityBaselinePath,
+        input.compatibilityPredecessor ?? options.compatibilityPredecessor),
+    };
+    platforms[target] = { signature, url: input.installerUrl };
+  }
+  if (!Object.keys(targets).length) throw new Error('release must have at least one target');
+  const descriptor = { schemaVersion: 2, sequence, version, channel: 'stable', metadataKeyId,
+    metadataRootPolicy: 'OFFLINE_LONG_LIVED_V1', publishedAt, targets };
   const descriptorBytes = Buffer.from(`${canonicalJson(descriptor)}\n`);
-  const metadataSignature = sign(
-    null,
-    descriptorBytes,
-    createPrivateKey(privateKeyPem),
-  ).toString('base64');
-  const latest = {
-    version,
-    notes,
-    pub_date: publishedAt,
-    platforms: {
-      'windows-x86_64': {
-        signature: artifactSignature.trim(),
-        url: installerUrl,
-      },
-    },
-  };
-
+  const metadataSignature = sign(null, descriptorBytes,
+    createPrivateKey(metadataPrivateKeyPem ?? await readFile(metadataPrivateKeyPath, 'utf8'))).toString('base64');
+  const latest = { version, notes, pub_date: publishedAt, platforms };
   await mkdir(outDir, { recursive: true });
+  // A reused output directory must not accidentally offer v2 to an installed v0.3.0 client.
+  await rm(path.join(outDir, 'release.v1.json'), { force: true });
+  await rm(path.join(outDir, 'release.v1.json.sig'), { force: true });
   await Promise.all([
-    writeFile(path.join(outDir, 'release.v1.json'), descriptorBytes),
-    writeFile(path.join(outDir, 'release.v1.json.sig'), `${metadataSignature}\n`),
+    writeFile(path.join(outDir, 'release.v2.json'), descriptorBytes),
+    writeFile(path.join(outDir, 'release.v2.json.sig'), `${metadataSignature}\n`),
     writeFile(path.join(outDir, 'latest.json'), `${JSON.stringify(latest, null, 2)}\n`),
   ]);
   return { descriptor, latest, metadataSignature };
 }
 
 export async function verifyReleaseAssets(options) {
-  const {
-    installerPath,
-    artifactSignaturePath,
-    metadataPublicKeyPath,
-    releaseDir,
-    expectedMetadataKeyId,
-    expectedMetadataPublicKeyBase64,
-  } = options;
-  const [installer, artifactSignatureRaw, publicKeyPem, descriptorBytes, signatureRaw, latestRaw] =
-    await Promise.all([
-      readFile(installerPath),
-      readFile(artifactSignaturePath, 'utf8'),
-      readFile(metadataPublicKeyPath, 'utf8'),
-      readFile(path.join(releaseDir, 'release.v1.json')),
-      readFile(path.join(releaseDir, 'release.v1.json.sig'), 'utf8'),
-      readFile(path.join(releaseDir, 'latest.json'), 'utf8'),
-    ]);
+  const { metadataPublicKeyPath, releaseDir, expectedMetadataKeyId,
+    expectedMetadataPublicKeyBase64 } = options;
+  const publicKeyPem = await readFile(metadataPublicKeyPath, 'utf8');
+  const descriptorBytes = await readFile(path.join(releaseDir, 'release.v2.json'));
+  const signatureRaw = await readFile(path.join(releaseDir, 'release.v2.json.sig'), 'utf8');
+  const latest = JSON.parse(await readFile(path.join(releaseDir, 'latest.json'), 'utf8'));
+  if (!verify(null, descriptorBytes, createPublicKey(publicKeyPem),
+    Buffer.from(signatureRaw.trim(), 'base64'))) {
+    throw new Error('release metadata signature verification failed');
+  }
   const descriptor = JSON.parse(descriptorBytes);
-  const latest = JSON.parse(latestRaw);
-  if (
-    expectedMetadataKeyId != null
-    && descriptor.metadataKeyId !== expectedMetadataKeyId
-  ) {
+  if (expectedMetadataKeyId != null && descriptor.metadataKeyId !== expectedMetadataKeyId) {
     throw new Error('release metadata key id does not match the compiled root key id');
   }
   if (expectedMetadataPublicKeyBase64 != null) {
-    const publicKeyDer = createPublicKey(publicKeyPem).export({
-      type: 'spki',
-      format: 'der',
-    });
-    const rawPublicKey = publicKeyDer.subarray(-32).toString('base64');
-    if (rawPublicKey !== expectedMetadataPublicKeyBase64.trim()) {
+    const raw = createPublicKey(publicKeyPem).export({ type: 'spki', format: 'der' }).subarray(-32);
+    if (raw.toString('base64') !== expectedMetadataPublicKeyBase64.trim()) {
       throw new Error('metadata PEM does not match the compiled raw root public key');
     }
   }
-  if (
-    descriptor.schemaVersion !== 1
-    || descriptor.channel !== 'stable'
-    || descriptor.target !== 'windows-x86_64'
-    || typeof descriptor.metadataKeyId !== 'string'
-    || descriptor.metadataKeyId.trim() === ''
-    || descriptor.metadataRootPolicy !== 'OFFLINE_LONG_LIVED_V1'
-  ) {
+  if (descriptor.schemaVersion !== 2 || descriptor.channel !== 'stable'
+    || !descriptor.metadataKeyId?.trim() || descriptor.metadataRootPolicy !== 'OFFLINE_LONG_LIVED_V1'
+    || !descriptor.targets || !Object.keys(descriptor.targets).length
+    || Object.keys(descriptor.targets).some(target => !TARGETS.includes(target))) {
     throw new Error('release descriptor schema/channel/target/key mismatch');
   }
-  if (!Number.isSafeInteger(descriptor.sequence) || descriptor.sequence <= 0) {
-    throw new Error('release descriptor sequence is invalid');
+  if (!Number.isSafeInteger(descriptor.sequence) || descriptor.sequence <= 0
+      || descriptor.sequence < (options.minimumSequence ?? 0)) {
+    throw new Error('release descriptor sequence is invalid or older than accepted sequence');
   }
-  if (
-    !verify(
-      null,
-      descriptorBytes,
-      createPublicKey(publicKeyPem),
-      Buffer.from(signatureRaw.trim(), 'base64'),
-    )
-  ) {
-    throw new Error('release metadata signature verification failed');
+  const inputs = targetInputs(options);
+  if (Object.keys(inputs).sort().join() !== Object.keys(descriptor.targets).sort().join()
+      || Object.keys(latest.platforms ?? {}).sort().join() !== Object.keys(inputs).sort().join()) {
+    throw new Error('release target set does not match supplied artifacts/latest.json');
   }
-  const installerHash = createHash('sha256').update(installer).digest('hex');
-  if (
-    descriptor.artifact?.sha256 !== installerHash
-    || descriptor.artifact?.size !== installer.length
-  ) {
-    throw new Error('installer digest or size does not match release descriptor');
-  }
-  const artifactSignature = artifactSignatureRaw.trim();
-  verifyTauriArtifactSignature(
-    installer,
-    artifactSignature,
-    descriptor.artifact?.publicKey,
-  );
-  const latestWindows = latest.platforms?.['windows-x86_64'];
-  if (
-    descriptor.version !== latest.version
-    || descriptor.artifact.url !== latestWindows?.url
-    || descriptor.artifact.signature !== artifactSignature
-    || latestWindows.signature !== artifactSignature
-  ) {
-    throw new Error('latest.json, descriptor, and artifact signature are not a closed set');
-  }
-  const owners = new Set();
-  for (const owner of descriptor.compatibility ?? []) {
-    if (!owner.ownerId || owners.has(owner.ownerId)) {
-      throw new Error(`duplicate or missing compatibility owner: ${owner.ownerId}`);
+  for (const [target, input] of Object.entries(inputs)) {
+    const { artifact, compatibility } = descriptor.targets[target];
+    const installer = await readFile(input.installerPath);
+    const artifactSignature = (await readFile(input.artifactSignaturePath, 'utf8')).trim();
+    if (artifact?.sha256 !== createHash('sha256').update(installer).digest('hex')
+      || artifact?.size !== installer.length) {
+      throw new Error('installer digest or size does not match release descriptor');
     }
-    owners.add(owner.ownerId);
-    if (
-      !owner.owner
-      || !owner.role
-      || !owner.reconciliationStrategy
-      || !owner.readableSourceVersions?.includes(owner.formatVersion)
-    ) {
-      throw new Error(`compatibility owner ${owner.ownerId} has incomplete strategy data`);
+    if ((input.artifactKeyId != null && artifact.keyId !== input.artifactKeyId)
+      || (input.artifactPublicKey != null && artifact.publicKey !== input.artifactPublicKey.trim())) {
+      throw new Error('artifact signing key does not match the compiled key');
+    }
+    verifyTauriArtifactSignature(installer, artifactSignature, artifact.publicKey);
+    const platform = latest.platforms[target];
+    if (descriptor.version !== latest.version || artifact.url !== platform.url
+      || artifact.signature !== artifactSignature || platform.signature !== artifactSignature) {
+      throw new Error('latest.json, descriptor, and artifact signature are not a closed set');
+    }
+    const owners = new Set();
+    for (const owner of compatibility ?? []) {
+      if (!owner.ownerId || owners.has(owner.ownerId)) {
+        throw new Error(`duplicate or missing compatibility owner: ${owner.ownerId}`);
+      }
+      owners.add(owner.ownerId);
+      if (!owner.owner || !owner.role || !owner.reconciliationStrategy
+        || !owner.readableSourceVersions?.includes(owner.formatVersion)) {
+        throw new Error(`compatibility owner ${owner.ownerId} has incomplete strategy data`);
+      }
+    }
+    if (options.compatibilityRegisterPath) {
+      const expected = await loadReleaseCompatibility(options.compatibilityRegisterPath,
+        input.compatibilityBaselinePath ?? options.compatibilityBaselinePath,
+        input.compatibilityPredecessor ?? options.compatibilityPredecessor);
+      if (canonicalJson(compatibility) !== canonicalJson(expected)) {
+        throw new Error('descriptor compatibility does not cover the complete predecessor register');
+      }
     }
   }
   return { descriptor, latest };
@@ -412,13 +386,16 @@ function parseArgs(argv) {
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
   const args = parseArgs(rest);
+  const targets = args.targets ? JSON.parse(await readFile(args.targets, 'utf8')) : undefined;
   if (command === 'build') {
     await buildReleaseAssets({
+      targets,
       installerPath: args.installer,
       artifactSignaturePath: args['artifact-signature'],
       metadataPrivateKeyPath: args['metadata-private-key'],
       compatibilityRegisterPath: args.compatibility,
       compatibilityBaselinePath: args['compat-baseline'],
+      compatibilityPredecessor: args['compat-predecessor'],
       outDir: args['out-dir'],
       version: args.version,
       sequence: Number(args.sequence),
@@ -430,9 +407,13 @@ async function main() {
       notes: args.notes ?? '',
     });
   } else if (command === 'check-compatibility') {
-    await loadReleaseCompatibility(args.compatibility, args['compat-baseline']);
+    await loadReleaseCompatibility(args.compatibility, args['compat-baseline'], args['compat-predecessor']);
   } else if (command === 'verify') {
     await verifyReleaseAssets({
+      targets,
+      compatibilityRegisterPath: args.compatibility,
+      compatibilityBaselinePath: args['compat-baseline'],
+      compatibilityPredecessor: args['compat-predecessor'],
       installerPath: args.installer,
       artifactSignaturePath: args['artifact-signature'],
       metadataPublicKeyPath: args['metadata-public-key'],

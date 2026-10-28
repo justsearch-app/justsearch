@@ -64,4 +64,27 @@ describe('searchResultActions (577 Phase 8)', () => {
     await actions.find((a) => a.id === 'search-result.copy-path')!.handler(HIT);
     expect(copyToClipboard).toHaveBeenCalledWith(HIT.path);
   });
+
+  it('S56.6 offers forget only to the host callback and leaves all ordinary verbs available', async () => {
+    const forget = vi.fn();
+    const supported = { ...HIT, forget };
+    const actions = listContextActions(SEARCH_RESULT_CONTEXT, supported);
+    expect(actions.map((action) => action.id)).toEqual([
+      'search-result.open', 'search-result.reveal', 'search-result.copy-path',
+      'search-result.forget-file', 'search-result.forget-folder',
+    ]);
+    await actions.find((action) => action.id === 'search-result.forget-file')!.handler(supported);
+    await actions.find((action) => action.id === 'search-result.forget-folder')!.handler(supported);
+    expect(forget.mock.calls).toEqual([['FILE'], ['FOLDER']]);
+    expect(listContextActions(SEARCH_RESULT_CONTEXT, HIT)).toHaveLength(3);
+  });
+
+  it('S56.9 keeps help and agent-history verbs absent even in a capable host', () => {
+    for (const collection of ['justsearch-help', 'agent-history']) {
+      const actions = listContextActions(SEARCH_RESULT_CONTEXT, { ...HIT, collection, forget: vi.fn() });
+      expect(actions.map((action) => action.id)).toEqual([
+        'search-result.open', 'search-result.reveal', 'search-result.copy-path',
+      ]);
+    }
+  });
 });

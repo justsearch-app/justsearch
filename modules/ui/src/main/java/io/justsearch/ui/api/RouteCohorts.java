@@ -23,6 +23,7 @@ final class RouteCohorts {
           Map.entry("/api/agent", "agent"),
           Map.entry("/api/chat", "conversation"),
           Map.entry("/api/knowledge", "knowledge"),
+          Map.entry("/api/documents/presence", "knowledge"),
           Map.entry("/api/document", "knowledge"),
           Map.entry("/api/preview", "knowledge"),
           Map.entry("/api/indexing-jobs", "resource"),

@@ -29,6 +29,29 @@ For the decision rationale (NSIS over MSI/WiX, per-user install, download-on-dem
 - **Tauri config**: `modules/shell/src-tauri/tauri.conf.json`
 - **Custom hooks**: `modules/shell/src-tauri/nsis/installer-hooks.nsh`
 
+### Building the Linux Debian package
+
+On Ubuntu 24.04 x86_64, install the Tauri build prerequisites (Rust, Node 24,
+JDK 25, the GTK 3/WebKitGTK 4.1 and Ayatana AppIndicator development libraries,
+OpenSSL development headers, librsvg, patchelf, binutils and a C compiler), then
+run `bash scripts/ci/package-installer-linux.sh` from the repository root. Gradle
+uses the repository wrapper. The script synchronizes versions from
+`gradle.properties`, installs locked npm dependencies, stages the bundled Java
+runtime and Engine, builds with `tauri.linux.conf.json`, and audits every shipped
+ELF, including natives inside JARs. The package and `elf-audit.json` land in
+`dist/installer-linux/`; the script prints the package size and SHA-256.
+
+To repeat just the audit, run
+`python3 scripts/ci/audit-linux-elf.py path/to/JustSearch_0.3.0_amd64.deb elf-audit.json`.
+It rejects requirements above GLIBC 2.39 or GLIBCXX 3.4.33, and unresolved libraries
+other than GPU-pack dependencies and ORT's Java-loaded `libonnxruntime.so.1`.
+Foreign JAR variants are listed as ignored. Library resolution uses the audit
+host plus packaged siblings/JVM libraries; clean Ubuntu desktop qualification
+is separate. Builds on newer systems must still pass these fixed ABI ceilings.
+OCR depends on system Tesseract and English data. Linux carries no CPU chat
+runtime. The reusable `build-installer-linux.yml` workflow builds on Ubuntu 24.04
+and uploads the package and audit without publishing a release.
+
 ### 1.2 Tauri shell (native container)
 
 - **Binary name**: `JustSearch.exe` (configured via `mainBinaryName` in `tauri.conf.json`)
@@ -192,7 +215,7 @@ The application updater is a coordinated replacement of the installed app,
 not a component updater. AI Home models remain outside the NSIS artifact and
 are reused in place.
 
-1. The shell fetches `release.v1.json` and its detached Ed25519 signature from
+1. The shell fetches `release.v2.json` and its detached Ed25519 signature from
    the compile-time-pinned HTTPS release endpoint.
 2. The shell verifies release identity, monotonic sequence, durable-store
    compatibility, and closed-set agreement with Tauri's `latest.json`.
@@ -298,7 +321,7 @@ while still supporting a one-click AI setup once the user opts in.
 
 Current scope: **24 assets, 9.08 GB total**, including ONNX `.onnx` files (embedding, reranker, citation, NER, SPLADE) and a GGUF LLM.
 
-**Per-asset failure isolation (INS-005 is fixed).** A failed asset fails only its own package: the download loop calls `failPackage(...)` and `continue`s to the next asset (`modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java`). Sandbox round 16 confirms it on real data — after `splade/model_fp16.onnx` failed, the same run went on to fetch that package's `tokenizer.json`, `vocab.txt`, `idf.json` and `config.json`. A package that has failed stays failed for the run (`updatePackageState` refuses to leave `failed`), so `installedFully` cannot lie, and the overall state completes with a counting message ("AI installed (6/7 packages; 1 failed)").
+**Per-asset failure isolation (INS-005 is fixed).** A failed asset fails only its own package: the download loop calls `failPackage(...)` and `continue`s to the next asset (`modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java`). Sandbox round 16 confirms it on real data — after `splade/model_fp16.onnx` failed, the same run went on to fetch that package's `tokenizer.json`, `vocab.txt`, `idf.json` and `config.json`. A package that has failed stays failed for the run (`updatePackageState` refuses to leave `failed`), so `installedFully` cannot lie. Downloaded files are kept, but if any package is still missing a required file the overall state ends as failed (`REQUIRED_DOWNLOADS_FAILED`, or `ALL_DOWNLOADS_FAILED` when nothing installed) with a counting message naming each failed package ("AI installation failed (6/7 packages installed; 1 failed). …"); gaps in optional files alone still complete.
 
 **Transport reliability.** Each asset gets up to 4 transport attempts, spaced ~3 s / 9 s / 27 s with jitter and escalating transport (BITS→curl, then curl, then curl on HTTP/1.1). Only transport-transient failures are retried — an HTTP 4xx (curl exit 22) or a SHA/size mismatch fails immediately. Round 16 measured why the spacing matters: connection resets arrived in bursts, and the old BITS→curl fallback fired within ~0.8 s of the failure it was answering, so it failed 82 % of the time. See tempdoc 823/824 (round-16 F1).
 

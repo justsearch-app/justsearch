@@ -24,10 +24,14 @@ public final class WorkerMutationAdmission {
   private boolean replayUncertain;
   private final java.util.Map<String, RootUncertainty> unavailableRoots = new java.util.HashMap<>();
   private Object owner;
+  private FinalFence finalFence;
 
   public WorkerMutationAdmission(Object initialOwner) {
     owner = Objects.requireNonNull(initialOwner, "initialOwner");
   }
+
+  /** Ownership assertion only; callers must retain this same outer fence through the decision. */
+  Object finalFenceScope() { return lock.isWriteLockedByCurrentThread() ? finalFence : null; }
 
   /** A lost watcher routing effect cannot be certified by the switch-buffer replay. */
   public void markReplayUncertain() {
@@ -157,7 +161,8 @@ public final class WorkerMutationAdmission {
       lock.writeLock().unlock();
       throw new IllegalStateException("Cutover owner is no longer serving");
     }
-    return new FinalFence(expectedOwner);
+    finalFence = new FinalFence(expectedOwner, finalFence);
+    return finalFence;
   }
 
   public final class Lease implements AutoCloseable {
@@ -184,7 +189,8 @@ public final class WorkerMutationAdmission {
     private boolean replayCertificateArmed;
     private boolean closed;
 
-    private FinalFence(Object prior) { this.prior = prior; }
+    private final FinalFence enclosing;
+    private FinalFence(Object prior, FinalFence enclosing) { this.prior = prior; this.enclosing = enclosing; }
 
     /** Changes only process-local admission after the durable pointer commits. */
     public void install(Object successor) {
@@ -280,6 +286,7 @@ public final class WorkerMutationAdmission {
       synchronized (replayCertificateMonitor) {
         boolean released = certified && !replayUncertain && unavailableRoots.isEmpty();
         if (!released) owner = fencedOwner;
+        finalFence = enclosing;
         lock.writeLock().unlock();
         return released;
       }
@@ -298,6 +305,7 @@ public final class WorkerMutationAdmission {
       synchronized (replayCertificateMonitor) {
         boolean released = !replayUncertain && unavailableRoots.isEmpty();
         if (!released) owner = fencedOwner;
+        finalFence = enclosing;
         lock.writeLock().unlock();
         return released;
       }
@@ -321,6 +329,7 @@ public final class WorkerMutationAdmission {
         if (installed && (!certified || replayCertificateArmed)) {
           owner = fencedOwner;
         }
+        finalFence = enclosing;
         lock.writeLock().unlock();
       }
     }

@@ -137,6 +137,18 @@ public final class PreparedInvocationCodec {
     return decodeAcceptedMetadata(row, stored, false);
   }
 
+  /** UI forget retains its accepted webview attribution; it is never an agent continuation grant. */
+  public static OperationPreparation decodeAcceptedForgetMetadata(
+      io.justsearch.app.api.operations.OperationRecord row,
+      io.justsearch.app.api.operations.OperationStore.Preparation stored) {
+    if (row.descriptor().kind() != io.justsearch.agent.api.registry.OperationKind.FORGET
+        || !io.justsearch.app.api.operations.ForgetPlan.OPERATION_ID.equals(row.descriptor().operationRef())
+        || row.context().clientKind() != EngineContext.ClientKind.WEBVIEW) {
+      throw new IllegalArgumentException("Forget metadata binding mismatch");
+    }
+    return decodeAcceptedMetadata(row, stored, false);
+  }
+
   private static OperationPreparation decodeAcceptedMetadata(
       io.justsearch.app.api.operations.OperationRecord row,
       io.justsearch.app.api.operations.OperationStore.Preparation stored, boolean requireAuthorizationBasis) {

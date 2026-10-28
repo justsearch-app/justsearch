@@ -492,6 +492,10 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     EngineContext context = plan.request().context();
     InvocationProvenance provenance = plan.request().provenance();
     OperationResult refusal = preflight(op, invocation.refusal());
+    if (refusal != null && (op.id().value().equals("core.forget-indexed-path")
+        || op.id().value().equals("core.retry-forget") || op.id().value().equals("core.withdraw-forget"))) {
+      return refusal;
+    }
     boolean valid = refusal == null && invocation.failure() == null;
     var publications = new java.util.ArrayList<Runnable>();
     try (var handoff = valid ? new OperationWorkHandoff(admission, caller, context) : null) {

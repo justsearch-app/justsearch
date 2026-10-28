@@ -1,0 +1,92 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T19:12:33.722Z",
+  "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+  "tree": "e85660bdaa17d56f6c6a149d96bb55a07b596ac7",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.operations.ForgetHandlersTest\" --tests \"io.justsearch.app.services.registry.operations.handlers.ForgetDecisionValidationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 618535,
+      "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/evidence-handler/run-1.log",
+      "outputDigest": "sha256:58bfd2e3de0648cf3f5a8e59861f2176b637432ee64e86c4eb23a17f97a520db"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:20609de3e8e7d7fad5160b423209fea4b9457445bc8c9927cba3031944174274",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N55OnlyWebviewCanPrepareOrExecuteEvenWithAValidFrozenPreparation()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] A watched folder or a folder containing one cannot be forgotten. Remove the folder in Library instead.",
+          "status": "passed"
+        },
+        {
+          "name": "[2] Help and agent-history content is managed by its own data controls",
+          "status": "passed"
+        },
+        {
+          "name": "S56ExactConsentFreezesEveryByteAndStatesOutsideFileException()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55FolderConsentDistinguishesUnixWhitespaceControlsAndMetacharacters()",
+          "status": "passed"
+        },
+        {
+          "name": "N55UnknownDuplicateAndCoercedPublicFieldsAndOversizedApprovalRefuseWithoutEffects()",
+          "status": "passed"
+        },
+        {
+          "name": "WD55RetryAndWithdrawUseExactSavedConsentAndCannotRetargetTheOriginalKey()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/ForgetDecisionValidationTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/ForgetDecisionValidationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c6ab55f4802dc49e12a5488bb8e3b61aed25c79b468975182fd34fc03e3a0cd2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frozenTargetRetainsStrictValidationWhenUsingTheSharedMapper(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:00606e77f07c9a9ebef901f1c0973eb6aa3d5f48472e5ef272f0917e530cd2e2"
+}

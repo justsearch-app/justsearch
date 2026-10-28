@@ -6,8 +6,23 @@ import io.justsearch.app.api.StatusSnapshotProvider;
 import io.justsearch.app.services.worker.ComponentRecoveryAuthority;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Diagnostic controller SPI bindings published before serving requests. */
+/** Fixed process/controller SPI bindings published before serving requests. */
 public final class BootstrapLateBindings {
+
+  private final AtomicReference<io.justsearch.app.api.operations.ForgetService> forgetService =
+      new AtomicReference<>();
+
+  /** The same-JVM Engine owner is published once before UI request admission. */
+  public void bindForgetService(io.justsearch.app.api.operations.ForgetService owner) {
+    if (!forgetService.compareAndSet(null, java.util.Objects.requireNonNull(owner, "owner"))) {
+      throw new IllegalStateException("Forget owner is already bound");
+    }
+  }
+
+  public io.justsearch.app.api.operations.ForgetService forgetService() {
+    var owner = forgetService.get();
+    return owner == null ? io.justsearch.app.api.operations.ForgetService.unavailable() : owner;
+  }
 
   private final AtomicReference<DebugStateProvider> debugStateProvider = new AtomicReference<>();
   private final AtomicReference<StatusSnapshotProvider> statusSnapshotProvider =

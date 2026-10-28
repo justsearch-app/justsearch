@@ -45,6 +45,9 @@ param(
   # Requires -AssembleReleaseAssets and the release key/sequence parameters below.
   [switch]$AssembleUpdaterAssets,
 
+  # Sign the updater artifact for later multi-platform assembly.
+  [switch]$SignUpdaterArtifact,
+
   [long]$ReleaseSequence = 0,
   [string]$CompatibilityBaselinePath,
   [string]$InstallerUrl,
@@ -327,7 +330,7 @@ try {
     Measure-Phase "tauri_build" {
       # Build NSIS installer (tauri.conf.json enforces ui-web build + bundleSidecar via hooks).
       $tauriArgs = @("--prefix", ".\modules\shell", "run", "tauri", "--", "build", "--bundles", "nsis")
-      if ($AssembleUpdaterAssets.IsPresent) {
+      if ($AssembleUpdaterAssets.IsPresent -or $SignUpdaterArtifact.IsPresent) {
         if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
           throw "-AssembleUpdaterAssets requires TAURI_SIGNING_PRIVATE_KEY so Tauri emits a verifiable NSIS signature."
         }
@@ -426,7 +429,7 @@ try {
     throw "Published installer staging failed digest/size verification."
   }
 
-  if ($AssembleUpdaterAssets.IsPresent) {
+  if ($AssembleUpdaterAssets.IsPresent -or $SignUpdaterArtifact.IsPresent) {
     $sourceSignature = "$SetupExePath.sig"
     if (-not (Test-Path -LiteralPath $sourceSignature -PathType Leaf)) {
       throw "Tauri updater signature not found beside NSIS installer: $sourceSignature"

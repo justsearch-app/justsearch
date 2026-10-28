@@ -939,8 +939,8 @@ def stage_in_app_updater_assets(
     release_dir = release_dir.resolve()
     metadata_public_key_path = metadata_public_key_path.resolve()
     required = [
-        release_dir / "release.v1.json",
-        release_dir / "release.v1.json.sig",
+        release_dir / "release.v2.json",
+        release_dir / "release.v2.json.sig",
         release_dir / "latest.json",
         release_dir / f"{installer.name}.sig",
         metadata_public_key_path,
@@ -955,14 +955,14 @@ def stage_in_app_updater_assets(
     except (OSError, json.JSONDecodeError) as exc:
         sys.exit(f"Updater release metadata is unreadable: {exc}")
 
-    artifact = descriptor.get("artifact") or {}
+    artifact = ((descriptor.get("targets") or {}).get("windows-x86_64") or {}).get("artifact") or {}
     artifact_url = str(artifact.get("url") or "")
     parsed_url = urlparse(artifact_url)
     candidate_hash = _sha256_of(installer)
     latest_platform = (latest.get("platforms") or {}).get("windows-x86_64") or {}
     metadata_key_id = str(descriptor.get("metadataKeyId") or "")
     if (
-        descriptor.get("schemaVersion") != 1
+        descriptor.get("schemaVersion") != 2
         or parsed_url.scheme != "http"
         or parsed_url.hostname not in {"127.0.0.1", "localhost"}
         or Path(parsed_url.path).name != installer.name
@@ -1020,7 +1020,7 @@ def stage_in_app_updater_assets(
         "sequence": descriptor.get("sequence"),
         "candidateInstaller": installer.name,
         "candidateSha256": candidate_hash,
-        "descriptorUrl": artifact_url.rsplit("/", 1)[0] + "/release.v1.json",
+        "descriptorUrl": artifact_url.rsplit("/", 1)[0] + "/release.v2.json",
         "metadataRootKeyId": metadata_key_id,
         "metadataRootPublicKey": _ed25519_raw_public_key(metadata_public_key_path),
         "durablePhases": [
@@ -1950,7 +1950,7 @@ def main():
         "--in-app-updater-assets",
         help=(
             "Directory containing the candidate's authenticated updater closed "
-            "set (release.v1.json, release.v1.json.sig, latest.json, and "
+            "set (release.v2.json, release.v2.json.sig, latest.json, and "
             "<installer>.sig). Requires --upgrade-from and "
             "--metadata-public-key. The descriptor/artifact URLs must target "
             "loopback HTTP. The installed --upgrade-from SOURCE build must "
@@ -1961,7 +1961,7 @@ def main():
     parser.add_argument(
         "--metadata-public-key",
         help=(
-            "Ed25519 SPKI PEM public key used to verify release.v1.json for an "
+            "Ed25519 SPKI PEM public key used to verify release.v2.json for an "
             "--in-app-updater-assets round. This is public trust material, not "
             "a signing secret."
         ),

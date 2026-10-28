@@ -3,7 +3,6 @@ package io.justsearch.configuration.excludes;
 
 import io.justsearch.configuration.resolved.ConfigStore;
 
-import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -49,7 +48,7 @@ public final class ExclusionPatterns {
       try {
         // Live operator overrides keep the optional parser's legacy fail-open semantics.
         compiled = raw == null || raw.isBlank() ? empty()
-            : fromPatterns(JSON.readValue(raw, new TypeReference<List<String>>() {}));
+            : fromRawJsonStrict(raw, isWindows());
       } catch (RuntimeException invalid) {
         compiled = empty();
         log.warn("Ignoring malformed justsearch.ui.exclude_patterns; continuing without user exclusions");
@@ -61,14 +60,14 @@ public final class ExclusionPatterns {
   }
 
   /** Validate new saves without changing how older settings files deserialize. */
-  public static void validateSavedPatterns(List<String> patterns) {
+  public static void validateSavedPatterns(List<?> patterns) {
     if (patterns == null) return;
     if (patterns.size() > 512) throw new IllegalArgumentException("At most 512 exclude patterns are allowed");
     ExclusionPatterns compiled = fromPatterns(patterns);
     if (!compiled.invalidPatterns().isEmpty()) {
       throw new IllegalArgumentException("Invalid exclude pattern: " + compiled.invalidPatterns().getFirst());
     }
-    if (compiled.patterns().size() > 512) {
+    if (compiled.patterns().size() + compiled.literals.size() > 512) {
       throw new IllegalArgumentException("Exclude patterns expand beyond the limit of 512");
     }
   }
@@ -76,28 +75,36 @@ public final class ExclusionPatterns {
   public static ExclusionPatterns fromRawJsonStrict(String raw, boolean windows) {
     if (raw == null || raw.isBlank()) return fromPatterns(List.of(), windows);
     var array = JSON.readTree(raw);
-    if (!array.isArray()) throw new IllegalArgumentException("Exclude policy must be a string array");
-    List<String> patterns = new ArrayList<>();
+    if (!array.isArray()) throw new IllegalArgumentException("Exclude policy must be an array");
+    List<Object> patterns = new ArrayList<>();
     for (var entry : array) {
-      if (!entry.isString()) throw new IllegalArgumentException("Exclude policy must be a string array");
-      patterns.add(entry.asString());
+      if (entry.isString()) patterns.add(entry.asString());
+      else if (entry.isObject()) patterns.add(LiteralExclusion.fromEntry(JSON.convertValue(entry, java.util.Map.class)));
+      else throw new IllegalArgumentException("Exclude policy entries must be strings or literal rules");
     }
     return fromPatterns(patterns, windows);
   }
 
   private final List<String> patterns;
   private final List<Pattern> fileMatchers;
-  private final List<String> savedPatterns;
+  private final List<Object> savedPatterns;
   private final List<Integer> savedPatternIndices;
   private final List<String> invalidPatterns;
+  private final List<LiteralExclusion> literals;
+  private final List<Integer> savedLiteralIndices;
+  private final boolean windows;
 
   private ExclusionPatterns(List<String> patterns, List<Pattern> fileMatchers,
-      List<String> savedPatterns, List<Integer> savedPatternIndices, List<String> invalidPatterns) {
+      List<Object> savedPatterns, List<Integer> savedPatternIndices, List<String> invalidPatterns,
+      List<LiteralExclusion> literals, List<Integer> savedLiteralIndices, boolean windows) {
     this.patterns = patterns;
     this.fileMatchers = fileMatchers;
     this.savedPatterns = savedPatterns;
     this.savedPatternIndices = savedPatternIndices;
     this.invalidPatterns = invalidPatterns;
+    this.literals = literals;
+    this.savedLiteralIndices = savedLiteralIndices;
+    this.windows = windows;
   }
 
   /** Parses an optional operator-provided JSON list for observational callers. */
@@ -106,8 +113,7 @@ public final class ExclusionPatterns {
       return empty();
     }
     try {
-      List<String> patterns = JSON.readValue(raw, new TypeReference<List<String>>() {});
-      return fromPatterns(patterns);
+      return fromRawJsonStrict(raw, isWindows());
     } catch (Exception e) {
       // Fail open: bad sysprop should not break indexing.
       return empty();
@@ -115,26 +121,32 @@ public final class ExclusionPatterns {
   }
 
   public static ExclusionPatterns empty() {
-    return new ExclusionPatterns(List.of(), List.of(), List.of(), List.of(), List.of());
+    return fromPatterns(List.of(), isWindows());
   }
 
-  public static ExclusionPatterns fromPatterns(List<String> patterns) {
+  public static ExclusionPatterns fromPatterns(List<?> patterns) {
     return fromPatterns(patterns, isWindows());
   }
 
-  public static ExclusionPatterns fromPatterns(List<String> patterns, boolean win) {
-    if (patterns == null || patterns.isEmpty()) {
-      return new ExclusionPatterns(List.of(), List.of(), List.of(), List.of(), List.of());
+  public static ExclusionPatterns fromPatterns(List<?> patterns, boolean win) {
+    List<Object> saved = new ArrayList<>();
+    if (patterns != null) for (Object entry : patterns) {
+      if (entry != null) saved.add(entry instanceof String ? entry : LiteralExclusion.fromEntry(entry));
     }
-
-    List<String> saved = patterns.stream().filter(java.util.Objects::nonNull).toList();
     LinkedHashSet<String> cleaned = new LinkedHashSet<>();
     List<Pattern> matchers = new ArrayList<>();
     List<Integer> indices = new ArrayList<>();
     List<String> invalid = new ArrayList<>();
+    List<LiteralExclusion> literals = new ArrayList<>();
+    List<Integer> literalIndices = new ArrayList<>();
     int flags = win ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0;
     for (int index = 0; index < saved.size(); index++) {
-      String original = saved.get(index);
+      if (saved.get(index) instanceof LiteralExclusion literal) {
+        literals.add(literal);
+        literalIndices.add(index);
+        continue;
+      }
+      String original = (String) saved.get(index);
       String normalized = original.trim().replace('\\', '/');
       if (normalized.isBlank()) continue;
       List<String> expanded = expandBarePattern(normalized);
@@ -155,17 +167,30 @@ public final class ExclusionPatterns {
         }
       }
     }
-    return new ExclusionPatterns(List.copyOf(cleaned), List.copyOf(matchers), saved,
-        List.copyOf(indices), List.copyOf(invalid));
+    return new ExclusionPatterns(List.copyOf(cleaned), List.copyOf(matchers), List.copyOf(saved),
+        List.copyOf(indices), List.copyOf(invalid), List.copyOf(literals),
+        List.copyOf(literalIndices), win);
   }
 
   /** Diagnostics and labels come from the same compiler used by every admission path. */
   public List<String> invalidPatterns() { return invalidPatterns; }
-  public List<String> savedPatterns() { return savedPatterns; }
+  public List<Object> savedPatterns() { return savedPatterns; }
+
+  /** Frozen root-plan.v1 carries only legacy glob strings; live policy guards enforce literals. */
+  public List<String> legacyGlobPatterns() { return patterns; }
+
+  /** Admission capacity includes literal entries, retaining tolerant legacy compilation. */
+  public static void validateCapacity(List<?> entries) {
+    ExclusionPatterns compiled = fromPatterns(entries);
+    if (entries.size() > 512 || compiled.patterns.size() + compiled.literals.size() > 512) {
+      throw new IllegalArgumentException("Exclude policy exceeds the limit of 512");
+    }
+  }
 
   public int matchingSavedPatternIndex(Path root, Path path) {
     int index = matchingPatternIndex(root, path);
-    return index < 0 ? -1 : savedPatternIndices.get(index);
+    return index < 0 ? -1 : index < fileMatchers.size() ? savedPatternIndices.get(index)
+        : savedLiteralIndices.get(index - fileMatchers.size());
   }
 
   private static String literalNameRegex(String name) {
@@ -176,7 +201,7 @@ public final class ExclusionPatterns {
   }
 
   public boolean isEmpty() {
-    return patterns.isEmpty();
+    return patterns.isEmpty() && literals.isEmpty();
   }
 
   public List<String> patterns() {
@@ -190,8 +215,13 @@ public final class ExclusionPatterns {
    * as an optimization for common directory patterns (e.g., {@code ** /node_modules/**}).
    */
   public boolean isExcludedDirectory(Path root, Path dir) {
-    if (isEmpty() || root == null || dir == null) return false;
+    if (isEmpty() || dir == null) return false;
     try {
+      for (LiteralExclusion literal : literals) {
+        if (literal.literal().scope() == LiteralExclusion.Scope.FOLDER
+            && literal.matches(dir, windows)) return true;
+      }
+      if (root == null) return false;
       Path normalizedRoot = root.toAbsolutePath().normalize();
       Path normalizedDir = dir.toAbsolutePath().normalize();
       if (!normalizedDir.startsWith(normalizedRoot) || normalizedDir.equals(normalizedRoot)) return false;
@@ -219,8 +249,12 @@ public final class ExclusionPatterns {
 
   /** Returns the index of the first matching pattern for this path, or -1 if none match. */
   public int matchingPatternIndex(Path root, Path path) {
-    if (isEmpty() || root == null || path == null) return -1;
+    if (isEmpty() || path == null) return -1;
     try {
+      for (int i = 0; i < literals.size(); i++) {
+        if (literals.get(i).matches(path, windows)) return fileMatchers.size() + i;
+      }
+      if (root == null) return -1;
       Path normalizedRoot = root.toAbsolutePath().normalize();
       Path normalizedPath = path.toAbsolutePath().normalize();
       if (!normalizedPath.startsWith(normalizedRoot)) return -1;

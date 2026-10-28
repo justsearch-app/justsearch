@@ -81,6 +81,8 @@ import { markScrollableRegions } from '../markdown/markdownScrollRegions.js';
 import { formatDisplayPath, formatLocationBreadcrumb } from '../searchResults/resultRowPresentation.js';
 import { isAdvancedMode, subscribeUiMode } from '../../state/uiModeState.js';
 import { authorizedFetch } from '../../api/authorizedFetch.js';
+import { copyToClipboard } from '../../utils/clipboardCopy.js';
+import { revealLocalPath } from '../../plugin-api/capabilities/platform.js';
 import '../ErrorAlert.js';
 import '../Button.js';
 import { icon } from '../Icon.js';
@@ -204,7 +206,8 @@ const WINDOW_NOTE = {
 } as const;
 /** What the pane says when the index has no such document (a 404 from `/api/preview`). */
 const DOCUMENT_GONE =
-  'This document is no longer in your index — it may have been moved or deleted.';
+  'This source is no longer available — it is no longer in your index.';
+const PREVIEW_FAILED = 'This source could not be read. Please try again when the index is ready.';
 /** Search Thread Round-2 R1b — how long the passage lands with the strong tint before decaying to
  *  the quiet translucent tint + edge marker (the card's refined-✓ decay idiom, ported here). */
 const HIGHLIGHT_DECAY_MS = 1500;
@@ -242,6 +245,7 @@ export class DocumentPane extends JfElement {
     evidence: { state: true },
     loading: { state: true },
     error: { state: true },
+    pathCopyNotice: { state: true },
     // Search Thread Round-2 R1b — has the current highlightRange decayed to the quiet tier?
     highlightSettled: { state: true },
     // Tempdoc 846 §2.3 — the shared ramp's prose variant, reflected so the shared sheet's
@@ -282,6 +286,7 @@ export class DocumentPane extends JfElement {
   declare evidence: VisualExtractionEvidence | null;
   declare loading: boolean;
   declare error: string | null;
+  declare private pathCopyNotice: string;
   /** Round-2 R1b — false while the landed highlight is in its strong phase; true once decayed
    *  (or immediately, under prefers-reduced-motion) to the quiet tint + edge marker. */
   declare highlightSettled: boolean;
@@ -314,6 +319,7 @@ export class DocumentPane extends JfElement {
     this.evidence = null;
     this.loading = false;
     this.error = null;
+    this.pathCopyNotice = '';
     this.highlightSettled = false;
     this.prose = true;
   }
@@ -321,6 +327,7 @@ export class DocumentPane extends JfElement {
   static override transientState = {
     loading: false,
     error: null,
+    pathCopyNotice: '',
   };
 
   /** Tempdoc 738 — re-render the disclosure-gated path header on Simple/Detailed change. */
@@ -333,6 +340,7 @@ export class DocumentPane extends JfElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    ++this.loadToken;
     this.uiModeUnsubscribe?.();
     this.uiModeUnsubscribe = null;
     if (this.scrollDebounceTimer) {
@@ -345,12 +353,19 @@ export class DocumentPane extends JfElement {
     }
   }
 
+  protected override onReveal(): void {
+    // Resume an invalidated pending read; a completed retained preview keeps its existing behavior.
+    if (this.docPath && this.previewWindow === null) void this.loadContent(this.docPath, this.anchor());
+  }
+
   private base(): string {
     return this.apiBase || '';
   }
 
   override willUpdate(changed: PropertyValues): void {
     if (changed.has('docPath')) {
+      ++this.loadToken;
+      this.pathCopyNotice = '';
       const path = this.docPath;
       this.mode = path && isMarkdownPath(path) ? 'rendered' : 'source';
       this.content = '';
@@ -513,9 +528,14 @@ export class DocumentPane extends JfElement {
       );
       if (token !== this.loadToken) return; // a newer docPath superseded this request
       if (!res.ok) {
-        // 404 is the index answering "no such document" — a search hit or citation that outlived its
-        // file. Say that, rather than a status code the reader cannot act on.
-        this.error = res.status === 404 ? DOCUMENT_GONE : `HTTP ${res.status}`;
+        let absent = false;
+        try {
+          const body: unknown = await res.json();
+          absent = res.status === 404 && body !== null && typeof body === 'object'
+            && 'sourceState' in body && body.sourceState === 'absent';
+        } catch { /* An unrecognized response is unknown. */ }
+        if (token !== this.loadToken) return;
+        this.error = absent ? DOCUMENT_GONE : PREVIEW_FAILED;
         return;
       }
       const data = (await res.json()) as {
@@ -552,9 +572,9 @@ export class DocumentPane extends JfElement {
       this.provenance = data.textProvenance ?? null;
       this.evidence = data.visualExtractionEvidence ?? null;
       this.deriveAnchorState();
-    } catch (err) {
+    } catch {
       if (token !== this.loadToken) return;
-      this.error = err instanceof Error ? err.message : String(err);
+      this.error = PREVIEW_FAILED;
     } finally {
       if (token === this.loadToken) {
         this.requestedWindow = null;
@@ -800,6 +820,12 @@ export class DocumentPane extends JfElement {
     }
     /* Round-2 R5c — truncation is the shared formatDisplayPath authority (filename-preserving
        middle-ellipsis), not CSS end-truncation; overflow stays hidden as a defensive clamp only. */
+    .missing-path { padding: 1rem; min-width: 0; }
+    .last-known-path { overflow-wrap: anywhere; user-select: text; }
+    .missing-path jf-button { margin: 0 0.5rem 0.5rem 0; }
+    @media (forced-colors: active) {
+      .missing-path { color: CanvasText; }
+    }
     .path {
       flex: 1;
       min-width: 0;
@@ -1210,12 +1236,25 @@ export class DocumentPane extends JfElement {
     `;
   }
 
+  private async copyPath(): Promise<void> {
+    const path = this.docPath;
+    if (path === null) return;
+    const copied = await copyToClipboard(path);
+    if (this.docPath === path) this.pathCopyNotice = copied ? 'Path copied.' : 'Could not copy the path.';
+  }
+
   private renderBody(): TemplateResult {
     if (this.loading) {
       return html`<div class="empty">Loading…</div>`;
     }
     if (this.error) {
-      return html`<jf-error-alert tone="error">${this.error}</jf-error-alert>`;
+      return html`<jf-error-alert tone="error">${this.error}</jf-error-alert>
+        ${this.error === DOCUMENT_GONE ? html`<div class="missing-path">
+          <p>Last-known path</p><p class="last-known-path">${this.docPath}</p>
+          <jf-button size="sm" .onActivate=${() => this.copyPath()}>Copy path</jf-button>
+          <jf-button size="sm" .onActivate=${() => revealLocalPath(this.docPath ?? '').catch(() => { /* Already reported. */ })}>Reveal path</jf-button>
+          <span role="status">${this.pathCopyNotice}</span>
+        </div>` : nothing}`;
     }
     return html`
       ${this.renderCitationHeader()}${this.renderProvenanceLine()}${this.renderSpanNotice()}${this.renderAnchorNotice()}${this.renderWindowNote()}

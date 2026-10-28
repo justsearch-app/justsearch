@@ -85,15 +85,21 @@ final class SyncRootPromotionCrashRecoveryTest {
       Map.entry("lateoldtoken", "shelf/late.txt"), Map.entry("latenewtoken", "shelf/late.txt"),
       Map.entry("projectedfiletoken", "projected/file.txt"), Map.entry("clearedtoken", "cleared/cleared.txt"),
       Map.entry("shelfrestoredtoken", "shelf/restored.txt"),
+      Map.entry("forgottentoken", "watched/forgotten.txt"), Map.entry("excludedtoken", "watched/excluded.txt"),
       Map.entry("earlyprojectiontoken", "-"), Map.entry("laterprojectiontoken", "-"));
   private static final String PROJECTION_SOURCE = "memory";
+  /** Under the watched root: a file forgotten (its exact-path policy entry) and one excluded by pattern. */
+  private static final String FORGOTTEN = "watched/forgotten.txt";
+  private static final String EXCLUDED = "watched/excluded.txt";
 
   /**
    * S1, S3 and S5 against the control. B retains only SYNC_ROOTs: for a watched root and a
    * configured collection root that change while stopped (S3), a watched root whose volume is
    * away (S5a), a collection root deleted from disk (S5b), and a watched root and a collection
    * root no longer declared (S5c). {@link #deletedAndUnreadableWatchedRootsLetBootPublishAsTheControl}
-   * covers a deleted watched root and S8.
+   * covers a deleted watched root and S8. These children run with the Engine's native policy owner:
+   * the watched root also holds a forgotten and an excluded file, both saved again while stopped;
+   * boot neither indexes nor requeues them.
    */
   @Test
   void retainedRootSyncsRestartAsAnUninterruptedMigrationDoes(@TempDir Path temporary) throws Exception {
@@ -123,6 +129,12 @@ final class SyncRootPromotionCrashRecoveryTest {
         () -> assertHits(restart, "archiveremovedtoken", "archive/remove-me.txt"));
     assertAll("S5: other roots serve while a root is away, deleted or undeclared",
         () -> assertHits(restart, "controltoken", "other/control.txt"));
+    assertAll("Forget: a forgotten and an excluded file under the retained SYNC_ROOT's root stay out",
+        () -> assertTrue(restart.published(), "boot must publish B"),
+        () -> assertHits(restart, "forgottentoken"),
+        () -> assertHits(restart, "excludedtoken"),
+        () -> assertEquals(restart.hits().getProperty("@kept-out-jobs-before"),
+            restart.hits().getProperty("@kept-out-jobs"), "boot requeues neither file"));
     for (String token : List.of("awaykeeptoken", "awaytoken", "shelftoken",
         "droppedtoken", "loosetoken")) {
       assertEquals(relative(ordinary, ordinary.hits(), token), relative(restart, restart.hits(), token),
@@ -392,6 +404,26 @@ final class SyncRootPromotionCrashRecoveryTest {
     return null;
   }
 
+  /** The forgotten and the excluded file's job rows, column by column; empty when none exists. */
+  private static String keptOutJobs(Path root) throws java.sql.SQLException {
+    var rows = new ArrayList<String>();
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + root.resolve("data/jobs.db"));
+        var query = connection.prepareStatement("SELECT * FROM jobs WHERE path IN (?, ?) ORDER BY path")) {
+      query.setString(1, key(root.resolve(FORGOTTEN)));
+      query.setString(2, key(root.resolve(EXCLUDED)));
+      try (var row = query.executeQuery()) {
+        while (row.next()) {
+          var columns = new ArrayList<String>();
+          for (int i = 1; i <= row.getMetaData().getColumnCount(); i++) {
+            columns.add(row.getMetaData().getColumnName(i) + "=" + row.getString(i));
+          }
+          rows.add(String.join(",", columns).replace(key(root), "<root>"));
+        }
+      }
+    }
+    return rows.toString();
+  }
+
   private static List<String> retained(Path root, String generation) throws Exception {
     try (var queue = new SqliteJobQueue(root.resolve("data/jobs.db"))) {
       queue.open();
@@ -416,7 +448,8 @@ final class SyncRootPromotionCrashRecoveryTest {
    * S3: in the watched root and in the configured collection root, one file added, one removed
    * and one changed while no Engine runs; each change is saved anew, so its size and mtime change.
    * S5: a file added to the root whose volume is away; a collection root deleted;
-   * a watched and a collection root no longer declared.
+   * a watched and a collection root no longer declared. The forgotten and the excluded file are
+   * saved again.
    */
   private static Void changeRootsWhileStopped(Path root) throws IOException {
     Files.writeString(root.resolve("watched/added.txt"), "addedtoken");
@@ -429,6 +462,8 @@ final class SyncRootPromotionCrashRecoveryTest {
     Files.writeString(changed, "archivenewtoken saved");
     assertNotEquals(modified, Files.getLastModifiedTime(changed), "the edit must change the mtime");
     Files.writeString(root.resolve("away/while-away.txt"), "awaytoken");
+    Files.writeString(root.resolve(FORGOTTEN), "forgottentoken saved again");
+    Files.writeString(root.resolve(EXCLUDED), "excludedtoken saved again");
     deleteTree(root.resolve("shelf"));
     Files.writeString(root.resolve("undeclare"), "dropped loose");
     return null;
@@ -445,6 +480,7 @@ final class SyncRootPromotionCrashRecoveryTest {
   }
 
   private static Restart restart(Path root, String mode, String scenario, String phase) throws Exception {
+    if (scenario.equals("roots")) Files.writeString(root.resolve("kept-out-jobs"), keptOutJobs(root));
     Process restarted = child(root, mode, scenario, phase);
     long started = System.nanoTime();
     boolean published;
@@ -469,7 +505,7 @@ final class SyncRootPromotionCrashRecoveryTest {
         properties(root.resolve("hits.properties")), properties(root.resolve("returned.properties")));
     // A further restart of the same root writes its own markers.
     for (String marker : List.of("published", "searched", "settled", "verified", "halted", "boot-failed",
-        "hits.properties", "returned.properties")) {
+        "hits.properties", "returned.properties", "kept-out-jobs")) {
       Files.deleteIfExists(root.resolve(marker));
     }
     return restart;
@@ -505,6 +541,9 @@ final class SyncRootPromotionCrashRecoveryTest {
   private static Map<String, String> parity(Restart restart) {
     var parity = relative(restart, restart.hits());
     parity.remove("@watched-watched");
+    // Job rows carry this run's revisions and times; each restart compares its own before and after.
+    parity.remove("@kept-out-jobs-before");
+    parity.remove("@kept-out-jobs");
     return parity;
   }
 
@@ -600,20 +639,35 @@ final class SyncRootPromotionCrashRecoveryTest {
             + root.resolve(name).toString().replace("\\", "\\\\") + "\"]}")
         .collect(java.util.stream.Collectors.joining(",", "[", "]"));
     Files.createDirectories(dataDir);
-    WorkerBootFixture.publishConfig(dataDir, indexBase, "BLUE_GREEN_MIGRATE", Map.of(
+    var settings = new java.util.HashMap<>(Map.of(
         "justsearch.ai.disabled", "true",
         "justsearch.ai.embed.enabled", "false",
         "justsearch.splade.enabled", "false",
         "justsearch.ner.enabled", "false",
         "justsearch.extraction.sandbox.mode", "IN_PROCESS",
         "index.collections", collections));
+    if (scenario.equals("roots")) {
+      // Forget's exact-path entry for one file, and an ordinary pattern for another.
+      settings.put("justsearch.ui.exclude_patterns", new tools.jackson.databind.ObjectMapper().writeValueAsString(
+          List.of(Map.of("literal", Map.of("version", 1, "id", "0f3a5c1e-6b2d-4e8f-9a7c-1d2e3f405162",
+              "path", root.resolve(FORGOTTEN).toAbsolutePath().normalize().toString(), "scope", "FILE")),
+              Path.of(EXCLUDED).getFileName().toString())));
+    }
+    WorkerBootFixture.publishConfig(dataDir, indexBase, "BLUE_GREEN_MIGRATE", settings);
     Files.writeString(dataDir.resolve("watched_roots.json"), new tools.jackson.databind.ObjectMapper()
         .writeValueAsString(Map.of("schemaVersion", 1, "roots",
             watched.stream().map(path -> Map.of("path", path.toString())).toList())));
     var executors = phase.equals("migrate") ? new TestEngineExecutors()
         : compressedMaintenance(new TestEngineExecutors());
-    var server = org.mockito.Mockito.spy(new KnowledgeServer(executors,
-        WorkerBootFixture.workerConfig(dataDir), null, ManagedChildRegistry.noop(), lifecycle(root)));
+    // "roots" composes the server as the Engine does, with the native policy owner Forget shares.
+    var configuration = io.justsearch.configuration.resolved.ConfigStore.global();
+    var server = org.mockito.Mockito.spy(scenario.equals("roots")
+        ? new KnowledgeServer(executors, WorkerBootFixture.workerConfig(dataDir), null,
+            io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(ManagedChildRegistry.noop()),
+            lifecycle(root), null, null, null, null, configuration.publicationLock(),
+            () -> new io.justsearch.core.component.DeviceMemoryLine(null, null), configuration)
+        : new KnowledgeServer(executors,
+            WorkerBootFixture.workerConfig(dataDir), null, ManagedChildRegistry.noop(), lifecycle(root)));
     org.mockito.Mockito.doNothing().when(server)
         .startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
     if (Files.exists(root.resolve("refuse-removals"))) {
@@ -625,7 +679,15 @@ final class SyncRootPromotionCrashRecoveryTest {
         return reaper.callRealMethod();
       }).when(server).startStuckJobReaper(org.mockito.ArgumentMatchers.any());
     }
-    server.bindBootRootBindings(watched.stream().map(path -> new RootBinding(path, null)).toList());
+    var bindings = watched.stream().map(path -> new RootBinding(path, null)).toList();
+    if (scenario.equals("roots")) {
+      server.bindNativePolicyRootBindings(new KnowledgeServer.NativePolicyRootBindings() {
+        @Override public <T> T withBindings(java.util.function.Function<List<RootBinding>, T> action) {
+          return action.apply(bindings);
+        }
+      });
+    }
+    server.bindBootRootBindings(bindings);
     server.bindExclusionRoots(() -> watched);
     if (scenario.equals("projection")) server.installProjectionSeedSources(List.of(new ProjectionSeedSource() {
       @Override public String sourceId() { return PROJECTION_SOURCE; }
@@ -827,6 +889,9 @@ final class SyncRootPromotionCrashRecoveryTest {
         write(root, "shelf/shelf.txt", "shelftoken");
         write(root, "dropped/dropped.txt", "droppedtoken");
         write(root, "loose/loose.txt", "loosetoken");
+        // Only the watched root's sync walks these; no file receipt names them.
+        write(root, FORGOTTEN, "forgottentoken");
+        write(root, EXCLUDED, "excludedtoken");
         for (String synced : List.of("watched", "archive", "away", "shelf", "dropped", "loose")) {
           syncRoot(queue, building, root.resolve(synced), true, null);
         }
@@ -988,6 +1053,8 @@ final class SyncRootPromotionCrashRecoveryTest {
     }
     System.out.println("CRASH-RECOVERY " + mode + " published active=" + active + " after "
         + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + "ms");
+    // What boot itself admitted, before the Head's walks below.
+    String keptOutJobs = scenario.equals("roots") ? keptOutJobs(root) : null;
     mark(root, "published");
     // The Head after every restart: it watches each persisted root and walks it
     // (RootLifecycleOps.reindexPersistedRoots), and its periodic sync reconciles it (SyncOps).
@@ -1023,6 +1090,10 @@ final class SyncRootPromotionCrashRecoveryTest {
     hits.setProperty("@later-id", projection(root.resolve("projected"), "later", 1, "").indexId());
     hits.setProperty("@archive-watched", Boolean.toString(watching(server, root.resolve("archive"))));
     hits.setProperty("@watched-watched", Boolean.toString(watching(server, root.resolve("watched"))));
+    if (keptOutJobs != null) {
+      hits.setProperty("@kept-out-jobs", keptOutJobs);
+      hits.setProperty("@kept-out-jobs-before", Files.readString(root.resolve("kept-out-jobs")));
+    }
     store(root.resolve("hits.properties"), hits);
     if (scenario.equals("withheld")) {
       // S8: permissions return while the Engine runs. S5b: the root returns with its file and one

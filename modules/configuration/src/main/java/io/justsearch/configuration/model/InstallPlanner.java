@@ -36,6 +36,21 @@ public final class InstallPlanner {
 
   private InstallPlanner() {}
 
+  /** Hardware the target's shipped or downloadable runtime can actually support. */
+  public static HardwareProfile hardwareForPlan(ModelRegistry registry, HardwareProfile detected) {
+    var target = io.justsearch.configuration.NativeTargets.current();
+    // Windows' bundled runtime and CUDA supplement keep their existing selection. On Linux the
+    // ORT provider alone cannot run: its CUDA/cuDNN dependencies need a target-specific pack.
+    boolean cudaSupplied = target.hasCpuBaselineRuntime()
+        || registry.packages().stream().noneMatch(pkg -> pkg.tier() == CapabilityTier.RUNTIME
+            && pkg.requiresCuda())
+        || registry.packages().stream().anyMatch(pkg -> !pkg.devOnly()
+            && pkg.tier() == CapabilityTier.RUNTIME && pkg.requiresCuda()
+            && (pkg.nativeTarget() == null || target.targetId().equals(pkg.nativeTarget())));
+    return cudaSupplied ? detected
+        : new HardwareProfile(detected.gpuDetected(), false, detected.vramBytes());
+  }
+
   /** The staging path a partially-downloaded {@code finalTarget} occupies. */
   public static Path partialPathFor(Path finalTarget) {
     return finalTarget.resolveSibling(finalTarget.getFileName() + PARTIAL_SUFFIX);
@@ -184,6 +199,7 @@ public final class InstallPlanner {
     DownloadProfile excludedProfile = policyExcludedHardware == null
         ? DownloadProfile.CPU : policyExcludedHardware.downloadProfile();
     Set<String> declinedIds = declined == null ? Set.of() : declined;
+    hardware = hardwareForPlan(registry, hardware);
     DownloadProfile profile = hardware.downloadProfile();
     List<InstallPlan.PlannedDownload> downloads = new ArrayList<>();
     List<InstallPlan.SkippedPackage> skipped = new ArrayList<>();
@@ -246,11 +262,10 @@ public final class InstallPlanner {
 
       // Native packages declare the descriptor's OS/architecture key. Portable model packages
       // have no target. This decision is shared by preview, acquisition and saved contracts.
-      if (pkg.nativeTarget() != null
-          && !pkg.nativeTarget().equals(io.justsearch.configuration.NativeTargets.current().targetId())) {
+      String platformReason = platformExclusion(pkg, registry);
+      if (platformReason != null) {
         skipped.add(new InstallPlan.SkippedPackage(pkg.id(), SkipCause.PLATFORM,
-            "Runtime artifacts target " + pkg.nativeTarget() + "; configure an external runtime for "
-                + io.justsearch.configuration.NativeTargets.current().targetId() + "."));
+            platformReason));
         continue;
       }
 
@@ -498,6 +513,9 @@ public final class InstallPlanner {
     if (pkg.necessity().userDeclinable() && declined != null && declined.contains(pkg.id())) {
       return false;
     }
+    if (platformExclusion(pkg, null) != null) {
+      return false;
+    }
     if (requiresUnavailableCuda(pkg, profile)) {
       return false;
     }
@@ -505,6 +523,35 @@ public final class InstallPlanner {
       return false;
     }
     return true;
+  }
+
+  /** Includes the registry's native runtime dependencies, as the download plan does. */
+  public static boolean isIncludedByPlan(
+      ModelPackage pkg, ModelRegistry registry, InstallIntent intent, Set<String> declined,
+      HardwareProfile hardware) {
+    return isIncludedByPlan(pkg, intent, declined, hardwareForPlan(registry, hardware))
+        && platformExclusion(pkg, registry) == null;
+  }
+
+  private static String platformExclusion(ModelPackage pkg, ModelRegistry registry) {
+    String target = io.justsearch.configuration.NativeTargets.current().targetId();
+    if (pkg.nativeTarget() != null && !pkg.nativeTarget().equals(target)) {
+      return "Runtime artifacts target " + pkg.nativeTarget()
+          + "; configure an external runtime for " + target + ".";
+    }
+    // ONNX search can run without llama-server. A chat model cannot use a runtime package
+    // whose native artifacts belong to another platform, even though the GGUF is portable.
+    if (registry != null
+        && pkg.variants().stream().anyMatch(v -> v.targetEP() == ExecutionProvider.LLAMA_SERVER)) {
+      for (String id : pkg.dependsOn()) {
+        ModelPackage runtime = registry.findPackage(id);
+        if (runtime != null && runtime.tier() == CapabilityTier.RUNTIME
+            && runtime.nativeTarget() != null && !runtime.nativeTarget().equals(target)) {
+          return pkg.label() + " is unavailable: its runtime is not supplied for " + target + ".";
+        }
+      }
+    }
+    return null;
   }
 
   /** Returns whether the selected variant owns a retained ONNX candidate directory. */

@@ -9,6 +9,7 @@ import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
+import org.apache.tika.parser.ParseRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,6 +104,11 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
 
   ExtractionResult extract(PreparedExtractionInput input, org.apache.tika.parser.ParseContext context,
       EmbeddedResourceBudget budget) throws IOException, ExtractionException {
+    return extract(input, context, budget, input.metadata());
+  }
+
+  ExtractionResult extract(PreparedExtractionInput input, org.apache.tika.parser.ParseContext context,
+      EmbeddedResourceBudget budget, Metadata metadata) throws IOException, ExtractionException {
     Path file = input.source();
     long fileSize = input.size();
     if (fileSize > MAX_FILE_SIZE) {
@@ -132,12 +138,15 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
     log.debug("Extracting content from: {} ({} bytes)", file.getFileName(), fileSize);
 
     StructuredContentExtractor.configureTesseractSkipOcr(context);
-    Metadata metadata = input.metadata();
 
     // No owner window: this parser graph cannot launch Tesseract (OwnedTikaParsers excludes it).
     try (InputStream is = input.openParserStream(tika)) {
       org.apache.tika.sax.BodyContentHandler handler =
           new org.apache.tika.sax.BodyContentHandler(maxContentLength);
+      // A flat fallback is a new parse attempt; do not retain parsers or limits from the
+      // failed structured attempt in its reused context.
+      ParseRecord record = new ParseRecord();
+      context.set(ParseRecord.class, record);
       context.set(org.apache.tika.parser.Parser.class, tika.getParser());
       try {
         tika.getParser().parse(is, handler, metadata, context);
@@ -145,9 +154,15 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
         if (!org.apache.tika.exception.WriteLimitReachedException.isWriteLimitReached(e)) {
           throw new TikaException("Flat extraction failed", e);
         }
+        record.setWriteLimitReached(true);
       }
       budget.check();
       String content = handler.toString();
+      // Tika's WriteOutContentHandler counts UTF-16 units and may stop inside a pair.
+      if (record.isWriteLimitReached() && !content.isEmpty()
+          && Character.isHighSurrogate(content.charAt(content.length() - 1))) {
+        content = content.substring(0, content.length() - 1);
+      }
       String mimeType = metadata.get(Metadata.CONTENT_TYPE);
       String title = metadata.get(TikaCoreProperties.TITLE);
       // Fallback: extract title from YAML frontmatter (Tika doesn't parse markdown frontmatter)

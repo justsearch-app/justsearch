@@ -1,0 +1,513 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T19:06:02.975Z",
+  "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+  "tree": "9c9d94a65a6f09d33b0cfdbfc15aacbe7af91bb7",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run --configLoader runner \"src/api/domains/forget.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/ConfirmDialog.forget-abort.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forget.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/p76fs5wh/tmp/test-intent-vitest-182-1793127956256.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6717,
+      "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/uiux-forget-current-ui-complete/run-1.log",
+      "outputDigest": "sha256:670d384ff3037f568bb24c84ed98ade78a8f68b49cd6c4a9b2cd5297394cf391"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/domains/forget.test.ts",
+      "file": "modules/ui-web/src/api/domains/forget.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:916e7436202fc3492e3b08a986e265accb1744853fafdbc40d5318cb037c2858",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56.2 consent names the exact frozen target and preserves one key and every path byte",
+          "status": "passed"
+        },
+        {
+          "name": "N56 cancellation never approves, replays or reads a fictitious successful outcome",
+          "status": "passed"
+        },
+        {
+          "name": "S56 lost post-approval response observes the original key without another destructive POST",
+          "status": "passed"
+        },
+        {
+          "name": "S56 keeps typed INCOMPLETE separate from success",
+          "status": "passed"
+        },
+        {
+          "name": "S56 keeps typed UNKNOWN separate from success",
+          "status": "passed"
+        },
+        {
+          "name": "N56 malformed completion and an observation for another key remain unknown",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'success' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'success' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'error' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'error' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'lost-response' receipt cannot retarget the frozen exact attempt ({ path: '/docs/report\\[1].txt' })",
+          "status": "passed"
+        },
+        {
+          "name": "N56 'lost-response' receipt cannot retarget the frozen exact attempt ({ scope: 'FOLDER' })",
+          "status": "passed"
+        },
+        {
+          "name": "S56 preparation refusal is truthful and does not become a success through an empty read",
+          "status": "passed"
+        },
+        {
+          "name": "RF55 Unix backslashes and trailing whitespace are not separators or wildcard prefixes",
+          "status": "passed"
+        },
+        {
+          "name": "S56 unfinished pagination is explicit and malformed or failed reads cannot become empty lists",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5543bdbda0a2543ebecae87992a3618c996fa97eb85021229a22fe48c89cb373",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchResultActions (577 Phase 8) registers the core verbs for the search-result-row context, in priority order",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) is idempotent — a second boot call does not duplicate the verbs",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) verbs are disabled for a payload without a path",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) handlers ride the one platform/clipboard seams",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) S56.6 offers forget only to the host callback and leaves all ordinary verbs available",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) S56.9 keeps help and agent-history verbs absent even in a capable host",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ConfirmDialog.forget-abort.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ConfirmDialog.forget-abort.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f9789d91f01cc26c0d90fb3ba9096425bd369ac53299f970fe9f9d9284cb53a4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56 an already departed owner never opens or approves a forget dialog",
+          "status": "passed"
+        },
+        {
+          "name": "S56 a placement departure closes its own dialog and a late confirm cannot authorize it",
+          "status": "passed"
+        },
+        {
+          "name": "S56 aborted modal and its delayed autofocus do not steal the new placement focus",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.forget.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.forget.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c8bc013aefe8780b2c514d2ae181afc0bdb839448d91ba07eb5b806ade5bd449",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56.1 opens the real forget menu by pointer and emits the exact selected target",
+          "status": "passed"
+        },
+        {
+          "name": "S56.1 opens the real forget menu by ContextMenu and emits the exact selected target",
+          "status": "passed"
+        },
+        {
+          "name": "S56.1 opens the real forget menu by Shift+F10 and emits the exact selected target",
+          "status": "passed"
+        },
+        {
+          "name": "S56.6 an unsupported host retains its ordinary pointer actions without offering forget",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.forget.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f1f8a6a0e46342ab5f4ecb4b38f8b52ad938cd51dbbb43921b176a6f0e902a64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56 recovery remains available without the original result and remount never retries",
+          "status": "passed"
+        },
+        {
+          "name": "S56 Retry freezes exact saved target and sends only original key",
+          "status": "passed"
+        },
+        {
+          "name": "S56 Withdraw freezes exact saved target and sends only original key",
+          "status": "passed"
+        },
+        {
+          "name": "N56 cancellation and Library departure abort consent before approval or effects",
+          "status": "passed"
+        },
+        {
+          "name": "WD55 unresolved withdrawal disables destructive Retry and names retry of withdrawal",
+          "status": "passed"
+        },
+        {
+          "name": "S56 explicit pagination and failed refresh cannot claim an empty successful observation",
+          "status": "passed"
+        },
+        {
+          "name": "N56 unknown targets disable decisions and unsupported hosts hide recovery controls",
+          "status": "passed"
+        },
+        {
+          "name": "WD55 late withdrawal preserves a new draft after leaving this Library placement",
+          "status": "passed"
+        },
+        {
+          "name": "F1 Retry has one owned ceremony in both broadcast orders; Cancel preserves focus and state",
+          "status": "passed"
+        },
+        {
+          "name": "F1 Withdraw has one owned ceremony in both broadcast orders; Cancel preserves focus and state",
+          "status": "passed"
+        },
+        {
+          "name": "F1 Library Cancel returns focus to its enabled originating control without a broadcast",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:faa003ce6517c34066f9a13cef325d00655c976ab549879d558787238882d8a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions RF55 exact rows visibly distinguish trailing whitespace, control characters and slash pairs",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions RF55 keeps exact path objects out of the glob editor and retains their bytes on a glob save",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions RF55 removes a precise keep-out only through the witnessed save without editing glob text",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX1 editor preserves the saved list and names every literal fallback warning",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX2 pattern help explains character classes and alternatives for previously saved lists",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions keeps the witness read with the draft and never refreshes it before saving",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (503) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (200) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions preserves a conflicting draft and blocks effects until explicit reload and a new attempt",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions waits through open202 during Save and rejects overlapping clicks",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions retains uncertain bytes across timeout and a later check instead of minting a new mutation",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions renders disabled controls after failed load and retains a conflicting draft across remount",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions unblocks reload after a stalled GET and ignores its late result after a newer observation",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions EX4 editor reports input limit refusal without applying or discarding the draft",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions EX4 editor reports expanded limit refusal without applying or discarding the draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5f623191bc5c6b06aaf17a0a45e82e86123db0258516ff689091585952b316b6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S56 confirmed success refreshes real current search counts, selection, pending Ask and the matching pane",
+          "status": "passed"
+        },
+        {
+          "name": "N56 cancellation and repeated activation create no second request or destructive effect",
+          "status": "passed"
+        },
+        {
+          "name": "S56 REFUSED never removes rows, selection, Ask scope or pane optimistically",
+          "status": "passed"
+        },
+        {
+          "name": "S56 INCOMPLETE never removes rows, selection, Ask scope or pane optimistically",
+          "status": "passed"
+        },
+        {
+          "name": "S56 UNKNOWN never removes rows, selection, Ask scope or pane optimistically",
+          "status": "passed"
+        },
+        {
+          "name": "S56 leaving a screen while consent is open aborts that dialog and a stale confirm cannot execute",
+          "status": "passed"
+        },
+        {
+          "name": "S56 a late completed response cannot close another conversation pane or rewrite its new draft",
+          "status": "passed"
+        },
+        {
+          "name": "S56 remounting during an accepted forget does not replay the destructive operation",
+          "status": "passed"
+        },
+        {
+          "name": "S56 a host without the owner keeps forget unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "F1 a broadcast before the 428=true leaves one ceremony; Escape changes nothing and returns focus",
+          "status": "passed"
+        },
+        {
+          "name": "F1 a broadcast before the 428=false leaves one ceremony; Escape changes nothing and returns focus",
+          "status": "passed"
+        },
+        {
+          "name": "F3 refused preparation displays the specific Library pointer with no dialog or raw arguments",
+          "status": "passed"
+        },
+        {
+          "name": "F4 an already absent completed target is described without claiming a removal",
+          "status": "passed"
+        },
+        {
+          "name": "F1 cancellation restores a keyboard-focusable row before returning focus, without a broadcast",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d7d96cbe3c5ea1ab3c307bb9eaa93d72198cf404ba9b257feab143d7367ff9ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (inside) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (containing) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:91719b753d591cf6654bca1a8d6ae5250f21d80682d751ca69c9774731fce5d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "confirmed Forget immediately republishes the live choice [ '/docs/sub/report\\[1].txt ' ]",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget immediately republishes the live choice [ '/docs/sub/report\\[1].txt ', …(1) ]",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed FILE Forget prunes a kept draft across reload and navigation",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed FOLDER Forget prunes a kept draft across reload and navigation",
+          "status": "passed"
+        },
+        {
+          "name": "forgetting the last kept file requires reselection rather than granting all-file scope",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget preserves saved turn scopes while pruning a live prepared Ask",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget prunes a retained submission without rewriting its saved turn",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget prunes an incoming handoff selection and its kept file preparation",
+          "status": "passed"
+        },
+        {
+          "name": "a confirmed card Forget arriving after navigation prunes the kept draft without replacing current text",
+          "status": "passed"
+        },
+        {
+          "name": "a live kept Ask losing its final file stays blocked when returning without reload",
+          "status": "passed"
+        },
+        {
+          "name": "a live Structured draft losing its final file keeps its schema and requires reselection",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5452d1a2addc98b46945c44b25bd2c9b29eb84b9ee8f3b82750879f73fa273ef"
+}

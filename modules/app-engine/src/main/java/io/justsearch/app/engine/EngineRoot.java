@@ -67,6 +67,34 @@ public final class EngineRoot implements WorkerHost {
   private final io.justsearch.app.api.operations.OperationAttemptRunner attempts;
   public io.justsearch.app.api.operations.OperationAttemptRunner operationAttempts() { return attempts; }
 
+  private final io.justsearch.app.api.operations.ForgetService forgetService;
+
+  /** Process-scoped UI data control; an index restart does not discard its durable intents. */
+  public io.justsearch.app.api.operations.ForgetService forgetService() { return forgetService; }
+
+  boolean forgetQueueEntryAllowed() {
+    KnowledgeServer physical = server;
+    return physical == null || physical.forgetQueueEntryAllowed();
+  }
+
+  /** Synchronous physical scope. Never route this callback through EngineKnowledgeClient. */
+  <T> T withForgetAuthority(java.util.function.BiFunction<
+      java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>,
+      io.justsearch.indexerworker.services.WorkerIngestService, T> action) {
+    KnowledgeServer physical = server;
+    // Reject queue/callback reentry BEFORE taking the root lifecycle or stable-binding owner.
+    if (physical == null || !physical.forgetEntryAllowed()) {
+      throw new IllegalStateException("The writable index is unavailable for forget");
+    }
+    synchronized (this) {
+      if (server != physical || !clientReady || admission.isClosing()) {
+        throw new IllegalStateException("The index is starting, stopping or changing");
+      }
+      return authority.roots().withForgetBindings(bindings ->
+          physical.withForgetAuthority(worker -> action.apply(bindings, worker)));
+    }
+  }
+
   /** Externally owned, shared by both halves; closed after the index half. */
   public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
   private final DefaultEngineProcessResources processResources;
@@ -786,7 +814,7 @@ public final class EngineRoot implements WorkerHost {
     }
     return new EngineRoot(operations, attempts, serverFactory(childControl, () -> configStore),
         deadlineMs, batchSize, terminalWriterFaultAction, requestedRestartAction, authority,
-        processResources);
+        processResources, configStore);
   }
 
   private EngineRoot(io.justsearch.app.api.operations.OperationStore operations, io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize, IntConsumer exitAction) {
@@ -894,7 +922,7 @@ public final class EngineRoot implements WorkerHost {
                       .pinnedPciBusId().orElse(null)).effective();
               return new io.justsearch.core.component.DeviceMemoryLine(
                   device.totalVramBytes(), device.freeVramBytes());
-            });
+            }, configStore);
       }
     };
   }
@@ -941,6 +969,17 @@ public final class EngineRoot implements WorkerHost {
       IntConsumer terminalWriterFaultAction, Runnable requestedRestartAction,
       io.justsearch.app.services.bootstrap.OperationAuthority authority,
       DefaultEngineProcessResources processResources) {
+    this(operations, attempts, serverFactory, deadlineMs, batchSize, terminalWriterFaultAction,
+        requestedRestartAction, authority, processResources, null);
+  }
+
+  private EngineRoot(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      ServerFactory serverFactory, long deadlineMs, int batchSize,
+      IntConsumer terminalWriterFaultAction, Runnable requestedRestartAction,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      DefaultEngineProcessResources processResources,
+      io.justsearch.configuration.resolved.ConfigStore fixedConfiguration) {
     this.processResources = Objects.requireNonNull(processResources, "processResources");
     this.resources = processResources.policy();
     resources.retained().connect("representation-generations", () -> {
@@ -967,6 +1006,11 @@ public final class EngineRoot implements WorkerHost {
     this.authority = Objects.requireNonNull(authority, "authority");
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
+    // Older embedded factories do not establish a shared settings/configuration owner. They
+    // retain the refusing sentinel instead of advertising an action with an unrelated lock.
+    this.forgetService = fixedConfiguration == null
+        ? io.justsearch.app.api.operations.ForgetService.unavailable()
+        : new ForgetCoordinator(this, operations, attempts, admission, fixedConfiguration.publicationLock());
     this.recordedIngestion = new RecordedIngestionCoordinator(operations, attempts, admission, authority);
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
     this.serverFactory = Objects.requireNonNull(serverFactory, "serverFactory");
@@ -1031,6 +1075,15 @@ public final class EngineRoot implements WorkerHost {
     started.onMigrationRestart(() -> requestRestart(started));
     try {
       started.installProjectionSeedSources(projectionSeedSources);
+      // Policy permission requires the same shared configuration owner as Forget itself.
+      if (forgetService.hasOwner()) {
+        started.bindNativePolicyRootBindings(new KnowledgeServer.NativePolicyRootBindings() {
+          @Override public <T> T withBindings(java.util.function.Function<
+              java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>, T> action) {
+            return authority.roots().withForgetBindings(action);
+          }
+        });
+      }
       started.bindBootRootBindings(authority.roots().snapshotBindings());
       started.bindExclusionRoots(authority.roots()::watchedPaths);
       if (startContext != null) started.bindIndexStartContext(startContext);

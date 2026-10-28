@@ -84,7 +84,7 @@ Path llmModel = Path.of(EnvRegistry.LLM_MODEL_PATH.getString("Qwen_Qwen3.5-9B-Q4
 
 ## Settings preparation and storage
 
-`UiSettingsStore` writes a schema-v5 envelope containing settings, `acceptedRevision`,
+`UiSettingsStore` writes a schema-v6 envelope containing settings, `acceptedRevision`,
 `lastCommittedOperationKey`, and an optional query-role selection. An absent selection
 retains the active generation manifest's legacy authority; a present selection
 distinguishes each explicitly disabled query role from an exact selected model and

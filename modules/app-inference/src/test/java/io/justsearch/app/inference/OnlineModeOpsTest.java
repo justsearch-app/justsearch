@@ -262,6 +262,37 @@ class OnlineModeOpsTest {
     assertNull(OnlineModeOps.extractUsageFromChatChunk(null));
   }
 
+  @Test
+  @DisplayName("Extract usage from llama-server streaming final chunk")
+  void extractsUsageFromStreamingChunk() throws Exception {
+    JsonNode root =
+        MAPPER.readTree(
+            """
+            {
+              "choices": [],
+              "object": "chat.completion.chunk",
+              "usage": { "completion_tokens": 8, "prompt_tokens": 24, "total_tokens": 32 },
+              "timings": { "prompt_n": 24 }
+            }
+            """);
+    AiUsage usage = OnlineModeOps.extractUsageFromChatChunk(root);
+    assertNotNull(usage);
+    assertEquals(24, usage.promptTokens());
+    assertEquals(8, usage.completionTokens());
+    assertEquals(32, usage.totalTokens());
+  }
+
+  @Test
+  @DisplayName("Returns null when usage object is missing")
+  void missingUsageReturnsNull() throws Exception {
+    JsonNode root =
+        MAPPER.readTree(
+            """
+            { "choices": [ { "delta": { "content": "hi" } } ] }
+            """);
+    assertNull(OnlineModeOps.extractUsageFromChatChunk(root));
+  }
+
   // ==================== chatCompletion ====================
 
   @Test

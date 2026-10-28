@@ -19,8 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Tempdoc 824 §3.3b/§3.3d — the terminal claim an install run publishes is CHECKED against disk,
  * and it counts required files only.
  *
- * <p>Round 16's run ended with five of seven packages failed. The state and the message were
- * honest; the two booleans the UI actually reads were not. {@code installedFully} was never
+ * <p>Round 16's run ended with five of seven packages failed. Required failures now fail the run; optional-only gaps remain non-blocking. {@code installedFully} was never
  * recomputed within the session that ran the install ({@code maybeRecomputeInstalledFromDisk} is
  * gated on {@code "idle".equals(status.state)}), and {@code repairNeeded} was {@code failedCount >
  * 0} regardless of WHICH file failed — so one 872-byte optional metadata sidecar produced "a
@@ -64,12 +63,12 @@ final class AiInstallServiceCompletionTruthTest {
 
   /**
    * Test 6 — per-asset isolation (INS-005 stays fixed). One package's asset failing must leave the
-   * others installed and the RUN completed, with an honest count. Pins the property the round-16
+   * others installed and the RUN failed, with an honest count. Pins the property the round-16
    * log already demonstrates in production, so a future refactor of the download loop cannot
    * quietly reintroduce the abort-remaining behaviour the docs claimed was still present.
    */
   @Test
-  @DisplayName("one failed package of three: A and C installed, B failed, run completed 2/3")
+  @DisplayName("one failed package of three: A and C installed, B failed, run failed 2/3")
   void perAssetIsolation_oneFailedPackageOfThree() throws Exception {
     AiInstallService svc = new AiInstallService(null, null, null, null, tmp);
     AiInstallStatus status = statusOf(svc);
@@ -79,7 +78,7 @@ final class AiInstallServiceCompletionTruthTest {
 
     svc.applyCompletionState(completeness(List.of(missing("splade", "splade/model_fp16.onnx", true))));
 
-    assertEquals("completed", status.state, "a partial failure is a completed run, never a failed one");
+    assertEquals("failed", status.state, "a required file failed, even though other packages installed");
     assertTrue(status.message.contains("2/3"), "honest count: " + status.message);
     assertTrue(status.message.contains("1 failed"), status.message);
     assertFalse(status.installedFully, "a missing REQUIRED file is still an incomplete install");
@@ -136,7 +135,7 @@ final class AiInstallServiceCompletionTruthTest {
 
     svc.applyCompletionState(completeness(List.of(missing("splade", "splade/vocab.txt", true))));
 
-    assertEquals("completed", status.state);
+    assertEquals("failed", status.state);
     assertFalse(status.installedFully, "disk contradicts the bookkeeping — disk wins");
     assertTrue(status.repairNeeded);
   }

@@ -1,6 +1,6 @@
 {
   "kind": "justsearch-workflow-signal-policy.v1",
-  "version": 7,
+  "version": 8,
   "defaultStaleDays": 14,
   "branchProtection": {
     "requireBranchesUpToDateBeforeMerging": false
@@ -71,9 +71,10 @@
       "path": ".github/workflows/build-installer.yml",
       "class": "release-gate",
       "expectedTriggers": [
+        "push",
         "workflow_dispatch"
       ],
-      "owner": "tempdoc 374 / Production-Reality Verification",
+      "owner": "two-platform immutable release candidate",
       "failureDefault": "release-blocking-failure",
       "staleDays": 14,
       "blocking": true,
@@ -183,6 +184,61 @@
       "staleDays": 30,
       "blocking": false,
       "advisory": true
+    },
+    {
+      "name": "Build Linux Installer",
+      "path": ".github/workflows/build-installer-linux.yml",
+      "class": "release-gate",
+      "expectedTriggers": [
+        "workflow_call",
+        "workflow_dispatch",
+        "pull_request"
+      ],
+      "owner": "Linux Debian packaging",
+      "failureDefault": "release-blocking-failure",
+      "staleDays": 14,
+      "blocking": true,
+      "advisory": false
+    },
+    {
+      "name": "Build Windows Installer",
+      "path": ".github/workflows/build-installer-windows.yml",
+      "class": "release-gate",
+      "expectedTriggers": [
+        "workflow_call"
+      ],
+      "owner": "two-platform release packaging",
+      "failureDefault": "release-blocking-failure",
+      "staleDays": 14,
+      "blocking": true,
+      "advisory": false
+    },
+    {
+      "name": "Publish Release",
+      "path": ".github/workflows/publish-release.yml",
+      "class": "release-gate",
+      "expectedTriggers": [
+        "workflow_dispatch"
+      ],
+      "owner": "two-platform release packaging",
+      "failureDefault": "release-blocking-failure",
+      "staleDays": 14,
+      "blocking": true,
+      "advisory": false
+    },
+    {
+      "name": "Daily Packaging Smoke",
+      "path": ".github/workflows/packaging-smoke.yml",
+      "class": "scheduled-quality-signal",
+      "expectedTriggers": [
+        "schedule",
+        "workflow_dispatch"
+      ],
+      "owner": "two-platform release packaging",
+      "failureDefault": "release-blocking-failure",
+      "staleDays": 2,
+      "blocking": true,
+      "advisory": false
     }
   ]
 }

@@ -66,6 +66,19 @@ public interface DocumentService {
    */
   CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext);
 
+  /** Index membership only; a missing capability or failed read must never imply absence. */
+  enum Presence { PRESENT, ABSENT, UNKNOWN }
+
+  int MAX_PRESENCE_IDS = 64;
+
+  /**
+   * Bounded observation, independent of extracted text and the source's current disk location.
+   * An omitted ID means unknown; implementations must not derive absence from a fetch failure.
+   */
+  default CompletionStage<Map<String, Presence>> checkPresence(List<String> docIds, EngineContext engineContext) {
+    return CompletableFuture.completedFuture(Map.of());
+  }
+
   /**
    * List parent document identifiers from the Worker-owned index.
    *

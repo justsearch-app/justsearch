@@ -43,6 +43,14 @@ public final class WatchedRootsState {
         .toList();
   }
 
+  /** Short synchronous forget admission/settlement; official root mutations cannot change scope. */
+  public <T> T withForgetBindings(java.util.function.Function<
+      java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>, T> action) {
+    synchronized (lifecycleLock) {
+      return action.apply(snapshotBindings());
+    }
+  }
+
   Map<Path, Instant> rootsMap() { return watchedRoots; }
 
   // Shared across client instances; do not hold the state monitor while calling the Engine.

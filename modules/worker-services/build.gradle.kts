@@ -45,6 +45,8 @@ dependencies {
 
   // Tika for content extraction
   implementation(libs.tika.core)
+  // The owned text parser reuses Tika's CSV sniffing and table implementation.
+  implementation("org.apache.tika:tika-parser-text-module:${libs.versions.tika.get()}")
   implementation("org.apache.pdfbox:pdfbox:3.0.6")
   // Tempdoc 632 — exclude junrar (UnRar License, field-of-use restricted, non-OSI). RAR content
   // extraction is dropped; Tika core still detects the RAR MIME from magic bytes (used only as a

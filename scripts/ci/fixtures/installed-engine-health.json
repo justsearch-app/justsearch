@@ -1,0 +1,31 @@
+{
+  "schema_version": 2,
+  "observed_at": "2026-10-28T06:32:44.922289768Z",
+  "lifecycle": {
+    "state": "LIFECYCLE_STATE_READY",
+    "reason_code": null,
+    "message": null
+  },
+  "components": {
+    "api": {
+      "state": "READY",
+      "reason_code": null,
+      "state_since": "2026-10-28T06:32:41.664676491Z"
+    },
+    "index": {
+      "state": "READY",
+      "reason_code": null,
+      "state_since": "2026-10-28T06:32:43.319621404Z"
+    },
+    "encoders": {
+      "state": "ABSENT",
+      "reason_code": null,
+      "state_since": "2026-10-28T06:32:43.118169452Z"
+    },
+    "generative": {
+      "state": "ABSENT",
+      "reason_code": "inference.deactivated",
+      "state_since": "2026-10-28T06:32:40.652248236Z"
+    }
+  }
+}

@@ -8,7 +8,14 @@ import java.util.Map;
 public record WatcherReconciliationFile(String candidate,
     List<SwitchBufferCapableQueue.SwitchBufferOp> journal,
     SwitchBufferCapableQueue.SwitchBufferOp rootReceipt, String path, String sourceSha256,
-    long size, boolean orderedApply, boolean targetMatches, Map<String, String> expectedRow) {
+    long size, boolean orderedApply, boolean targetMatches, Map<String, String> expectedRow, boolean policyOmitted) {
+  public WatcherReconciliationFile(String candidate,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> journal,
+      SwitchBufferCapableQueue.SwitchBufferOp rootReceipt, String path, String sourceSha256,
+      long size, boolean orderedApply, boolean targetMatches, Map<String, String> expectedRow) {
+    this(candidate, journal, rootReceipt, path, sourceSha256, size, orderedApply, targetMatches,
+        expectedRow, false);
+  }
   public WatcherReconciliationFile {
     journal = List.copyOf(journal);
     expectedRow = expectedRow == null ? null

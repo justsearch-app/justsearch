@@ -77,13 +77,27 @@ impl HandoffFixture {
         }
     }
     async fn run(&self, coordinator: &UpdateCoordinator) -> Result<(), String> {
-        let path = self.root.path().join("staged/attempt-1/installer.exe");
+        let path = self
+            .root
+            .path()
+            .join(if self.failure.starts_with("linux-") {
+                "staged/attempt-1/JustSearch-update.deb"
+            } else {
+                "staged/attempt-1/installer.exe"
+            });
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(&path, b"MZfixture").unwrap();
+        let bytes = if self.failure.starts_with("linux-") {
+            std::env::var_os("JUSTSEARCH_TEST_DEB")
+                .map(|path| fs::read(path).unwrap())
+                .unwrap_or_else(|| fixture_installer_bytes().to_vec())
+        } else {
+            fixture_installer_bytes().to_vec()
+        };
+        fs::write(&path, &bytes).unwrap();
         let staged = StagedArtifact {
             path: path.to_string_lossy().into_owned(),
-            sha256: sha256_bytes(b"MZfixture"),
-            size: 9,
+            sha256: sha256_bytes(&bytes),
+            size: bytes.len() as u64,
         };
         if self.failure == "artifact" {
             fs::write(&path, b"tampered").unwrap();
@@ -117,6 +131,7 @@ impl HandoffFixture {
                 size: staged.size,
                 signature: "fixture".into(),
                 public_key: "fixture".into(),
+                key_id: "fixture-artifact".into(),
             },
             compatibility: vec![ReleaseStoreCompatibility {
                 owner_id: "preferences".into(),
@@ -262,7 +277,13 @@ impl UpgradeHandoff for HandoffFixture {
         self.resumes.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
-    fn launch(&self, _: &Path) -> Result<(u32, u128), String> {
+    fn launch(&self, path: &Path) -> Result<(u32, u128), InstallerError> {
+        #[cfg(target_os = "linux")]
+        if self.failure.starts_with("linux-") {
+            self.launches.fetch_add(1, Ordering::SeqCst);
+            return linux_installer::tests::fake_launch(path, self.root.path(), self.failure);
+        }
+        let _ = path;
         assert!(self.is_held());
         assert_eq!(self.host.child_pid(), None);
         if let Some(child) = self.registered_child.lock().unwrap().as_mut() {
@@ -486,3 +507,74 @@ async fn p5_u2_nonempty_job_never_launches_the_installer() {
 
 #[path = "updater_p5_oracle.rs"]
 mod p5_original;
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn linux_fake_pkexec_handoff_records_exact_arguments_and_recovers_or_holds() {
+    let outcomes = if std::env::var_os("JUSTSEARCH_TEST_DEB").is_some() {
+        vec!["linux-126"]
+    } else {
+        vec![
+            "linux-0",
+            "linux-126",
+            "linux-127",
+            "linux-100",
+            "linux-signal",
+            "linux-spawn",
+            "linux-100-changed",
+            "linux-signal-changed",
+            "linux-spawn-changed",
+            "linux-100-files",
+            "linux-100-unknown",
+        ]
+    };
+    for outcome in outcomes {
+        let fixture = HandoffFixture::new(false, outcome);
+        let coordinator = UpdateCoordinator::default();
+        let result = fixture.run(&coordinator).await;
+        let success = outcome == "linux-0";
+        let changed = outcome.ends_with("changed")
+            || outcome.ends_with("files")
+            || outcome.ends_with("unknown");
+        assert_eq!(result.is_ok(), success, "{outcome}: {result:?}");
+        assert_eq!(
+            fixture.resumes.load(Ordering::SeqCst),
+            usize::from(!success && !changed),
+            "{outcome}"
+        );
+        assert_eq!(fixture.is_held(), success || changed, "{outcome}");
+        let intent: UpgradeIntent = read_json(&fixture.root.path().join("intent.v1.json")).unwrap();
+        assert_eq!(
+            intent.phase,
+            if success {
+                UpgradePhase::InstallLaunched
+            } else if changed {
+                UpgradePhase::RepairRequired
+            } else {
+                UpgradePhase::Cancelled
+            },
+            "{outcome}"
+        );
+        if !success && !changed {
+            assert!(
+                ensure_no_unresolved_intent(&coordinator).is_ok(),
+                "must re-offer update: {outcome}"
+            );
+            assert_eq!(coordinator.snapshot().state, "available", "{outcome}");
+            assert!(
+                fixture.host.child_pid().is_some(),
+                "old Engine must resume: {outcome}"
+            );
+        }
+        if !outcome.contains("spawn") {
+            let args = fs::read_to_string(fixture.root.path().join("pkexec.args")).unwrap();
+            let staged = fs::canonicalize(&intent.staged_artifact.path).unwrap();
+            assert_eq!(args, format!("env\nDEBIAN_FRONTEND=noninteractive\napt-get\ninstall\n-y\n-o\nDPkg::Lock::Timeout=300\n{}\n", staged.display()));
+            println!(
+                "{outcome}: args={args:?}, phase={:?}, resumes={}",
+                intent.phase,
+                fixture.resumes.load(Ordering::SeqCst)
+            );
+        }
+    }
+}

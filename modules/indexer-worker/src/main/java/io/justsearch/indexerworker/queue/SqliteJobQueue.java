@@ -480,6 +480,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private final Path dbPath;
   private final ReentrantLock lock = new ReentrantLock();
+  private static final ThreadLocal<Integer> FORGET_CALLBACK_DEPTH = ThreadLocal.withInitial(() -> 0);
   private final int maxAttempts;
   private Connection connection;
   private Throwable connectionFailure;
@@ -3211,6 +3212,215 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  @Override
+  public boolean tryMatchesNativePolicySkippedAdmission(String candidate,
+      List<SwitchBufferOp> expectedJournal, SwitchBufferOp expectedOp,
+      Map<String, String> expectedRow) {
+    final List<SwitchBufferOp> journal;
+    final Map<String, String> row;
+    try {
+      journal = List.copyOf(expectedJournal);
+      row = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(expectedRow));
+    } catch (RuntimeException invalid) { return false; }
+    if (!lock.tryLock()) return false;
+    try {
+      ensureOpen();
+      return nativePolicyJournalMatches(candidate, journal)
+          && nativePolicySkippedAdmissionMatches(candidate, journal, expectedOp, row);
+    } catch (SQLException | RuntimeException unknown) {
+      return false;
+    } finally {
+      // This read must never steal or deliver another writer's committed notifications.
+      lock.unlock();
+    }
+  }
+
+  @Override
+  public List<SwitchBufferOp> readmitNativePolicySkippedAdmissions(String candidate,
+      List<SwitchBufferOp> expectedJournal, List<NativePolicyReadmission> entries) {
+    final List<SwitchBufferOp> journal;
+    final List<NativePolicyReadmission> batch;
+    try {
+      journal = List.copyOf(expectedJournal);
+      batch = List.copyOf(entries);
+      if (batch.isEmpty() || batch.size() > 2_000 || candidate == null || candidate.isBlank()
+          || io.justsearch.indexerworker.index.IndexGenerationManager.isRecordedGenerationIdentity(candidate)) {
+        return List.of();
+      }
+      Set<String> paths = new HashSet<>();
+      for (var item : batch) {
+        if (!nativePolicyReadmissionJoins(item)
+            || !nativePolicyReadmissionSurvives(journal, item.expectedOp())
+            || !paths.add(PathNormalizer.normalizeKey(item.entry().path()))) return List.of();
+      }
+    } catch (RuntimeException invalid) { return List.of(); }
+    lockTimed();
+    Throwable primary = null;
+    try {
+      ensureOpen();
+      List<SwitchBufferOp> committed = inTransaction(() -> {
+        if (!nativePolicyJournalMatches(candidate, journal)) return List.of();
+        // Complete all preservation reads before the first write in this reserved transaction.
+        for (var item : batch) {
+          if (!nativePolicySkippedAdmissionMatches(candidate, journal,
+                  item.expectedOp(), item.expectedFullRow())
+              || !nativePolicyReadmissionSurvives(journal, item.expectedOp())) return List.of();
+        }
+        long now = System.currentTimeMillis();
+        for (var item : batch) {
+          if (enqueueEntriesInTransaction(List.of(item.entry()), rootOwner(item.collection()),
+              null, now, true, null) != 1) {
+            throw new SQLException("Native policy replacement did not admit the complete batch");
+          }
+          String path = normalizePath(item.entry().path());
+          var actual = watcherRowLocked(path);
+          if (actual == null || !STATE_PENDING.equals(actual.get("state"))
+              || !isAdmissionRevision(actual.get("unit_revision"))
+              || Objects.equals(item.expectedFullRow().get("unit_revision"), actual.get("unit_revision"))
+              || !Objects.equals(item.entry().plannedSourceSha256(), actual.get("planned_source_sha256"))
+              || !Objects.equals(rootOwner(item.collection()), rootOwner(actual.get("collection")))
+              || !Objects.equals(PathNormalizer.normalizeKey(item.entry().ingestionRoot()), actual.get("ingestion_root"))
+              || !Objects.equals(item.entry().provenance().originator(), actual.get("originator"))
+              || !Objects.equals(item.entry().provenance().transport(), actual.get("transport"))) {
+            throw new SQLException("Native policy replacement lost its actual admission witness");
+          }
+          var payload = new SwitchBufferUpsert(path, actual.get("collection"),
+              new EnqueueProvenance(actual.get("originator"), actual.get("transport")),
+              actual.get("unit_revision"), actual.get("planned_source_sha256"),
+              Path.of(actual.get("ingestion_root"))).encode();
+          if (!switchBufferOps.putForGenerationInTransaction(
+              connection, candidate, "path:" + path, "UPSERT", payload)) {
+            throw new SQLException("Native policy replacement lost its atomic journal write");
+          }
+        }
+        var current = switchBufferOps.listAllStrict();
+        List<SwitchBufferOp> result = new ArrayList<>(batch.size());
+        for (var item : batch) {
+          String key = "path:" + normalizePath(item.entry().path());
+          var op = current.stream().filter(value -> candidate.equals(value.generation())
+              && key.equals(value.key())).findFirst().orElseThrow(
+                  () -> new SQLException("Native policy replacement lost its final receipt"));
+          if (op.revision() == null || op.revision().isBlank() || op.acceptedOrder() <= 0
+              || !"UPSERT".equals(op.op())) throw new SQLException("Invalid native replacement receipt");
+          var admitted = SwitchBufferUpsert.decode(op.payload());
+          var row = watcherRowLocked(admitted.path());
+          if (row == null || !Objects.equals(admitted.unitRevision(), row.get("unit_revision"))
+              || !Objects.equals(admitted.sourceSha256(), row.get("planned_source_sha256"))) {
+            throw new SQLException("Native policy replacement final row changed");
+          }
+          result.add(op);
+        }
+        return List.copyOf(result);
+      });
+      if (!committed.isEmpty()) meters.recordEnqueued(committed.size());
+      return committed;
+    } catch (SQLException failure) {
+      // inTransaction preserves rollback, commit ambiguity, restore and witness failures.
+      var unconfirmed = SqliteServiceAvailability.failure("Native policy readmission is unconfirmed", failure);
+      primary = unconfirmed;
+      throw unconfirmed;
+    } catch (RuntimeException | Error failure) {
+      primary = failure;
+      throw failure;
+    } finally {
+      // Ordinary admission delivery, outside configuration publication ownership. A failure
+      // here is unconfirmed even when the transaction already committed; never return empty.
+      try { unlockAfterChanges(); }
+      catch (RuntimeException | Error deliveryFailure) {
+        if (primary == null) throw deliveryFailure;
+        if (primary != deliveryFailure) primary.addSuppressed(deliveryFailure);
+      }
+    }
+  }
+
+  private boolean nativePolicyJournalMatches(String candidate, List<SwitchBufferOp> expected) {
+    return candidate != null && !candidate.isBlank()
+        && !io.justsearch.indexerworker.index.IndexGenerationManager.isRecordedGenerationIdentity(candidate)
+        && nativePolicyRelevantJournal().stream()
+            .filter(op -> op.generation().isEmpty() || candidate.equals(op.generation())).toList()
+            .equals(expected);
+  }
+
+  private List<SwitchBufferOp> nativePolicyRelevantJournal() {
+    var journal = switchBufferOps.listAllStrict();
+    for (var op : journal) {
+      if (op.generation() == null || op.key() == null || op.op() == null || op.payload() == null
+          || op.revision() == null || op.revision().isBlank() || op.acceptedOrder() <= 0
+          || WatcherRootReconciliation.OPERATION.equals(op.op()) && !op.generation().isEmpty()) {
+        throw new IllegalStateException("Native policy journal ownership is unavailable");
+      }
+    }
+    return journal;
+  }
+
+  private boolean nativePolicySkippedAdmissionMatches(String candidate,
+      List<SwitchBufferOp> journal, SwitchBufferOp op, Map<String, String> expected) throws SQLException {
+    if (op == null || expected == null || !journal.contains(op)
+        || !candidate.equals(op.generation()) || !"UPSERT".equals(op.op())
+        || op.revision() == null || op.revision().isBlank() || op.acceptedOrder() <= 0) return false;
+    final SwitchBufferUpsert file;
+    try { file = SwitchBufferUpsert.decode(op.payload()); }
+    catch (RuntimeException invalid) { return false; }
+    if (file.ingestionRoot() == null || file.ingestionRoot().equals(Path.of(file.path()))
+        || file.sourceSha256() == null || !isAdmissionRevision(file.unitRevision())
+        || !file.path().equals(PathNormalizer.normalizeKey(Path.of(file.path())))
+        || !("path:" + file.path()).equals(op.key())
+        || IngestCollectionPolicy.isReserved(file.collection()) || file.provenance() == null
+        || "WATCHER_RECONCILIATION".equals(file.provenance().transport())) return false;
+    var row = watcherRowLocked(file.path());
+    return row != null && row.equals(expected) && file.path().equals(row.get("path"))
+        && STATE_DONE.equals(row.get("state")) && !activeClaims.containsKey(file.path())
+        && "SKIPPED_POLICY".equals(row.get("last_outcome_class"))
+        && "SKIPPED_TEMP_OR_SYSTEM".equals(row.get("last_reason_code"))
+        && "NONE".equals(row.get("last_retry_policy")) && row.get("content_hash") == null
+        && row.get("retry_after") == null && row.get("walk_seen_epoch") == null
+        && !recordedWatcherRow(row) && !release030ExactFiles.contains(Path.of(file.path()))
+        && !release030IndependentDebt.contains(Path.of(file.path()))
+        && file.unitRevision().equals(row.get("unit_revision"))
+        && file.sourceSha256().equals(row.get("planned_source_sha256"))
+        && PathNormalizer.normalizeKey(file.ingestionRoot()).equals(row.get("ingestion_root"))
+        && Objects.equals(rootOwner(file.collection()), rootOwner(row.get("collection")))
+        && Objects.equals(file.provenance().originator(), row.get("originator"))
+        && Objects.equals(file.provenance().transport(), row.get("transport"));
+  }
+
+  private static boolean nativePolicyReadmissionJoins(NativePolicyReadmission item) {
+    if (item == null || item.expectedOp() == null || item.expectedFullRow() == null
+        || item.entry() == null || item.entry().path() == null) return false;
+    var old = SwitchBufferUpsert.decode(item.expectedOp().payload());
+    var entry = item.entry();
+    String path = normalizePath(entry.path());
+    return "UPSERT".equals(item.expectedOp().op()) && old.path().equals(path)
+        && path.equals(item.expectedFullRow().get("path"))
+        && ("path:" + path).equals(item.expectedOp().key())
+        && old.path().equals(PathNormalizer.normalizeKey(Path.of(old.path())))
+        && path.equals(PathNormalizer.normalizeKey(entry.path()))
+        && entry.ingestionRoot() != null && !entry.ingestionRoot().equals(entry.path().toAbsolutePath().normalize())
+        && Objects.equals(PathNormalizer.normalizeKey(old.ingestionRoot()), PathNormalizer.normalizeKey(entry.ingestionRoot()))
+        && entry.sizeBytes() >= 0 && IngestionLedgerTransition.isSha256(entry.plannedSourceSha256())
+        && entry.provenance() != null && Objects.equals(old.provenance(), entry.provenance())
+        && !"WATCHER_RECONCILIATION".equals(entry.provenance().transport())
+        && Objects.equals(rootOwner(old.collection()), rootOwner(item.collection()))
+        && !IngestCollectionPolicy.isReserved(item.collection());
+  }
+
+  private static boolean nativePolicyReadmissionSurvives(List<SwitchBufferOp> journal, SwitchBufferOp expected) {
+    var file = SwitchBufferUpsert.decode(expected.payload());
+    for (var later : journal) {
+      if (later.acceptedOrder() <= expected.acceptedOrder()) continue;
+      if ("DELETE".equals(later.op()) && file.path().equals(SwitchBufferDelete.decode(later.payload()).path())) return false;
+      if ("DELETE_PREFIX".equals(later.op()) && PathPrefixScope.decode(later.payload()).contains(file.path())) return false;
+      if ("DELETE_COLLECTION".equals(later.op())
+          && Objects.equals(rootOwner(file.collection()), rootOwner(later.payload()))) return false;
+      if (WatcherRootReconciliation.OPERATION.equals(later.op())) {
+        var root = WatcherRootReconciliation.decode(later.payload());
+        if (Path.of(file.path()).startsWith(Path.of(root.root()))
+            && Objects.equals(rootOwner(file.collection()), rootOwner(root.collection()))) return false;
+      }
+    }
+    return true;
+  }
+
   /**
    * A terminal outcome of A's normal policy for a source that is not indexable as it is: not a
    * regular file, excluded, unsupported or too large. Outside a migration nothing more happens
@@ -3277,6 +3487,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public boolean reconcileWatcherFile(WatcherReconciliationFile file, Runnable freshProof,
       Runnable removeIndex) {
+    if (file != null && file.policyOmitted()) return tryMatchesWatcherPolicyOmission(file, freshProof);
     lock.lock();
     try {
       ensureOpen();
@@ -3382,6 +3593,84 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       recordDbError();
       throw new IllegalStateException("Conditional watcher reconciliation failed", failure);
     } finally { unlockAfterChanges(); }
+  }
+
+  /** Policy omission is a read, including for encoded watcher predecessor ownership. */
+  private boolean tryMatchesWatcherPolicyOmission(WatcherReconciliationFile file, Runnable freshProof) {
+    if (!lock.tryLock()) return false;
+    try {
+      ensureOpen();
+      if (!nativePolicyJournalMatches(file.candidate(), file.journal())) return false;
+      var root = file.rootReceipt();
+      if (root == null || !file.journal().contains(root)
+          || !WatcherRootReconciliation.OPERATION.equals(root.op())
+          || !root.generation().isEmpty() || root.acceptedOrder() <= 0
+          || root.revision() == null || root.revision().isBlank()) return false;
+      var debt = WatcherRootReconciliation.decode(root.payload());
+      Path path = Path.of(file.path());
+      if (!debt.key().equals(root.key()) || !file.path().equals(PathNormalizer.normalizeKey(path))
+          || path.equals(Path.of(debt.root())) || !path.startsWith(Path.of(debt.root()))
+          || IngestCollectionPolicy.isReserved(debt.collection())
+          || file.sourceSha256() != null || !file.targetMatches()) return false;
+      var row = watcherRowLocked(file.path());
+      if (!Objects.equals(row, file.expectedRow()) || activeClaims.containsKey(file.path())
+          || release030ExactFiles.contains(path) || release030IndependentDebt.contains(path)) return false;
+      SwitchBufferOp predecessor = null;
+      SwitchBufferOp deletion = null;
+      for (var op : file.journal()) {
+        if ("UPSERT".equals(op.op())) {
+          var admitted = SwitchBufferUpsert.decode(op.payload());
+          if (!file.path().equals(admitted.path())) continue;
+          if (!("path:" + file.path()).equals(op.key())
+              || op.acceptedOrder() >= root.acceptedOrder()) return false;
+          if (predecessor == null || predecessor.acceptedOrder() < op.acceptedOrder()) predecessor = op;
+        } else if ("DELETE".equals(op.op())) {
+          var removed = SwitchBufferDelete.decode(op.payload());
+          if (!file.path().equals(removed.path())) continue;
+          if (!("path:" + file.path()).equals(op.key())
+              || op.acceptedOrder() >= root.acceptedOrder()) return false;
+          if (removed.origin() == SwitchBufferDelete.Origin.WATCHER
+              && debt.root().equals(removed.root()) && debt.rootIdentity().equals(removed.rootIdentity())
+              && Objects.equals(rootOwner(debt.collection()), rootOwner(removed.collection()))
+              && (deletion == null || deletion.acceptedOrder() < op.acceptedOrder())) deletion = op;
+        }
+      }
+      if (row == null) {
+        // A missing retained UPSERT is unknown. Only the same root's conditional DELETE
+        // can explain an absent queue owner, and cannot borrow a later admission.
+        if (deletion == null || predecessor != null
+            && predecessor.acceptedOrder() >= deletion.acceptedOrder()) return false;
+      } else {
+        if (!STATE_DONE.equals(row.get("state")) || !file.path().equals(row.get("path"))
+            || !"SKIPPED_POLICY".equals(row.get("last_outcome_class"))
+            || !"SKIPPED_TEMP_OR_SYSTEM".equals(row.get("last_reason_code"))
+            || !"NONE".equals(row.get("last_retry_policy")) || row.get("content_hash") != null
+            || row.get("retry_after") != null || row.get("walk_seen_epoch") != null
+            || recordedWatcherRow(row) || row.get("unit_revision") == null
+            || row.get("unit_revision").startsWith("release030")
+            || !Objects.equals(rootOwner(debt.collection()), rootOwner(row.get("collection")))) return false;
+        boolean original = predecessor != null && nativePolicySkippedAdmissionMatches(
+            file.candidate(), file.journal(), predecessor, row)
+            && debt.root().equals(row.get("ingestion_root"))
+            && Objects.equals(rootOwner(debt.collection()),
+                rootOwner(SwitchBufferUpsert.decode(predecessor.payload()).collection()));
+        WatcherAdmission prior = parseWatcherAdmission(row.get("unit_revision"));
+        boolean owned = prior != null && prior.candidate().equals(file.candidate())
+            && prior.path().equals(file.path()) && Objects.equals(prior.owner(), rootOwner(debt.collection()))
+            && Objects.equals(prior.plannedHash(), row.get("planned_source_sha256"))
+            && "system".equals(row.get("originator")) && "WATCHER_RECONCILIATION".equals(row.get("transport"))
+            && debt.root().equals(row.get("ingestion_root")) && Objects.equals(prior.scanId(), row.get("scan_id"))
+            && Objects.equals(prior.predecessor(), predecessor)
+            && (prior.predecessor() != null || !conflictingWatcherPathReceipt(file.journal(), prior, root))
+            && prior.root().generation().equals(root.generation()) && prior.root().key().equals(root.key())
+            && prior.root().payload().equals(root.payload())
+            && (prior.root().equals(root) || root.acceptedOrder() > prior.root().acceptedOrder());
+        if (!original && !owned) return false;
+      }
+      freshProof.run();
+      return true;
+    } catch (SQLException | RuntimeException unknown) { return false; }
+    finally { lock.unlock(); } // Never drain or deliver another writer's committed events.
   }
 
   private static boolean conflictingWatcherPathReceipt(List<SwitchBufferOp> journal,
@@ -4835,7 +5124,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     Runnable delivery = null;
     try {
       if (lock.getHoldCount() == 1 && changeStream != null) {
-        try { changeStream.drainCommitted(); }
+        try { deliverOutsideForgetEntry(changeStream::drainCommitted); }
         catch (RuntimeException | Error deliveryFailure) {
           if (connectionFailure == null) throw deliveryFailure;
           if (connectionFailure != deliveryFailure) connectionFailure.addSuppressed(deliveryFailure);
@@ -4857,8 +5146,65 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try {
         if (lock.getHoldCount() == 1 && walkChanges != null) delivery = walkChanges.takeDelivery();
       } finally { lock.unlock(); }
-      if (delivery != null) delivery.run();
+      if (delivery != null) deliverOutsideForgetEntry(delivery);
     }
+  }
+
+  private static void deliverOutsideForgetEntry(Runnable delivery) {
+    int previous = FORGET_CALLBACK_DEPTH.get();
+    FORGET_CALLBACK_DEPTH.set(previous + 1);
+    try { delivery.run(); }
+    finally {
+      if (previous == 0) FORGET_CALLBACK_DEPTH.remove();
+      else FORGET_CALLBACK_DEPTH.set(previous);
+    }
+  }
+
+  @Override public boolean forgetEntryAllowed() {
+    return !lock.isHeldByCurrentThread() && FORGET_CALLBACK_DEPTH.get() == 0;
+  }
+
+  @Override public java.util.Optional<JobQueue.ForgetQueueFence> tryForgetQueueFence() {
+    if (!forgetEntryAllowed() || !lock.tryLock()) return java.util.Optional.empty();
+    boolean retained = false;
+    try {
+      ensureOpen();
+      Thread holder = Thread.currentThread();
+      JobQueue.ForgetQueueFence fence = new JobQueue.ForgetQueueFence() {
+        private boolean closed;
+        @Override public void close() {
+          if (Thread.currentThread() != holder) {
+            throw new IllegalStateException("Forget queue fence must leave on its owning thread");
+          }
+          if (closed) return;
+          closed = true;
+          unlockAfterChanges();
+        }
+      };
+      retained = true;
+      return java.util.Optional.of(fence);
+    } finally { if (!retained) lock.unlock(); }
+  }
+
+  @Override public boolean forgetJobsAbsent(String path, boolean folder) {
+    lock.lock();
+    try {
+      ensureOpen();
+      String key = PathNormalizer.normalizePath(path);
+      if (key == null || key.isBlank()) throw new IllegalArgumentException("Forget requires an exact nonempty path");
+      String predicate = folder ? "(path = ? OR (path >= ? AND path < ?))" : "path = ?";
+      try (var query = connection.prepareStatement("SELECT 1 FROM jobs WHERE " + predicate + " LIMIT 1")) {
+        query.setString(1, key);
+        if (folder) {
+          String prefix = PathNormalizer.normalizePathPrefix(key);
+          query.setString(2, prefix);
+          query.setString(3, upperBoundExclusive(prefix));
+        }
+        try (var row = query.executeQuery()) { return !row.next(); }
+      }
+    } catch (SQLException unavailable) {
+      throw SqliteServiceAvailability.failure("Forget queue absence could not be verified", unavailable);
+    } finally { unlockAfterChanges(); }
   }
 
   private <T> T inTransaction(SqlWork<T> work) throws SQLException {

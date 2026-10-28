@@ -8,6 +8,7 @@ import { parseWireContract } from '../schemas';
 import { settingsV2Schema } from '../generated/schema-types/settings-v2';
 import { createSettingsAttempt, executeSettingsAttempt, type SettingsWitness, type SettingsCompletion, type SettingsPatch } from '../settingsAttempt.js';
 import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
+import type { ExclusionEntry } from '../exclusionPolicy.js';
 
 // ============================================
 // Types
@@ -24,7 +25,7 @@ export interface UISettings {
   // One-time trust-loop teaching moment (citations)
   hasSeenTrustLoopNudge?: boolean | undefined;
   // Glob patterns to exclude from indexing/search (applied via explicit action)
-  excludePatterns?: string[] | undefined;
+  excludePatterns?: ExclusionEntry[] | undefined;
   // Vim-style keyboard navigation
   vimMode?: boolean | undefined;
 }

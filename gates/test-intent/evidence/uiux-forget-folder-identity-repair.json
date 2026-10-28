@@ -1,0 +1,103 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T15:52:10.190Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "a52cbf58fdbff65f892f355118000f4eac1e1095",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetFolderIdentityTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 19273,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-folder-b0202b00/run-2.log",
+      "outputDigest": "sha256:f73316e7ead2b867382d27eccc32b32831e6a191dcf674432eaa260c0f059261"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetFolderIdentityTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetFolderIdentityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:660de8a3fde831e1bbee297ee62fab96fd2c0d15e08ff01ea88673853fc43b64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FX55IgnoredExactQueueDeleteCannotBypassInclusiveAbsenceProof()",
+          "status": "passed"
+        },
+        {
+          "name": "FX55UnknownQueueAbsenceAfterCommittedDeletesNeverBecomesZeroOrComplete()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "[1] true, false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] false, true",
+          "status": "passed"
+        },
+        {
+          "name": "[3] true, true",
+          "status": "passed"
+        },
+        {
+          "name": "[4] false, false",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bb3f8e62314cb05b137d9d8efa9d72506bbd843b",
+    "revision": "bb3f8e62314cb05b137d9d8efa9d72506bbd843b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetFolderIdentityTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 21303,
+        "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-folder-b0202b00/run-1.log",
+        "outputDigest": "sha256:5b13c8b9a47c5ead9a89e2120f3455be8783f6c4e190087af960cff1bccaea5e"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetFolderIdentityTest.java",
+        "classification": "assertion",
+        "detail": "FX55IgnoredExactQueueDeleteCannotBypassInclusiveAbsenceProof(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a nonnegative delete result cannot certify a still-present exact job: Removal from the search index completed. Original files and retained answers, logs and backups were not erased. ==> expected: <INCOMPLETE> but was: <COMPLETE> | [1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <3> | [2] true: org.opent"
+      }
+    ]
+  },
+  "digest": "sha256:095f764b2963be184ac999df5a46474ab18c0e4163c47a97a79b996472524438"
+}

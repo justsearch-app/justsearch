@@ -20,6 +20,7 @@ function make(): DocumentPane {
 function stubFetchOnce(response: {
   ok?: boolean;
   status?: number;
+  sourceState?: string;
   content?: string;
   textProvenance?: string | null;
   visualExtractionEvidence?: Record<string, unknown> | null;
@@ -30,6 +31,7 @@ function stubFetchOnce(response: {
       ok: response.ok ?? true,
       status: response.status ?? 200,
       json: async () => ({
+        sourceState: response.sourceState,
         content: response.content ?? '',
         textProvenance: response.textProvenance ?? null,
         visualExtractionEvidence: response.visualExtractionEvidence ?? null,
@@ -269,7 +271,7 @@ describe('DocumentPane — a document the index no longer has (WP1.1 S1.5)', () 
   });
 
   it('says the file is no longer in the index', async () => {
-    stubFetchOnce({ ok: false, status: 404 });
+    stubFetchOnce({ ok: false, status: 404, sourceState: 'absent' });
     const el = make();
     el.docPath = 'Contracts/Gone.pdf';
     await flush(el);

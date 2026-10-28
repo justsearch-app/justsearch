@@ -117,6 +117,11 @@ export function startPendingAuthorizationBridge(
       if (!payload?.pendingId || !payload.operationId) {
         return;
       }
+      // These user-only operations always have their own exact-target ceremony in the
+      // originating window. A broadcast may precede its 428; it must never offer a second
+      // route that can execute while that window still offers Cancel.
+      if (payload.operationId === 'core.forget-indexed-path' || payload.operationId === 'core.retry-forget'
+          || payload.operationId === 'core.withdraw-forget') return;
       if (handledIds.has(payload.pendingId)) {
         return;
       }

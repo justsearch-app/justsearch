@@ -23,7 +23,7 @@ final class StatusAtRestReadTimeHttpTest {
 
   @Test void statusSaysWhenTheDiskEncryptionValueWasRead() throws Exception {
     long jvmStarted = java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime();
-    try (var fixture = new VerifierStatusIsolationTest.Fixture(false);
+    try (var fixture = new StatusIsolationFixtureSupport.Fixture(false);
         HttpClient client = HttpClient.newHttpClient()) {
       var response = client.send(HttpRequest.newBuilder(
               URI.create("http://127.0.0.1:" + fixture.app.port() + "/api/status"))

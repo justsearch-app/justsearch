@@ -1,0 +1,135 @@
+name: Build Linux Installer
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - modules/shell/src-tauri/tauri.linux.conf.json
+      - modules/shell/src-tauri/linux/**
+      - scripts/ci/package-installer-linux.sh
+      - scripts/ci/audit-linux-elf.py
+      - scripts/ci/audit-linux-elf.test.py
+      - scripts/ci/sync-version.mjs
+      - scripts/ci/sync-version.test.mjs
+      - .github/workflows/build-installer-linux.yml
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  JUSTSEARCH_RELEASE_DESCRIPTOR_URL: https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json
+  JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY }}
+  JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID }}
+  JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY }}
+  JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID }}
+jobs:
+  cached:
+    runs-on: ubuntu-24.04
+    outputs:
+      exists: ${{ steps.cache.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/packaging-smoke.mjs cached linux-installer-${{ github.run_id }}
+  build-linux-installer:
+    needs: cached
+    if: github.event_name == 'push' && inputs.release && startsWith(github.ref, 'refs/tags/v') && needs.cached.outputs.exists != 'true'
+    environment: release-signing
+    name: Ubuntu 24.04 Debian package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - &linux-actions-checkout-v7
+        uses: actions/checkout@v7
+      - &linux-actions-setup-node-v7
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.14.0'
+      - &linux-actions-setup-java-v6
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - &linux-gradle-actions-setup-gradle-v6
+        uses: gradle/actions/setup-gradle@v6
+      - &linux-dtolnay-rust-toolchain-stable
+        uses: dtolnay/rust-toolchain@stable
+      - &linux-swatinem-rust-cache-v2
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: modules/shell/src-tauri
+      - &linux-install-build-libraries
+        name: Install build libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf build-essential binutils libssl-dev pkg-config
+      - &linux-test-pins-for-unsigned-packaging-smoke
+        name: Test pins for unsigned packaging smoke
+        if: ${{ !inputs.release }}
+        run: node scripts/ci/packaging-smoke.mjs pins
+      - &linux-build-and-audit-debian-package
+        name: Build and audit Debian package
+        run: bash scripts/ci/package-installer-linux.sh
+      - name: Sign Debian updater artifact
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY_PASSWORD }}
+        run: |
+          packages=(dist/installer-linux/*.deb)
+          test "${#packages[@]}" = 1
+          npm --prefix modules/shell run tauri -- signer sign "$PWD/${packages[0]}"
+          test -s "${packages[0]}.sig"
+      - &linux-check-packaging-scripts
+        name: Check packaging scripts
+        run: |
+          python3 scripts/ci/verify-installer-linux.test.py
+          python3 scripts/ci/audit-linux-elf.test.py
+          node --test scripts/ci/sync-version.test.mjs
+      - &linux-check-mcpb-consistency
+        name: Check MCPB consistency
+        run: node scripts/ci/check-mcpb-consistency.mjs
+      - &linux-install-and-smoke-the-debian-package
+        name: Install and smoke the Debian package
+        run: |
+          packages=(dist/installer-linux/*.deb)
+          test "${#packages[@]}" = 1
+          sudo apt-get install --no-install-recommends -y "./${packages[0]}"
+          python3 scripts/ci/verify-installer-linux.py "${packages[0]}" --evidence dist/installer-linux/smoke-linux.json
+      - &linux-upload-package-audit-and-successful-packaged-smoke
+        name: Upload package, audit and successful packaged smoke
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-installer-${{ github.run_id }}
+          path: dist/installer-linux/*
+          if-no-files-found: error
+          retention-days: 14
+  build-linux-unsigned:
+    needs: cached
+    if: ${{ !inputs.release && needs.cached.outputs.exists != 'true' }}
+    name: Ubuntu 24.04 Debian package (unsigned)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - *linux-actions-checkout-v7
+      - *linux-actions-setup-node-v7
+      - *linux-actions-setup-java-v6
+      - *linux-gradle-actions-setup-gradle-v6
+      - *linux-dtolnay-rust-toolchain-stable
+      - *linux-swatinem-rust-cache-v2
+      - *linux-install-build-libraries
+      - *linux-test-pins-for-unsigned-packaging-smoke
+      - *linux-build-and-audit-debian-package
+      - *linux-check-packaging-scripts
+      - *linux-check-mcpb-consistency
+      - *linux-install-and-smoke-the-debian-package
+      - *linux-upload-package-audit-and-successful-packaged-smoke

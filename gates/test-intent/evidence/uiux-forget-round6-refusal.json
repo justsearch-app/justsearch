@@ -1,0 +1,123 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:fdbf6d454d72abf41178a310e1e183650c9ea2bdf52ff87cb4fa3bbbaa7ece84",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-ui-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Private copied npm executable links retain their relative targets. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T19:12:52.557Z",
+  "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+  "tree": "465f8697ee16ee0dd4d96fecb52d61e5b4e31f18",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.executor.ForgetPreparationGateTest\" --tests \"io.justsearch.app.services.registry.operations.ForgetHandlersTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 599646,
+      "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/evidence-refusal-final/run-2.log",
+      "outputDigest": "sha256:7d002461c0caf8e65a63204f1a7fc269e40ba36eacb44d7007c62a29ef0c3956"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/ForgetPreparationGateTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/ForgetPreparationGateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2bea10a20e9984fbb87d654cf99bea8c0dce8807d9db7d01e9ad703c02966993",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] A watched folder or a folder containing one cannot be forgotten. Remove the folder in Library instead.",
+          "status": "passed"
+        },
+        {
+          "name": "[2] Help and agent-history content is managed by its own data controls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:20609de3e8e7d7fad5160b423209fea4b9457445bc8c9927cba3031944174274",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N55OnlyWebviewCanPrepareOrExecuteEvenWithAValidFrozenPreparation()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] A watched folder or a folder containing one cannot be forgotten. Remove the folder in Library instead.",
+          "status": "passed"
+        },
+        {
+          "name": "[2] Help and agent-history content is managed by its own data controls",
+          "status": "passed"
+        },
+        {
+          "name": "S56ExactConsentFreezesEveryByteAndStatesOutsideFileException()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55FolderConsentDistinguishesUnixWhitespaceControlsAndMetacharacters()",
+          "status": "passed"
+        },
+        {
+          "name": "N55UnknownDuplicateAndCoercedPublicFieldsAndOversizedApprovalRefuseWithoutEffects()",
+          "status": "passed"
+        },
+        {
+          "name": "WD55RetryAndWithdrawUseExactSavedConsentAndCannotRetargetTheOriginalKey()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+    "revision": "6a0e0f2a9bd13468d30330c05dea00280de35176",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.executor.ForgetPreparationGateTest\" --tests \"io.justsearch.app.services.registry.operations.ForgetHandlersTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 14603,
+        "outputLog": "/home/elias/.cache/am/p76fs5wh/tmp/forget-builder-6-report/evidence-refusal-final/run-1.log",
+        "outputDigest": "sha256:6aa1c7d33d3290e59b1b552ec4e143843849d0470e8a43ed4914316a1ca616bd"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/ForgetPreparationGateTest.java",
+        "classification": "assertion",
+        "detail": "[1] A watched folder or a folder containing one cannot be forgotten. Remove the folder in Library instead.: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a refused target must not produce a confirmation gate ==> Unexpected exception thrown: io.justsearch.agent.api.registry.ConfirmationRequiredException: Confirmation required for operation core.forget-indexed-path (gate=TYPED_CONFIRM, sourceTier=TRUSTED) | [2] Help and agent-history content is managed by its own data co"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/ForgetHandlersTest.java",
+        "classification": "assertion",
+        "detail": "[1] A watched folder or a folder containing one cannot be forgotten. Remove the folder in Library instead.: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <A watched folder or a folder containing one cannot be forgotten. Remove the folder in Library instead.> but was: <The exact forget target is invalid, protected or cannot be represented safely> | [2] Help and agent-history content is managed by its own data controls: org.opentest4j.AssertionFailedError org.o"
+      }
+    ]
+  },
+  "digest": "sha256:0a2cc3ede284c7d7b7d2100620db9e195afac69682e88b16f56bc1f865e90904"
+}

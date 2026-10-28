@@ -23,6 +23,7 @@ public final class ObservationJustifications {
   private ObservationJustifications() {}
 
   private static final Map<String, String> REASONS = Map.ofEntries(
+      Map.entry("POST /api/documents/presence", "CONSUMER: ui-web/src/shell-v0/components/chat/CitationsPanel.ts checks index membership when Search v3 sources are shown; never user activity"),
       Map.entry("GET /.well-known/justsearch/manifest.json", "STATUS: canonical current runtime manifest discovery mirror (RuntimeManifestController.handleGet)"),
       Map.entry("GET /api/action-ledger", "CONSUMER: ui-web/src/shell-v0/operations/ActionLedgerClient.ts via ui-web/src/shell-v0/components/ActionLedgerView.ts ledger snapshot seed on Activity mount"),
       Map.entry("GET /api/action-ledger/stream", "CONSUMER: ui-web/src/shell-v0/operations/ActionLedgerClient.ts via ui-web/src/shell-v0/components/ActionLedgerView.ts continuous ledger subscription on Activity mount"),
@@ -65,6 +66,8 @@ public final class ObservationJustifications {
       Map.entry("GET /api/indexing-roots/substrate", "CONSUMER: ui-web/src/shell-v0/views/LibrarySurface.ts automatic roots refresh on mount and status updates"),
       Map.entry("GET /api/indexing/failed-jobs", "CONSUMER: ui-web/src/shell-v0/views/HealthSurface.ts failed-job mount hydration"),
       Map.entry("GET /api/indexing/excludes", "CONSUMER: ui-web/src/shell-v0/views/LibrarySurface.ts loadExcludesPolicy hydrates the effective exclusion list and its winning source before Preview or Apply"),
+      Map.entry("GET /api/indexing/forgets", "CONSUMER: ui-web/src/api/domains/forget.ts hydrates Library unfinished intents and Search v3 host capability without replaying effects"),
+      Map.entry("GET /api/indexing/forgets/{operationKey}", "STATUS: current exact forget observation for UI lost-response and reload reconciliation"),
       Map.entry("GET /api/indexing/roots", "CONSUMER: ui-web/src/shell-v0/views/BrowseSurface.ts mount hydration via api/domains/indexing.ts"),
       Map.entry("GET /api/inference/encoders", "STATUS: currently loaded encoder runtime and device state (encoderRuntimeHandler)"),
       Map.entry("GET /api/inference/status", "STATUS: inference readiness/state"),

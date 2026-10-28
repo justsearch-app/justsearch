@@ -65,10 +65,13 @@ public final class SchemaController {
           "indexing-job-view.v1.json",
           "operation-history-entry.v1.json",
           "operation-outcome-view.v1.json",
+          "forget-outcome.v1.json",
+          "forget-page.v1.json",
           "operation.v1.json",
           "prompt.v1.json",
           "resource.v1.json",
           "runtime-context.v1.json",
+          "document-presence-response.v1.json",
           // Slice 3a.1.9 §B.B.B D1: closes the dangling-schema-URL
           // defect surfaced by the second-agent review. Four
           // TIMESERIES metric catalogs reference this URL; the file

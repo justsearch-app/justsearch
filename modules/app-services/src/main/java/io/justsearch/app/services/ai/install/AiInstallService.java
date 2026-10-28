@@ -1285,19 +1285,18 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       touch();
     }
 
-    // Restore llama-server runtime. Tempdoc 772 §Design "Design 1": the bundled runtime is not the
-    // only possible runtime source — a RUNTIME-tier package the plan supplies can deliver one too.
-    // So fail RUNTIME_MISSING only when the bundled restore fails AND the plan supplies no runtime
-    // package. Today no pack-delivered runtime package exists (see planSuppliesRuntime), so for
-    // every real install this stays exactly today's "restore or fail" — the second clause is
-    // dormant-but-correct until such a package is introduced.
-    updateState("running", "restore_runtime", "Restoring AI runtime...");
-    boolean bundledRuntimePresent = RuntimeRestoreUtil.ensureRuntimePresent(homeDir);
-    if (!runtimePreconditionMet(bundledRuntimePresent, plan, registry)) {
-      fail(
-          "RUNTIME_MISSING",
-          "Bundled AI runtime is missing and no runtime-supplying package is planned.");
-      return;
+    // Windows retains its bundled runtime prerequisite. Targets without that baseline only
+    // need llama-server when the selected plan includes a model that actually uses it.
+    if (NativeTargets.current().hasCpuBaselineRuntime()
+        || planIncludesChatRuntimeConsumer(plan, registry)) {
+      updateState("running", "restore_runtime", "Restoring AI runtime...");
+      boolean bundledRuntimePresent = RuntimeRestoreUtil.ensureRuntimePresent(homeDir);
+      if (!runtimePreconditionMet(bundledRuntimePresent, plan, registry)) {
+        fail(
+            "RUNTIME_MISSING",
+            "Bundled AI runtime is missing and no runtime-supplying package is planned.");
+        return;
+      }
     }
 
     // Reclaim BITS jobs an earlier crash left in the queue (tempdoc 840). Here rather than at app
@@ -1339,14 +1338,6 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         return;
       }
 
-      // Check for failures
-      long failedCount = countPackagesByState("failed");
-      long totalCount = status.packages.size();
-      if (failedCount > 0 && failedCount == totalCount) {
-        fail("ALL_DOWNLOADS_FAILED", "All packages failed to install.");
-        return;
-      }
-
       // ---- The run's bill of materials -----------------------------------------------------
       placement.writeContract(buildContract(plan, registry, hardware), homeDir);
 
@@ -1384,12 +1375,6 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       }
 
       applyCompletionState();
-      // Generation-changing ONNX assets are staged successfully, but their paths must be
-      // published by the separately approved recorded activation operation. Keep the acquisition
-      // result truthful and leave the ordinary settings owner untouched until that operation runs.
-      if (hasGenerationChangingAcquisition()) {
-        markActivationRequired();
-      }
     } finally {
       if (acquisitionFreeze != null) {
         acquisitionFreeze.close();
@@ -1793,15 +1778,19 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   /**
-   * Terminal honesty decision, extracted so a regression test can pin the INS-005 property (a
-   * multi-package run where some assets fail must still report {@code state == "completed"} with an
-   * accurate count, never {@code failed}) without staging real downloads — mirroring why {@link
-   * #applyInstalledFromPlan} was made package-private. Reads the already-populated {@code
-   * status.packages}: a per-package {@code failed} keeps {@code installedFully} false but the run
-   * completed; {@code skipped} (hardware/policy) is distinguished from {@code failed}.
+   * Reconciles the run against disk, then publishes its terminal outcome and any activation
+   * obligation together. Candidate hashing can take several seconds, so the run stays in progress
+   * until both are known.
    */
   void applyCompletionState() {
-    applyCompletionState(recomputeCompletenessFromDiskBestEffort());
+    InstallCompleteness diskTruth = recomputeCompletenessFromDiskBestEffort();
+    boolean activationRequired = hasGenerationChangingAcquisition();
+    synchronized (lock) {
+      applyCompletionState(diskTruth);
+      if ("completed".equals(status.state) && activationRequired) {
+        markActivationRequired();
+      }
+    }
   }
 
   /**
@@ -1859,35 +1848,26 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // the run's bookkeeping while disk says the install is complete. Counting it as failed in the
     // message would deny the flag printed beside it. When disk cannot answer, the bookkeeping is the
     // only authority for both, so they still agree.
-    long messageFailedCount = failedCount;
-    boolean optionalFilesMissing = false;
-    if (diskTruth != null) {
-      // A HashSet, not the returned immutable List: this runs on the terminal-state path, and
-      // List.copyOf(...).contains(null) THROWS rather than answering false.
-      Set<String> requiredGapPackages = new HashSet<>(diskTruth.packagesWithMissingRequiredFiles());
-      messageFailedCount =
-          status.packages.stream()
-              .filter(ps -> "failed".equals(ps.state))
-              .filter(ps -> requiredGapPackages.contains(ps.packageId))
-              .count();
-      optionalFilesMissing = !diskTruth.optionalGaps().isEmpty();
-    }
+    boolean optionalFilesMissing = diskTruth != null && !diskTruth.optionalGaps().isEmpty();
     String optionalNote = optionalFilesMissing ? "; optional files missing" : "";
 
-    if (messageFailedCount > 0) {
-      long installed = totalCount - messageFailedCount - skippedCount;
-      updateState(
-          "completed",
-          "done",
-          "AI installed ("
-              + installed
-              + "/"
-              + totalCount
-              + " packages; "
-              + messageFailedCount
-              + " failed"
-              + optionalNote
-              + ").");
+    List<String> missingRequired = diskTruth == null
+        ? status.packages.stream().filter(ps -> "failed".equals(ps.state))
+            .map(ps -> ps.packageId).toList()
+        : diskTruth.packagesWithMissingRequiredFiles();
+    if (!missingRequired.isEmpty()) {
+      String failures = missingRequired.stream().map(id -> {
+        var ps = findPackageStatus(id);
+        return id + (ps == null || ps.error == null || ps.error.isBlank()
+            ? ": required files are missing; retry installation."
+            : ": " + ps.error);
+      }).collect(java.util.stream.Collectors.joining("; "));
+      long installed = status.packages.stream()
+          .filter(ps -> "installed".equals(ps.state) && !missingRequired.contains(ps.packageId)).count();
+      long planned = totalCount - skippedCount;
+      fail(installed == 0 ? "ALL_DOWNLOADS_FAILED" : "REQUIRED_DOWNLOADS_FAILED",
+          "AI installation failed (" + installed + "/" + planned + " packages installed; "
+              + missingRequired.size() + " failed). " + failures);
     } else if (limitingSkippedCount > 0) {
       // Partial-success path: state is still "completed" (Install AI ran to
       // termination), but installedFully is false so the Brain UI can show
@@ -2005,22 +1985,26 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     return bundledRuntimePresent || planSuppliesRuntime(plan, registry);
   }
 
+  private static boolean planIncludesChatRuntimeConsumer(InstallPlan plan, ModelRegistry registry) {
+    return registry.packages().stream()
+        .filter(pkg -> pkg.variants().stream().anyMatch(
+            variant -> variant.targetEP() == ExecutionProvider.LLAMA_SERVER))
+        .anyMatch(pkg -> plan.alreadyInstalled().contains(pkg.id())
+            || plan.downloads().stream().anyMatch(dl -> dl.packageId().equals(pkg.id())));
+  }
+
   /**
-   * Whether the plan already supplies a working runtime via a pack-delivered RUNTIME-tier package —
-   * i.e. a RUNTIME-tier package that is <em>hardware-independent</em> ({@code requiresCuda=false})
-   * appears in {@code downloads()} or {@code alreadyInstalled()}. The hardware-independence filter is
-   * deliberate: {@code cuda-runtime} is a RUNTIME-tier package too, but it is a CUDA DLL supplement
-   * ({@code requiresCuda=true}), not a from-scratch runtime supplier — counting it would change
-   * today's behavior on GPU hardware (proceed instead of RUNTIME_MISSING when the bundled restore
-   * fails). No hardware-independent RUNTIME package exists in any production registry today, so this
-   * returns false for every real install and the bundled-runtime restore stays the sole runtime
-   * source — behavior is unchanged. It activates only for a future hardware-independent runtime
-   * package (tempdoc 772 Q3 / §Design "Design 1").
+   * A selected RUNTIME package supplies the runtime on targets without a bundled baseline,
+   * including GPU-specific packages. Windows keeps its existing hardware-independent filter:
+   * its CUDA supplement does not replace the bundled restore prerequisite.
    */
   static boolean planSuppliesRuntime(InstallPlan plan, ModelRegistry registry) {
     Set<String> runtimePackIds = new HashSet<>();
     for (ModelPackage pkg : registry.packages()) {
-      if (pkg.tier() == CapabilityTier.RUNTIME && !pkg.requiresCuda()) {
+      if (pkg.tier() == CapabilityTier.RUNTIME
+          && (!pkg.requiresCuda()
+              || (!NativeTargets.current().hasCpuBaselineRuntime()
+                  && NativeTargets.current().targetId().equals(pkg.nativeTarget())))) {
         runtimePackIds.add(pkg.id());
       }
     }
@@ -2051,7 +2035,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private record InstallHardware(HardwareProfile effective, HardwareProfile policyExcluded) {}
 
   private InstallHardware buildInstallHardware() {
-    HardwareProfile detected = detectHardwareProfile();
+    HardwareProfile detected = InstallPlanner.hardwareForPlan(getManifest(), detectHardwareProfile());
     return gpuAccelerationAllowed()
         ? new InstallHardware(detected, null)
         : new InstallHardware(HardwareProfile.cpuOnly(), detected);
@@ -2067,7 +2051,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         declinedPackages(), modelsDir, homeDir, hardware.policyExcluded());
   }
 
-  private HardwareProfile detectHardwareProfile() {
+  HardwareProfile detectHardwareProfile() {
     // Tempdoc 587: read every GPU fact from the ONE composition seam (GpuCapabilityResolver),
     // which folds the CUDA driver-API probe into the NVML/nvidia-smi VRAM+device merge. This
     // replaces the prior split — a direct GpuDriverApiProbe call for cudaFunctional plus a

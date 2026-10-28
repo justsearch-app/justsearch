@@ -468,6 +468,7 @@ public class HeadlessApp {
             engineRoot.executors(), telemetry, new ConfigManagerBootstrap(), null, settingsStore,
             childRegistry, engineRoot.operationLeases(), engineRoot.admission(), engineRoot.authority(),
             engineRoot.recordedIngestion(), engineRoot.components(), childControl);
+    bootstrap.lateBindings().bindForgetService(engineRoot.forgetService());
     LocalApiServer constructedApi = null;
     try {
       // Register fixed physical owners before the API can admit a settings transaction.
@@ -1478,6 +1479,7 @@ public class HeadlessApp {
               io.justsearch.agent.api.registry.OperationKind.RECONFIGURE,
               io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
               io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS,
+              io.justsearch.agent.api.registry.OperationKind.FORGET,
               io.justsearch.agent.api.registry.OperationKind.SCHEDULED_RUN), settingsOwner,
           new io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver(),
           operationFaultHook);

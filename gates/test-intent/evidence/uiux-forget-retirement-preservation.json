@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T01:09:11.861Z",
+  "revision": "cfd349c5870d68c7f8013a4a04f43d2d38b41e17",
+  "tree": "fe3f4de7bd09b8fa51d6387d917df3ba7f71c12f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.Release030ForgetSourceObservationTest.ordinaryNonExcludedPathStillReadsAndReconciles\" --tests \"io.justsearch.indexerworker.services.Release030ForgetRootReplayTest.ordinaryRootStillReadsAndCorrectsWithoutANewPathBudget\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7556
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/Release030ForgetSourceObservationTest.java#ordinaryNonExcludedPathStillReadsAndReconciles",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/Release030ForgetSourceObservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e190d9862e74b9282a2134b2d177e357840218d0129a4604de755c41aff1e5f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryNonExcludedPathStillReadsAndReconciles()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/Release030ForgetRootReplayTest.java#ordinaryRootStillReadsAndCorrectsWithoutANewPathBudget",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/Release030ForgetRootReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:624876e5f3f43ad2e8b6ee384e71c15647b4177783618d0c439efecf93a5541f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryRootStillReadsAndCorrectsWithoutANewPathBudget(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "ordinaryRootStillReadsAndCorrectsWithoutANewPathBudget(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3df76d7086370c5ef96da9fb1fef206201361b92eb56730eb423da57c8351792"
+}

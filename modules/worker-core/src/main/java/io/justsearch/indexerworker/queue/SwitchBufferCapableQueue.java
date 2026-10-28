@@ -283,6 +283,22 @@ public interface SwitchBufferCapableQueue extends JobQueue {
         && matchesAcceptedFileProjection(path, unitRevision, sourceSha256);
   }
 
+  /** Read-only, nonblocking exact native skip ownership; policy and index absence are separate. */
+  default boolean tryMatchesNativePolicySkippedAdmission(String candidate,
+      List<SwitchBufferOp> expectedJournal, SwitchBufferOp expectedOp,
+      java.util.Map<String, String> expectedRow) {
+    return false;
+  }
+
+  /**
+   * Atomically replace a bounded set of exact native skips with ordinary current admissions.
+   * Empty means a known prewrite refusal. Unconfirmed transaction/delivery outcomes throw.
+   */
+  default List<SwitchBufferOp> readmitNativePolicySkippedAdmissions(String candidate,
+      List<SwitchBufferOp> expectedJournal, List<NativePolicyReadmission> entries) {
+    return List.of();
+  }
+
   /** What the path's own queue row says about an accepted file admission on a generation. */
   enum SourceFileWork {
     /**

@@ -1,0 +1,128 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a6a274b2243765fdbd38129536f57141541f8cfce20358a7b2842387cf930f88",
+    "adapterPatch": "gates/test-intent/evidence/uiux-forget/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display variables and disabled CUDA, existing per-task isolation (no init script), Vite runner config loading, mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources. Raw run logs retained outside gates with content digests; temporary-index object writes isolated under TMPDIR because source common Git metadata is read-only."
+  },
+  "createdAt": "2026-10-27T15:52:44.288Z",
+  "revision": "3da06662909e0b7a52544b5ce5a503bdf4590e66",
+  "tree": "e26b09dfe1db623d17450ea5213561ae18839b42",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.validator.ValidatorRunnerTest\" --tests \"io.justsearch.app.services.registry.emitter.UIOperationViewConformanceTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2699,
+      "outputLog": "/home/elias/.cache/am/4t4brn6h/tmp/forget-builder-5-report/evidence-logs/evidence-fixtures-863ab857/run-1.log",
+      "outputDigest": "sha256:9da1d1eff347e359f3d01190c8cbe57027e999bdbc1a93b2d2a7b7d5b6b0653a"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:33ae33a34de48589a1f7c480e5ea5a327e2769e173cda2d7c61b4afb237f2988",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] io.justsearch.app.services.registry.validator.RiskAuditValidator@2b5f8e61",
+          "status": "passed"
+        },
+        {
+          "name": "[2] io.justsearch.app.services.registry.validator.ConfirmValidator@1c4057f9",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io.justsearch.app.services.registry.validator.ExecutorBindingValidator@1224e1b6",
+          "status": "passed"
+        },
+        {
+          "name": "[4] io.justsearch.app.services.registry.validator.NamespacingValidator@632c3f55",
+          "status": "passed"
+        },
+        {
+          "name": "[5] io.justsearch.app.services.registry.validator.I18nKeyValidator@22aefae0",
+          "status": "passed"
+        },
+        {
+          "name": "[1] io.justsearch.app.services.registry.validator.RiskAuditValidator@1d8be7b9",
+          "status": "passed"
+        },
+        {
+          "name": "[2] io.justsearch.app.services.registry.validator.ConfirmValidator@794cb26b",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io.justsearch.app.services.registry.validator.ExecutorBindingValidator@311a0b3e",
+          "status": "passed"
+        },
+        {
+          "name": "[4] io.justsearch.app.services.registry.validator.NamespacingValidator@21abda60",
+          "status": "passed"
+        },
+        {
+          "name": "[5] io.justsearch.app.services.registry.validator.I18nKeyValidator@6c70b7c3",
+          "status": "passed"
+        },
+        {
+          "name": "[1] io.justsearch.app.services.registry.validator.RiskAuditValidator@69a73867",
+          "status": "passed"
+        },
+        {
+          "name": "[2] io.justsearch.app.services.registry.validator.ConfirmValidator@401ec794",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io.justsearch.app.services.registry.validator.ExecutorBindingValidator@47f0f414",
+          "status": "passed"
+        },
+        {
+          "name": "[4] io.justsearch.app.services.registry.validator.NamespacingValidator@4809c771",
+          "status": "passed"
+        },
+        {
+          "name": "[5] io.justsearch.app.services.registry.validator.I18nKeyValidator@359e27d2",
+          "status": "passed"
+        },
+        {
+          "name": "composedCatalogActuallyCoversProjectedWorkflowTools()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cfc429b85dbe0d040048c849450e487e64d2ea969a64396a051c35107b3d2aeb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the emitted core-operation wire matches the committed golden",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:49c0440f839fbc4870d4c0c9a89e7b309444f7c8822231495ef02d7189a8c3b7"
+}

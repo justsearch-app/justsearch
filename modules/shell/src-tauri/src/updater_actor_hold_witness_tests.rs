@@ -91,11 +91,11 @@ impl Witness {
     async fn failed_prepare(&self) -> Result<(), String> {
         let path = self.root.path().join("staged/attempt-1/installer.exe");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(&path, b"MZfixture").unwrap();
+        fs::write(&path, fixture_installer_bytes()).unwrap();
         let staged = StagedArtifact {
             path: path.to_string_lossy().into_owned(),
-            sha256: sha256_bytes(b"MZfixture"),
-            size: 9,
+            sha256: sha256_bytes(fixture_installer_bytes()),
+            size: fixture_installer_bytes().len() as u64,
         };
         let descriptor = ReleaseDescriptor {
             schema_version: 1,
@@ -111,6 +111,7 @@ impl Witness {
                 size: staged.size,
                 signature: "fixture".into(),
                 public_key: "fixture".into(),
+                key_id: "fixture-artifact".into(),
             },
             compatibility: vec![],
         };
@@ -200,7 +201,7 @@ impl UpgradeHandoff for Witness {
         self.resumes.fetch_add(1, Ordering::SeqCst);
         self.host.release_replacement_hold()
     }
-    fn launch(&self, _: &Path) -> Result<(u32, u128), String> {
+    fn launch(&self, _: &Path) -> Result<(u32, u128), InstallerError> {
         panic!("failed prepare must not launch")
     }
 }

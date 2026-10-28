@@ -906,7 +906,14 @@ public interface JobQueue extends Closeable {
       String policyId,
       String parserId,
       String originator,
-      String transport) {
+      String transport,
+      String artifactReasonCode) {
+    public IngestionLedgerEntry(String pathHash, String collection, Long sourceSizeBytes,
+        Long sourceModifiedAtMs, String sourceKind, String artifactStatus, String policyId,
+        String parserId, String originator, String transport) {
+      this(pathHash, collection, sourceSizeBytes, sourceModifiedAtMs, sourceKind, artifactStatus,
+          policyId, parserId, originator, transport, null);
+    }
     /** Explicitly unknown attribution for legacy entries; never replaced by a later admission. */
     public IngestionLedgerEntry(String pathHash, String collection, Long sourceSizeBytes,
         Long sourceModifiedAtMs, String sourceKind, String artifactStatus, String policyId,
@@ -920,6 +927,7 @@ public interface JobQueue extends Closeable {
       collection = capField(collection);
       sourceKind = capField(sourceKind);
       artifactStatus = capField(artifactStatus);
+      artifactReasonCode = capField(artifactReasonCode);
       policyId = capField(policyId);
       parserId = capField(parserId);
       originator = capField(originator);
@@ -1148,6 +1156,22 @@ public interface JobQueue extends Closeable {
    */
   default int deleteByExactPath(String path) {
     return 0;
+  }
+
+  /** FORGET must refuse queue-owner/callback reentry before acquiring any outer owner. */
+  default boolean forgetEntryAllowed() { return false; }
+
+  interface ForgetQueueFence extends AutoCloseable {
+    /** Close on the acquiring thread, after ALL outer physical owners, delivering existing feeds. */
+    @Override void close();
+  }
+
+  /** Nonblocking acquisition after the file fence. No new feed buffer or dispatcher. */
+  default Optional<ForgetQueueFence> tryForgetQueueFence() { return Optional.empty(); }
+
+  /** Exact/prefix absence over all saved jobs; unknown inspection throws rather than inventing zero. */
+  default boolean forgetJobsAbsent(String path, boolean folder) {
+    throw new UnsupportedOperationException("Forget queue inspection is unavailable");
   }
 
   /**

@@ -44,12 +44,41 @@ public final class RootWatcherRegistry {
     return false;
   }
 
+  /** Captured outside file/publication ownership; retained return identities are not policy roots. */
+  synchronized PolicyRoots policyRoots() {
+    if (successor != null) return successor.policyRoots();
+    return new PolicyRoots(this, Map.copyOf(subscriptions), Map.copyOf(awaitingVolume));
+  }
+
+  record PolicyRoots(RootWatcherRegistry owner, Map<Path, Subscription> subscriptions,
+      Map<Path, AwaitingVolume> awaiting) {
+    boolean current(Path path, Path ownRoot) {
+      if (owner.successor != null) return false;
+      for (Path ancestor = path.toAbsolutePath().normalize().getParent(); ancestor != null;
+          ancestor = ancestor.getParent()) {
+        // The ingestion root has its separate exact held-identity/registration proof. Root replay
+        // may establish that registration itself; only ancestor memberships supply extra policy.
+        if (ancestor.equals(ownRoot.toAbsolutePath().normalize())) continue;
+        if (owner.subscriptions.get(ancestor) != subscriptions.get(ancestor)
+            || owner.awaitingVolume.get(ancestor) != awaiting.get(ancestor)) return false;
+      }
+      return true;
+    }
+
+    Set<Path> paths() {
+      var paths = new java.util.HashSet<>(subscriptions.keySet());
+      paths.addAll(awaiting.keySet());
+      return Set.copyOf(paths);
+    }
+  }
+
   private final Map<Path, Subscription> subscriptions = new ConcurrentHashMap<>();
   /**
    * Task t-20261013-ef3c41, round 5 (S8): roots whose watch waits for the volume recorded for them
    * to be back at their path, with the collection each was asked for ({@code ""} for none).
    */
-  private final Map<Path, String> awaitingVolume = new ConcurrentHashMap<>();
+  private record AwaitingVolume(String collection) {}
+  private final Map<Path, AwaitingVolume> awaitingVolume = new ConcurrentHashMap<>();
   /**
    * Round 8 (S8): the removal count at which each root was last unwatched, the person's removal,
    * so work that captured {@link #removalMark()} before it can tell the root was removed since,
@@ -181,7 +210,7 @@ public final class RootWatcherRegistry {
         watcher.unregisterRoot(normalized);
       }
     }
-    awaitingVolume.put(normalized, collection == null ? "" : collection);
+    awaitingVolume.put(normalized, new AwaitingVolume(collection == null ? "" : collection));
     removedRoots.remove(normalized);
     log.info("Root watcher waits for the volume first seen at {}; another volume is there now",
         normalized);
@@ -208,7 +237,8 @@ public final class RootWatcherRegistry {
         && !watcher.isActive(normalized, registered.watcherEpoch())) {
       watchWhenVolumeReturns(normalized, registered.collection());
     }
-    String collection = awaitingVolume.get(normalized);
+    AwaitingVolume awaiting = awaitingVolume.get(normalized);
+    String collection = awaiting == null ? null : awaiting.collection();
     if (collection == null) {
       return false;
     }
@@ -330,14 +360,14 @@ public final class RootWatcherRegistry {
         next.holdUntilVolumeReturns(watched.root(), watched.collection());
       }
     }
-    awaitingVolume.forEach(next::holdUntilVolumeReturns);
+    awaitingVolume.forEach((root, awaiting) -> next.holdUntilVolumeReturns(root, awaiting.collection()));
     handoverMark = next.removalMark();
     successor = next;
   }
 
   private synchronized void holdUntilVolumeReturns(Path root, String collection) {
     if (subscriptions.containsKey(root)) return;
-    awaitingVolume.putIfAbsent(root, collection == null ? "" : collection);
+    awaitingVolume.putIfAbsent(root, new AwaitingVolume(collection == null ? "" : collection));
   }
 
   @SuppressWarnings("unused") // RootWatcherRegistryTest only; frozen in UnreferencedCodeTest's store.

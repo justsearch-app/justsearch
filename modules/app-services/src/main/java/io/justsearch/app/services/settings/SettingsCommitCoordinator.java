@@ -142,8 +142,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   private final CompletableFuture<RecoveryIssue> recoveryIssue = new CompletableFuture<>();
   private volatile SettingsCommitFence fence;
   private volatile RecoveryIssue issue;
-  private boolean inspected;
-  private boolean blocked;
+  private volatile boolean inspected;
+  private volatile boolean blocked;
   private boolean restartIssued;
   private Long recoveredId;
   private OperationAttemptRunner.Reconciliation recoveredDecision;
@@ -426,6 +426,292 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         default -> { }
       }
     }
+  }
+
+  @Override public PreparedForgetProjection prepareForgetProjection(OperationRecord row,
+      OperationStore.Preparation accepted, ForgetControl control) {
+    var plan = ForgetPreparation.decode(row, accepted);
+    var previous = io.justsearch.app.api.operations.ForgetProgress.read(row.checkpointCursor());
+    boolean withdrawing = previous.withdrawalRequested();
+    Objects.requireNonNull(control, "control");
+    if (row.expectedSettingsRevision() != null) {
+      throw refused("SETTINGS_RECOVERY_REQUIRED", "The previous keep-out save needs reconciliation", Map.of());
+    }
+    if (!mutex.tryLock()) throw reconfigureInProgress();
+    SettingsCommitFence active = null;
+    try {
+      var exact = store.inspectExact();
+      active = reserveOwned(row.id(), row.key(), exact.snapshot().witness(), false);
+      if (active.preparationStarted) throw reconfigureInProgress();
+      active.preparationStarted = true;
+      var source = config.currentSnapshot().resolution("justsearch.ui.exclude_patterns");
+      if (!withdrawing && source != null && source.sourceOrdinal() > 300) {
+        throw refused("FORGET_POLICY_OVERRIDE", "An exclusion override prevents saving an effective keep-out", Map.of());
+      }
+      UiSettings candidate = exact.snapshot().settings();
+      if (!plan.keepOutRequired()) {
+        return new ForgetProjection(active, plan, previous, control, exact.fileWitness(), null, null,
+            config.currentSnapshot());
+      }
+      if (withdrawing && (previous.installedToken() == null
+          || !previous.installedToken().equals(plan.keepOut().literal().id()))) {
+        throw refused("FORGET_POLICY_UNKNOWN", "The keep-out to withdraw cannot be attributed", Map.of());
+      }
+      if (withdrawing && !candidate.getExcludePatterns().contains(plan.keepOut())) {
+        throw refused("FORGET_SUPERSEDED", "This keep-out entry has already been removed or replaced", Map.of());
+      }
+      if (!withdrawing && candidate.getExcludePatterns().contains(plan.keepOut())) {
+        throw refused("FORGET_POLICY_UNKNOWN", "The keep-out save cannot yet be attributed", Map.of());
+      }
+      var entries = new java.util.ArrayList<>(candidate.getExcludePatterns());
+      if (withdrawing) entries.remove(plan.keepOut());
+      else {
+        entries.removeIf(entry -> sameForgetTarget(entry, plan));
+        entries.add(plan.keepOut());
+      }
+      io.justsearch.configuration.excludes.ExclusionPatterns.validateCapacity(entries);
+      candidate.setExcludePatterns(entries);
+      var successor = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
+      var prepared = store.prepareExact(candidate, successor, exact.snapshot().queryRoles());
+      var desired = Objects.requireNonNull(prepareConfig.apply(prepared.settings(),
+          io.justsearch.app.api.settings.SettingsCandidateContext.NONE), "Prepared forget configuration");
+      var changed = ConfigApplyScopes.classify(config.currentSnapshot(), desired);
+      if (!Set.of("justsearch.ui.exclude_patterns").containsAll(changed.hot())
+          || !changed.component().isEmpty() || !changed.generationBound().isEmpty()
+          || !changed.restartRequired().isEmpty() || !withdrawing && !effectiveLiteral(desired, plan)) {
+        throw refused("FORGET_POLICY_OVERRIDE", "An effective keep-out cannot be established without changing other settings", Map.of());
+      }
+      return new ForgetProjection(active, plan, previous, control, exact.fileWitness(), prepared,
+          config.prepareSwap(desired), config.currentSnapshot());
+    } catch (RuntimeException | Error failure) {
+      if (active != null && fence == active) fence = null; // Preparation has made no file effects.
+      throw failure;
+    } finally { mutex.unlock(); publishIssue(); }
+  }
+
+  @Override public void preflightForget(io.justsearch.app.api.operations.ForgetPlan plan) {
+    if (!mutex.tryLock()) throw reconfigureInProgress();
+    try {
+      if (!inspected || blocked) throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings authority is unresolved", Map.of());
+      if (fence != null) throw reconfigureInProgress();
+      if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
+      var snapshot = store.inspectExact().snapshot();
+      var source = config.currentSnapshot().resolution("justsearch.ui.exclude_patterns");
+      if (source != null && source.sourceOrdinal() > 300) {
+        throw refused("FORGET_POLICY_OVERRIDE", "An exclusion override prevents forget admission", Map.of());
+      }
+      if (plan.keepOutRequired()) {
+        var entries = new java.util.ArrayList<>(snapshot.settings().getExcludePatterns());
+        entries.removeIf(entry -> sameForgetTarget(entry, plan));
+        entries.add(plan.keepOut());
+        io.justsearch.configuration.excludes.ExclusionPatterns.validateCapacity(entries);
+      }
+    } finally { mutex.unlock(); }
+  }
+
+  private static boolean sameForgetTarget(Object entry, io.justsearch.app.api.operations.ForgetPlan plan) {
+    if (entry instanceof String) return false;
+    var literal = io.justsearch.configuration.excludes.LiteralExclusion.fromEntry(entry);
+    boolean windows = io.justsearch.configuration.PlatformPaths.isWindows();
+    return literal.literal().scope() == plan.scope()
+        && literal.matches(Path.of(plan.path()), windows)
+        && plan.keepOut().matches(Path.of(literal.literal().path()), windows);
+  }
+
+  @Override public ForgetPolicy forgetPolicy(OperationRecord row, OperationStore.Preparation accepted) {
+    if (!config.publicationLock().isWriteLockedByCurrentThread()) {
+      throw new IllegalStateException("Forget policy must be checked inside configuration publication ownership");
+    }
+    if (!inspected || blocked || !store.mode().isWritable()) return ForgetPolicy.UNKNOWN;
+    try {
+      var plan = ForgetPreparation.decode(row, accepted);
+      var progress = io.justsearch.app.api.operations.ForgetProgress.read(row.checkpointCursor());
+      var actual = store.inspectExact().snapshot();
+      if (!plan.keepOutRequired()) return ForgetPolicy.NO_KEEP_OUT;
+      if (progress.installedToken() == null) {
+        return actual.settings().getExcludePatterns().contains(plan.keepOut())
+            ? ForgetPolicy.UNKNOWN : ForgetPolicy.NOT_INSTALLED;
+      }
+      if (!progress.installedToken().equals(plan.keepOut().literal().id())) return ForgetPolicy.UNKNOWN;
+      if (!actual.settings().getExcludePatterns().contains(plan.keepOut())) return ForgetPolicy.SUPERSEDED;
+      return effectiveLiteral(config.currentSnapshot(), plan) ? ForgetPolicy.INSTALLED : ForgetPolicy.UNKNOWN;
+    } catch (RuntimeException unavailable) { return ForgetPolicy.UNKNOWN; }
+  }
+
+  private static boolean effectiveLiteral(ResolvedConfig current,
+      io.justsearch.app.api.operations.ForgetPlan plan) {
+    var source = current.resolution("justsearch.ui.exclude_patterns");
+    if (source != null && source.sourceOrdinal() > 300) return false;
+    return io.justsearch.configuration.excludes.ExclusionPatterns.fromRawJsonStrict(
+        current.ui().excludePatterns(), io.justsearch.configuration.PlatformPaths.isWindows())
+        .savedPatterns().contains(plan.keepOut());
+  }
+
+  private final class ForgetProjection implements PreparedForgetProjection {
+    private final SettingsCommitFence active;
+    private final io.justsearch.app.api.operations.ForgetPlan plan;
+    private final io.justsearch.app.api.operations.ForgetProgress previous;
+    private final ForgetControl control;
+    private final String priorFile;
+    private final UiSettingsStore.PreparedSettings prepared;
+    private final ConfigStore.PreparedSwap configSwap;
+    private final ResolvedConfig authorityConfig;
+    private boolean armed;
+    private boolean installed;
+    private boolean released;
+
+    private ForgetProjection(SettingsCommitFence active,
+        io.justsearch.app.api.operations.ForgetPlan plan,
+        io.justsearch.app.api.operations.ForgetProgress previous, ForgetControl control, String priorFile,
+        UiSettingsStore.PreparedSettings prepared, ConfigStore.PreparedSwap configSwap,
+        ResolvedConfig authorityConfig) {
+      this.active = active; this.plan = plan; this.previous = previous;
+      this.control = control; this.priorFile = priorFile;
+      this.prepared = prepared; this.configSwap = configSwap; this.authorityConfig = authorityConfig;
+    }
+
+    private io.justsearch.app.api.operations.ForgetProgress progress(
+        io.justsearch.app.api.operations.ForgetProgress.Phase phase, String token,
+        io.justsearch.app.api.operations.ForgetProgress.Reason reason) {
+      return new io.justsearch.app.api.operations.ForgetProgress(1, phase, true, token,
+          active.prior, priorFile, prepared == null ? null : prepared.fileWitness(),
+          previous.withdrawalRequested(), reason);
+    }
+
+    @Override public void publish() {
+      if (!config.publicationLock().isWriteLockedByCurrentThread()) {
+        throw new IllegalStateException("Forget publication requires configuration ownership");
+      }
+      if (active != fence || installed || released || processClosing.getAsBoolean()) {
+        throw refused("ENGINE_CLOSING", "Forget settings admission is no longer available", Map.of());
+      }
+      var current = store.inspectExact();
+      if (!active.prior.equals(current.snapshot().witness()) || !priorFile.equals(current.fileWitness())
+          || config.currentSnapshot() != authorityConfig) {
+        throw refused("VERSION_CONFLICT", "Settings changed before forget admission", Map.of());
+      }
+      if (prepared == null) { installed = true; active.phase = Phase.COMMITTED; return; }
+      config.validatePrepared(configSwap);
+      armed = true; // A failed SQL return may still have committed the marker; retain its witness.
+      control.arm(active.prior, progress(previous.withdrawalRequested()
+              ? io.justsearch.app.api.operations.ForgetProgress.Phase.WITHDRAWAL_ARMED
+              : io.justsearch.app.api.operations.ForgetProgress.Phase.POLICY_ARMED,
+          previous.installedToken(), io.justsearch.app.api.operations.ForgetProgress.Reason.NONE));
+      try {
+        try { replacement.replace(prepared); }
+        catch (IOException | RuntimeException replacementFailure) {
+          var actual = store.inspectExact();
+          if (!prepared.fileWitness().equals(actual.fileWitness())
+              || !prepared.witness().equals(actual.snapshot().witness())) {
+            throw new IllegalStateException("Keep-out replacement is not confirmed", replacementFailure);
+          }
+        }
+        active.phase = Phase.COMMITTED;
+        config.installPrepared(configSwap);
+        control.settled(progress(previous.withdrawalRequested()
+                ? io.justsearch.app.api.operations.ForgetProgress.Phase.WITHDRAWN
+                : io.justsearch.app.api.operations.ForgetProgress.Phase.POLICY_INSTALLED,
+            plan.keepOut().literal().id(), io.justsearch.app.api.operations.ForgetProgress.Reason.NONE));
+        armed = false;
+        installed = true;
+      } catch (RuntimeException | Error failure) {
+        active.phase = Phase.UNCERTAIN;
+        throw failure;
+      }
+    }
+
+    @Override public void afterOwnersReleased() {
+      if (installed) {
+        releaseForgetProjection(active.id);
+        released = true;
+        if (configSwap != null) config.notifyListeners(configSwap.event());
+      } else abandonUncommitted();
+    }
+
+    @Override public void abandonUncommitted() {
+      if (released) return;
+      if (installed) { afterOwnersReleased(); return; }
+      mutex.lock();
+      try {
+        if (active != fence) return;
+        if (!armed && active.phase == Phase.PREPARING) {
+          fence = null;
+          released = true;
+          return;
+        }
+        var actual = store.inspectExact();
+        if (priorFile.equals(actual.fileWitness()) && active.prior.equals(actual.snapshot().witness())) {
+          if (armed) control.settled(progress(previous.withdrawalRequested()
+                  ? io.justsearch.app.api.operations.ForgetProgress.Phase.POLICY_INSTALLED
+                  : io.justsearch.app.api.operations.ForgetProgress.Phase.ADMITTED,
+              previous.installedToken(), io.justsearch.app.api.operations.ForgetProgress.Reason.SETTINGS_UNCOMMITTED));
+          armed = false;
+          fence = null;
+          released = true;
+        } else {
+          active.phase = Phase.UNCERTAIN;
+          block(new RecoveryIssue(RecoveryReason.CONTRADICTORY_WITNESS, active.id));
+        }
+      } catch (RuntimeException unavailable) {
+        active.phase = Phase.UNCERTAIN;
+        block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, active.id));
+        throw unavailable;
+      } finally { mutex.unlock(); publishIssue(); }
+    }
+  }
+
+  @Override public java.util.Optional<io.justsearch.app.api.operations.ForgetProgress> reconcileForgetProjection(
+      OperationRecord row, OperationStore.Preparation accepted) {
+    mutex.lock();
+    try {
+      var plan = ForgetPreparation.decode(row, accepted);
+      var progress = io.justsearch.app.api.operations.ForgetProgress.read(row.checkpointCursor());
+      if (row.expectedSettingsRevision() == null || progress.settingsBase() == null
+          || progress.settingsBase().acceptedRevision() != row.expectedSettingsRevision()
+          || !progress.admitted() || !plan.keepOutRequired()) return java.util.Optional.empty();
+      var actual = store.inspectExact();
+      var witness = actual.snapshot().witness();
+      boolean withdrawing = progress.phase() == io.justsearch.app.api.operations.ForgetProgress.Phase.WITHDRAWAL_ARMED;
+      if (Objects.equals(actual.fileWitness(), progress.priorFileWitness())
+          && progress.settingsBase().equals(witness)) {
+        return java.util.Optional.of(new io.justsearch.app.api.operations.ForgetProgress(1,
+            withdrawing ? io.justsearch.app.api.operations.ForgetProgress.Phase.POLICY_INSTALLED
+                : io.justsearch.app.api.operations.ForgetProgress.Phase.ADMITTED,
+            true, progress.installedToken(),
+            progress.settingsBase(), progress.priorFileWitness(), progress.installedFileWitness(),
+            progress.withdrawalRequested(),
+            io.justsearch.app.api.operations.ForgetProgress.Reason.SETTINGS_UNCOMMITTED));
+      }
+      if (Objects.equals(actual.fileWitness(), progress.installedFileWitness())
+          && witness.acceptedRevision() == Math.addExact(progress.settingsBase().acceptedRevision(), 1)
+          && row.key().equals(witness.lastCommittedOperationKey())
+          && (withdrawing ? !actual.snapshot().settings().getExcludePatterns().contains(plan.keepOut())
+              : actual.snapshot().settings().getExcludePatterns().contains(plan.keepOut())
+                  && effectiveLiteral(config.currentSnapshot(), plan))) {
+        return java.util.Optional.of(new io.justsearch.app.api.operations.ForgetProgress(1,
+            withdrawing ? io.justsearch.app.api.operations.ForgetProgress.Phase.WITHDRAWN
+                : io.justsearch.app.api.operations.ForgetProgress.Phase.POLICY_INSTALLED, true,
+            plan.keepOut().literal().id(), progress.settingsBase(), progress.priorFileWitness(),
+            progress.installedFileWitness(), progress.withdrawalRequested(),
+            io.justsearch.app.api.operations.ForgetProgress.Reason.NONE));
+      }
+      block(new RecoveryIssue(RecoveryReason.CONTRADICTORY_WITNESS, row.id()));
+      return java.util.Optional.empty();
+    } catch (RuntimeException unavailable) {
+      block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, row.id()));
+      return java.util.Optional.empty();
+    } finally { mutex.unlock(); publishIssue(); }
+  }
+
+  @Override public void releaseForgetProjection(long id) {
+    mutex.lock();
+    try {
+      if (fence != null && fence.id == id) {
+        fence = null;
+        if (Objects.equals(recoveredId, id)) recoveredId = null;
+        if (issue != null && Objects.equals(issue.operationRecordId(), id)) blocked = false;
+      }
+    } finally { mutex.unlock(); }
   }
 
   private static Map<String, Set<String>> ordinaryInstallerComponents(
@@ -1043,6 +1329,27 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (expected < 0 || expected == Long.MAX_VALUE) {
         block(new RecoveryIssue(RecoveryReason.CONTRADICTORY_WITNESS, row.id()));
         return;
+      }
+      if (row.descriptor().kind() == OperationKind.FORGET) {
+        try {
+          var plan = ForgetPreparation.decode(row, armed.getFirst().preparation().orElseThrow());
+          var progress = io.justsearch.app.api.operations.ForgetProgress.read(row.checkpointCursor());
+          if (!plan.keepOutRequired() || !progress.admitted()
+              || progress.phase() != io.justsearch.app.api.operations.ForgetProgress.Phase.POLICY_ARMED
+                  && progress.phase() != io.justsearch.app.api.operations.ForgetProgress.Phase.WITHDRAWAL_ARMED
+              || progress.settingsBase() == null || progress.settingsBase().acceptedRevision() != expected
+              || progress.priorFileWitness() == null || progress.installedFileWitness() == null) {
+            throw new IllegalArgumentException("Invalid armed forget settings step");
+          }
+          // Reserve this step, with no whole-forget terminal decision. The runner resolves the
+          // exact byte witness after ordinary configuration composition and checkpoints nonterminally.
+          fence = new SettingsCommitFence(row.id(), row.key(), witness, snapshot.settings(),
+              snapshot.queryRoles(), null, false);
+          return;
+        } catch (RuntimeException invalid) {
+          block(new RecoveryIssue(RecoveryReason.INVALID_PREPARATION, row.id()));
+          return;
+        }
       }
       if (RecordedInstallerGenerationPlan.OPERATION_ID.equals(row.descriptor().operationRef())) {
         if (row.descriptor().kind() != OperationKind.REINDEX) {

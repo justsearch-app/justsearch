@@ -370,7 +370,16 @@ class PreviewControllerTest {
   }
 
   private static DocumentService stubDocumentsAlwaysNotFound() {
-    return (docId, engineContext) -> CompletableFuture.completedFuture(null);
+    return new DocumentService() {
+      @Override public java.util.concurrent.CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
+        return CompletableFuture.completedFuture(null);
+      }
+      @Override public java.util.concurrent.CompletionStage<Map<String, Presence>> checkPresence(
+          java.util.List<String> docIds, EngineContext engineContext) {
+        return CompletableFuture.completedFuture(docIds.stream().collect(
+            java.util.stream.Collectors.toMap(id -> id, id -> Presence.ABSENT)));
+      }
+    };
   }
 
   private static DocumentService stubDocumentsUnavailable() {

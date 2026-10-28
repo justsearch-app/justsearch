@@ -134,6 +134,7 @@ export class ConfirmDialog extends JfElement {
     }
     .message ol { padding-inline-start: 1.25rem; }
     .message li { margin-block: 0.5rem; }
+    .message pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 0; }
     .typed-row {
       margin-bottom: 0.875rem;
       display: flex;
@@ -191,6 +192,7 @@ export class ConfirmDialog extends JfElement {
     dialog: () => this.shadowRoot?.querySelector('dialog'),
     onOpened: () => {
       requestAnimationFrame(() => {
+        if (!this.isConnected || !this.open) return;
         if (this.typedConfirmWord) {
           this.shadowRoot?.querySelector<HTMLInputElement>('.typed-row input')?.focus();
         } else {
@@ -260,6 +262,12 @@ export class ConfirmDialog extends JfElement {
     this.dispatchEvent(
       new CustomEvent('cancel', { bubbles: true, composed: true }),
     );
+  }
+
+  /** A departed placement must release its modal without taking focus back from navigation. */
+  closeForNavigation(): void {
+    this.modal.close({ skipFocusRestore: true });
+    this.open = false;
   }
 
   private onBackdrop(e: Event): void {
@@ -347,11 +355,12 @@ export interface ConfirmAsyncOptions {
   message: string | TemplateResult;
   /** Keep cancellation available while a disclosure is being read. */
   readyMessage?: Promise<string | TemplateResult>;
-  signal?: AbortSignal;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: Variant;
   typedConfirmWord?: string;
+  /** The originating placement may leave while the server-owned preview is displayed. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -371,7 +380,7 @@ export function confirmAsync(opts: ConfirmAsyncOptions): Promise<boolean> {
     if (opts.typedConfirmWord) el.typedConfirmWord = opts.typedConfirmWord;
     el.open = true;
     let settled = false;
-    const abort = () => cleanup(false);
+    const abort = () => { el.closeForNavigation(); cleanup(false); };
     const cleanup = (result: boolean) => {
       if (settled || (result && el.pending)) return;
       settled = true;

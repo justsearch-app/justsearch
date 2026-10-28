@@ -130,7 +130,7 @@ export class EngineRecovery extends JfElement {
         ${this.supervisor?.retryAt ? html`<p>Automatic retry at ${new Date(this.supervisor.retryAt).toLocaleTimeString()}.</p>` : nothing}
         ${available ? html`<p>JustSearch ${status.availableVersion ?? 'update'} is available.</p>` : nothing}
         ${status?.state === 'up_to_date' ? html`<p>You have the latest version.</p>` : nothing}
-        ${status?.state === 'repair_required' ? html`<p>The last update needs repair. Automatic restart may be paused until the update is recovered.</p>` : nothing}
+        ${status?.state === 'repair_required' ? html`<p>The last update needs repair. Automatic restart may be paused until the update is recovered. ${status.error ?? ''}</p>` : nothing}
         ${this.busy && !updating ? html`<p role="status">Please wait…</p>` : nothing}
         ${updating ? html`<p role="status">${status?.state === 'checking' ? 'Checking for updates…' : 'Updating JustSearch…'}</p>` : nothing}
         ${this.error || status?.state === 'error' ? html`<p role="alert">${this.error || status?.error

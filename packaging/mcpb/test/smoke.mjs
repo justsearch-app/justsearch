@@ -5,7 +5,7 @@
  *
  * Success path (JustSearch app must be running):
  *   node packaging/mcpb/test/smoke.mjs
- *   -> initialize, notifications/initialized, tools/list (expects the 6
+ *   -> initialize, notifications/initialized, tools/list (expects the 7
  *      justsearch_* tools), tools/call justsearch_status. Exit 0 on pass.
  *
  * Failure path (JustSearch app must NOT be running):
@@ -22,6 +22,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const bridgePath = path.join(here, '..', 'server', 'index.js');
 const expectUnreachable = process.argv.includes('--expect-unreachable');
 
+// McpContractVersions TOOL_SURFACE_VERSION 0.9.0 / McpToolSurface.listTools.
 const EXPECTED_TOOLS = [
   'justsearch_answer',
   'justsearch_search',
@@ -29,6 +30,7 @@ const EXPECTED_TOOLS = [
   'justsearch_ingest',
   'justsearch_status',
   'justsearch_runtime_manifest',
+  'justsearch_operation_outcome',
 ];
 
 function fail(msg) {
@@ -134,9 +136,9 @@ async function runSuccessPath() {
   const names = list.result.tools.map((t) => t.name).sort();
   const missing = EXPECTED_TOOLS.filter((t) => !names.includes(t));
   if (names.length !== EXPECTED_TOOLS.length || missing.length > 0) {
-    fail(`tools/list: expected the 6 justsearch tools, got [${names.join(', ')}]`);
+    fail(`tools/list: expected the ${EXPECTED_TOOLS.length} justsearch tools, got [${names.join(', ')}]`);
   }
-  console.log(`2. tools/list OK: 6 tools [${names.join(', ')}]`);
+  console.log(`2. tools/list OK: ${EXPECTED_TOOLS.length} tools [${names.join(', ')}]`);
 
   // 3. tools/call justsearch_status
   const status = await request('tools/call', { name: 'justsearch_status', arguments: {} });

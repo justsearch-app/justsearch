@@ -34,6 +34,35 @@ final class ReadDocumentToolTest {
 
   private static final String PATH = "/docs/report.md";
 
+  @Test
+  void absoluteIndexedIdsPreserveTrailingSpaceAndBackslash() {
+    for (String exact : List.of("/docs/report.md ", "/docs/report\\name.md ")) {
+      var observed = new java.util.concurrent.atomic.AtomicReference<String>();
+      ReadDocumentTool.SliceFetcher fetch = (docId, offset, maximum, context) -> {
+        observed.set(docId);
+        return CompletableFuture.completedFuture(slice(docId, "exact body", false, 10));
+      };
+      String encoded = exact.replace("\\", "\\\\");
+      OperationResult result = new ReadDocumentTool(fetch)
+          .execute("{\"path\":\"" + encoded + "\"}", EngineContextTestFixtures.AGENT_LOOP);
+      assertTrue(result.success(), result.message());
+      assertEquals(exact, observed.get(), "the fetch boundary must receive the exact indexed id");
+    }
+  }
+
+  @Test
+  void relativeDocumentInputKeepsWhitespaceConvenience() {
+    var observed = new java.util.concurrent.atomic.AtomicReference<String>();
+    ReadDocumentTool.SliceFetcher fetch = (docId, offset, maximum, context) -> {
+      observed.set(docId);
+      return CompletableFuture.completedFuture(slice(docId, "body", false, 4));
+    };
+    OperationResult result = new ReadDocumentTool(fetch)
+        .execute("{\"path\":\" report.md \"}", EngineContextTestFixtures.AGENT_LOOP);
+    assertTrue(result.success(), result.message());
+    assertEquals("report.md", observed.get());
+  }
+
   /** Records the arguments it was called with, so the cap can be asserted at the boundary. */
   private static final class FakeFetch implements ReadDocumentTool.SliceFetcher {
     private final DocumentService.DocumentSlice slice;

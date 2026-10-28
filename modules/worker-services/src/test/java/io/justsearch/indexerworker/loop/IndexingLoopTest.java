@@ -1457,6 +1457,46 @@ class IndexingLoopTest {
     }
 
     @Test
+    void mixedPartialReasonsSurviveBatchFallbackAndRetry() throws Exception {
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("ignored"));
+      for (String reason : List.of("TEXT_LOST_WHILE_DECODING", "TEXT_LOST_WHILE_DECODING_AND_TRUNCATED", "SUCCESS_PARTIAL")) {
+        Path file = Files.writeString(Files.createTempFile("js-partial-reason", ".txt"), "valid words");
+        boolean truncated = !reason.equals("TEXT_LOST_WHILE_DECODING");
+        var envelope = FileEnvelope.fromSnapshot(FileFreshnessSnapshot.capture(file));
+        var artifact = new ExtractionArtifact(
+            ExtractionStatus.SUCCESS_PARTIAL,
+            new ExtractionResult("valid words", null, "text/plain"),
+            TikaExtractionPolicy.defaults().policyId(), "test", truncated,
+            reason.equals("SUCCESS_PARTIAL") ? List.of() : List.of("TEXT_LOST_WHILE_DECODING"))
+            .validate(TikaExtractionPolicy.defaults(), envelope.pathHash());
+        invokeWriteExtractedJob(loop, new ExtractedJob(file, null, artifact,
+            System.currentTimeMillis(), envelope, SourceContentHash.sha256(file),
+            "00000000-0000-4000-8000-000000000001"));
+      }
+      // First group fails both the batched and individual write. Other reasons still drain.
+      queue.transientOutcomeWriteFailures = 2;
+      loop.getJournal().drainPending();
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      loop.getJournal().drainPending();
+      assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
+      assertEquals(java.util.Set.of("TEXT_LOST_WHILE_DECODING", "TEXT_LOST_WHILE_DECODING_AND_TRUNCATED", "SUCCESS_PARTIAL"),
+          queue.capturedOutcomes.stream().map(IngestionOutcome::reasonCode).collect(java.util.stream.Collectors.toSet()));
+      for (var outcome : queue.capturedOutcomes) {
+        assertEquals(IngestionOutcomeClass.SUCCESS_PARTIAL, outcome.outcomeClass());
+        assertEquals(io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE, outcome.retryPolicy());
+        if (outcome.reasonCode().equals("TEXT_LOST_WHILE_DECODING")) {
+          assertFalse(outcome.diagnosticSummary().contains("truncated"));
+        }
+      }
+      var docs = org.mockito.ArgumentCaptor.forClass(IndexDocument.class);
+      verify(queue.indexingCoordinator, times(3)).indexSingle(docs.capture());
+      assertEquals(java.util.Set.of("TEXT_LOST_WHILE_DECODING", "TEXT_LOST_WHILE_DECODING_AND_TRUNCATED", "SUCCESS_PARTIAL"),
+          docs.getAllValues().stream().map(doc -> doc.fields().get(SchemaFields.EXTRACTION_REASON_CODE))
+              .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
     void misroutedOutcomeWriteDoesNotCrashBatch() throws Exception {
       // B-H.4 defect F — recordOutcomeSafely must catch RuntimeException, not just
       // OutcomeWriteException, so the SqliteJobQueue defer-policy guard

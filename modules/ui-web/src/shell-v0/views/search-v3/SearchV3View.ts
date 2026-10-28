@@ -54,6 +54,7 @@ import { peekSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js
 import type { SelectionPayload } from '../../../api/types/selection.js';
 import type { ShapeId } from '../unifiedChatRequest.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { keyed } from 'lit/directives/keyed.js';
 import { EMPTY_PREFIX_SENTINEL } from '../unifiedChatRequest.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import { FrameLatch } from '../../primitives/frameLatch.js';
@@ -337,6 +338,12 @@ import {
 import { confirmConversationTree, conversationDeleteOutcome } from '../../components/chat/conversationDelete.js';
 import type { DeleteTreeEntry } from '../../state/conversationListStore.js';
 import { emitEphemeralToast } from '../../components/advisory/ephemeralToast.js';
+import { completedForget, createForgetAttempt, executeForget, forgetContainsPath, forgetObservationText,
+  forgetParentFolder, publishForgetCompletion, readUnfinishedForgets,
+  type IndexedForgetCompletion } from '../../../api/domains/forget.js';
+import { confirmForget } from '../../components/searchResults/forgetConsent.js';
+import type { CardForgetDetail, ResultsCard } from '../../components/searchResults/ResultsCard.js';
+import { describeExactPath } from '../../../api/exclusionPolicy.js';
 import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js';
 import {
   BRANCH_FAILED,
@@ -819,6 +826,9 @@ export class SearchV3View extends JfElement {
     composerState: { type: String, reflect: true, attribute: COMPOSER_STATE_ATTR },
     theme: { type: String, reflect: true },
     apiBase: { type: String, attribute: 'api-base' },
+    forgetAvailable: { state: true },
+    forgetBusy: { state: true },
+    forgetNotice: { state: true },
     sessions: { state: true },
     aiSnapshot: { state: true },
     streaming: { state: true },
@@ -862,6 +872,14 @@ export class SearchV3View extends JfElement {
   declare theme: AppearanceMode;
   /** Set by the shell on every render of a mounted surface (`chrome/Shell.ts:2945-2949`). */
   declare apiBase: string;
+  declare forgetCompletionOwner: object | undefined;
+  private declare forgetAvailable: boolean;
+  private declare forgetBusy: boolean;
+  private declare forgetNotice: string;
+  private forgetPlacement = 0;
+  private forgetConsent: AbortController | null = null;
+  private forgetCapabilityRead: AbortController | null = null;
+  private forgetCapabilityBase: string | null = null;
   /** Shell settles cold ingress before this mount may dispose of the legacy draft. */
   declare initialNavigationPending: boolean;
   private mountDraftPending = false;
@@ -914,7 +932,7 @@ export class SearchV3View extends JfElement {
    * `rag.citation_matches` only once the answer has streamed, so the pane is routinely opened before
    * its matched sentence exists — the upgrade is the common path, not a repair.
    */
-  declare paneSource: { readonly turnId: string; readonly sourceIndex: number } | null;
+  declare paneSource: { readonly turnId: string; readonly sourceIndex: number; readonly sourceUnavailable?: true } | null;
   /**
    * Tempdoc 849 §7 — what the open pane may say about the citation that opened it. Held HERE rather
    * than derived inside the pane for the reason slice 2 recorded: the event carries identity only,
@@ -1679,6 +1697,9 @@ export class SearchV3View extends JfElement {
     // pre-paint script exists to avoid.
     this.theme = getAppearanceMode();
     this.apiBase = '';
+    this.forgetAvailable = false;
+    this.forgetBusy = false;
+    this.forgetNotice = '';
     this.initialNavigationPending = false;
     this.sessions = SV3_SESSIONS_EMPTY;
     this.aiSnapshot = null;
@@ -1726,6 +1747,7 @@ export class SearchV3View extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    void this.loadForgetCapability();
     window.addEventListener('storage', this.onOtherWindowStorage);
     this.mountDraftPending = !this.recoveryOpened;
     this.mountHasIncoming = false;
@@ -1870,6 +1892,10 @@ export class SearchV3View extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.leaveForgetPlacement();
+    this.forgetCapabilityRead?.abort();
+    this.forgetCapabilityRead = null;
+    this.forgetAvailable = false;
     this.removalConfirmation?.abort();
     this.removalDraft = null;
     this.liveDraftOwner = null;
@@ -2084,6 +2110,8 @@ export class SearchV3View extends JfElement {
    * reason.
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
+    const previousSessions = changed.get('sessions') as Sv3SessionList | undefined;
+    if (previousSessions && previousSessions.activeId !== this.sessions.activeId) this.leaveForgetPlacement();
     if (changed.has('sessions')) { this.syncActiveAsk(); this.upgradeOpenPaneAnchor(); }
     this.syncForkReads();
     if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
@@ -2100,6 +2128,10 @@ export class SearchV3View extends JfElement {
     if (changed.has('apiBase')) {
       setSearchApiBase(this.apiBase || '');
       setConversationApiBase(this.apiBase || '');
+      if (this.forgetCapabilityBase !== this.apiBase) {
+        this.leaveForgetPlacement();
+        void this.loadForgetCapability();
+      }
     }
     if (changed.has('sidebarWidthPx')) this.applySidebarWidth(this.sidebarWidthPx);
     if (changed.has('paneWidthPx')) this.applyPaneWidth(this.paneWidthPx);
@@ -3438,7 +3470,8 @@ export class SearchV3View extends JfElement {
     this.paneDocPath = detail.docPath;
     this.paneHighlight = null;
     this.paneCitation = detail.anchor ?? null;
-    this.paneSource = { turnId: detail.turnId, sourceIndex: detail.sourceIndex };
+    this.paneSource = { turnId: detail.turnId, sourceIndex: detail.sourceIndex,
+      ...(detail.sourceUnavailable ? { sourceUnavailable: detail.sourceUnavailable } : {}) };
     this.paneCitationHeader = this.headerFor(detail.turnId, detail.sourceIndex, this.paneCitation);
   }
 
@@ -3795,6 +3828,7 @@ export class SearchV3View extends JfElement {
   private enterResults(leftDraft: string, query = this.search.query): boolean {
     this.removalConfirmation?.abort();
     if (!this.search.showing) {
+      this.leaveForgetPlacement();
       this.revokeHumanTask(true);
       const leaving = this.sessions.activeId;
       if (!this.persistDraft({ place: RESULTS_PLACE, text: query, preparation: { kind: 'search' } },
@@ -3821,6 +3855,7 @@ export class SearchV3View extends JfElement {
 
   /** Back/Forward onto the bare address while this window has a result list. */
   private returnToResults(): boolean {
+    this.leaveForgetPlacement();
     this.removalConfirmation?.abort();
     this.revokeHumanTask(true);
     const saved = this.placeDrafts.get(RESULTS_PLACE);
@@ -3871,6 +3906,7 @@ export class SearchV3View extends JfElement {
     if (from === RESULTS_PLACE) this.resultsTier = this.tier;
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
+    this.leaveForgetPlacement();
     this.search.hide(); this.askInConversation();
     if (review) {
       this.markDraftReview(preparation);
@@ -3933,6 +3969,162 @@ export class SearchV3View extends JfElement {
     this.search.select(detail.ids);
     if (this.tier === 'structured' && this.search.showing && this.search.prepareFromSelection() === null) {
       this.search.clearScope();
+    }
+  }
+
+  private leaveForgetPlacement(): void {
+    this.forgetPlacement++;
+    this.forgetConsent?.abort();
+    this.forgetConsent = null;
+    this.forgetNotice = '';
+  }
+
+  private async loadForgetCapability(): Promise<void> {
+    this.forgetCapabilityRead?.abort();
+    const read = new AbortController();
+    this.forgetCapabilityRead = read;
+    const base = this.apiBase;
+    this.forgetCapabilityBase = base;
+    this.forgetAvailable = false;
+    try {
+      await readUnfinishedForgets(base, 0, read.signal, 1);
+      if (this.isConnected && !read.signal.aborted && this.apiBase === base) this.forgetAvailable = true;
+    } catch { /* A host must prove that it handles the action before any card offers it. */ }
+  }
+
+  /** One target-specific reconciliation for initial completion and the owning Stage's Retry. */
+  reconcileConfirmedForget(detail: IndexedForgetCompletion): void {
+    if (detail.apiBase !== this.apiBase || detail.owner !== this.forgetCompletionOwner) return;
+    const outcome = completedForget(detail.outcome);
+    if (outcome?.path == null || outcome.scope === null) return;
+    if (!this.recoveryOpened) this.openRecovery();
+    const forgotten = (path: string) => forgetContainsPath(outcome.path!, outcome.scope!, path);
+    const pruneScope = (scope: Sv3AskScope | null): Sv3AskScope | null => {
+      if (scope === null) return null;
+      const paths = scope.paths.filter(path => !forgotten(path));
+      return paths.length === scope.paths.length ? scope : paths.length ? { paths } : null;
+    };
+    const prunePreparation = (preparation: Sv3Preparation | null): Sv3Preparation | null => {
+      if (preparation === null || !('scope' in preparation) || !('paths' in preparation.scope)) return preparation;
+      const paths = preparation.scope.paths.filter(path => !forgotten(path));
+      if (paths.length === preparation.scope.paths.length) return preparation;
+      return { ...preparation, scope: { kind: paths.length ? preparation.scope.kind : 'reselect', paths } };
+    };
+    const pruneSelection = (selection: SelectionPayload | null): SelectionPayload | null => {
+      if (selection === null) return null;
+      if (selection.kind === 'result-set') {
+        if (!Array.isArray(selection.items) || selection.items.some(item => typeof item?.id !== 'string')) return null;
+        const items = selection.items.filter(item => !forgotten(item.id));
+        return items.length === selection.items.length ? selection : items.length ? { ...selection, items } : null;
+      }
+      const path = selection.kind === 'text-range' ? selection.address?.docId
+        : selection.kind === 'citation' ? selection.citation?.parentDocId
+        : selection.kind === 'search-trace' ? selection.docId
+        : selection.kind === 'item' ? selection.itemId : undefined;
+      return typeof path === 'string' && forgotten(path) ? null : selection;
+    };
+    for (const [place, draft] of this.placeDrafts) {
+      const preparation = prunePreparation(draft.preparation);
+      const reselect = preparation !== null && 'scope' in preparation && preparation.scope.kind === 'reselect';
+      this.placeDrafts.set(place, { ...draft, preparation, review: draft.review || reselect });
+    }
+    for (const [place, scope] of this.placeScopes) this.placeScopes.set(place, pruneScope(scope));
+    this.recoveryDrafts = this.recoveryDrafts.map(draft => ({ ...draft, preparation: prunePreparation(draft.preparation ?? null) }))
+      .filter((draft, index, drafts) => drafts.findIndex(other => this.sameDraft(draft, other)) === index);
+    this.draftProposal = prunePreparation(this.draftProposal);
+    if (this.preparedHandoff !== null) {
+      const selection = pruneSelection(this.preparedHandoff.selection);
+      if (selection !== this.preparedHandoff.selection) {
+        if (selection === null) {
+          this.handoffBlocked = true;
+          this.handoffNotice = 'Choose files or a passage again before sending.';
+        }
+        this.preparedHandoff = { ...this.preparedHandoff, selection };
+      }
+    }
+    if (this.humanTask !== null) {
+      const task = this.humanTask;
+      const scope = task.saved.scope.filter(path => !forgotten(path));
+      const selection = pruneSelection(task.selection);
+      if (scope.length !== task.saved.scope.length || JSON.stringify(selection) !== JSON.stringify(task.selection)) {
+        this.revokeHumanTask(true);
+        task.saved = { ...task.saved, scope, needsReselection: true };
+        task.scope = pruneScope(task.scope);
+        task.scopeOwner = pruneScope(task.scopeOwner);
+        task.selection = selection;
+      }
+    }
+    const preparation = prunePreparation(this.currentPreparation());
+    const cleared = this.search.reconcileForgotten(outcome.path, outcome.scope);
+    if (cleared && this.tier === 'ask') this.tier = 'search';
+    else if (cleared && preparation !== null && 'scope' in preparation && preparation.scope.kind === 'reselect') {
+      this.markDraftReview(preparation);
+      this.reviewConfigured = true;
+    }
+    this.preparationRevision += 1;
+    this.saveRecovery();
+    if (this.paneDocPath !== null && forgetContainsPath(outcome.path, outcome.scope, this.paneDocPath)) this.closePane();
+  }
+
+  private async onCardForget(event: Event): Promise<void> {
+    const detail = (event as CustomEvent<CardForgetDetail>).detail;
+    if (!detail || !this.forgetAvailable || this.forgetBusy || !this.search.showing) return;
+    const hit = this.search.snapshot?.results.find(row => row.id === detail.id && row.path === detail.path);
+    if (!hit) return;
+    const path = detail.scope === 'FILE' ? detail.path : forgetParentFolder(detail.path);
+    if (path === null) {
+      this.forgetNotice = 'Use Library root controls for a filesystem root.';
+      return;
+    }
+    const placement = this.forgetPlacement;
+    const session = this.sessions.activeId;
+    const base = this.apiBase;
+    const completionOwner = this.forgetCompletionOwner;
+    const current = () => this.isConnected && this.forgetPlacement === placement
+      && this.sessions.activeId === session && this.apiBase === base && this.search.showing;
+    const consent = new AbortController();
+    this.forgetConsent = consent;
+    this.forgetBusy = true;
+    this.forgetNotice = 'Preparing the exact forget target…';
+    try {
+      const attempt = createForgetAttempt(path, detail.scope);
+      const outcome = await executeForget(base, attempt, async prompt =>
+        current() && !consent.signal.aborted && await confirmForget(prompt, consent.signal) && current());
+      if (!current()) {
+        if (outcome?.status === 'COMPLETE') {
+          this.reconcileConfirmedForget({ apiBase: base, owner: completionOwner, outcome });
+          publishForgetCompletion(this, base, outcome, completionOwner);
+        }
+        return;
+      }
+      if (outcome === null) {
+        this.forgetNotice = 'Forget cancelled before approval. This request changed nothing.';
+        this.forgetBusy = false;
+        await this.updateComplete;
+        // Busy temporarily removes the row's tabindex. Restore it before returning focus.
+        const main = this.shadowRoot?.querySelector('jf-sv3-main');
+        await main?.updateComplete;
+        const results = main?.shadowRoot?.querySelector('jf-sv3-results');
+        await results?.updateComplete;
+        const card = (detail.invoker?.getRootNode() as ShadowRoot | undefined)?.host as ResultsCard | undefined;
+        await card?.updateComplete;
+        if (!current()) return;
+        if (detail.invoker?.isConnected) detail.invoker.focus();
+        else this.composer?.focusField();
+        return;
+      }
+      this.forgetNotice = `${describeExactPath(path)}: ${forgetObservationText(outcome)}`;
+      if (outcome.status === 'COMPLETE' && outcome.path !== null && outcome.scope !== null) {
+        this.reconcileConfirmedForget({ apiBase: base, owner: completionOwner, outcome });
+        publishForgetCompletion(this, base, outcome, completionOwner);
+        const focused = deepActiveElement();
+        if (focused === document.body || focused === detail.invoker || detail.invoker?.contains(focused)) this.composer?.focusField();
+      }
+    } catch {
+      if (current()) this.forgetNotice = 'The forget outcome could not be confirmed. Review unfinished forgets in Library.';
+    } finally {
+      if (this.forgetConsent === consent) this.forgetConsent = null;
+      this.forgetBusy = false;
     }
   }
 
@@ -5395,6 +5587,7 @@ export class SearchV3View extends JfElement {
    * guarantee, so the fix is to not make the write at all.
    */
   private resetToHero(clearDraft = false, retainLeaving = false): boolean {
+    this.leaveForgetPlacement();
     this.removalConfirmation?.abort();
     this.revokeHumanTask(true);
     const preparation = clearDraft ? { kind: 'search' as const } : this.currentPreparation();
@@ -5532,7 +5725,7 @@ export class SearchV3View extends JfElement {
         ></button>`;
     return html`
       ${grip}
-      <jf-sv3-pane
+      ${keyed(this.paneSource?.sourceUnavailable ? this.paneSource : null, html`<jf-sv3-pane
         data-testid="sv3-pane"
         .docPath=${this.paneDocPath}
         .highlightRange=${this.paneHighlight}
@@ -5541,7 +5734,7 @@ export class SearchV3View extends JfElement {
         ?overlay=${this.paneOverlay}
         api-base=${this.apiBase}
         @sv3-pane-close=${this.dismissPane}
-      ></jf-sv3-pane>
+      ></jf-sv3-pane>`)}
     `;
   }
 
@@ -5626,6 +5819,7 @@ export class SearchV3View extends JfElement {
         @sv3-results-clear-selection=${() => { this.revokeHumanTask(); this.search.select([]); }}
         @card-open=${this.onCardOpen}
         @card-selection=${this.onCardSelection}
+        @card-forget=${this.onCardForget}
         @card-facet-toggle=${this.onCardFacetToggle}
         @card-scope-file=${this.onCardScopeFile}
         @sv3-composer-stop=${this.onComposerStop}
@@ -5652,10 +5846,17 @@ export class SearchV3View extends JfElement {
         ${this.renderBranchOrigin()}
         ${this.recoveryNotice()}
         <div class="column">
+        ${this.forgetNotice ? html`<div role="status" aria-live="polite" data-testid="sv3-forget-notice">
+          <span style="white-space:pre-wrap;overflow-wrap:anywhere">${this.forgetNotice}</span>
+          <jf-button label="Review in Library" .onActivate=${() => requestSurfaceNavigation('core.library-surface')}>Review in Library</jf-button>
+        </div>` : nothing}
         <jf-sv3-main
+          .apiBase=${this.apiBase}
           state=${this.composerState}
           .view=${results}
+          .forgetAvailable=${this.forgetAvailable && !this.forgetBusy}
           .turns=${turns}
+          .conversationId=${session?.id ?? ''}
           .turnScopes=${this.search.scopesByTurn}
           .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
           ?model-answer-busy=${this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true}

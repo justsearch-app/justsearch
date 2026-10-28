@@ -295,13 +295,17 @@ public final class IndexCountOps {
 
   /** Mirrors exact deletion's identity and chunk ownership scope without changing the writer. */
   public int countByIdAndChunksStrict(String id) throws IOException {
+    return countQueryOrThrow(idAndChunksQuery(id));
+  }
+
+  static Query idAndChunksQuery(String id) {
     if (id == null || id.isBlank()) throw new IllegalArgumentException("Empty document identity");
     var chunks = new BooleanQuery.Builder()
         .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, id)), BooleanClause.Occur.FILTER)
         .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.FILTER);
-    return countQueryOrThrow(new BooleanQuery.Builder()
+    return new BooleanQuery.Builder()
         .add(new TermQuery(new Term(SchemaFields.DOC_ID, id)), BooleanClause.Occur.SHOULD)
-        .add(chunks.build(), BooleanClause.Occur.SHOULD).build());
+        .add(chunks.build(), BooleanClause.Occur.SHOULD).build();
   }
 
   private int countUnexpectedSurvivors(Query scope, List<String> fileIds,

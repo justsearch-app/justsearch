@@ -206,14 +206,19 @@ final class AiInstallServicePolicyTest {
 
   @Test
   void absentServiceAndPermissiveServiceKeepAllThreePlans() throws Exception {
-    for (EnterprisePolicyService policy : new EnterprisePolicyService[] {null, () -> policy(true, true)}) {
-      for (long vram : new long[] {12_000_000_000L, 6_000_000_000L, -1}) {
-        try (var _ = capableGpu(vram)) {
-          var hardware = service(policy).buildHardwareProfile();
-          assertEquals(vram < 0 ? DownloadProfile.CPU
-              : vram > 7_500_000_000L ? DownloadProfile.GPU_FULL : DownloadProfile.GPU_LITE,
-              hardware.downloadProfile());
-          assertEquals(false, invoke(service(policy), "policyBlocksDownloads"));
+    // This preservation check describes the Windows runtime plans. Linux has no CUDA pack yet.
+    NativeTargets windows = NativeTargets.forTarget("windows-x86_64");
+    try (var target = mockStatic(NativeTargets.class, CALLS_REAL_METHODS)) {
+      target.when(NativeTargets::current).thenReturn(windows);
+      for (EnterprisePolicyService policy : new EnterprisePolicyService[] {null, () -> policy(true, true)}) {
+        for (long vram : new long[] {12_000_000_000L, 6_000_000_000L, -1}) {
+          try (var _ = capableGpu(vram)) {
+            var hardware = service(policy).buildHardwareProfile();
+            assertEquals(vram < 0 ? DownloadProfile.CPU
+                : vram > 7_500_000_000L ? DownloadProfile.GPU_FULL : DownloadProfile.GPU_LITE,
+                hardware.downloadProfile());
+            assertEquals(false, invoke(service(policy), "policyBlocksDownloads"));
+          }
         }
       }
     }

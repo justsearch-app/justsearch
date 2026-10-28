@@ -29,11 +29,11 @@
 #[path = "../binding.rs"]
 #[allow(dead_code)]
 mod binding;
+#[path = "../engine_conn.rs"]
+mod engine_conn;
 #[path = "../engine_host.rs"]
 #[allow(dead_code)]
 mod engine_host;
-#[path = "../engine_conn.rs"]
-mod engine_conn;
 #[path = "../engine_probe.rs"]
 mod engine_probe;
 #[path = "../recovery.rs"]
@@ -68,7 +68,7 @@ mod shell_actuator;
 #[allow(dead_code)]
 mod updater_probe {
     include!("../updater.rs");
-    include!("support/updater_probe.inc.rs");
+    include!("../supervisor_support/updater_probe.inc.rs");
 }
 // AppHandle paths are never driven by the conformance binary. Fail explicitly if used.
 #[cfg_attr(test, derive(Default))]
@@ -95,9 +95,7 @@ impl BackendState {
 fn resolve_app_data_dir(_: &tauri::AppHandle) -> Result<PathBuf, String> {
     Err("AppHandle is outside supervisor conformance".into())
 }
-fn reconcile_registered_children(_: &std::path::Path) -> Result<(), String> {
-    Err("registered-child reconciliation is outside this probe".into())
-}
+include!("../registered_children.inc.rs");
 fn start_supervision(_: &tauri::AppHandle, _: Arc<BackendState>) -> Result<(), String> {
     Err("conformance must keep its original actor".into())
 }

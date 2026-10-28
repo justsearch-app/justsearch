@@ -115,15 +115,15 @@ test('build and verify a closed descriptor/latest/artifact set', async () => {
   });
   assert.equal(verified.descriptor.sequence, 42);
   assert.deepEqual(
-    verified.descriptor.compatibility[0].readableSourceVersions,
+    verified.descriptor.targets['windows-x86_64'].compatibility[0].readableSourceVersions,
     [0, 1],
   );
-  assert.equal(verified.descriptor.compatibility[0].role, 'AUTHORED');
-  assert.equal(verified.descriptor.compatibility[0].formatVersion, 1);
+  assert.equal(verified.descriptor.targets['windows-x86_64'].compatibility[0].role, 'AUTHORED');
+  assert.equal(verified.descriptor.targets['windows-x86_64'].compatibility[0].formatVersion, 1);
   assert.equal(verified.descriptor.metadataKeyId, 'metadata-2026-01');
   assert.equal(verified.descriptor.metadataRootPolicy, 'OFFLINE_LONG_LIVED_V1');
-  assert.equal(verified.descriptor.artifact.size, 4);
-  assert.equal(verified.descriptor.artifact.keyId, 'artifact-2026-01');
+  assert.equal(verified.descriptor.targets['windows-x86_64'].artifact.size, 4);
+  assert.equal(verified.descriptor.targets['windows-x86_64'].artifact.keyId, 'artifact-2026-01');
 });
 
 test('compatibility baseline preserves the frozen strategy while version 4 reads version 1', async () => {
@@ -146,12 +146,12 @@ test('compatibility baseline preserves the frozen strategy while version 4 reads
     artifactPublicKey: TAURI_PUBLIC_KEY,
     metadataKeyId: 'metadata-2026-01',
   });
-  assert.deepEqual(descriptor.compatibility.map((row) => row.ownerId), ['preferences']);
-  assert.equal(descriptor.compatibility[0].formatVersion, 4);
-  assert.deepEqual(descriptor.compatibility[0].readableSourceVersions, [0, 1, 2, 3, 4]);
-  assert.equal(descriptor.compatibility[0].reconciliationStrategy,
+  assert.deepEqual(descriptor.targets['windows-x86_64'].compatibility.map((row) => row.ownerId), ['preferences']);
+  assert.equal(descriptor.targets['windows-x86_64'].compatibility[0].formatVersion, 4);
+  assert.deepEqual(descriptor.targets['windows-x86_64'].compatibility[0].readableSourceVersions, [0, 1, 2, 3, 4]);
+  assert.equal(descriptor.targets['windows-x86_64'].compatibility[0].reconciliationStrategy,
     'READ_V0_OR_V1_AND_WRITE_V1');
-  await verifyReleaseAssets({ ...f, releaseDir: f.outDir });
+  await verifyReleaseAssets({ ...f, compatibilityBaselinePath, releaseDir: f.outDir });
 });
 
 test('signed release inherits an exact retired predecessor owner without activating its bytes', async () => {
@@ -194,10 +194,10 @@ test('signed release inherits an exact retired predecessor owner without activat
     artifactPublicKey: TAURI_PUBLIC_KEY,
     metadataKeyId: 'metadata-2026-01',
   });
-  assert.deepEqual(descriptor.compatibility.map(row => row.ownerId), [
+  assert.deepEqual(descriptor.targets['windows-x86_64'].compatibility.map(row => row.ownerId), [
     'preferences', 'worker-config-snapshot',
   ]);
-  await verifyReleaseAssets({ ...f, releaseDir: f.outDir });
+  await verifyReleaseAssets({ ...f, compatibilityBaselinePath, releaseDir: f.outDir });
 });
 
 test('retired rows are omitted when no predecessor baseline inherits them', async () => {
@@ -291,7 +291,7 @@ test('tampered descriptor fails metadata verification', async () => {
     artifactPublicKey: TAURI_PUBLIC_KEY,
     metadataKeyId: 'metadata-2026-01',
   });
-  const descriptorPath = path.join(f.outDir, 'release.v1.json');
+  const descriptorPath = path.join(f.outDir, 'release.v2.json');
   const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'));
   descriptor.sequence = 41;
   await writeFile(descriptorPath, `${JSON.stringify(descriptor)}\n`);
