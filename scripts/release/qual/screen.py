@@ -2,6 +2,7 @@
 """Host screen and input through QMP only; guests use a US keyboard layout."""
 import argparse
 import binascii
+import json
 from pathlib import Path
 import re
 import struct
@@ -10,7 +11,8 @@ import tempfile
 import time
 import zlib
 
-from vm import OS, ROOT, QMP
+import vm
+from vm import OS, ROOT, QMP, require_owner
 
 
 def ppm(data):
@@ -29,7 +31,7 @@ def chunk(kind, data):
     return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', binascii.crc32(kind + data))
 
 
-def shot(qmp, out):
+def shot(qmp, out, exclusive=False):
     with tempfile.TemporaryDirectory(prefix='screen-', dir=ROOT) as tmp:
         src = Path(tmp) / 'screen.ppm'
         qmp.command('screendump', filename=str(src))
@@ -37,7 +39,8 @@ def shot(qmp, out):
     rows = b''.join(b'\0' + pixels[y * width * 3:(y + 1) * width * 3] for y in range(height))
     png = (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0))
            + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
-    Path(out).write_bytes(png)
+    with Path(out).open('xb' if exclusive else 'wb') as target:
+        target.write(png)
     return width, height
 
 
@@ -96,8 +99,116 @@ def move(qmp, x, y):
         {'type': 'abs', 'data': {'axis': 'y', 'value': round(y * 32767 / max(1, height - 1))}}])
 
 
+def perform(qmp, action, values, out=None, exclusive=False):
+    expected = {'shot': set(), 'click': {'x', 'y', 'button'}, 'move': {'x', 'y'},
+                'key': {'combo'}, 'type': {'text'}}
+    if action not in expected or set(values) != expected[action]:
+        raise ValueError('Only shot, click, move, key, type and their exact arguments are accepted')
+    if action == 'shot':
+        return '%dx%d' % shot(qmp, out, exclusive=exclusive)
+    if action in ('move', 'click'):
+        if type(values['x']) is not int or type(values['y']) is not int:
+            raise ValueError('Coordinates must be integers')
+        if action == 'click' and values['button'] not in ('left', 'middle', 'right'):
+            raise ValueError('Invalid mouse button')
+        move(qmp, values['x'], values['y'])
+        if action == 'click':
+            for down in (True, False):
+                qmp.command('input-send-event', events=[{'type': 'btn', 'data': {'down': down, 'button': values['button']}}])
+                time.sleep(.05)
+    elif action == 'key':
+        if not isinstance(values['combo'], str) or len(values['combo']) > 128:
+            raise ValueError('Key combination must be a string of at most 128 characters')
+        key(qmp, values['combo'])
+    else:
+        if not isinstance(values['text'], str) or len(values['text']) > 4096:
+            raise ValueError('Text must be a string of at most 4096 characters')
+        type_text(qmp, values['text'])
+    return 'ok'
+
+
+def queue_path(data):
+    return ROOT / 'screen-queue' / f"{data['pid']}-{data['start_ticks']}"
+
+
+def broker(os_name):
+    data = require_owner(os_name)
+    folder = queue_path(data)
+    folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if folder.is_symlink() or folder.parent.is_symlink():
+        raise RuntimeError('Screen queue directories must not be symlinks')
+    # One broker per run; crash releases the lock. Readiness is never inferred from PID visibility.
+    with vm.locked('screen-broker.lock'):
+        ready = folder / 'ready'
+        vm.save(ready, {'ready': True})
+        print(f'Screen broker ready: {folder}', flush=True)
+        try:
+            next_probe = 0
+            while vm.current() == data:
+                if time.monotonic() >= next_probe:
+                    if not vm.live_reasons():
+                        break
+                    next_probe = time.monotonic() + 5
+                for request in sorted(folder.glob('*.request')):
+                    name = request.stem
+                    if not re.fullmatch(r'[0-9a-f]{32}', name):
+                        continue
+                    reply = folder / (name + '.reply')
+                    try:
+                        if request.is_symlink() or request.stat().st_size > 32768:
+                            raise ValueError('Request too large')
+                        job = json.loads(request.read_text())
+                        if set(job) != {'owner', 'action', 'values'} or job['owner'] != data['owner']:
+                            raise ValueError(f"VM belongs to owner {data['owner']}")
+                        with vm.locked('control.lock'):
+                            if require_owner(os_name) != data:
+                                raise RuntimeError('VM run changed')
+                            with QMP(os_name) as qmp:
+                                result = perform(qmp, job['action'], job['values'], folder / (name + '.png'), exclusive=True)
+                        response = {'result': result}
+                    except (OSError, RuntimeError, ValueError, TypeError, KeyError) as exc:
+                        response = {'error': str(exc)}
+                    vm.save(reply, response)
+                    request.unlink(missing_ok=True)
+                time.sleep(.1)
+        finally:
+            ready.unlink(missing_ok=True)
+
+
+def via_broker(os_name, action, values, out=None):
+    import uuid
+    data = require_owner(os_name)
+    folder = queue_path(data)
+    if not (folder / 'ready').exists():
+        raise RuntimeError('Start screen.py broker on the host first')
+    name = uuid.uuid4().hex
+    request = folder / (name + '.request')
+    reply = folder / (name + '.reply')
+    png = folder / (name + '.png')
+    vm.save(request, {'owner': vm.owner(), 'action': action, 'values': values})
+    deadline = time.monotonic() + 360
+    try:
+        while time.monotonic() < deadline:
+            if reply.exists():
+                response = json.loads(reply.read_text())
+                if 'error' in response:
+                    raise RuntimeError(response['error'])
+                if action == 'shot':
+                    Path(out).write_bytes(png.read_bytes())
+                return response['result']
+            if require_owner(os_name) != data:
+                raise RuntimeError('VM run changed while waiting for screen broker')
+            time.sleep(.1)
+        raise RuntimeError('Screen broker timed out; check its host process')
+    finally:
+        request.unlink(missing_ok=True)
+        reply.unlink(missing_ok=True)
+        png.unlink(missing_ok=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--broker', action='store_true', help='Use the host file-queue broker (no sockets needed)')
     sub = parser.add_subparsers(dest='action', required=True)
     for action in ('shot', 'click', 'move', 'type', 'key'):
         p = sub.add_parser(action)
@@ -113,20 +224,20 @@ def main():
             p.add_argument('text')
         else:
             p.add_argument('combo')
+    p = sub.add_parser('broker', help='Run the screen-only file-queue broker on the host')
+    p.add_argument('os', choices=OS)
     args = parser.parse_args()
-    with QMP(args.os) as qmp:
-        if args.action == 'shot':
-            print('%dx%d' % shot(qmp, args.out))
-        elif args.action == 'type':
-            type_text(qmp, args.text)
-        elif args.action == 'key':
-            key(qmp, args.combo)
-        else:
-            move(qmp, args.x, args.y)
-            if args.action == 'click':
-                qmp.command('input-send-event', events=[{'type': 'btn', 'data': {'down': True, 'button': args.button}}])
-                time.sleep(.05)
-                qmp.command('input-send-event', events=[{'type': 'btn', 'data': {'down': False, 'button': args.button}}])
+    require_owner(args.os)
+    if args.action == 'broker':
+        broker(args.os)
+        return
+    values = {k: v for k, v in vars(args).items() if k not in ('action', 'os', 'broker', 'out')}
+    if args.broker:
+        print(via_broker(args.os, args.action, values, getattr(args, 'out', None)))
+    else:
+        with vm.locked('control.lock'):
+            with QMP(args.os) as qmp:
+                print(perform(qmp, args.action, values, getattr(args, 'out', None)))
 
 
 if __name__ == '__main__':
