@@ -22,7 +22,7 @@ import org.apache.tika.mime.MediaType;
 public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
   private static final long serialVersionUID = 1L;
   private static final int UTF16_WINDOW_BYTES = 8192;
-  private static final int UTF8_WINDOW_BYTES = 16_384;
+  static final int UTF8_WINDOW_BYTES = 16_384;
   private static final Charset WINDOWS_1252 = Charset.forName("windows-1252");
   // XML 1.0 [23] XMLDecl with the optional EncodingDecl present. XML S is deliberately
   // narrower than Java's whitespace classes; each attribute must use matching quotes.
@@ -128,8 +128,8 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
     // Only these inconclusive windows may consult the complete top-level snapshot. BOMs,
     // malformed windows and read failures returned above; existing UTF-8 window wins unchanged.
     if (!PreparedExtractionInput.isNonAsciiUtf8(metadata)) return null;
-    // Only a complete XML declaration can override the snapshot fact. A declaration naming
-    // UTF-8 (including aliases) agrees with it; other declarations keep their existing path.
+    // A declaration still valid but unfinished at the window edge keeps the existing path,
+    // whatever it names. A complete UTF-8 declaration (including aliases) agrees with the fact.
     chars.flip();
     var declaration = XML_DECLARATION.matcher(chars);
     if (declaration.lookingAt()) {
@@ -137,6 +137,8 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
       if (!Charset.isSupported(encoding) || !StandardCharsets.UTF_8.equals(Charset.forName(encoding))) {
         return null;
       }
+    } else if (declaration.hitEnd()) {
+      return null;
     }
     return StandardCharsets.UTF_8;
   }

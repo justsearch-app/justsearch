@@ -8,6 +8,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.SequenceInputStream;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -360,36 +363,65 @@ final class PreparedExtractionInput implements AutoCloseable {
     }
   }
 
-  /** Strict streaming validation of the snapshot, including any suffix a parser never reads. */
-  private static final class Utf8Validator {
+  /** Validates the snapshot only while its fact can affect the detector's window decision. */
+  static final class Utf8Validator {
+    private static final VarHandle LONG_BYTES =
+        MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.nativeOrder());
     private boolean valid = true;
+    private boolean windowDecides;
+    private long processed;
     private boolean multibyte;
     private int remaining;
     private int minimum = 0x80;
     private int maximum = 0xBF;
 
     void accept(byte[] bytes, int length) {
-      if (!valid) return;
-      for (int offset = 0; offset < length; offset++) {
-        int value = bytes[offset] & 0xFF;
-        if (remaining == 0) {
-          if (value < 0x80) continue;
-          if (value >= 0xC2 && value <= 0xDF) remaining = 1;
-          else if (value >= 0xE0 && value <= 0xEF) remaining = 2;
-          else if (value >= 0xF0 && value <= 0xF4) remaining = 3;
+      if (!valid || windowDecides) return;
+      int pending = remaining;
+      int lower = minimum;
+      int upper = maximum;
+      boolean complete = multibyte;
+      int windowRemaining = (int) Math.max(0, OwnedTextEncodingDetector.UTF8_WINDOW_BYTES - processed);
+      int offset = 0;
+      while (offset < length) {
+        int value = bytes[offset++] & 0xFF;
+        if (pending == 0) {
+          if (value < 0x80) {
+            while (offset <= length - Long.BYTES
+                && ((long) LONG_BYTES.get(bytes, offset) & 0x8080808080808080L) == 0) {
+              offset += Long.BYTES;
+            }
+            continue;
+          }
+          if (value >= 0xC2 && value <= 0xDF) pending = 1;
+          else if (value >= 0xE0 && value <= 0xEF) pending = 2;
+          else if (value >= 0xF0 && value <= 0xF4) pending = 3;
           else { valid = false; return; }
-          minimum = value == 0xE0 ? 0xA0 : value == 0xF0 ? 0x90 : 0x80;
-          maximum = value == 0xED ? 0x9F : value == 0xF4 ? 0x8F : 0xBF;
+          lower = value == 0xE0 ? 0xA0 : value == 0xF0 ? 0x90 : 0x80;
+          upper = value == 0xED ? 0x9F : value == 0xF4 ? 0x8F : 0xBF;
         } else {
-          if (value < minimum || value > maximum) { valid = false; return; }
-          minimum = 0x80;
-          maximum = 0xBF;
-          if (--remaining == 0) multibyte = true;
+          if (value < lower || value > upper) { valid = false; return; }
+          lower = 0x80;
+          upper = 0xBF;
+          if (--pending == 0) {
+            complete = true;
+            if (offset <= windowRemaining) {
+              windowDecides = true;
+              return;
+            }
+          }
         }
       }
+      remaining = pending;
+      minimum = lower;
+      maximum = upper;
+      multibyte = complete;
+      processed += length;
     }
 
-    boolean isNonAsciiUtf8() { return valid && remaining == 0 && multibyte; }
+    boolean windowDecides() { return windowDecides; }
+
+    boolean isNonAsciiUtf8() { return !windowDecides && valid && remaining == 0 && multibyte; }
   }
 
   /** Two different Office main types are declared; distinct from a merely malformed member. */

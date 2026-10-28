@@ -291,6 +291,39 @@ class AsciiFirstUtf8PreservationTest {
     }
   }
 
+  @ParameterizedTest(name = "declarationClosingBeyondWindowKeepsTodaysOutcome({0}, {1})")
+  @MethodSource("unfinishedWindowDeclarations")
+  void declarationClosingBeyondWindowKeepsTodaysOutcome(String extension, String encoding) throws Exception {
+    String declaration = "<?xml version=\"1.0\" encoding=\"" + encoding + "\"" + " ".repeat(20_000) + "?>";
+    String padding = "a".repeat(16_384);
+    String source = declaration + "<html><body>" + padding + "ספרים</body></html>";
+    Path file = Files.writeString(tempDir.resolve("long-declaration." + extension), source);
+    try (var flat = new ContentExtractor(); var structured = new StructuredContentExtractor()) {
+      assertEquals(padding + "×¡×¤×¨×™×�", flat.extract(file).content().strip());
+      assertEquals(padding + "×¡×¤×¨×™×�", structured.extract(file).content().strip());
+    }
+  }
+
+  @ParameterizedTest(name = "unfinishedWindowDeclarationKeepsDetectorFallback({0}, {1})")
+  @MethodSource("unfinishedWindowDeclarations")
+  void unfinishedWindowDeclarationKeepsDetectorFallback(String extension, String encoding) throws Exception {
+    String source = "<?xml version=\"1.0\" encoding=\"" + encoding + "\"" + " ".repeat(20_000)
+        + "?><html><body>" + "a".repeat(16_384) + "ספרים</body></html>";
+    Path file = Files.writeString(tempDir.resolve("long-declaration." + extension), source);
+    try (var factory = new PreparedExtractionInput.Factory();
+        var prepared = factory.prepare(file, TikaExtractionPolicy.defaults());
+        var input = new java.io.BufferedInputStream(prepared.openStream())) {
+      Metadata metadata = prepared.metadata();
+      metadata.set(Metadata.CONTENT_TYPE, "html".equals(extension) ? "text/html" : "text/plain");
+      assertEquals(Charset.forName("windows-1252"), detector().detect(input, metadata));
+    }
+  }
+
+  static Stream<Arguments> unfinishedWindowDeclarations() {
+    return Stream.of("html", "txt").flatMap(extension -> Stream.of("ISO-8859-1", "UTF-8", "utf8")
+        .map(encoding -> Arguments.of(extension, encoding)));
+  }
+
   @ParameterizedTest(name = "parserPassesRootMetadataUncopied({0})")
   @ValueSource(strings = {"txt", "md", "csv", "json", "py", "html"})
   void parserPassesRootMetadataUncopied(String extension) throws Exception {
