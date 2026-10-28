@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-28T17:09:28.002Z",
-  "revision": "edf31674779d432098809d29f711951d64110cf1",
-  "tree": "0b5976f73e686eb16b9b55924d5077fe1d1e5c21",
+  "createdAt": "2026-10-28T18:17:04.229Z",
+  "revision": "ff3d03adee6c90910ad7d064b5c60bd449954760",
+  "tree": "6d462dd0278aa4c85daac43a4c015eda883a9643",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3Main.imports.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2914853-1793207363615.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3Main.imports.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3605052-1793211416571.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1532
+      "durationMs": 1902
     }
   ],
   "checks": [
@@ -29,13 +29,28 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#D-T46 Sources hover breadcrumb and preview detail clear AA with margin in light",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2f49685a70085c8a3f1d9a9bcc2eac4bedd5d30a5e943d3a39395179d44d680e",
+      "contentDigest": "sha256:ec744a00e5255ae0fe97b846659368217484c8ddf477374b3d21381d4819d989",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "D-T46 Sources hover breadcrumb and preview detail clear AA with margin in light",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#D-T46 Sources hover breadcrumb and preview detail clear AA with margin in dark",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec744a00e5255ae0fe97b846659368217484c8ddf477374b3d21381d4819d989",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "D-T46 Sources hover breadcrumb and preview detail clear AA with margin in dark",
           "status": "passed"
         }
       ]
@@ -48,20 +63,25 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3Main.imports.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2914853-1793207366295.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/Sv3Main.imports.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3605052-1793211421046.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1559,
-        "output": "JSON report written to /tmp/test-intent-vitest-2914853-1793207366295.json\n\n"
+        "durationMs": 2888,
+        "output": "JSON report written to /tmp/test-intent-vitest-3605052-1793211421046.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#D-T46 Sources hover breadcrumb and preview detail clear AA with margin in light",
         "classification": "assertion",
-        "detail": "D-T46 Sources hover breadcrumb and preview detail clear AA with margin in light:  AssertionError: light .heading-breadcrumb hover: 4.62:1: expected 4.624946780412645 to be greater than or equal to 4.7\n    at /tmp/test-intent-before-8SRWVL/modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts:806:74\n    at file:///home/elias/dev/js-uiux-sweep/modules/ui-web/node_modu"
+        "detail": "D-T46 Sources hover breadcrumb and preview detail clear AA with margin in light:  AssertionError: light .heading-breadcrumb on var(--surface-3): 4.62:1: expected 4.624946780412645 to be greater than or equal to 4.7\n    at /tmp/test-intent-before-bcukez/modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts:809:81\n    at file:///home/elias/dev/js-uiux-sweep/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts#D-T46 Sources hover breadcrumb and preview detail clear AA with margin in dark",
+        "classification": "assertion",
+        "detail": "D-T46 Sources hover breadcrumb and preview detail clear AA with margin in dark:  AssertionError: dark .heading-breadcrumb on var(--cp-selected, var(--surface-3)): 4.66:1: expected 4.655816227592829 to be greater than or equal to 4.7\n    at /tmp/test-intent-before-bcukez/modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.imports.test.ts:809:81\n    at file:///home/elias/dev/js-ui"
       }
     ]
   },
-  "digest": "sha256:aecbd7beac625c2ed34a1efa2082a706736b58a35495d8f401648582def20f32"
+  "digest": "sha256:bbb86863bcc64447e81197d2978acc24c10ba7f187ab311a3abde96737a7db99"
 }
