@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-28T05:27:34.116Z",
-  "revision": "3c41a92567f31bc92e1ee63a18f44d57dfeb898c",
-  "tree": "8ffb500cbff18abce2fa9f78f612e3b640466db4",
+  "createdAt": "2026-10-28T05:29:47.984Z",
+  "revision": "8cc29995c0792f1ce682423cb15a34456207701f",
+  "tree": "63b8e936616ea5fc8f46a1cd90928ae0dc6ef5eb",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.universalDetectorReproducesHebrewGb18030Defect\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.asciiEmptyAndCutFirstMultibyteSequenceKeepDefault\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.invalidUtf8RestoresStreamAndKeepsDefault\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.utf8ReadProblemRestoresStreamAndKeepsDefault\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.declarationsAndBomlessUtf16KeepPrecedenceAndAttribution\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.nonHtmlMetadataDoesNotChangeTodaysChain\" --tests \"io.justsearch.indexerworker.extract.Utf8EncodingPreservationTest.otherUtf8ScriptsKeepCharsetAndText\" --tests \"io.justsearch.indexerworker.extract.Utf8EncodingPreservationTest.legacyProseKeepsTodaysCharsetAndExactText\" --tests \"io.justsearch.indexerworker.extract.Utf8EncodingPreservationTest.previouslyReadableShortHebrewKeepsText\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5977
+      "durationMs": 6201
     },
     {
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.Utf8QueuedRestartTest.oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5959
+      "durationMs": 5382
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java#universalDetectorReproducesHebrewGb18030Defect",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ec07aa647cec68d611a4a323917fe5bd9dede1c51902ab54aa088c6944324973",
+      "contentDigest": "sha256:3068d66bf36b6df344448955cfb1e4245e6e627c46a1c7eb70d5cb2ded772dc9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java#asciiEmptyAndCutFirstMultibyteSequenceKeepDefault",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ec07aa647cec68d611a4a323917fe5bd9dede1c51902ab54aa088c6944324973",
+      "contentDigest": "sha256:3068d66bf36b6df344448955cfb1e4245e6e627c46a1c7eb70d5cb2ded772dc9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java#invalidUtf8RestoresStreamAndKeepsDefault",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ec07aa647cec68d611a4a323917fe5bd9dede1c51902ab54aa088c6944324973",
+      "contentDigest": "sha256:3068d66bf36b6df344448955cfb1e4245e6e627c46a1c7eb70d5cb2ded772dc9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java#utf8ReadProblemRestoresStreamAndKeepsDefault",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ec07aa647cec68d611a4a323917fe5bd9dede1c51902ab54aa088c6944324973",
+      "contentDigest": "sha256:3068d66bf36b6df344448955cfb1e4245e6e627c46a1c7eb70d5cb2ded772dc9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java#declarationsAndBomlessUtf16KeepPrecedenceAndAttribution",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ec07aa647cec68d611a4a323917fe5bd9dede1c51902ab54aa088c6944324973",
+      "contentDigest": "sha256:3068d66bf36b6df344448955cfb1e4245e6e627c46a1c7eb70d5cb2ded772dc9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java#nonHtmlMetadataDoesNotChangeTodaysChain",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WindowEncodingDetectorTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:ec07aa647cec68d611a4a323917fe5bd9dede1c51902ab54aa088c6944324973",
+      "contentDigest": "sha256:3068d66bf36b6df344448955cfb1e4245e6e627c46a1c7eb70d5cb2ded772dc9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,21 +125,103 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8EncodingPreservationTest.java#otherUtf8ScriptsKeepCharsetAndText",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8EncodingPreservationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8ff8ce3d84f2e7726dcbd01b1b8dd4ccbc1f57168261afad65436050d1352e8e",
-      "executed": false,
+      "contentDigest": "sha256:99b42e6fb6ffc89742308386aa7b264a74f18b82d1dbe9484487abe001b26223",
+      "executed": true,
       "skipped": false,
-      "outcome": "not-found",
-      "cases": []
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "otherUtf8ScriptsKeepCharsetAndText(P1 Arabic)",
+          "status": "passed"
+        },
+        {
+          "name": "otherUtf8ScriptsKeepCharsetAndText(P1 Russian)",
+          "status": "passed"
+        },
+        {
+          "name": "otherUtf8ScriptsKeepCharsetAndText(P1 Greek)",
+          "status": "passed"
+        },
+        {
+          "name": "otherUtf8ScriptsKeepCharsetAndText(P1 Ukrainian)",
+          "status": "passed"
+        },
+        {
+          "name": "otherUtf8ScriptsKeepCharsetAndText(P1 Thai)",
+          "status": "passed"
+        },
+        {
+          "name": "otherUtf8ScriptsKeepCharsetAndText(P1 Hindi)",
+          "status": "passed"
+        },
+        {
+          "name": "otherUtf8ScriptsKeepCharsetAndText(P1 Chinese)",
+          "status": "passed"
+        },
+        {
+          "name": "otherUtf8ScriptsKeepCharsetAndText(P1 Japanese)",
+          "status": "passed"
+        },
+        {
+          "name": "otherUtf8ScriptsKeepCharsetAndText(P1 Korean)",
+          "status": "passed"
+        }
+      ]
     },
     {
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8EncodingPreservationTest.java#legacyProseKeepsTodaysCharsetAndExactText",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8EncodingPreservationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8ff8ce3d84f2e7726dcbd01b1b8dd4ccbc1f57168261afad65436050d1352e8e",
-      "executed": false,
+      "contentDigest": "sha256:99b42e6fb6ffc89742308386aa7b264a74f18b82d1dbe9484487abe001b26223",
+      "executed": true,
       "skipped": false,
-      "outcome": "not-found",
-      "cases": []
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 windows-1252: Die Schüler lesen Bücher in der städtischen Bibliothek. Grüße aus Köln, schöne Straßen und große Häuser.)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 windows-1252: Les élèves français ont déjà préparé le café à côté de l'école. Nous lisons de nouveaux livres à la bibliothèque.)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 KOI8-R: Это русский текст. Сегодня мы читаем новые книги в городской библиотеке. Хорошие рассказы помогают людям понимать мир.)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 windows-1251: Это русский текст. Сегодня мы читаем новые книги в городской библиотеке. Хорошие рассказы помогают людям понимать мир.)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 ISO-8859-8: זה טקסט בעברית. היום אנחנו קוראים ספרים חדשים בספרייה העירונית. ילדים ומבוגרים לומדים יחד ומגלים סיפורים חדשים.)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 windows-1255: זה טקסט בעברית. היום אנחנו קוראים ספרים חדשים בספרייה העירונית. ילדים ומבוגרים לומדים יחד ומגלים סיפורים חדשים.)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 Shift_JIS: 日本語の文章です。東京の図書館で新しい本を読みます。今日は天気がよいので友達と公園に行きます。)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 GB18030: 这是一个中文文本，今天我们在北京的图书馆阅读新的书籍。孩子们和朋友一起学习，发现许多有趣的故事。)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 EUC-KR: 한국어 문장입니다. 오늘 우리는 도서관에서 새로운 책을 읽습니다. 아이들은 친구들과 함께 공부하고 재미있는 이야기를 발견합니다.)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 EUC-JP: 日本語の文章です。東京の図書館で新しい本を読みます。今日は天気がよいので友達と公園に行きます。)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProseKeepsTodaysCharsetAndExactText(P2 Big5: 這是一篇中文文章，今天我們在臺北的圖書館閱讀新的書籍。孩子們和朋友一起學習，發現許多有趣的故事。)",
+          "status": "passed"
+        }
+      ]
     },
     {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Utf8QueuedRestartTest.java#oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork",
@@ -160,7 +242,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8EncodingPreservationTest.java#previouslyReadableShortHebrewKeepsText",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8EncodingPreservationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:8ff8ce3d84f2e7726dcbd01b1b8dd4ccbc1f57168261afad65436050d1352e8e",
+      "contentDigest": "sha256:99b42e6fb6ffc89742308386aa7b264a74f18b82d1dbe9484487abe001b26223",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -182,13 +264,13 @@
         "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.universalDetectorReproducesHebrewGb18030Defect\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.asciiEmptyAndCutFirstMultibyteSequenceKeepDefault\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.invalidUtf8RestoresStreamAndKeepsDefault\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.utf8ReadProblemRestoresStreamAndKeepsDefault\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.declarationsAndBomlessUtf16KeepPrecedenceAndAttribution\" --tests \"io.justsearch.indexerworker.extract.Utf8WindowEncodingDetectorTest.nonHtmlMetadataDoesNotChangeTodaysChain\" --tests \"io.justsearch.indexerworker.extract.Utf8EncodingPreservationTest.otherUtf8ScriptsKeepCharsetAndText\" --tests \"io.justsearch.indexerworker.extract.Utf8EncodingPreservationTest.legacyProseKeepsTodaysCharsetAndExactText\" --tests \"io.justsearch.indexerworker.extract.Utf8EncodingPreservationTest.previouslyReadableShortHebrewKeepsText\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 9021
+        "durationMs": 9170
       },
       {
         "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.Utf8QueuedRestartTest.oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 6024
+        "durationMs": 6338
       }
     ],
     "checks": [
@@ -224,13 +306,13 @@
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8EncodingPreservationTest.java#otherUtf8ScriptsKeepCharsetAndText",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8EncodingPreservationTest.java#legacyProseKeepsTodaysCharsetAndExactText",
-        "classification": "compile",
-        "detail": "the check did not compile against the before-state"
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
       },
       {
         "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Utf8QueuedRestartTest.java#oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork",
@@ -244,5 +326,5 @@
       }
     ]
   },
-  "digest": "sha256:2a9573b61ef17ad6a3418166db963212cbf76067d7d5935c74a7018547ba8a12"
+  "digest": "sha256:dccee240adf84f203ab6022e9ab76ee90be9d52aa35386552c8b52bedaad3abb"
 }
