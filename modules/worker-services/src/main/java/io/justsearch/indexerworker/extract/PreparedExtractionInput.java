@@ -421,7 +421,7 @@ final class PreparedExtractionInput implements AutoCloseable {
 
     boolean windowDecides() { return windowDecides; }
 
-    boolean isNonAsciiUtf8() { return !windowDecides && valid && remaining == 0 && multibyte; }
+    boolean isNonAsciiUtf8() { return !windowDecides() && valid && remaining == 0 && multibyte; }
   }
 
   /** Two different Office main types are declared; distinct from a merely malformed member. */
