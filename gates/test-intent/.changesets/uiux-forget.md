@@ -517,3 +517,14 @@ Isolated new files remain subject to independent scenario and execution review e
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "65100462-7959-4e35-afd0-504583c5a7b7",
+  "verdict": "accept",
+  "digest": "sha256:7cc44c7b0772c5744a1bde83e1b24b37ae9d52381c5b4c1b4120e035648b3b46",
+  "note": "Claude security verifier-3 on 2a55f58a6c: classes valid, fail-before by assertion reproduced, all checks pass on candidate and real ext4 volume"
+}
+```

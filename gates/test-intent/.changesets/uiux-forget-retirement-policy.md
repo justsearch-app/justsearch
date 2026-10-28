@@ -71,3 +71,16 @@ Agent-adopted D-T32 checks under the round 9 builder assignment. Execution evide
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "65100462-7959-4e35-afd0-504583c5a7b7",
+  "verdict": "accept",
+  "digest": "sha256:6cc1c48fcb2963c14d01b14bcf8c8f4887b6ba8d8cae4e9887e88898b235c323",
+  "note": "Claude security verifier-3 on 2a55f58a6c: classes valid, fail-before by assertion reproduced, all checks pass on candidate and real ext4 volume"
+}
+```
