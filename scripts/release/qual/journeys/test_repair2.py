@@ -25,7 +25,7 @@ class Repair2Tests(unittest.TestCase):
                    for name in ('embed', 'splade', 'reranker', 'citation_scorer')]}
         transient = {'state': 'idle', 'phase': 'idle', 'installedFully': True}
         staged = dict(transient, phase='activation_required', installedFully=False)
-        active = dict(transient, phase='done', readyCapabilities=['retrieval-core'])
+        active = dict(transient, phase='done', readyCapabilities=[])
         activated = False
         statuses = iter([transient, staged])
         retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',

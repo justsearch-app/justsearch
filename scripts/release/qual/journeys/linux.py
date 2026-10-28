@@ -274,6 +274,17 @@ def install_ai(run):
                       error=Infrastructure if resumed else AssertionError)
     assert preview.get('downloadProfile') == 'CPU', 'Default plan did not select CPU'
     run.evidence('J3-downloaded', status)
+    memory_samples = []
+    def sample_memory():
+        sample = run.target.json("""
+import json,time
+from pathlib import Path
+m={k:int(v.split()[0]) for k,v in (line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines()) if k in ('MemTotal','MemAvailable','SwapTotal','SwapFree')}
+print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAvailable'])))
+""", desktop=False)
+        memory_samples.append(sample)
+        run.evidence('J3-activation-memory', memory_samples)
+    sample_memory()
     if not resumed or status.get('phase') == 'activation_required':
         activate_downloaded(run)
     else:
@@ -281,6 +292,7 @@ def install_ai(run):
             'reason': 'Development rerun; original UI action belongs to the snapshot source report'})
     activation_samples = []
     def activated():
+        sample_memory()
         install = run.api('/api/ai/install/status')
         runtime = run.api('/api/ai/runtime/status')
         ui = run.wd.text()
@@ -296,7 +308,9 @@ def install_ai(run):
             features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
     active = wait_for(activated, 'Downloaded default CPU search encoders activated', seconds=900, interval=5)
     status = active['install']
-    assert 'retrieval-core' in status.get('readyCapabilities', []), 'Installed CPU search capability is not ready'
+    # Acquisition stages belong to this download session, not rebooted caches.
+    if not resumed:
+        assert 'retrieval-core' in status.get('readyCapabilities', []), 'Installed CPU search capability is not ready'
     runtime = run.api('/api/ai/runtime/status')
     run.evidence('J3-runtime', runtime)
     components = preview.get('components', [])
@@ -359,7 +373,8 @@ def semantic_search(run):
         degradation = trace.get('degradation', {})
         stages = trace.get('stages', [])
         return result if OPEN_FILE in json.dumps(result.get('results', [])) and trace.get('effectiveMode') == 'VECTOR' and not degradation.get('hybridFallback') and not degradation.get('vectorBlocked') and any(
-            s.get('id') == 'dense-retrieval' and s.get('status') == 'executed' for s in stages) and not any(
+            s.get('id') == 'dense-retrieval' and s.get('status') == 'executed' for s in stages) and any(
+            s.get('id') == 'cross-encoder' and s.get('status') == 'executed' for s in stages) and not any(
             s.get('id') == 'sparse-retrieval' and s.get('status') == 'executed' for s in stages) else None
     return wait_for(probe, 'Semantic fixture retrieval without keyword fallback', seconds=240, interval=3)
 

@@ -124,7 +124,10 @@ the actual hosted workflow keeps its temporary XDG directories.
 
 Guest-only provisioning masks Snap refresh, firmware update, APT timers and
 the desktop file indexer, and sets swappiness to 1 to prefer reclaiming file
-cache over writing anonymous pages. Journald and swap remain enabled.
+cache over writing anonymous pages. At first boot, desktop preparation disables
+Ubuntu update-notifier crash pop-ups and renews the guest login session if needed.
+Apport still records crashes; raw reports and key fields are retained, and a
+JustSearch or bundled Engine crash is a product finding. Journald and swap remain enabled.
 Every journey records synced whole-device write and swap-counter deltas,
 without double-counting disk partitions. Overlay summaries record boot through
 pre-shutdown guest counters, QMP counters and QEMU's host process I/O; the top
@@ -157,7 +160,10 @@ private signing key is needed or used for these tests.
   UI's typed authorization when requested (immediate operation acceptance is
   also observed). All four reported retrieval models must be active
   and installation fully complete. A semantic vector query must return the
-  fixture with a dense-only execution trace, without keyword fallback. The CPU
+  fixture with a dense-only execution trace and an executed cross-encoder, without
+  keyword fallback. Fresh downloads also require the session acquisition capability;
+  cached reboots prove readiness through active runtime encoders and that query.
+  Activation polls record `/proc/meminfo` samples about every five seconds. The CPU
   plan and chat-unavailable explanation are also checked. Downloads are not seeded.
 - J4: a UI-authored bookmark and theme, normal restart, retained settings,
   watched folder, indexed fixture, authored records and model file hashes.

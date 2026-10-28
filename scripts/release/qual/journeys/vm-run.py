@@ -164,17 +164,60 @@ def provision(args, out):
                       'systemctl restart gdm3')
 
 
+def crash_evidence(out):
+    # Keep reports even when the disposable desktop's notification is disabled.
+    result = vm.ssh('ubuntu', "find /var/crash -maxdepth 1 -name '*.crash' -printf '%f\\n'",
+                    capture_output=True, text=True, check=True, timeout=30)
+    names = result.stdout.splitlines()
+    if any(Path(name).name != name or not name.endswith('.crash') for name in names):
+        raise Infrastructure('Unsafe guest crash report filename')
+    if names:
+        with (out / 'guest-crashes.tar').open('wb') as stream:
+            vm.ssh('ubuntu', "sudo -S -p '' tar -cf - -C /var/crash -- " + shlex.join(names),
+                   input=(vm.config()['password'] + '\n').encode(), stdout=stream,
+                   check=True, timeout=60)
+        fields = []
+        with tarfile.open(out / 'guest-crashes.tar') as archive:
+            for member in archive.getmembers():
+                row = {'file': '/var/crash/' + member.name, 'fields': {}}
+                for raw in archive.extractfile(member):
+                    line = raw.decode(errors='replace')
+                    if line[:1].isspace() or ':' not in line:
+                        continue
+                    key, value = line.split(':', 1)
+                    if key in ('ExecutablePath', 'Signal', 'ProblemType', 'Date', 'Package', 'ProcCmdline'):
+                        row['fields'][key] = value.strip()
+                fields.append(row)
+        (out / 'guest-crashes.json').write_text(json.dumps(fields, indent=2) + '\n')
+        product = [r for r in fields if any(name in (r['fields'].get('ExecutablePath', '')
+                    + ' ' + r['fields'].get('ProcCmdline', '')).lower()
+                    for name in ('justsearch', 'just-search'))]
+        if product:
+            raise AssertionError('Product crash in guest: ' + json.dumps(product))
+
+
 def prepare_desktop(args, out):
     target = Target('ubuntu')
-    deadline = time.monotonic() + 120
-    while True:
-        try:
-            target.prepare('vm-linux-' + ('wayland' if args.session == 'hosted' else args.session), 'prepare-only')
-            break
-        except Exception:
-            if time.monotonic() >= deadline:
-                raise
-            time.sleep(2)
+    def ready():
+        deadline = time.monotonic() + 120
+        while True:
+            try:
+                target.prepare('vm-linux-' + ('wayland' if args.session == 'hosted' else args.session), 'prepare-only')
+                return
+            except Exception:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(2)
+    ready()
+    crash_evidence(out)
+    # Ubuntu's release-upgrade checker can crash before qualification starts.
+    # Disable only desktop notifications; apport still writes crash reports.
+    notify = ['gsettings', 'get', 'com.ubuntu.update-notifier', 'show-apport-crashes']
+    if target.run(notify).stdout.strip() != 'false':
+        target.run(['gsettings', 'set', 'com.ubuntu.update-notifier', 'show-apport-crashes', 'false'])
+        vm.guest_root('ubuntu', 'systemctl restart gdm3')
+        ready()
+    (out / 'crash-notifications.txt').write_text(target.run(notify).stdout)
     target.run(['gsettings', 'set', 'org.gnome.desktop.session', 'idle-delay', '0'])
     target.run(['gsettings', 'set', 'org.gnome.desktop.screensaver', 'lock-enabled', 'false'])
     target.run(['xdg-mime', 'default', 'org.xfce.mousepad.desktop', 'text/plain'])
@@ -289,11 +332,26 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         return execute(args, out, phase, journeys, snapshot)
     except Exception as exc:
         lane = 'hosted-linux-x11' if args.session == 'hosted' else 'vm-linux-' + args.session
-        (out / 'summary.json').write_text(json.dumps(preparation_failure(lane, str(exc)), indent=2) + '\n')
+        report = preparation_failure(lane, str(exc))
+        if isinstance(exc, AssertionError):
+            report['journeys'][0]['checks'][0].update(status='failed-product',
+                evidence=['../guest-crashes.json', '../guest-crashes.tar'])
+            report.update(summarize(report['journeys']))
+        (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
         (out / 'wrapper-error.txt').write_text(repr(exc) + '\n')
         return 1
     finally:
         if started and vm.read_state() == started:
+            try:
+                crash_evidence(out)
+            except Exception as exc:
+                report = json.loads((out / 'summary.json').read_text())
+                report['journeys'].append({'id': 'guest-crashes', 'checks': [{
+                    'name': 'guest-crashes', 'status': 'failed-product' if isinstance(exc, AssertionError)
+                    else 'failed-infrastructure', 'reason': str(exc),
+                    'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
+                report.update(summarize(report['journeys']))
+                (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
             try:
                 volume = Target('ubuntu').json(COUNTERS, desktop=False)
                 volume['hostQemuIo'] = Path('/proc/' + str(started['pid']) + '/io').read_text()

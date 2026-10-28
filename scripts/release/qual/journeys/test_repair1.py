@@ -110,15 +110,15 @@ class RepairTests(unittest.TestCase):
         run = Mock()
         for trace in [
             {'effectiveMode': 'TEXT'},
-            {'effectiveMode': 'VECTOR', 'degradation': {'hybridFallback': True}, 'stages': [{'id': 'dense-retrieval', 'status': 'executed'}]},
-            {'effectiveMode': 'VECTOR', 'stages': [{'id': 'dense-retrieval', 'status': 'skipped'}]},
-            {'effectiveMode': 'VECTOR', 'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'sparse-retrieval', 'status': 'executed'}]},
+            {'effectiveMode': 'VECTOR', 'degradation': {'hybridFallback': True}, 'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]},
+            {'effectiveMode': 'VECTOR', 'stages': [{'id': 'dense-retrieval', 'status': 'skipped'}, {'id': 'cross-encoder', 'status': 'executed'}]},
+            {'effectiveMode': 'VECTOR', 'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}, {'id': 'sparse-retrieval', 'status': 'executed'}]},
         ]:
             run.api.return_value = {'results': [linux.OPEN_FILE], 'searchTrace': trace}
             with patch.object(linux, 'wait_for', once), self.assertRaises(AssertionError):
                 linux.semantic_search(run)
         good = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                'stages': [{'id': 'dense-retrieval', 'status': 'executed'}]}}
+                'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]}}
         run.api.return_value = good
         with patch.object(linux, 'wait_for', once):
             self.assertEqual(linux.semantic_search(run), good)
@@ -135,7 +135,7 @@ class RepairTests(unittest.TestCase):
             active = dict(downloaded, phase='completed', installedFully=True)
             statuses = iter([downloaded, active])
             retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                         'stages': [{'id': 'dense-retrieval', 'status': 'executed'}]}}
+                         'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]}}
             queried = False
             def api(path, *args):
                 nonlocal queried
@@ -184,7 +184,7 @@ class RepairTests(unittest.TestCase):
         installed = {'state': 'completed', 'phase': 'completed', 'installedFully': True,
                      'readyCapabilities': ['retrieval-core']}
         retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}]}}
+                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]}}
         run.api.side_effect = lambda path, *args: {
             '/api/ai/install/plan-preview': {'downloadProfile': 'CPU', 'components': [
                 {'id': 'chat', 'state': 'unavailable'}, {'id': 'embedding', 'state': 'installed'}]},
@@ -207,7 +207,7 @@ class RepairTests(unittest.TestCase):
         active = {'state': 'idle', 'phase': 'done', 'installedFully': True, 'readyCapabilities': ['retrieval-core']}
         statuses = iter([staged, active])
         retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}]}}
+                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]}}
         def api(path, *args):
             if path == '/api/ai/install/status':
                 return next(statuses)
