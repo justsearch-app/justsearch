@@ -33,13 +33,13 @@ import tools.jackson.databind.json.JsonMapper;
 final class ExclusionSaveStateHttpTest {
   @TempDir Path directory;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "refusalsLeaveNoDurableStateAndFollowingValidSaveSucceeds({0})")
   @ValueSource(strings = {"input-capacity", "expanded-capacity", "syntax"})
   void refusalsLeaveNoDurableStateAndFollowingValidSaveSucceeds(String kind) throws Exception {
     checkRefusal(kind, false);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "productionRefusalsLeaveNoDurableStateAndFollowingValidSaveSucceeds({0})")
   @ValueSource(strings = {"input-capacity", "expanded-capacity", "syntax"})
   void productionRefusalsLeaveNoDurableStateAndFollowingValidSaveSucceeds(String kind) throws Exception {
     checkRefusal(kind, true);
