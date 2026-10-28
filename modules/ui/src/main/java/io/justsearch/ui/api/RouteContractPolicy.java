@@ -152,6 +152,10 @@ final class RouteContractPolicy {
 
   static final List<Contract> CONTRACTS =
       List.of(
+          contract("POST", "/api/documents/presence", Stability.INTERNAL, null,
+              Map.of(200, "document-presence-response.v1.json", 400, "api-error-response.v1.json",
+                  500, "api-error-response.v1.json", 503, "api-error-response.v1.json",
+                  504, "api-error-response.v1.json")),
           contract("POST", "/api/engine/components/{name}/recover", Stability.REFERENCE_CLIENT,
               null, Map.of(202, "component-recovery-response.v1.json",
                   404, "api-error-response.v1.json", 409, "api-error-response.v1.json",

@@ -1,0 +1,105 @@
+{
+  "observedUtc": "2026-10-27T18:39:26Z",
+  "files": {
+    "npm-root.log": {
+      "sha256": "88d03f6fccd0ee62a0fce9135569d1e388966bfa59a29f77885988bb64452c6f",
+      "bytes": 444
+    },
+    "npm-web.log": {
+      "sha256": "6294f536b255b125497da24732049636d008ec852f2f4ad1d81ca66499779e48",
+      "bytes": 228
+    },
+    "api-base-typecheck.log": {
+      "sha256": "c8d2e1bbc6c37e08225a662df8d8fc9af17316c77b6aafc9b776350e0f188ab3",
+      "bytes": 131
+    },
+    "api-base-lint.log": {
+      "sha256": "901a6221b089f44724e9d7454a1a8547652691fe55522109007a8e9f755ce437",
+      "bytes": 128
+    },
+    "api-base-unit.log": {
+      "sha256": "f65dfd4c2677abef1882a144557d95c0b68daaa54871fb467730a382fdbed027",
+      "bytes": 12836
+    },
+    "api-base-lockdown.log": {
+      "sha256": "e22559b46d96452ab10311fdb18f4865d0272ff76a4e016520195ad834430ae8",
+      "bytes": 347
+    },
+    "java-app-api.log": {
+      "sha256": "5390bd65ce2afe7cb8f2b13ee6df6b286856053269318a569595839b935d4bd0",
+      "bytes": 35007
+    },
+    "java-app-services.log": {
+      "sha256": "506262b8197cbe4196bde1c15f945e45f369e50bac21be364d3b51b01dce5705",
+      "bytes": 39840
+    },
+    "java-app-engine.log": {
+      "sha256": "a43755497b096442351ba65079e04acf1bfbf2d075984a16c3f666f9682704a2",
+      "bytes": 41503
+    },
+    "java-worker-services.log": {
+      "sha256": "0d970db886235b2f65a4e01c9ab5f52ce58a51fc5f5523e122559cf308a38581",
+      "bytes": 39732
+    },
+    "ui-full-candidate-final.log": {
+      "sha256": "96c23edbd8f08dfedfef29352ea8d794ef1aca2b57a7b3d549350df649d07abd",
+      "bytes": 9102
+    },
+    "ui-full-baseline.log": {
+      "sha256": "e0e4ab715346bde5c87774d95dd9ce1f2a55031b19e96b2b9f9cd2472175e7db",
+      "bytes": 40522
+    },
+    "compile-pmd-final.log": {
+      "sha256": "233aeb37a3cd9dbd52d7d4a06876a45eef2f8d4df0c59a349a1201a587ba05ec",
+      "bytes": 72411
+    },
+    "governance-final-origin.log": {
+      "sha256": "44d8752b73f415b7cbbac60841187b955e11e68d0618cc6a538161b241e49726",
+      "bytes": 6264
+    },
+    "governance-baseline-final.log": {
+      "sha256": "bae6765a21dd92784166887c413289c94c11cf5352d73b7cd03ba79a2e791e94",
+      "bytes": 4086
+    },
+    "intent-final-origin.log": {
+      "sha256": "945be467ccb5bb902498743886ba9a2e4395f85b8ed2c424c487176519c314d9",
+      "bytes": 9350
+    },
+    "intent-final-assigned.log": {
+      "sha256": "f057f539aa02cba831bcea059de5d15dcdd8ad0a3d8f212f578774155b7874f7",
+      "bytes": 2806
+    },
+    "stock-address-before.log": {
+      "sha256": "16aca3291039d716ca293cbc28d3534b12a33eba507acf16baed33318e091478",
+      "bytes": 835
+    },
+    "stock-address-after.log": {
+      "sha256": "e2dd2e985bd7515dcf4c08d83f9f0e1f22da41e819f66613dc1d705e6311e433",
+      "bytes": 383
+    },
+    "raw-address-before.log": {
+      "sha256": "f838a0e448d29ddfc2d6ba5ef817de0ae0371d0b33a3cabd432c9d470fb8886c",
+      "bytes": 131
+    },
+    "raw-address-after.log": {
+      "sha256": "d90b08284f6f62297221458b0b4ccef262503a1691a71d2520c570a70890e785",
+      "bytes": 130
+    },
+    "install-final.log": {
+      "sha256": "9f449ed20e4e723643a06fd74363981c76fc6b97b07da600c03c7f1c03583c62",
+      "bytes": 23507
+    },
+    "browser-final.log": {
+      "sha256": "f91f7575adbb4c086b7da551d211164da9d19abfdb34b8c1cb1c3e6ac24e1621",
+      "bytes": 733
+    },
+    "governance-handoff.log": {
+      "sha256": "ee1c8ce4cee03de6f2cdf4651297f50d5d1d2b8555085a38409f14c37ee8cfa8",
+      "bytes": 6264
+    },
+    "intent-handoff-origin.log": {
+      "sha256": "d3bfced5480d4cf728b5d1be278813c8a153aa4ad62358a03bd2359f469d199f",
+      "bytes": 9350
+    }
+  }
+}

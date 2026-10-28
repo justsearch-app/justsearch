@@ -1,0 +1,26 @@
+{
+  "observedUtc": "2026-10-27T18:37:33Z",
+  "ports": {
+    "final-engine": {
+      "port": 41933,
+      "responding": false,
+      "errorType": "URLError"
+    },
+    "final-preview": {
+      "port": 34971,
+      "responding": false,
+      "errorType": "URLError"
+    },
+    "earlier-preview-needs-native-cleanup": {
+      "port": 34385,
+      "httpStatus": 200,
+      "responding": true
+    }
+  },
+  "engineExit": {
+    "exit": 143
+  },
+  "previewExit": {
+    "exit": 143
+  }
+}

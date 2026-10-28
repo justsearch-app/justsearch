@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="PreviewController Tests" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-10-27T16:37:15.212Z" hostname="elias-systemproductname" time="0.823">
+  <properties/>
+  <testcase name="Real file path containing #chunk_ is NOT truncated (P0.8 regression)" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.512"/>
+  <testcase name="VDU FAILED status returns textProvenance='vdu_failed'" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.016"/>
+  <testcase name="VDU COMPLETED_EMPTY status returns textProvenance='vdu_empty' (tempdoc 677: no longer falls through to base method)" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.011"/>
+  <testcase name="No VDU status returns textProvenance='tika' (default)" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.012"/>
+  <testcase name="VDU REJECTED status returns textProvenance='vdu_rejected' (tempdoc 677 abstention gate)" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.011"/>
+  <testcase name="[1] true" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.016"/>
+  <testcase name="[2] 1" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.01"/>
+  <testcase name="VDU PENDING status returns textProvenance='vdu_pending'" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.01"/>
+  <testcase name="VDU PROCESSING status returns textProvenance='vdu_processing'" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.011"/>
+  <testcase name="Missing docId returns 400 + NO_DOC_ID" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.013"/>
+  <testcase name="Preview returns parsed visual extraction evidence" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.026"/>
+  <testcase name="Opaque chunk ID (chunk:UUID) is passed through unchanged (will 404)" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.017"/>
+  <testcase name="Eval document-ID route fails closed on malformed or over-ceiling pagination" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.032"/>
+  <testcase name="OCR extraction method returns textProvenance='ocr'" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.01"/>
+  <testcase name="VDU NOT_NEEDED status returns textProvenance='tika'" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.012"/>
+  <testcase name="Eval document-ID route returns the Worker-backed parent-ID page" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.029"/>
+  <testcase name="Found doc exposes persisted extraction provenance" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.01"/>
+  <testcase name="Not found returns 404 + NOT_FOUND" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.009"/>
+  <testcase name="UnavailableException returns 503 + INDEX_UNAVAILABLE" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.012"/>
+  <testcase name="Found doc returns 200 with paging fields" classname="io.justsearch.ui.api.PreviewControllerTest" time="0.009"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -110,6 +110,7 @@ public final class AiRoutes {
         "/api/chat/conversations/{sessionId}/auto-title",
         chatController::handleAutoTitle, ActivityRole.OBSERVATION);
     app.get("/api/preview", previewController::handlePreview, ActivityRole.USER_ACTION);
+    app.post(PreviewController.PRESENCE_PATH, previewController::handlePresence, ActivityRole.OBSERVATION);
     app.post(PreviewController.DOCUMENT_IDS_PATH, previewController::handleListDocumentIds, ActivityRole.USER_ACTION);
 
     app.get("/api/ai/install/manifest", aiInstallController::handleGetManifest, ActivityRole.OBSERVATION);
