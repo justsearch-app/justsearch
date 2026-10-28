@@ -198,6 +198,68 @@ export function usesSelfHostedRunner(lines) {
   return finishBlock();
 }
 
+// Environment deployment rules are the authorization boundary for production
+// signing. Keep this independent of the editable trigger allowlist.
+function signingSecretErrors(lines, rel) {
+  const errors = [];
+  const privateName = 'JUSTSEARCH_(?:CODESIGN_\\w+|TAURI_UPDATER_PRIVATE_KEY\\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)';
+  const reference = new RegExp(`secrets\\s*(?:\\.\\s*${privateName}\\b|\\[\\s*['"]${privateName}['"]\\s*\\])`);
+  const anchors = new Map();
+  for (let i = 0; i < lines.length; i++) {
+    const match = /:\s*&([\w-]+)/.exec(stripInlineComment(lines[i]));
+    if (!match) continue;
+    const block = [lines[i]];
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j].trim() && leadingSpaces(lines[j]) <= leadingSpaces(lines[i])) break;
+      block.push(stripInlineComment(lines[j]));
+    }
+    anchors.set(match[1], block);
+  }
+  const referencesPrivateKey = (line, seen = new Set()) => {
+    if (reference.test(line)) return true;
+    const alias = /:\s*\*([\w-]+)\s*$/.exec(line)?.[1];
+    if (!alias || seen.has(alias)) return false;
+    return (anchors.get(alias) ?? []).some(value => referencesPrivateKey(value, new Set([...seen, alias])));
+  };
+  let inJobs = false;
+  let job = [];
+  const check = () => {
+    if (!job.length) return;
+    let environment;
+    let environmentBlock = false;
+    for (const { line } of job) {
+      if (leadingSpaces(line) === 4) {
+        const entry = parseMappingEntry(line.trim());
+        environmentBlock = entry?.key === 'environment' && !entry.rest.trim();
+        if (entry?.key === 'environment') environment = stripOuterQuotes(entry.rest);
+      } else if (environmentBlock && leadingSpaces(line) === 6) {
+        const entry = parseMappingEntry(line.trim());
+        if (entry?.key === 'name') environment = stripOuterQuotes(entry.rest);
+      }
+    }
+    if (environment !== 'release-signing') {
+      for (const { line, lineNumber } of job) {
+        if (referencesPrivateKey(line)) errors.push({ rel, lineNumber, message: 'production signing secrets require the release-signing environment' });
+      }
+    }
+    job = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = stripInlineComment(lines[i]).trimEnd();
+    if (!line.trim()) continue;
+    const indent = leadingSpaces(line);
+    if (indent === 0) {
+      check();
+      inJobs = parseMappingEntry(line)?.key === 'jobs';
+    }
+    if (inJobs && indent === 2 && parseMappingEntry(line.trim())) check();
+    if (inJobs && indent >= 2) job.push({ line, lineNumber: i + 1 });
+    else if (referencesPrivateKey(line)) errors.push({ rel, lineNumber: i + 1, message: 'production signing secrets must be scoped to a release-signing job' });
+  }
+  check();
+  return errors;
+}
+
 export function scanWorkflow(file, repoRoot) {
   const rel = normalizeRel(path.relative(repoRoot, file));
   const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
@@ -252,7 +314,7 @@ export function scanWorkflow(file, repoRoot) {
     }
   }
 
-  return { rel, sawOn, events, selfHosted };
+  return { rel, sawOn, events, selfHosted, signingErrors: signingSecretErrors(lines, rel) };
 }
 
 function workflowEntries(policy) {
@@ -285,6 +347,7 @@ export function validateWorkflows({ repoRoot, policy }) {
   const seen = new Set();
   for (const file of files) {
     const scanned = scanWorkflow(file, repoRoot);
+    errors.push(...scanned.signingErrors);
     seen.add(scanned.rel);
 
     // HARD invariant (policy-independent, tempdoc 747 P-D): a self-hosted job

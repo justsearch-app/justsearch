@@ -162,6 +162,7 @@ export async function publishDraft(o, remote) {
   const { candidate: c } = await verifyCandidate(o);
   const release = await remote.get();
   if (!release || release.tag_name !== c.tag || !release.body?.includes(candidateMarker(c))) throw Error('draft candidate identity mismatch');
+  if (/\b(?:Not tested|Known issues)\s*:\s*\[agent fills before final validation\]/i.test(release.body)) throw Error('unfilled release notes placeholder');
   const names = (await readdir(o.releaseDir)).sort();
   if (release.assets.map(a => a.name).sort().join() !== names.join()) throw Error('draft asset set mismatch');
   for (const name of names) {

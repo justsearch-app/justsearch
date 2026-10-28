@@ -34,8 +34,6 @@ sha256sum "$package"
 # not one of Tauri's automatic updater bundles, so sign the exact copied bytes.
 if [[ ${JUSTSEARCH_SIGN_UPDATER:-} == 1 ]]; then
   : "${TAURI_SIGNING_PRIVATE_KEY:?TAURI_SIGNING_PRIVATE_KEY is required}"
-  npm --prefix modules/shell run tauri -- signer sign \
-    --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
-    --password "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" "$PWD/$package"
+  npm --prefix modules/shell run tauri -- signer sign "$PWD/$package"
   [[ -s "$package.sig" ]] || { echo 'Missing Debian updater signature' >&2; exit 1; }
 fi

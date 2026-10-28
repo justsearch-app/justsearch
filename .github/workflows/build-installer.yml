@@ -12,16 +12,12 @@ on:
         description: Version override for a qualification build
         type: string
         default: ''
-      sign:
-        description: Sign a manual Windows branch candidate (metered)
-        type: boolean
-        default: false
 permissions:
   contents: read
   actions: read
 # Serialize candidate sequence derivation and draft upload with publication.
 concurrency:
-  group: release-candidate
+  group: ${{ startsWith(github.ref, 'refs/tags/v') && 'release-candidate' || format('manual-windows-{0}', github.ref) }}
   cancel-in-progress: false
 env:
   JUSTSEARCH_RELEASE_DESCRIPTOR_URL: https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json
@@ -36,9 +32,8 @@ jobs:
     with:
       sandboxTestMode: ${{ inputs.sandboxTestMode }}
       candidateVersion: ${{ inputs.candidateVersion }}
-      sign: ${{ inputs.sign }}
-    secrets: inherit
   prepare:
+    environment: release-signing
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -94,14 +89,13 @@ jobs:
     uses: ./.github/workflows/build-installer-windows.yml
     with:
       release: true
-    secrets: inherit
   linux:
     needs: prepare
     uses: ./.github/workflows/build-installer-linux.yml
     with:
       release: true
-    secrets: inherit
   assemble:
+    environment: release-signing
     needs: [windows, linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 15

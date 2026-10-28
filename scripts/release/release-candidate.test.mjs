@@ -149,3 +149,22 @@ test('verification requires every production trust pin', async t => {
     await assert.rejects(subject.verifyCandidate({ ...policy(f), [name]: '' }), /required/);
   }
 });
+
+for (const section of ['Not tested', 'Known issues']) {
+  test(`publication refuses the unfilled ${section} placeholder`, async t => {
+    const f = await build(t); await attest(f);
+    let promoted = false;
+    let notes = `${section}: [agent fills before final validation]`;
+    const remote = {
+      get: async () => ({ tag_name: f.tag, body: `${subject.candidateMarker(f)}\n${notes}`, draft: true,
+        assets: (await readdir(f.outDir)).map(name => ({ name })) }),
+      download: async name => readFile(path.join(f.outDir, name)),
+      promote: async () => { promoted = true; },
+    };
+    await assert.rejects(subject.publishDraft(policy(f), remote), /unfilled.*placeholder/);
+    assert.equal(promoted, false);
+    notes = 'Not tested: GPU hardware.\nKnown issues: None found.';
+    await subject.publishDraft(policy(f), remote);
+    assert.equal(promoted, true);
+  });
+}

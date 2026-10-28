@@ -73,8 +73,7 @@ def main():
                         if status.get("knowledgeServerStartError"):
                             raise RuntimeError(status["knowledgeServerStartError"])
                         health = request(port, "/api/health", token)
-                        worker = health.get("components", {}).get("worker", {}).get("state") or health.get("worker", {}).get("status")
-                        if status.get("indexAvailable") is True and worker in ("UP", "READY", "LIFECYCLE_STATE_READY"):
+                        if status.get("indexAvailable") is True and health.get("components", {}).get("index", {}).get("state") == "READY":
                             result = request(port, "/api/knowledge/search", token,
                                              {"query": "keyboard shortcuts", "mode": "text", "limit": 10})
                             hits = result.get("results", [])

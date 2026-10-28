@@ -110,7 +110,8 @@ sequence stale, abandon the stale candidate and cut the next patch.
 
 `build-installer.yml` still supports branch `workflow_dispatch` for existing Windows qualification
 uses. It calls `build-installer-windows.yml`, retaining `sandboxTestMode`, `candidateVersion`
-(qualification only), and opt-in `sign`. A normal manual build remains unsigned. A qualification
+(qualification only). Manual builds, including Sandbox qualification, are unsigned and use
+generated test trust pins. Signed candidates come only from `v*` tags. A qualification
 build is forbidden on a tag. Release publication has moved entirely to `publish-release.yml`.
 The existing `windows-installer` artifact name remains available to qualification consumers.
 
@@ -125,21 +126,29 @@ searches the bundled keyboard-shortcuts help. Failure is a red Actions run; no i
 
 Apply these once; these instructions do not change repository settings:
 
-- Repository **secrets**: `JUSTSEARCH_CODESIGN_MODE=command`, `JUSTSEARCH_CODESIGN_COMMAND`
-  (the SSL.com noninteractive template below), `JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY`,
+- Create environment **`release-signing`**. Under **Deployment branches and tags**, choose
+  **Selected branches and tags**, add a **Tag** rule matching **`v*`**, and add **no branch
+  rules**. Remove any existing branch rules or broader tag rules. Under **Deployment protection
+  rules**, leave **Required reviewers empty/disabled** and **Wait timer disabled**; add no custom
+  approval rules. Tags sign unattended; branch, PR and daily-smoke jobs cannot access this
+  environment. Every job reading a production signing or updater key binds this environment.
+- Move all production signing **secrets** into `release-signing`:
+  `JUSTSEARCH_CODESIGN_MODE` (`command`), `JUSTSEARCH_CODESIGN_COMMAND` (the SSL.com template
+  below), `JUSTSEARCH_CODESIGN_PFX_B64`, `JUSTSEARCH_CODESIGN_PFX_PASSWORD`,
+  `JUSTSEARCH_CODESIGN_TIMESTAMP_URL`, `JUSTSEARCH_CODESIGN_THUMBPRINT` (the latter four only
+  if used by the selected signing mode), `JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY`,
   `JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY_PASSWORD` (empty only for an unencrypted key), and
-  `JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM` (Ed25519). Copy the signing secrets out of
-  environment-only storage if necessary; the installer jobs no longer bind an environment.
-- Repository **variables**: `JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM`,
-  `JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY` (base64 raw Ed25519, same key as the PEM),
-  `JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID`, `JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY` (Tauri
-  base64 Minisign public key), and `JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID`. The private/public pairs
-  must match. Remove `JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED` for production. The production
-  descriptor URL is fixed in the workflows; the previous `JUSTSEARCH_RELEASE_DESCRIPTOR_URL`
-  variable is no longer consulted.
-- Environment **`release-signing`**: installer jobs no longer use its required-reviewer gate.
-  No protection-rule change is needed for releases. Keep its credentials/protection for the
-  separately dispatched `sign-vendored-mirrors.yml`; that bulk workflow retains its balance input.
+  `JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM` (Ed25519). **Delete their repository-scoped
+  copies** and any copies in other environments; remove any organization-secret repository
+  access granting these credentials outside `release-signing`. Do not leave a fallback copy.
+- Public **variables remain repository-scoped** so unsigned builds and publication can read them:
+  `JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM`, `JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY`
+  (base64 raw Ed25519, same key as the PEM), `JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID`,
+  `JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY` (Tauri base64 Minisign public key), and
+  `JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID`. No variable needs moving into the environment.
+  The private/public pairs must match. Delete `JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED` from both
+  repository and environment variables for production. The production descriptor URL is fixed
+  in the workflows; the old `JUSTSEARCH_RELEASE_DESCRIPTOR_URL` variable is no longer consulted.
 - Tag ruleset for **`v*`**: restrict creation to authorized release operators/agents and prohibit
   updates and deletion (including failed candidates). Keep main's existing merge checks. Limit
   who may dispatch publication to the owner's authorized operators through repository access.
@@ -162,9 +171,10 @@ full `-Release` contract. `scripts/ci/sign-windows.ps1` selects a credential mod
 | `store` | `JUSTSEARCH_CODESIGN_THUMBPRINT` | Cert from the Windows cert store — how USB-token / HSM CSP-backed non-exportable keys present locally (`signtool /sha1`). |
 | `command` | `JUSTSEARCH_CODESIGN_COMMAND` (a template with a `{file}` placeholder) | Any vendor CLI (Azure Trusted Signing, eSigner, …) — pluggable with zero further repo changes. |
 
-**Credential scope.** Release jobs use repository secrets without an environment approval.
-The separate bulk mirror producer continues to use the protected `release-signing` environment.
-See the one-time settings above before the first tag build.
+**Credential scope.** Release jobs and the bulk mirror producer read production keys only from
+`release-signing`, whose deployment policy allows only `v*` tags and has no required reviewers.
+Branch, PR and daily-smoke builds use generated test keys. See the one-time settings above
+before the first tag build.
 
 **eSigner (SSL.com) via `command` mode — validated template.** Sandbox-validated end-to-end
 (2026-07-22, CodeSignTool 1.3.3, demo credentials; tempdoc 760): signs in place, non-interactive,
@@ -220,11 +230,12 @@ upstream pin bump** and re-host the signed archives, dropping per-release signin
    metered signings):
 
    ```bash
-   gh workflow run sign-vendored-mirrors.yml --ref main -f signLlama=true -f signTesseract=true -f providerRemainingSignatures=<portal-value>
+   gh workflow run sign-vendored-mirrors.yml --ref vX.Y.Z -f signLlama=true -f signTesseract=true -f providerRemainingSignatures=<portal-value>
    ```
 
-   Both inputs default to `true`; set one to `false` to re-sign a single payload when only one pin
-   moved. The workflow reads the pins from their existing authorities rather than restating them
+   Use a protected `v*` tag containing the reviewed pins; branch dispatches cannot access
+   `release-signing`. Both inputs default to `true`; set one to `false` to re-sign a single payload
+   when only one pin moved. The workflow reads the pins from their existing authorities rather than restating them
    (llama from `modules/ui/build.gradle.kts`, Tesseract from
    `packaging/runtime/tesseract-windows.v1.json`), sha256-verifies each upstream download before
    signing anything, repacks the Tesseract self-extracting NSIS installer into a layout-preserving

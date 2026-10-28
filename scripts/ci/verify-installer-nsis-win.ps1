@@ -24,7 +24,7 @@ param(
   [int]$PortTimeoutSec = 60,
 
   # Timeout waiting for the backend to reach "ready" after the port is known.
-  # This includes Worker readiness (indexAvailable=true) and /api/health worker.status == "UP".
+  # This includes indexAvailable=true and /api/health components.index.state == "READY".
   [int]$ReadyTimeoutSec = 60,
 
   # Timeout per HTTP request to /api/status and /api/health.
@@ -306,19 +306,12 @@ function Wait-ForBackendReady {
       Add-BackoffSleep -Det $Det -Reason "wait_for_backend_ready" -Ms 250
       continue
     }
-    $workerStatus = ""
+    $indexState = ""
     try {
-      # Check components.worker.state (new API format) first, fallback to worker.status (legacy)
-      if ($lastHealthJson.components -and $lastHealthJson.components.worker) {
-        $workerStatus = [string]$lastHealthJson.components.worker.state
-      } else {
-        $workerStatus = [string]$lastHealthJson.worker.status
-      }
-    } catch { $workerStatus = "" }
+      $indexState = [string]$lastHealthJson.components.index.state
+    } catch { $indexState = "" }
 
-    # Accept "UP" (legacy), "READY" (transitional), and "LIFECYCLE_STATE_READY" (current
-    # lifecycle-enum shape — the value the shipped payload actually reports, 2026-08-04).
-    if ($workerStatus -eq "UP" -or $workerStatus -eq "READY" -or $workerStatus -eq "LIFECYCLE_STATE_READY") {
+    if ($indexState -eq "READY") {
       return [pscustomobject]@{
         StatusRaw = $lastStatus
         StatusJson = $lastStatusJson
