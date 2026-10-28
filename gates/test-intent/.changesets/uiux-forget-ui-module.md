@@ -80,3 +80,16 @@ raw check results are in tmp/verify/forget-round10-report.md.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "87691848-c418-4a8c-bb53-69d33f5bc962",
+  "verdict": "accept",
+  "digest": "sha256:74150721b6afdb690e1f3f48ba884d80b9eaf29d196f35e7d098c10649ec22ba",
+  "note": "Claude verifier-4 on c415db23f6: preservation check passes before, after and on main; repair check fails before only because the operations journal changed, passes after; schema count 24 right after the merge; real Engine refuses all three invalid kinds with nothing recorded"
+}
+```
