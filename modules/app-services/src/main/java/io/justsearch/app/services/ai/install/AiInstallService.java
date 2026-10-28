@@ -1374,16 +1374,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         return;
       }
 
-      // Candidate hashing can take several seconds. Keep the run in progress until both the
-      // completion verdict and activation obligation are known, then publish them together.
-      InstallCompleteness diskTruth = recomputeCompletenessFromDiskBestEffort();
-      boolean activationRequired = hasGenerationChangingAcquisition();
-      synchronized (lock) {
-        applyCompletionState(diskTruth);
-        if ("completed".equals(status.state) && activationRequired) {
-          markActivationRequired();
-        }
-      }
+      applyCompletionState();
     } finally {
       if (acquisitionFreeze != null) {
         acquisitionFreeze.close();
@@ -1786,9 +1777,20 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
   }
 
-  /** Reconciles the run against disk before publishing its terminal outcome. */
+  /**
+   * Reconciles the run against disk, then publishes its terminal outcome and any activation
+   * obligation together. Candidate hashing can take several seconds, so the run stays in progress
+   * until both are known.
+   */
   void applyCompletionState() {
-    applyCompletionState(recomputeCompletenessFromDiskBestEffort());
+    InstallCompleteness diskTruth = recomputeCompletenessFromDiskBestEffort();
+    boolean activationRequired = hasGenerationChangingAcquisition();
+    synchronized (lock) {
+      applyCompletionState(diskTruth);
+      if ("completed".equals(status.state) && activationRequired) {
+        markActivationRequired();
+      }
+    }
   }
 
   /**
