@@ -14,7 +14,7 @@
     }
   ],
   "viewCoverage": [
-    { "surfaceId": "core.search-v3-surface", "step": "sv3-composer-occlusion", "source": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts", "additionalSources": ["modules/ui-web/src/shell-v0/views/search-v3/Sv3Composer.ts", "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.ts"] },
+    { "surfaceId": "core.search-v3-surface", "step": "sv3-recents-hero-normal-dark", "source": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts", "additionalSources": ["modules/ui-web/src/shell-v0/views/search-v3/Sv3Composer.ts", "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.ts"] },
     { "surfaceId": "core.library-surface", "step": "library", "source": "modules/ui-web/src/shell-v0/views/LibrarySurface.ts" },
     { "surfaceId": "core.brain-surface", "step": "ai-brain", "source": "modules/ui-web/src/shell-v0/views/BrainSurface.ts" },
     { "surfaceId": "core.settings-surface", "step": "settings", "source": "modules/ui-web/src/shell-v0/views/SettingsSurface.ts", "additionalSources": ["modules/ui-web/src/shell-v0/chrome/SettingsWindow.ts"] },

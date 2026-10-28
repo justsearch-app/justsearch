@@ -6,6 +6,7 @@
  * because conversations are a content domain, not an AI state concern.
  */
 
+import { subscribeProfileSwitch } from './UserStateDocument.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { startUserActivity } from '../utils/userActivity.js';
 import { subscribeStatus } from '../utils/statusPoll.js';
@@ -372,17 +373,24 @@ export async function loadForkConversations(
   } catch { return null; }
 }
 
-export async function loadConversations(): Promise<void> {
+let listProfileEpoch = 0;
+let stopListProfileWatch: (() => void) | null = null;
+
+export async function loadConversations(): Promise<boolean> {
+  stopListProfileWatch ??= subscribeProfileSwitch(() => { listProfileEpoch += 1; });
   watchOtherWindowsLegacyTitles();
   const request = ++listRequests;
+  const profileEpoch = listProfileEpoch;
   state = { ...state, loading: true };
   emit();
   try {
     const res = await authorizedFetch(`${apiBase}/api/chat/conversations?limit=20`);
-    if (!res.ok) { state = { ...state, loading: false }; emit(); return; }
+    if (profileEpoch !== listProfileEpoch) return false;
+    if (!res.ok) { state = { ...state, loading: false }; emit(); return false; }
     const data = await res.json();
+    if (profileEpoch !== listProfileEpoch) return false;
     // A newer answer is already on screen; this one was built from older server state.
-    if (request < listShown) return;
+    if (request < listShown) return false;
     listShown = request;
     const rows: Array<Record<string, unknown>> = data.sessions ?? [];
     // The backend is the authority for a name now. A name this tab wrote that the answer may predate
@@ -426,9 +434,9 @@ export async function loadConversations(): Promise<void> {
     // another confirmed absence. A limited list, failed read or old-server reply proves nothing.
     await Promise.all(missing.map(async id => {
       const exists = await readConversationExists(id, request);
-      if (generation !== existenceGeneration) return;
+      if (profileEpoch !== listProfileEpoch || generation !== existenceGeneration) return false;
       if (exists === true && generation !== null && serverConversations.has(id)) confirmedExisting.add(id);
-      if (exists !== false || request < listShown) return;
+      if (exists !== false || request < listShown) return false;
       serverConversations.delete(id);
       confirmedExisting.delete(id);
       forgetRecentSession(id);
@@ -438,9 +446,12 @@ export async function loadConversations(): Promise<void> {
         activeId: state.activeId === id ? null : state.activeId };
       emit();
     }));
+    return true;
   } catch {
+    if (profileEpoch !== listProfileEpoch) return false;
     state = { ...state, loading: false };
     emit();
+    return false;
   }
 }
 
@@ -1573,6 +1584,9 @@ export function exportConversationMarkdown(
 }
 
 export function __resetConversationListForTest(): void {
+  stopListProfileWatch?.();
+  stopListProfileWatch = null;
+  listProfileEpoch += 1;
   pendingDeleteReads.clear();
   stopDeleteStatus?.();
   stopDeleteStatus = null;

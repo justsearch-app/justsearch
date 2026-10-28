@@ -57,7 +57,8 @@
     "chat-occlusion", "chat-bands", "chat-bands-detailed",
     "chat-composer-small", "chat-evidence-rail", "chat-activity-rail-open",
     "chat-wide-docked", "chat-mode", "qa-response",
-    "chat-budget", "chat-model-only", "chat-structured"
+    "chat-budget", "chat-model-only", "chat-structured",
+    "sv3-recents-hero-normal-dark", "sv3-recents-hero-normal-light", "sv3-recents-hero-normal-forced", "sv3-recents-hero-narrow-dark", "sv3-recents-hero-narrow-light", "sv3-recents-hero-narrow-forced", "sv3-recents-docked-normal-dark", "sv3-recents-docked-normal-light", "sv3-recents-docked-normal-forced", "sv3-recents-docked-narrow-dark", "sv3-recents-docked-narrow-light", "sv3-recents-docked-narrow-forced"
   ],
   "shell-v0/views/search-v3/Sv3Composer.ts": [
     "sv3-composer-occlusion", "sv3-search-results", "chat-chip-yield",
@@ -65,7 +66,8 @@
     "chat-bands-detailed", "chat-composer-small", "chat-evidence-rail",
     "chat-activity-rail-open", "chat-wide-docked", "chat-mode",
     "qa-response", "chat-budget", "chat-model-only",
-    "chat-structured"
+    "chat-structured",
+    "sv3-recents-hero-normal-dark", "sv3-recents-hero-normal-light", "sv3-recents-hero-normal-forced", "sv3-recents-hero-narrow-dark", "sv3-recents-hero-narrow-light", "sv3-recents-hero-narrow-forced", "sv3-recents-docked-normal-dark", "sv3-recents-docked-normal-light", "sv3-recents-docked-normal-forced", "sv3-recents-docked-narrow-dark", "sv3-recents-docked-narrow-light", "sv3-recents-docked-narrow-forced"
   ],
   "shell-v0/views/search-v3/Sv3ContextBar.ts": [
     "sv3-composer-occlusion", "chat-proportion", "chat-bands-detailed"

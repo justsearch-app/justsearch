@@ -797,6 +797,12 @@ def fixture_body(url: str, variant: str = "default") -> str:
                 "engineState": "Down", "engineReason": "not-installed", "chatEnabledSpec": False})
             status["aiReady"] = False
             return json.dumps(status)
+    if "/api/messages/registry-surface/en" in url:
+        # Keep the Search copy in its production catalog, including cold async boot.
+        catalog = Path(__file__).resolve().parents[3] / "modules/app-api/src/main/resources/messages/registry-surface.en.properties"
+        messages = dict(line.split("=", 1) for line in catalog.read_text().splitlines()
+                        if line and not line.startswith("#") and "=" in line)
+        return json.dumps({"locale": "en", "messages": messages})
     if "/api/inference/status" in url:
         return _inference_body(variant)
     if "/api/status" in url:

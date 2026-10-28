@@ -78,7 +78,14 @@ import {
   type Sv3Corpus,
   type Sv3RemedyDetail,
 } from './sv3-honesty.js';
+import { localizeResourceKey, onCatalogUpdated } from '../../../i18n/resourceCatalog.js';
 import { sv3ComposerReason, type Sv3Degradation } from './sv3-degradation.js';
+
+export interface Sv3RecentItem {
+  readonly kind: 'search' | 'conversation';
+  readonly value: string;
+  readonly label: string;
+}
 
 /** Raised when the composer asks the window for the other state; the window owns the morph. */
 export const SV3_COMPOSER_STATE_REQUEST = 'sv3-composer-state-request';
@@ -249,6 +256,22 @@ export class Sv3Composer extends JfElement {
          now: everything around it (the host's own inset, and in docked the window's '.dock'
          wrapper) is click-through so the transcript underneath stays wheel-scrollable right up to
          the glass edge. Unconditional rather than hero-only, because docked is an overlay too. */
+      .recents { margin-block-start: var(--space-2); padding: var(--space-2);
+        border: 1px solid var(--border); border-radius: var(--radius-lg);
+        background: var(--background); color: var(--foreground); font-size: var(--font-size-sv3-sm); }
+      .recent-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+      .recents button { font: inherit; color: inherit; background: transparent; border: 0;
+        border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); cursor: pointer; text-align: start; }
+      .recents [role='option'] { padding-block: calc(var(--space-1) / 2); display: flex; gap: var(--space-2); align-items: center; width: 100%; min-width: 0; }
+      .recents [role='option'] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .recents [aria-selected='true'], .recents button:hover { background: var(--muted); }
+      .recents button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+      .recents p { margin: var(--space-1) var(--space-2); }
+      @media (forced-colors: active) {
+        .recents { background: Canvas; color: CanvasText; border-color: CanvasText; }
+        .recents [aria-selected='true'] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+        .recents [aria-selected='true'] * { color: HighlightText; }
+      }
       .band {
         position: relative;
         width: 100%;
@@ -268,6 +291,13 @@ export class Sv3Composer extends JfElement {
         inset-inline: 0;
         bottom: 100%;
         padding-bottom: var(--space-8);
+      }
+
+      /* With Recent open the introduction participates in the hero's measured height, so
+         a full list cannot move it above the column's clipped top edge. */
+      :host([state='hero']) .band:has(.recents) .landing {
+        position: static;
+        padding-bottom: var(--space-4);
       }
 
       .headline {
@@ -1111,6 +1141,10 @@ export class Sv3Composer extends JfElement {
     structuredError: { type: String, attribute: false },
     taskNotice: { type: String, attribute: 'task-notice' },
     degradationOpen: { state: true },
+    recentItems: { attribute: false },
+    recentLocked: { type: Boolean },
+    recentsOpen: { state: true },
+    recentIndex: { state: true },
   };
 
   declare state: Sv3ComposerState;
@@ -1207,6 +1241,62 @@ export class Sv3Composer extends JfElement {
    * the duplicate the F-series audit measured zero of.
    */
   declare modelLabel: string;
+  declare recentItems: readonly Sv3RecentItem[];
+  declare recentLocked: boolean;
+  declare recentsOpen: boolean;
+  declare private recentIndex: number;
+  private catalogUnsubscribe: (() => void) | null = null;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.catalogUnsubscribe = onCatalogUpdated(() => this.requestUpdate());
+  }
+
+  override disconnectedCallback(): void {
+    this.catalogUnsubscribe?.();
+    this.catalogUnsubscribe = null;
+    this.closeRecents();
+    super.disconnectedCallback();
+  }
+
+  closeRecents(): void { this.recentsOpen = false; this.recentIndex = -1; }
+
+  private openRecents(): void {
+    if (this.tier !== 'search' || this.draft !== '') return;
+    this.recentsOpen = true;
+    this.recentIndex = -1;
+    this.dispatchEvent(new CustomEvent('sv3-recents-refresh', { bubbles: true, composed: true }));
+  }
+
+  private selectRecent(item: Sv3RecentItem): void {
+    this.closeRecents();
+    this.dispatchEvent(new CustomEvent('sv3-recent-select', { detail: item, bubbles: true, composed: true }));
+  }
+
+  private recentList(): TemplateResult | typeof nothing {
+    if (!this.recentsOpen || this.tier !== 'search' || this.draft !== '') return nothing;
+    return html`<section class="recents" data-testid="sv3-recents" aria-labelledby="sv3-recent-heading"
+      @keydown=${(event: KeyboardEvent) => {
+        if (event.key === 'Escape' && !event.isComposing) {
+          event.preventDefault(); event.stopPropagation(); this.focusField(); this.closeRecents();
+        }
+      }}>
+      <div class="recent-heading"><span id="sv3-recent-heading">${localizeResourceKey('search.recent')}</span>
+        <button type="button" data-testid="sv3-recent-clear" @click=${() => {
+          this.recentIndex = -1;
+          this.dispatchEvent(new CustomEvent('sv3-recents-clear', { bubbles: true, composed: true }));
+        }}>${localizeResourceKey('search.clear-recent')}</button>
+      </div>
+      <div id="sv3-recent-list" role="listbox" aria-labelledby="sv3-recent-heading">
+        ${this.recentItems.map((item, index) => html`<button type="button" role="option"
+          id=${`sv3-recent-${index}`} tabindex="-1" aria-selected=${index === this.recentIndex}
+          data-kind=${item.kind} @pointerdown=${(event: Event) => event.preventDefault()}
+          @click=${() => this.selectRecent(item)}>${icon({ name: item.kind === 'search' ? 'search' : 'message-square', size: 14 })}<span>${item.label || localizeResourceKey('search.untitled-conversation')}</span></button>`)}
+      </div>
+      ${this.recentLocked ? html`<p role="status">${localizeResourceKey('search.conversations-locked')}</p>` : nothing}
+    </section>`;
+  }
+
   private draftText = '';
   /** Every assignment is a new owner, including identical text and a new IME composition. */
   draftVersion = 0;
@@ -1242,6 +1332,10 @@ export class Sv3Composer extends JfElement {
   constructor() {
     super();
     this.state = COMPOSER_STATE_DEFAULT;
+    this.recentItems = [];
+    this.recentLocked = false;
+    this.recentsOpen = false;
+    this.recentIndex = -1;
     this.slotKind = 'send';
     this.slotReason = sv3PrimaryAction({
       pendingPrompt: false,
@@ -1281,7 +1375,9 @@ export class Sv3Composer extends JfElement {
   }
 
   private onInput(event: Event): void {
+    this.closeRecents();
     this.setDraft((event.target as HTMLTextAreaElement).value, (event as InputEvent).isComposing === true);
+    if (this.draft === '' && !(event as InputEvent).isComposing) this.openRecents();
   }
 
   /** The IME committed: the composed text is the draft now, and only now is it announced. */
@@ -1308,7 +1404,20 @@ export class Sv3Composer extends JfElement {
     // Escape branch, not after it: `Escape` is how a reader dismisses an IME candidate window, and
     // this handler used to read that press as "leave the composer" and flip the window to hero
     // mid-draft. Same reason the `Enter` branch below has always tested `isComposing`.
-    if (event.isComposing) return;
+    if (event.isComposing) { this.closeRecents(); return; }
+    if (this.recentsOpen && this.tier === 'search' && this.draft === '') {
+      if (event.shiftKey || event.ctrlKey || event.metaKey) this.closeRecents();
+      else if (event.key === 'Escape') {
+        event.preventDefault(); event.stopPropagation(); this.closeRecents(); return;
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const count = this.recentItems.length;
+        this.recentIndex = count === 0 ? -1 : (this.recentIndex + (event.key === 'ArrowDown' ? 1 : (this.recentIndex < 0 ? 0 : -1)) + count) % count;
+        return;
+      } else if (event.key === 'Enter' && this.recentItems[this.recentIndex]) {
+        event.preventDefault(); event.stopPropagation(); this.selectRecent(this.recentItems[this.recentIndex]!); return;
+      }
+    }
     if (event.key === 'Escape') {
       event.preventDefault();
       this.request('hero');
@@ -1469,7 +1578,9 @@ export class Sv3Composer extends JfElement {
     // Like the degradation banner, this is a reachable description of the refusal. The shell's
     // always-mounted status deck announces observed health/indexing changes once for all surfaces.
     return html`
-      <div class="band" data-testid="sv3-composer-band">
+      <div class="band" data-testid="sv3-composer-band" @focusout=${(event: FocusEvent) => {
+        if (!this.shadowRoot?.contains(event.relatedTarget as Node | null)) this.closeRecents();
+      }}>
         ${this.state === 'hero' ? this.landing() : nothing}
         ${this.degradationBanner()}
         ${reason === ''
@@ -1491,8 +1602,15 @@ export class Sv3Composer extends JfElement {
                 .value=${this.draft}
                 aria-label=${COMPOSER_PLACEHOLDER}
                 data-testid="sv3-composer-input"
+                role=${this.tier === 'search' ? 'combobox' : nothing}
+                aria-autocomplete=${this.tier === 'search' ? 'list' : nothing}
+                aria-haspopup=${this.tier === 'search' ? 'listbox' : nothing}
+                aria-expanded=${this.tier === 'search' ? String(this.recentsOpen && this.draft === '') : nothing}
+                aria-controls=${this.recentsOpen && this.tier === 'search' && this.draft === '' ? 'sv3-recent-list' : nothing}
+                aria-activedescendant=${this.recentsOpen && this.recentItems[this.recentIndex] ? `sv3-recent-${this.recentIndex}` : nothing}
+                @focus=${this.openRecents}
                 @input=${this.onInput}
-                @compositionstart=${() => { this.draftVersion += 1; this.dispatchEvent(new CustomEvent('sv3-composer-assignment', { bubbles: true, composed: true })); }}
+                @compositionstart=${() => { this.closeRecents(); this.draftVersion += 1; this.dispatchEvent(new CustomEvent('sv3-composer-assignment', { bubbles: true, composed: true })); }}
                 @compositionend=${this.onCompositionEnd}
                 @keydown=${this.onKeydown}
               ></textarea>
@@ -1537,6 +1655,7 @@ export class Sv3Composer extends JfElement {
             </div>
           </div>
         </div>
+      ${this.recentList()}
       </div>
     `;
   }

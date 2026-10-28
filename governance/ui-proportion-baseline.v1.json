@@ -501,6 +501,414 @@
         "[data-testid=\"sv3-run-budget-finalize\"]",
         "[data-testid=\"sv3-run-budget-stop\"]"
       ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-normal-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-normal-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-normal-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-narrow-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-narrow-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-narrow-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-normal-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-normal-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-normal-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-narrow-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-narrow-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-narrow-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
     }
   ]
 }

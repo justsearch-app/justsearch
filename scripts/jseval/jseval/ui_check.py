@@ -1277,6 +1277,40 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.keyboard.press("Tab")
         await _settle_focus_marks(page)
 
+    def setup_sv3_recents(state, narrow):
+        async def setup(page):
+            # A full list: eight accepted explicit searches and five saved conversations.
+            async def conversations(route):
+                await route.fulfill(status=200, content_type="application/json", body=json.dumps({
+                    "sessions": [{"sessionId": f"recent-{i}", "title": f"Conversation {i + 1}",
+                                  "titleSource": "user", "firstUserMessage": "Saved question",
+                                  "createdAtMs": 1, "lastActiveAtMs": 100 - i,
+                                  "shapeId": "core.rag-ask", "messageCount": 2} for i in range(5)]
+                }))
+            await page.route("**/api/chat/conversations?limit=20", conversations)
+            await page.set_viewport_size({"width": 760 if narrow else 1280, "height": 800})
+            await _open_sv3_window(page)
+            field = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
+            for query in ["notes", "budget", "title:report", '"exact phrase"', "Ada", "forecast", "plan", "latest"]:
+                await field.fill(query)
+                async with page.expect_response("**/api/knowledge/search", timeout=15_000):
+                    await field.press("Enter")
+            await field.fill("")
+            if state == "hero":
+                # Escape dismisses Recent first, then returns the composer to hero.
+                await field.press("Escape")
+                await field.press("Escape")
+                await page.locator("jf-sv3-composer[state='hero']").wait_for(state="visible")
+            await field.blur()
+            await field.focus()
+            await page.locator('[data-testid="sv3-recents"] [role="option"]').nth(12).wait_for(state="visible")
+            await field.press("ArrowDown")
+            if await page.evaluate("matchMedia('(forced-colors: active)').matches"):
+                selected = page.locator('[data-testid="sv3-recents"] [aria-selected="true"]')
+                assert await selected.evaluate("el => getComputedStyle(el).forcedColorAdjust") == "none"
+            await _settle_focus_marks(page)
+        return setup
+
     async def setup_sv3_search_results(page):
         # WP1.1 S1.12 — Search mode's result list stays reachable beside the floating composer, at a
         # narrow width and with a long list. DETERMINISTIC: the `sv3-results` fixtures variant
@@ -1984,6 +2018,12 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              forced_colors="active"),
         Step("settings-forced-colors", setup=setup_settings_forced_colors, isolated=True,
              forced_colors="active"),
+        *[Step(f"sv3-recents-{state}-{width}-{theme}",
+               setup=setup_sv3_recents(state, width == "narrow"), isolated=True,
+               color_scheme="light" if theme == "light" else "dark",
+               forced_colors="active" if theme == "forced" else None)
+          for state in ("hero", "docked") for width in ("normal", "narrow")
+          for theme in ("dark", "light", "forced")],
         Step("sv3-search-results", setup=setup_sv3_search_results, isolated=True,
              fixtures_variant="sv3-results"),
         Step("library-enriching", setup=setup_library_enriching, isolated=True,
