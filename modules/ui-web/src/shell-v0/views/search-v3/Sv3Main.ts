@@ -45,6 +45,7 @@ import '../../components/chat/ToolCallCard.js';
 // on sv3 tokens through the custom properties the two components read.
 import '../../components/chat/MarkdownBlock.js';
 import '../../components/chat/CitationsPanel.js';
+import type { CitationsPanel } from '../../components/chat/CitationsPanel.js';
 // The product's ONE citation hover preview and ONE reasoning block (tempdoc 822 Phase F7; inventory
 // C3 and C9). Both are shared components the shipped window mounts for the same events this surface
 // now receives; a window-local preview card or thinking disclosure would be a second presentation of
@@ -179,6 +180,8 @@ export const SV3_CITATION_OPEN = 'sv3-citation-open';
 
 export interface Sv3CitationOpen {
   readonly docPath: string;
+  /** Re-open an already displayed source through a fresh Head read. Never a saved field. */
+  readonly sourceUnavailable?: true;
   /**
    * Tempdoc 849 §3 — the cited passage in the producer's OWN coordinate: document-relative character
    * offsets plus the excerpt quoted from them, or null when the citation carried no usable span. The
@@ -1337,6 +1340,8 @@ export class Sv3Main extends JfElement {
     view: { attribute: false },
     forgetAvailable: { type: Boolean, attribute: false },
     turns: { attribute: false },
+    conversationId: { attribute: false },
+    apiBase: { attribute: false },
     turnScopes: { attribute: false },
     structuredNotes: { attribute: false },
     run: { attribute: false },
@@ -1380,6 +1385,8 @@ export class Sv3Main extends JfElement {
   declare forgetAvailable: boolean;
   /** The ACTIVE session's turns, oldest first. Handed down; the region holds no session list. */
   declare turns: readonly Sv3Turn[];
+  declare conversationId: string;
+  declare apiBase: string;
   declare modelAnswerUnavailableReason: string;
   declare modelAnswerBusy: boolean;
   /**
@@ -1636,6 +1643,8 @@ export class Sv3Main extends JfElement {
 
   constructor() {
     super();
+    this.conversationId = '';
+    this.apiBase = '';
     this.state = COMPOSER_STATE_DEFAULT;
     this.view = SV3_RESULTS_IDLE;
     this.forgetAvailable = false;
@@ -2816,7 +2825,10 @@ export class Sv3Main extends JfElement {
       .resultBeingExplained=${resultBeingExplained}
       .sourcesExpanded=${true}
       .citations=${[...turn.evidence.matches]}
-      .sources=${[...turn.evidence.sources]}
+      .sources=${turn.evidence.sources}
+      .observeAvailability=${!resultBeingExplained}
+      .apiBase=${this.apiBase}
+      .presenceScope=${JSON.stringify([this.conversationId, turn.id])}
       .retrievalMode=${turn.evidence.retrievalMode}
       .groundingIncomplete=${turn.evidence.groundingIncomplete ?? false}
       .sourceCoverage=${[...(turn.evidence.sourceCoverage ?? [])]}
@@ -2852,10 +2864,13 @@ export class Sv3Main extends JfElement {
     const turnId = (event.currentTarget as HTMLElement | null)?.dataset.turnId ?? '';
     const turn = this.turns.find((candidate) => candidate.id === turnId) ?? null;
     const sourceIndex = sv3SourceIndex(turn, detail);
+    const panel = this.shadowRoot?.getElementById(sourcesBodyId(turnId)) as CitationsPanel | null;
+    const sourceUnavailable = panel?.isUnavailable(detail.parentDocId) === true;
     const anchor = sv3CitationAnchor(detail, sv3MatchedSentence(turn, sourceIndex));
     this.dispatchEvent(
       new CustomEvent<Sv3CitationOpen>(SV3_CITATION_OPEN, {
-        detail: { docPath: detail.parentDocId, anchor, turnId, sourceIndex },
+        detail: { docPath: detail.parentDocId, anchor, turnId, sourceIndex,
+          ...(sourceUnavailable ? { sourceUnavailable: true } : {}) },
         bubbles: true,
         composed: true,
       }),

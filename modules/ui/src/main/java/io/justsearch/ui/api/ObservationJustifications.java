@@ -23,6 +23,7 @@ public final class ObservationJustifications {
   private ObservationJustifications() {}
 
   private static final Map<String, String> REASONS = Map.ofEntries(
+      Map.entry("POST /api/documents/presence", "CONSUMER: ui-web/src/shell-v0/components/chat/CitationsPanel.ts checks index membership when Search v3 sources are shown; never user activity"),
       Map.entry("GET /.well-known/justsearch/manifest.json", "STATUS: canonical current runtime manifest discovery mirror (RuntimeManifestController.handleGet)"),
       Map.entry("GET /api/action-ledger", "CONSUMER: ui-web/src/shell-v0/operations/ActionLedgerClient.ts via ui-web/src/shell-v0/components/ActionLedgerView.ts ledger snapshot seed on Activity mount"),
       Map.entry("GET /api/action-ledger/stream", "CONSUMER: ui-web/src/shell-v0/operations/ActionLedgerClient.ts via ui-web/src/shell-v0/components/ActionLedgerView.ts continuous ledger subscription on Activity mount"),

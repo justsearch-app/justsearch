@@ -30,33 +30,38 @@ final class AiInstallServicePolicyPreservationTest {
 
   @Test
   void noPolicyPreviewAndNormalizedContractKeepAllThreeProfiles() throws Exception {
-    var mapper = JsonMapper.builder().build();
-    for (long vram : new long[] {12_000_000_000L, 6_000_000_000L, -1}) {
-      var facts = new GpuCapabilities.Effective(vram > 0, "fixture", GpuCapabilities.Confidence.HIGH,
-          null, null, null, 1, vram, vram, 0L,
-          new GpuCapabilities.Cuda(vram > 0, "fixture", GpuCapabilities.Confidence.HIGH));
-      try (var _ = mockConstruction(GpuCapabilityResolver.class,
-          (mock, context) -> when(mock.snapshot()).thenReturn(new GpuCapabilities(null, null, facts)))) {
-        var service = new AiInstallService(null, null, null, null, home);
-        var profile = service.buildHardwareProfile();
-        var preview = service.previewInstallPlan();
-        assertEquals(vram < 0 ? "CPU" : vram > 7_500_000_000L ? "GPU_FULL" : "GPU_LITE",
-            preview.downloadProfile);
-        assertTrue(preview.components.stream().noneMatch(c -> c.unavailableReason != null
-            && c.unavailableReason.contains("administrator policy")));
-        var registry = service.getManifest();
-        var plan = InstallPlanner.plan(registry, profile, InstallIntent.FULL_DESKTOP,
-            java.util.Set.of(), home.resolve("models"), home);
-        var contract = service.buildContract(plan, registry, profile);
-        assertEquals(profile.downloadProfile(), contract.downloadProfile());
-        // Compare these outputs between the base and candidate, excluding only clock and fixture root.
-        var normalized = new InstallContract(contract.schemaVersion(), 0, contract.hardwareProfile(),
-            contract.downloadProfile(), contract.models(), null, contract.installIntent());
-        Path output = Path.of("build/policy-preservation/" + preview.downloadProfile);
-        Files.createDirectories(output);
-        Files.writeString(output.resolve("preview.json"),
-            mapper.writeValueAsString(preview).replace(home.toString().replace("\\", "\\\\"), "<home>"));
-        InstallContractIO.write(normalized, output);
+    // This preservation check describes the Windows runtime plans. Linux has no CUDA pack yet.
+    NativeTargets windows = NativeTargets.forTarget("windows-x86_64");
+    try (var target = mockStatic(NativeTargets.class, CALLS_REAL_METHODS)) {
+      target.when(NativeTargets::current).thenReturn(windows);
+      var mapper = JsonMapper.builder().build();
+      for (long vram : new long[] {12_000_000_000L, 6_000_000_000L, -1}) {
+        var facts = new GpuCapabilities.Effective(vram > 0, "fixture", GpuCapabilities.Confidence.HIGH,
+            null, null, null, 1, vram, vram, 0L,
+            new GpuCapabilities.Cuda(vram > 0, "fixture", GpuCapabilities.Confidence.HIGH));
+        try (var _ = mockConstruction(GpuCapabilityResolver.class,
+            (mock, context) -> when(mock.snapshot()).thenReturn(new GpuCapabilities(null, null, facts)))) {
+          var service = new AiInstallService(null, null, null, null, home);
+          var profile = service.buildHardwareProfile();
+          var preview = service.previewInstallPlan();
+          assertEquals(vram < 0 ? "CPU" : vram > 7_500_000_000L ? "GPU_FULL" : "GPU_LITE",
+              preview.downloadProfile);
+          assertTrue(preview.components.stream().noneMatch(c -> c.unavailableReason != null
+              && c.unavailableReason.contains("administrator policy")));
+          var registry = service.getManifest();
+          var plan = InstallPlanner.plan(registry, profile, InstallIntent.FULL_DESKTOP,
+              java.util.Set.of(), home.resolve("models"), home);
+          var contract = service.buildContract(plan, registry, profile);
+          assertEquals(profile.downloadProfile(), contract.downloadProfile());
+          // Compare these outputs between the base and candidate, excluding only clock and fixture root.
+          var normalized = new InstallContract(contract.schemaVersion(), 0, contract.hardwareProfile(),
+              contract.downloadProfile(), contract.models(), null, contract.installIntent());
+          Path output = Path.of("build/policy-preservation/" + preview.downloadProfile);
+          Files.createDirectories(output);
+          Files.writeString(output.resolve("preview.json"),
+              mapper.writeValueAsString(preview).replace(home.toString().replace("\\", "\\\\"), "<home>"));
+          InstallContractIO.write(normalized, output);
+        }
       }
     }
   }

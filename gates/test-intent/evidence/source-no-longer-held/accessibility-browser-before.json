@@ -1,0 +1,123 @@
+{
+  "startedUtc": "2026-10-27T21:28:06.025Z",
+  "root": "/home/elias/.cache/am/mnnedt0c/tmp/wp58-r2-aSu92c/before",
+  "entry": "assets/SearchV3View-C7HTBDUf.js",
+  "checks": [
+    {
+      "mode": "Ask",
+      "state": "present",
+      "initial": {
+        "name": "present recorded passage present recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "actual": {
+        "name": "present recorded passage present recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "passed": true
+    },
+    {
+      "mode": "Ask",
+      "state": "unknown",
+      "initial": {
+        "name": "unknown recorded passage unknown recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "actual": {
+        "name": "unknown recorded passage unknown recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "passed": true
+    },
+    {
+      "mode": "Ask",
+      "state": "absent",
+      "initial": {
+        "name": "absent recorded passage absent recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "actual": {
+        "name": "absent recorded passage absent recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "passed": false
+    },
+    {
+      "mode": "Delegate",
+      "state": "present",
+      "initial": {
+        "name": "present recorded passage present recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "actual": {
+        "name": "present recorded passage present recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "passed": true
+    },
+    {
+      "mode": "Delegate",
+      "state": "unknown",
+      "initial": {
+        "name": "unknown recorded passage unknown recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "actual": {
+        "name": "unknown recorded passage unknown recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "passed": true
+    },
+    {
+      "mode": "Delegate",
+      "state": "absent",
+      "initial": {
+        "name": "absent recorded passage absent recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "actual": {
+        "name": "absent recorded passage absent recorded passage",
+        "description": "",
+        "focused": true
+      },
+      "passed": false
+    }
+  ],
+  "requests": [
+    [
+      "/docs/present.md",
+      "/docs/unknown.md",
+      "/docs/absent.md"
+    ],
+    [
+      "/docs/present.md",
+      "/docs/unknown.md",
+      "/docs/absent.md"
+    ]
+  ],
+  "previewPid": 14,
+  "origin": "http://127.0.0.1:36731",
+  "statusChanges": [
+    "No longer available",
+    "No longer available"
+  ],
+  "status": "failed",
+  "error": "AssertionError [ERR_ASSERTION]: absent source must expose No longer available in its computed accessible name or description; present and unknown must stay unchanged\n    at file:///home/elias/dev/js-uiux-source-gone/gates/test-intent/evidence/source-no-longer-held/accessibility-browser.mjs:146:3",
+  "previewExit": {
+    "code": 143,
+    "signal": null
+  },
+  "temporaryResourcesRemoved": true,
+  "finishedUtc": "2026-10-27T21:28:07.326Z"
+}

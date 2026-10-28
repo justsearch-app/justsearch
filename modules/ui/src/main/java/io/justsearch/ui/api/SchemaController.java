@@ -71,6 +71,7 @@ public final class SchemaController {
           "prompt.v1.json",
           "resource.v1.json",
           "runtime-context.v1.json",
+          "document-presence-response.v1.json",
           // Slice 3a.1.9 §B.B.B D1: closes the dangling-schema-URL
           // defect surfaced by the second-agent review. Four
           // TIMESERIES metric catalogs reference this URL; the file

@@ -77,6 +77,15 @@ final class EngineExclusionReplayPolicyTest {
           Thread.sleep(50);
         }
         assertTrue(promoted, "Green must be serving without a restart");
+        // Green is published before the cutover removes its replayed versions, so wait for that
+        // removal; versions never removed still fail below. Strict reads: depth reports 0 on error.
+        long settleDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        var retained = queue.listSwitchBufferOpsStrict();
+        while (!retained.isEmpty() && System.nanoTime() < settleDeadline) {
+          Thread.sleep(50);
+          retained = queue.listSwitchBufferOpsStrict();
+        }
+        assertEquals(List.of(), retained, "the replay must have committed and settled");
         assertEquals(0, queue.switchBufferDepth(), "the replay must have committed and settled");
         try (var view = engine.captureServingView()) {
           var runtime = (RunningRuntime) view.ingestRuntime();

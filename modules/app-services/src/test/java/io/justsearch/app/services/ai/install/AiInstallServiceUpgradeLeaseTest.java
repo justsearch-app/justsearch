@@ -3,6 +3,8 @@ package io.justsearch.app.services.ai.install;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 import io.justsearch.app.services.lease.RecordingOperationLeaseService;
 import java.nio.file.Path;
@@ -23,12 +25,13 @@ final class AiInstallServiceUpgradeLeaseTest {
 
   @Test
   void modelInstallHoldsAnOperationLeaseForTheInstallThreadLifetime() throws Exception {
-    AiInstallService svc = new AiInstallService(null, null, null, null, tmp);
+    AiInstallService svc = spy(new AiInstallService(null, null, null, null, tmp));
+    doThrow(new IllegalStateException("fixture preflight failure")).when(svc).getManifest();
     RecordingOperationLeaseService leases = new RecordingOperationLeaseService();
     svc.setOperationLeaseService(leases);
 
     String caller = Thread.currentThread().getName();
-    // The install fails fast on the null collaborators; the lease contract must hold either way.
+    // Fail before acquisition on every platform; null collaborators permit Linux search downloads.
     svc.startInstall(true);
 
     assertEquals(

@@ -1,0 +1,1335 @@
+{
+  "module": "app-engine",
+  "observedUtc": "2026-10-27T17:09:32Z",
+  "revision": "bfd625c7eea6591250e5a3d231c25e7884aa4312",
+  "totals": {
+    "tests": 774,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 9
+  },
+  "suites": [
+    {
+      "name": "io.justsearch.app.engine.AppliedConfigurationRevisionTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "99b41a57c4d4c51320cd36787c81905900f10d6e7e862d3cdb8721fdf9cb7071",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.BoundedHandoffTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a0e59dd76e9ab8559821f1c0b3b8eb9d9d2403b88832951edc283ffb194e3e49",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.ChatGenerationSlowsIndexingTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "af29c48b15090073b55b1565ec30c3c344379f7048464dcc5bc12d5221c01966",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.ComponentReadinessTriggerTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1be5602f391f1851e605da4e057c42a0f63033e592074b163a8871c222b5558f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.ConfigApplyOwnerDispatchTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f27c597ac61ff73d7acede521ca5677782c13fc30010f6bcb4529e08ea67b01c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.CpuChatPacesIndexingTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1add88140e4b602d221e16fb6341bd7f072509f86bce161df3e130918f7dc207",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.DataVersionMarkerTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a7a468ee63fe627094b23cc5f3a2329433df4abe525591ca76af887ea419ca83",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.DefaultEngineComponentRegistryTest",
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1177040b0d060923da7a2a7d3dc419dc2009becee14bcdfacbeb7dda09bb3608",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.DefaultEngineExecutorRegistryTest",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ac1f7ba2db36bfcd9f8181a0d059d4a1dcb0840030a2a38a822ab02bab02daf0",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.DefaultEngineProcessResourcesTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4d84ca61729ff095d84bf572dd5471affa25c1a92763b04c806a087a3f471996",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.DevicePlanP16PacingTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5b86459dd155918c29ac2d3ecf4f8d90b003d1c518e7290a9105bcff8aee45bd",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EncoderDeviceLossReporterTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "87d19b031c01766bc8e6e4ed024f857267ab655e151bc46fd4fa3a27f43ced8a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineAdmissionControllerTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4937d352465aafb63ad6fe581ae11b27505b76800624331b607869b4fb00ab2f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineAppliedGenerationObservationTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e81506b0156c9354cdcedbffb737a22a74f198a6e84225817e202713fd5c0e06",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineContainmentNoticeTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7136324e5dc30261392f7023e8ac62954524da5e9e3dc37d77fc669aaf161d3f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineContextPortPropagationTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "90cc2d8fa91e5cfe16e7f91977f0550b338c467d26db10ae78a7ff6b82065846",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineCorruptionRebuildTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ee8d2e440a53b52c4ccb6427f3a5c5d7cfa388851fdd2f1f8e1fb999ce7f38b6",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineDeviceLossWitnessTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "41d8a255cf54137f521de559184bd315a1bc20b5352db338855488936bb1fd08",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Engine document fetch and context retrieval (in-process)",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ba0d5e2a631cd448f818766386a6a62324d3c8f626c3b7e9088ad962579b6f33",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineEnrichmentBacklogFailureTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9218aa9357f539669145df2c0365b43fb7018f23e835625da772705eb78536d5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineExclusionApplyPublicationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "23370d1feb5766cb7b72b829b52cfa29a808342ef0fa1566c58c88599288ead2",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineExclusionReplayPolicyTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ea42ed38659e4b87d7c084c4eb6b78e941b03c4ef163d0d80e8550971a318c4c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineExecutorLifetimeTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2828d9387408b723af81e38a560267a00a9737862bbf93d44f4924dba7f27413",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "EngineExit \u2014 exit-code classification (stage B item B1)",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6426e90e19e7126445b6d2785d4c81f148f705e12560cd49a5fe746e952bc714",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineFanoutOwnershipTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "200023d0780d788ce3049bc3291fd1d0e8314dd48ba1d015b891ef0b22151b17",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineForegroundPacingTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1b3c98ffa0749737019083bbf2dc8dd0e96ffce6f4fc52eb8454d646e43e3b5c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Engine format capability matrix production path (in-process)",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4b7cabbb63abaeb8a359195413ed41925d868fc91afa3e0966ad3d2228a67127",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineGameDetectionWitnessTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9ca6354b1eec5b7221956dd3c8ffd2f0693a25a65644a16b296ed1402893c60d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineGenerationCaptureTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "90182363d51c0ce2c8d0087dae4fb73b5ccad1c8d1d465ba3110b70584f5b58b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineGpuResidencyWitnessTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9502250c0a255f2e14efef19a7afca2b0bde959ab477df3a3a18ff2c068a3243",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineIndexBasePathLockTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "254b68a26f8c85392de2e9a2b5203f23da8a6349c295b1d52d6fc967131b8958",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineIndexingJobsFlowTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c09c629e3d45c0bdbcc972f41af093630241ae89951c7a0a4bb07ac58a3fff71",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Engine indexing workflow (in-process)",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "a7f3dbdc7854d7c3074eb398cb498be1923f2c18bd499943e7e9b1060862b444",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineKnowledgeClientExecutorTest",
+      "tests": 34,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0e981145a89af21b6918a63273a34d2cf1409ab0e4875c28664ebff79b95123f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineKnowledgeClientHeadBudgetTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f4f248e5e17693e08f09bc5aaf8aa65656f47830f144fca3c4d34dc5d426a55f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest",
+      "tests": 38,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cf6aeab4474c4d56d3fff9239b099e56211f85eb00282e86184582d9757cf1ab",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineKnowledgeClientServingViewLifetimeTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d9bbcf5b1dfe6c0c09b7cf76a2832ecbd08dcec670b2a39f71e408569ffecd3e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineLinuxRootVolumeLiveTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "sha256": "37bae2540135adcdcac1518d4dcabfe32b39c6950828394fb4cd99c84c0f9df5",
+      "failed": [],
+      "skippedCases": [
+        "absentDifferentUnknownAndReturningFilesystemsPreserveTheOriginalIndex()"
+      ]
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineLuceneGenerationCapacityTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8d761b4670d9bd5c35d580cd1c1741683f7a59b734378a069403ec34c7911aa1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineMigrationCollectionOwnershipTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4933f9f938cf0b004e4406227ec6b3ab9688c30695d85f6b27b47a77b42136c3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineMigrationLifecycleTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "21e0cffd7f3b3e1677e8f30d8e95bcd74690f7fab4ecc5b43c3c5692756f3661",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineMigrationRestartDispatchTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "14de0bba056cba42482baab32f5cd757e4f1bf028fb872ab78281d7b2f3b67a9",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineNativePointerBootMutationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9cb99c11aaccc5af5ff8b158b23093235514bce7448a25f813b8c38ba3d2afdc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EnginePdfOcrCapacityTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0de200c76ffbbb7ed97ffcf1e43deb4771bcc473f85304a38155dfe8dfdf5155",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EnginePerSourceOwnershipTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0c5b0a12864a175a300124ce4ccce5de9f4cbaa3bde7027b6af482b7b393d4eb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EnginePortForegroundTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "65fddc6788dd8ef01be4b628af263923fc4f7514b25a4693096e9af1e6883ef1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EnginePruneReappearedFileTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "da5db83f374aa8ca845bf29218be729ab8eddcfae3a8fd2d5e89371a28876b82",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineQueuedRootOwnershipTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e769da994f80d23f4ef04f2e5b5030b9281a826163ecfd16971a40499958600c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineReadWhileWriteTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "8b89374fe5c9771c0501dad435dd927cac1ed53c07f7c0284d35d16f0ef44993",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRebuildPreparationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "67ad11360e08da04a8da0956fcb9611dafe5adb9d1f0dedf6768e16f27d9a286",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRecordedBindingTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f254c79f2049b6aa029eb4c34dbba6268451e9c7ff68c73cb3df9b5cf0552d84",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRecordedIngestionProducerTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6fe34432f61f5d18aa148100f241c00e1f91197848be482cd4ebe7dc2497c205",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRecordedProducerExitTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "33b4eab925472fc0b44a58e8af6da3636e9d82d0017d23a23bc632768cf0047f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineResourcePolicyTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ed666a99318e760e79601de917564dbd630b091c598c86c524bf75f67c482e3f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineResumeWiringTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0c4253ada984e5fbcceee7fbf3fa01a86a5b4e41ee187a76b6fc5327c440d570",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRootAuthorityTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5f7cd1c3642f7b5236f1138a38fed1a65e55c9b5ceeb40b9e73ff639b5b7235d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRootConfigAuthorityTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b32971f992cfd47c2ff193925aff0abe0839d658065a62f61eafe283d5b6af4c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRootInProcessPortsTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2197dd019a7d376b8cd19963feaf1525eaea5ecd5de16d2f978a5b7969eced09",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRootIndexRecoveryTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "efdd7620a25055a0d96c734d05531a8be74e34c8bb61898141a9f41a5d591e94",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRootRetirementTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9788a055911a40966d0c03392c95c64a20a95cc5fd315b471a9ec89b5f0315c7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRootStartupCleanupTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0bcb1cf268c4c49c47e49791abce53b1c9d9619df79bdd9db3796568b7800954",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRootTerminalWriterFailureTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ec2f13918f8c8cd1c3a9ef0d935db94484d0bccf2d2cebaab6e02406fb075a1e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRootVolumeSwapTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 7,
+      "sha256": "8260b2e83c881e4c0b32e5ebc04c79a880c2b39e91b1dca0eef2da37f17dba4b",
+      "failed": [],
+      "skippedCases": [
+        "aReindexRefusedOnAnotherVolumeShowsTheRootUnavailableAtOnce()",
+        "watchingResumesWithoutARestartWhenTheOriginalVolumeReturnsAfterABoot()",
+        "aRestartOntoAnotherVolumeKeepsTheOriginalText()",
+        "watcherEventsOnAnotherVolumeIndexNothing()",
+        "aSwapWhileRunningAddsNothingAndShowsTheRootUnavailableAtOnce()",
+        "aRestartWhileUnavailableKeepsTheLastIndexedTime()",
+        "theOriginalVolumeReturningIsIndexedAndPrunedAsBefore()"
+      ]
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineRuntimeReloadTest",
+      "tests": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5238cbd1c57dfc173d0afebc5f3b839d85af3cec4ce14b8623b85c988293b853",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineSandboxFailureWorkflowTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6a23039b9266c02e7100eabaedbdc82171501181620db7d93dd8bf7f8c26d1db",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineScanRootFlowTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "4858b61acf60be7f825b12c1da14bc5316fe7344980db4e6d4eaf65c6e66639c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineSearchAdmissionUnderStallTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f9b4187c040ec94a32dc6f376f3cf75425dbf47809b50caf57e482cf0a5ee0b7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineShutdownDeviceLostTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "717322386ef0cdae145d81e7fec2433229dbbb94a4f0a21e019543078b64ca31",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineShutdownSelfIntentTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "864eedc81bddc1b0f76845ad10d39e0dc80e0c4d2cf28991f693932e8b925e39",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "EngineShutdownSequence \u2014 the one ordered close (stage B item B4)",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "90b48ab4c4d5ec305817d4edc66d65ec9f25661d6cb2652db78f3d686d7bd184",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineSoakTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7444527c2188e607d0d7d3411f54f5e131d97ab79db6e6e0d65880813a449a3f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "supervision contract: the engine row <-> EngineSupervisionPolicy + EngineExit",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "465bf1f6b3f2df71e08b7be46a9189dcca84d7e8387649d908a5146b24332120",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineSwitchingFenceBufferingTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7c52099a43ce2354473451622cfa03926ae73feeacf489abce7bc792896486d3",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Engine SyncDirectory (in-process)",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "88b182965a90d08cdd6e021bf55cc4976c266945f425469c71f329ec2fac36ff",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineTestHarnessIsolationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f773ef209a9280dd4955c2d3a906f3bcff8c6597a786942b9de37e274e4d2b12",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineUndeclaredParentRemovalTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "1265c04273332130abd39efdda1512697c27848d5e0b2e1a70986c79dc835a8b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineVduGenerationRefusalTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ad6ad92f7411513a58ddde4e47d9f3463cb2611028c0973dd606ff8453c9fb1a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineVduMigrationReplayTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "82c5b917e41130597fc5607360d93c89764ec6f0f361fcffadf462f5327f09cb",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "Engine VDU recovery (in-process)",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b8f6284ec986d369a0e8cf10e03328a2c6e84ee9b126dced7bcc4e45b4e7da76",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineVduRetainedCleanupTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d039d05d52af0a05d6bb942538dea9b6b780e0ef435a7f004a31fca0dea1989a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.EngineWorkCancellationTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c96fcdeadb8891c1c8285bc60baed056fd1d6a9d7890a9229417f3a62c588e42",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.ExternalPressureHoldsBackfillTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "659a92a545af4881516fd071c38e2247f18d0a18ece21eb817f5a8369333be31",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.FlowCancelSignalTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d01a4a89107428c1ee97bfcb53f572ad8f544e05b15953399ec10896266ef446",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.ForegroundLoadGateTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7d4c4a1717126bb03b2a50a35120e447dc96883346e1b1972d8c2d571b3831c4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "shutdown reasons and the generative backend (ADR-0051 decision 2)",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "ff3d1d454c908319a84335c5e741558f1db6d08f5a16dbe564af92d12260eb5a",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.HeadRerankAcquireBudgetInProcessTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7f12542eb17ac0d70aca770480e327a3b26d2e82d0d15504abe8dfbad443a4f1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.HeadRerankAdmissionInProcessTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "eb153d997acf5f8382e65cc1ca14fa57b4dd5c83764db9684d8ed80bd9c6b186",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.HeadRerankDeadlineInProcessTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "49130f820c0ebf7a62e0c63523f41e54acb6b8ec53f8ba05b4130aca857dcde8",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.HeadSearchDeadlineInProcessTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e8ab43fadfd5e773e6172a4417c1c3f40452e8ed15ae858988b045e2b39abd19",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.IndexingJobsCoalescingTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b903d6b4da667d35e2f18d4c07c6bdc40429669b23574aecb7b9bb7744a3c719",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.IndexingJobsEnqueueBurstTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "d3c7c53cc5012902c144265a8b34b1bca57722d82a844bed16b3497c00bd4f2c",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.IndexingJobsRetiredDeliveryTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "327ff182d34acead05474b67ac1c54d8700d4338d146c9a68fa250298b463acf",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.IndexingJobsSseIsolationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "556bfe515f4a4ba3a0a2e91b7f27d7a0279bba89b3e1cae22ac6c47f3667df9b",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.IndexingJobsTerminalOverflowTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "b06a7bd18896a01d6b49705881da830b63d48812e665298ceb2b606457839400",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.IndexingJobsWindowFlowTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "245e4c31c1503ecb4f400eb2c339270451d7c872c231b365355b26042fd75766",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "KnowledgeClientException.Status <-> WorkerServiceException.Status parity",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "daf54119b92a80f22af09727864fd89f42e8e86d717a6c8d00926f4d79c5a687",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.KnowledgeServerHealthMonitorCapacityTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "21a4671420d3d40d14f31a34a7bb9424948d003a81102613735dab2c6c334790",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.NoDeviceEncoderPlanTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3083129e3d9da7e0829f02bc10952ee1653485d94ddbe940a3085fff62bed080",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.OperationOutcomeQueryTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "11feb9d6c7e84111115c7a8a59436f15bc24e1663ff916a687f598eac6175fbc",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.ProbeChurnPrimaryRateMeasurement",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "sha256": "87a31c91f0995ef96e372d56cb6f9c0ce56ec01656381532258e2b4830ae5013",
+      "failed": [],
+      "skippedCases": [
+        "primaryRateWithAndWithoutProbeChurn(Path)"
+      ]
+    },
+    {
+      "name": "io.justsearch.app.engine.QueryAssistDoesNotSlowIndexingTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "5a817b7e3a9051138779df2f6793b4e63da23fb721020650c9927a9cabab45ba",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "QuitBudget",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "837f58e58f1eeedcdde475ab24a974599f3b60c9d59c12972fcf3d2db852bdde",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RagRetrievalBudgetInProcessTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9b4b0790dc704966d773e10d4b85afedb2aa16da6ae0c22100637d1309d89086",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RecordedBulkEngineRestartTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "fda2ada9755afc0e77ef140a33e7c2aad9fd3ae2049933397f197ebb53832ac8",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RecordedBulkIngestionCoordinatorTest",
+      "tests": 29,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "55660f7ebff4ed82b51ff01d69692e9e877630d269e8f1dd00b1693f5ac23981",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RecordedIngestionCoordinatorTest",
+      "tests": 61,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "05ed0256c2d94363d8eff8795d99353631f8c0f9bc80a0d9092b2d1ee5636377",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RecordedIngestionReceiptTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "7f81c278c465a4189a1adc3c56c87d78920764fd89d3876070f233393a0299ad",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RecordedIngestionSettlementTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "79e64b00c1b01a438ac25db5e8573a8a37b78b4726d6719e447b424845ab2846",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RecordedInstallerCallbacksTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f8dd26ae038da8f9fe816556226ef446a7cd3c0e4a92d39fea354fe5c1a6057f",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RecordedInstallerGenerationBootProjectionTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "71e55f182f32197c66590193dd1f95f05c92dbb37024f9a4f1de59d125978725",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RecoverableChunkCompletenessTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c26344bd0d127049521ebb44115bd0b6c3691e75cad98db6cdcab05cf860b9f4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RecoverableQuitReplayTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "90d04870c98eb951633351f45edb7747138dfe65ad0aca417f444fcd4041f732",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RemoteIndexingJobsBridgeCapacityTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "acc3f02376cabfc7f3d6e055fa4aa37e2fdd6757a4c71cb0e7873f1e12cb99ae",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.ReservedSeatQueueTest",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "e92dbff4f01241e69f834fb74117bdcebb400e8ece7b82ba75c9d449949158f4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.RichDocumentInProcessTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0eca5ab382c46787d2be7276d52a841a115d260bcbb819088a53bf636f2fa966",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.ShutdownRequestDeadlineNameTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "95a99efe2d01ebb09c49ed2445d49977dcc3034a76646ea1d8d3212e21954485",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "ShutdownRequest ownership",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "45f391708258f4a552bc3547b680a22425b6ce6a4b5d168e9f321f8bb27d1cdd",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "ShutdownRequest \u2014 the out-of-band shutdown channel (stage B item B2)",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6721a1a133545a74f85d96cf8dbaee70f54af0bec3a41fd032ef22547963f8d1",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "ShutdownRequestWatcher \u2014 the out-of-band trigger (stage B item B3)",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "6c6cebe1dd22f05bdb393e16d1265d7e97b435969aa6771715088f8a2b1337f7",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.VduDeferredRetryTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "c1e76d07b7b63a12cea5a8f1f2a70f84023be184a4f5255d9dd4cc117bf2bc11",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.engine.VduGenerationDoesNotSlowIndexingTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "cb0b62baaa63c5198f583c02f42368e6d31d3e043bcec5d896e584229b93f33d",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.inference.DevicePlanP8PreservationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "0c2d0c152b7a12f0629606ed1245d1abefc47b068fb6dc67b802a5db04b4ad18",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.inference.DevicePlanStartOrderTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "3ab9addf8a772fc53bf7bb84d2c7cd77b70151fe3c6ca9872199ba3523797558",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.inference.LlamaProfileDevicePlanTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "344769656874bfd7f0877b4d3ca112114c5a9bfbfa0756c49fa6c5bf3ca4efe5",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.inference.NoDeviceChatPlanTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "25288d5b90dc4c2f87b024046466761f5ed81d3e16952be67fd17f6df0d29470",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "9b61a06a87646910b5b317d12b961a3884507430fe49f020596c3a625123b815",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeCurrentStateTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "68227d8251cc6a7d7f5dadc21880cd384a6917263d4e2af13420abf4b102c7ab",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeMappingFailureTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "2adec3b6f260c48422cb28d65a2fbf4b3b23bdc0cdc7700ad410d73e58171ae4",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeObserverLifetimeTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "40d515d55499fb78b79987e586452f1528a37c9dba072858e72a540c83504c1e",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeSubscriberRecoveryTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "76d4bf336a985591935e016ec29639baeeae191311fb47c110208dc47257ef26",
+      "failed": [],
+      "skippedCases": []
+    },
+    {
+      "name": "io.justsearch.app.services.bootstrap.phases.HealthProducerInterruptTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "sha256": "f57e974eaeca5f839761ace624ce7157b5ceedf9006e03cf9c6398b7cf4fed1d",
+      "failed": [],
+      "skippedCases": []
+    }
+  ]
+}

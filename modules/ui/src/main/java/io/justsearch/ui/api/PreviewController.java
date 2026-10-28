@@ -44,6 +44,7 @@ public final class PreviewController {
   private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(5);
   private static final ObjectMapper MAPPER = new ObjectMapper();
   public static final String DOCUMENT_IDS_PATH = "/api/debug/eval/document-ids";
+  public static final String PRESENCE_PATH = "/api/documents/presence";
   // Tempdoc 526 F2: same root cause as F1 — the 502 refactor captured DocumentService
   // by value at controller-ctor time, so the sentinel from b.appFacade.documents() pinned
   // for the process lifetime when the worker came up async. Capture by Supplier instead;
@@ -212,6 +213,45 @@ public final class PreviewController {
         .json(ApiErrorHandler.toResponse(code, detail, telemetry, ApiErrorHandler.routeOf(ctx)));
   }
 
+  /** Read-only, bounded index membership. Never records user activity. */
+  public void handlePresence(Context ctx) {
+    try {
+      JsonNode body = MAPPER.readTree(ctx.body());
+      JsonNode ids = body == null ? null : body.get("docIds");
+      if (body == null || !body.isObject() || body.size() != 1 || ids == null
+          || !ids.isArray() || ids.size() > DocumentService.MAX_PRESENCE_IDS) {
+        rejectDocumentIdRequest(ctx, "docIds must be an array of at most 64 document IDs");
+        return;
+      }
+      java.util.List<String> requested = new java.util.ArrayList<>();
+      for (JsonNode id : ids) {
+        if (!id.isString() || id.asText().isBlank() || id.asText().length() > 8192) {
+          rejectDocumentIdRequest(ctx, "Each document ID must be a nonempty string of at most 8192 characters");
+          return;
+        }
+        requested.add(id.asText());
+      }
+      Map<String, DocumentService.Presence> states = documentService()
+          .checkPresence(java.util.List.copyOf(requested), RequestEngineContext.get(ctx))
+          .toCompletableFuture().get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+      Map<String, String> result = new LinkedHashMap<>();
+      for (String id : requested) {
+        var state = states == null ? DocumentService.Presence.UNKNOWN
+            : states.getOrDefault(id, DocumentService.Presence.UNKNOWN);
+        result.put(id, state == null ? "unknown" : state.name().toLowerCase(java.util.Locale.ROOT));
+      }
+      ctx.json(Map.of("states", result));
+    } catch (tools.jackson.core.JacksonException invalid) {
+      rejectDocumentIdRequest(ctx, "Invalid presence request");
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      handlePreviewFailure(ctx, interrupted);
+    } catch (Exception failure) {
+      handlePreviewFailure(ctx, failure instanceof ExecutionException && failure.getCause() != null
+          ? failure.getCause() : failure);
+    }
+  }
+
   public void handlePreview(Context ctx) {
     try {
       long startNs = System.nanoTime();
@@ -250,19 +290,28 @@ public final class PreviewController {
     if (maxChars > MAX_MAX_CHARS) maxChars = MAX_MAX_CHARS;
 
     try {
+      DocumentService documents = documentService();
       DocumentService.DocumentSlice slice =
-          documentService()
+          documents
               .fetchSlice(docId, offsetChars, maxChars, RequestEngineContext.get(ctx))
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
 
       if (slice == null || !slice.found()) {
-        String errorMsg = slice == null ? "not_found" : (slice.error() == null ? "not_found" : slice.error());
-        Map<String, Object> resp = new LinkedHashMap<>(ApiErrorHandler.toResponse(ApiErrorCode.NOT_FOUND, errorMsg, telemetry, ApiErrorHandler.routeOf(ctx)));
+        Map<String, DocumentService.Presence> states = documents
+            .checkPresence(java.util.List.of(docId), RequestEngineContext.get(ctx))
+            .toCompletableFuture().get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        boolean absent = states != null && states.get(docId) == DocumentService.Presence.ABSENT;
+        Map<String, Object> resp = new LinkedHashMap<>(ApiErrorHandler.toResponse(
+            absent ? ApiErrorCode.NOT_FOUND : ApiErrorCode.INDEX_UNAVAILABLE,
+            absent ? "This source is no longer available in your index."
+                : "This source could not be read. Please try again when the index is ready.",
+            telemetry, ApiErrorHandler.routeOf(ctx)));
         resp.put("docId", docId);
         resp.put("requestedDocId", rawDocId);
         resp.put("normalizedFromChunk", normalizedFromChunk);
-        ctx.status(404).json(resp);
+        resp.put("sourceState", absent ? "absent" : "unknown");
+        ctx.status(absent ? 404 : 503).json(resp);
         return;
       }
 

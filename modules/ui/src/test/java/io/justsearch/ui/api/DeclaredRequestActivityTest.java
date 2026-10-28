@@ -36,7 +36,7 @@ class DeclaredRequestActivityTest {
     try (var http = HttpClient.newHttpClient()) {
       for (var route : routes) {
         String path = route.getPath();
-        boolean observation = path.equals("/api/ui/ready") || path.equals("/api/knowledge/collection-facet")
+        boolean observation = path.equals("/api/documents/presence") || path.equals("/api/ui/ready") || path.equals("/api/knowledge/collection-facet")
             || path.equals("/api/library/path-label") || path.endsWith("/observe")
             || (path.endsWith("/virtual-operations") && route.getMethod().name().equals("POST"))
             || path.endsWith("/tool-result")
@@ -50,7 +50,8 @@ class DeclaredRequestActivityTest {
         var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port() + concrete))
             .timeout(Duration.ofSeconds(10)).header("Content-Type", "application/json")
             .method(route.getMethod().name(), route.getMethod().name().equals("GET")
-                ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString("{}"));
+                ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(
+                    path.equals("/api/documents/presence") ? "{\"docIds\":[]}" : "{}"));
         http.send(request.build(), HttpResponse.BodyHandlers.ofString());
         assertEquals(user, IndependentObserverHttpTest.version(admission) > before,
             route.getMethod() + " " + path + " operation input semantics");

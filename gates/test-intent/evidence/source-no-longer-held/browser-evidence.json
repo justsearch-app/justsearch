@@ -1,0 +1,159 @@
+{
+  "startedUtc": "2026-10-27T18:35:21.678Z",
+  "engine": {
+    "pid": 3,
+    "startticks": "20173718",
+    "startedUtc": "2026-10-27T18:35:00Z"
+  },
+  "checks": [
+    {
+      "name": "wp58-ask present saved citation preserves mark and indexed preview",
+      "status": "passed",
+      "facts": {
+        "presence": "present"
+      }
+    },
+    {
+      "name": "wp58-delegate present saved citation preserves mark and indexed preview",
+      "status": "passed",
+      "facts": {
+        "presence": "present"
+      }
+    },
+    {
+      "name": "renamed disk file remains present and readable from the index",
+      "status": "passed",
+      "facts": {
+        "presence": "present",
+        "preview": 200
+      }
+    },
+    {
+      "name": "wp58-ask already open pane refreshes after confirmed absence",
+      "status": "passed",
+      "facts": {}
+    },
+    {
+      "name": "wp58-ask removed folder shows announced absence after redisclosure and reload; pane path copied",
+      "status": "passed",
+      "facts": {
+        "removal": 200,
+        "themes": [
+          "light",
+          "dark",
+          "forced-colors"
+        ],
+        "width": 360
+      }
+    },
+    {
+      "name": "wp58-delegate already open pane refreshes after confirmed absence",
+      "status": "passed",
+      "facts": {}
+    },
+    {
+      "name": "wp58-delegate removed folder shows announced absence after redisclosure and reload; pane path copied",
+      "status": "passed",
+      "facts": {
+        "removal": 200,
+        "themes": [
+          "light",
+          "dark",
+          "forced-colors"
+        ],
+        "width": 360
+      }
+    },
+    {
+      "name": "re-added folder restores sources on next load",
+      "status": "passed",
+      "facts": {}
+    },
+    {
+      "name": "Engine stopped remains unknown for both saved source panels and opened panes",
+      "status": "passed",
+      "facts": {}
+    },
+    {
+      "name": "saved conversation bytes unchanged",
+      "status": "passed",
+      "facts": {}
+    }
+  ],
+  "screenshots": [
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-ask-present.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-delegate-present.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-ask-absent-light.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-ask-absent-dark.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-ask-absent-forced-narrow.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-ask-source-forced-narrow.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-delegate-absent-light.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-delegate-absent-dark.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-delegate-absent-forced-narrow.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-delegate-source-forced-narrow.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-ask-engine-stopped-unknown.png",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/wp58-delegate-engine-stopped-unknown.png"
+  ],
+  "candidateFiles": {
+    "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.ts": "e573f90202af55eea95ad268090618fc5c55c16d6084a8699f26c20c33952156",
+    "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.ts": "8e27063ffc8a5a93d79ead9f55e35001494d5cbd9b9101fc60ca3a7addac5378",
+    "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.ts": "84d4af1f8646f70a8b857e072e537fc42e2ad35bfd73e577679de0c6394d1940",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts": "7d147e7c3cfc4c0446a6cf42559d01ace6cfd22523ba2a656c98126923d80a84",
+    "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java": "1bbcd4cca4c81c9f8b1868aaa00a44428c803af7ede16ca7853b47871d7b5cbc",
+    "modules/ui/src/main/java/io/justsearch/ui/api/PreviewController.java": "2d50089a304b4c743a3273658b9a15809a065ae1dde2ead9f0d0f90c1655a736",
+    "modules/ui/src/main/java/io/justsearch/ui/api/SchemaController.java": "31b45015f3c676dec850585fdb46ee7722a10939269e5c3ab69686c851156dac",
+    "modules/ui/build/install/ui/lib/ui-0.3.0.jar": "974c24875ca821c4ec056bbd5c3866d701649ea8fbdeb26de2902d4de2941421",
+    "modules/ui-web/dist/index.html": "70d8f3db0d9f9074477637203c26edb6223baa2373aa66b007c0d51b3b49e9ed"
+  },
+  "savedBefore": {
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/data/index/conversations/wp58-ask/meta.json": "14fb28d281285f1b05f5f21eae372637a70bf5c8b0ed9277aef5f20d096913ea",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/data/index/conversations/wp58-ask/messages.jsonl": "95b6326198c0697615d33559ce7d89ea658c569ebd59d69d78598856fe325a54",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/data/index/conversations/wp58-delegate/meta.json": "cbfacce7e3c735972e5ff641062b5d718f3faeb25996f27dd2fb204b53f1bf66",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/data/index/conversations/wp58-delegate/messages.jsonl": "a597653e1c51b1da1e22285841578bfb9131003773f7a0f5af16b5121ff67c03"
+  },
+  "chromiumProcesses": [
+    {
+      "type": "browser",
+      "id": 15,
+      "cpuTime": 0.28
+    },
+    {
+      "type": "renderer",
+      "id": 124,
+      "cpuTime": 0
+    },
+    {
+      "type": "renderer",
+      "id": 125,
+      "cpuTime": 0.02
+    },
+    {
+      "type": "renderer",
+      "id": 115,
+      "cpuTime": 0.09
+    },
+    {
+      "type": "GPU",
+      "id": 51,
+      "cpuTime": 0.02
+    },
+    {
+      "type": "network.mojom.NetworkService",
+      "id": 55,
+      "cpuTime": 0.03
+    },
+    {
+      "type": "storage.mojom.StorageService",
+      "id": 91,
+      "cpuTime": 0
+    }
+  ],
+  "savedAfter": {
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/data/index/conversations/wp58-ask/meta.json": "14fb28d281285f1b05f5f21eae372637a70bf5c8b0ed9277aef5f20d096913ea",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/data/index/conversations/wp58-ask/messages.jsonl": "95b6326198c0697615d33559ce7d89ea658c569ebd59d69d78598856fe325a54",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/data/index/conversations/wp58-delegate/meta.json": "cbfacce7e3c735972e5ff641062b5d718f3faeb25996f27dd2fb204b53f1bf66",
+    "/home/elias/.cache/am/mif8de7q/tmp/engine-live/data/index/conversations/wp58-delegate/messages.jsonl": "a597653e1c51b1da1e22285841578bfb9131003773f7a0f5af16b5121ff67c03"
+  },
+  "status": "passed",
+  "finishedUtc": "2026-10-27T18:35:54.652Z"
+}

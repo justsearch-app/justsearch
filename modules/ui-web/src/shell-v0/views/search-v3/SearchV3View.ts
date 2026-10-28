@@ -54,6 +54,7 @@ import { peekSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js
 import type { SelectionPayload } from '../../../api/types/selection.js';
 import type { ShapeId } from '../unifiedChatRequest.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { keyed } from 'lit/directives/keyed.js';
 import { EMPTY_PREFIX_SENTINEL } from '../unifiedChatRequest.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import { FrameLatch } from '../../primitives/frameLatch.js';
@@ -931,7 +932,7 @@ export class SearchV3View extends JfElement {
    * `rag.citation_matches` only once the answer has streamed, so the pane is routinely opened before
    * its matched sentence exists — the upgrade is the common path, not a repair.
    */
-  declare paneSource: { readonly turnId: string; readonly sourceIndex: number } | null;
+  declare paneSource: { readonly turnId: string; readonly sourceIndex: number; readonly sourceUnavailable?: true } | null;
   /**
    * Tempdoc 849 §7 — what the open pane may say about the citation that opened it. Held HERE rather
    * than derived inside the pane for the reason slice 2 recorded: the event carries identity only,
@@ -3469,7 +3470,8 @@ export class SearchV3View extends JfElement {
     this.paneDocPath = detail.docPath;
     this.paneHighlight = null;
     this.paneCitation = detail.anchor ?? null;
-    this.paneSource = { turnId: detail.turnId, sourceIndex: detail.sourceIndex };
+    this.paneSource = { turnId: detail.turnId, sourceIndex: detail.sourceIndex,
+      ...(detail.sourceUnavailable ? { sourceUnavailable: detail.sourceUnavailable } : {}) };
     this.paneCitationHeader = this.headerFor(detail.turnId, detail.sourceIndex, this.paneCitation);
   }
 
@@ -5723,7 +5725,7 @@ export class SearchV3View extends JfElement {
         ></button>`;
     return html`
       ${grip}
-      <jf-sv3-pane
+      ${keyed(this.paneSource?.sourceUnavailable ? this.paneSource : null, html`<jf-sv3-pane
         data-testid="sv3-pane"
         .docPath=${this.paneDocPath}
         .highlightRange=${this.paneHighlight}
@@ -5732,7 +5734,7 @@ export class SearchV3View extends JfElement {
         ?overlay=${this.paneOverlay}
         api-base=${this.apiBase}
         @sv3-pane-close=${this.dismissPane}
-      ></jf-sv3-pane>
+      ></jf-sv3-pane>`)}
     `;
   }
 
@@ -5849,10 +5851,12 @@ export class SearchV3View extends JfElement {
           <jf-button label="Review in Library" .onActivate=${() => requestSurfaceNavigation('core.library-surface')}>Review in Library</jf-button>
         </div>` : nothing}
         <jf-sv3-main
+          .apiBase=${this.apiBase}
           state=${this.composerState}
           .view=${results}
           .forgetAvailable=${this.forgetAvailable && !this.forgetBusy}
           .turns=${turns}
+          .conversationId=${session?.id ?? ''}
           .turnScopes=${this.search.scopesByTurn}
           .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
           ?model-answer-busy=${this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true}

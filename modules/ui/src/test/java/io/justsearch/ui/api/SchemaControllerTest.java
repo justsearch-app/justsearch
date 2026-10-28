@@ -225,9 +225,10 @@ final class SchemaControllerTest {
     assertTrue(names.contains("operation-outcome-view.v1.json"));
     assertTrue(names.contains("condition-recovery-index.v1.json"));
     assertTrue(names.contains("component-recovery-response.v1.json"));
+    assertTrue(names.contains("document-presence-response.v1.json"));
     assertTrue(names.contains("forget-outcome.v1.json"));
     assertTrue(names.contains("forget-page.v1.json"));
-    assertEquals(23, names.size());
+    assertEquals(24, names.size());
     assertFalse(names.contains("nonexistent.v1.json"));
   }
 }

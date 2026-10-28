@@ -530,6 +530,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return searchRpcOps.fetchDocuments(docIds, engineContext);
     }
 
+    public Map<String, io.justsearch.app.api.DocumentService.Presence> checkDocumentPresence(
+            List<String> docIds, EngineContext engineContext) {
+        return executeSearchRpc("checkDocumentPresence", RpcDeadlineCategory.STANDARD,
+                stub -> stub.checkDocumentPresence(docIds), engineContext);
+    }
+
     public FetchDocumentSliceResponse fetchDocumentSlice(String docId, int offsetChars, int maxChars, EngineContext engineContext) {
         return searchRpcOps.fetchDocumentSlice(docId, offsetChars, maxChars, engineContext);
     }

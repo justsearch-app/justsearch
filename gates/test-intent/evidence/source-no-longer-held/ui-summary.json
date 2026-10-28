@@ -1,0 +1,177 @@
+{
+  "baselineRevision": "bfd625c7eea6591250e5a3d231c25e7884aa4312",
+  "reports": {
+    "ui-before-results.json": "9468e5bd23de439b6bdaf8b7fe8cada3e7b7249bc540dee974280f247294863a",
+    "ui-after-results.json": "b766215c4417db2810354381b4230500f058b3e0a820faf06c103fb3d27a3741"
+  },
+  "before": {
+    "passed": 108,
+    "failed": 12,
+    "skipped": 0
+  },
+  "after": {
+    "passed": 120,
+    "failed": 0,
+    "skipped": 0
+  },
+  "assertionFailuresBefore": [
+    {
+      "name": "WP5.8 opened source availability shows confirmed absence with last-known path, copy and reveal",
+      "failure": "AssertionError: expected '\\n      \\n        \\n        \\n       \u2026' to contain 'no longer available'"
+    },
+    {
+      "name": "WP5.8 opened source availability rechecks a retained pane on return and ignores its earlier missing-source reply",
+      "failure": "AssertionError: expected [ [Function] ] to have a length of 2 but got 1"
+    },
+    {
+      "name": "WP5.8 opened source availability shows a friendly retryable failure for unconfirmed HTTP 404",
+      "failure": "AssertionError: expected '\\n      \\n        \\n        \\n       \u2026' to contain 'could not be read'"
+    },
+    {
+      "name": "WP5.8 opened source availability shows a friendly retryable failure for unconfirmed HTTP 500",
+      "failure": "AssertionError: expected '\\n      \\n        \\n        \\n       \u2026' to contain 'could not be read'"
+    },
+    {
+      "name": "WP5.8 opened source availability shows a friendly retryable failure for unconfirmed HTTP 503",
+      "failure": "AssertionError: expected '\\n      \\n        \\n        \\n       \u2026' to contain 'could not be read'"
+    },
+    {
+      "name": "WP5.8 opened source availability shows a friendly retryable failure for unconfirmed HTTP 504",
+      "failure": "AssertionError: expected '\\n      \\n        \\n        \\n       \u2026' to contain 'could not be read'"
+    },
+    {
+      "name": "WP5.8 source availability announces only confirmed absence without changing recorded evidence",
+      "failure": "AssertionError: expected '\\n        \\n          \\n            \\\u2026' to contain 'No longer available'"
+    },
+    {
+      "name": "WP5.8 source availability paints sources before a slow check and pages many sources in bounded batches",
+      "failure": "AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times"
+    },
+    {
+      "name": "WP5.8 source availability ignores a late prior conversation and observes returned sources on the next showing",
+      "failure": "AssertionError: expected undefined to be type of 'function'"
+    },
+    {
+      "name": "WP5.8 source availability uses the resolved Engine address and ignores replies from its previous address",
+      "failure": "AssertionError: expected undefined to be 'http://127.0.0.1:43123/api/documents/\u2026' // Object.is equality"
+    },
+    {
+      "name": "rechecks a new conversation even when it inherits the identical turn and source objects",
+      "failure": "AssertionError: expected [] to have a length of 1 but got +0"
+    },
+    {
+      "name": "passes confirmed panel absence to the pane owner for both source-card and inline citation opens",
+      "failure": "AssertionError: expected undefined to be 'http://127.0.0.1:43123/api/documents/\u2026' // Object.is equality"
+    }
+  ],
+  "preservedChecks": [
+    "WP5.8 opened source availability keeps an already completed retained preview without another read",
+    "DocumentPane \u2014 849 citation header says which turn cited the document, where the passage sits, and what happened to it",
+    "DocumentPane \u2014 849 citation header labels its ONE score by what it MEASURES, and renders no retrieval band",
+    "DocumentPane \u2014 849 citation header a DROPPED passage shows the badge ALONE, with no grounding claim beside it",
+    "DocumentPane \u2014 849 citation header renders a SHORTER header when the producer said less \u2014 never a padded one",
+    "DocumentPane \u2014 849 citation header renders no header at all for the line-addressed mount sites",
+    "DocumentPane \u2014 849 citation header 849 S10 \u2014 a degenerate span is explained instead of opening in silence",
+    "DocumentPane \u2014 849 citation header 849 S10 \u2014 a citation WITH a usable span shows no such notice",
+    "DocumentPane \u2014 empty state renders the no-document empty state when docPath is null",
+    "DocumentPane \u2014 a document the index no longer has (WP1.1 S1.5) says the file is no longer in the index",
+    "DocumentPane \u2014 a document the index no longer has (WP1.1 S1.5) shows any other failure as a failure, not as a missing file",
+    "DocumentPane \u2014 load + render (markdown) fetches /api/preview for the docPath and renders the fixture as blocks in Rendered mode by default",
+    "DocumentPane \u2014 load + render (markdown) toggles to Source mode and back to Rendered",
+    "DocumentPane \u2014 load + render (markdown) a non-markdown docPath defaults to Source mode with Rendered disabled",
+    "DocumentPane \u2014 highlightRange / chunkRange applies hl-strong to the covering block and scrolls it to block:center",
+    "DocumentPane \u2014 highlightRange / chunkRange tints the rest of a wider chunkRange with hl-weak, leaving the exact range hl-strong",
+    "DocumentPane \u2014 highlightRange / chunkRange applies hl-strong to the covering line span in Source mode",
+    "DocumentPane \u2014 highlight decay (Search Thread Round-2 R1b) lands hl-strong, then decays to hl-weak after ~1.5s",
+    "DocumentPane \u2014 highlight decay (Search Thread Round-2 R1b) honors prefers-reduced-motion: lands quiet immediately, never rendering hl-strong",
+    "DocumentPane \u2014 highlight decay (Search Thread Round-2 R1b) a NEW highlightRange re-arms the strong phase even after a prior range decayed",
+    "DocumentPane \u2014 highlight decay (Search Thread Round-2 R1b) the chunkRange tier never gets the strong phase, before or after decay",
+    "DocumentPane \u2014 header path truncation (Search Thread Round-2 R5c) Detailed: renders a formatDisplayPath-truncated header text with the full path in title",
+    "DocumentPane \u2014 header path truncation (Search Thread Round-2 R5c) Detailed: renders a short path verbatim (no truncation needed)",
+    "DocumentPane \u2014 header path truncation (Search Thread Round-2 R5c) Simple (default): renders a humanized folder breadcrumb, not the raw path (Tempdoc 738 C4)",
+    "DocumentPane \u2014 zero-content diagnostic (tempdoc 671 parity) shows the provenance diagnostic even when content is empty",
+    "DocumentPane \u2014 VDU abstention-gate provenance (tempdoc 677) labels vdu_empty as VDU-ran-but-found-nothing, not the silent base-method fall-through",
+    "DocumentPane \u2014 VDU abstention-gate provenance (tempdoc 677) labels vdu_rejected with the abstention-gate label and an explanatory tooltip",
+    "DocumentPane \u2014 a11y + events the scroll region is keyboard-focusable (tabindex=0 + role=region)",
+    "DocumentPane \u2014 a11y + events the ramp's own scroll containers are keyboard-reachable too (tempdoc 853 F-05)",
+    "DocumentPane \u2014 a11y + events emits pane-close when the header close action activates",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) derives the highlighted line from startChar \u2014 the reader counts the line the citation names",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) marks the claim-matched sentence strong INSIDE the tinted chunk",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) with NO claim match, scrolls the tinted chunk into view (not the top of the document)",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) a late claim match upgrades the OPEN pane to strong, once, without re-fetching",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) reaches a citation past the old 5,000-character head window",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) confirms the witness across a whitespace difference (the excerpt was re-wrapped)",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) SUPPRESSES the highlight when the excerpt is not at the anchored offsets, and says why",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) says so rather than guessing when the LOADED WINDOW does not reach the anchor",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) anchors across a length-changing lowercase (U+0130) without desyncing the offset map",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) a witness too SHORT to be evidence confirms rather than suppressing",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) suppresses when the witness sits far INSIDE the span (text was inserted before it)",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) names a SHRUNK document as changed, not as an under-loaded window",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) an offset past the end of the document reads as shrunk, not as a blank window",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) does not contradict itself: no window note beside a suppression notice",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) a degenerate span says nothing at all \u2014 no highlight, and no notice blaming the document",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) does not fire a second identical fetch for an anchor the in-flight request already covers",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) anchors in a document with NO line breaks before the citation",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) treats an UNBOUND citation property as no citation (Lit leaves it undefined, not null)",
+    "DocumentPane \u2014 char-anchored citations (tempdoc 849 \u00a73) leaves the line-addressed consumers alone: no citation, no window note, head window",
+    "DocumentPane \u2014 anchored highlight decay (tempdoc 849 \u00a74) re-arms the strong phase for a NEW anchored sentence after the previous one decayed",
+    "DocumentPane \u2014 pane-visible-range (debounced scroll) emits the first/last visible source line after the scroll debounce settles",
+    "WP5.8 source availability keeps unknown checks neutral",
+    "WP5.8 source availability keeps failed checks neutral",
+    "WP5.8 source availability keeps malformed checks neutral",
+    "WP5.8 source availability keeps unrecognized checks neutral",
+    "WP5.8 source availability does not treat an array response as membership for an opaque numeric document ID",
+    "WP5.8 source availability does not observe old-window consumers",
+    "CitationsPanel \u2014 849 inclusion badge names a DROPPED passage as retrieved but never sent to the model",
+    "CitationsPanel \u2014 849 inclusion badge a DROPPED passage does not ALSO claim it grounded a sentence",
+    "CitationsPanel \u2014 849 inclusion badge names the partial and included states in the same vocabulary \u2014 and they KEEP their grounding",
+    "CitationsPanel \u2014 849 inclusion badge renders NOTHING for a citation that said nothing about inclusion",
+    "CitationsPanel \u2014 849 inclusion badge an unrecognised state is absence, not a guess",
+    "CitationsPanel renders nothing when both arrays are empty",
+    "CitationsPanel grades a CITED source by grounding (Grounds the answer), joining by ARRAY POSITION not the doc-ordinal",
+    "CitationsPanel demotes a retrieved-but-UNCITED source to \"retrieved \u00b7 not cited\", never high confidence",
+    "CitationsPanel no citation-matches \u2192 neutral flat list (no trust grade, no BM25 %)",
+    "CitationsPanel shows heading breadcrumb when present",
+    "CitationsPanel renders citation-match fallback with confidence bars",
+    "CitationsPanel clamps citation-match scores above 1.0 to 100%",
+    "CitationsPanel clamps negative citation-match scores to 0%",
+    "CitationsPanel fires citation-select exactly once per click",
+    "CitationsPanel collapses sources by default and discloses on toggle (559 C-1)",
+    "CitationsPanel leaves the SHIPPED default untouched \u2014 tiered sources (the disclosure path)",
+    "CitationsPanel renders BODY ONLY when the host owns the disclosure \u2014 tiered sources (the disclosure path)",
+    "CitationsPanel leaves the SHIPPED default untouched \u2014 flat sources (no matches, so no trust grade)",
+    "CitationsPanel renders BODY ONLY when the host owns the disclosure \u2014 flat sources (no matches, so no trust grade)",
+    "CitationsPanel leaves the SHIPPED default untouched \u2014 citation-matches only (no retrieval sources)",
+    "CitationsPanel renders BODY ONLY when the host owns the disclosure \u2014 citation-matches only (no retrieval sources)",
+    "CitationsPanel 822 \u00a75.4 \u2014 the source card is the selection\u2019s far side marks ONLY the card whose source key is selected",
+    "CitationsPanel 822 \u00a75.4 \u2014 the source card is the selection\u2019s far side clicking a card publishes that source as the cross-surface selection",
+    "CitationsPanel 822 \u00a75.4 \u2014 the source card is the selection\u2019s far side unsubscribes from the store on disconnect (no leaked listener)",
+    "CitationsPanel 822 \u00a75.4 \u2014 the source card is the selection\u2019s far side announces the selected card to assistive tech, and only that card",
+    "CitationsPanel 822 \u00a75.4 \u2014 the source card is the selection\u2019s far side renders a selected card IDENTICALLY to an unselected one with no --cp-* tokens set (the shipped-containment proof)",
+    "CitationsPanel 822 \u00a75.4 \u2014 the source card is the selection\u2019s far side freezes the selected card\u2019s un-overridden fill and edge at the base rule\u2019s own tokens",
+    "CitationsPanel 822 \u00a75.4 \u2014 the source card is the selection\u2019s far side leaves the hover edge on its shipped default (--cp-hover-edge is opt-in only)",
+    "CitationsPanel 822 \u00a75.4 \u2014 the source card is the selection\u2019s far side keeps hover feedback on a card that is ALREADY selected",
+    "CitationsPanel \u2014 the grounding pass did not complete (865 PR-0) gives the sources their own heading, and never the \"not cited\" group",
+    "CitationsPanel \u2014 the grounding pass did not complete (865 PR-0) says \"this source\" when there is exactly one",
+    "CitationsPanel \u2014 the grounding pass did not complete (865 PR-0) ABSENT flag keeps the flat, ungraded list byte-for-byte",
+    "CitationsPanel \u2014 the grounding pass did not complete (865 PR-0) FULLTEXT_FALLBACK still wins \u2014 a keyword run is graded by nothing at all",
+    "CitationsPanel \u2014 the grounding pass did not complete (865 PR-0) a matcher that RAN still demotes its uncited sources \u2014 the honest verdict is untouched",
+    "CitationsPanel \u2014 870 motion and type scale item 6a: the hover preview FADES \u2014 `display` alone could never animate",
+    "CitationsPanel \u2014 870 motion and type scale item 7: nothing in this panel shouts \u2014 no uppercase, no hand-authored tracking",
+    "CitationsPanel \u2014 870 motion and type scale item 7: two type roles \u2014 meta at xs, content at sm",
+    "CitationsPanel \u2014 excerpt display budget (868 \u00a7B.3) the premise: the two fixtures sit on either side of the budget",
+    "CitationsPanel \u2014 excerpt display budget (868 \u00a7B.3) an opened page is elided to the card budget, at a word boundary, with an ellipsis",
+    "CitationsPanel \u2014 excerpt display budget (868 \u00a7B.3) a retrieved excerpt under the budget renders byte-for-byte \u2014 the clamp is a ceiling, not a format",
+    "CitationsPanel \u2014 excerpt display budget (868 \u00a7B.3) the SOURCE keeps its full text \u2014 display shortened it, nothing else did",
+    "CitationsPanel \u2014 acquisition-neutral group copy (868 \u00a7B.3) says nothing about retrieval in ANY group copy when the set is mixed",
+    "CitationsPanel \u2014 acquisition-neutral group copy (868 \u00a7B.3) the neutral group still holds sources that describe themselves \u2014 each by its own route",
+    "CitationsPanel \u2014 acquisition-neutral group copy (868 \u00a7B.3) a wholly-retrieved run reads the same \u2014 the copy is neutral, not conditional",
+    "S4.4 agent citation decoration waits for settlement status only settles identical text once; a reload has the same marks",
+    "S4.4 agent citation decoration waits for settlement status and evidence settles identical text once; a reload has the same marks",
+    "S4.4 agent citation decoration waits for settlement evidence during streaming settles identical text once; a reload has the same marks",
+    "S4.4 agent citation decoration waits for settlement late evidence and its withdrawal update settled text without a new text delta",
+    "S4.4 agent citation decoration waits for settlement halted partial text keeps evidence off interim prose and unrelated terminal text",
+    "S4.4 agent citation decoration waits for settlement failed partial text keeps evidence off interim prose and unrelated terminal text",
+    "S4.4 agent citation decoration waits for settlement another conversation uses its own evidence with a stale live run property"
+  ]
+}

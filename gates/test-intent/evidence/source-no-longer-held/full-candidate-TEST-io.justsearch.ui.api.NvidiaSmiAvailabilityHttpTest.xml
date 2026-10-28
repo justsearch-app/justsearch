@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest" tests="2" skipped="0" failures="1" errors="0" timestamp="2026-10-27T18:29:10.012Z" hostname="elias-systemproductname" time="0.173">
+  <properties/>
+  <testcase name="nvmlMemoryDoesNotMakeAMissingNvidiaSmiAvailable()" classname="io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest" time="0.141"/>
+  <testcase name="anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory()" classname="io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest" time="0.032">
+    <failure message="org.opentest4j.AssertionFailedError: the installed tool is available: {&quot;cudaAvailable&quot;:true,&quot;totalVramBytes&quot;:12884901888,&quot;vramDescription&quot;:&quot;12.0 GB&quot;,&quot;vramDetectionSource&quot;:&quot;nvml&quot;,&quot;nvidiaSmiAvailable&quot;:false,&quot;nvmlAvailable&quot;:true,&quot;nvmlTotalVramBytes&quot;:12884901888,&quot;nvmlDriverVersion&quot;:&quot;591.59&quot;,&quot;cudaVersion&quot;:&quot;12&quot;} ==&gt; expected: &lt;true&gt; but was: &lt;false&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: the installed tool is available: {&quot;cudaAvailable&quot;:true,&quot;totalVramBytes&quot;:12884901888,&quot;vramDescription&quot;:&quot;12.0 GB&quot;,&quot;vramDetectionSource&quot;:&quot;nvml&quot;,&quot;nvidiaSmiAvailable&quot;:false,&quot;nvmlAvailable&quot;:true,&quot;nvmlTotalVramBytes&quot;:12884901888,&quot;nvmlDriverVersion&quot;:&quot;591.59&quot;,&quot;cudaVersion&quot;:&quot;12&quot;} ==&gt; expected: &lt;true&gt; but was: &lt;false&gt;
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertTrue.failNotTrue(AssertTrue.java:63)
+	at org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:36)
+	at org.junit.jupiter.api.Assertions.assertTrue(Assertions.java:214)
+	at io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest.anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory(NvidiaSmiAvailabilityHttpTest.java:83)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
