@@ -30,19 +30,24 @@ function identity(o) {
     || o.tag !== `v${o.version}` || !/^[0-9a-f]{40}$/.test(o.commit)
     || !/^\d+$/.test(o.runId) || !/^[\w.-]+\/[\w.-]+$/.test(o.repo)) throw Error('invalid candidate identity');
 }
-export async function validateKeys(o) {
+async function validatePublicKeys(o) {
   if (o.qualificationMode || process.env.JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE) throw Error('qualification mode cannot ship');
   for (const name of ['artifactPublicKey', 'artifactKeyId', 'metadataKeyId', 'metadataRootPublicKey']) required(name, o[name]);
-  required('metadata private key', o.metadataPrivateKeyPath);
   required('metadata public key', o.metadataPublicKeyPath);
-  const privateKey = createPrivateKey(await readFile(o.metadataPrivateKeyPath));
   const publicKey = createPublicKey(await readFile(o.metadataPublicKeyPath));
-  if (privateKey.asymmetricKeyType !== 'ed25519' || publicKey.asymmetricKeyType !== 'ed25519'
-    || !createPublicKey(privateKey).export({ type: 'spki', format: 'der' }).equals(publicKey.export({ type: 'spki', format: 'der' }))) {
-    throw Error('metadata signing key pair mismatch');
-  }
+  if (publicKey.asymmetricKeyType !== 'ed25519') throw Error('metadata public key must be ed25519');
   if (publicKey.export({ type: 'spki', format: 'der' }).subarray(-32).toString('base64') !== o.metadataRootPublicKey) {
     throw Error('metadata root public key does not match signing key');
+  }
+}
+export async function validateKeys(o) {
+  await validatePublicKeys(o);
+  required('metadata private key', o.metadataPrivateKeyPath);
+  const privateKey = createPrivateKey(await readFile(o.metadataPrivateKeyPath));
+  const publicKey = createPublicKey(await readFile(o.metadataPublicKeyPath));
+  if (privateKey.asymmetricKeyType !== 'ed25519'
+    || !createPublicKey(privateKey).export({ type: 'spki', format: 'der' }).equals(publicKey.export({ type: 'spki', format: 'der' }))) {
+    throw Error('metadata signing key pair mismatch');
   }
 }
 export async function buildCandidate(o) {
@@ -225,17 +230,17 @@ function envOptions() {
 async function main() {
   const [command, ...args] = process.argv.slice(2);
   const o = { ...envOptions(), ...(args[0]?.endsWith('.json') ? JSON.parse(await readFile(args[0])) : {}) };
-  if (command === 'stage-keys') {
-    const dir = process.env.RUNNER_TEMP;
-    for (const [kind, variable] of [['PRIVATE', 'METADATA_PRIVATE_KEY_PEM'], ['PUBLIC', 'METADATA_PUBLIC_KEY_PEM']]) {
-      const name = `JUSTSEARCH_RELEASE_METADATA_${kind}_KEY_PATH`;
-      const destination = path.join(dir, `release-metadata-${kind.toLowerCase()}.pem`);
-      await writeFile(destination, required(variable, process.env[variable]), { mode: 0o600 });
-      await import('node:fs/promises').then(fs => fs.appendFile(process.env.GITHUB_ENV, `${name}=${destination}\n`));
+  if (command === 'build') {
+    const pem = required('METADATA_PRIVATE_KEY_PEM', process.env.METADATA_PRIVATE_KEY_PEM);
+    const dir = await mkdtemp(path.join(process.env.RUNNER_TEMP ?? os.tmpdir(), 'release-signing-'));
+    try {
+      const metadataPrivateKeyPath = path.join(dir, 'metadata-private.pem');
+      await writeFile(metadataPrivateKeyPath, pem, { mode: 0o600, flag: 'wx' });
+      return await buildCandidate({ ...o, metadataPrivateKeyPath });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
     }
-    return;
   }
-  if (command === 'build') return buildCandidate(o);
   if (command === 'checksums') return writeChecksums(args[0]);
   if (command === 'verify' || command === 'upload' || command === 'publish') {
     o.releaseDir ??= args[0];
@@ -260,12 +265,13 @@ async function main() {
     return;
   }
   if (command === 'admit') {
+    for (const name of ['HAS_CODESIGN_COMMAND', 'HAS_TAURI_KEY', 'HAS_METADATA_KEY']) {
+      if (process.env[name] !== 'true') throw Error(`${name} must be true`);
+    }
     o.version = (await readFile('gradle.properties', 'utf8')).match(/^version=(.+)$/m)?.[1].trim();
-    identity(o); await validateKeys(o);
+    identity(o); await validatePublicKeys(o);
     extractVersion(await readFile('CHANGELOG.md', 'utf8'), o.version);
     if (process.env.JUSTSEARCH_RELEASE_DESCRIPTOR_URL !== DESCRIPTOR_URL) throw Error('production descriptor URL is required');
-    if (process.env.JUSTSEARCH_CODESIGN_MODE !== 'command' || !process.env.JUSTSEARCH_CODESIGN_COMMAND?.includes('{file}') || process.env.JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED) throw Error('production SSL.com signing configuration is required');
-    required('TAURI_SIGNING_PRIVATE_KEY', process.env.TAURI_SIGNING_PRIVATE_KEY);
     const prior = await remoteFor({ ...o, expectedTag: o.tag }).get();
     if (prior && (!prior.draft || !prior.body?.includes(candidateMarker(o)))) throw Error('tag already belongs to another candidate; use the next patch version');
     const runs = JSON.parse(gh(['api', '--paginate', '--slurp',

@@ -200,8 +200,10 @@ export function usesSelfHostedRunner(lines) {
 
 // Environment deployment rules are the authorization boundary for production
 // signing. Keep this independent of the editable trigger allowlist.
-function signingSecretErrors(lines, rel) {
+function signingSecretErrors(lines, rel, repoRoot) {
   const errors = [];
+  const releaseWorkflow = ['build-installer', 'build-installer-windows', 'build-installer-linux',
+    'publish-release', 'packaging-smoke'].some(name => rel === `.github/workflows/${name}.yml`);
   const privateName = 'JUSTSEARCH_(?:CODESIGN_\\w+|TAURI_UPDATER_PRIVATE_KEY\\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)';
   const reference = new RegExp(`secrets\\s*(?:\\.\\s*${privateName}\\b|\\[\\s*['"]${privateName}['"]\\s*\\])`);
   const anchors = new Map();
@@ -216,6 +218,8 @@ function signingSecretErrors(lines, rel) {
     anchors.set(match[1], block);
   }
   const referencesPrivateKey = (line, seen = new Set()) => {
+    // Only an exact presence expression may cross into a non-signing step.
+    if (releaseWorkflow && /^\s*HAS_\w+:\s*\$\{\{\s*secrets(?:\.[A-Z_]+|\[['"][A-Z_]+['"]\])\s*!=\s*''\s*\}\}\s*$/.test(line)) return false;
     if (reference.test(line)) return true;
     const alias = /(?:[:]|-)\s*\*([\w-]+)\s*$/.exec(line)?.[1];
     if (!alias || seen.has(alias)) return false;
@@ -248,6 +252,41 @@ function signingSecretErrors(lines, rel) {
         if (referencesPrivateKey(line)) errors.push({ rel, lineNumber, message: 'production signing secrets require the release-signing environment' });
       }
     }
+    if (!releaseWorkflow) { job = []; return; }
+    const expand = (line, seen = new Set()) => {
+      const alias = /(?:[:]|-)\s*\*([\w-]+)\s*$/.exec(line)?.[1];
+      if (!alias || seen.has(alias)) return [line];
+      const block = anchors.get(alias) ?? [];
+      const offset = leadingSpaces(line) - leadingSpaces(block[0] ?? '');
+      return block.flatMap(value => expand(' '.repeat(Math.max(0, offset)) + value, new Set([...seen, alias])));
+    };
+    const expanded = job.flatMap(({ line, lineNumber }) => expand(line).map(value => ({ line: value, lineNumber })));
+    let step = [];
+    const checkStep = () => {
+      if (!step.some(({ line }) => referencesPrivateKey(line))) { step = []; return; }
+      const text = step.map(({ line }) => line).join('\n');
+      const lineNumber = step[0].lineNumber;
+      // These are the existing signing entry points, not names supplied by a workflow author.
+      const run = text.match(/^(?:      - |        )run:([^\n]*(?:\n          [^\n]*)*)/m)?.[1] ?? '';
+      const signingCommand = /^\s*(?:node\s+scripts\/release\/release-candidate\.mjs\s+build\b|(?:&\s+)?\.[\\/]scripts[\\/]ci[\\/]build-installer-windows\.ps1\b|npm\s+--prefix\s+modules\/shell\s+run\s+tauri\s+--\s+signer\s+sign\b)/;
+      const signingLines = run.split('\n').filter(line => signingCommand.test(line));
+      const signs = signingLines.length > 0;
+      if (!signs || /(?:^|\n)\s*(?:-\s*)?uses:/.test(text)) errors.push({ rel, lineNumber,
+        message: 'production signing secrets may be referenced only by the step that signs, never by an action' });
+      let source = run;
+      for (const match of signingLines.join('\n').matchAll(/scripts[\/\\][\w./\\-]+\.(?:mjs|ps1|sh)\b/g)) {
+        const file = path.resolve(repoRoot, match[0].replaceAll('\\', '/'));
+        if (fs.existsSync(file)) source += '\n' + fs.readFileSync(file, 'utf8');
+      }
+      if (/GITHUB_(?:ENV|OUTPUT)/.test(source)) errors.push({ rel, lineNumber,
+        message: 'a signing-secret step must not export secret-derived values or paths to GITHUB_ENV or GITHUB_OUTPUT' });
+      step = [];
+    };
+    for (const entry of expanded) {
+      if (/^      -/.test(entry.line)) checkStep();
+      if (step.length || /^      -/.test(entry.line)) step.push(entry);
+    }
+    checkStep();
     job = [];
   };
   for (let i = 0; i < lines.length; i++) {
@@ -320,7 +359,7 @@ export function scanWorkflow(file, repoRoot) {
     }
   }
 
-  return { rel, sawOn, events, selfHosted, signingErrors: signingSecretErrors(lines, rel) };
+  return { rel, sawOn, events, selfHosted, signingErrors: signingSecretErrors(lines, rel, repoRoot) };
 }
 
 function workflowEntries(policy) {

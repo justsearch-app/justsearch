@@ -3,6 +3,11 @@
 param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($env:RELEASE_BUILD -eq 'true' -and ($env:JUSTSEARCH_CODESIGN_MODE -cne 'command' -or
+    -not ($env:JUSTSEARCH_CODESIGN_COMMAND -and $env:JUSTSEARCH_CODESIGN_COMMAND.Contains('{file}')) -or
+    $env:JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED)) {
+  throw 'production SSL.com signing configuration is required'
+}
 $extra = @{}
 $projectVersionLine = Get-Content -LiteralPath gradle.properties | Where-Object { $_ -match '^version=' }
 if (@($projectVersionLine).Count -ne 1) { throw "gradle.properties must contain exactly one version= line." }

@@ -52,7 +52,7 @@ test('workflow policy refuses private signing secrets outside the protected envi
       for (const environment of ['    environment: release-signing\n', '    environment:\n      name: release-signing\n']) {
         writeFileSync(path.join(repoRoot, file), `on: workflow_dispatch\njobs:\n  build:\n${environment}    runs-on: ubuntu-latest\n    env:\n      KEY: \${{ ${ref} }}\n`);
         assert(validateWorkflows({ repoRoot, policy }).some(e => /step/.test(e.message)), `${ref}: job-level secret must fail even in release-signing`);
-        writeFileSync(path.join(repoRoot, file), `on: workflow_dispatch\njobs:\n  build:\n${environment}    runs-on: ubuntu-latest\n    steps:\n      - run: echo signing\n        env:\n          KEY: \${{ ${ref} }}\n`);
+        writeFileSync(path.join(repoRoot, file), `on: workflow_dispatch\njobs:\n  build:\n${environment}    runs-on: ubuntu-latest\n    steps:\n      - run: node scripts/release/release-candidate.mjs build options.json\n        env:\n          KEY: \${{ ${ref} }}\n`);
         assert.deepEqual(validateWorkflows({ repoRoot, policy }), []);
       }
     }
@@ -64,7 +64,7 @@ jobs:
   signed:
     environment: release-signing
     steps: &shared-steps
-      - run: echo signing
+      - run: node scripts/release/release-candidate.mjs build options.json
         env:
           KEY: \${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY }}
   unsigned:
@@ -77,7 +77,7 @@ jobs:
     environment: release-signing
     steps:
       - &signing-step
-        run: echo signing
+        run: node scripts/release/release-candidate.mjs build options.json
         env:
           KEY: \${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY }}
   unsigned:
@@ -152,4 +152,75 @@ test('release instructions describe real-tag rehearsals and main mirror dispatch
   assert.match(doc, /never publish/i);
   assert.match(doc, /gh workflow run sign-vendored-mirrors.yml --ref main/);
   assert.match(doc, /\*\*Branch\*\* rule matching \*\*`main`\*\*/);
+});
+
+function policyFixture(t, name = 'build-installer') {
+  const repoRoot = mkdtempSync(path.join(tmpdir(), 'release-policy-'));
+  t.after(() => rmSync(repoRoot, { recursive: true, force: true }));
+  mkdirSync(path.join(repoRoot, '.github/workflows'), { recursive: true });
+  mkdirSync(path.join(repoRoot, 'scripts/release'), { recursive: true });
+  const file = `.github/workflows/${name}.yml`;
+  const policy = { workflows: [{ path: file, expectedTriggers: ['workflow_dispatch'] }] };
+  return { repoRoot, check(run, env = "KEY: ${{ secrets.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM }}") {
+    writeFileSync(path.join(repoRoot, file), `on: workflow_dispatch
+jobs:
+  sign:
+    environment: release-signing
+    steps:
+      - ${run}
+        env:
+          ${env}
+`);
+    return validateWorkflows({ repoRoot, policy });
+  } };
+}
+for (const name of ['build-installer', 'build-installer-windows', 'build-installer-linux', 'publish-release', 'packaging-smoke']) {
+  test(`workflow policy rejects a secret-bearing non-signing step in ${name}`, t => {
+    const { check } = policyFixture(t, name);
+    assert(check('run: echo check-only').some(e => /step that signs/.test(e.message)));
+  });
+}
+test('step-only secret policy excludes the separately tracked mirror workflow', t => {
+  const { check } = policyFixture(t, 'sign-vendored-mirrors');
+  assert.deepEqual(check('run: echo check-only'), []);
+});
+for (const run of ['run: echo check-only', 'run: node scripts/release/release-candidate.mjs admit',
+  'run: node scripts/release/release-candidate.mjs stage-keys', 'uses: actions/upload-artifact@v7']) {
+  test(`workflow policy rejects signing secrets in a non-signing step: ${run}`, t => {
+    const { check } = policyFixture(t);
+    assert(check(run).some(e => /step that signs/.test(e.message)));
+  });
+}
+test('workflow policy permits exact presence flags in non-signing steps', t => {
+  const { check } = policyFixture(t);
+  assert.deepEqual(check('run: echo check-only', "HAS_KEY: ${{ secrets.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM != '' }}"), []);
+});
+for (const destination of ['GITHUB_ENV', 'GITHUB_OUTPUT']) {
+  test(`workflow policy rejects a secret-derived path exported to ${destination}`, t => {
+    const { check } = policyFixture(t);
+    const run = `run: |
+          node scripts/release/release-candidate.mjs build options.json
+          echo KEY_PATH=/tmp/private.pem >> "$${destination}"`;
+    assert(check(run).some(e => /secret-derived/.test(e.message)));
+  });
+  test(`workflow policy rejects a script exporting a secret-derived path to ${destination}`, t => {
+    const { repoRoot, check } = policyFixture(t);
+    writeFileSync(path.join(repoRoot, 'scripts/release/release-candidate.mjs'), `writeFile(keyPath, process.env.KEY); appendFile(process.env.${destination}, keyPath);`);
+    assert(check('run: node scripts/release/release-candidate.mjs build options.json').some(e => /secret-derived/.test(e.message)));
+  });
+}
+
+test('release admission has only presence flags, and only descriptor assembly receives the metadata secret', () => {
+  const { prepare, assemble } = workflow('build-installer').jobs;
+  const admission = prepare.steps.find(s => s.run?.includes('release-candidate.mjs admit'));
+  for (const flag of ['HAS_CODESIGN_COMMAND', 'HAS_TAURI_KEY', 'HAS_METADATA_KEY']) assert.match(admission.env[flag], /!= ''/);
+  assert.equal(Object.keys(admission.env).filter(k => k !== 'GH_TOKEN').length, 3);
+  for (const job of [prepare, assemble]) {
+    for (const step of job.steps) {
+      if (!privateSecret.test(JSON.stringify(step))) continue;
+      if (step === admission) continue;
+      assert.match(step.run, /release-candidate\.mjs build/);
+      assert.equal(step.env.METADATA_PRIVATE_KEY_PEM, '${{ secrets.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM }}');
+    }
+  }
 });

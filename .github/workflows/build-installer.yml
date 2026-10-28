@@ -49,18 +49,18 @@ jobs:
           SANDBOX: ${{ inputs.sandboxTestMode }}
           CANDIDATE_VERSION: ${{ inputs.candidateVersion }}
         run: test "$SANDBOX" != true && test -z "$CANDIDATE_VERSION"
-      - name: Stage metadata keys
+      - name: Stage public metadata key
         env:
-          METADATA_PRIVATE_KEY_PEM: ${{ secrets.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM }}
           METADATA_PUBLIC_KEY_PEM: ${{ vars.JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM }}
-        run: node scripts/release/release-candidate.mjs stage-keys
+        run: |
+          printf '%s' "$METADATA_PUBLIC_KEY_PEM" > "$RUNNER_TEMP/metadata-public.pem"
+          echo "JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PATH=$RUNNER_TEMP/metadata-public.pem" >> "$GITHUB_ENV"
       - name: Admit release before any signing
         env:
           GH_TOKEN: ${{ github.token }}
-          JUSTSEARCH_CODESIGN_MODE: ${{ secrets.JUSTSEARCH_CODESIGN_MODE }}
-          JUSTSEARCH_CODESIGN_COMMAND: ${{ secrets.JUSTSEARCH_CODESIGN_COMMAND }}
-          JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED: ${{ vars.JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY }}
+          HAS_CODESIGN_COMMAND: ${{ secrets.JUSTSEARCH_CODESIGN_COMMAND != '' }}
+          HAS_TAURI_KEY: ${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY != '' }}
+          HAS_METADATA_KEY: ${{ secrets.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM != '' }}
         run: |
           node scripts/release/release-candidate.mjs admit
           node scripts/ci/sync-version.mjs --require-release-semver --what-if
@@ -135,14 +135,17 @@ jobs:
         with:
           name: release-context-${{ github.run_id }}
           path: dist/inputs/context
-      - name: Stage metadata keys
+      - name: Stage public metadata key
+        if: steps.cached.outputs.exists != 'true'
+        env:
+          METADATA_PUBLIC_KEY_PEM: ${{ vars.JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM }}
+        run: |
+          printf '%s' "$METADATA_PUBLIC_KEY_PEM" > "$RUNNER_TEMP/metadata-public.pem"
+          echo "JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PATH=$RUNNER_TEMP/metadata-public.pem" >> "$GITHUB_ENV"
+      - name: Assemble and verify the closed asset set
         if: steps.cached.outputs.exists != 'true'
         env:
           METADATA_PRIVATE_KEY_PEM: ${{ secrets.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM }}
-          METADATA_PUBLIC_KEY_PEM: ${{ vars.JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM }}
-        run: node scripts/release/release-candidate.mjs stage-keys
-      - name: Assemble and verify the closed asset set
-        if: steps.cached.outputs.exists != 'true'
         run: |
           node scripts/ci/packaging-smoke.mjs plan dist/inputs dist/candidate-inputs.json
           node scripts/release/release-candidate.mjs build dist/candidate-inputs.json

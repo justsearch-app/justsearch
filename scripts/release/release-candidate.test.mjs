@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { generateFixture, signArtifact } from './updater-v2-fixture.mjs';
 const subject = await import('./release-candidate.mjs').catch(() => ({}));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -235,4 +236,70 @@ else throw Error('unexpected gh arguments: ' + JSON.stringify(a));
   // Remote corruption must still fail at the real adapter boundary.
   await writeFile(path.join(dir, 'remote', path.basename(installer.installerPath)), 'tampered');
   await assert.rejects(run('publish'), /draft bytes changed before publication/);
+});
+
+for (const fails of [false, true]) test(`descriptor signing command removes its temporary private key on ${fails ? 'a thrown error' : 'success'}`, async t => {
+  const f = await fixture(t);
+  const dir = path.dirname(f.outDir);
+  const runnerTemp = path.join(dir, 'runner-temp');
+  await mkdir(runnerTemp);
+  const githubEnv = path.join(dir, 'github-env');
+  await writeFile(githubEnv, '');
+  const env = { ...process.env, RUNNER_TEMP: runnerTemp, GITHUB_ENV: githubEnv,
+    METADATA_PRIVATE_KEY_PEM: await readFile(f.metadataPrivateKeyPath, 'utf8'),
+    METADATA_PUBLIC_KEY_PEM: await readFile(f.metadataPublicKeyPath, 'utf8') };
+  delete env.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PATH;
+  delete f.metadataPrivateKeyPath;
+  // Execute the workflow's key-staging commands as well: a key exported by an
+  // earlier step must not survive the signing step, even when assembly throws.
+  const yaml = createRequire(import.meta.url)('js-yaml');
+  const workflow = yaml.load(await readFile(new URL('../../.github/workflows/build-installer.yml', import.meta.url), 'utf8'));
+  const script = fileURLToPath(new URL('./release-candidate.mjs', import.meta.url));
+  for (const step of workflow.jobs.assemble.steps) {
+    if (step.run?.includes('release-candidate.mjs build')) break;
+    if (!step.env?.METADATA_PUBLIC_KEY_PEM) continue;
+    await promisify(execFile)('bash', ['-e', '-c', step.run], { env });
+    for (const line of (await readFile(githubEnv, 'utf8')).trim().split('\n')) {
+      const split = line.indexOf('=');
+      if (split > 0) env[line.slice(0, split)] = line.slice(split + 1);
+    }
+  }
+  if (fails) delete f.targets['linux-x86_64'];
+  const config = path.join(dir, 'signing-options.json');
+  await writeFile(config, JSON.stringify(f));
+  const run = promisify(execFile)(process.execPath, [script, 'build', config], { env });
+  if (fails) await assert.rejects(run, /candidate requires both targets/);
+  else { await run; assert((await readdir(f.outDir)).includes('release.v2.json.sig')); }
+  assert.deepEqual((await readdir(runnerTemp)).filter(name => name !== 'metadata-public.pem'), [], 'signing step left private key material on disk');
+  assert.doesNotMatch(await readFile(githubEnv, 'utf8'), /PRIVATE_KEY_PATH/, 'private key path escaped into GITHUB_ENV');
+});
+
+test('admit requires boolean presence flags and accepts no signing secret values', async t => {
+  const f = await fixture(t);
+  const dir = path.dirname(f.outDir);
+  const bin = path.join(dir, 'bin');
+  await mkdir(bin);
+  for (const [name, source] of [['gh', '#!/bin/sh\necho "[]"\n'], ['git', '#!/bin/sh\ntest "$1" = merge-base\n']]) {
+    const file = path.join(bin, name); await writeFile(file, source); await chmod(file, 0o755);
+  }
+  await writeFile(path.join(dir, 'gradle.properties'), 'version=1.2.3\n');
+  await writeFile(path.join(dir, 'CHANGELOG.md'), '# Changelog\n\n## [Unreleased]\n\n## [1.2.3] - 2026-10-27\n\n### Fixed\n\n- Test candidate.\n');
+  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    GITHUB_REPOSITORY: f.repo, GITHUB_REF_NAME: f.tag, GITHUB_SHA: f.commit, GITHUB_RUN_ID: f.runId,
+    JUSTSEARCH_RELEASE_DESCRIPTOR_URL: subject.DESCRIPTOR_URL,
+    JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY: f.metadataRootPublicKey,
+    JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID: f.metadataKeyId,
+    JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PATH: f.metadataPublicKeyPath,
+    JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY: f.artifactPublicKey, JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID: f.artifactKeyId,
+    HAS_CODESIGN_COMMAND: 'true', HAS_TAURI_KEY: 'true', HAS_METADATA_KEY: 'true' };
+  for (const name of ['JUSTSEARCH_CODESIGN_MODE', 'JUSTSEARCH_CODESIGN_COMMAND', 'TAURI_SIGNING_PRIVATE_KEY',
+    'METADATA_PRIVATE_KEY_PEM', 'JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PATH']) delete env[name];
+  const script = fileURLToPath(new URL('./release-candidate.mjs', import.meta.url));
+  const run = values => promisify(execFile)(process.execPath, [script, 'admit'], { cwd: dir, env: values });
+  assert.match((await run(env)).stdout, /Release admission passed/);
+  for (const flag of ['HAS_CODESIGN_COMMAND', 'HAS_TAURI_KEY', 'HAS_METADATA_KEY']) {
+    for (const value of ['', 'false', 'not-a-boolean']) {
+      await assert.rejects(run({ ...env, [flag]: value }), new RegExp(`${flag} must be true`));
+    }
+  }
 });
