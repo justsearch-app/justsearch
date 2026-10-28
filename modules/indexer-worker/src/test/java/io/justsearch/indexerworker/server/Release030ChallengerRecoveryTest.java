@@ -147,11 +147,11 @@ final class Release030ChallengerRecoveryTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"migrating", "switching"})
   void interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String fixture, @TempDir Path temporary)
       throws Exception {
-    Path root = Release030Fixture.unpack(fixture, temporary);
+    Path root = Release030Fixture.unpackNativeMigration(fixture, temporary);
     // Add C1's stated input: an independently queued explicit path in the v13 database.
     Path pending = Files.writeString(root.resolve("native-pending.txt"), "nativequeuedcopper");
     sql(root, "INSERT INTO jobs(path,state,attempts,last_updated) VALUES ('" + key(pending)
@@ -160,7 +160,7 @@ final class Release030ChallengerRecoveryTest {
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
-      var models = new ReleasedModelIdentities(root);
+      var models = new ReleasedModelIdentities(root, true);
       try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
         Release030ExactFileRecoveryTest.activateNative(server);
         var resumed = server.appServices().ingestService().resumeMigration(
@@ -231,7 +231,7 @@ final class Release030ChallengerRecoveryTest {
             field.set(service, walks);
             for (int tick = 0; tick < 4; tick++) recover(server);
             long calls = org.mockito.Mockito.mockingDetails(walks).getInvocations().stream()
-                .filter(call -> call.getMethod().getName().equals("execute") && call.getArguments().length == 7
+                .filter(call -> call.getMethod().getName().equals("execute") && call.getArguments().length == 8
                     && call.getArgument(0).equals(root.resolve("roots/alpha").toString())).count();
             assertEquals(boot == 0 ? 1 : 0, calls,
                 "F5: a durable cooldown prevents a full rewalk on each recovery tick and restart");

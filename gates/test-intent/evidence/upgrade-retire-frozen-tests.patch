@@ -1,0 +1,1690 @@
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerProducerOwnershipTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerProducerOwnershipTest.java
+index d8b19f43b3..7c41a466ec 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerProducerOwnershipTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerProducerOwnershipTest.java
+@@ -19,0 +20 @@ import java.util.HashMap;
++import java.util.List;
+@@ -109 +110 @@ final class KnowledgeServerProducerOwnershipTest {
+-        assertTrue(interrupted.await(3, TimeUnit.SECONDS));
++        assertTrue(registry.reaperShutdown.await(3, TimeUnit.SECONDS));
+@@ -143,0 +145 @@ final class KnowledgeServerProducerOwnershipTest {
++    private final CountDownLatch reaperShutdown = new CountDownLatch(1);
+@@ -150,0 +153,9 @@ final class KnowledgeServerProducerOwnershipTest {
++            @Override public void shutdown() {
++              super.shutdown();
++              reaperShutdown.countDown();
++            }
++            @Override public List<Runnable> shutdownNow() {
++              var pending = super.shutdownNow();
++              reaperShutdown.countDown();
++              return pending;
++            }
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java
+index f445058c25..d97b904edc 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java
+@@ -793 +793 @@ class RecordedMigrationRestartRecoveryTest {
+-      when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
++      when(queue.jobStateCountsStrict()).thenAnswer(ignored -> queue.jobStateCounts());
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java
+index be49f1207b..4f5e8adf2e 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030AdmissionDebtTest.java
+@@ -262 +262 @@ final class Release030AdmissionDebtTest {
+-    Path root = Release030Fixture.unpack(fixture, temporary);
++    Path root = Release030Fixture.unpackNativeMigration(fixture, temporary);
+@@ -271 +271 @@ final class Release030AdmissionDebtTest {
+-      var models = new ReleasedModelIdentities(root);
++      var models = new ReleasedModelIdentities(root, true);
+@@ -291 +291 @@ final class Release030AdmissionDebtTest {
+-    Path root = Release030Fixture.unpack("switching", temporary);
++    Path root = Release030Fixture.unpackNativeMigration("switching", temporary);
+@@ -297 +297 @@ final class Release030AdmissionDebtTest {
+-      var models = new ReleasedModelIdentities(root);
++      var models = new ReleasedModelIdentities(root, true);
+@@ -343 +343 @@ final class Release030AdmissionDebtTest {
+-    Path root = Release030Fixture.unpack("migrating", temporary);
++    Path root = Release030Fixture.unpackNativeMigration("migrating", temporary);
+@@ -350 +350 @@ final class Release030AdmissionDebtTest {
+-      var models = new ReleasedModelIdentities(root);
++      var models = new ReleasedModelIdentities(root, true);
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java
+index e465578ecb..1136430ed4 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java
+@@ -154 +154 @@ final class Release030ChallengerRecoveryTest {
+-    Path root = Release030Fixture.unpack(fixture, temporary);
++    Path root = Release030Fixture.unpackNativeMigration(fixture, temporary);
+@@ -163 +163 @@ final class Release030ChallengerRecoveryTest {
+-      var models = new ReleasedModelIdentities(root);
++      var models = new ReleasedModelIdentities(root, true);
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java
+index 8f96644006..2f092c39eb 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java
+@@ -97 +97 @@ final class Release030ExactFileRecoveryTest {
+-    Path root = Release030Fixture.unpack(fixture, temporary);
++    Path root = Release030Fixture.unpackNativeMigration(fixture, temporary);
+@@ -103 +103 @@ final class Release030ExactFileRecoveryTest {
+-      var models = new ReleasedModelIdentities(root);
++      var models = new ReleasedModelIdentities(root, true);
+@@ -127 +127 @@ final class Release030ExactFileRecoveryTest {
+-    Path root = Release030Fixture.unpack("migrating", temporary);
++    Path root = Release030Fixture.unpackNativeMigration("migrating", temporary);
+@@ -135 +135 @@ final class Release030ExactFileRecoveryTest {
+-      var models = new ReleasedModelIdentities(root);
++      var models = new ReleasedModelIdentities(root, true);
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java
+index 38428fb12f..d7e3c5e55c 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030Fixture.java
+@@ -74,0 +75,19 @@ public final class Release030Fixture {
++  /** Keep native-path preservation scenarios native: A has a genuine analyzer mismatch. */
++  static Path unpackNativeMigration(String name, Path destination) throws Exception {
++    Path root = unpack(name, destination);
++    Path active = Release030CompatibilityTest.generation(root);
++    var metadata = new HashMap<>(Release030CompatibilityTest.readMetadata(active));
++    var inputs = (tools.jackson.databind.node.ObjectNode) JSON.readTree(metadata.get("index_fingerprint_inputs"));
++    inputs.put("analyzer_fp", "b".repeat(64));
++    metadata.put("index_fingerprint_inputs", JSON.writeValueAsString(inputs));
++    metadata.remove("index_fingerprint");
++    try (var directory = FSDirectory.open(active);
++        var writer = new org.apache.lucene.index.IndexWriter(directory,
++            new org.apache.lucene.index.IndexWriterConfig().setOpenMode(
++                org.apache.lucene.index.IndexWriterConfig.OpenMode.APPEND))) {
++      writer.setLiveCommitData(metadata.entrySet());
++      writer.commit();
++    }
++    return root;
++  }
++
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java
+new file mode 100644
+index 0000000000..361ff7b1bb
+--- /dev/null
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030MigrationRetirementTest.java
+@@ -0,0 +1,160 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.server;
++
++import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++import io.justsearch.configuration.resolved.ConfigStore;
++import io.justsearch.core.execution.TestEngineExecutors;
++import io.justsearch.indexerworker.queue.JobQueue;
++import io.justsearch.indexerworker.queue.SqliteJobQueue;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import org.junit.jupiter.api.Timeout;
++import org.junit.jupiter.api.io.TempDir;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.ValueSource;
++
++/** U6: retire the release's interrupted build while keeping its compatible serving index. */
++@Timeout(180)
++@org.junit.jupiter.api.extension.ExtendWith(
++    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
++final class Release030MigrationRetirementTest {
++  @ParameterizedTest
++  @ValueSource(strings = {"migrating", "switching"})
++  void replayRetiresObsoleteBuildAndKeepsServingIdentity(String fixture, @TempDir Path temporary)
++      throws Exception {
++    Path root = Release030Fixture.unpack(fixture, temporary);
++    var before = state(root);
++    Path updated = Files.writeString(root.resolve("roots/alpha/pending.txt"), "retirementcobalt");
++    Path deleted = root.resolve("roots/beta/file-01.txt");
++    Files.delete(deleted);
++    // Real admission creates a receipt-bearing MIGRATING variant without inventing a schema.
++    try (var queue = new SqliteJobQueue(root.resolve("data/jobs.db"))) {
++      queue.open();
++      assertTrue(queue.enqueueAndBufferFileForGeneration(before.building_generation(),
++          JobQueue.EnqueueEntry.stat(updated).withinRoot(root.resolve("roots/alpha")), null));
++    }
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        for (int restart = 0; restart < 2; restart++) {
++          try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++            assertEquals("IDLE", state(root).migration_state(), "obsolete migration is cancelled at boot");
++            assertEquals(before.active_generation(), state(root).active_generation());
++            activate(server);
++            await(() -> search(server, "retirementcobalt").contains(key(updated))
++                && !search(server, "nebula").contains(key(deleted))
++                && state(root).previous_generation() == null,
++                "replayed effects are durable before B is retired");
++            assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++            assertTrue(search(server, "copper").contains(key(root.resolve("roots/alpha/file-00.txt"))));
++            assertFalse(Files.exists(root.resolve("data/index/default/indices")
++                .resolve(before.building_generation())));
++            assertFalse(Files.exists(root.resolve("data/index/default/migration_progress.json")));
++            assertEquals(0, ((SqliteJobQueue) Release030ExtractionRecoveryTest.field(server, "jobQueue"))
++                .listSwitchBufferOpsStrict().size());
++          }
++        }
++      }
++    } finally { ConfigStore.restoreGlobal(installed, previous); }
++  }
++  @ParameterizedTest
++  @ValueSource(booleans = {false, true})
++  void backoffNeverHoldsMutationAdmissionDuringForcedNativeCutover(boolean mixed,
++      @TempDir Path temporary) throws Exception {
++    Path root = Release030Fixture.unpackNativeMigration("migrating", temporary);
++    var original = state(root);
++    Path deleted = root.resolve("roots/beta/file-01.txt");
++    Files.delete(deleted);
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root, true);
++      var attempts = new java.util.concurrent.atomic.AtomicInteger();
++      try (models) {
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          assertEquals("MIGRATING", state(root).migration_state());
++          Release030RetirementSafetyTest.stopMonitor(server);
++          Release030ExactFileRecoveryTest.activateNative(server);
++          Release030RetirementSafetyTest.stopMonitor(server);
++          assertTrue(server.appServices().ingestService().resumeMigration(
++              io.justsearch.ipc.MigrationResumeRequest.getDefaultInstance(),
++              io.justsearch.indexerworker.services.CallContext.none()).getAccepted());
++          await(() -> Boolean.TRUE.equals(Release030ExtractionRecoveryTest.field(server, "migrationEnumeratorDone"))
++              && queue(server).jobStateCountsStrict().pendingReadyCount() == 0
++              && queue(server).jobStateCountsStrict().processingCount() == 0,
++              "real native enumeration finishes before admitting the work whose backoff is observed");
++          assertNull(Release030ExtractionRecoveryTest.field(server, "migrationEnumeratorFailure"));
++          var producer = (DefaultWorkerAppServices) server.appServices();
++          assertTrue(producer.pauseProducerForCutover(10_000));
++          try {
++            Path waiting = Files.writeString(root.resolve("roots/beta/waiting-io.txt"), "notyetindexedwaitingcobalt");
++            queue(server).enqueueEntries(java.util.List.of(JobQueue.EnqueueEntry.stat(waiting)
++                .withinRoot(root.resolve("roots/beta"))), null);
++            queue(server).markFailed(waiting, io.justsearch.indexerworker.ingest.IngestionOutcome.of(
++                io.justsearch.indexerworker.ingest.IngestionOutcomeClass.IO_FAILED,
++                io.justsearch.indexerworker.ingest.IngestionReasonCodes.SOURCE_UNREADABLE,
++                io.justsearch.indexerworker.ingest.IngestionRetryPolicy.RETRY_UNTIL_AVAILABLE, "scheduled I/O retry"));
++            if (mixed) {
++              Path ready = Files.writeString(root.resolve("roots/alpha/ready.txt"), "readycobalt");
++              assertTrue(queue(server).enqueueAndBufferFileForGeneration(original.building_generation(),
++                  JobQueue.EnqueueEntry.stat(ready).withinRoot(root.resolve("roots/alpha")), null));
++              assertTrue(queue(server).jobStateCountsStrict().pendingReadyCount() > 0);
++            }
++            assertTrue(queue(server).jobStateCountsStrict().pendingBackoffCount() > 0);
++          } finally { producer.resumeProducerAfterCutover(); }
++          await(() -> queue(server).jobStateCountsStrict().pendingReadyCount() == 0
++              && queue(server).jobStateCountsStrict().processingCount() == 0,
++              "mixed ready work finishes, leaving only scheduled work");
++          assertTrue(queue(server).jobStateCountsStrict().pendingBackoffCount() > 0);
++          assertTrue(server.appServices().ingestService().requestCutover(
++              io.justsearch.ipc.MigrationCutoverRequest.newBuilder().setForceSwitching(true).build(),
++              io.justsearch.indexerworker.services.CallContext.none()).getAccepted());
++          assertTrue(queue(server).nativeCutoverCountsStrict().pendingBackoffCount() > 0,
++              "relevant backoff work is still pending at monitor entry, not exempt independent debt");
++          var manager = (io.justsearch.indexerworker.index.IndexGenerationManager)
++              Release030ExtractionRecoveryTest.field(server, "indexGenerationManager");
++          var runtime = (io.justsearch.adapters.lucene.runtime.LuceneRuntime)
++              Release030ExtractionRecoveryTest.field(server, "ingestLifecycle");
++          var ticks = new java.util.concurrent.atomic.AtomicInteger(2);
++          // Observe entry to live promotion, before its final safety checks. The real server,
++          // enumeration, queue and writer remain running; this avoids a timing-only fence probe.
++          io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.runMigrationCutoverLoop(
++              new io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps.CutoverContext(
++                  manager, queue(server), () -> ticks.getAndDecrement() > 0, () -> true, () -> null,
++                  0, 60_000, 0, () -> runtime, () -> true,
++                  () -> fail("scheduled work must not enter deadline/failure cleanup"),
++                  org.slf4j.LoggerFactory.getLogger(getClass()),
++                  observed -> fail("forceSwitching already entered the switching phase"),
++                  () -> { attempts.incrementAndGet(); return null; }));
++          Path unrelated = Files.writeString(root.resolve("roots/alpha/unrelated.txt"), "unrelatedcobalt");
++          assertEquals(1, server.appServices().ingestService().submitBatch(io.justsearch.ipc.BatchRequest
++              .newBuilder().addFilePaths(unrelated.toString()).setRootAdded(true).build(),
++              io.justsearch.indexerworker.services.CallContext.none()).getAcceptedCount());
++          assertEquals(original.active_generation(), state(root).active_generation());
++          assertNotNull(state(root).building_generation());
++          assertTrue(search(server, "copper").contains(key(root.resolve("roots/alpha/file-00.txt"))));
++          assertTrue(search(server, "nebula").contains(key(deleted)), "A retains old results until cutover is complete");
++        }
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          Release030RetirementSafetyTest.stopMonitor(server);
++          assertEquals(original.active_generation(), state(root).active_generation());
++          assertEquals(original.building_generation(), state(root).building_generation());
++          assertTrue(queue(server).jobStateCountsStrict().pendingBackoffCount() > 0);
++          assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++          assertTrue(search(server, "copper").contains(key(root.resolve("roots/alpha/file-00.txt"))));
++          assertTrue(search(server, "nebula").contains(key(deleted)));
++        }
++        assertEquals(0, attempts.get(), "U13: backoff-only work must not invoke live promotion");
++      }
++    } finally { ConfigStore.restoreGlobal(installed, previous); }
++  }
++
++  private static SqliteJobQueue queue(KnowledgeServer server) throws Exception {
++    return (SqliteJobQueue) Release030ExtractionRecoveryTest.field(server, "jobQueue");
++  }
++
++}
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java
+new file mode 100644
+index 0000000000..835430dd09
+--- /dev/null
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RecoveryShutdownTest.java
+@@ -0,0 +1,97 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.server;
++
++import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++import io.justsearch.adapters.lucene.runtime.CommitReason;
++import io.justsearch.adapters.lucene.runtime.RunningRuntime;
++import io.justsearch.configuration.resolved.ConfigStore;
++import io.justsearch.core.execution.TestEngineExecutors;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.Executors;
++import java.util.concurrent.ScheduledExecutorService;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.atomic.AtomicBoolean;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.Timeout;
++import org.junit.jupiter.api.io.TempDir;
++
++/** Normal restart must not interrupt maintenance through a shared Lucene file channel. */
++@Timeout(180)
++@org.junit.jupiter.api.extension.ExtendWith(
++    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
++final class Release030RecoveryShutdownTest {
++  @Test
++  void closeDrainsMaintenanceWithoutInterruptingTheServingWriter(@TempDir Path temporary) throws Exception {
++    Path root = Release030Fixture.unpack("small", temporary);
++    String activeGeneration = state(root).active_generation();
++    Path updated = Files.writeString(root.resolve("roots/alpha/file-00.txt"), "shutdownrecoverycobalt");
++    Path deleted = root.resolve("roots/beta/file-01.txt");
++    Files.delete(deleted);
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    var interrupted = new AtomicBoolean();
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          activate(server);
++          await(() -> search(server, "shutdownrecoverycobalt").contains(key(updated))
++                  && !search(server, "nebula").contains(key(deleted))
++                  && !Files.exists(root.resolve("data/upgrade-030-recovery.properties")),
++              "real boot recovery settles before controlling maintenance shutdown", 90);
++          var runtime = (RunningRuntime) server.lifecycleManagerForTests();
++          var maintenance = (ScheduledExecutorService)
++              Release030ExtractionRecoveryTest.field(server, "stuckJobReaper");
++          var entered = new CountDownLatch(1);
++          var release = new CountDownLatch(1);
++          var observedInterrupt = new CountDownLatch(1);
++          var work = maintenance.submit(() -> {
++            runtime.commitOps().commitAndTrack(CommitReason.DRAIN);
++            entered.countDown();
++            try {
++              while (release.getCount() != 0) {
++                try { release.await(); }
++                catch (InterruptedException cancellation) {
++                  interrupted.set(true);
++                  observedInterrupt.countDown();
++                  // Record the unsafe signal before propagating it. Finish this real commit
++                  // without poisoning the before-state fixture's shared native lock channel.
++                }
++              }
++              runtime.commitOps().commitAndTrack(CommitReason.DRAIN);
++              runtime.commitOps().maybeRefreshBlocking();
++              return null;
++            } finally {
++              if (interrupted.get()) Thread.currentThread().interrupt();
++            }
++          });
++          assertTrue(entered.await(10, TimeUnit.SECONDS));
++          try (var closer = Executors.newSingleThreadExecutor()) {
++            var closing = closer.submit(() -> { server.close(); return null; });
++            try {
++              await(maintenance::isShutdown, "server close stops scheduling maintenance", 10);
++              assertFalse(closing.isDone(), "close waits for its current writer work");
++              observedInterrupt.await(1, TimeUnit.SECONDS);
++            } finally { release.countDown(); }
++            work.get(20, TimeUnit.SECONDS);
++            closing.get(20, TimeUnit.SECONDS);
++          } finally { release.countDown(); }
++        }
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          activate(server);
++          assertEquals(activeGeneration, state(root).active_generation());
++          assertEquals("IDLE", state(root).migration_state());
++          assertNull(state(root).building_generation());
++          assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++          assertTrue(search(server, "shutdownrecoverycobalt").contains(key(updated)));
++          assertFalse(search(server, "nebula").contains(key(deleted)));
++        }
++        assertFalse(interrupted.get(), "shutdown must drain maintenance without interrupting the shared writer");
++      }
++    } finally { ConfigStore.restoreGlobal(installed, previous); }
++  }
++}
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java
+index 006602d40e..436a88479f 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java
+@@ -82 +82 @@ final class Release030ReplayRetentionTest {
+-    Path root = Release030Fixture.unpack(fixture, temporary);
++    Path root = Release030Fixture.unpackNativeMigration(fixture, temporary);
+@@ -88 +88 @@ final class Release030ReplayRetentionTest {
+-      var models = new ReleasedModelIdentities(root);
++      var models = new ReleasedModelIdentities(root, true);
+@@ -131 +131 @@ final class Release030ReplayRetentionTest {
+-    Path root = Release030Fixture.unpack("switching", temporary);
++    Path root = Release030Fixture.unpackNativeMigration("switching", temporary);
+@@ -137 +137 @@ final class Release030ReplayRetentionTest {
+-      var models = new ReleasedModelIdentities(root);
++      var models = new ReleasedModelIdentities(root, true);
+@@ -266 +266 @@ final class Release030ReplayRetentionTest {
+-    Path root = Release030Fixture.unpack("migrating", temporary);
++    Path root = Release030Fixture.unpackNativeMigration("migrating", temporary);
+@@ -272 +272 @@ final class Release030ReplayRetentionTest {
+-      var models = new ReleasedModelIdentities(root);
++      var models = new ReleasedModelIdentities(root, true);
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java
+new file mode 100644
+index 0000000000..59d2212725
+--- /dev/null
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementBudgetTest.java
+@@ -0,0 +1,92 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.server;
++
++import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++import io.justsearch.configuration.resolved.ConfigStore;
++import io.justsearch.core.execution.TestEngineExecutors;
++import io.justsearch.indexerworker.ingest.IngestionOutcome;
++import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
++import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
++import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
++import io.justsearch.indexerworker.queue.JobQueue;
++import io.justsearch.indexerworker.services.CallContext;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.List;
++import java.util.Map;
++import org.junit.jupiter.api.Timeout;
++import org.junit.jupiter.api.io.TempDir;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.CsvSource;
++
++/** U13 preservation: real native boot, configured failure limits, explicit cutover, then restart. */
++@Timeout(240)
++@org.junit.jupiter.api.extension.ExtendWith(
++    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
++final class Release030RetirementBudgetTest {
++  @ParameterizedTest
++  @CsvSource({"1,2,false,false", "1,2,true,false", "1,1,false,true", "1,1,true,true",
++      "-1,2,false,true", "-1,2,true,true", "0,0,false,true"})
++  void nativeFailureBudgetAndForceSwitchingKeepTheirMeaning(int limit, int failures,
++      boolean force, boolean promotes, @TempDir Path temporary) throws Exception {
++    Path root = Release030Fixture.unpack("migrating", temporary);
++    var original = state(root);
++    Path sentinel = Release030RetirementSafetyTest.buildingSentinel(root);
++    String owner = Files.readString(sentinel);
++    Files.writeString(sentinel, "unverified candidate owner");
++    Files.delete(root.resolve("roots/beta/file-01.txt"));
++    ConfigStore previous = ConfigStore.globalOrNull();
++    WorkerBootFixture.publishConfig(root.resolve("data"), root.resolve("data/index/default"),
++        "BLUE_GREEN_MIGRATE", Map.of("justsearch.ai.disabled", "true", "justsearch.ai.embed.enabled", "false",
++            "justsearch.splade.enabled", "false", "justsearch.ner.enabled", "false",
++            "index.migration.cutover.max_failed_jobs", Integer.toString(limit)));
++    var installed = ConfigStore.global();
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          Files.writeString(sentinel, owner);
++          assertEquals("MIGRATING", state(root).migration_state(), "uncertified builds retain native cutover");
++          var queue = Release030RetirementSafetyTest.queue(server);
++          for (int failure = 0; failure < failures; failure++) {
++            Path path = Files.writeString(root.resolve("failed-" + failure + ".bin"), "terminal parser input");
++            assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(path).withinRoot(path)), null));
++            queue.markFailed(path, IngestionOutcome.of(IngestionOutcomeClass.PARSER_FAILED,
++                IngestionReasonCodes.PARSER_FAILED, IngestionRetryPolicy.NONE, "terminal parser result"));
++          }
++          assertEquals(failures, queue.nativeCutoverCountsStrict().failedCount() - queue.unownedFailureCount());
++          Release030ExactFileRecoveryTest.activateNative(server);
++          if (force) assertTrue(server.appServices().ingestService().requestCutover(
++              io.justsearch.ipc.MigrationCutoverRequest.newBuilder().setForceSwitching(true).build(),
++              CallContext.none()).getAccepted());
++          assertTrue(server.appServices().ingestService().resumeMigration(
++              io.justsearch.ipc.MigrationResumeRequest.getDefaultInstance(), CallContext.none()).getAccepted());
++          await(() -> (promotes ? "IDLE" : "FAILED").equals(state(root).migration_state()),
++              "configured native budget decides promotion without an implicit override", 100);
++          assertEquals(promotes ? original.building_generation() : original.active_generation(),
++              state(root).active_generation());
++          assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++          assertTrue(search(server, "copper").contains(key(root.resolve("roots/alpha/file-00.txt"))));
++          assertEquals(!promotes, search(server, "nebula").contains(key(root.resolve("roots/beta/file-01.txt"))));
++          if (promotes) {
++            assertTrue(search(server, "copper").contains(key(root.resolve("roots/alpha/pending.txt"))));
++          }
++        }
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          assertEquals(promotes ? original.building_generation() : original.active_generation(),
++              state(root).active_generation());
++          // Base resumes original independent debt in MIGRATING before the readiness latch.
++          assertEquals(promotes ? "IDLE" : "MIGRATING", state(root).migration_state());
++          assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++          assertTrue(search(server, "copper").contains(key(root.resolve("roots/alpha/file-00.txt"))));
++          assertEquals(!promotes, search(server, "nebula").contains(key(root.resolve("roots/beta/file-01.txt"))));
++        }
++      }
++    } finally {
++      if (Files.exists(sentinel)) Files.writeString(sentinel, owner);
++      ConfigStore.restoreGlobal(installed, previous);
++    }
++  }
++}
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java
+new file mode 100644
+index 0000000000..d480a77788
+--- /dev/null
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCompletedBuildTest.java
+@@ -0,0 +1,131 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.server;
++
++import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++import io.justsearch.adapters.lucene.runtime.CommitReason;
++import io.justsearch.adapters.lucene.runtime.CleanShutdownMarker;
++import io.justsearch.adapters.lucene.runtime.IndexRecoveryMarker;
++import io.justsearch.adapters.lucene.runtime.RunningRuntime;
++import io.justsearch.configuration.resolved.ConfigStore;
++import io.justsearch.core.execution.TestEngineExecutors;
++import io.justsearch.indexerworker.queue.SwitchBufferDelete;
++import io.justsearch.indexerworker.services.CallContext;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import org.junit.jupiter.api.Timeout;
++import org.junit.jupiter.api.io.TempDir;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.CsvSource;
++
++/** Amendment 1: completed B effects without receipts are still obligations, including DONE files. */
++@Timeout(360)
++@org.junit.jupiter.api.extension.ExtendWith(
++    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
++final class Release030RetirementCompletedBuildTest {
++  @ParameterizedTest
++  @CsvSource({"migrating,false", "switching,false", "migrating,true", "switching,true"})
++  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
++  void completedBuildEffectsAreReconciledAndUncertaintyRetainsBuild(String fixture, boolean denied,
++      @TempDir Path temporary) throws Exception {
++    Path root = Release030Fixture.unpack(fixture, temporary);
++    var original = state(root);
++    Path explicit = root.resolve("explicit.txt"), added = root.resolve("completed-b-only.txt");
++    Path deleted = root.resolve("roots/beta/file-02.txt");
++    Path sentinel = Release030RetirementSafetyTest.buildingSentinel(root);
++    String owner = Files.readString(sentinel);
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    var permissions = Files.getPosixFilePermissions(explicit);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        Files.writeString(sentinel, "uncertified B during historical fixture admission");
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          Files.writeString(sentinel, owner);
++          Release030RetirementSafetyTest.stopMonitor(server);
++          Release030ExactFileRecoveryTest.activateNative(server);
++          assertTrue(server.appServices().ingestService().resumeMigration(
++              io.justsearch.ipc.MigrationResumeRequest.getDefaultInstance(), CallContext.none()).getAccepted());
++          Release030RetirementSafetyTest.stopMonitor(server);
++          await(() -> Boolean.TRUE.equals(Release030ExtractionRecoveryTest.field(server, "migrationEnumeratorDone"))
++              && Release030RetirementSafetyTest.queue(server).jobStateCountsStrict().pendingReadyCount() == 0
++              && Release030RetirementSafetyTest.queue(server).jobStateCountsStrict().processingCount() == 0,
++              "the real historical B enumeration completes before new admissions", 90);
++          Files.writeString(explicit, "completedbuildexplicitviolet");
++          Files.writeString(added, "completedbuildaddedviolet");
++          assertEquals(2, server.appServices().ingestService().submitBatch(io.justsearch.ipc.BatchRequest
++              .newBuilder().addFilePaths(explicit.toString()).addFilePaths(added.toString())
++              .setRootAdded(true).setForceReindex(true).build(), CallContext.none()).getAcceptedCount());
++          await(() -> count(root, "path IN ('" + key(explicit) + "','" + key(added) + "') AND state='DONE'") == 2,
++              "real admitted changes finish on B", 60);
++          var green = (RunningRuntime) Release030ExtractionRecoveryTest.field(server, "ingestLifecycle");
++          green.commitOps().commitAndTrack(CommitReason.DRAIN);
++          green.commitOps().maybeRefreshBlocking();
++          assertEquals(Release030Fixture.sha256(Files.readAllBytes(added)),
++              green.documentFieldOps().getDocumentFieldOrThrow(key(added), "source_sha256"));
++          assertTrue(search(server, "completedbuildaddedviolet").isEmpty(), "A has never served B's new file");
++          assertTrue(search(server, "copper").contains(key(explicit)), "A still serves the older explicit bytes");
++          assertEquals(1, green.indexCountOps().countByIdAndChunksStrict(key(deleted)));
++          var queue = Release030RetirementSafetyTest.queue(server);
++          assertTrue(queue.putSwitchBufferForGeneration(original.building_generation(), "path:" + key(deleted),
++              "DELETE", new SwitchBufferDelete(key(deleted), SwitchBufferDelete.Origin.EXPLICIT, null).encode()));
++          green.indexingCoordinator().deleteByIdAndChunks(key(deleted));
++          queue.deleteByExactPath(key(deleted));
++          green.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
++          green.commitOps().maybeRefreshBlocking();
++          assertEquals(0, green.indexCountOps().countByIdAndChunksStrict(key(deleted)));
++          // Released MIGRATING admissions could finish on B without a retained switch receipt.
++          // Remove only these exact versions, after proving the corresponding committed effects.
++          var completed = queue.listSwitchBufferOpsStrict().stream()
++              .filter(op -> original.building_generation().equals(op.generation())
++                  && (op.key().equals("path:" + key(explicit)) || op.key().equals("path:" + key(added))
++                      || op.key().equals("path:" + key(deleted)))).toList();
++          assertEquals(3, completed.size());
++          assertEquals(completed.size(), queue.removeReplayedSwitchBufferOps(completed));
++          assertTrue(queue.listSwitchBufferOpsStrict().stream().noneMatch(op -> op.key().equals("path:" + key(added))));
++        } finally { Files.writeString(sentinel, owner); }
++        Path building = root.resolve("data/index/default/indices").resolve(original.building_generation());
++        assertTrue(CleanShutdownMarker.wasClean(building), "the real historical B writer closed cleanly");
++        IndexRecoveryMarker.write(building, "obsolete completed migration");
++        Files.delete(deleted);
++        if (denied) {
++          Files.setPosixFilePermissions(explicit, java.util.Set.of());
++          assertFalse(Files.isReadable(explicit), "real unreadable completed B source");
++          for (int restart = 0; restart < 2; restart++) {
++            try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++              assertEquals("IDLE", state(root).migration_state());
++              activate(server);
++              await(() -> search(server, "completedbuildaddedviolet").contains(key(added)),
++                  "other completed B work reaches A while one source is unreadable", 90);
++              assertEquals(original.building_generation(), state(root).previous_generation());
++              Release030RetirementSafetyTest.assertRetained(root, original.building_generation());
++              assertTrue(search(server, "copper").contains(key(explicit)), "unreadable B update retains serving A content");
++              assertTrue(Files.exists(root.resolve("data/upgrade-030-recovery.properties")));
++            }
++          }
++          Files.setPosixFilePermissions(explicit, permissions);
++        }
++        for (int restart = 0; restart < 2; restart++) {
++          try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++            assertEquals("IDLE", state(root).migration_state());
++            activate(server);
++            await(() -> state(root).previous_generation() == null
++                && search(server, "completedbuildexplicitviolet").contains(key(explicit))
++                && search(server, "completedbuildaddedviolet").contains(key(added))
++                && !search(server, "nebula").contains(key(deleted)),
++                "unjournalled completed B effects become durable A results before retirement", 120);
++            assertEquals(original.active_generation(), state(root).active_generation());
++            assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++            Release030RetirementSafetyTest.assertRetired(root, original.building_generation());
++            assertFalse(Files.exists(root.resolve("data/index/default/migration_progress.json")));
++          }
++        }
++      }
++    } finally {
++      Files.setPosixFilePermissions(explicit, permissions);
++      ConfigStore.restoreGlobal(installed, previous);
++    }
++  }
++}
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java
+new file mode 100644
+index 0000000000..3e3f72a84d
+--- /dev/null
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementCrashTest.java
+@@ -0,0 +1,186 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.server;
++
++import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++import io.justsearch.configuration.resolved.ConfigStore;
++import io.justsearch.core.execution.TestEngineExecutors;
++import io.justsearch.indexerworker.queue.JobQueue;
++import io.justsearch.indexerworker.queue.SqliteJobQueue;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.concurrent.TimeUnit;
++import org.junit.jupiter.api.Timeout;
++import org.junit.jupiter.api.io.TempDir;
++import org.junit.jupiter.params.ParameterizedTest;
++
++/** Real process death at cross-store publication boundaries; no close or shutdown hook runs. */
++@Timeout(600)
++@org.junit.jupiter.api.extension.ExtendWith(
++    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
++final class Release030RetirementCrashTest {
++  @ParameterizedTest
++  @org.junit.jupiter.params.provider.MethodSource("cuts")
++  void killedRetirementResumesAndBackupCannotReviveBuild(String cut, String fixture, @TempDir Path temporary)
++      throws Exception {
++      Path root = Release030Fixture.unpack(fixture, temporary.resolve(fixture));
++      var original = state(root);
++      Path updated = Files.writeString(root.resolve("roots/alpha/pending.txt"), "retirementcrashcobalt");
++      Files.delete(root.resolve("explicit.txt"));
++      Path rootOnly = Files.writeString(root.resolve("roots/alpha/root-only.txt"), "rootrecoveryadmittedcobalt");
++      try (var queue = new SqliteJobQueue(root.resolve("data/jobs.db"))) {
++        queue.open();
++        assertTrue(queue.enqueueAndBufferFileForGeneration(original.building_generation(),
++            JobQueue.EnqueueEntry.stat(updated).withinRoot(root.resolve("roots/alpha")), null));
++        String deleted = key(root.resolve("explicit.txt"));
++        assertTrue(queue.putSwitchBufferForGeneration(original.building_generation(), "path:" + deleted,
++            "DELETE", new io.justsearch.indexerworker.queue.SwitchBufferDelete(deleted,
++                io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode()));
++      }
++      if (cut.equals("during-deletion")) {
++        // The paused release can have no B payload yet. A real empty commit supplies a
++        // physical build file so the existing deletion harness can cut after removing it.
++        Path building = root.resolve("data/index/default/indices").resolve(original.building_generation());
++        try (var directory = org.apache.lucene.store.FSDirectory.open(building);
++            var writer = new org.apache.lucene.index.IndexWriter(directory,
++                new org.apache.lucene.index.IndexWriterConfig())) {
++          writer.commit();
++        }
++      }
++      killAt(root, cut, original.building_generation());
++      if (cut.equals("during-deletion") || cut.equals("release030-building-retired")) {
++        Path base = root.resolve("data/index/default");
++        Files.copy(base.resolve("state.json.prev"), base.resolve("state.json"),
++            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
++      }
++      ConfigStore previous = ConfigStore.globalOrNull();
++      var installed = configure(root);
++      try {
++        var models = new ReleasedModelIdentities(root);
++        try (models) {
++          for (int restart = 0; restart < 2; restart++) {
++            try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++              assertEquals("IDLE", state(root).migration_state(), "restoring a backup cannot revive the build");
++              assertNull(state(root).building_generation());
++              activate(server);
++              await(() -> state(root).previous_generation() == null
++                  && search(server, "retirementcrashcobalt").contains(key(updated))
++                  && !search(server, "copper").contains(key(root.resolve("explicit.txt")))
++                  && !Files.exists(root.resolve("data/upgrade-030-recovery.properties")),
++                  "replay and scheduled root recovery converge after " + cut, 150);
++              assertTrue(search(server, "rootrecoveryadmittedcobalt").contains(key(rootOnly)));
++              assertEquals(original.active_generation(), state(root).active_generation());
++              assertEquals("IDLE", state(root).migration_state());
++              assertNull(state(root).building_generation());
++              assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++              assertTrue(Release030RetirementSafetyTest.queue(server).listSwitchBufferOpsStrict().isEmpty());
++              assertFalse(Files.exists(root.resolve("data/index/default/migration_progress.json")));
++              try (var directories = Files.list(root.resolve("data/index/default/indices"))) {
++                assertTrue(directories.noneMatch(path -> path.getFileName().toString()
++                    .startsWith(original.building_generation())), "no original or marked B remains");
++              }
++            }
++          }
++        }
++      } finally { ConfigStore.restoreGlobal(installed, previous); }
++  }
++
++  static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> cuts() {
++    return java.util.stream.Stream.of("release030-checkpointed", "release030-cancelled", "release030-queue-prepared",
++        "release030-preparation-published", "release030-roots-journaled", "release030-root-admitted", "release030-root-walked", "release030-differences-committed", "release030-replay-before-commit", "release030-replay-committed",
++        "release030-journal-acknowledged", "release030-replay-complete", "during-deletion",
++        "release030-building-retired", "release030-retirement-complete")
++        .flatMap(cut -> java.util.stream.Stream.of("migrating", "switching")
++            .map(fixture -> org.junit.jupiter.params.provider.Arguments.of(cut, fixture)));
++  }
++
++  private static void killAt(Path root, String cut, String building) throws Exception {
++    Path args = root.resolve("child.args");
++    Files.writeString(args, "-cp\n\"" + System.getProperty("java.class.path")
++        .replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n");
++    var command = new ArrayList<>(List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
++        "-Xmx512m", "--enable-native-access=ALL-UNNAMED",
++        "-Djustsearch.test.noVolumeIdentity=" + Boolean.getBoolean("justsearch.test.noVolumeIdentity"), "-Djava.io.tmpdir=" + System.getProperty("java.io.tmpdir"),
++        "@" + args, Release030RetirementCrashTest.class.getName(), root.toString(), cut));
++    var builder = new ProcessBuilder(command).redirectErrorStream(true)
++        .redirectOutput(root.resolve("child.log").toFile());
++    builder.environment().remove("JAVA_TOOL_OPTIONS");
++    builder.environment().put("JUSTSEARCH_HOME", root.resolve("home").toString());
++    builder.environment().put("JUSTSEARCH_DATA_DIR", root.resolve("data").toString());
++    if (cut.equals("during-deletion")) {
++      builder.environment().put("JUSTSEARCH_SUPERVISOR_HARNESS", "1");
++      builder.environment().put("JUSTSEARCH_RETIREMENT_CUT_GENERATION", building);
++    }
++    Process child = builder.start();
++    Path reached = cut.equals("during-deletion")
++        ? root.resolve("data/index/default/retirement-cut-reached.txt") : root.resolve("cut");
++    try {
++      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(150);
++      while (child.isAlive() && !Files.exists(reached) && System.nanoTime() < deadline) Thread.sleep(20);
++      assertTrue(Files.exists(reached), () -> "child must reach " + cut + ": " + readLog(root));
++      if (child.isAlive()) child.destroyForcibly();
++      assertTrue(child.waitFor(15, TimeUnit.SECONDS));
++    } finally {
++      if (child.isAlive()) { child.destroyForcibly(); child.waitFor(15, TimeUnit.SECONDS); }
++    }
++  }
++
++  private static String readLog(Path root) {
++    try { return Files.readString(root.resolve("child.log")); }
++    catch (java.io.IOException failure) { return failure.toString(); }
++  }
++
++  public static void main(String[] args) throws Exception {
++    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.installVolumeLookupIfAbsent();
++    Path root = Path.of(args[0]);
++    String cut = args[1];
++    configure(root);
++    var models = new ReleasedModelIdentities(root);
++    try (models; var executors = new TestEngineExecutors()) {
++      var server = org.mockito.Mockito.spy(new KnowledgeServer(executors,
++          WorkerBootFixture.workerConfig(root.resolve("data")), null));
++      org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
++      server.bindBootRootBindings(List.of(
++          new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/alpha"), null),
++          new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/beta"), null)));
++      server.bindExclusionRoots(() -> List.of(root.resolve("roots/alpha"), root.resolve("roots/beta")));
++      server.installMigrationBarrierForTests(transition -> {
++        if (transition.point().equals(cut)) {
++          if (cut.equals("release030-replay-before-commit")) {
++            io.justsearch.adapters.lucene.runtime.LuceneRuntime active;
++            try {
++              var field = KnowledgeServer.class.getDeclaredField("searchLifecycle");
++              field.setAccessible(true);
++              active = (io.justsearch.adapters.lucene.runtime.LuceneRuntime) field.get(server);
++            } catch (ReflectiveOperationException failure) { throw new java.io.IOException(failure); }
++            active.commitOps().maybeRefreshBlocking();
++            String deleted = key(root.resolve("explicit.txt"));
++            assertEquals(0, active.indexCountOps().countByIdAndChunksStrict(deleted));
++            try (var directory = org.apache.lucene.store.FSDirectory.open(Release030CompatibilityTest.generation(root));
++                var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
++              assertEquals(1, new org.apache.lucene.search.IndexSearcher(reader).count(
++                  new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term("doc_id", deleted))),
++                  "the crash really cuts an uncommitted A deletion");
++            }
++            System.out.println("UNCOMMITTED_REPLAY_DELETE memory=absent disk=present");
++          }
++          Files.writeString(root.resolve("cut"), Long.toString(ProcessHandle.current().pid()));
++          new java.util.concurrent.CountDownLatch(1).await();
++        }
++      });
++      try (server) {
++        server.start();
++        assertEquals("IDLE", state(root).migration_state(), "an obsolete migration must cancel before replay");
++        activate(server);
++        var task = (java.util.concurrent.Future<?>) Release030ExtractionRecoveryTest.field(server, "release030RecoveryTask");
++        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(170);
++        while (!task.isDone() && System.nanoTime() < deadline) Thread.sleep(100);
++        if (task.isDone()) task.get(); // Surface an assertion from the scheduled recovery thread.
++        fail("retirement cut was never reached");
++      }
++    }
++  }
++}
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementHttpTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementHttpTest.java
+new file mode 100644
+index 0000000000..8ffe545661
+--- /dev/null
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementHttpTest.java
+@@ -0,0 +1,177 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.server;
++
++import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++import io.justsearch.indexerworker.queue.JobQueue;
++import io.justsearch.indexerworker.queue.SqliteJobQueue;
++import java.net.URI;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.time.Duration;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Map;
++import java.util.Properties;
++import java.util.concurrent.TimeUnit;
++import org.junit.jupiter.api.Tag;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.Timeout;
++import tools.jackson.databind.ObjectMapper;
++
++/** Installed jars over HTTP. Opt-in evidence reuses one fixed Engine folder across runs. */
++@Tag("evidence")
++@Timeout(360)
++final class Release030RetirementHttpTest {
++  private static final ObjectMapper JSON = new ObjectMapper();
++
++  @Test
++  void packagedSwitchingUpgradeAndRestartKeepReplayedSearch() throws Exception {
++    Path packaged = Path.of(System.getProperty("retirement.packaged.dir")).toAbsolutePath().normalize();
++    Path scratch = Path.of(System.getenv("TMPDIR")).toAbsolutePath().normalize();
++    Path root = Path.of(System.getProperty("retirement.engine.root", scratch.resolve("packaged-engine").toString()))
++        .toAbsolutePath().normalize();
++    assertTrue(root.startsWith(scratch), "the Engine evidence folder stays under TMPDIR");
++    Path originalFile = root.resolve("http-original.properties");
++    Properties original = new Properties();
++    if (!Files.exists(originalFile)) {
++      Release030Fixture.unpack("switching", root);
++      var state = state(root);
++      original.setProperty("active", state.active_generation());
++      original.setProperty("building", state.building_generation());
++      Path updated = Files.writeString(root.resolve("roots/alpha/pending.txt"), "httpreplayviolet");
++      Files.delete(root.resolve("roots/beta/file-01.txt"));
++      try (var queue = new SqliteJobQueue(root.resolve("data/jobs.db"))) {
++        queue.open();
++        assertTrue(queue.enqueueAndBufferFileForGeneration(state.building_generation(),
++            JobQueue.EnqueueEntry.stat(updated).withinRoot(root.resolve("roots/alpha")), null));
++      }
++      try (var out = Files.newOutputStream(originalFile)) { original.store(out, "fixed reusable Engine fixture"); }
++    } else try (var input = Files.newInputStream(originalFile)) { original.load(input); }
++    for (int boot = 0; boot < 2; boot++) {
++      try (var engine = new Engine(root, packaged, boot)) {
++        engine.ready();
++        await(() -> {
++          Thread.sleep(450); // Avoid busy HTTP polling and per-request production log writes.
++          return engine.has("httpreplayviolet", root.resolve("roots/alpha/pending.txt"))
++              && !engine.has("nebula", root.resolve("roots/beta/file-01.txt"));
++        },
++            "packaged HTTP exposes committed replay effects", 120);
++        assertTrue(engine.has("nebula", root.resolve("roots/alpha/file-01.txt")));
++        await(() -> state(root).previous_generation() == null, "packaged replay retires B", 120);
++        assertTrue(engine.has("copper", root.resolve("roots/alpha/file-00.txt")));
++        assertEquals(original.getProperty("active"), state(root).active_generation());
++        assertEquals("IDLE", state(root).migration_state());
++        assertFalse(Files.exists(root.resolve("data/index/default/indices").resolve(original.getProperty("building"))));
++        assertFalse(Files.exists(root.resolve("data/index/default/migration_progress.json")));
++        System.out.println("PACKAGED_HTTP boot=" + boot + " old=present updated=present deleted=absent active="
++            + state(root).active_generation() + " B=retired");
++      }
++    }
++  }
++
++  private static final class Engine implements AutoCloseable {
++    private final Path root;
++    private final Path output;
++    private final Process process;
++    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
++    private int port;
++
++    Engine(Path root, Path packaged, int boot) throws Exception {
++      this.root = root;
++      output = root.resolve("http-boot-" + boot + ".log");
++      List<String> jars = new ArrayList<>();
++      try (var files = Files.list(packaged)) {
++        files.filter(path -> path.toString().endsWith(".jar")).sorted().forEach(path -> jars.add(path.toString()));
++      }
++      try (var files = Files.list(packaged.resolve("lib"))) {
++        files.filter(path -> path.toString().endsWith(".jar")).sorted().forEach(path -> jars.add(path.toString()));
++      }
++      assertFalse(jars.isEmpty(), "headless distribution must be assembled");
++      String classpath = String.join(java.io.File.pathSeparator, jars)
++          + java.io.File.pathSeparator + System.getProperty("java.class.path");
++      Path arguments = root.resolve("packaged.args");
++      Files.writeString(arguments, "-cp\n\"" + classpath.replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n");
++      Path repo = Path.of(System.getProperty("user.dir")).toAbsolutePath();
++      while (!Files.isDirectory(repo.resolve("SSOT"))) repo = repo.getParent();
++      Path java = packaged.resolve("runtime/bin").resolve(
++          System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java");
++      assertTrue(Files.isExecutable(java), "the packaged runtime must be staged: " + java);
++      var command = List.of(java.toString(),
++          "-Xmx768m", "--enable-native-access=ALL-UNNAMED", "-Duser.home=" + root.resolve("home"),
++          "-Djustsearch.ssot.path=" + repo.resolve("SSOT"), "-Djava.io.tmpdir=" + System.getProperty("java.io.tmpdir"),
++          "-Djustsearch.test.noVolumeIdentity=" + Boolean.getBoolean("justsearch.test.noVolumeIdentity"),
++          "@" + arguments, Child.class.getName(), root.toString(), packaged.toString());
++      var builder = new ProcessBuilder(command).directory(repo.toFile())
++          .redirectErrorStream(true).redirectOutput(output.toFile());
++      var env = builder.environment();
++      env.keySet().removeIf(key -> key.startsWith("JUSTSEARCH_") || key.equals("JAVA_TOOL_OPTIONS"));
++      env.putAll(Map.of("JUSTSEARCH_HOME", root.resolve("home").toString(),
++          "JUSTSEARCH_DATA_DIR", root.resolve("data").toString(), "JUSTSEARCH_API_PORT", "0",
++          "JUSTSEARCH_MODE", "mcp-lite", "JUSTSEARCH_REPO_ROOT", repo.toString(),
++          "JUSTSEARCH_AI_DISABLED", "true", "JUSTSEARCH_LLM_ENABLED", "false", "JUSTSEARCH_GPU_ENABLED", "false"));
++      env.putAll(Map.of("JUSTSEARCH_NER_ENABLED", "false", "JUSTSEARCH_SPLADE_ENABLED", "false",
++          "JUSTSEARCH_AI_EMBED_ENABLED", "false"));
++      process = builder.start();
++    }
++
++    void ready() throws Exception {
++      await(() -> {
++        assertTrue(process.isAlive(), () -> "packaged Engine exited: " + log());
++        try {
++          var manifest = JSON.readTree(root.resolve("data/runtime/manifest.json").toFile());
++          port = manifest.path("head").path("apiPort").asInt();
++          var response = http.send(HttpRequest.newBuilder(URI.create(base() + "/api/knowledge/status"))
++              .timeout(Duration.ofSeconds(3)).GET().build(), HttpResponse.BodyHandlers.ofString());
++          return response.statusCode() == 200 && JSON.readTree(response.body()).path("ready").asBoolean();
++        } catch (java.io.IOException | tools.jackson.core.JacksonException unavailable) { return false; }
++      }, "packaged Engine becomes ready: " + output, 120);
++    }
++
++    boolean has(String query, Path file) throws Exception {
++      String body = JSON.writeValueAsString(Map.of("query", query, "limit", 100, "mode", "text"));
++      var response = http.send(HttpRequest.newBuilder(URI.create(base() + "/api/knowledge/search"))
++          .timeout(Duration.ofSeconds(5)).header("Content-Type", "application/json")
++          .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
++      assertEquals(200, response.statusCode(), response.body());
++      var results = JSON.readTree(response.body()).path("results");
++      assertTrue(results.isArray(), response.body());
++      for (var hit : results) if (key(file).equals(hit.path("id").asText())) return true;
++      return false;
++    }
++
++    private String base() { return "http://127.0.0.1:" + port; }
++    private String log() {
++      try { return Files.readString(output); } catch (java.io.IOException failure) { return failure.toString(); }
++    }
++    @Override public void close() throws Exception {
++      process.destroy();
++      if (!process.waitFor(30, TimeUnit.SECONDS)) {
++        process.destroyForcibly(); assertTrue(process.waitFor(10, TimeUnit.SECONDS));
++      }
++    }
++  }
++
++  public static final class Child {
++    public static void main(String[] args) throws Exception {
++      Path root = Path.of(args[0]), packaged = Path.of(args[1]);
++      io.justsearch.indexerworker.services.NoVolumeIdentityExtension.installVolumeLookupIfAbsent();
++      configure(root);
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        for (String type : List.of("io.justsearch.ui.HeadlessApp", KnowledgeServer.class.getName(),
++            "io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard")) {
++          Path loaded = Path.of(Class.forName(type).getProtectionDomain().getCodeSource().getLocation().toURI());
++          assertTrue(loaded.startsWith(packaged), type + " must load from the assembled distribution: " + loaded);
++        }
++        Class.forName("io.justsearch.ui.HeadlessApp").getMethod("main", String[].class)
++            .invoke(null, (Object) new String[0]);
++        new java.util.concurrent.CountDownLatch(1).await(); // Keep the released model identities for the Engine lifetime.
++      }
++    }
++  }
++}
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java
+new file mode 100644
+index 0000000000..acc8005f81
+--- /dev/null
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementOrderingTest.java
+@@ -0,0 +1,126 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.server;
++
++import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++import io.justsearch.configuration.resolved.ConfigStore;
++import io.justsearch.core.execution.TestEngineExecutors;
++import io.justsearch.indexerworker.queue.JobQueue;
++import io.justsearch.indexerworker.queue.SqliteJobQueue;
++import io.justsearch.indexerworker.services.CallContext;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.List;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.atomic.AtomicBoolean;
++import org.junit.jupiter.api.Timeout;
++import org.junit.jupiter.api.io.TempDir;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.ValueSource;
++
++/** U6 accepted ordering: newer acknowledged mutations precede a paused old recovery attempt. */
++@Timeout(240)
++@org.junit.jupiter.api.extension.ExtendWith(
++    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
++final class Release030RetirementOrderingTest {
++  @ParameterizedTest
++  @ValueSource(strings = {"update", "delete", "prefix"})
++  void newerAcknowledgementWinsPausedReplayAndRestart(String mutation, @TempDir Path temporary)
++      throws Exception {
++    Path root = Release030Fixture.unpack("switching", temporary);
++    var original = state(root);
++    Path file = Files.writeString(root.resolve("roots/alpha/pending.txt"), "oldreplaycobalt");
++    try (var queue = new SqliteJobQueue(root.resolve("data/jobs.db"))) {
++      queue.open();
++      assertTrue(queue.enqueueAndBufferFileForGeneration(original.building_generation(),
++          JobQueue.EnqueueEntry.stat(file).withinRoot(root.resolve("roots/alpha")), null));
++    }
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    var reached = new CountDownLatch(1);
++    var resume = new CountDownLatch(1);
++    var once = new AtomicBoolean();
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        try (var executors = new TestEngineExecutors(); var server = bootWithBarrier(root, executors,
++            transition -> {
++              if (transition.point().equals("release030-before-replay") && once.compareAndSet(false, true)) {
++                reached.countDown();
++                assertTrue(resume.await(30, TimeUnit.SECONDS), "paused recovery is released");
++              }
++            })) {
++          assertEquals("IDLE", state(root).migration_state());
++          activate(server);
++          assertTrue(reached.await(30, TimeUnit.SECONDS));
++          try {
++            var sync = server.appServices().ingestService().syncDirectory(io.justsearch.ipc.SyncDirectoryRequest
++                .newBuilder().setRootPath(root.resolve("roots/alpha").toString()).setForce(true).build(), CallContext.none());
++            assertTrue(sync.getError().isBlank(), sync.getError());
++            assertTrue(Release030RetirementSafetyTest.queue(server).listSwitchBufferOpsStrict().stream()
++                .anyMatch(op -> original.building_generation().equals(op.generation()) && op.op().equals("SYNC_ROOT")
++                    && !op.key().startsWith("release030-root:")), "the accepted sync has its own ordered receipt");
++            if (mutation.equals("update")) {
++              Files.writeString(file, "newreplayviolet");
++              assertEquals(1, server.appServices().ingestService().submitBatch(io.justsearch.ipc.BatchRequest
++                  .newBuilder().addFilePaths(file.toString()).setRootAdded(true).setForceReindex(true).build(),
++                  CallContext.none()).getAcceptedCount());
++            } else if (mutation.equals("delete")) {
++              assertTrue(server.appServices().ingestService().deleteById(io.justsearch.ipc.DeleteByIdRequest
++                  .newBuilder().setDocId(key(file)).build(), CallContext.none()).getError().isBlank());
++            } else {
++              assertTrue(server.appServices().ingestService().deleteByPath(io.justsearch.ipc.DeleteByPathRequest
++                  .newBuilder().setPath(root.resolve("roots/alpha").toString()).build(), CallContext.none())
++                  .getError().isBlank());
++            }
++            Path unrelated = Files.writeString(root.resolve("roots/beta/unrelated.txt"), "unrelatedviolet");
++            assertEquals(1, server.appServices().ingestService().submitBatch(io.justsearch.ipc.BatchRequest
++                .newBuilder().addFilePaths(unrelated.toString()).setRootAdded(true).build(), CallContext.none())
++                .getAcceptedCount(), "unrelated admission proceeds while old replay is paused");
++          } finally { resume.countDown(); }
++          await(() -> state(root).previous_generation() == null
++              && !Files.exists(root.resolve("data/upgrade-030-recovery.properties"))
++              && Release030RetirementSafetyTest.queue(server).jobStateCountsStrict().processingCount() == 0
++              && Release030RetirementSafetyTest.queue(server).jobStateCountsStrict().pendingReadyCount() == 0,
++              "all old recovery settles after the newer acknowledgement", 120);
++          assertFinal(server, file, mutation);
++          Release030RetirementSafetyTest.assertRetired(root, original.building_generation());
++        } finally { resume.countDown(); }
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          activate(server);
++          assertFinal(server, file, mutation);
++          Release030RetirementSafetyTest.assertRetired(root, original.building_generation());
++          assertEquals(original.active_generation(), state(root).active_generation());
++          assertNull(state(root).previous_generation());
++          assertTrue(Release030RetirementSafetyTest.queue(server).listSwitchBufferOpsStrict().isEmpty());
++        }
++      }
++    } finally { resume.countDown(); ConfigStore.restoreGlobal(installed, previous); }
++  }
++
++  private static void assertFinal(KnowledgeServer server, Path file, String mutation) throws Exception {
++    if (mutation.equals("update")) assertTrue(search(server, "newreplayviolet").contains(key(file)));
++    else {
++      assertFalse(search(server, "oldreplaycobalt").contains(key(file)), "older recovery cannot undo an acknowledged delete");
++      assertEquals(0, server.lifecycleManagerForTests().indexCountOps().countByIdAndChunksStrict(key(file)));
++    }
++    assertTrue(search(server, "unrelatedviolet").stream().anyMatch(id -> id.endsWith("/unrelated.txt")));
++    assertTrue(search(server, "nebula").contains(key(file.getParent().getParent().resolve("beta/file-02.txt"))));
++  }
++
++  static KnowledgeServer bootWithBarrier(Path root, TestEngineExecutors executors,
++      MigrationTransitionBarrier.Hook hook) throws Exception {
++    var server = org.mockito.Mockito.spy(new KnowledgeServer(executors,
++        WorkerBootFixture.workerConfig(root.resolve("data")), null));
++    org.mockito.Mockito.doNothing().when(server).startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
++    server.bindBootRootBindings(List.of(
++        new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/alpha"), null),
++        new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root.resolve("roots/beta"), null)));
++    server.bindExclusionRoots(() -> List.of(root.resolve("roots/alpha"), root.resolve("roots/beta")));
++    server.installMigrationBarrierForTests(hook);
++    try { server.start(); } catch (Exception | Error failure) { server.close(); throw failure; }
++    return server;
++  }
++}
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java
+new file mode 100644
+index 0000000000..379d4b38ac
+--- /dev/null
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementPartialWalkTest.java
+@@ -0,0 +1,137 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.server;
++
++import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++import io.justsearch.configuration.resolved.ConfigStore;
++import io.justsearch.core.execution.TestEngineExecutors;
++import io.justsearch.indexerworker.queue.SqliteJobQueue;
++import io.justsearch.indexerworker.queue.SwitchBufferSyncRoot;
++import io.justsearch.indexerworker.services.CallContext;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.Properties;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.Timeout;
++import org.junit.jupiter.api.io.TempDir;
++
++/** U6: a listable root with an unreadable child does not certify its buffered SYNC_ROOT. */
++@Timeout(240)
++@org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
++@org.junit.jupiter.api.extension.ExtendWith(
++    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
++final class Release030RetirementPartialWalkTest {
++  @Test
++  void partialWalkRetainsReceiptAndBuildUntilACompleteWalk(@TempDir Path temporary) throws Exception {
++    Path root = Release030Fixture.unpack("switching", temporary);
++    var original = state(root);
++    String syncKey;
++    Path watched;
++    try (var queue = new SqliteJobQueue(root.resolve("data/jobs.db"))) {
++      queue.open();
++      var receipt = queue.listSwitchBufferOpsStrict().stream().filter(op -> op.op().equals("SYNC_ROOT"))
++          .findFirst().orElseThrow();
++      watched = Path.of(SwitchBufferSyncRoot.decode(receipt.payload()).rootPath());
++      syncKey = receipt.key();
++    }
++    Path denied = Files.createDirectory(watched.resolve("denied-subtree"));
++    Path hidden = Files.writeString(denied.resolve("new.txt"), "partialwalkviolet");
++    var permissions = Files.getPosixFilePermissions(denied);
++    Files.setPosixFilePermissions(denied, java.util.Set.of());
++    assertFalse(Files.isReadable(denied), "real denied subtree precondition");
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        for (int restart = 0; restart < 2; restart++) {
++          try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++            assertEquals("IDLE", state(root).migration_state());
++            activate(server);
++            var response = server.appServices().ingestService().syncDirectory(io.justsearch.ipc.SyncDirectoryRequest
++                .newBuilder().setRootPath(watched.toString()).build(), CallContext.none());
++            assertTrue(response.getError().isBlank(), response.getError());
++            assertTrue(response.getDeleteDetectionUnverified(), "a partial walk reports uncertainty on the real interface");
++            await(() -> differencesComplete(root)
++                && Release030RetirementSafetyTest.queue(server).jobStateCountsStrict().pendingReadyCount() == 0
++                && Release030RetirementSafetyTest.queue(server).jobStateCountsStrict().processingCount() == 0,
++                "other readable differences settle while the partial SYNC_ROOT stays outstanding", 90);
++            assertEquals(original.active_generation(), state(root).active_generation());
++            assertEquals(original.building_generation(), state(root).previous_generation());
++            Release030RetirementSafetyTest.assertRetained(root, original.building_generation());
++            assertTrue(Release030RetirementSafetyTest.queue(server).listSwitchBufferOpsStrict().stream()
++                .anyMatch(op -> op.key().equals(syncKey) && op.op().equals("SYNC_ROOT")));
++            assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++            assertTrue(search(server, "partialwalkviolet").isEmpty());
++          }
++        }
++        Files.setPosixFilePermissions(denied, permissions);
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          activate(server);
++          await(() -> state(root).previous_generation() == null
++              && search(server, "partialwalkviolet").contains(key(hidden)),
++              "confirmed full walk indexes the unread source before retiring B", 100);
++          assertEquals(original.active_generation(), state(root).active_generation());
++          Release030RetirementSafetyTest.assertRetired(root, original.building_generation());
++          assertTrue(Release030RetirementSafetyTest.queue(server).listSwitchBufferOpsStrict().isEmpty());
++        }
++      }
++    } finally {
++      Files.setPosixFilePermissions(denied, permissions);
++      ConfigStore.restoreGlobal(installed, previous);
++    }
++  }
++
++  @Test
++  void ordinaryPartialWalkReportsUnverifiedDeletionAcrossRestart(@TempDir Path temporary) throws Exception {
++    Path root = Release030Fixture.unpack("small", temporary);
++    String active = state(root).active_generation();
++    Path watched = root.resolve("roots/alpha");
++    Path denied = Files.createDirectory(watched.resolve("denied-subtree"));
++    Path hidden = Files.writeString(denied.resolve("new.txt"), "ordinarypartialviolet");
++    var permissions = Files.getPosixFilePermissions(denied);
++    Files.setPosixFilePermissions(denied, java.util.Set.of());
++    assertFalse(Files.isReadable(denied));
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        for (int restart = 0; restart < 2; restart++) {
++          try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++            activate(server);
++            var response = server.appServices().ingestService().syncDirectory(io.justsearch.ipc.SyncDirectoryRequest
++                .newBuilder().setRootPath(watched.toString()).build(), CallContext.none());
++            assertTrue(response.getError().isBlank(), response.getError());
++            assertTrue(response.getDeleteDetectionUnverified(), "a partial ordinary walk cannot certify deletion");
++            assertTrue(search(server, "nebula").contains(key(watched.resolve("file-01.txt"))));
++            assertTrue(search(server, "ordinarypartialviolet").isEmpty());
++            assertEquals(active, state(root).active_generation());
++          }
++        }
++        Files.setPosixFilePermissions(denied, permissions);
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          activate(server);
++          var response = server.appServices().ingestService().syncDirectory(io.justsearch.ipc.SyncDirectoryRequest
++              .newBuilder().setRootPath(watched.toString()).build(), CallContext.none());
++          assertTrue(response.getError().isBlank(), response.getError());
++          assertFalse(response.getDeleteDetectionUnverified(), "a complete walk certifies its own evidence");
++          await(() -> search(server, "ordinarypartialviolet").contains(key(hidden)), "confirmed walk indexes the source");
++          assertEquals(active, state(root).active_generation());
++        }
++      }
++    } finally {
++      Files.setPosixFilePermissions(denied, permissions);
++      ConfigStore.restoreGlobal(installed, previous);
++    }
++  }
++
++  private static boolean differencesComplete(Path root) throws Exception {
++    var checkpoint = new Properties();
++    Path path = root.resolve("data/upgrade-030-recovery.properties");
++    if (!Files.exists(path)) return false;
++    try (var input = Files.newInputStream(path)) { checkpoint.load(input); }
++    return "true".equals(checkpoint.getProperty("retire|differences"));
++  }
++}
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java
+new file mode 100644
+index 0000000000..d3fb043121
+--- /dev/null
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030RetirementSafetyTest.java
+@@ -0,0 +1,359 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.server;
++
++import static io.justsearch.indexerworker.server.Release030UpgradeCharacterizationTest.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++import io.justsearch.configuration.resolved.ConfigStore;
++import io.justsearch.core.execution.TestEngineExecutors;
++import io.justsearch.indexerworker.queue.SqliteJobQueue;
++import io.justsearch.indexerworker.services.CallContext;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.Timeout;
++import org.junit.jupiter.api.io.TempDir;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.ValueSource;
++
++/** Completed, unjournalled release effects and uncertain source obligations across real boots. */
++@Timeout(240)
++@org.junit.jupiter.api.extension.ExtendWith(
++    io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
++final class Release030RetirementSafetyTest {
++  @Test
++  void alreadyDoneExplicitFileOnServingGenerationSurvivesResume(@TempDir Path temporary)
++      throws Exception {
++    Path root = Release030Fixture.unpack("migrating", temporary);
++    var original = state(root);
++    Path explicit = root.resolve("explicit.txt");
++    Files.writeString(root.resolve("neighbor.txt"), "unrequestedneighbor");
++    Path sentinel = buildingSentinel(root);
++    String owner = Files.readString(sentinel);
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        Files.writeString(sentinel, "unverified ownership");
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          stopMonitor(server);
++          assertTrue(search(server, "copper").contains(key(explicit)), "released A contains the explicit file");
++          // The authentic admitted file already has its bytes on A. Model the released DONE row
++          // using the real queue completion API, after proving those bytes, never invented DDL.
++          assertEquals(Release030Fixture.sha256(Files.readAllBytes(explicit)),
++              ((io.justsearch.adapters.lucene.runtime.LuceneRuntime)
++                  Release030ExtractionRecoveryTest.field(server, "searchLifecycle"))
++                  .documentFieldOps().getDocumentFieldOrThrow(
++                  key(explicit), io.justsearch.indexing.SchemaFields.SOURCE_SHA256));
++          queue(server).markDone(explicit);
++          assertEquals(1, count(root, "path='" + key(explicit) + "' AND state='DONE'"));
++        } finally { Files.writeString(sentinel, owner); }
++        for (int restart = 0; restart < 2; restart++) {
++          try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++            if ("IDLE".equals(state(root).migration_state())) {
++              activate(server);
++            } else {
++              Release030ExactFileRecoveryTest.activateNative(server);
++              assertTrue(server.appServices().ingestService().resumeMigration(
++                  io.justsearch.ipc.MigrationResumeRequest.getDefaultInstance(), CallContext.none()).getAccepted());
++            }
++            await(() -> "IDLE".equals(state(root).migration_state()) && state(root).previous_generation() == null,
++                "completed explicit content is preserved while the old build retires", 90);
++            assertTrue(search(server, "copper").contains(key(explicit)),
++                "already-DONE explicit content outside every root must stay searchable");
++            assertEquals(original.active_generation(), state(root).active_generation());
++            assertRetired(root, original.building_generation());
++            assertTrue(search(server, "unrequestedneighbor").isEmpty());
++            assertEquals(0, count(root, "path='" + key(root.resolve("neighbor.txt")) + "'"),
++                "DONE explicit recovery grants no authority to its neighbor");
++          }
++        }
++      }
++    } finally { ConfigStore.restoreGlobal(installed, previous); }
++  }
++
++  @ParameterizedTest
++  @ValueSource(strings = {"migrating", "switching"})
++  void unavailableRootKeepsBuildAndOldSearchWhileOtherMutationsProceed(String fixture,
++      @TempDir Path temporary) throws Exception {
++    Path root = Release030Fixture.unpack(fixture, temporary);
++    var original = state(root);
++    Path beta = root.resolve("roots/beta");
++    Path updated = Files.writeString(beta.resolve("file-01.txt"), "returnedrootviolet");
++    if (fixture.equals("migrating")) {
++      try (var queue = new SqliteJobQueue(root.resolve("data/jobs.db"))) {
++        queue.open();
++        assertTrue(queue.enqueueAndBufferFileForGeneration(original.building_generation(),
++            io.justsearch.indexerworker.queue.JobQueue.EnqueueEntry.stat(updated).withinRoot(beta), null));
++      }
++    }
++    Path held = Files.move(beta, root.resolve("held-beta"));
++    Path unrelated = root.resolve("roots/alpha/unrelated.txt");
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        for (int restart = 0; restart < 2; restart++) {
++          try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++            assertEquals("IDLE", state(root).migration_state());
++            activate(server);
++            Files.writeString(unrelated, "unrelatedcobalt");
++            assertEquals(1, server.appServices().ingestService().submitBatch(io.justsearch.ipc.BatchRequest
++                .newBuilder().addFilePaths(unrelated.toString()).setRootAdded(true).build(), CallContext.none())
++                .getAcceptedCount());
++            await(() -> search(server, "unrelatedcobalt").contains(key(unrelated)),
++                "unrelated writes remain available during unresolved replay");
++            assertEquals(original.active_generation(), state(root).active_generation());
++            assertEquals(original.building_generation(), state(root).previous_generation());
++            assertRetained(root, original.building_generation());
++            assertTrue(Files.exists(root.resolve("data/upgrade-030-recovery.properties")));
++            assertTrue(search(server, "nebula").contains(key(beta.resolve("file-01.txt"))));
++          }
++        }
++        Files.move(held, beta);
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          activate(server);
++          await(() -> state(root).previous_generation() == null,
++              "returned root resolves its durable obligation and permits B retirement", 100);
++          assertEquals(original.active_generation(), state(root).active_generation());
++          assertTrue(search(server, "unrelatedcobalt").contains(key(unrelated)));
++          assertTrue(search(server, "returnedrootviolet").contains(key(updated)));
++          assertRetired(root, original.building_generation());
++          assertFalse(search(server, "nebula").contains(key(updated)));
++        }
++      }
++    } finally {
++      if (Files.exists(held)) Files.move(held, beta);
++      ConfigStore.restoreGlobal(installed, previous);
++    }
++  }
++
++  @Test
++  void reappearedLegacyDeleteProvesCurrentBytesBeforeAcknowledgement(@TempDir Path temporary)
++      throws Exception {
++    Path root = Release030Fixture.unpack("switching", temporary);
++    var original = state(root);
++    Path file = Files.writeString(root.resolve("roots/beta/file-01.txt"), "reappearedviolet");
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        for (int restart = 0; restart < 2; restart++) {
++          try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++            assertEquals("IDLE", state(root).migration_state());
++            activate(server);
++            await(() -> state(root).previous_generation() == null
++                && search(server, "reappearedviolet").contains(key(file)),
++                "a reappeared DELETE is acknowledged only for A's current committed bytes", 100);
++            assertEquals(original.active_generation(), state(root).active_generation());
++            assertRetired(root, original.building_generation());
++            assertFalse(search(server, "nebula").contains(key(file)));
++            assertTrue(queue(server).listSwitchBufferOpsStrict().isEmpty());
++          }
++        }
++      }
++    } finally { ConfigStore.restoreGlobal(installed, previous); }
++  }
++
++  @ParameterizedTest
++  @ValueSource(strings = {"analyzer_fp", "vector_format", "unresolved-model"})
++  void uncertifiedServingGenerationKeepsOriginalMigration(String failure, @TempDir Path temporary)
++      throws Exception {
++    Path root = Release030Fixture.unpack("migrating", temporary);
++    var original = state(root);
++    Path active = Release030CompatibilityTest.generation(root);
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        if (failure.equals("unresolved-model")) {
++          Class<?> type = io.justsearch.indexerworker.embed.EmbeddingFingerprint.class;
++          var field = type.getDeclaredField("cachedResult"); field.setAccessible(true);
++          @SuppressWarnings("unchecked")
++          var cache = (java.util.concurrent.atomic.AtomicReference<Object>) field.get(null);
++          var constructor = Class.forName(type.getName() + "$CachedResult")
++              .getDeclaredConstructor(java.util.Optional.class, java.util.Optional.class);
++          constructor.setAccessible(true);
++          cache.set(constructor.newInstance(java.util.Optional.of(root.resolve("unreadable-model.onnx")),
++              java.util.Optional.empty()));
++        } else {
++          var metadata = new java.util.HashMap<>(Release030CompatibilityTest.readMetadata(active));
++          var json = new tools.jackson.databind.ObjectMapper();
++          var inputs = (tools.jackson.databind.node.ObjectNode) json.readTree(metadata.get("index_fingerprint_inputs"));
++          inputs.put(failure, failure.equals("analyzer_fp") ? "b".repeat(64) : "incompatible-vector-format");
++          metadata.put("index_fingerprint_inputs", json.writeValueAsString(inputs));
++          metadata.remove("index_fingerprint");
++          try (var directory = org.apache.lucene.store.FSDirectory.open(active);
++              var writer = new org.apache.lucene.index.IndexWriter(directory,
++                  new org.apache.lucene.index.IndexWriterConfig().setOpenMode(
++                      org.apache.lucene.index.IndexWriterConfig.OpenMode.APPEND))) {
++            writer.setLiveCommitData(metadata.entrySet()); writer.commit();
++          }
++        }
++        for (int restart = 0; restart < 2; restart++) {
++          try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++            assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++            assertEquals(original.migration_state(), state(root).migration_state());
++            assertRetained(root, original.building_generation());
++          }
++        }
++        assertEquals(original.migration_state(), state(root).migration_state());
++        assertEquals(original.active_generation(), state(root).active_generation());
++        assertEquals(original.building_generation(), state(root).building_generation());
++        var checkpoint = new java.util.Properties();
++        try (var input = Files.newInputStream(root.resolve("data/upgrade-030-recovery.properties"))) {
++          checkpoint.load(input);
++        }
++        assertNull(checkpoint.getProperty("retire|active"), "uncertainty never becomes a cancellation certificate");
++      }
++    } finally { ConfigStore.restoreGlobal(installed, previous); }
++  }
++
++  @ParameterizedTest
++  @ValueSource(strings = {"migrating", "switching"})
++  void corruptCommitKeepsNativeRecoveryInsteadOfRetiring(String fixture, @TempDir Path temporary)
++      throws Exception {
++    Path root = Release030Fixture.unpack(fixture, temporary);
++    var original = state(root);
++    Path active = Release030CompatibilityTest.generation(root);
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        java.util.List<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp> before;
++        try (var queue = new SqliteJobQueue(root.resolve("data/jobs.db"))) {
++          queue.open(); before = queue.listSwitchBufferOpsStrict();
++        }
++        String commit;
++        try (var directory = org.apache.lucene.store.FSDirectory.open(active);
++            var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
++          commit = reader.getIndexCommit().getSegmentsFileName();
++        }
++        byte[] damaged = {1, 2, 3};
++        Files.write(active.resolve(commit), damaged);
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          stopMonitor(server);
++          assertEquals(original.migration_state(), state(root).migration_state());
++          assertEquals(original.active_generation(), state(root).active_generation());
++          assertEquals(original.building_generation(), state(root).building_generation());
++          assertTrue(Files.isDirectory(root.resolve("data/index/default/indices").resolve(original.building_generation())));
++          assertEquals(before, queue(server).listSwitchBufferOpsStrict(), "native recovery retains the same receipts as base");
++          assertTrue(search(server, "nebula").isEmpty(), "today's backup-first path boots an empty replacement A");
++          assertTrue(io.justsearch.adapters.lucene.runtime.IndexRecoveryMarker.exists(active));
++          try (var siblings = Files.list(active.getParent())) {
++            var backups = siblings.filter(path -> path.getFileName().toString()
++                .startsWith(original.active_generation() + ".bak-")).toList();
++            assertEquals(1, backups.size(), "today's backup-first recovery retains the corrupt original");
++            assertArrayEquals(damaged, Files.readAllBytes(backups.getFirst().resolve(commit)));
++          }
++          var checkpoint = new java.util.Properties();
++          try (var input = Files.newInputStream(root.resolve("data/upgrade-030-recovery.properties"))) {
++            checkpoint.load(input);
++          }
++          assertNull(checkpoint.getProperty("retire|active"), "a corrupt commit never certifies obsolete retirement");
++        }
++      }
++    } finally { ConfigStore.restoreGlobal(installed, previous); }
++  }
++
++  @Test
++  void modernUnownedAdmissionCannotBorrowRetiredBuildAuthority(@TempDir Path temporary) throws Exception {
++    Path root = Release030Fixture.unpack("migrating", temporary);
++    var original = state(root);
++    Path file = Files.writeString(root.resolve("explicit.txt"), "unownedreplacementviolet");
++    Path neighbor = Files.writeString(root.resolve("neighbor.txt"), "unrequestedneighbor");
++    Files.delete(root.resolve("roots/beta/file-01.txt"));
++    try (var queue = new SqliteJobQueue(root.resolve("data/jobs.db"))) {
++      queue.open();
++      assertEquals(1, queue.enqueueEntries(java.util.List.of(
++          io.justsearch.indexerworker.queue.JobQueue.EnqueueEntry.stat(file)), null));
++    }
++    ConfigStore previous = ConfigStore.globalOrNull();
++    var installed = configure(root);
++    try {
++      var models = new ReleasedModelIdentities(root);
++      try (models) {
++        for (int restart = 0; restart < 2; restart++) {
++          try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++            assertEquals("IDLE", state(root).migration_state());
++            activate(server);
++            Path unrelated = Files.writeString(root.resolve("roots/alpha/unrelated.txt"), "independentauthoritycobalt");
++            assertEquals(1, server.appServices().ingestService().submitBatch(io.justsearch.ipc.BatchRequest
++                .newBuilder().addFilePaths(unrelated.toString()).setRootAdded(true).build(), CallContext.none())
++                .getAcceptedCount());
++            await(() -> search(server, "independentauthoritycobalt").contains(key(unrelated)),
++                "normal admissions proceed while unowned recovery remains quarantined");
++            assertFalse(queue(server).isRelease030ExactFile(file));
++            assertTrue(search(server, "copper").contains(key(file)), "A retains the acknowledged original bytes");
++            assertTrue(search(server, "unownedreplacementviolet").isEmpty());
++            assertEquals(original.building_generation(), state(root).previous_generation());
++            assertRetained(root, original.building_generation());
++            assertTrue(Files.exists(root.resolve("data/upgrade-030-recovery.properties")));
++            assertEquals(1, count(root, "path='" + key(file)
++                + "' AND ingestion_root IS NULL AND unit_revision LIKE 'release030-unscoped/%'"));
++          }
++        }
++        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
++          activate(server);
++          assertEquals(1, server.appServices().ingestService().submitBatch(io.justsearch.ipc.BatchRequest
++              .newBuilder().addFilePaths(file.toString()).setRootAdded(true).setForceReindex(true).build(),
++              CallContext.none()).getAcceptedCount());
++          await(() -> search(server, "unownedreplacementviolet").contains(key(file))
++              && state(root).previous_generation() == null, "a deliberate exact-file admission settles its own debt", 100);
++          assertTrue(search(server, "nebula").contains(key(root.resolve("roots/alpha/file-01.txt"))));
++          assertFalse(search(server, "nebula").contains(key(root.resolve("roots/beta/file-01.txt"))));
++          assertTrue(search(server, "unrequestedneighbor").isEmpty());
++          assertEquals(0, count(root, "path='" + key(neighbor) + "'"));
++          assertEquals(original.active_generation(), state(root).active_generation());
++          assertRetired(root, original.building_generation());
++        }
++      }
++    } finally { ConfigStore.restoreGlobal(installed, previous); }
++  }
++
++  static void assertRetained(Path root, String building) {
++    assertTrue(Files.isDirectory(root.resolve("data/index/default/indices").resolve(building)),
++        "uncertainty retains the physical B generation");
++    assertTrue(Files.exists(root.resolve("data/upgrade-030-recovery.properties")));
++  }
++
++  static void assertRetired(Path root, String building) throws Exception {
++    Path base = root.resolve("data/index/default");
++    try {
++      await(() -> {
++        if (Files.exists(base.resolve("migration_progress.json"))
++            || Files.exists(base.resolve("migration_progress.json.tmp"))) return false;
++        try (var entries = Files.list(base.resolve("indices"))) {
++          return entries.noneMatch(path -> path.getFileName().toString().startsWith(building));
++        }
++      }, "physical B and migration leftovers are retired", 15);
++    } catch (AssertionError incomplete) {
++      try (var entries = Files.list(base.resolve("indices"))) {
++        throw new AssertionError("Retirement leftovers: " + entries.map(Path::getFileName).toList()
++            + "; progress=" + Files.exists(base.resolve("migration_progress.json"))
++            + "; progress.tmp=" + Files.exists(base.resolve("migration_progress.json.tmp"))
++            + "; state=" + state(root), incomplete);
++      }
++    }
++  }
++
++  static SqliteJobQueue queue(KnowledgeServer server) throws Exception {
++    return (SqliteJobQueue) Release030ExtractionRecoveryTest.field(server, "jobQueue");
++  }
++
++  static Path buildingSentinel(Path root) {
++    return root.resolve("data/index/default/indices").resolve(state(root).building_generation())
++        .resolve(".justsearch-generation.sentinel");
++  }
++
++  static void stopMonitor(KnowledgeServer server) throws Exception {
++    if (Release030ExtractionRecoveryTest.field(server, "migrationCutoverThread") instanceof Thread monitor) {
++      monitor.interrupt(); monitor.join(10_000); assertFalse(monitor.isAlive());
++    }
++  }
++}
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java
+index 3afa88f0f8..00f61370ac 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeCharacterizationTest.java
+@@ -243 +243,3 @@ final class Release030UpgradeCharacterizationTest {
+-    ReleasedModelIdentities(Path root) throws Exception {
++    ReleasedModelIdentities(Path root) throws Exception { this(root, false); }
++
++    ReleasedModelIdentities(Path root, boolean nativeAnalyzerMismatch) throws Exception {
+@@ -263,0 +266,6 @@ final class Release030UpgradeCharacterizationTest {
++        if (nativeAnalyzerMismatch) {
++          assertEquals("b".repeat(64), inputs.path("analyzer_fp").asText(), "the native fixture has its stated mismatch");
++          org.junit.jupiter.api.Assertions.assertNotEquals(inputs.get("analyzer_fp"), current.get("analyzer_fp"));
++          ((tools.jackson.databind.node.ObjectNode) inputs).remove("analyzer_fp");
++          current.remove("analyzer_fp");
++        }
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java
+index 9ac75d7a02..536ad00d9c 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java
+@@ -42,2 +42,7 @@ final class Release030UpgradeProbeTest {
+-          assertEquals(metadata.get("index_fingerprint"),
+-              Release030CompatibilityTest.readMetadata(serving).get("index_fingerprint"));
++          assertEquals(serving, Release030CompatibilityTest.generation(root), "the serving generation identity survives");
++          var oldInputs = new tools.jackson.databind.ObjectMapper().readTree(metadata.get("index_fingerprint_inputs"));
++          var newInputs = new tools.jackson.databind.ObjectMapper().readTree(
++              Release030CompatibilityTest.readMetadata(serving).get("index_fingerprint_inputs"));
++          for (String identity : List.of("analyzer_fp", "embedding_model_sha256", "splade_model_sha256", "ner_model_sha256")) {
++            assertEquals(oldInputs.get(identity), newInputs.get(identity), "compatible writes preserve " + identity);
++          }
+diff --git a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LiveMigrationCutoverTest.java b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LiveMigrationCutoverTest.java
+index cbed124d62..6d2342caff 100644
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LiveMigrationCutoverTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/LiveMigrationCutoverTest.java
+@@ -35,0 +36,2 @@ final class LiveMigrationCutoverTest {
++    org.mockito.Mockito.when(queue.jobStateCountsStrict())
++        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
+@@ -72,0 +75,2 @@ final class LiveMigrationCutoverTest {
++    org.mockito.Mockito.when(queue.jobStateCountsStrict())
++        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
+@@ -99,0 +104,2 @@ final class LiveMigrationCutoverTest {
++    org.mockito.Mockito.when(queue.jobStateCountsStrict())
++        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
+@@ -140,0 +147,2 @@ final class LiveMigrationCutoverTest {
++    org.mockito.Mockito.when(queue.jobStateCountsStrict())
++        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
+@@ -300,0 +309,2 @@ final class LiveMigrationCutoverTest {
++    org.mockito.Mockito.when(queue.jobStateCountsStrict())
++        .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));

@@ -1,0 +1,41 @@
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
+@@ -114,6 +114,8 @@
+  * through {@link #appServices()}. The name is kept because every log line, metric and doc uses it.
+  */
+ public final class KnowledgeServer implements Closeable {
++  // Compatibility for the fixture stub only; old production never invokes this method.
++  protected long recoveryRetryDelayMillis(long delayMs) { return delayMs; }
+   private static final Logger log = LoggerFactory.getLogger(KnowledgeServer.class);
+   private static final ObjectMapper JSON = new ObjectMapper();
+ 
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/LoopPacingPolicy.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/LoopPacingPolicy.java
+@@ -5,7 +5,8 @@
+ import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
+ 
+ public final class LoopPacingPolicy {
+-  private static final long IDLE_SLEEP_MS = 1000L;
++  // Timing seam only: the production idle default is unchanged.
++  private static volatile long idleSleepMillis = 1000L;
+   private static final long ACTIVE_IDLE_SLEEP_MS = 100L;
+ 
+   // Tempdoc 710 Wave-1.5 Move 4: pollBatchSize / embeddingBackfillBatchSize /
+@@ -19,7 +20,7 @@
+   private LoopPacingPolicy() {}
+ 
+   public static long idleSleepMs() {
+-    return IDLE_SLEEP_MS;
++    return idleSleepMillis;
+   }
+ 
+   public static long activeIdleSleepMs() {
+@@ -32,7 +33,7 @@
+    * idleness.
+    */
+   public static long idleSleepMs(boolean recentlyActive) {
+-    return recentlyActive ? ACTIVE_IDLE_SLEEP_MS : IDLE_SLEEP_MS;
++    return recentlyActive ? ACTIVE_IDLE_SLEEP_MS : idleSleepMillis;
+   }
+ 
+   /**

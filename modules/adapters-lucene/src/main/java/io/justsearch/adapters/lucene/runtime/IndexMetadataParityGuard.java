@@ -174,6 +174,31 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
     }
   }
 
+  /** Positive evidence for cancelling an obsolete build; uncertainty is never compatibility. */
+  public static boolean certifiesCommittedCompatibility(Path path, Map<String, Object> expected,
+      List<String> unresolvedInputs) throws IOException {
+    if (!unresolvedInputs.isEmpty()
+        || !IndexFingerprint.isWellFormedDigest(Objects.toString(expected.get("index_fingerprint"), null))) {
+      return false;
+    }
+    try (Directory directory = FSDirectory.open(path);
+        DirectoryReader reader = DirectoryReader.open(directory)) {
+      var stored = reader.getIndexCommit().getUserData();
+      if (ParityDiagnostics.storedShapeUnreadable(stored, expected)
+          || (!IndexFingerprint.isWellFormedDigest(stored.get("index_fingerprint"))
+              && (!IndexFingerprint.isReadableInputs(stored.get("index_fingerprint_inputs"))
+                  || !IndexFingerprint.nullModelInputs(stored.get("index_fingerprint_inputs")).isEmpty()))) {
+        // Without a committed digest, a null/missing model input cannot distinguish an
+        // unconfigured model from an unreadable one. The ordinary open comparison deliberately
+        // tolerates that uncertainty; it cannot authorize discarding a migration.
+        return false;
+      }
+      for (var leaf : reader.leaves()) leaf.reader().checkIntegrity();
+      return !ParityDiagnostics.requiresRebuild(
+          ParityDiagnostics.diff(stored, expected, Math.max(1, reader.numDocs()), unresolvedInputs));
+    }
+  }
+
   /**
    * The mismatch a rebuild-requiring diff means, as an exception. One message, whether it is raised
    * before the open (pre-open detection) or during it (this guard) — a difference in wording would

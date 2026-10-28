@@ -64,11 +64,61 @@ final class LegacyApprovedGapReplayTest extends LuceneExecutorTestBase {
     }
   }
 
+  @Test void exactApprovedMalformedRootPreservesUnrelatedDelete() throws Exception { checkMalformedRootApproval(true, false); }
+  @Test void unapprovedMalformedRootIsHeld() throws Exception { checkMalformedRootApproval(false, false); }
+  @Test void changedRevisionCannotReuseApproval() throws Exception { checkMalformedRootApproval(true, true); }
+
+  private void checkMalformedRootApproval(boolean approve, boolean replace) throws Exception {
+    Path parent = Files.createDirectories(directory.resolve("parent"));
+    String path = PathNormalizer.normalizeKey(parent.resolve("remove.txt"));
+    try (var queue = new SqliteJobQueue(directory.resolve("jobs.db"));
+        var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0))
+            .atPath(directory.resolve("index")).withExecutorRegistrations(testLuceneExecutors()).open()) {
+      queue.open();
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, path, SchemaFields.DOC_UID, "removed-file",
+          SchemaFields.PATH, path, SchemaFields.CONTENT, "remove")));
+      runtime.commitOps().commitAndTrack();
+      assertTrue(queue.putSwitchBufferForGeneration("green", "root:malformed", "SYNC_ROOT", "malformed"));
+      var approved = queue.listSwitchBufferOpsStrictForGeneration("green").getFirst();
+      if (replace) {
+        assertTrue(queue.putSwitchBufferForGeneration("green", approved.key(), "SYNC_ROOT", "malformed-replacement"));
+        var changed = queue.listSwitchBufferOpsStrictForGeneration("green").getFirst();
+        assertEquals(approved.key(), changed.key());
+        assertNotEquals(approved.revision(), changed.revision());
+      }
+      String deletion = new io.justsearch.indexerworker.queue.SwitchBufferDelete(
+          path, io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode();
+      if (approve && !replace) assertTrue(queue.putSwitchBufferForGeneration("green", "path:" + path, "DELETE", deletion));
+      var before = queue.listSwitchBufferOpsStrictForGeneration("green");
+      var context = context(queue, runtime, approve ? Set.of(approved) : Set.of());
+      var prepared = assertDoesNotThrow(() -> KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(context),
+          "public replay must handle exact gap approval without eager malformed ROOT decode");
+      runtime.commitOps().maybeRefreshBlocking();
+      if (approve && !replace) {
+        assertTrue(prepared.isPresent(), "approved exact ROOT must permit unrelated valid DELETE");
+        assertEquals(before, prepared.orElseThrow().versions());
+        assertNull(runtime.documentFieldOps().getDocumentField(path, SchemaFields.CONTENT));
+        assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(queue, prepared.orElseThrow()));
+        assertTrue(queue.listSwitchBufferOpsStrictForGeneration("green").isEmpty());
+      } else {
+        assertTrue(prepared.isEmpty(), "malformed ROOT without exact approval must remain held");
+        assertEquals(before, queue.listSwitchBufferOpsStrictForGeneration("green"));
+        assertEquals("remove", runtime.documentFieldOps().getDocumentField(path, SchemaFields.CONTENT));
+      }
+    }
+  }
+
   private static KnowledgeServerMigrationOps.DrainSwitchBufferContext context(SqliteJobQueue queue,
       RunningRuntime runtime, SwitchBufferCapableQueue.SwitchBufferOp approved) {
+    return context(queue, runtime, Set.of(approved));
+  }
+
+  private static KnowledgeServerMigrationOps.DrainSwitchBufferContext context(SqliteJobQueue queue,
+      RunningRuntime runtime, Set<SwitchBufferCapableQueue.SwitchBufferOp> approvals) {
     return new KnowledgeServerMigrationOps.DrainSwitchBufferContext(queue, runtime, null,
         IndexingPacing.unthrottled(), runtime.openedIndexPath(), runtime.openedIndexPath(),
         new ObjectMapper(), () -> false, () -> true, LoggerFactory.getLogger(LegacyApprovedGapReplayTest.class),
-        Long.MAX_VALUE, "green", ignored -> true, Set.of(approved));
+        Long.MAX_VALUE, "green", ignored -> true, approvals);
   }
 }

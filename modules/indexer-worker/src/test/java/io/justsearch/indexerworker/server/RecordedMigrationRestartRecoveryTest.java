@@ -790,7 +790,7 @@ class RecordedMigrationRestartRecoveryTest {
       when(green.commitOps()).thenReturn(mock(CommitOps.class));
       when(queue.recordedWalk(OPERATION)).thenReturn(Optional.of(walk(0L)));
       when(queue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
-      when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
+      when(queue.jobStateCountsStrict()).thenAnswer(ignored -> queue.jobStateCounts());
       when(queue.listSwitchBufferOpsStrictForGeneration(any())).thenReturn(List.of());
       var ecc = mock(EmbeddingCompatibilityController.class);
       when(ecc.currentFingerprint()).thenReturn(embeddingFingerprint);
