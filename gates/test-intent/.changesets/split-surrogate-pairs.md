@@ -7,18 +7,19 @@ author-session: uq-split
 
 # Test-intent entries
 
-Incomplete builder candidate: do not accept the stored-state checks until their fixture is resolved.
-Both stored-state methods fail on baseline and candidate at the unchanged-admission assertion.
-After two fixture attempts, inspection found that the synthetic parent declares a chunk revision
-but omits CONTENT_SHA256. ChunkSetCompleteness.assess requires the declaration revision to equal
-that parent hash. No third fixture repair was attempted under the builder's stop rule.
-The before-state is the shared clone of e5d7d12f980767c1b88a84e3918de6e9059bb57b in the session temporary folder.
-Only test sources, compile-classpath/lock scaffolding, and a test-only owned-parser stub were added there;
-its production text read loop and graph remain Tika's baseline implementation. The stub supplies the old
-4096-unit loop for the direct short-read checks. No production files were reverted in the working tree.
-The flat helper child uses the production ContentExtractor and real sandbox frames; it does not force
-the shipped child's structured extractor into its fallback. Real Engine and performance checks are
-reserved for independent verification. No evidence generator was run or evidence file edited.
+Review repairs seed CONTENT_SHA256 from the declared chunk plan revision so stored-state checks
+reach the production unchanged-admission decision. Flat extraction now publishes its write-limit
+flag through a fresh ParseRecord, and the structured fallback carries that flag into its result.
+Both flat-limit checks select the production fallback and assert pair-safe content, truncation and
+SUCCESS_PARTIAL, including a helper child using real sandbox request/response frames. Differential
+captures now observe stream closure, with explicit ordinary, complete-override and CSV-failure cases.
+
+The review-repair comparisons use separate shared clones inside the session temporary folder:
+`before` at e5d7d12f980767c1b88a84e3918de6e9059bb57b for the corrected restart fixture, and
+`before-review` at 3fb878fe6efe1d6323a182e2f796b8462f6d2581 for the strengthened flat/status and
+stream-ownership checks. Only their test sources are changed; production sources remain committed
+baseline versions. Each checkout builds into its own folders. Real Engine and performance checks
+remain reserved for independent verification. No evidence generator is run or evidence file edited.
 
 ```json
 {
@@ -30,7 +31,7 @@ reserved for independent verification. No evidence generator was run or evidence
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SplitSurrogateQueuedRestartTest.java"
       ],
       "class": "New",
-      "behaviour": "Keep supplementary characters intact at decoded offsets 4095, 8191 and 20479 across the listed encodings, both extraction implementations and the real child route, with a Lucene query depending on the character. Cover adjacent pairs, every 4096 boundary in a 100 KB file, EOF pairs, arbitrary decoder short reads, Markdown/JSON/Python/JavaScript, pair-safe plain/Markdown previews, flat limits in-process and in a framed helper child, and owned parser routing identity. The queued restart/force check is incomplete: its unchanged-admission assertion fails on the candidate before it reaches the repaired fields. It cannot yet substantiate stored-state repair.",
+      "behaviour": "Keep supplementary characters intact at decoded offsets 4095, 8191 and 20479 across the listed encodings, both extraction implementations and the real child route, with a Lucene query depending on the character. Cover adjacent pairs, every 4096 boundary in a 100 KB file, EOF pairs, arbitrary decoder short reads, Markdown/JSON/Python/JavaScript, pair-safe plain/Markdown previews, flat fallback limits and SUCCESS_PARTIAL in-process and in a framed helper child, fresh per-parse write-limit records, and owned parser routing identity. The corrected queued restart/force fixture reaches unchanged admission and checks repaired stored content, hash and preview across restart.",
       "sources": [
         {
           "kind": "defect-source",
@@ -63,6 +64,7 @@ reserved for independent verification. No evidence generator was run or evidence
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/SplitSurrogateExtractionTest.java#markdownPreviewCutsBeforePair",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/SplitSurrogateExtractionTest.java#flatContentLimitCutsBeforePair",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/SplitSurrogateExtractionTest.java#flatChildContentLimitCutsBeforePair",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/SplitSurrogateExtractionTest.java#flatParseRecordDoesNotRetainPriorWriteLimit",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextParserDifferentialTest.java#arbitraryShortReaderCallsKeepPairsTogether",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextParserDifferentialTest.java#supportedTypesAndParserIdentityFollowOwnedRouting",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SplitSurrogateQueuedRestartTest.java#forcedReextractionRepairsStoredContentHashAndPreviewAcrossRestart"
@@ -76,7 +78,7 @@ reserved for independent verification. No evidence generator was run or evidence
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SplitSurrogateQueuedRestartTest.java"
       ],
       "class": "New",
-      "behaviour": "Preserve exact SAX events and metadata (apart from parser identity) across the fixed encoding/text/CSV/TSV/override corpus, malformed bytes/reader surrogates and control filtering, whole supplementary CSV cells, HTML/XML/Java/C++/Groovy/PDF/Office, zero-embedded inline mail and sequential/concurrent shared graph parsing. Artifact and structured/child caps already cut safely before pairs on baseline and are preservation checks. The legacy queued restart check currently fails unchanged-admission on the candidate and remains unverified.",
+      "behaviour": "Preserve exact SAX events and metadata (apart from parser identity) across the fixed encoding/text/CSV/TSV/override corpus, malformed bytes/reader surrogates and control filtering, whole supplementary CSV cells, HTML/XML/Java/C++/Groovy/PDF/Office, zero-embedded inline mail and sequential/concurrent shared graph parsing. Artifact and structured/child caps already cut safely before pairs on baseline and are preservation checks. The corrected legacy queued restart fixture checks preservation without a user action. Tracked input streams also compare ownership for ordinary parsing, a complete encoding override and a CSV failure.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -98,6 +100,7 @@ reserved for independent verification. No evidence generator was run or evidence
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextParserDifferentialTest.java#malformedUtf16AndUtf8AndControlsMatchTika",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextParserDifferentialTest.java#otherParserFamiliesKeepSaxAndMetadata",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextParserDifferentialTest.java#malformedReaderSurrogatesKeepTikaReplacementBehaviour",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/OwnedTextParserDifferentialTest.java#streamOwnershipMatchesTikaForOrdinaryOverrideAndCsvFailure",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SplitSurrogateQueuedRestartTest.java#restartKeepsLegacyReplacementsAndPolicyWithoutUserAction"
       ],
       "repaired": false
@@ -135,7 +138,7 @@ reserved for independent verification. No evidence generator was run or evidence
 }
 ```
 
-## Builder execution record
+## Initial builder execution record (superseded by review repairs below)
 
 Baseline: `e5d7d12f980767c1b88a84e3918de6e9059bb57b`. Before checkout is a shared clone in the
 session temporary directory, with its own build folders. All repair failures below are assertions;
@@ -213,5 +216,63 @@ which exited 130 before any Gradle output or test execution, to return the block
 further shared-machine load. Those 64 existing failures have not been reproduced on baseline in
 this session, and their classification remains unverified. No changes to those checks or their
 code have been made. The new stored-state fixture is held after two attempts, not weakened or skipped.
+
+## Review-repair execution record
+
+Started 2026-10-28 02:45 UTC (`date -u`); estimate 40–70 minutes, stop by 04:45 UTC.
+The original fixture-admission blocker above is superseded by this authorized review-repair run.
+Review comparison results:
+
+| Review check | Baseline | Before result | After result |
+| --- | --- | --- | --- |
+| SplitSurrogateQueuedRestartTest.restartKeepsLegacyReplacementsAndPolicyWithoutUserAction | e5d7d12f98 | pass | pass |
+| SplitSurrogateQueuedRestartTest.forcedReextractionRepairsStoredContentHashAndPreviewAcrossRestart | e5d7d12f98 | assertion fail at stored content (two U+FFFD), after unchanged admission succeeds | pass |
+| SplitSurrogateExtractionTest.flatContentLimitCutsBeforePair | 3fb878fe6e | assertion fail: SUCCESS_FULL instead of SUCCESS_PARTIAL; pair-safe content assertion passes | pass |
+| SplitSurrogateExtractionTest.flatChildContentLimitCutsBeforePair | 3fb878fe6e | assertion fail: SUCCESS_FULL instead of SUCCESS_PARTIAL; pair-safe content assertion passes | pass |
+| SplitSurrogateExtractionTest.flatParseRecordDoesNotRetainPriorWriteLimit | 3fb878fe6e | assertion fail: prior write-limit flag remains true | pass |
+| OwnedTextParserDifferentialTest.streamOwnershipMatchesTikaForOrdinaryOverrideAndCsvFailure | 3fb878fe6e | pass | pass |
+
+The first ownership fixture used an unterminated CSV field, which Tika accepts without throwing;
+its failure-path assertion correctly rejected that fixture. The replacement injects a downstream
+SAX failure while emitting the first CSV cell and retains explicit failure and closure assertions.
+The valid before comparison uses that replacement; no assertion was weakened.
+
+Before commands (all sanitized and serialized through `js-gradle-slot ./gradlew ... -PskipWebBuild=true`):
+
+- `:modules:indexer-worker:test --tests '*SplitSurrogate*'` in `before`: exit 1, 8 tests,
+  1 expected repaired-content assertion failure; restart preservation passes.
+- `:modules:worker-services:test` selecting both flat-limit methods, the fresh-record method and
+  the first ownership fixture in `before-review`: exit 1, 4 assertion failures. The three flat
+  failures are valid before evidence; the ownership fixture failure is excluded.
+- `:modules:worker-services:test --tests '*OwnedTextParserDifferentialTest.streamOwnershipMatchesTikaForOrdinaryOverrideAndCsvFailure'`
+  in `before-review`: exit 0 with the corrected ownership fixture.
+
+Candidate acceptance commands (the same sanitized wrapper, one Gradle invocation at a time):
+
+- `:modules:worker-services:test --tests 'io.justsearch.indexerworker.extract.*'`: exit 0,
+  BUILD SUCCESSFUL in 1m 30s; XML reports 562 tests, 0 failures/errors and 6 skips. All 20
+  SplitSurrogateExtractionTest methods and all 8 OwnedTextParserDifferentialTest methods pass,
+  with no skips in either class.
+- `:modules:indexer-worker:test --tests '*SplitSurrogate*'`: exit 0,
+  BUILD SUCCESSFUL in 31s; 8 tests, 0 failures/errors/skips. Both corrected restart methods pass.
+- `:modules:worker-services:pmdMain :modules:worker-services:pmdTest
+  :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest`: exit 0,
+  BUILD SUCCESSFUL in 19s; all four PMD tasks executed.
+- `git diff --check`: exit 0. `.agents/preflight` is absent.
+
+The six extraction-suite skips are three platform-specific RecordedTesseractExecutableTest
+methods, optionalLocalPreparationTiming, and the TikaProductionOwnerCoverageTest and
+TikaProbeOwnerIntentTest methods. Skips are not counted as passes.
+
+Each Gradle invocation unsets CI, DISPLAY, JUSTSEARCH_*, JAVA_TOOL_OPTIONS, JDK_JAVA_OPTIONS,
+JAVA_OPTS and _JAVA_OPTIONS; GRADLE_OPTS is retained. Shared resources touched: machine-wide
+Gradle slots and dependency/build caches, plus ordinary CPU/RAM/disk. Checks use their own
+Lucene/SQLite stores, snapshots and child processes. No owner Engine, models, GPU or shared dev
+stack was used; no other session's process was stopped. No GitHub access was performed.
+
+Finished 2026-10-28 03:03 UTC; elapsed about 18 minutes including shared-slot waits (estimate was
+40–70 minutes, two-hour stop was not reached). Candidate changes remain uncommitted. Real Engine
+and performance verification remain outside this builder assignment. No run-evidence.mjs was run
+and no evidence files were edited. This record supersedes the initial fixture blocker above.
 
 ## Acceptance records

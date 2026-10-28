@@ -67,6 +67,7 @@ class SplitSurrogateQueuedRestartTest extends LuceneExecutorTestBase {
           SchemaFields.MODIFIED_AT, Files.getLastModifiedTime(file).toMillis(),
           SchemaFields.CONTENT, legacy, SchemaFields.EXTRACTION_POLICY_ID, "tika-default-v3"));
       var plan = ChunkDocumentWriter.plan(legacy, "text/plain", "txt");
+      parentFields.put(SchemaFields.CONTENT_SHA256, plan.revision());
       ChunkDocumentWriter.declare(parentFields, plan);
       runtime.indexingCoordinator().indexSingle(new IndexDocument(parentFields));
       ChunkDocumentWriter.replaceDeclaredChunks(runtime.indexingCoordinator(), id, legacy,

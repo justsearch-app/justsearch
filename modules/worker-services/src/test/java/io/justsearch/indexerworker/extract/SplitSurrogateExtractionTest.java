@@ -137,8 +137,11 @@ class SplitSurrogateExtractionTest {
   @Test
   void flatContentLimitCutsBeforePair() throws Exception {
     Path file = write("flat-limit.txt", ("x".repeat(47) + "😀ending").getBytes(StandardCharsets.UTF_8));
-    try (var flat = new ContentExtractor(48)) {
-      assertEquals("x".repeat(47), flat.extract(file).content().strip());
+    var policy = TikaExtractionPolicy.fromWorkerLimits(new ResolvedConfig.Worker(
+        48, TikaExtractionPolicy.DEFAULT_MAX_INPUT_BYTES));
+    try (var extractor = new PolicyDrivenTikaExtractor(TestWorkerExecutorRegistrations.ocrFactory(), policy)) {
+      forceFlatFallback(extractor);
+      assertFlatLimit(extractor.extractArtifact(file), policy);
     }
   }
 
@@ -147,14 +150,52 @@ class SplitSurrogateExtractionTest {
     var policy = TikaExtractionPolicy.fromWorkerLimits(new ResolvedConfig.Worker(
         48, TikaExtractionPolicy.DEFAULT_MAX_INPUT_BYTES));
     Path file = write("flat-child-limit.txt", ("x".repeat(47) + "😀ending").getBytes(StandardCharsets.UTF_8));
-    // The shipped child normally takes the structured path. This helper exercises its flat
-    // fallback implementation across the same real request/response boundary, without inducing
-    // an unrelated parser failure merely to select that fallback.
+    // Force the production structured fallback in a helper using the real sandbox frames.
     try (var sandbox = new PersistentExtractionSandbox(TestWorkerExecutorRegistrations.readers(),
         PersistentExtractionSandboxTest.javaCommand(FlatExtractionChild.class), policy,
         OcrRoutingConfig.disabled(), Duration.ofSeconds(30), 1, 500, null)) {
-      assertEquals("x".repeat(47), sandbox.extract(file).result().content().strip());
+      assertFlatLimit(sandbox.extract(file), policy);
     }
+  }
+
+  private static void assertFlatLimit(ExtractionArtifact artifact, TikaExtractionPolicy policy)
+      throws Exception {
+    assertEquals("x".repeat(47), artifact.result().content().strip());
+    assertEquals(ExtractionStatus.SUCCESS_PARTIAL, artifact.status());
+    assertTrue(artifact.truncated());
+    artifact.validate(policy, "split-surrogate-flat-limit");
+  }
+
+  @Test
+  void flatParseRecordDoesNotRetainPriorWriteLimit() throws Exception {
+    var policy = TikaExtractionPolicy.defaults();
+    var context = new org.apache.tika.parser.ParseContext();
+    var previous = new org.apache.tika.parser.ParseRecord();
+    previous.setWriteLimitReached(true);
+    context.set(org.apache.tika.parser.ParseRecord.class, previous);
+    try (var factory = new PreparedExtractionInput.Factory(); var flat = new ContentExtractor(48)) {
+      for (String text : List.of("ordinary text", "short text")) {
+        try (var input = factory.prepare(write("fresh-record.txt", text.getBytes(StandardCharsets.UTF_8)), policy)) {
+          var budget = new EmbeddedResourceBudget(policy, input.size(), context, input.expansion());
+          assertEquals(text, flat.extract(input, context, budget).content().strip());
+          var record = context.get(org.apache.tika.parser.ParseRecord.class);
+          assertFalse(record.isWriteLimitReached());
+          record.setWriteLimitReached(true);
+        }
+      }
+    }
+  }
+
+  private static void forceFlatFallback(PolicyDrivenTikaExtractor extractor) throws Exception {
+    var structuredField = PolicyDrivenTikaExtractor.class.getDeclaredField("structuredExtractor");
+    structuredField.setAccessible(true);
+    var parser = org.mockito.Mockito.mock(org.apache.tika.parser.AutoDetectParser.class);
+    org.mockito.Mockito.doThrow(new org.xml.sax.SAXException("force flat fallback"))
+        .when(parser).parse(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    var parserField = StructuredContentExtractor.class.getDeclaredField("parser");
+    parserField.setAccessible(true);
+    parserField.set(structuredField.get(extractor), parser);
   }
 
   @Test
@@ -291,8 +332,9 @@ class SplitSurrogateExtractionTest {
       while ((frame = SandboxFrames.read(System.in, SandboxFrames.MAX_FRAME_BYTES)) != null) {
         var request = mapper.readValue(new String(frame, StandardCharsets.UTF_8), SandboxExtractionRequest.class);
         var policy = request.policy();
-        try (var extractor = new ContentExtractor(policy.maxExtractedChars())) {
-          var artifact = ExtractionArtifact.full(extractor.extract(Path.of(request.path())), policy, "flat", false);
+        try (var extractor = new PolicyDrivenTikaExtractor(TestWorkerExecutorRegistrations.ocrFactory(), policy)) {
+          forceFlatFallback(extractor);
+          var artifact = extractor.extractArtifact(Path.of(request.path()));
           SandboxFrames.write(protocolOut, mapper.writeValueAsBytes(
               SandboxExtractionResponse.fromArtifact(request.requestId(), artifact)));
         }

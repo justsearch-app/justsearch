@@ -104,6 +104,28 @@ class OwnedTextParserDifferentialTest {
   }
 
   @Test
+  void streamOwnershipMatchesTikaForOrdinaryOverrideAndCsvFailure() throws Exception {
+    var detector = new OwnedTextEncodingDetector(List.of((stream, metadata) -> null, new DefaultEncodingDetector()));
+    for (String override : new String[] {null, "text/plain; charset=UTF-8"}) {
+      byte[] bytes = "Ordinary café writing".getBytes(StandardCharsets.UTF_8);
+      var expected = capture(new TextAndCSVParser(detector), bytes, "text/plain", override, new ParseContext());
+      var actual = capture(new SurrogateSafeTextAndCSVParser(detector), bytes, "text/plain", override,
+          new ParseContext());
+      assertNull(expected.failure());
+      assertFalse(expected.closed(), "Tika leaves the caller's plain-text stream open");
+      assertEquals(expected, actual, "plain-text override=" + override);
+    }
+    byte[] csv = "a,b\nfirst,second\n".getBytes(StandardCharsets.UTF_8);
+    String override = "text/csv; charset=UTF-8; delimiter=comma";
+    var expected = capture(new TextAndCSVParser(detector), csv, "text/csv", override, new ParseContext(), true);
+    var actual = capture(new SurrogateSafeTextAndCSVParser(detector), csv, "text/csv", override,
+        new ParseContext(), true);
+    assertNotNull(expected.failure(), "the CSV case must reach the failure path");
+    assertTrue(expected.closed(), "Tika closes the complete-override CSV reader on failure");
+    assertEquals(expected, actual, "CSV failure");
+  }
+
+  @Test
   void otherParserFamiliesKeepSaxAndMetadata() throws Exception {
     String config = """
         <properties><encodingDetectors><encodingDetector class="io.justsearch.indexerworker.extract.OwnedTextEncodingDetector">
@@ -201,6 +223,11 @@ class OwnedTextParserDifferentialTest {
 
   private static Capture capture(Parser parser, byte[] bytes, String type, String override, ParseContext context)
       throws Exception {
+    return capture(parser, bytes, type, override, context, false);
+  }
+
+  private static Capture capture(Parser parser, byte[] bytes, String type, String override, ParseContext context,
+      boolean failCsvCell) throws Exception {
     var metadata = new Metadata();
     metadata.set(Metadata.CONTENT_TYPE, type);
     if (override != null) metadata.set(TikaCoreProperties.CONTENT_TYPE_USER_OVERRIDE, override);
@@ -212,7 +239,10 @@ class OwnedTextParserDifferentialTest {
       @Override public void endDocument() { events.add("endDocument"); }
       @Override public void startPrefixMapping(String prefix, String uri) { events.add("prefix:" + prefix + ":" + uri); }
       @Override public void endPrefixMapping(String prefix) { events.add("endPrefix:" + prefix); }
-      @Override public void startElement(String uri, String local, String name, Attributes attrs) {
+      @Override public void startElement(String uri, String local, String name, Attributes attrs)
+          throws org.xml.sax.SAXException {
+        // CSVParser must close its reader even when a downstream consumer aborts a cell.
+        if (failCsvCell && local.equals("td")) throw new org.xml.sax.SAXException("CSV cell failure");
         // XHTML repeats parser-identity metadata in <head>; the outer CompositeParser adds one.
         if (local.equals("meta") && (TikaCoreProperties.TIKA_PARSED_BY.getName().equals(attrs.getValue("name"))
             || TikaCoreProperties.TIKA_PARSED_BY_FULL_SET.getName().equals(attrs.getValue("name")))) {
@@ -244,8 +274,9 @@ class OwnedTextParserDifferentialTest {
       @Override public void processingInstruction(String target, String data) { events.add("pi:" + target + ":" + data); }
     };
     String failure = null;
+    var stream = new TrackedInputStream(bytes);
     try {
-      parser.parse(new ByteArrayInputStream(bytes), handler, metadata, context);
+      parser.parse(stream, handler, metadata, context);
     } catch (org.apache.tika.exception.TikaException | java.io.IOException | org.xml.sax.SAXException e) {
       failure = e.getClass().getName() + ":" + e.getMessage();
     }
@@ -256,8 +287,22 @@ class OwnedTextParserDifferentialTest {
         values.put(key, List.of(metadata.getValues(key)));
       }
     }
-    return new Capture(events, values, failure);
+    return new Capture(events, values, failure, stream.closed);
   }
 
-  private record Capture(List<String> events, Map<String, List<String>> metadata, String failure) {}
+  private static final class TrackedInputStream extends ByteArrayInputStream {
+    private boolean closed;
+
+    private TrackedInputStream(byte[] bytes) {
+      super(bytes);
+    }
+
+    @Override
+    public void close() throws java.io.IOException {
+      closed = true;
+      super.close();
+    }
+  }
+
+  private record Capture(List<String> events, Map<String, List<String>> metadata, String failure, boolean closed) {}
 }
