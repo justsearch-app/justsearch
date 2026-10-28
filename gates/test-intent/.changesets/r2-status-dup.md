@@ -24,9 +24,12 @@ retired.
       "class": "Obsolete",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "well do whatever you think is best",
-          "location": "task t-20261018-6108b0 user turn 2026-10-28 (row 2: remove after a method-by-method comparison)"
+          "kind": "delegated-choice",
+          "delegationQuote": "well do whatever you think is best",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-28, replying to the agent's list for deletion-review rows 2-5",
+          "delegationScope": "deletion-review row 2: remove the VerifierStatusIsolationTest cases duplicated by StatusIsolationHttpTest after a method-by-method comparison, keeping the stronger real-HTTP case and any unique assertion",
+          "choice": "delete VerifierStatusIsolationTest: all nine methods have same-name StatusIsolationHttpTest counterparts that assert every value at least as strictly; no unique assertion needed moving",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none; docs/decisions contains no status-isolation or duplicate-test retention decision"
