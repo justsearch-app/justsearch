@@ -206,7 +206,7 @@ function signingSecretErrors(lines, rel) {
   const reference = new RegExp(`secrets\\s*(?:\\.\\s*${privateName}\\b|\\[\\s*['"]${privateName}['"]\\s*\\])`);
   const anchors = new Map();
   for (let i = 0; i < lines.length; i++) {
-    const match = /:\s*&([\w-]+)/.exec(stripInlineComment(lines[i]));
+    const match = /(?:[:]|-)\s*&([\w-]+)/.exec(stripInlineComment(lines[i]));
     if (!match) continue;
     const block = [lines[i]];
     for (let j = i + 1; j < lines.length; j++) {
@@ -217,7 +217,7 @@ function signingSecretErrors(lines, rel) {
   }
   const referencesPrivateKey = (line, seen = new Set()) => {
     if (reference.test(line)) return true;
-    const alias = /:\s*\*([\w-]+)\s*$/.exec(line)?.[1];
+    const alias = /(?:[:]|-)\s*\*([\w-]+)\s*$/.exec(line)?.[1];
     if (!alias || seen.has(alias)) return false;
     return (anchors.get(alias) ?? []).some(value => referencesPrivateKey(value, new Set([...seen, alias])));
   };
@@ -237,6 +237,12 @@ function signingSecretErrors(lines, rel) {
         if (entry?.key === 'name') environment = stripOuterQuotes(entry.rest);
       }
     }
+    let inSteps = false;
+    for (const { line, lineNumber } of job) {
+      if (leadingSpaces(line) === 4) inSteps = parseMappingEntry(line.trim())?.key === 'steps';
+      if (!inSteps && referencesPrivateKey(line)) errors.push({ rel, lineNumber,
+        message: 'production signing secrets must be scoped to a single release-signing step' });
+    }
     if (environment !== 'release-signing') {
       for (const { line, lineNumber } of job) {
         if (referencesPrivateKey(line)) errors.push({ rel, lineNumber, message: 'production signing secrets require the release-signing environment' });
@@ -254,7 +260,7 @@ function signingSecretErrors(lines, rel) {
     }
     if (inJobs && indent === 2 && parseMappingEntry(line.trim())) check();
     if (inJobs && indent >= 2) job.push({ line, lineNumber: i + 1 });
-    else if (referencesPrivateKey(line)) errors.push({ rel, lineNumber: i + 1, message: 'production signing secrets must be scoped to a release-signing job' });
+    else if (referencesPrivateKey(line)) errors.push({ rel, lineNumber: i + 1, message: 'production signing secrets must be scoped to a single release-signing step' });
   }
   check();
   return errors;

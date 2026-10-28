@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 // One immutable candidate. gh is an adapter; the producer and verifier also run offline.
 import { createHash, createPrivateKey, createPublicKey } from 'node:crypto';
-import { mkdir, readFile, writeFile, readdir, copyFile, lstat } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, readdir, copyFile, lstat, mkdtemp, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import os from 'node:os';
+import { createReadStream } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { buildReleaseAssets, verifyReleaseAssets } from './app-release-assets.mjs';
 import { extractVersion } from './release-changelog.mjs';
 
 export const DESCRIPTOR_URL = 'https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json';
 const TARGETS = ['linux-x86_64', 'windows-x86_64'];
-const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+async function fileHash(file) {
+  const digest = createHash('sha256');
+  for await (const chunk of createReadStream(file)) digest.update(chunk);
+  return digest.digest('hex');
+}
 function required(name, value) {
   if (typeof value !== 'string' || !value.trim()) throw Error(`${name} is required`);
   return value;
@@ -87,7 +93,7 @@ export async function writeChecksums(directory) {
   for (const name of names) {
     safeName(name);
     if (!(await lstat(path.join(directory, name))).isFile()) throw Error('release assets must be regular files');
-    lines.push(`${hash(await readFile(path.join(directory, name)))}  ${name}`);
+    lines.push(`${await fileHash(path.join(directory, name))}  ${name}`);
   }
   await writeFile(path.join(directory, 'SHA256SUMS'), `${lines.join('\n')}\n`);
 }
@@ -100,7 +106,7 @@ export async function verifyChecksums(directory) {
     if (!match) throw Error('malformed checksum manifest');
     const name = safeName(match[2]); listed.push(name);
     if (!(await lstat(path.join(directory, name))).isFile()
-      || hash(await readFile(path.join(directory, name))) !== match[1]) throw Error(`checksum mismatch: ${name}`);
+      || await fileHash(path.join(directory, name)) !== match[1]) throw Error(`checksum mismatch: ${name}`);
   }
   if (listed.sort().join() !== names.join() || new Set(listed).size !== listed.length) throw Error('checksum asset set mismatch');
   return names;
@@ -150,13 +156,13 @@ export async function uploadDraft(o, remote) {
   if (!release) release = await remote.create({ tag_name: c.tag, target_commitish: c.commit, body: `${marker}\n${o.notes ?? ''}`, name: c.tag, draft: true });
   if (release.assets.some(a => !names.includes(a.name)) || new Set(release.assets.map(a => a.name)).size !== release.assets.length) throw Error('draft contains another candidate asset set');
   for (const name of names) {
-    const bytes = await readFile(path.join(o.releaseDir, name));
+    const digest = await fileHash(path.join(o.releaseDir, name));
     if (release.assets.some(a => a.name === name)) {
-      if (!bytes.equals(await remote.download(name))) throw Error(`draft has different bytes: ${name}`);
-    } else await remote.upload(name, bytes);
+      if (digest !== await remote.hash(name)) throw Error(`draft has different bytes: ${name}`);
+    } else await remote.upload(name);
   }
   // A successful upload is not enough: download and compare the complete remote set.
-  for (const name of names) if (!(await readFile(path.join(o.releaseDir, name))).equals(await remote.download(name))) throw Error(`round-trip has different bytes: ${name}`);
+  for (const name of names) if (await fileHash(path.join(o.releaseDir, name)) !== await remote.hash(name)) throw Error(`round-trip has different bytes: ${name}`);
 }
 export async function publishDraft(o, remote) {
   const { candidate: c } = await verifyCandidate(o);
@@ -166,7 +172,7 @@ export async function publishDraft(o, remote) {
   const names = (await readdir(o.releaseDir)).sort();
   if (release.assets.map(a => a.name).sort().join() !== names.join()) throw Error('draft asset set mismatch');
   for (const name of names) {
-    if (!(await readFile(path.join(o.releaseDir, name))).equals(await remote.download(name))) throw Error('draft bytes changed before publication');
+    if (await fileHash(path.join(o.releaseDir, name)) !== await remote.hash(name)) throw Error('draft bytes changed before publication');
   }
   // After a lost promotion response, verification is repeated and no bytes are rewritten.
   if (!release.draft) return;
@@ -188,12 +194,17 @@ function remoteFor(o) {
       release = JSON.parse(execFileSync('gh', ['api', api, '--method', 'POST', '--input', '-'], { input: JSON.stringify(body), encoding: 'utf8' }));
       return release;
     },
-    download: async name => {
-      // Refresh after uploads so a partially failed HTTP response can be retried safely.
-      const assets = JSON.parse(gh(['api', `${api}/${release.id}/assets?per_page=100`]));
-      const asset = assets.find(a => a.name === name);
-      if (!asset) throw Error(`draft missing asset: ${name}`);
-      return gh(['api', `/repos/${o.repo}/releases/assets/${asset.id}`, '-H', 'Accept: application/octet-stream'], 'buffer');
+    hash: async name => {
+      // A fresh directory prevents stale downloads from hiding a missing asset.
+      // gh writes payloads to disk; installer bytes never enter a child-process buffer.
+      safeName(name);
+      const directory = await mkdtemp(path.join(os.tmpdir(), 'release-download-'));
+      try {
+        gh(['release', 'download', o.expectedTag, '--repo', o.repo, '--pattern', name, '--dir', directory]);
+        return await fileHash(path.join(directory, name));
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
     },
     promote: async () => { gh(['release', 'edit', o.expectedTag, '--repo', o.repo, '--draft=false', '--prerelease=false', '--latest']); },
     upload: async name => { gh(['release', 'upload', o.expectedTag, path.join(o.releaseDir, name), '--repo', o.repo]); },

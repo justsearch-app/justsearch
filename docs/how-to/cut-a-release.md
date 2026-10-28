@@ -17,8 +17,8 @@ old rolling packaging log).
 
 > **Status.** The Sandbox verification *loop* has been exercised across many candidates.
 > `build-installer.yml` has been dispatched successfully against both `main` and a worktree branch
-> (2026-07-15) — dispatching it does **not** require a `v*` tag or create/update a GitHub Release
-> unless the ref dispatched against is one. The first stable release, **v0.2.0**, was published on
+> (2026-07-15). Dispatches now produce unsigned qualification builds; only a release tag push
+> can create a signed draft. The first stable release, **v0.2.0**, was published on
 > 2026-08-13 with Authenticode signatures (publisher **Elias Justus**). The exact published-installer
 > updater qualification tracked by tempdoc 617 remains a separate, still-open evidence tier.
 
@@ -111,13 +111,14 @@ sequence stale, abandon the stale candidate and cut the next patch.
 `build-installer.yml` still supports branch `workflow_dispatch` for existing Windows qualification
 uses. It calls `build-installer-windows.yml`, retaining `sandboxTestMode`, `candidateVersion`
 (qualification only). Manual builds, including Sandbox qualification, are unsigned and use
-generated test trust pins. Signed candidates come only from `v*` tags. A qualification
-build is forbidden on a tag. Release publication has moved entirely to `publish-release.yml`.
+generated test trust pins. Signed candidates come only from `v*` tag pushes; dispatching on main
+or a tag cannot sign or create a draft. A qualification build is forbidden on a tag. Release publication has moved entirely to `publish-release.yml`.
 The existing `windows-installer` artifact name remains available to qualification consumers.
 
 `packaging-smoke.yml` runs daily on main at 04:23 UTC (and can be dispatched on main). It compares
-packaging-relevant paths with the last successful run and skips both builds when they have not
-changed. Otherwise both hosted platforms build in release configuration with test pins and no
+all paths except `docs/**` and root Markdown files with the last successful run, and skips both
+builds only when none changed. If that commit is missing or no longer an ancestor after a history
+rewrite, it runs both builds. Selected builds use release configuration with test pins and no
 production signing secrets. Windows runs `installer_verify`; Ubuntu installs the `.deb`, launches
 its installed Engine with its bundled JVM and isolated data, waits for Engine readiness, and
 searches the bundled keyboard-shortcuts help. Failure is a red Actions run; no issue is posted.
@@ -127,11 +128,14 @@ searches the bundled keyboard-shortcuts help. Failure is a red Actions run; no i
 Apply these once; these instructions do not change repository settings:
 
 - Create environment **`release-signing`**. Under **Deployment branches and tags**, choose
-  **Selected branches and tags**, add a **Tag** rule matching **`v*`**, and add **no branch
-  rules**. Remove any existing branch rules or broader tag rules. Under **Deployment protection
-  rules**, leave **Required reviewers empty/disabled** and **Wait timer disabled**; add no custom
-  approval rules. Tags sign unattended; branch, PR and daily-smoke jobs cannot access this
-  environment. Every job reading a production signing or updater key binds this environment.
+  **Selected branches and tags**, add a **Tag** rule matching **`v*`** and a
+  **Branch** rule matching **`main`**. Keep `main` protected by the existing merge checks; remove
+  any other branch or broader tag rules. Under **Deployment protection rules**, leave **Required reviewers empty/disabled** and **Wait timer disabled**; add no custom
+  approval rules. Tags sign unattended; the mirror producer dispatches on protected `main`
+  with merged code.
+  Arbitrary branch dispatches stay excluded. Main dispatches of `build-installer.yml`, PR builds
+  and daily smoke remain unsigned; only tag pushes enter its signing and draft graph. Every job
+  reading a production signing or updater key binds this environment.
 - Move all production signing **secrets** into `release-signing`:
   `JUSTSEARCH_CODESIGN_MODE` (`command`), `JUSTSEARCH_CODESIGN_COMMAND` (the SSL.com template
   below), `JUSTSEARCH_CODESIGN_PFX_B64`, `JUSTSEARCH_CODESIGN_PFX_PASSWORD`,
@@ -159,9 +163,9 @@ Apply these once; these instructions do not change repository settings:
 
 ## Code signing
 
-Authenticode signing is live: v0.2.0 shipped signed by **Elias Justus**. Branch rehearsals may still
-be unsigned or explicitly self-signed, but every `v*` tag requires a configured credential and the
-full `-Release` contract. `scripts/ci/sign-windows.ps1` selects a credential mode via
+Authenticode signing is live: v0.2.0 shipped signed by **Elias Justus**. Branch qualification
+builds are unsigned. Every `v*` tag push requires a configured credential and the full `-Release`
+contract. `scripts/ci/sign-windows.ps1` selects a credential mode via
 `JUSTSEARCH_CODESIGN_MODE` (default `pfx`), all fail-closed under
 `JUSTSEARCH_REQUIRE_SIGNING`:
 
@@ -172,9 +176,9 @@ full `-Release` contract. `scripts/ci/sign-windows.ps1` selects a credential mod
 | `command` | `JUSTSEARCH_CODESIGN_COMMAND` (a template with a `{file}` placeholder) | Any vendor CLI (Azure Trusted Signing, eSigner, …) — pluggable with zero further repo changes. |
 
 **Credential scope.** Release jobs and the bulk mirror producer read production keys only from
-`release-signing`, whose deployment policy allows only `v*` tags and has no required reviewers.
-Branch, PR and daily-smoke builds use generated test keys. See the one-time settings above
-before the first tag build.
+`release-signing`, whose deployment policy allows `v*` tags and protected `main`, with no required
+reviewers. The mirror producer uses main dispatch; branch qualification, PR and daily-smoke builds
+use generated test keys. See the one-time settings above before the first tag build.
 
 **eSigner (SSL.com) via `command` mode — validated template.** Sandbox-validated end-to-end
 (2026-07-22, CodeSignTool 1.3.3, demo credentials; tempdoc 760): signs in place, non-interactive,
@@ -205,18 +209,16 @@ signatures are then free).
 > path and positive ceiling before any command/vendor invocation; bulk mirror dispatches additionally supply provider-authoritative remaining budget.
 > Installer runs enforce the existing 12-signature per-run ceiling without a balance input.
 
-**Rehearsal (no paid cert needed).** The full CI signing path can be exercised before any purchase:
-generate a throwaway self-signed certificate, configure it through `pfx` or `store` mode, set
-`JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED=1`, and dispatch a branch build. Never put an eSigner/vendor
-command in this rehearsal lane. This is how tempdoc 760's signing-rehearsal campaign reached green
-(run `29914075529`) with zero paid signings spent; remove the rehearsal credential/variable
-afterward. The signing script itself is separately rehearsable via
-`scripts/ci/test-sign-windows.ps1`.
+**Rehearsal.** Use a real tag on a throwaway patch version merged on main, with the production
+signing configuration. Build and qualify its draft through the same path as a release, but
+**never publish** that draft. It consumes real signing allocation. Abandon the candidate after the
+rehearsal and use the next patch version for the next candidate; never move or reuse the tag.
+The signing script itself can be checked separately with `scripts/ci/test-sign-windows.ps1`.
 
 Each signing run keeps two credential-free journals. The append-only attempt journal reserves a
 slot before every vendor invocation, so failures, retries, and interrupted calls still consume the
 reviewed ceiling. The verified-signature ledger is appended only after local Authenticode
-verification succeeds. The workflow summary reports both counts; the mirror producer separately checks provider allocation before bulk signing.
+verification succeeds. The mirror producer separately checks provider allocation before bulk signing.
 
 ### Per-pin-bump signed-mirror procedure
 
@@ -230,12 +232,12 @@ upstream pin bump** and re-host the signed archives, dropping per-release signin
    metered signings):
 
    ```bash
-   gh workflow run sign-vendored-mirrors.yml --ref vX.Y.Z -f signLlama=true -f signTesseract=true -f providerRemainingSignatures=<portal-value>
+   gh workflow run sign-vendored-mirrors.yml --ref main -f signLlama=true -f signTesseract=true -f providerRemainingSignatures=<portal-value>
    ```
 
-   Use a protected `v*` tag containing the reviewed pins; branch dispatches cannot access
-   `release-signing`. Both inputs default to `true`; set one to `false` to re-sign a single payload
-   when only one pin moved. The workflow reads the pins from their existing authorities rather than restating them
+   Dispatch on protected `main` after the reviewed pins have merged; arbitrary branch dispatches
+   cannot access `release-signing`. A release tag is not required. Both inputs default to `true`;
+   set one to `false` to re-sign a single payload when only one pin moved. The workflow reads the pins from their existing authorities rather than restating them
    (llama from `modules/ui/build.gradle.kts`, Tesseract from
    `packaging/runtime/tesseract-windows.v1.json`), sha256-verifies each upstream download before
    signing anything, repacks the Tesseract self-extracting NSIS installer into a layout-preserving

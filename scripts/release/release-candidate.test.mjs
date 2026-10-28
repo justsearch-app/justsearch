@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, readdir, rm, cp, unlink } from 'node:fs/promises';
-import { generateKeyPairSync, createPublicKey } from 'node:crypto';
+import { mkdtemp, readFile, writeFile, readdir, rm, cp, unlink, mkdir, chmod, symlink } from 'node:fs/promises';
+import { generateKeyPairSync, createPublicKey, createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { generateFixture } from './updater-v2-fixture.mjs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createServer } from 'node:http';
+import { fileURLToPath } from 'node:url';
+import { generateFixture, signArtifact } from './updater-v2-fixture.mjs';
 const subject = await import('./release-candidate.mjs').catch(() => ({}));
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const commit = 'a'.repeat(40);
 async function fixture(t) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'release-candidate-'));
@@ -111,8 +116,8 @@ test('draft retries accept only the same run and identical uploaded bytes; never
   const remote = {
     get: async () => release,
     create: async body => { release = { ...body, id: 1, draft: true, assets: [] }; return release; },
-    download: async name => uploads.get(name),
-    upload: async (name, bytes) => { assert(!uploads.has(name)); uploads.set(name, bytes); release.assets.push({ name }); },
+    hash: async name => hash(uploads.get(name)),
+    upload: async name => { const bytes = await readFile(path.join(f.outDir, name)); assert(!uploads.has(name)); uploads.set(name, bytes); release.assets.push({ name }); },
   };
   await subject.uploadDraft(options, remote);
   const count = uploads.size;
@@ -131,7 +136,7 @@ test('publication promotes only verified draft bytes; retry never rebuilds, and 
   const remote = {
     get: async () => ({ tag_name: f.tag, body: subject.candidateMarker(f), draft,
       assets: (await readdir(f.outDir)).map(name => ({ name })) }),
-    download: async name => readFile(path.join(f.outDir, name)),
+    hash: async name => hash(await readFile(path.join(f.outDir, name))),
     promote: async () => { promoted++; draft = false; },
   };
   await assert.rejects(subject.publishDraft({ ...policy(f), minimumSequence: 43 }, remote), /older than accepted/);
@@ -141,7 +146,7 @@ test('publication promotes only verified draft bytes; retry never rebuilds, and 
   await subject.publishDraft(policy(f), remote);
   await subject.publishDraft(policy(f), remote);
   assert.equal(promoted, 1);
-  await assert.rejects(subject.publishDraft(policy(f), { ...remote, download: async () => Buffer.from('tampered') }), /changed before publication/);
+  await assert.rejects(subject.publishDraft(policy(f), { ...remote, hash: async () => hash(Buffer.from('tampered')) }), /changed before publication/);
 });
 test('verification requires every production trust pin', async t => {
   const f = await build(t); await attest(f);
@@ -158,7 +163,7 @@ for (const section of ['Not tested', 'Known issues']) {
     const remote = {
       get: async () => ({ tag_name: f.tag, body: `${subject.candidateMarker(f)}\n${notes}`, draft: true,
         assets: (await readdir(f.outDir)).map(name => ({ name })) }),
-      download: async name => readFile(path.join(f.outDir, name)),
+      hash: async name => hash(await readFile(path.join(f.outDir, name))),
       promote: async () => { promoted = true; },
     };
     await assert.rejects(subject.publishDraft(policy(f), remote), /unfilled.*placeholder/);
@@ -168,3 +173,66 @@ for (const section of ['Not tested', 'Known issues']) {
     assert.equal(promoted, true);
   });
 }
+
+test('real gh adapter streams large installers through upload, resume, round-trip and publication', async t => {
+  const f = await fixture(t);
+  const dir = path.dirname(f.outDir);
+  const installer = f.targets['windows-x86_64'];
+  const bytes = Buffer.concat([Buffer.from('MZ'), Buffer.alloc(2 * 1024 * 1024, 7)]);
+  await writeFile(installer.installerPath, bytes);
+  await writeFile(installer.artifactSignaturePath, signArtifact(bytes).signature);
+  await subject.buildCandidate(f); await attest(f);
+  await mkdir(path.join(dir, 'bin'));
+  await mkdir(path.join(dir, 'remote'));
+  await mkdir(path.join(dir, 'scripts'));
+  await mkdir(path.join(dir, 'scripts/ci'));
+  await cp(new URL('../ci/derive-release-sequence.mjs', import.meta.url), path.join(dir, 'scripts/ci/derive-release-sequence.mjs'));
+  await symlink(fileURLToPath(new URL('../ci/check-store-recoverability.mjs', import.meta.url)), path.join(dir, 'scripts/ci/check-store-recoverability.mjs'));
+  const api = createServer((_request, response) => { response.setHeader('content-type', 'application/json'); response.end('[]'); });
+  await new Promise(resolve => api.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => api.close(resolve)));
+  await writeFile(path.join(dir, 'CHANGELOG.md'), '# Changelog\n\n## [Unreleased]\n\n## [1.2.3] - 2026-10-27\n\n### Fixed\n\n- Test candidate.\n');
+  const gh = path.join(dir, 'bin/gh');
+  await writeFile(gh, `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+const a = process.argv.slice(2), root = process.env.FAKE_GH_ROOT;
+const stateFile = path.join(root, 'state.json');
+const state = fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile)) : null;
+const save = value => fs.writeFileSync(stateFile, JSON.stringify(value));
+const assets = () => fs.readdirSync(root).filter(n => n !== 'state.json').map(name => ({ name, id: name }));
+if (a[0] === 'attestation') process.exit(0); // Test-only provenance adapter.
+if (a[0] === 'api') {
+  if (a.includes('POST')) { const body = JSON.parse(fs.readFileSync(0)); save({...body, id: 1}); console.log(JSON.stringify({...body, id: 1, assets: []})); }
+  else if (a.some(x => x.includes('/releases/assets/'))) process.stdout.write(fs.readFileSync(path.join(root, a[1].split('/').pop())));
+  else if (a.some(x => x.includes('/assets?'))) console.log(JSON.stringify(assets()));
+  else console.log(JSON.stringify([state ? [{...state, assets: assets()}] : []]));
+} else if (a[0] === 'release' && a[1] === 'upload') {
+  const name = path.basename(a[3]);
+  if (fs.existsSync(path.join(root, name))) throw Error('no clobber');
+  fs.copyFileSync(a[3], path.join(root, name));
+} else if (a[0] === 'release' && a[1] === 'download') {
+  const name = a[a.indexOf('--pattern') + 1], dir = a[a.indexOf('--dir') + 1];
+  fs.copyFileSync(path.join(root, name), path.join(dir, name));
+} else if (a[0] === 'release' && a[1] === 'edit') save({...state, draft: false});
+else throw Error('unexpected gh arguments: ' + JSON.stringify(a));
+`);
+  await chmod(gh, 0o755);
+  const config = path.join(dir, 'options.json');
+  const options = { ...f, releaseDir: f.outDir, expectedTag: f.tag, expectedCommit: commit };
+  await writeFile(config, JSON.stringify(options));
+  const script = fileURLToPath(new URL('./release-candidate.mjs', import.meta.url));
+  const env = { ...process.env, PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}`, FAKE_GH_ROOT: path.join(dir, 'remote'),
+    DERIVE_RELEASE_SEQUENCE_API_ROOT: `http://127.0.0.1:${api.address().port}` };
+  const run = command => promisify(execFile)(process.execPath, [script, command, config], { cwd: dir, env, encoding: 'utf8' });
+  await run('upload'); await run('upload');
+  const stateFile = path.join(dir, 'remote/state.json');
+  const state = JSON.parse(await readFile(stateFile));
+  state.body = state.body.replaceAll('[agent fills before final validation]', 'None.');
+  await writeFile(stateFile, JSON.stringify(state));
+  await run('publish'); await run('publish');
+  assert.equal(JSON.parse(await readFile(stateFile)).draft, false);
+  // Remote corruption must still fail at the real adapter boundary.
+  await writeFile(path.join(dir, 'remote', path.basename(installer.installerPath)), 'tampered');
+  await assert.rejects(run('publish'), /draft bytes changed before publication/);
+});

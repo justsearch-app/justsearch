@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 import { appendFileSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { generateKeyPairSync } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { signArtifact } from '../release/updater-v2-fixture.mjs';
 export function packagingChanged(files) {
-  return files.some(file => /^(modules\/|SSOT\/|packaging\/|gradle\/|build-logic\/|scripts\/(ci|release|lib)\/|\.github\/workflows\/|(?:build|settings)\.gradle\.kts$|gradle.properties$|gradlew|package(?:-lock)?\.json$)/.test(file));
+  // Only human documentation is exempt. SSOT help and all other paths can be
+  // compiled package inputs, including paths introduced after this selector.
+  return files.some(file => file && !/^(?:docs\/|[^/]+\.md$)/i.test(file));
 }
 function api(endpoint) { return JSON.parse(execFileSync('gh', ['api', '--paginate', '--slurp', endpoint], { encoding: 'utf8' })); }
 function env(name, value) { appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`); }
@@ -36,10 +38,11 @@ function main() {
     const previous = runs.find(r => String(r.id) !== process.env.GITHUB_RUN_ID);
     let changed = true;
     if (previous) {
-      const ancestor = execFileSync('git', ['merge-base', previous.head_sha, 'HEAD'], { encoding: 'utf8' }).trim();
-      // A rewritten main cannot be assumed equivalent to the last smoke.
-      if (ancestor === previous.head_sha) {
-        const files = execFileSync('git', ['diff', '--name-only', previous.head_sha, 'HEAD'], { encoding: 'utf8' }).trim().split('\n');
+      const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', previous.head_sha, 'HEAD'], { stdio: 'ignore' });
+      // Missing commits and rewritten/unrelated histories require a fresh smoke.
+      if (ancestor.error) throw ancestor.error;
+      if (ancestor.status === 0) {
+        const files = execFileSync('git', ['diff', '--name-only', '-z', previous.head_sha, 'HEAD'], { encoding: 'utf8' }).split('\0');
         changed = packagingChanged(files);
       }
     }
