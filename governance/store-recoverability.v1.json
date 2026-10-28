@@ -2150,7 +2150,7 @@
       "reason": "The only persistence write in this mixed production/test source is inside linux_tests, compiled only under cfg(all(test, target_os = linux)). child_survives_caller_thread_exit_but_not_owner_death writes child.pid under its test-owned tempfile::TempDir so the test driver can observe its fixture child before ending the owner. The temporary directory is discarded after the case; losing the PID receipt costs only a test rerun. Production containment writes no state file."
     },
     {
-      "path": "modules/shell/src-tauri/src/bin/support/updater_probe.inc.rs",
+      "path": "modules/shell/src-tauri/src/supervisor_support/updater_probe.inc.rs",
       "reason": "Included only by the supervisor-conformance binary. Its updater-probe/staged/probe/installer.exe fixture, upgrade intent and witness are written below the harness's throwaway per-case data directory; no product binary includes this probe. Losing these files costs a rerun of that conformance case."
     },
     {
