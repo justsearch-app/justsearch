@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import org.apache.commons.io.input.XmlStreamReader;
 import org.apache.tika.detect.CompositeEncodingDetector;
 import org.apache.tika.detect.EncodingDetector;
 import org.apache.tika.metadata.Metadata;
@@ -53,7 +54,7 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
       }
     }
     if (charset == null) {
-      charset = detectUtf8(input);
+      charset = detectUtf8(input, metadata);
       if (charset != null) {
         metadata.set(TikaCoreProperties.ENCODING_DETECTOR, getClass().getName() + "#detectUtf8");
       }
@@ -72,7 +73,7 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
     return charset;
   }
 
-  private static Charset detectUtf8(InputStream input) throws IOException {
+  private static Charset detectUtf8(InputStream input, Metadata metadata) throws IOException {
     if (input == null || !input.markSupported()) {
       return null;
     }
@@ -116,8 +117,14 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
       }
     }
     // Only completed multi-byte sequences consume more bytes than UTF-16 code units.
-    // An ASCII window ending in the prefix of its first such sequence stays on today's path.
-    return bytes.position() > chars.position() ? StandardCharsets.UTF_8 : null;
+    if (bytes.position() > chars.position()) return StandardCharsets.UTF_8;
+    // Only these inconclusive windows may consult the complete top-level snapshot. BOMs,
+    // malformed windows and read failures returned above; existing UTF-8 window wins unchanged.
+    if (!PreparedExtractionInput.isNonAsciiUtf8(metadata)) return null;
+    // Declared XML/XHTML keeps its existing reader/detector path, including charset aliases.
+    // Reuse Commons IO's XML-prolog grammar rather than interpreting declarations a second way.
+    chars.flip();
+    return XmlStreamReader.ENCODING_PATTERN.matcher(chars).lookingAt() ? null : StandardCharsets.UTF_8;
   }
 
   private static Charset detectBomlessUtf16(InputStream input) throws IOException {

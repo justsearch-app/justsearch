@@ -85,10 +85,12 @@ final class PreparedExtractionInput implements AutoCloseable {
   private final long size;
   private final ContainerExpansionBudget expansion;
   private final boolean zipCandidate;
+  private final boolean nonAsciiUtf8;
   private Path snapshot;
 
   private PreparedExtractionInput(Path source, Factory factory, List<byte[]> chunks,
-      long size, Path snapshot, ContainerExpansionBudget expansion, boolean zipCandidate) {
+      long size, Path snapshot, ContainerExpansionBudget expansion, boolean zipCandidate,
+      boolean nonAsciiUtf8) {
     this.source = source;
     this.factory = factory;
     this.chunks = chunks;
@@ -96,6 +98,7 @@ final class PreparedExtractionInput implements AutoCloseable {
     this.snapshot = snapshot;
     this.expansion = expansion;
     this.zipCandidate = zipCandidate;
+    this.nonAsciiUtf8 = nonAsciiUtf8;
   }
 
   boolean isDiskBacked() { return snapshot != null; }
@@ -105,10 +108,24 @@ final class PreparedExtractionInput implements AutoCloseable {
   ContainerExpansionBudget expansion() { return expansion; }
 
   Metadata metadata() {
-    Metadata metadata = new Metadata();
+    Metadata metadata = new RootMetadata(nonAsciiUtf8);
     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, name());
     metadata.set(Metadata.CONTENT_LENGTH, Long.toString(size));
     return metadata;
+  }
+
+  /** Not an enumerable key: copying metadata for an embedded resource drops this fact. */
+  static boolean isNonAsciiUtf8(Metadata metadata) {
+    return metadata instanceof RootMetadata root && root.nonAsciiUtf8;
+  }
+
+  private static final class RootMetadata extends Metadata {
+    private static final long serialVersionUID = 1L;
+    private final boolean nonAsciiUtf8;
+
+    private RootMetadata(boolean nonAsciiUtf8) {
+      this.nonAsciiUtf8 = nonAsciiUtf8;
+    }
   }
 
   /**
@@ -280,6 +297,7 @@ final class PreparedExtractionInput implements AutoCloseable {
       int signature = 0;
       boolean zipCandidate = false;
       boolean retained = false;
+      var utf8 = new Utf8Validator();
       try (InputStream input = openSource(source)) {
         // Files.size is only an early refusal, never the accounting authority.
         if (Files.size(source) > policy.maxInputBytes()) throw tooLarge();
@@ -290,6 +308,7 @@ final class PreparedExtractionInput implements AutoCloseable {
                 ? policy.maxInputBytes() - copied + 1 : buffer.length))) != -1) {
           copied += read;
           if (copied > policy.maxInputBytes()) throw tooLarge();
+          utf8.accept(buffer, read);
           for (int i = 0; i < read; i++) {
             signature = (signature << 8) | (buffer[i] & 0xff);
             // Inspect every offset, covering preambles and chunk boundaries. Any ZIP
@@ -312,7 +331,8 @@ final class PreparedExtractionInput implements AutoCloseable {
         var expansion = new ContainerExpansionBudget(policy, copied);
         if (snapshot != null) expansion.inspect(snapshot);
         retained = true;
-        return new PreparedExtractionInput(source, this, chunks, copied, snapshot, expansion, zipCandidate);
+        return new PreparedExtractionInput(source, this, chunks, copied, snapshot, expansion,
+            zipCandidate, utf8.isNonAsciiUtf8());
       } catch (IOException | ContentExtractor.ExtractionException | RuntimeException e) {
         retained = false;
         throw e;
@@ -338,6 +358,38 @@ final class PreparedExtractionInput implements AutoCloseable {
         directory = null;
       }
     }
+  }
+
+  /** Strict streaming validation of the snapshot, including any suffix a parser never reads. */
+  private static final class Utf8Validator {
+    private boolean valid = true;
+    private boolean multibyte;
+    private int remaining;
+    private int minimum = 0x80;
+    private int maximum = 0xBF;
+
+    void accept(byte[] bytes, int length) {
+      if (!valid) return;
+      for (int offset = 0; offset < length; offset++) {
+        int value = bytes[offset] & 0xFF;
+        if (remaining == 0) {
+          if (value < 0x80) continue;
+          if (value >= 0xC2 && value <= 0xDF) remaining = 1;
+          else if (value >= 0xE0 && value <= 0xEF) remaining = 2;
+          else if (value >= 0xF0 && value <= 0xF4) remaining = 3;
+          else { valid = false; return; }
+          minimum = value == 0xE0 ? 0xA0 : value == 0xF0 ? 0x90 : 0x80;
+          maximum = value == 0xED ? 0x9F : value == 0xF4 ? 0x8F : 0xBF;
+        } else {
+          if (value < minimum || value > maximum) { valid = false; return; }
+          minimum = 0x80;
+          maximum = 0xBF;
+          if (--remaining == 0) multibyte = true;
+        }
+      }
+    }
+
+    boolean isNonAsciiUtf8() { return valid && remaining == 0 && multibyte; }
   }
 
   /** Two different Office main types are declared; distinct from a merely malformed member. */
