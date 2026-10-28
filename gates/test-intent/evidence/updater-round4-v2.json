@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-28T01:46:45.511Z",
-  "revision": "c138996c9e8253e2f5429ed18a723e7f9148cb5e",
-  "tree": "56755be4363c68a4077946c0f86ee07479a3ead3",
+  "createdAt": "2026-10-28T04:01:43.519Z",
+  "revision": "74f130fcceb7c724021f4fee760bbb6d47a12640",
+  "tree": "f0633513203b028d0b8f3b610544faf41db9c582",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,43 +21,43 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::producer_bytes_select_both_targets_and_cover_every_installed_store\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5404
+      "durationMs": 503
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::producer_bytes_enforce_metadata_signature_root_identity_and_rollback\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1971
+      "durationMs": 243
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::tauri_download_verifies_producer_deb_and_rejects_mismatched_signature\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2361
+      "durationMs": 319
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::authenticated_deb_bytes_pass_download_validation\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2239
+      "durationMs": 242
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::linux_installer::tests::linux_install_exit_classification_preserves_old_engine_only_when_safe\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2174
+      "durationMs": 200
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::linux_installer::tests::deb_format_requires_complete_version_member\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1950
+      "durationMs": 190
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::linux_fake_pkexec_handoff_records_exact_arguments_and_recovers_or_holds\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 31531
+      "durationMs": 29328
     }
   ],
   "checks": [
@@ -65,7 +65,7 @@
       "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::producer_bytes_select_both_targets_and_cover_every_installed_store",
       "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:aa67ee577fcd312ac02345bdfc8831488ec74b8c5613e15ce3ea79caedd5debb",
+      "contentDigest": "sha256:4b7ee33e239932d3ce7f42fe0463214ee72b70d8490672af491c6088cc574c84",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::producer_bytes_enforce_metadata_signature_root_identity_and_rollback",
       "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:aa67ee577fcd312ac02345bdfc8831488ec74b8c5613e15ce3ea79caedd5debb",
+      "contentDigest": "sha256:4b7ee33e239932d3ce7f42fe0463214ee72b70d8490672af491c6088cc574c84",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::tauri_download_verifies_producer_deb_and_rejects_mismatched_signature",
       "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:aa67ee577fcd312ac02345bdfc8831488ec74b8c5613e15ce3ea79caedd5debb",
+      "contentDigest": "sha256:4b7ee33e239932d3ce7f42fe0463214ee72b70d8490672af491c6088cc574c84",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::authenticated_deb_bytes_pass_download_validation",
       "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:aa67ee577fcd312ac02345bdfc8831488ec74b8c5613e15ce3ea79caedd5debb",
+      "contentDigest": "sha256:4b7ee33e239932d3ce7f42fe0463214ee72b70d8490672af491c6088cc574c84",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -168,5 +168,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:333ef7dcd4d3214dc362c1005a6e7d7e576b0edbc8e891c1761863078a702aed"
+  "digest": "sha256:5ee32efb0b3dddf4f6d59358ae2945cc78d0b32e2ca3f917be8506d5e30c6fee"
 }

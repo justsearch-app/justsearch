@@ -78,6 +78,9 @@ fn producer_bytes_enforce_metadata_signature_root_identity_and_rollback() {
 
 // Drive the actual Tauri signature verifier on producer-generated artifacts, through a local
 // download. Only this mock app permits HTTP; the production endpoint policy stays unchanged.
+// Linux only, like the crate's other mock-app tests: the Tauri runtime in the Windows test binary
+// fails to load with STATUS_ENTRYPOINT_NOT_FOUND (tempdoc 501).
+#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn tauri_download_verifies_producer_deb_and_rejects_mismatched_signature() {
     use std::io::{Read, Write};
