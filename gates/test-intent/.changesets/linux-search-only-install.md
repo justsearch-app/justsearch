@@ -118,3 +118,14 @@ approved activation. This assignment preserves that design.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-nrdi6r2q",
+  "verdict": "accept",
+  "digest": "sha256:b52837bdc564ea5f9316d71fe5f19baa377b05ce26cdfba542f308830a09dfe5",
+  "note": "Classes confirmed: New (repaired) for LinuxSearchOnlyInstallTest/LinuxPreflightCandidateTest, New preservation for the two Windows checks, Adaptation (instrumentation) for AiInstallServiceUpgradeLeaseTest with every lease assertion unchanged. Delegated choices lie within the 2026-10-27 delegation (next release for Windows and Linux); no stronger source found. Re-run by the verifier against baseline e5d7d12f98 plus only the detectHardwareProfile visibility seam: each repair check failed by assertion for the reason under test (RUNTIME_MISSING on Linux CPU, GPU_FULL instead of CPU, cuda-runtime included on Linux, runtime precondition false, retained directory invisible to preflight); Windows checks and the lease test passed on baseline and candidate. Full app-services and configuration suites: no failures on either side. Global state: ConfigStore global restored, static and construction mocks closed, HTTP server stopped; no existing test reads the new files. Real-system: clean Ubuntu 24.04 VM, see verifier evidence."
+}
+```
