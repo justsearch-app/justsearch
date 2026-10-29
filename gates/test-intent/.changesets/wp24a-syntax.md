@@ -308,7 +308,13 @@ Agent choices under the quoted design delegation, never owner-agreed words. Buil
     },
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java",
+        "modules/worker-services/src/test/resources/fixtures/authors/README.md",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.docx",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.odt",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.pdf",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.eml",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.msg"
       ],
       "class": "New",
       "behaviour": "X3: document authors and mail senders reach author phrase search through normal extraction-to-index ingestion.",
@@ -334,7 +340,8 @@ Agent choices under the quoted design delegation, never owner-agreed words. Buil
     },
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.md"
       ],
       "class": "New",
       "behaviour": "X3 preservation: Markdown YAML author stays in the meta_author facet; this repair does not promote it into the author text field.",
@@ -363,8 +370,9 @@ Agent choices under the quoted design delegation, never owner-agreed words. Buil
 ### WP2.4a author ingestion repair selectors
 
 Agent-adopted under the same design delegation above (delegated-choice), never owner-agreed.
-Do not run the evidence launcher during the builder repair. Exact launcher arguments for the
-orchestrator after committing the candidate:
+Evidence uses the committed candidate c6f56abaef5ea4e504b1820c43707f0ce5d7e106 and
+the adapted Java runner reproduced from `runner-machine-rules.patch`. Exact check arguments
+(also pass `--before-root` pointing to an owned TMPDIR containing the before shared clone):
 
 ```text
 --before 0417bfd91363488ea2d639888f5767c069c2fe39
@@ -386,5 +394,5 @@ orchestrator after committing the candidate:
 
 Builder logs, before/after JUnit XML, installed-Engine HTTP requests/responses and process
 cleanup are recorded in `tmp/verify/wp2.4a-author-report.md` and its linked evidence directory.
-The `authors-java.json` evidence path is reserved for the orchestrator's launcher run, not claimed
-as generated evidence by this builder.
+The evidence run, per-check outcomes, fixture coverage and gate result are recorded in
+`tmp/verify/wp2.4a-author-evidence-report.md`. Independent acceptance remains pending.
