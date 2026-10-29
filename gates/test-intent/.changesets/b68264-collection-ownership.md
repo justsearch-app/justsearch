@@ -131,3 +131,14 @@ collection field and are handled by their existing replay authority.
   "note": "Collection checks pass after merge; activation stall and final index/queue state match baseline; all full-suite failures reproduce before."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-b68264-codex-r3",
+  "verdict": "accept",
+  "digest": "sha256:f6e805563a893d0d3c3ff06623c882882dc67ad90fdf0d1f74c9ef440442c770",
+  "note": "R1 restart/cutover, deletion boundaries, snapshot refresh, C1-C7 and merge checks pass; all 96 full-suite failures match baseline."
+}
+```

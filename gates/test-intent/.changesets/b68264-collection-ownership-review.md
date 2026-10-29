@@ -93,3 +93,14 @@ accepted. The builder does not generate execution evidence or acceptance records
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-b68264-codex-r3",
+  "verdict": "accept",
+  "digest": "sha256:7a2c0e5384682d8d75087ef3b2bd8d9fe3c98b7371dd411050f514c9cbe013aa",
+  "note": "R1 restart/cutover, deletion boundaries, snapshot refresh, C1-C7 and merge checks pass; all 96 full-suite failures match baseline."
+}
+```
