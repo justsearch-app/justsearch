@@ -136,14 +136,21 @@ function gitOut(args, cwd, env) {
 
 /** Tree hash of the working tree (tracked + untracked, ignored excluded), via a throwaway index. */
 function workingTreeHash(root) {
-  const idx = path.join(os.tmpdir(), `test-intent-index-${process.pid}-${Date.now()}`);
-  const env = { ...process.env, GIT_INDEX_FILE: idx };
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'test-intent-tree-'));
   try {
-    gitOut(['read-tree', 'HEAD'], root, env);
-    gitOut(['add', '-A'], root, env);
-    return gitOut(['write-tree'], root, env);
+    // Git resolves the common object store for linked worktrees as well as ordinary checkouts.
+    const objects = path.resolve(root, gitOut(['rev-parse', '--git-path', 'objects'], root));
+    const objectDirectory = path.join(scratch, 'objects');
+    fs.mkdirSync(objectDirectory);
+    const env = { ...process.env, GIT_INDEX_FILE: path.join(scratch, 'index'),
+      GIT_OBJECT_DIRECTORY: objectDirectory, GIT_ALTERNATE_OBJECT_DIRECTORIES: JSON.stringify(objects) };
+    // A repository's split-index setting or index hooks must not write outside the scratch tree.
+    const config = ['-c', 'core.splitIndex=false', '-c', 'core.hooksPath=/dev/null'];
+    gitOut([...config, 'read-tree', 'HEAD'], root, env);
+    gitOut([...config, 'add', '-A'], root, env);
+    return gitOut([...config, 'write-tree'], root, env);
   } finally {
-    fs.rmSync(idx, { force: true });
+    fs.rmSync(scratch, { recursive: true, force: true });
   }
 }
 

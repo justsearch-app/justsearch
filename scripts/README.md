@@ -23,6 +23,8 @@ node scripts/docs/docs-validate.mjs
 python -m jseval --help
 ```
 
+For fresh named-check evidence, ingest verification and other [recurring jobs](../docs/reference/contributing/agent-guide.md#recurring-jobs), see the contributor guide.
+
 ## Choose Your Tool
 
 | What you want to do | Script/Directory |

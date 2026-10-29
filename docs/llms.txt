@@ -12,6 +12,8 @@ If docs disagree, treat **canonical** docs as truth. If canonical docs are uncle
 
 This repo does not maintain an `llms-full.txt`. Use this file as the index and follow links into canonical docs.
 
+For contributor commands, see [Recurring jobs](reference/contributing/agent-guide.md#recurring-jobs).
+
 ## Summary
 JustSearch runs entirely on localhost. Since ADR-0049 it is **one JVM plus two process boundaries**:
 1.  **Engine:** the API gateway and the index half (Lucene, Tika extraction) in a single JVM. The

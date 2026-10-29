@@ -98,7 +98,7 @@ const failure = !before ? '' : process.env.PROBE_MODE === 'exception'
   : '<failure type="org.opentest4j.AssertionFailedError" message="before assertion"/>';
 fs.mkdirSync('modules/core/build/test-results/test', { recursive: true });
 fs.writeFileSync('modules/core/build/test-results/test/TEST-io.x.ProbeTest.xml',
-  '<testsuite><testcase classname="io.x.ProbeTest" name="probe">' + failure + '</testcase></testsuite>');
+  '<testsuite><testcase classname="io.x.ProbeTest" name="probe">' + failure + '</testcase><testcase classname="io.x.ProbeTest" name="skipped"><skipped/></testcase></testsuite>');
 if (before && process.env.PROBE_MODE === 'exception') console.error('java.lang.IllegalStateException: before probe exploded');
 process.exitCode = before ? 1 : 0;
 `);
@@ -181,8 +181,11 @@ try {
       locker.stderr.on('data', data => { lockerOutput += data; });
       lockerClosed = once(locker, 'close');
     }
+    if (options.candidate) write(CHECK.split('#')[0], '// changed candidate check\n');
     const result = spawnSync(process.execPath, [path.join(root, CLI), '--out', out, '--check', CHECK,
-      '--before', options.invalidRef ? 'NO-SUCH-REVISION' : 'HEAD', '--before-root', beforeRoot],
+      ...(options.mixed ? ['--check', CHECK.replace('#probe', '#noSuchMethod'),
+        '--check', CHECK.replace('#probe', '#skipped')] : []),
+      ...(options.candidate ? [] : ['--before', options.invalidRef ? 'NO-SUCH-REVISION' : 'HEAD', '--before-root', beforeRoot])],
     { cwd: root, env, encoding: 'utf8' });
     const output = `${result.stdout}\n${result.stderr}`;
     if (options.lock) {
@@ -281,3 +284,15 @@ test('CLI: candidate and historical runners isolate profiles while retaining Gra
     }
   });
 });
+
+for (const mixed of [false, true]) {
+  test(`CLI: candidate-only ${mixed ? 'mixed results exit 1' : 'passing checks exit 0'} with valid JSON`, async () => {
+    await fixture({ candidate: true, mixed }, ({ result, output, out }) => {
+      assert.equal(result.status, mixed ? 1 : 0, output);
+      const evidence = readEvidence(out);
+      assert.equal(evidence.failBefore, null);
+      assert.deepEqual(evidence.checks.map(c => c.outcome), mixed ? ['passed', 'not-found', 'skipped'] : ['passed']);
+      assert.deepEqual(evidence.checks.map(c => c.executed), mixed ? [true, false, false] : [true]);
+    });
+  });
+}
