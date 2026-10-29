@@ -6,7 +6,7 @@ if (!(Test-Path C:/Qual/justsearch-qualification-guest) -or
     (Get-Content C:/Qual/justsearch-qualification-guest -Raw) -cne "justsearch-vm`n") {throw 'An owned disposable VM is required'}
 # DoSvc is protected even from SYSTEM. Its verified no-download policy below,
 # together with disabled Windows Update, is the accepted qualification control.
-$services=@('wuauserv','SysMain','WSearch','DiagTrack','dmwappushservice','edgeupdate','edgeupdatem')
+$services=@('wuauserv','UsoSvc','SysMain','WSearch','DiagTrack','dmwappushservice','edgeupdate','edgeupdatem')
 $taskPaths=@('\Microsoft\Windows\WindowsUpdate\','\Microsoft\Windows\UpdateOrchestrator\',
  '\Microsoft\Windows\Defrag\','\Microsoft\Windows\Customer Experience Improvement Program\',
  '\Microsoft\Windows\Feedback\Siuf\','\Microsoft\Windows\Diagnosis\',
@@ -42,6 +42,7 @@ if ($Mode -eq 'Apply') {
  }
  foreach($policy in @(
   @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU','NoAutoUpdate',1),
+  @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU','AUOptions',2),
   @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection','AllowTelemetry',0),
   @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','UpdateDefault',0),
  @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','Update{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',0),
@@ -58,13 +59,21 @@ if ($Mode -eq 'Apply') {
  [IO.File]::WriteAllText('C:/Qual/quiet-applied.json',(@{boot=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o');errors=$errors.ToArray()} | ConvertTo-Json -Depth 5))
 }
 $rows=New-Object 'Collections.Generic.List[object]'
+$exceptions=New-Object 'Collections.Generic.List[object]'
 foreach($name in $services) {
  $s=Get-CimInstance Win32_Service -Filter "Name='$name'"
- $rows.Add(@{setting="service/$name";observed=$s | Select-Object Name,StartMode,State;verified=(!$s -or ($s.StartMode -eq 'Disabled' -and $s.State -eq 'Stopped'))})
+ $protected=($name -in 'wuauserv','UsoSvc' -and $s -and $s.StartMode -ne 'Disabled')
+ if($protected){$exceptions.Add(@{setting="service/$name";observed=$s | Select-Object Name,StartMode,State;reason='Startup control refused or reverted; require stopped service, update policies and per-run download/install/write evidence'})}
+ $rows.Add(@{setting="service/$name";observed=$s | Select-Object Name,StartMode,State;verified=(!$s -or ($s.State -eq 'Stopped' -and ($s.StartMode -eq 'Disabled' -or $protected)))})
 }
 foreach($path in $taskPaths) {
  $tasks=@(Get-ScheduledTask | Where-Object {$_.TaskPath -eq $path})
- $rows.Add(@{setting="tasks/$path";observed=@($tasks | Select-Object TaskName,State);verified=(@($tasks | Where-Object {$_.State -ne 'Disabled'}).Count -eq 0)})
+ $enabled=@($tasks | Where-Object {$_.State -ne 'Disabled'})
+ if($path -eq '\Microsoft\Windows\UpdateOrchestrator\') {
+  $exceptions.Add(@{setting="tasks/$path";observed=@($tasks | Select-Object TaskName,State);reason='Protected tasks re-enabled by Windows; verify update services/policies and per-run download/install/write effects instead'})
+ } else {
+  $rows.Add(@{setting="tasks/$path";observed=@($tasks | Select-Object TaskName,State);verified=($enabled.Count -eq 0)})
+ }
 }
 $rows.Add(@{setting='tasks/EdgeUpdate';observed=@($edgeTasks | Select-Object TaskName,State);verified=(@($edgeTasks | Where-Object {$_.State -ne 'Disabled'}).Count -eq 0)})
 $mp=Get-MpPreference;$status=Get-MpComputerStatus
@@ -82,6 +91,7 @@ $rows.Add(@{setting='pagefile';observed=@{automatic=$auto;settings=$page | Selec
  verified=($auto -and $usage.Count -gt 0 -and @($usage | Where-Object {$_.AllocatedBaseSize -gt 0}).Count -gt 0)})
 foreach($policy in @(
  @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU','NoAutoUpdate',1),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU','AUOptions',2),
  @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection','AllowTelemetry',0),
  @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','UpdateDefault',0),
  @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','Update{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',0),
@@ -92,8 +102,9 @@ foreach($policy in @(
 $boot=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o')
 $applied=Get-Content C:/Qual/quiet-applied.json -Raw | ConvertFrom-Json
 $rebooted=$boot -ne $applied.boot
+$exceptions.Add(@{setting='service/DoSvc';reason='Protected service: verify DODownloadMode=99 after reboot instead of startup mode; Windows Update disabled or stopped; measured writes remain the guard';observed=Get-CimInstance Win32_Service -Filter "Name='DoSvc'" | Select-Object Name,StartMode,State})
 $report=@{mode=$Mode;boot=$boot;appliedBoot=$applied.boot;rebooted=$rebooted;applyErrors=$applied.errors;settings=$rows.ToArray();
- exceptions=@(@{setting='service/DoSvc';reason='Protected service: verify DODownloadMode=99 after reboot instead of startup mode; Windows Update disabled; measured writes remain the guard';observed=Get-CimInstance Win32_Service -Filter "Name='DoSvc'" | Select-Object Name,StartMode,State});
+ exceptions=$exceptions.ToArray();
  verified=($Mode -eq 'Verify' -and $rebooted -and @($rows | Where-Object {!$_.verified}).Count -eq 0)}
 [IO.File]::WriteAllText('C:/Qual/quiet-'+$Mode.ToLowerInvariant()+'.json',($report | ConvertTo-Json -Depth 12))
 if($Mode -eq 'Verify' -and !$report.verified) {throw 'Guest write settings did not survive reboot; see quiet-verify.json'}

@@ -33,6 +33,43 @@ if(!$d.Count){throw 'Physical disk counters unavailable'}
 $total=[long]0;foreach($disk in $d){$total+=[long]$disk.DiskWriteBytesPersec}
 @{writtenBytes=$total} | ConvertTo-Json -Compress
 """
+UPDATE_ACTIVITY = r"""
+$folder='C:/Windows/SoftwareDistribution/Download'
+$files=@(if(Test-Path $folder){Get-ChildItem $folder -File -Recurse -ErrorAction Stop | Sort-Object FullName | ForEach-Object {
+ @{name=$_.FullName.Substring($folder.Length);bytes=$_.Length;modified=$_.LastWriteTimeUtc.ToString('o')}
+}})
+$bytes=[long]0;foreach($file in $files){$bytes+=$file.bytes}
+$log=Get-WinEvent -ListLog 'Microsoft-Windows-WindowsUpdateClient/Operational'
+$events=@()
+if($since){
+ $errors=@()
+ $events=@(Get-WinEvent -FilterHashtable @{LogName=@('System',$log.LogName);ProviderName='Microsoft-Windows-WindowsUpdateClient';StartTime=[DateTime]::Parse($since).ToUniversalTime()} -ErrorAction SilentlyContinue -ErrorVariable errors | ForEach-Object {
+  @{id=$_.Id;recordId=$_.RecordId;log=$_.LogName;time=$_.TimeCreated.ToUniversalTime().ToString('o');keywords=@($_.KeywordsDisplayNames);message=$_.Message}
+ })
+ foreach($e in $errors){if($e.FullyQualifiedErrorId -notlike 'NoMatchingEventsFound*'){throw $e}}
+}
+$policy=Get-ItemProperty 'HKLM:/SOFTWARE/Policies/Microsoft/Windows/WindowsUpdate/AU'
+@{time=[DateTime]::UtcNow.ToString('o');services=@(Get-CimInstance Win32_Service | Where-Object {$_.Name -in 'wuauserv','UsoSvc'} | Select-Object Name,StartMode,State);
+ policies=@{NoAutoUpdate=$policy.NoAutoUpdate;AUOptions=$policy.AUOptions};downloads=$files;downloadBytes=$bytes;
+ events=$events;eventLogEnabled=$log.IsEnabled} | ConvertTo-Json -Depth 8 -Compress
+"""
+
+
+def verify_update_effect(before, after):
+    for observation in (before, after):
+        services = {s['Name']: s for s in observation['services']}
+        if any(services.get(name, {}).get('State') != 'Stopped' for name in ('wuauserv', 'UsoSvc')):
+            raise Infrastructure('Windows Update services are not stopped; see update-activity.json')
+        if observation['policies'] != {'NoAutoUpdate': 1, 'AUOptions': 2} or not observation['eventLogEnabled']:
+            raise Infrastructure('Windows Update policy or event collection unavailable; see update-activity.json')
+    if before['downloads'] != after['downloads'] or before['downloadBytes'] != after['downloadBytes']:
+        raise Infrastructure('Windows Update download folder changed during run; see update-activity.json')
+    if any(re.search(r'download|install', ' '.join(event['keywords']), re.I) for event in after['events']):
+        raise Infrastructure('Windows Update download/install activity during run; see update-activity.json')
+
+
+def update_observation(since=None):
+    return json.loads(guest_ps('$since=' + (ps_value(since) if since else '$null') + ';' + UPDATE_ACTIVITY))
 
 
 def write_limit(journeys):
@@ -525,6 +562,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
     out.mkdir(parents=True, exist_ok=False)
     started = None
     budget = None
+    update_before = None
     try:
         manifest = json.loads((snapshot / 'manifest.json').read_text()) if snapshot else {}
         expected = pins(args, 'tools' if manifest.get('kind') == 'tools' else phase)
@@ -547,6 +585,9 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         budget.thread.start()
         inode = Path(started['disk']).stat().st_ino
         vm.wait_ssh('windows', timeout=600)
+        update_before = update_observation()
+        (out / 'update-activity.json').write_text(json.dumps({'before': update_before}, indent=2) + '\n')
+        verify_update_effect(update_before, update_before)
         (out / 'vm.json').write_text(json.dumps(started, indent=2) + '\n')
         return execute(args, out, phase, journeys, snapshot, budget)
     except Exception as exc:
@@ -559,6 +600,10 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         if started and vm.read_state() == started:
             errors = []
             try:
+                if update_before:
+                    update_after = update_observation(update_before['time'])
+                    (out / 'update-activity.json').write_text(json.dumps({'before': update_before, 'after': update_after}, indent=2) + '\n')
+                    verify_update_effect(update_before, update_after)
                 guest_ps('if (Get-ScheduledTask -TaskName ' + ps_value(TASK) + ' -ErrorAction SilentlyContinue) {Unregister-ScheduledTask -TaskName ' + ps_value(TASK) + ' -Confirm:$false}')
                 if args.mirror and guest_ps('Test-Path C:/Qual/mirror/server.json') == 'True':
                     if seal:
@@ -578,7 +623,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
             report.update(writeVolume=volume, execution={'mode': args.mode, 'snapshot': str(snapshot) if snapshot else None,
                 'requestedJourneys': journeys}, **summarize(report['journeys'], report.get('fullSelection', False)))
             (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
-            if seal and clean and not budget.error and (out / 'checkpoint.json').is_file():
+            if seal and clean and not errors and not budget.error and (out / 'checkpoint.json').is_file():
                 seal_snapshot(out, started, inode, args, phase)
         if budget:
             report = json.loads((out / 'summary.json').read_text())

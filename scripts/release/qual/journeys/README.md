@@ -393,8 +393,14 @@ high-integrity archive labels otherwise deny reads even with the ACL. After
 reboot, a separate limited task must enumerate and open the reports before
 sealing (`crash-access.json`). Any later unreadable report fails collection.
 DoSvc is a recorded protected-service exception: its startup mode is observed,
-and `DODownloadMode=99` is verified after reboot instead. Disabled Windows Update
-and the per-run measured write limit remain required.
+and `DODownloadMode=99` is verified after reboot instead. UpdateOrchestrator tasks
+are also recorded exceptions because Windows re-enables them. Update services
+`wuauserv` and `UsoSvc` must remain stopped; a refused/reverted startup mode is
+recorded. Policies `NoAutoUpdate=1` and `AUOptions=2` are required. Every journey
+overlay retains `update-activity.json`: before/after SoftwareDistribution download
+folder sizes and inventories, service/policy observations and Windows Update
+events. Changed download files or download/install events fail the environment
+check. The per-run measured write limit remains required.
 
 The wrapper owns one headless, eight-thread Windows VM at a time and honors the
 harness's 14 GiB host-memory threshold. It runs the adapter through a **limited,

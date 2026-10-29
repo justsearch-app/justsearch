@@ -15,6 +15,22 @@ wrapper=importlib.util.module_from_spec(spec);spec.loader.exec_module(wrapper)
 
 
 class WindowsVMTests(unittest.TestCase):
+    def test_update_effect_requires_stopped_services_policies_and_unchanged_downloads(self):
+        before = {'time': '2026-10-29T00:00:00Z', 'services': [
+            {'Name': name, 'StartMode': 'Manual', 'State': 'Stopped'} for name in ('wuauserv', 'UsoSvc')],
+            'policies': {'NoAutoUpdate': 1, 'AUOptions': 2}, 'downloadBytes': 0,
+            'downloads': [], 'events': [], 'eventLogEnabled': True}
+        wrapper.verify_update_effect(before, before)
+        for change in ({'services': [dict(before['services'][0], State='Running'), before['services'][1]]},
+                       {'services': []}, {'policies': {'NoAutoUpdate': 0, 'AUOptions': 2}},
+                       {'policies': {'NoAutoUpdate': 1}}, {'downloadBytes': 10},
+                       {'downloads': [{'name': 'new-update', 'bytes': 0}]},
+                       {'events': [{'id': 44, 'keywords': ['Download', 'Started']}]},
+                       {'eventLogEnabled': False}):
+            with self.subTest(change=change), self.assertRaises(Infrastructure):
+                wrapper.verify_update_effect(before, dict(before, **change))
+        wrapper.verify_update_effect(before, dict(before, events=[{'id': 26, 'keywords': ['Search']}]))
+
     def test_write_stop_ends_shared_polling_immediately_without_a_retry(self):
         import runner
         with tempfile.TemporaryDirectory() as temp:
@@ -153,6 +169,7 @@ class WindowsVMTests(unittest.TestCase):
                  patch.object(wrapper,'wait_for',return_value=True),patch.object(wrapper,'start_snapshot'), \
                  patch.object(wrapper.vm,'require_owner',return_value=started),patch.object(wrapper.vm,'wait_ssh'), \
                  patch.object(wrapper.vm,'read_state',side_effect=lambda:current[0]), \
+                 patch.object(wrapper,'update_observation',return_value={'time':'2026-10-29T00:00:00Z'}) as updates,patch.object(wrapper,'verify_update_effect') as effects, \
                  patch.object(wrapper,'guest_ps',return_value='True') as guest,patch.object(wrapper.vm,'mirror') as mirror, \
                  patch.object(wrapper,'WriteBudget') as budget,patch.object(wrapper,'execute',side_effect=execute), \
                  patch.object(wrapper.vm,'locked',return_value=contextlib.nullcontext()), \
@@ -161,6 +178,9 @@ class WindowsVMTests(unittest.TestCase):
                 self.assertEqual(wrapper.run_overlay(args,root/'out','candidate',['J1'],snapshot,seal=True),0)
             self.assertTrue((root/'out/snapshot/disk.qcow2').is_file())
             mirror.assert_not_called()
+            self.assertEqual(updates.call_count,2)
+            self.assertEqual(effects.call_count,2)
+            self.assertIn('after',json.loads((root/'out/update-activity.json').read_text()))
             self.assertTrue(any('mirror-windows.py suspend' in call.args[0] for call in guest.call_args_list))
 
     def test_write_limit_uses_written_bytes_and_overlay_growth_independently(self):
