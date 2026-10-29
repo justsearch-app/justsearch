@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — the prune-side root authority. A root vouches for
+ * Task t-20261013-ef3c41, scenarios S2 and S8 — the prune-side root authority. A root vouches for
  * absence only while it is the same present, listable folder, checked per batch: renamed away, a
  * drive letter unmapped, or a different folder mapped at the same letter all stop it vouching.
  * Real conditions only (rename and SUBST); every mapping is removed before the test returns.

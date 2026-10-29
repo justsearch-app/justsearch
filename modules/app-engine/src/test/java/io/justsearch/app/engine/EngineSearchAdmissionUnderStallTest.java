@@ -95,7 +95,7 @@ final class EngineSearchAdmissionUnderStallTest {
   }
 
   /**
-   * #759 (changed intent: the ninth search used to be refused
+   * Task t-20261005-b6d536, FP1, FP4 and FP10 (changed intent: the ninth search used to be refused
    * at once). With the eight inference threads held by stalled native runs, the ninth to sixteenth
    * concurrent hybrid searches wait for a thread instead of being refused, the seventeenth finds
    * the threads and the queue full and is refused with its own code, and the waiting searches end

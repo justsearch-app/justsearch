@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 through the prune-first reindex caller ({@code pruneMissing}):
+ * Task t-20261013-ef3c41, scenario S2 through the prune-first reindex caller ({@code pruneMissing}):
  * a root that is not there vouches for no deletion. Before the change this caller ran the prune
  * with no root check at all, so a folder renamed or a drive unplugged pruned every document under
  * it. The root is really renamed away; nothing is injected.

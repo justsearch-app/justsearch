@@ -196,7 +196,7 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
 
 
   /**
-   * #758 — a brake that cannot be read counts as braked. The brake
+   * Task t-20261013-ef3c41, round 2 — a brake that cannot be read counts as braked. The brake
    * record names the shape this runtime would build but its attempt count is gone (the record
    * parses; the count does not). Before, the missing count read as no attempts: the boot counted a
    * first attempt and started an automatic rebuild. Now the boot holds exactly as a spent brake

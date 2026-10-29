@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — the volume check the Head asks of every watched
+ * Task t-20261013-ef3c41, round 6, scenario S8 — the volume check the Head asks of every watched
  * root each periodic cycle tells another volume at a root's drive letter with one read, without a
  * walk.
  *

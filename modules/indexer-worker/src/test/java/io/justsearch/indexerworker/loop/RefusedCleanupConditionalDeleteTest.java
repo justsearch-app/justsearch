@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * #852. Refusal cleanup replays an accepted watcher DELETE receipt on
+ * Task t-20261020-a5fbcb, round 12. Refusal cleanup replays an accepted watcher DELETE receipt on
  * surviving A against the path's state as refusal cleanup confirms it now. A watched file is
  * replaced by a folder inside a parent folder that can be traversed but not listed: that state is
  * uncertain, so nothing is admitted and A keeps the file's text. With a listable parent the same

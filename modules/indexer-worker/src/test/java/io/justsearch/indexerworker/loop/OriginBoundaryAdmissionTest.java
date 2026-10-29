@@ -86,7 +86,7 @@ final class OriginBoundaryAdmissionTest {
     when(fields.isUnmodified(anyString(), anyLong(), anyLong())).thenReturn(true);
     var counts = mock(IndexCountOps.class);
     when(counts.docCount()).thenReturn(7L);
-    // #758: the extractor decides "empty index" from the count it actually read.
+    // Task t-20261013-ef3c41: the extractor decides "empty index" from the count it actually read.
     when(counts.docCountOrThrow()).thenReturn(7L);
     var content = mock(TimeboxedContentExtractor.class);
     when(content.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());

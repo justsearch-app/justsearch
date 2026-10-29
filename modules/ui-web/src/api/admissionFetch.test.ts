@@ -58,7 +58,7 @@ describe('pre-execution admission waits', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  // #759: full inference threads and queue are a capacity refusal too.
+  // Task t-20261005-b6d536, FP11: full inference threads and queue are a capacity refusal too.
   it('ADMISSION_INFERENCE_BUSY refused before execution waits the named delay and retries', async () => {
     const send = vi.fn().mockResolvedValueOnce(refused('ADMISSION_INFERENCE_BUSY'))
       .mockResolvedValueOnce(new Response('{}'));

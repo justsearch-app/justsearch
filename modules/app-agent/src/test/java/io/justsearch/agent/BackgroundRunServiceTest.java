@@ -426,7 +426,7 @@ final class BackgroundRunServiceTest {
 
   @Test
   void inferenceBusyRefusalIsRecordedWithItsOwnCode() {
-    // #759: a run refused because the inference threads and queue are full
+    // Task t-20261005-b6d536, FP11: a run refused because the inference threads and queue are full
     // records ADMISSION_INFERENCE_BUSY. Looked up by name so the check fails by assertion where absent.
     var busy = java.util.Arrays.stream(io.justsearch.app.api.EngineAdmissionException.Reason.values())
         .filter(r -> r.name().equals("INFERENCE_BUSY")).findFirst();

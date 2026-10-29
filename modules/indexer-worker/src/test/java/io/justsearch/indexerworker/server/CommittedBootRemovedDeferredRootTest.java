@@ -51,7 +51,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — a root the committed boot deferred (its drive
+ * Task t-20261013-ef3c41, round 8, scenario S8 — a root the committed boot deferred (its drive
  * letter held another volume, "stick B", while the previous index generation was kept) is removed
  * by the person while stick B is still mapped. Nothing of stick B is ever indexed into the removed
  * root, no watcher is registered on it and no volume is recorded for it; the removal resolves the

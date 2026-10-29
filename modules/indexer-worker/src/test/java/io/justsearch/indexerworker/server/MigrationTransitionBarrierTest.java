@@ -53,7 +53,7 @@ final class MigrationTransitionBarrierTest {
 
   @Test
   void pruneReplayCutRequiresAnInstalledHarnessSelfExit() {
-    // #803: a stop point at a replayed prune's first removal, before
+    // Task t-20261019-24fb14, RP8: a stop point at a replayed prune's first removal, before
     // anything of it is committed. Like the projection cut, only a process halt there is a state.
     String point = "migration-after-first-prune-removal";
     var installed = org.junit.jupiter.api.Assertions.assertDoesNotThrow(

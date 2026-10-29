@@ -46,7 +46,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — the upgrade from a version that kept no
+ * Task t-20261013-ef3c41, round 8 (refined decision 2) — the upgrade from a version that kept no
  * record of each root's volume. At the first boot without the record, the volume of each declared
  * root is confirmed once, on evidence: a root whose indexed files are on the drive at its path with
  * their indexed size and modification time is recorded there, a root with nothing indexed is

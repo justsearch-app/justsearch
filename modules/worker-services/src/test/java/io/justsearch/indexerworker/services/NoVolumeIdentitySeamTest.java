@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758: the no-volume-identity seam ({@link NoVolumeIdentityExtension})
+ * Task t-20261013-ef3c41, round 9: the no-volume-identity seam ({@link NoVolumeIdentityExtension})
  * takes the volume identity away, so a folder answers as on a platform without one (Linux,
  * macOS). In a run with the seam's property set, the explicitly registered extension switches it on for this test.
  */

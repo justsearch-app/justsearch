@@ -37,10 +37,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — what the Worker's status says when (a) the document count
+ * Task t-20261013-ef3c41, round 2 — what the Worker's status says when (a) the document count
  * cannot be read from the very first read, and (b) the automatic-rebuild brake cannot be read.
  *
- * <p>(a) With no earlier count to fall back on, status says the count is unknown ({@code
+ * <p>(a) S5: with no earlier count to fall back on, status says the count is unknown ({@code
  * doc_count_unknown}) instead of reporting 0 documents as if the index were empty. The field is read
  * through the descriptor so the check compiles against a revision without it and fails there by
  * assertion. The count failure is injected as in {@code SchemaCompatUnknownTest}: a Lucene count is

@@ -12,9 +12,9 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * #758 — an index whose stored fingerprint cannot be parsed opens
+ * Task t-20261013-ef3c41, scenario S6 — an index whose stored fingerprint cannot be parsed opens
  * without an automatic rebuild: the open-time parity diff files no difference for a digest it
- * cannot read. A readable but different digest still does (schema mismatch still migrates).
+ * cannot read. A readable but different digest still does (P2: schema mismatch still migrates).
  */
 final class UnreadableFingerprintParityTest {
 

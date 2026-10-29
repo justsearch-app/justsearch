@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * #803: a buffered PRUNE_PREFIX or SYNC_ROOT replayed while the live Worker's
+ * Task t-20261019-24fb14: a buffered PRUNE_PREFIX or SYNC_ROOT replayed while the live Worker's
  * indexing loop writes. The replay is vouched for by the live Worker's root authority and applied
  * inside its file-mutation fence, so no row a writer publishes for a deleted file outlives the
  * replayed prune. The writer is the loop's real {@code JobBatchWriter}, held inside the fence.

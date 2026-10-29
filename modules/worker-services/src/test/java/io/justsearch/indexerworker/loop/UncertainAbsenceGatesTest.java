@@ -42,7 +42,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
 /**
- * #758 — the checks that can end in a deletion never remove a source's indexed
+ * Task t-20261013-ef3c41 — the checks that can end in a deletion never remove a source's indexed
  * content, or mark its queue item done, unless the source is confirmed absent: not found while the
  * folder that holds it is present.
  *

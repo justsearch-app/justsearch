@@ -293,7 +293,7 @@ final class EngineTestHarness implements AutoCloseable {
   /**
    * Records {@code folder}'s volume as the person's add does: the Worker's watch with the add
    * marker. Only the add records a root's volume, and every walk, sync and migration refuses a root
-   * with none recorded (#758); tests that declare a
+   * with none recorded (task t-20261013-ef3c41, round 8, refined decision 2); tests that declare a
    * root by writing {@code watched_roots.json}, or sync a folder directly, call this first. The
    * watch subscription itself is then dropped from the Worker's registry (not removed as the
    * person's removal does, which would drop the record too), so these tests run without watcher

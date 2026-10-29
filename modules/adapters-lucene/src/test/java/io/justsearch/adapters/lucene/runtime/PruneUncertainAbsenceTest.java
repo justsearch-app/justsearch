@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — a prune removes a document only when its file is not found
+ * Task t-20261013-ef3c41, scenario S2 — a prune removes a document only when its file is not found
  * while the same root is present, re-checked during the prune; when the root stops answering, part
  * way or from the start, nothing more is removed.
  *

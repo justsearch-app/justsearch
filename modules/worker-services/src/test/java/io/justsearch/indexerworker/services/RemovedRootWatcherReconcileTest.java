@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — a reconcile the Worker's watcher asked for (an
+ * Task t-20261013-ef3c41, round 8, scenario S8 — a reconcile the Worker's watcher asked for (an
  * event overflow) and had not yet run when the person removed the root is dropped. Run, it would
  * sync the removed root: index whatever folder is at its path and record its volume.
  *

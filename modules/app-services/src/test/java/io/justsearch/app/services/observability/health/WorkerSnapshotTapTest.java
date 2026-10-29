@@ -951,7 +951,7 @@ final class WorkerSnapshotTapTest {
   }
 
   /**
-   * #758 — an unreadable rebuild brake holds like a spent one, so its
+   * Task t-20261013-ef3c41, round 2 — an unreadable rebuild brake holds like a spent one, so its
    * recovery is the same: the explicit index rebuild, not a plain reindex (which the held Worker
    * would not act on).
    */

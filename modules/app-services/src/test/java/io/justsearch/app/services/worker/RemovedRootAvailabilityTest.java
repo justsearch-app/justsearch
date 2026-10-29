@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — removing a root keeps nothing of it. The Head
+ * Task t-20261013-ef3c41, round 8, scenario S8 — removing a root keeps nothing of it. The Head
  * keeps the last answer of each root's background availability check; a root removed while it read
  * unavailable and added again once its folder is back must not show the removed root's
  * "unavailable" answer.

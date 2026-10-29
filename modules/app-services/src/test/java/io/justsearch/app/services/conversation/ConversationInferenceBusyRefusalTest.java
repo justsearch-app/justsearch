@@ -12,7 +12,7 @@ import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 
 /**
- * #759: a chat whose retrieval is refused because the Engine's inference
+ * Task t-20261005-b6d536, FP11: a chat whose retrieval is refused because the Engine's inference
  * threads and queue are full streams an error event with {@code ADMISSION_INFERENCE_BUSY}, its
  * catalogue key and Retry-After seconds, and never offers a safe replay.
  *

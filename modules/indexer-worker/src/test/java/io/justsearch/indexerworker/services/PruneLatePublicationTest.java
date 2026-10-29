@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * #803 on the normal paths: the indexing loop's real writer checked a file
+ * Task t-20261019-24fb14, RP3 on the normal paths: the indexing loop's real writer checked a file
  * just before the person deleted it, and is held inside the file-mutation fence before it
  * publishes the file's first row. The prune's scan therefore finds no row of the file. Once the
  * writer finishes, the file must have no row left: the prune judges the files published since its

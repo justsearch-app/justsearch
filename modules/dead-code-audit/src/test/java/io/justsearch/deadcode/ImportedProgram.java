@@ -30,8 +30,6 @@ abstract class ImportedProgram {
   @BeforeAll
   @Timeout(120)
   static void importProgram() {
-    // JUnit 5.14.4 ignored SEPARATE_THREAD timeouts on this lifecycle method; explicit preemption
-    // was what bounded an injected CompletableFuture.join hang (2026-10-24).
     assertTimeoutPreemptively(Duration.ofMinutes(2), ImportedProgram::classes);
   }
 

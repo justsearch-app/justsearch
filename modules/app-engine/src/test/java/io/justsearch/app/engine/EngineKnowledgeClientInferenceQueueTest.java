@@ -53,7 +53,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * #759: the Engine's foreground inference lane lets a
+ * Task t-20261005-b6d536, scenarios FP1 to FP10: the Engine's foreground inference lane lets a
  * request that finds every inference thread busy wait for one within its own deadline, and only a
  * full wait queue refuses, with its own code.
  *

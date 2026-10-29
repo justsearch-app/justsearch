@@ -355,7 +355,7 @@ final class EngineRootRetirementTest {
     when(runtime.pruneOps()).thenReturn(null);
     var service = spy(new WorkerIngestService(queue, null, null, pacing, layout.basePath(),
         layout.activeGenerationPath(), runtime, runtime, null, 0L));
-    // The person added the root, which records its volume (#758: only
+    // The person added the root, which records its volume (task t-20261013-ef3c41, round 8: only
     // the add records it). The fixture's own calls are not the test's.
     EngineTestHarness.recordAddedRoot(service, root);
     org.mockito.Mockito.clearInvocations(service);

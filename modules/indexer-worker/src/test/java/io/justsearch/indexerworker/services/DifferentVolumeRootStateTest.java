@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — a root whose drive letter now holds another
+ * Task t-20261013-ef3c41, round 4, scenario S8 — a root whose drive letter now holds another
  * volume shows the root-level state, rather than reading as an available folder whose files are
  * the original's.
  *

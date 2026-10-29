@@ -778,8 +778,8 @@ final class EngineKnowledgeClientExecutorTest {
         assertTrue(text.get(2, TimeUnit.SECONDS), "Text-only APIs must execute while native work stays blocked");
         assertFalse(release.isDone());
         assertEquals(1, admission.activeWorkCount());
-        // The inference lane waits for a thread within the caller's deadline (#759); one waiting
-        // call fills its queue, so the next calls are refused.
+        // The inference lane waits for a thread within the caller's deadline (task
+        // t-20261005-b6d536, FP1); one waiting call fills its queue, so the next calls are refused.
         var waiting = new java.util.concurrent.FutureTask<>(
             () -> client.search(request, TestEngineContexts.FOREGROUND));
         Thread.ofVirtual().start(waiting);
@@ -833,7 +833,7 @@ final class EngineKnowledgeClientExecutorTest {
   }
 
   /**
-   * Bounded queue (#759): "The pool gets a bounded queue equal to its
+   * Changed intent (task t-20261005-b6d536, FP1): "The pool gets a bounded queue equal to its
    * thread count (8 by default, 1 with the minimum policy), within the policy's foregroundQueue
    * bound." The lane used to refuse without queueing.
    */

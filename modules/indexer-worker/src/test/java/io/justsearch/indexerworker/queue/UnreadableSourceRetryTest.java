@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — a source that exists but cannot be read is retried with a
+ * Task t-20261013-ef3c41, scenario S7 — a source that exists but cannot be read is retried with a
  * counted, growing back-off and no time limit, survives a restart queued, and is listed on the
  * failed-files surface as "indexed, source unreadable", distinct from a missing file. Reason codes
  * and the retry policy are named as strings, the way they are persisted, so the check compiles at

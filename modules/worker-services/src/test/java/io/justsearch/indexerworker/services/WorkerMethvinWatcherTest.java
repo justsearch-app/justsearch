@@ -61,7 +61,7 @@ final class WorkerMethvinWatcherTest {
   /** Longer than the watcher's delete settle window, so a deferred delete has had its chance. */
   private static final long SETTLE_WAIT_MS = 5_000L;
 
-  // ---- #758: a watcher delete removes a document only after its
+  // ---- Task t-20261013-ef3c41, scenario S3: a watcher delete removes a document only after its
   // absence is confirmed. Each case performs the real file-system change; the DELETE notification
   // is dispatched directly because the event sequence the OS reports for an atomic save or a
   // case-only rename differs by platform and editor, and the claim under test is what the watcher
@@ -599,7 +599,7 @@ final class WorkerMethvinWatcherTest {
       RootWatcherRegistry.Subscription registration =
           subscription(root, null, new Object());
       watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, child);
-      // #758: a delete is applied once its absence is confirmed, which may wait
+      // Task t-20261013-ef3c41: a delete is applied once its absence is confirmed, which may wait
       // out a short settle window; it must still arrive without any further event.
       String observed = pollForDeletedPath(sink.observed, child, 10_000);
       assertNotNull(observed, "Delete under an existing root must reach the sink");

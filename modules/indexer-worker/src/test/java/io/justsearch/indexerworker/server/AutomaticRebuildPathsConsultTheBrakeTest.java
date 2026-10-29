@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — every automatic rebuild consults the repeat-rebuild brake.
+ * Task t-20261013-ef3c41, round 3 — every automatic rebuild consults the repeat-rebuild brake.
  *
  * <p>Only the schema-mismatch rebuild asked it. The embedding-model-change re-embed, the rebuild
  * from source of an index recovered to empty, and the backup-first rebuild all started without

@@ -12,7 +12,7 @@ import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
 /**
- * #759: the refusal for full inference threads and queue has its
+ * Task t-20261005-b6d536, FP4 and FP11: the refusal for full inference threads and queue has its
  * own admission reason, a transient registry code that the background run's {@code "ADMISSION_" +
  * reason} spelling reaches exactly, and a catalogue message.
  *

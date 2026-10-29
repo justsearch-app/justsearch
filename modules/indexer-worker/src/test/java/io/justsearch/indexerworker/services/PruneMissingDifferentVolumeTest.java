@@ -47,7 +47,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758: a different volume at the same drive letter, appearing while
+ * Task t-20261013-ef3c41, scenario S8: a different volume at the same drive letter, appearing while
  * the app was not running, does not remove the original's documents. Real conditions: one SUBST
  * letter mapped first to a folder on one volume, then, after a simulated restart (a new service
  * over the same index and queue), to a folder of the same name on another volume. Every mapping

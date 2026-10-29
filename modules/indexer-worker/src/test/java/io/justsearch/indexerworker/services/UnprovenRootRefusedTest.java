@@ -41,7 +41,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — after the one-time upgrade seeding, only
+ * Task t-20261013-ef3c41, round 8 (refined decision 2) — after the one-time upgrade seeding, only
  * the person's add records a root's volume. A background path that meets a declared root with no
  * volume recorded (the walk, the periodic sync and its volume check, the prune) refuses it as
  * unproven: it records nothing, queues nothing and deletes nothing. The root is declared the way it

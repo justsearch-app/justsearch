@@ -18,7 +18,7 @@ import io.justsearch.app.api.status.WorkerOperationalViewBuilder;
 import org.junit.jupiter.api.Test;
 
 /**
- * #758 — a brake whose state record was lost is shown as an unreadable
+ * Task t-20261013-ef3c41, round 3 — a brake whose state record was lost is shown as an unreadable
  * brake ({@code index.rebuild_brake_unreadable}); the Worker's reason carries the "state lost"
  * detail. Before, any brake reason other than the unreadable one was shown as a spent budget.
  */

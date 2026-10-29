@@ -23,7 +23,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * #758 — a rebuild brake whose state record was lost and re-established
+ * Task t-20261013-ef3c41, round 3 — a rebuild brake whose state record was lost and re-established
  * ({@code rebuild_brake_state_lost}) is an unreadable brake. Its recovery is the index rebuild, as
  * for a spent or unreadable brake; before, the unknown reason fell through to the plain reindex,
  * which the Worker would not act on while it holds.

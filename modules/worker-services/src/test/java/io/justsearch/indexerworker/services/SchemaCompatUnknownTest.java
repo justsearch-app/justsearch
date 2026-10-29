@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * #758 — when the document count or the recorded index
+ * Task t-20261013-ef3c41, scenarios S5 and S6 — when the document count or the recorded index
  * shape or metadata cannot be read, the status says unknown ({@code UNAVAILABLE}): never
  * compatible, never 0 documents, never legacy or rebuild required.
  *

@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 /**
- * What an explicit file ingest records besides its queue item (#758): the volume of the file's
- * folder, in the Worker's volume record under {@code
+ * What an explicit file ingest records besides its queue item (task t-20261013-ef3c41, round 8b,
+ * decision 1): the volume of the file's folder, in the Worker's volume record under {@code
  * indexBase}. For tests that put such a queue item in place before the Worker boots, as a request
  * made before a restart left it.
  */

@@ -561,8 +561,8 @@ final class WorkerRecordedScanAdmissionTest extends LuceneExecutorTestBase {
 
   /**
    * The person's add of {@code root}: its watch request with the add marker, which records the
-   * root's volume under {@code indexBasePath}. #758: only the add records a root's volume, and
-   * every other path refuses a root with none
+   * root's volume under {@code indexBasePath}. Task t-20261013-ef3c41, round 8 (refined decision
+   * 2): only the add records a root's volume, and every other path refuses a root with none
    * recorded.
    */
   private static void addedByThePerson(Path indexBasePath, Path root) {
