@@ -4,7 +4,8 @@ The fragility these pin (615 §26/§28): the auto-serve trusted HTTP-200 as read
 hardcoded :5174, discarded Vite stderr, and set inert VITE_MSW/--mode mock. The contract
 is: FREE-PORT scan, --strictPort, NEUTRAL vite (no mock), stderr CAPTURED to a file,
 provenance on the server-info, and a mount gate that fails LOUD with the best-available
-reason. No real Vite/browser — these are pure-unit (mocked Popen / fake page).
+reason. The startup race regression uses real child processes and HTTP listeners;
+the other checks use mocked Popen / fake pages.
 """
 from __future__ import annotations
 
@@ -13,6 +14,12 @@ import datetime
 import json
 import socket
 import subprocess
+import sys
+import threading
+from contextlib import nullcontext
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import pytest
 
 from jseval import ui_check, ui_shot
 
@@ -50,11 +57,110 @@ def test_port_in_use_real_socket_smoke():
 
 # --- _start_vite_server honors the serve contract (mocked, no real Vite) -----
 
+@pytest.mark.parametrize("exit_delay", [0, 0.7])
+def test_start_vite_server_never_adopts_foreign_listener(tmp_path, monkeypatch, exit_delay):
+    class ForeignHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"foreign responder")
+
+        def log_message(self, *_args):
+            pass
+
+    foreign = ThreadingHTTPServer(("127.0.0.1", 0), ForeignHandler)
+    thread = threading.Thread(target=foreign.serve_forever, daemon=True)
+    thread.start()
+    port = foreign.server_port
+    ui_web = tmp_path / "modules" / "ui-web"
+    ui_web.mkdir(parents=True)
+    # A real strict-port child: refusal can occur AFTER the foreign HTTP response.
+    entry = tmp_path / "strict_server.py"
+    entry.write_text(f"""
+import sys, time
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+port = int(sys.argv[sys.argv.index('--port') + 1])
+try:
+    server = HTTPServer(('127.0.0.1', port), SimpleHTTPRequestHandler)
+except OSError:
+    time.sleep({exit_delay!r})
+    print(f'Port {{port}} is already in use', file=sys.stderr, flush=True)
+    sys.exit(1)
+server.serve_forever()
+""", encoding="utf-8")
+    info_path = tmp_path / "server.json"
+    monkeypatch.setattr(ui_shot, "_SERVER_INFO_PATH", info_path)
+    monkeypatch.setattr(ui_shot, "_find_ui_web_dir", lambda: ui_web)
+    monkeypatch.setattr(ui_shot, "_ensure_node_modules_junction", lambda _u: True)
+    monkeypatch.setattr(ui_shot, "_resolve_vite_entry", lambda _u: entry)
+    monkeypatch.setattr(ui_shot.shutil, "which", lambda _name: sys.executable)
+    monkeypatch.setattr(ui_shot, "_register_agent_spawn", lambda *_args: None)
+    monkeypatch.setattr(ui_shot, "_git_provenance", lambda _u: {})
+    # Simulate the chosen port being taken between the free scan and spawn.
+    pick = ui_shot._pick_free_port
+    monkeypatch.setattr(ui_shot, "_VITE_PORT_START", port)
+    monkeypatch.setattr(ui_shot, "_pick_free_port", lambda start=port: port if start == port else pick(start))
+    popen = subprocess.Popen
+    children = []
+
+    def spawn(*args, **kwargs):
+        child = popen(*args, **kwargs)
+        children.append(child)
+        return child
+
+    monkeypatch.setattr(subprocess, "Popen", spawn)
+    try:
+        url = ui_shot._start_vite_server()
+        assert url != f"http://localhost:{port}", "adopted the foreign HTTP 200"
+        info = json.loads(info_path.read_text())
+        assert info["port"] > port
+        assert children[-1].poll() is None
+        assert info["pid"] == children[-1].pid
+        assert children[0].poll() == 1
+        assert f"Port {port} is already in use" in (tmp_path / f"ui-shot-vite-{port}.log").read_text()
+    finally:
+        for child in children:
+            if child.poll() is None:
+                child.kill()
+            child.wait(timeout=5)
+        foreign.shutdown()
+        foreign.server_close()
+        thread.join(timeout=5)
+
+
+def test_start_vite_server_exhausts_range_with_child_log(tmp_path, monkeypatch):
+    attempts = []
+
+    class Refused:
+        pid = 1234
+        returncode = 1
+        def poll(self): return self.returncode
+        def wait(self): return self.returncode
+
+    def spawn(cmd, **kwargs):
+        attempts.append(int(cmd[-2]))
+        kwargs["stderr"].write(f"Port {cmd[-2]} is already in use\n")
+        return Refused()
+
+    monkeypatch.setattr(ui_shot, "_SERVER_INFO_PATH", tmp_path / "server.json")
+    monkeypatch.setattr(ui_shot, "_find_ui_web_dir", lambda: tmp_path)
+    monkeypatch.setattr(ui_shot, "_ensure_node_modules_junction", lambda _u: True)
+    monkeypatch.setattr(ui_shot, "_resolve_vite_entry", lambda _u: tmp_path / "vite.js")
+    monkeypatch.setattr(ui_shot.shutil, "which", lambda _n: "node")
+    monkeypatch.setattr(ui_shot, "_is_free", lambda _port: True)
+    monkeypatch.setattr(subprocess, "Popen", spawn)
+    with pytest.raises(ui_shot.ServeStartError, match="Port 5223 is already in use"):
+        ui_shot._start_vite_server()
+    assert attempts == list(range(5174, 5224))
+    assert not (tmp_path / "server.json").exists()
+
+
 def test_start_vite_server_honors_contract(tmp_path, monkeypatch):
     captured = {}
 
     class _FakeProc:
         pid = 4321
+        def poll(self): return None
         def kill(self): pass
 
     def _fake_popen(cmd, **kw):
@@ -64,7 +170,7 @@ def test_start_vite_server_honors_contract(tmp_path, monkeypatch):
         return _FakeProc()
 
     def _fake_urlopen(url, timeout=1):
-        return object()  # server "accepts connections" immediately
+        return nullcontext()  # server "accepts connections" immediately
 
     ui_web = tmp_path / "modules" / "ui-web"
     ui_web.mkdir(parents=True)
@@ -77,6 +183,9 @@ def test_start_vite_server_honors_contract(tmp_path, monkeypatch):
     # real main checkout's `tmp/dev-runner/agent-spawns/`, regardless of whether the fake pid
     # happens to collide with a real process on the test machine.
     monkeypatch.setenv("JUSTSEARCH_DEV_RUNNER_STATE_ROOT", str(tmp_path / "state"))
+    monkeypatch.setattr(ui_shot.agent_spawn_register.agent_identity, "_cached", {
+        "harness": "unknown", "owner": None, "sessionId": None,
+    })
     monkeypatch.setattr(
         ui_shot.agent_spawn_register, "process_creation_file_time_utc", lambda _pid: "134320479841300350",
     )
@@ -89,6 +198,7 @@ def test_start_vite_server_honors_contract(tmp_path, monkeypatch):
     monkeypatch.setattr(ui_shot, "_git_provenance", lambda _c: {"branch": "x", "head": "abc"})
     monkeypatch.setattr(ui_shot, "_SERVER_INFO_PATH", info_path)
     monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+    monkeypatch.setattr(ui_shot, "_pid_listens_on_port", lambda *_args: True)
     monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
     monkeypatch.chdir(tmp_path)  # so the relative tmp/ stderr-log lands here
 
@@ -214,7 +324,10 @@ def test_timeout_reason_names_remedy_on_module_error(tmp_path, monkeypatch):
 
     class _FakeProc:
         pid = 1
+        returncode = -9
+        def poll(self): return None
         def kill(self): pass
+        def wait(self): return self.returncode
 
     monkeypatch.setattr(ui_shot, "_find_ui_web_dir", lambda: ui_web)
     monkeypatch.setattr(ui_shot, "_ensure_node_modules_junction", lambda _u: True)
