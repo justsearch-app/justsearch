@@ -1,0 +1,1239 @@
+{
+  "kind": "installed-model-activation-live-round3",
+  "candidate": "repair commit containing this evidence; copied distribution built from its product changes",
+  "workRoot": "/home/elias/dev/justsearch/tmp/rel-act-round3-20261028/live",
+  "qualifiedA1Runs": [],
+  "conformanceRuns": [],
+  "trials": [
+    {
+      "case": "a1-help",
+      "summary": {
+        "case": "help",
+        "stops": [
+          {
+            "gpuLibrariesLoaded": false,
+            "label": "before-download",
+            "pid": 504395,
+            "seconds": 0.665,
+            "forced": false,
+            "exitCode": 143
+          },
+          {
+            "gpuLibrariesLoaded": false,
+            "label": "between-download-and-activation",
+            "pid": 507029,
+            "seconds": 0.214,
+            "forced": false,
+            "exitCode": 143
+          },
+          {
+            "gpuLibrariesLoaded": false,
+            "label": "cleanup",
+            "pid": 507735,
+            "seconds": 3.17,
+            "forced": false,
+            "exitCode": 143
+          },
+          {
+            "gpuLibrariesLoaded": false,
+            "label": "cleanup",
+            "pid": 551108,
+            "seconds": 4.889,
+            "forced": false,
+            "exitCode": 143
+          }
+        ],
+        "sourceGeneration": "g-20261028-205138",
+        "activeGeneration": "g-01a18448-ca47-78f0-b33b-d1c944ebc0ef",
+        "activation": {
+          "state": "complete"
+        },
+        "activated-help-vector": {
+          "helpDocuments": 5,
+          "effectiveMode": "VECTOR",
+          "fallback": false
+        },
+        "observerCorrection": "Canonical terminal state is complete; continued the same accepted generation after stopping the observer."
+      },
+      "qualified": false,
+      "observations": [
+        {
+          "phase": "activated",
+          "readiness": {
+            "schemaVersion": 2,
+            "observedAt": "2026-10-28T20:56:33.706891923Z",
+            "engineComponents": {
+              "api": {
+                "state": "READY",
+                "stateSince": "2026-10-28T20:52:04.515128808Z",
+                "appliedVersion": "be58fcccd28f71dc21316b4a60214c6cf2e1592ccf7e177aa4b44054630bb4bf",
+                "desiredVersion": "be58fcccd28f71dc21316b4a60214c6cf2e1592ccf7e177aa4b44054630bb4bf",
+                "deadlineMs": 0,
+                "recoveryAttempts": 0,
+                "evidence": "boundPort=37579"
+              },
+              "index": {
+                "state": "READY",
+                "stateSince": "2026-10-28T20:52:05.095760240Z",
+                "appliedVersion": "2b07139816b1704ca2add91b01d76f1bfa3eef37b6d4786c1b6cd867ef420ebf",
+                "desiredVersion": "2b07139816b1704ca2add91b01d76f1bfa3eef37b6d4786c1b6cd867ef420ebf",
+                "deadlineMs": 60000,
+                "recoveryAttempts": 0
+              },
+              "generative": {
+                "state": "ABSENT",
+                "reasonCode": "inference.deactivated",
+                "stateSince": "2026-10-28T20:52:03.114647049Z",
+                "appliedVersion": "89b009bb54269e7efd6e67099039803ac17a910ef2e2484f0b548c7faf019d0e",
+                "desiredVersion": "89b009bb54269e7efd6e67099039803ac17a910ef2e2484f0b548c7faf019d0e",
+                "deadlineMs": 180000,
+                "recoveryAttempts": 0,
+                "evidence": "generative intent is disabled"
+              },
+              "encoders": {
+                "state": "READY",
+                "stateSince": "2026-10-28T20:52:31.935047171Z",
+                "appliedVersion": "14051b67a9525e9c6dda80ee6c411ada1aeeb4652b87e924c860e17956dfde5c",
+                "desiredVersion": "1652dba8a57cc1197ee23e88485c9981cf8b0a297531101a954a965cf900406d",
+                "mode": "BESIDE",
+                "reason": "candidate_fits_free_device_memory",
+                "footprintBytes": 0,
+                "deadlineMs": 120000,
+                "recoveryAttempts": 0
+              }
+            },
+            "components": {
+              "visualTextExtraction": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T20:56:33.051432561Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "ai": {
+                "state": "NOT_CONFIGURED",
+                "reasonCode": "inference.deactivated",
+                "source": "lifecycle_inference",
+                "observedAt": "2026-10-28T20:56:33.706891923Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "embedding": {
+                "state": "READY",
+                "source": "worker_health_check",
+                "observedAt": "2026-10-28T20:56:33.050653152Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "chunkEmbedding": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T20:56:33.049787964Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "visualDocumentUnderstanding": {
+                "state": "READY",
+                "source": "head_vdu_status",
+                "observedAt": "2026-10-28T20:56:33.052064129Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "workerControlPlane": {
+                "state": "READY",
+                "source": "lifecycle_snapshot",
+                "observedAt": "2026-10-28T20:56:33.706891923Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "telemetry": {
+                "state": "READY",
+                "source": "telemetry_health",
+                "observedAt": "2026-10-28T20:56:33.052804446Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "gpu": {
+                "state": "READY",
+                "source": "gpu_saturation_monitor",
+                "observedAt": "2026-10-28T20:56:33.053440757Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "lambdamartModel": {
+                "state": "READY",
+                "reasonCode": "lambdamart.not_configured",
+                "source": "head_gpl_status",
+                "observedAt": "2026-10-28T20:56:33.052387847Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "indexServing": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T20:56:33.706891923Z",
+                "stale": false,
+                "stalenessMs": 0
+              }
+            },
+            "composites": {
+              "aiFeatures": {
+                "state": "NOT_CONFIGURED",
+                "reasonCodes": [
+                  "inference.deactivated"
+                ],
+                "stale": false,
+                "maxStalenessMs": 0
+              },
+              "retrieval": {
+                "state": "READY",
+                "reasonCodes": [
+                  "lambdamart.not_configured"
+                ],
+                "stale": false,
+                "maxStalenessMs": 0
+              },
+              "telemetry": {
+                "state": "READY",
+                "reasonCodes": [],
+                "stale": false,
+                "maxStalenessMs": 0
+              }
+            }
+          },
+          "compatibility": {
+            "embeddingCompatState": "COMPATIBLE",
+            "embeddingCompatReason": "FINGERPRINT_MATCH",
+            "embeddingFingerprintCurrent": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+            "embeddingFingerprintStored": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+            "indexSchemaFpCurrent": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+            "indexSchemaFpStored": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+            "indexSchemaCompatState": "COMPATIBLE",
+            "reindexRequired": false,
+            "reindexRequiredReason": ""
+          },
+          "migration": {
+            "activeGenerationId": "g-01a18448-ca47-78f0-b33b-d1c944ebc0ef",
+            "migrationState": "IDLE",
+            "buildingGenerationId": "",
+            "previousGenerationId": "",
+            "servingSearchGenerationId": "g-01a18448-ca47-78f0-b33b-d1c944ebc0ef",
+            "servingIngestGenerationId": "g-01a18448-ca47-78f0-b33b-d1c944ebc0ef",
+            "activeIndexedDocuments": 5,
+            "buildingIndexedDocuments": 0,
+            "switchBufferDepth": 0,
+            "pendingJobsCount": 0,
+            "processingJobsCount": 0,
+            "pendingReadyJobsCount": 0,
+            "pendingBackoffJobsCount": 0,
+            "migrationSwitchingAgeMs": 0,
+            "migrationSwitchingMaxDurationMs": 1800000,
+            "migrationPaused": false,
+            "migrationPauseReason": "",
+            "migrationPausedAtMs": 0,
+            "migrationSource": "",
+            "migrationEnumerator": {
+              "running": false,
+              "done": true,
+              "rootsTotal": 1,
+              "rootsDone": 1,
+              "filesSeen": 5,
+              "filesEnqueued": 5,
+              "startedAtMs": 1793220792440,
+              "finishedAtMs": 1793220792491,
+              "lastPath": "/home/elias/dev/justsearch/tmp/rel-act-round3-20261028/live/tmp/a1-help/SSOT/docs/help/ai-features.md"
+            }
+          },
+          "indexedDocuments": 5
+        },
+        {
+          "phase": "restarted",
+          "readiness": {
+            "schemaVersion": 2,
+            "observedAt": "2026-10-28T20:59:10.485328379Z",
+            "engineComponents": {
+              "index": {
+                "state": "READY",
+                "stateSince": "2026-10-28T20:58:28.148828840Z",
+                "appliedVersion": "2b07139816b1704ca2add91b01d76f1bfa3eef37b6d4786c1b6cd867ef420ebf",
+                "desiredVersion": "2b07139816b1704ca2add91b01d76f1bfa3eef37b6d4786c1b6cd867ef420ebf",
+                "deadlineMs": 60000,
+                "recoveryAttempts": 0
+              },
+              "api": {
+                "state": "READY",
+                "stateSince": "2026-10-28T20:58:17.956164706Z",
+                "appliedVersion": "be58fcccd28f71dc21316b4a60214c6cf2e1592ccf7e177aa4b44054630bb4bf",
+                "desiredVersion": "be58fcccd28f71dc21316b4a60214c6cf2e1592ccf7e177aa4b44054630bb4bf",
+                "deadlineMs": 0,
+                "recoveryAttempts": 0,
+                "evidence": "boundPort=41533"
+              },
+              "encoders": {
+                "state": "READY",
+                "stateSince": "2026-10-28T20:59:10.245401103Z",
+                "appliedVersion": "14051b67a9525e9c6dda80ee6c411ada1aeeb4652b87e924c860e17956dfde5c",
+                "desiredVersion": "1652dba8a57cc1197ee23e88485c9981cf8b0a297531101a954a965cf900406d",
+                "deadlineMs": 120000,
+                "recoveryAttempts": 0
+              },
+              "generative": {
+                "state": "ABSENT",
+                "reasonCode": "inference.deactivated",
+                "stateSince": "2026-10-28T20:58:16.623799364Z",
+                "appliedVersion": "89b009bb54269e7efd6e67099039803ac17a910ef2e2484f0b548c7faf019d0e",
+                "desiredVersion": "89b009bb54269e7efd6e67099039803ac17a910ef2e2484f0b548c7faf019d0e",
+                "deadlineMs": 180000,
+                "recoveryAttempts": 0,
+                "evidence": "generative intent is disabled"
+              }
+            },
+            "components": {
+              "workerControlPlane": {
+                "state": "READY",
+                "source": "lifecycle_snapshot",
+                "observedAt": "2026-10-28T20:59:10.485328379Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "visualDocumentUnderstanding": {
+                "state": "READY",
+                "source": "head_vdu_status",
+                "observedAt": "2026-10-28T20:59:10.450246285Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "chunkEmbedding": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T20:59:10.449255319Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "embedding": {
+                "state": "READY",
+                "source": "worker_health_check",
+                "observedAt": "2026-10-28T20:59:10.447264871Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "ai": {
+                "state": "NOT_CONFIGURED",
+                "reasonCode": "inference.deactivated",
+                "source": "lifecycle_inference",
+                "observedAt": "2026-10-28T20:59:10.485328379Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "visualTextExtraction": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T20:59:10.450141624Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "indexServing": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T20:59:10.485328379Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "lambdamartModel": {
+                "state": "READY",
+                "reasonCode": "lambdamart.not_configured",
+                "source": "head_gpl_status",
+                "observedAt": "2026-10-28T20:59:10.450561868Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "gpu": {
+                "state": "READY",
+                "source": "gpu_saturation_monitor",
+                "observedAt": "2026-10-28T20:59:10.450634975Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "telemetry": {
+                "state": "READY",
+                "source": "telemetry_health",
+                "observedAt": "2026-10-28T20:59:10.450597352Z",
+                "stale": false,
+                "stalenessMs": 0
+              }
+            },
+            "composites": {
+              "retrieval": {
+                "state": "READY",
+                "reasonCodes": [
+                  "lambdamart.not_configured"
+                ],
+                "stale": false,
+                "maxStalenessMs": 0
+              },
+              "aiFeatures": {
+                "state": "NOT_CONFIGURED",
+                "reasonCodes": [
+                  "inference.deactivated"
+                ],
+                "stale": false,
+                "maxStalenessMs": 0
+              },
+              "telemetry": {
+                "state": "READY",
+                "reasonCodes": [],
+                "stale": false,
+                "maxStalenessMs": 0
+              }
+            }
+          },
+          "compatibility": {
+            "embeddingCompatState": "COMPATIBLE",
+            "embeddingCompatReason": "FINGERPRINT_MATCH",
+            "embeddingFingerprintCurrent": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+            "embeddingFingerprintStored": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+            "indexSchemaFpCurrent": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+            "indexSchemaFpStored": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+            "indexSchemaCompatState": "COMPATIBLE",
+            "reindexRequired": false,
+            "reindexRequiredReason": ""
+          },
+          "migration": {
+            "activeGenerationId": "g-01a18448-ca47-78f0-b33b-d1c944ebc0ef",
+            "migrationState": "IDLE",
+            "buildingGenerationId": "",
+            "previousGenerationId": "",
+            "servingSearchGenerationId": "g-01a18448-ca47-78f0-b33b-d1c944ebc0ef",
+            "servingIngestGenerationId": "g-01a18448-ca47-78f0-b33b-d1c944ebc0ef",
+            "activeIndexedDocuments": 5,
+            "buildingIndexedDocuments": 0,
+            "switchBufferDepth": 0,
+            "pendingJobsCount": 0,
+            "processingJobsCount": 0,
+            "pendingReadyJobsCount": 0,
+            "pendingBackoffJobsCount": 0,
+            "migrationSwitchingAgeMs": 0,
+            "migrationSwitchingMaxDurationMs": 1800000,
+            "migrationPaused": false,
+            "migrationPauseReason": "",
+            "migrationPausedAtMs": 0,
+            "migrationSource": "",
+            "migrationEnumerator": {
+              "running": false,
+              "done": false,
+              "rootsTotal": 1,
+              "rootsDone": 1,
+              "filesSeen": 5,
+              "filesEnqueued": 5,
+              "startedAtMs": 1793220792440,
+              "finishedAtMs": 1793220792491,
+              "lastPath": "/home/elias/dev/justsearch/tmp/rel-act-round3-20261028/live/tmp/a1-help/SSOT/docs/help/ai-features.md"
+            }
+          },
+          "indexedDocuments": 5
+        }
+      ],
+      "activated-help-vector.json": {
+        "helpHits": 5,
+        "searchTrace": {
+          "version": 1,
+          "effectiveMode": "VECTOR",
+          "decisionKind": "multi_leg",
+          "qpp": {
+            "maxIdf": 0.0,
+            "avgIctf": 0.0,
+            "queryScope": 0.0
+          },
+          "degradation": {
+            "vectorBlocked": false,
+            "hybridFallback": false,
+            "spladeExecuted": false
+          },
+          "stages": [
+            {
+              "id": "correction",
+              "status": "skipped",
+              "reason": "not-triggered"
+            },
+            {
+              "id": "sparse-retrieval",
+              "status": "skipped",
+              "reason": "dense-only"
+            },
+            {
+              "id": "dense-retrieval",
+              "status": "executed",
+              "detail": "device=cpu"
+            },
+            {
+              "id": "splade-retrieval",
+              "status": "skipped",
+              "reason": "not-selected"
+            },
+            {
+              "id": "fusion",
+              "status": "skipped",
+              "reason": "single-leg-or-no-retrieval",
+              "ms": 12
+            },
+            {
+              "id": "chunk-merge",
+              "status": "executed",
+              "ms": 11,
+              "cardinality": 5
+            },
+            {
+              "id": "branch-fusion",
+              "status": "executed",
+              "ms": 1,
+              "detail": "cc"
+            },
+            {
+              "id": "query-understanding",
+              "status": "executed",
+              "detail": "NAVIGATIONAL"
+            },
+            {
+              "id": "expansion",
+              "status": "skipped",
+              "reason": "QUERY_TYPE_NAVIGATIONAL"
+            },
+            {
+              "id": "lambdamart",
+              "status": "skipped",
+              "reason": "PIPELINE_NOT_ELIGIBLE"
+            },
+            {
+              "id": "cross-encoder",
+              "status": "skipped",
+              "reason": "NAVIGATIONAL_QUERY"
+            },
+            {
+              "id": "freshness",
+              "status": "executed"
+            }
+          ]
+        }
+      },
+      "post-restart-install-observation.json": {
+        "phase": "idle",
+        "installedFully": false,
+        "repairNeeded": true,
+        "optionalGaps": [
+          {
+            "fileName": "config.json",
+            "packageId": "splade"
+          },
+          {
+            "fileName": "config.json",
+            "packageId": "reranker"
+          },
+          {
+            "fileName": "config.json",
+            "packageId": "citation-scorer"
+          }
+        ],
+        "pendingRegistryAdditions": []
+      }
+    },
+    {
+      "case": "a1-final-help",
+      "summary": {
+        "case": "help",
+        "stops": [
+          {
+            "gpuLibrariesLoaded": false,
+            "label": "before-download",
+            "pid": 587832,
+            "seconds": 1.116,
+            "forced": false,
+            "exitCode": 143
+          },
+          {
+            "gpuLibrariesLoaded": false,
+            "label": "between-download-and-activation",
+            "pid": 589832,
+            "seconds": 12.396,
+            "forced": false,
+            "exitCode": 143
+          },
+          {
+            "gpuLibrariesLoaded": false,
+            "label": "after-activation",
+            "pid": 592011,
+            "seconds": 4.336,
+            "forced": false,
+            "exitCode": 143
+          },
+          {
+            "gpuLibrariesLoaded": false,
+            "label": "cleanup",
+            "pid": 605573,
+            "seconds": 1.417,
+            "forced": false,
+            "exitCode": 143
+          }
+        ],
+        "sourceGeneration": "g-20261028-210347",
+        "activation": {
+          "state": "complete",
+          "phase": "settled",
+          "historySince": 0,
+          "acceptedAt": 1793221472577,
+          "completedAt": 1793221572255,
+          "unitsCompleted": 0,
+          "unitsFailed": 0,
+          "result": {
+            "code": "SUCCESS"
+          }
+        },
+        "activated-help-vector": {
+          "helpDocuments": 5,
+          "effectiveMode": "VECTOR",
+          "fallback": false
+        },
+        "activeGeneration": "g-01a18454-20aa-7e66-ae64-1d9d1a5919d3"
+      },
+      "qualified": false,
+      "observations": [
+        {
+          "phase": "activated",
+          "readiness": {
+            "schemaVersion": 2,
+            "observedAt": "2026-10-28T21:06:12.417890738Z",
+            "engineComponents": {
+              "api": {
+                "state": "READY",
+                "stateSince": "2026-10-28T21:04:27.240708995Z",
+                "appliedVersion": "be58fcccd28f71dc21316b4a60214c6cf2e1592ccf7e177aa4b44054630bb4bf",
+                "desiredVersion": "be58fcccd28f71dc21316b4a60214c6cf2e1592ccf7e177aa4b44054630bb4bf",
+                "deadlineMs": 0,
+                "recoveryAttempts": 0,
+                "evidence": "boundPort=38055"
+              },
+              "index": {
+                "state": "READY",
+                "stateSince": "2026-10-28T21:04:27.767295059Z",
+                "appliedVersion": "6c1537821055f16997616a9e7297c92a9f28cd289e7c5ae8e732a71d03febb28",
+                "desiredVersion": "6c1537821055f16997616a9e7297c92a9f28cd289e7c5ae8e732a71d03febb28",
+                "deadlineMs": 60000,
+                "recoveryAttempts": 0
+              },
+              "generative": {
+                "state": "ABSENT",
+                "reasonCode": "inference.deactivated",
+                "stateSince": "2026-10-28T21:04:25.769816895Z",
+                "appliedVersion": "aee5c8d33056759fed25287de6316bcb5c98fdf0acd3e6ca767086a7f8f1ec6a",
+                "desiredVersion": "aee5c8d33056759fed25287de6316bcb5c98fdf0acd3e6ca767086a7f8f1ec6a",
+                "deadlineMs": 180000,
+                "recoveryAttempts": 0,
+                "evidence": "generative intent is disabled"
+              },
+              "encoders": {
+                "state": "READY",
+                "stateSince": "2026-10-28T21:04:56.705522273Z",
+                "appliedVersion": "b98d3b3910d500d3b8a5520f71dc6889f50e76d680b4a5a2289d9a461d701f11",
+                "desiredVersion": "5fe7aa1d9854eb6b1d9b9a0374af53c34023057e62797513f1841968bfc2c208",
+                "mode": "BESIDE",
+                "reason": "candidate_fits_free_device_memory",
+                "footprintBytes": 0,
+                "deadlineMs": 120000,
+                "recoveryAttempts": 0
+              }
+            },
+            "components": {
+              "telemetry": {
+                "state": "READY",
+                "source": "telemetry_health",
+                "observedAt": "2026-10-28T21:06:12.416687796Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "gpu": {
+                "state": "READY",
+                "source": "gpu_saturation_monitor",
+                "observedAt": "2026-10-28T21:06:12.416095416Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "lambdamartModel": {
+                "state": "READY",
+                "reasonCode": "lambdamart.not_configured",
+                "source": "head_gpl_status",
+                "observedAt": "2026-10-28T21:06:12.415061407Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "indexServing": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T21:06:12.417890738Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "visualTextExtraction": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T21:06:12.414809524Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "ai": {
+                "state": "NOT_CONFIGURED",
+                "reasonCode": "inference.deactivated",
+                "source": "lifecycle_inference",
+                "observedAt": "2026-10-28T21:06:12.417890738Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "embedding": {
+                "state": "READY",
+                "source": "worker_health_check",
+                "observedAt": "2026-10-28T21:06:12.413163529Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "chunkEmbedding": {
+                "state": "DEGRADED",
+                "reasonCode": "chunk_embedding.not_ready",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T21:06:12.413927604Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "visualDocumentUnderstanding": {
+                "state": "READY",
+                "source": "head_vdu_status",
+                "observedAt": "2026-10-28T21:06:12.416472168Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "workerControlPlane": {
+                "state": "READY",
+                "source": "lifecycle_snapshot",
+                "observedAt": "2026-10-28T21:06:12.417890738Z",
+                "stale": false,
+                "stalenessMs": 0
+              }
+            },
+            "composites": {
+              "aiFeatures": {
+                "state": "NOT_CONFIGURED",
+                "reasonCodes": [
+                  "inference.deactivated"
+                ],
+                "stale": false,
+                "maxStalenessMs": 0
+              },
+              "retrieval": {
+                "state": "DEGRADED",
+                "reasonCodes": [
+                  "chunk_embedding.not_ready",
+                  "lambdamart.not_configured"
+                ],
+                "stale": false,
+                "maxStalenessMs": 0
+              },
+              "telemetry": {
+                "state": "READY",
+                "reasonCodes": [],
+                "stale": false,
+                "maxStalenessMs": 0
+              }
+            }
+          },
+          "compatibility": {
+            "embeddingCompatState": "COMPATIBLE",
+            "embeddingCompatReason": "FINGERPRINT_MATCH",
+            "embeddingFingerprintCurrent": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+            "embeddingFingerprintStored": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+            "indexSchemaFpCurrent": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+            "indexSchemaFpStored": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+            "indexSchemaCompatState": "COMPATIBLE",
+            "reindexRequired": false,
+            "reindexRequiredReason": ""
+          },
+          "migration": {
+            "activeGenerationId": "g-01a18454-20aa-7e66-ae64-1d9d1a5919d3",
+            "migrationState": "IDLE",
+            "buildingGenerationId": "",
+            "previousGenerationId": "g-20261028-210347",
+            "servingSearchGenerationId": "g-01a18454-20aa-7e66-ae64-1d9d1a5919d3",
+            "servingIngestGenerationId": "g-01a18454-20aa-7e66-ae64-1d9d1a5919d3",
+            "activeIndexedDocuments": 5,
+            "buildingIndexedDocuments": 0,
+            "switchBufferDepth": 0,
+            "pendingJobsCount": 0,
+            "processingJobsCount": 0,
+            "pendingReadyJobsCount": 0,
+            "pendingBackoffJobsCount": 0,
+            "migrationSwitchingAgeMs": 0,
+            "migrationSwitchingMaxDurationMs": 1800000,
+            "migrationPaused": false,
+            "migrationPauseReason": "",
+            "migrationPausedAtMs": 0,
+            "migrationSource": "",
+            "migrationEnumerator": {
+              "running": false,
+              "done": true,
+              "rootsTotal": 1,
+              "rootsDone": 1,
+              "filesSeen": 5,
+              "filesEnqueued": 5,
+              "startedAtMs": 1793221545581,
+              "finishedAtMs": 1793221545618,
+              "lastPath": "/home/elias/dev/justsearch/tmp/rel-act-round3-20261028/live/tmp/a1-final-help/SSOT/docs/help/ai-features.md"
+            }
+          },
+          "indexedDocuments": 5
+        },
+        {
+          "phase": "restarted",
+          "readiness": {
+            "schemaVersion": 2,
+            "observedAt": "2026-10-28T21:06:44.323040544Z",
+            "engineComponents": {
+              "api": {
+                "state": "READY",
+                "stateSince": "2026-10-28T21:06:20.353475235Z",
+                "appliedVersion": "be58fcccd28f71dc21316b4a60214c6cf2e1592ccf7e177aa4b44054630bb4bf",
+                "desiredVersion": "be58fcccd28f71dc21316b4a60214c6cf2e1592ccf7e177aa4b44054630bb4bf",
+                "deadlineMs": 0,
+                "recoveryAttempts": 0,
+                "evidence": "boundPort=45821"
+              },
+              "index": {
+                "state": "READY",
+                "stateSince": "2026-10-28T21:06:22.785795675Z",
+                "appliedVersion": "6c1537821055f16997616a9e7297c92a9f28cd289e7c5ae8e732a71d03febb28",
+                "desiredVersion": "6c1537821055f16997616a9e7297c92a9f28cd289e7c5ae8e732a71d03febb28",
+                "deadlineMs": 60000,
+                "recoveryAttempts": 0
+              },
+              "generative": {
+                "state": "ABSENT",
+                "reasonCode": "inference.deactivated",
+                "stateSince": "2026-10-28T21:06:18.883028752Z",
+                "appliedVersion": "aee5c8d33056759fed25287de6316bcb5c98fdf0acd3e6ca767086a7f8f1ec6a",
+                "desiredVersion": "aee5c8d33056759fed25287de6316bcb5c98fdf0acd3e6ca767086a7f8f1ec6a",
+                "deadlineMs": 180000,
+                "recoveryAttempts": 0,
+                "evidence": "generative intent is disabled"
+              },
+              "encoders": {
+                "state": "READY",
+                "stateSince": "2026-10-28T21:06:44.088863986Z",
+                "appliedVersion": "b98d3b3910d500d3b8a5520f71dc6889f50e76d680b4a5a2289d9a461d701f11",
+                "desiredVersion": "5fe7aa1d9854eb6b1d9b9a0374af53c34023057e62797513f1841968bfc2c208",
+                "deadlineMs": 120000,
+                "recoveryAttempts": 0
+              }
+            },
+            "components": {
+              "embedding": {
+                "state": "READY",
+                "source": "worker_health_check",
+                "observedAt": "2026-10-28T21:06:44.157647026Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "chunkEmbedding": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T21:06:44.156777520Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "visualDocumentUnderstanding": {
+                "state": "READY",
+                "source": "head_vdu_status",
+                "observedAt": "2026-10-28T21:06:44.156955712Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "workerControlPlane": {
+                "state": "READY",
+                "source": "lifecycle_snapshot",
+                "observedAt": "2026-10-28T21:06:44.323040544Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "telemetry": {
+                "state": "READY",
+                "source": "telemetry_health",
+                "observedAt": "2026-10-28T21:06:44.157813581Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "gpu": {
+                "state": "READY",
+                "source": "gpu_saturation_monitor",
+                "observedAt": "2026-10-28T21:06:44.158286444Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "lambdamartModel": {
+                "state": "READY",
+                "reasonCode": "lambdamart.not_configured",
+                "source": "head_gpl_status",
+                "observedAt": "2026-10-28T21:06:44.157483397Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "indexServing": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T21:06:44.323040544Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "visualTextExtraction": {
+                "state": "READY",
+                "source": "worker_status",
+                "observedAt": "2026-10-28T21:06:44.157120817Z",
+                "stale": false,
+                "stalenessMs": 0
+              },
+              "ai": {
+                "state": "NOT_CONFIGURED",
+                "reasonCode": "inference.deactivated",
+                "source": "lifecycle_inference",
+                "observedAt": "2026-10-28T21:06:44.323040544Z",
+                "stale": false,
+                "stalenessMs": 0
+              }
+            },
+            "composites": {
+              "retrieval": {
+                "state": "READY",
+                "reasonCodes": [
+                  "lambdamart.not_configured"
+                ],
+                "stale": false,
+                "maxStalenessMs": 0
+              },
+              "telemetry": {
+                "state": "READY",
+                "reasonCodes": [],
+                "stale": false,
+                "maxStalenessMs": 0
+              },
+              "aiFeatures": {
+                "state": "NOT_CONFIGURED",
+                "reasonCodes": [
+                  "inference.deactivated"
+                ],
+                "stale": false,
+                "maxStalenessMs": 0
+              }
+            }
+          },
+          "compatibility": {
+            "embeddingCompatState": "COMPATIBLE",
+            "embeddingCompatReason": "FINGERPRINT_MATCH",
+            "embeddingFingerprintCurrent": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+            "embeddingFingerprintStored": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+            "indexSchemaFpCurrent": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+            "indexSchemaFpStored": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+            "indexSchemaCompatState": "COMPATIBLE",
+            "reindexRequired": false,
+            "reindexRequiredReason": ""
+          },
+          "migration": {
+            "activeGenerationId": "g-01a18454-20aa-7e66-ae64-1d9d1a5919d3",
+            "migrationState": "IDLE",
+            "buildingGenerationId": "",
+            "previousGenerationId": "",
+            "servingSearchGenerationId": "g-01a18454-20aa-7e66-ae64-1d9d1a5919d3",
+            "servingIngestGenerationId": "g-01a18454-20aa-7e66-ae64-1d9d1a5919d3",
+            "activeIndexedDocuments": 5,
+            "buildingIndexedDocuments": 0,
+            "switchBufferDepth": 0,
+            "pendingJobsCount": 0,
+            "processingJobsCount": 0,
+            "pendingReadyJobsCount": 0,
+            "pendingBackoffJobsCount": 0,
+            "migrationSwitchingAgeMs": 0,
+            "migrationSwitchingMaxDurationMs": 1800000,
+            "migrationPaused": false,
+            "migrationPauseReason": "",
+            "migrationPausedAtMs": 0,
+            "migrationSource": "",
+            "migrationEnumerator": {
+              "running": false,
+              "done": false,
+              "rootsTotal": 1,
+              "rootsDone": 1,
+              "filesSeen": 5,
+              "filesEnqueued": 5,
+              "startedAtMs": 1793221545581,
+              "finishedAtMs": 1793221545618,
+              "lastPath": "/home/elias/dev/justsearch/tmp/rel-act-round3-20261028/live/tmp/a1-final-help/SSOT/docs/help/ai-features.md"
+            }
+          },
+          "indexedDocuments": 5
+        }
+      ],
+      "activated-help-vector.json": {
+        "helpHits": 5,
+        "searchTrace": {
+          "version": 1,
+          "effectiveMode": "VECTOR",
+          "decisionKind": "multi_leg",
+          "qpp": {
+            "maxIdf": 0.0,
+            "avgIctf": 0.0,
+            "queryScope": 0.0
+          },
+          "degradation": {
+            "vectorBlocked": false,
+            "hybridFallback": false,
+            "spladeExecuted": false
+          },
+          "stages": [
+            {
+              "id": "correction",
+              "status": "skipped",
+              "reason": "not-triggered"
+            },
+            {
+              "id": "sparse-retrieval",
+              "status": "skipped",
+              "reason": "dense-only"
+            },
+            {
+              "id": "dense-retrieval",
+              "status": "executed",
+              "detail": "device=cpu"
+            },
+            {
+              "id": "splade-retrieval",
+              "status": "skipped",
+              "reason": "not-selected"
+            },
+            {
+              "id": "fusion",
+              "status": "skipped",
+              "reason": "single-leg-or-no-retrieval",
+              "ms": 40
+            },
+            {
+              "id": "chunk-merge",
+              "status": "executed",
+              "ms": 27,
+              "cardinality": 5
+            },
+            {
+              "id": "branch-fusion",
+              "status": "skipped",
+              "reason": "no-chunk-branch-contribution"
+            },
+            {
+              "id": "query-understanding",
+              "status": "executed",
+              "detail": "NAVIGATIONAL"
+            },
+            {
+              "id": "expansion",
+              "status": "skipped",
+              "reason": "QUERY_TYPE_NAVIGATIONAL"
+            },
+            {
+              "id": "lambdamart",
+              "status": "skipped",
+              "reason": "PIPELINE_NOT_ELIGIBLE"
+            },
+            {
+              "id": "cross-encoder",
+              "status": "skipped",
+              "reason": "NAVIGATIONAL_QUERY"
+            },
+            {
+              "id": "freshness",
+              "status": "executed"
+            }
+          ]
+        }
+      },
+      "observed-install-status.json": {
+        "phase": "idle",
+        "installedFully": false,
+        "repairNeeded": true,
+        "optionalGaps": [
+          {
+            "fileName": "config.json",
+            "packageId": "splade"
+          },
+          {
+            "fileName": "config.json",
+            "packageId": "reranker"
+          },
+          {
+            "fileName": "config.json",
+            "packageId": "citation-scorer"
+          }
+        ],
+        "pendingRegistryAdditions": []
+      },
+      "observed-install-plan-preview.json": {
+        "components": [
+          {
+            "declinable": false,
+            "declined": false,
+            "description": "Multilingual semantic search",
+            "downloadBytes": 1272585559,
+            "id": "embedding",
+            "label": "Embedding model",
+            "necessity": "required",
+            "state": "to-download",
+            "tier": "retrieval-core",
+            "totalBytes": 1272585559,
+            "unavailableReason": ""
+          },
+          {
+            "declinable": true,
+            "declined": false,
+            "description": "Keyword-aware recall",
+            "downloadBytes": 1002573334,
+            "id": "splade",
+            "label": "Sparse retrieval (SPLADE)",
+            "necessity": "improves-results",
+            "state": "to-download",
+            "tier": "retrieval-enrichment",
+            "totalBytes": 1002573334,
+            "unavailableReason": ""
+          },
+          {
+            "declinable": true,
+            "declined": false,
+            "description": "Better result ordering",
+            "downloadBytes": 357942777,
+            "id": "reranker",
+            "label": "Search reranker",
+            "necessity": "improves-results",
+            "state": "to-download",
+            "tier": "retrieval-enrichment",
+            "totalBytes": 357942777,
+            "unavailableReason": ""
+          },
+          {
+            "declinable": true,
+            "declined": false,
+            "description": "People, organizations and places",
+            "downloadBytes": 138036009,
+            "id": "ner",
+            "label": "Named entity recognition",
+            "necessity": "improves-results",
+            "state": "to-download",
+            "tier": "retrieval-enrichment",
+            "totalBytes": 138036009,
+            "unavailableReason": ""
+          },
+          {
+            "declinable": true,
+            "declined": false,
+            "description": "Source attribution in answers",
+            "downloadBytes": 23724624,
+            "id": "citation-scorer",
+            "label": "Citation scorer",
+            "necessity": "improves-results",
+            "state": "to-download",
+            "tier": "retrieval-enrichment",
+            "totalBytes": 23724624,
+            "unavailableReason": ""
+          },
+          {
+            "declinable": true,
+            "declined": false,
+            "description": "Chat, Q&A and summaries",
+            "downloadBytes": 0,
+            "id": "chat",
+            "label": "Chat model",
+            "necessity": "adds-feature",
+            "state": "unavailable",
+            "tier": "llm",
+            "totalBytes": 6807977504,
+            "unavailableReason": "Chat model is unavailable: its runtime is not supplied for linux-x86_64."
+          },
+          {
+            "declinable": false,
+            "declined": false,
+            "description": "GPU acceleration",
+            "downloadBytes": 0,
+            "id": "cuda-runtime",
+            "label": "GPU runtime libraries",
+            "necessity": "infrastructure",
+            "state": "unavailable",
+            "tier": "runtime",
+            "totalBytes": 1989906411,
+            "unavailableReason": "Runtime artifacts target windows-x86_64; configure an external runtime for linux-x86_64."
+          }
+        ]
+      }
+    }
+  ],
+  "blocked": {
+    "check": "A1 installed-state assertion after restart",
+    "attempts": 2,
+    "reason": "The retained staging helper uses legacy package target directories; InstallPlanner.effectiveTargetDir requires candidate-owned identity directories for every ONNX variant. Changing the private models-root override did not repair the layout mismatch. Installed roles serve, but /api/ai/install/status still reports installedFully=false and repairNeeded=true, and plan-preview still schedules those files.",
+    "stopRule": "Builder contract: come back when the same failure repeats after two different attempts.",
+    "notExecuted": [
+      "genuinely empty A1",
+      "A1 new-file vector retrieval and first stamp",
+      "six installer crash cuts and second restarts"
+    ]
+  },
+  "resourceNotes": [
+    "One installDist completed. Distribution copied into this task's isolated shared clone. All live state, ports, HOME, XDG, DJL, temporary files and crash files were private. The GPU-hiding shim and mask-bin were reused from the prior investigation.",
+    "Read-only retained model files and shared ~/.gradle were the shared resources. A private ordinary copy of the prior optimized graph cache avoided regeneration. No shared dev stack, GPU, VM, push, tag or CI runner was used."
+  ],
+  "artifacts": {
+    "indexer-worker-0.3.0.jar": "sha256:0ec86299f4e9e06d123874182c80bad12b0c7592c61a36995ee1da464663fe6e",
+    "app-engine-0.3.0.jar": "sha256:8e5f8b6031b1c8d27fa060796b7dc2ad610f11a6bf8604eab738042c1bdb3e91",
+    "app-api-0.3.0.jar": "sha256:7214bd75deac3c6fcaa55aed80d22697c6124d1dfb4d417bf3b85e2aa9aea792",
+    "app-services-0.3.0.jar": "sha256:0398deca9c96470d907d5a4236830793fcb48906586f81840e30685600158c4f",
+    "app-observability-0.3.0.jar": "sha256:a33403bd721f9fb86c681358af5faff0796c2a3662ddf09855d4d83a99c73c15",
+    "ui-0.3.0.jar": "sha256:b3ed0ba715ae63014db37c1612adee740ba70d508f3004c317cec12bc58b39f2"
+  },
+  "manualBeforeRestart": {
+    "passed": true,
+    "operationState": "complete",
+    "activeGeneration": "g-01a18448-ca47-78f0-b33b-d1c944ebc0ef",
+    "settingsRevision": 1,
+    "helpDocuments": 5,
+    "effectiveMode": "VECTOR",
+    "fallback": false,
+    "compatibility": {
+      "embeddingCompatState": "COMPATIBLE",
+      "embeddingCompatReason": "FINGERPRINT_MATCH",
+      "embeddingFingerprintCurrent": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+      "embeddingFingerprintStored": "5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86",
+      "indexSchemaFpCurrent": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+      "indexSchemaFpStored": "d6b4f27d915629515ea571f9662ac7a49e81fff84c61030cbf0578b176f40b59",
+      "indexSchemaCompatState": "COMPATIBLE",
+      "reindexRequired": false,
+      "reindexRequiredReason": ""
+    }
+  },
+  "probeCorrections": [
+    "The first observer expected completed; the real operation state is complete. The observer was interrupted by its recorded PID after verifying the accepted B, revision 1 and all five help hits through vector-only retrieval. It then resumed the same B for restart observations.",
+    "The first models-root override pointed outside the staged models; the second trial points to the staged root, but the stale legacy directory layout still fails installer completeness. Neither trial is counted as a full A1 pass.",
+    "The download-only snapshots were taken while encoders were STARTING. They establish the source pointer and manifest at that instant, not steady-state download-only semantic readiness."
+  ],
+  "cleanup": {
+    "liveProcessesRemaining": [],
+    "removedPrivateProfilesAndCache": [
+      "/home/elias/dev/justsearch/tmp/rel-act-round3-20261028/live/tmp/ort-cache",
+      "/home/elias/dev/justsearch/.claude/worktrees/rel-act/modules/indexer-worker/build/test-profile/test",
+      "/home/elias/dev/justsearch/.claude/worktrees/rel-act/modules/app-engine/build/test-profile/test",
+      "/tmp/rel-act-round3-20261028/before/modules/indexer-worker/build/test-profile/test"
+    ],
+    "sharedServicesLeftAlone": [
+      "Gradle daemons and ~/.gradle",
+      "other sessions and their VMs"
+    ]
+  },
+  "evidenceOmissions": [
+    "Redundant operationKey fields were removed after the generic-key secret scanner flagged their public operation identifiers. Generation identities and outcomes remain recorded."
+  ]
+}

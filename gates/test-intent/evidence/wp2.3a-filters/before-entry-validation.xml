@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.justsearch.ui.api.RestrictionValidationEntryTest" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-28T23:46:30.035Z" hostname="elias-systemproductname" time="2.337">
+  <properties/>
+  <testcase name="searchAndAskRejectTheExactValidationMatrixBeforeAdmission()" classname="io.justsearch.ui.api.RestrictionValidationEntryTest" time="2.306">
+    <failure message="org.mockito.exceptions.verification.opentest4j.ArgumentsAreDifferent: &#10;Argument(s) are different! Wanted:&#10;context.status(&#10;    400&#10;);&#10;-&gt; at io.javalin.http.Context.status(Context.kt:457)&#10;Actual invocations have different arguments:&#10;context.attribute(&#10;    &quot;__engine_context__&quot;&#10;);&#10;-&gt; at io.justsearch.ui.api.RequestEngineContext.get(RequestEngineContext.java:26)&#10;context.bodyAsClass(&#10;    interface java.util.Map&#10;);&#10;-&gt; at io.justsearch.ui.api.KnowledgeSearchController.handleSearch(KnowledgeSearchController.java:347)&#10;context.status(&#10;    500&#10;);&#10;-&gt; at io.justsearch.ui.api.KnowledgeSearchController.handleSearch(KnowledgeSearchController.java:527)&#10;context.endpointHandlerPath(&#10;    &#10;);&#10;-&gt; at io.justsearch.ui.api.ApiErrorHandler.routeOf(ApiErrorHandler.java:557)&#10;context.json(&#10;    {&quot;error&quot; = &quot;Search requires the shared publication owner&quot;, &quot;errorCode&quot; = &quot;INVALID_STATE&quot;, &quot;errorClass&quot; = &quot;PERMANENT&quot;, &quot;retryable&quot; = false, &quot;i18nKey&quot; = &quot;errors.INVALID_STATE&quot;}&#10;);&#10;-&gt; at io.justsearch.ui.api.KnowledgeSearchController.handleSearch(KnowledgeSearchController.java:527)&#10;" type="org.mockito.exceptions.verification.opentest4j.ArgumentsAreDifferent">Argument(s) are different! Wanted:
+context.status(
+    400
+);
+-&gt; at io.javalin.http.Context.status(Context.kt:457)
+Actual invocations have different arguments:
+context.attribute(
+    &quot;__engine_context__&quot;
+);
+-&gt; at io.justsearch.ui.api.RequestEngineContext.get(RequestEngineContext.java:26)
+context.bodyAsClass(
+    interface java.util.Map
+);
+-&gt; at io.justsearch.ui.api.KnowledgeSearchController.handleSearch(KnowledgeSearchController.java:347)
+context.status(
+    500
+);
+-&gt; at io.justsearch.ui.api.KnowledgeSearchController.handleSearch(KnowledgeSearchController.java:527)
+context.endpointHandlerPath(
+    
+);
+-&gt; at io.justsearch.ui.api.ApiErrorHandler.routeOf(ApiErrorHandler.java:557)
+context.json(
+    {&quot;error&quot; = &quot;Search requires the shared publication owner&quot;, &quot;errorCode&quot; = &quot;INVALID_STATE&quot;, &quot;errorClass&quot; = &quot;PERMANENT&quot;, &quot;retryable&quot; = false, &quot;i18nKey&quot; = &quot;errors.INVALID_STATE&quot;}
+);
+-&gt; at io.justsearch.ui.api.KnowledgeSearchController.handleSearch(KnowledgeSearchController.java:527)
+
+	at io.javalin.http.Context.status(Context.kt:457)
+	at io.justsearch.ui.api.RestrictionValidationEntryTest.refused(RestrictionValidationEntryTest.java:97)
+	at io.justsearch.ui.api.RestrictionValidationEntryTest.searchAndAskRejectTheExactValidationMatrixBeforeAdmission(RestrictionValidationEntryTest.java:72)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/home/elias/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.17.7/fbf3d6d649ed37fc9e9c59480a05be0a26e3c2da/byte-buddy-agent-1.17.7.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>

@@ -91,3 +91,38 @@ def test_short_recents_heading_and_every_row_reachable(recent_ui, state, viewpor
                 await browser.close()
 
     asyncio.run(check())
+
+
+@pytest.mark.parametrize("state", ["hero", "docked"])
+@pytest.mark.parametrize("viewport", [(1280, 720), (600, 400)])
+def test_filters_with_full_recents_keep_controls_reachable(recent_ui, state, viewport):
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+
+    async def check():
+        url, private = recent_ui
+        async with async_playwright() as runtime:
+            browser = await runtime.chromium.launch(headless=True, env={
+                **{k: v for k, v in os.environ.items() if not k.startswith("JUSTSEARCH_") and k not in (
+                    "DISPLAY", "WAYLAND_DISPLAY", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "JAVA_OPTS", "_JAVA_OPTIONS")},
+                "TMPDIR": str(private), "CUDA_VISIBLE_DEVICES": "-1"})
+            try:
+                context = await browser.new_context(viewport={"width": viewport[0], "height": viewport[1]})
+                await install_fixtures(context)
+                page = await context.new_page()
+                await page.goto(url)
+                await _await_app_ready(page)
+                step = next(s for s in _build_steps(url, 100, 30000)
+                            if s.name == f"sv3-filters-{state}-{viewport[0]}x{viewport[1]}-dark")
+                await step.setup(page)
+                for selector in ('[data-testid="sv3-composer-shell"]', 'jf-sv3-filters',
+                                 '[data-testid="sv3-recents"]'):
+                    rect = await page.locator(selector).bounding_box()
+                    assert rect and rect['height'] >= 40
+                    assert rect['y'] >= 0 and rect['y'] + rect['height'] <= viewport[1]
+                await page.locator('[data-filter-input="folder"]').press('Escape')
+                assert await page.locator('[data-testid="sv3-filters-trigger"]').evaluate('el => el === el.getRootNode().activeElement')
+            finally:
+                await browser.close()
+
+    asyncio.run(check())

@@ -485,16 +485,24 @@ public final class KnowledgeServerMigrationOps {
   /** A recorded Green verifies against its frozen candidate target, not A's global providers. */
   public static boolean verifyGreenCommitMetadataBestEffort(
       LuceneRuntime ingestLifecycle, String expectedIndexFp, String expectedEmbeddingFp, Logger log) {
+    return verifyGreenCommitMetadataBestEffort(ingestLifecycle, expectedIndexFp, expectedEmbeddingFp, false, log);
+  }
+
+  /** Only a freshly fenced installer-empty proof may omit a missing embedding stamp. */
+  public static boolean verifyGreenCommitMetadataBestEffort(
+      LuceneRuntime ingestLifecycle, String expectedIndexFp, String expectedEmbeddingFp,
+      boolean installerEmpty, Logger log) {
     try {
       if (ingestLifecycle == null) {
         return false;
       }
       if (!ingestLifecycle.commitMetadataEnabled()) {
+        if (installerEmpty) return false; // Empty admission still requires COMPLETE and its exact target.
         log.warn("Green verification skipped because commit metadata is disabled");
         return true;
       }
       return verifyGreenMetadata(
-          ingestLifecycle.latestCommitUserDataBestEffort(), expectedIndexFp, expectedEmbeddingFp, log);
+          ingestLifecycle.latestCommitUserDataBestEffort(), expectedIndexFp, expectedEmbeddingFp, installerEmpty, log);
     } catch (Exception e) {
       log.warn("Green verification failed (best-effort): {}", e.getMessage());
       return false;
@@ -506,8 +514,8 @@ public final class KnowledgeServerMigrationOps {
    * {@link #verifyGreenCommitMetadataBestEffort}). Package-private so the build-state /
    * index-fingerprint / embedding-fp rules can be unit-tested without a (sealed) {@link LuceneRuntime} double.
    */
-  static boolean verifyGreenMetadata(
-      Map<String, String> ud, String expectedIndexFp, String expectedEmbeddingFp, Logger log) {
+  static boolean verifyGreenMetadata(Map<String, String> ud, String expectedIndexFp,
+      String expectedEmbeddingFp, boolean installerEmpty, Logger log) {
     String buildState = ud.get("build_state");
     if (!"COMPLETE".equalsIgnoreCase(buildState)) {
       log.warn("Green verification failed: build_state={} (expected COMPLETE)", buildState);
@@ -543,6 +551,7 @@ public final class KnowledgeServerMigrationOps {
       String committedEmbeddingFp =
           ud.get(io.justsearch.indexerworker.embed.EmbeddingCompatibilityController.COMMIT_META_KEY);
       if (committedEmbeddingFp == null || committedEmbeddingFp.isBlank()) {
+        if (installerEmpty) return true; // Structural proof grants no permission to write a stamp.
         log.warn(
             "Green verification failed: embedding_model_sha256 missing on a green that should be "
                 + "embedded (expected={})",
@@ -844,7 +853,12 @@ public final class KnowledgeServerMigrationOps {
    * Settle the accepted UPSERT receipts against their exact queue revision and B source identity;
    * replay exact DELETEs on B in accepted order, then durably commit and verify their absence.
    * Mixed projection and broad-delete snapshots certify B's final accepted effects without
-   * replaying destructive mutations. Conditional removal retains concurrent replacement rows.
+   * replaying destructive mutations. Conditional removal retains concurrent replacement rows and
+   * acknowledges the selected receipts together or not at all.
+   * A SYNC_ROOT was replayed onto B before its pointer moved: its exact receipt is validated and
+   * acknowledged with the others in accepted order, never walked again. On either path, a file
+   * receipt a later SYNC_ROOT covers is checked as a receipt only, unless a current owner's
+   * exclusion policy excludes its source: that receipt is certified as an uncovered one is.
    */
   public static boolean settleCommittedNativeFileWitnesses(
       JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log) {
@@ -861,7 +875,8 @@ public final class KnowledgeServerMigrationOps {
       if (policy != null && !policy.freeze(strictReplayOps(scoped, generation))) return false;
       List<SwitchBufferCapableQueue.SwitchBufferOp> selected = scoped.listSwitchBufferOpsStrict()
           .stream().filter(op -> generation.equals(op.generation())).toList();
-      if (selected.stream().allMatch(op -> "UPSERT".equals(op.op()) || "DELETE".equals(op.op()))) {
+      if (selected.stream().allMatch(op -> "UPSERT".equals(op.op()) || "DELETE".equals(op.op())
+          || "SYNC_ROOT".equals(op.op()))) {
         return settleCommittedNativeFiles(queue, active, generation, log, selected, policy);
       }
       // Native fallback can reopen a recorded generation whose promotion approved gaps. It does
@@ -874,8 +889,10 @@ public final class KnowledgeServerMigrationOps {
       for (int i = 0; i < effects.size(); i++) {
         effects.set(i, observeCommittedProjection(active, effects.get(i)));
       }
+      // B's commit holds a later root sync's walk over these paths; only their receipts are checked.
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> superseded = supersededByRootSync(selected);
       for (var op : selected) {
-        if ("DELETE".equals(op.op())) {
+        if ("DELETE".equals(op.op()) && !superseded.contains(op)) {
           var deletion = SwitchBufferDelete.decode(op.payload());
           if (deletion.origin() != SwitchBufferDelete.Origin.EXPLICIT
               && !settleConditionalNativeDelete(queue, active, deletion)) return false;
@@ -896,6 +913,8 @@ public final class KnowledgeServerMigrationOps {
       // Complete every reader/queue proof before conditionally acknowledging any receipt.
       for (int i = 0; i < effects.size(); i++) {
         var effect = effects.get(i);
+        // A superseded survivor stays an accepted exception to the broad deletes before it.
+        if (superseded.contains(effect.op()) && !policyExcludes(policy, effect.op())) continue;
         if (survivors.contains(effect)) {
           if (!certifyCommittedSurvivor(scoped, active, effects, deleteIndexes, i, policy)) return false;
         } else if (effect.id() != null
@@ -911,7 +930,7 @@ public final class KnowledgeServerMigrationOps {
         }
       }
       if (policy != null && !policy.confirmCommittedAcknowledgement(selected)) return false;
-      if (scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) return false;
+      if (!acknowledgeEvery(scoped, selected)) return false;
       return scoped.listSwitchBufferOpsStrict().stream()
           .noneMatch(op -> generation.equals(op.generation()));
     } catch (IOException | RuntimeException unavailable) {
@@ -971,6 +990,8 @@ public final class KnowledgeServerMigrationOps {
         }
         expectedKey = "collection:" + op.payload();
       }
+      case "SYNC_ROOT" -> expectedKey = "sync_root:"
+          + io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath();
       case "PROJECTION_SOURCE" -> {
         if (!sources.contains(op.payload())) throw new IllegalArgumentException("Unowned projection source");
         expectedKey = "projection-source:" + op.payload().length() + ":" + op.payload();
@@ -1134,15 +1155,23 @@ public final class KnowledgeServerMigrationOps {
     try {
       // Refuse unsupported kinds before applying any partial replay on this boot attempt.
       if (selected.stream().anyMatch(op -> !"UPSERT".equals(op.op())
-          && !"DELETE".equals(op.op()))) return false;
+          && !"DELETE".equals(op.op()) && !"SYNC_ROOT".equals(op.op()))) return false;
       if (selected.stream().anyMatch(op -> "UPSERT".equals(op.op()))) {
         active.commitOps().maybeRefreshBlocking();
       }
       // Validate every receipt before touching B. A later unresolved UPSERT must not leave an
       // earlier DELETE half-applied while the boot attempt waits for its exact queue revision.
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> superseded = supersededByRootSync(selected);
       for (var op : selected) {
         if (op.payload() == null || op.payload().isBlank()) return false;
-        if ("UPSERT".equals(op.op())) {
+        if ("SYNC_ROOT".equals(op.op()) || superseded.contains(op) && !policyExcludes(policy, op)) {
+          // B's commit holds the later root sync's walk over this path; only the receipt is checked.
+          // A retained SYNC_ROOT is in the snapshot B committed: promoteServingSuccessor holds
+          // beginFinalFence from before B's commit until finishPromotedSwitchReplay removes the
+          // receipts, refusing when promotionReplaySnapshotUnchanged fails, and once the pointer
+          // moves buildingGenerationForFileAdmission has no generation to admit B-scoped rows for.
+          decodeCommittedNativeEffect(op, Set.of());
+        } else if ("UPSERT".equals(op.op())) {
           var upsert = SwitchBufferUpsert.decode(op.payload());
           String indexed = active.documentFieldOps()
               .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
@@ -1156,7 +1185,7 @@ public final class KnowledgeServerMigrationOps {
       }
       boolean deleted = false;
       for (var op : selected) {
-        if ("DELETE".equals(op.op())) {
+        if ("DELETE".equals(op.op()) && !superseded.contains(op)) {
           var deletion = SwitchBufferDelete.decode(op.payload());
           if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT) {
             active.indexingCoordinator().deleteByIdAndChunks(deletion.path());
@@ -1171,7 +1200,7 @@ public final class KnowledgeServerMigrationOps {
         active.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
         active.commitOps().maybeRefreshBlocking();
         for (var op : selected) {
-          if ("DELETE".equals(op.op())) {
+          if ("DELETE".equals(op.op()) && !superseded.contains(op)) {
             var deletion = SwitchBufferDelete.decode(op.payload());
             if (deletion.origin() == SwitchBufferDelete.Origin.EXPLICIT
                 && active.indexCountOps().countByIdAndChunksStrict(deletion.path()) != 0) return false;
@@ -1179,14 +1208,54 @@ public final class KnowledgeServerMigrationOps {
         }
       }
       if (policy != null && !policy.confirmCommittedAcknowledgement(selected)) return false;
-      if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
-        return false;
-      }
+      if (!selected.isEmpty() && !acknowledgeEvery(scoped, selected)) return false;
       return switchBufferEmptyStrict(queue, generation);
     } catch (IOException | RuntimeException unavailable) {
       log.warn("Committed native file witnesses remain unresolved", unavailable);
       return false;
     }
+  }
+
+  /**
+   * Acknowledges B's selected receipts together or not at all. Supersession reads the later
+   * receipt from the retained snapshot, so a partial removal could let a retry replay an earlier
+   * receipt alone; the retry instead sees the whole snapshot again.
+   */
+  private static boolean acknowledgeEvery(SwitchBufferCapableQueue scoped,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> selected) {
+    return scoped instanceof SqliteJobQueue sqlite ? sqlite.removeEveryReplayedSwitchBufferOp(selected)
+        : scoped.removeReplayedSwitchBufferOps(selected) == selected.size();
+  }
+
+  /**
+   * A later root walk skips an excluded source, so only the policy's omission proof, confirmed by
+   * the final owner, settles that source's receipt. The current owner judges, not the binding the
+   * receipt records: a root declared since B committed may own and exclude the source.
+   */
+  private static boolean policyExcludes(io.justsearch.indexerworker.services.NativePolicyReplay policy,
+      SwitchBufferCapableQueue.SwitchBufferOp op) {
+    if (policy == null || !"UPSERT".equals(op.op())) return false;
+    var file = SwitchBufferUpsert.decode(op.payload());
+    return policy.excludesUnderCurrentOwner(Path.of(file.path()), file.ingestionRoot(), file.collection());
+  }
+
+  /** File receipts whose path a SYNC_ROOT accepted after them walked again before B committed. */
+  private static Set<SwitchBufferCapableQueue.SwitchBufferOp> supersededByRootSync(
+      List<SwitchBufferCapableQueue.SwitchBufferOp> selected) {
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> superseded = new java.util.HashSet<>();
+    List<PathPrefixScope> laterRoots = new ArrayList<>();
+    for (int i = selected.size() - 1; i >= 0; i--) {
+      var op = selected.get(i);
+      if ("SYNC_ROOT".equals(op.op())) {
+        laterRoots.add(new PathPrefixScope(
+            io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath(), List.of()));
+      } else if (!laterRoots.isEmpty() && ("UPSERT".equals(op.op()) || "DELETE".equals(op.op()))) {
+        String path = "UPSERT".equals(op.op()) ? SwitchBufferUpsert.decode(op.payload()).path()
+            : SwitchBufferDelete.decode(op.payload()).path();
+        if (laterRoots.stream().anyMatch(root -> root.contains(path))) superseded.add(op);
+      }
+    }
+    return superseded;
   }
 
   /** No post-snapshot versions may remain while the final mutation admission fence is held. */

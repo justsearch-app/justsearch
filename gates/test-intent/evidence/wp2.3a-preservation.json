@@ -1,0 +1,103 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:43a785d7580a8b25bd55895a88e6300605bf7adcd38a4fa7b5c901d687dac8e9",
+    "adapterPatch": "gates/test-intent/evidence/wp2.3a-filters/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, vitest with two workers, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-28T23:48:29.747Z",
+  "revision": "ae33f45a2e429c6a63b52ca8f971d12d408c2419",
+  "tree": "c880cbc832559f90007a5ab96e3b7917a1f30835",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ParentRestrictionQueryTest.folderPrefixesAreLiteralDirectories\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3116
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.RAGRestrictionFailureTest.reportedFallbackFailureIsNeverPresentedAsEmptyRestrictedContent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4159
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ParentRestrictionQueryTest.java#folderPrefixesAreLiteralDirectories",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ParentRestrictionQueryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:950edba496fee0802230e58367f84bd64e9390f2a45ad54e3572f85793c067e0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "folderPrefixesAreLiteralDirectories()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/RAGRestrictionFailureTest.java#reportedFallbackFailureIsNeverPresentedAsEmptyRestrictedContent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/RAGRestrictionFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5153d1fc267c5db5045899a02c56fd8e71d80e56be5ef1c03fc21f7f2b69936b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reportedFallbackFailureIsNeverPresentedAsEmptyRestrictedContent()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b744db87446b847edb306eb4d12c92781ac5b4dd",
+    "revision": "b744db87446b847edb306eb4d12c92781ac5b4dd",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ParentRestrictionQueryTest.folderPrefixesAreLiteralDirectories\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 0,
+        "durationMs": 3129
+      },
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.RAGRestrictionFailureTest.reportedFallbackFailureIsNeverPresentedAsEmptyRestrictedContent\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 0,
+        "durationMs": 3496
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ParentRestrictionQueryTest.java#folderPrefixesAreLiteralDirectories",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/RAGRestrictionFailureTest.java#reportedFallbackFailureIsNeverPresentedAsEmptyRestrictedContent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:c0bb6a7cfe36bc51f385f5b9e3a1347a1eb9c5eeee3be955f31fd3fe990404c1"
+}

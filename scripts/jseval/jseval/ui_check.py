@@ -1392,6 +1392,34 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await _settle_focus_marks(page)
         return setup
 
+    def setup_sv3_filters(state, narrow, viewport=None):
+        async def setup(page):
+            await setup_sv3_recents(state, narrow, viewport)(page)
+            await page.locator('[data-testid="sv3-filters-trigger"]').click()
+            for key, value in (("folder", "/inside"), ("from", "2026-03-29"), ("to", "2026-03-29"),
+                               ("minimum", "0"), ("maximum", "2")):
+                control = page.locator(f'[data-filter-input="{key}"]')
+                await control.fill(value)
+                await control.press("Enter")
+            # Keep the active folder chip while exposing its validation and association.
+            await page.locator('[data-filter-input="folder"]').fill("relative/path")
+            await page.locator('[data-filter-input="folder"]').press("Enter")
+            panel = page.locator('jf-sv3-filters')
+            assert await panel.locator('[data-filter]').count() == 3
+            assert await page.locator('[data-filter-input="folder"]').get_attribute('aria-invalid') == 'true'
+            # Every field, note and error is reachable inside the bounded panel; the window
+            # and bar keep their places while only the panel's contents scroll.
+            for selector in ('[data-filter-input="folder"]', '[data-filter-input="from"]',
+                             '[data-filter-input="to"]', '[data-filter-input="minimum"]',
+                             '[data-filter-input="maximum"]', '#folder-error', '.notes'):
+                control = panel.locator(selector).first
+                await control.scroll_into_view_if_needed()
+                assert await control.is_visible(), f"F16 unreachable {selector}"
+            await panel.evaluate('el => { el.scrollTop = 0; }')
+            await assert_recents_fit(page, state)
+            await _settle_focus_marks(page)
+        return setup
+
     async def setup_sv3_search_results(page):
         # WP1.1 S1.12 — Search mode's result list stays reachable beside the floating composer, at a
         # narrow width and with a long list. DETERMINISTIC: the `sv3-results` fixtures variant
@@ -2118,6 +2146,18 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                color_scheme="light" if theme == "light" else "dark",
                forced_colors="active" if theme == "forced" else None)
           for state in ("hero", "docked") for width, height in ((1280, 720), (760, 720), (600, 400))
+          for theme in ("dark", "light", "forced")],
+        *[Step(f"sv3-filters-{state}-{width}-{theme}",
+               setup=setup_sv3_filters(state, width == "narrow"), isolated=True,
+               color_scheme="light" if theme == "light" else "dark",
+               forced_colors="active" if theme == "forced" else None)
+          for state in ("hero", "docked") for width in ("normal", "narrow")
+          for theme in ("dark", "light", "forced")],
+        *[Step(f"sv3-filters-{state}-{width}x{height}-{theme}",
+               setup=setup_sv3_filters(state, False, {"width": width, "height": height}), isolated=True,
+               color_scheme="light" if theme == "light" else "dark",
+               forced_colors="active" if theme == "forced" else None)
+          for state in ("hero", "docked") for width, height in ((1280, 720), (600, 400))
           for theme in ("dark", "light", "forced")],
         Step("sv3-search-results", setup=setup_sv3_search_results, isolated=True,
              fixtures_variant="sv3-results"),

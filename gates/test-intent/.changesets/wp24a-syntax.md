@@ -1,0 +1,505 @@
+---
+schema: test-intent.v1
+task: t-20261019-bd718f
+author-role: builder
+author-session: wp24a-builder-suo96vr2
+---
+
+# Test-intent entries
+
+Agent choices under the quoted design delegation, never owner-agreed words. Builder execution evidence is recorded under `gates/test-intent/evidence/wp24a-syntax/`; independent acceptance remains pending. Every selected check compiled and ran on both revisions. New repaired checks have assertion fail-before evidence; New preservation checks explicitly set `repaired: false` and retain their passing before-state results. Existing oracle adaptations and additions are accounted for separately.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A1–A3/X1–X4/X6: real indexed contrasting documents establish field-local phrases, document-wide exclusions, required field/phrase composition with optional ranking words, literal punctuation and escapes, and fixed invalid-query reasons.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A1–A3/X1–X4/X6: real indexed contrasting documents establish field-local phrases, document-wide exclusions, required field/phrase composition with optional ranking words, literal punctuation and escapes, and fixed invalid-query reasons.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
+      "newChecks": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x1PhraseStaysWithinOneField",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x2ExclusionsApplyAcrossFieldsAndPhrases",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x3RequiredClausesComposeAcrossFieldsWithOptionalWords",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x4UnsupportedPunctuationIsLiteralInsideAdvancedQueries",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x6InvalidQueriesFailWithSpecificReasons"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A0/X7: plain Search produces exactly the historical SIMPLE query and results over a fixed corpus; raw Lucene phrases and *:* probes keep working.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A0/X7: plain Search produces exactly the historical SIMPLE query and results over a fixed corpus; raw Lucene phrases and *:* probes keep working.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
+      "newChecks": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x7PlainSearchEqualsHistoricalSimpleAndRawLuceneStillWorks"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A4/X5 and A5/X6: Head forces sparse-only advanced retrieval, turns off semantic/expansion/reranking work, preserves the supplied facet filter rather than normalizing it, and rejects invalid syntax before Worker search.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A4/X5 and A5/X6: Head forces sparse-only advanced retrieval, turns off semantic/expansion/reranking work, preserves the supplied facet filter rather than normalizing it, and rejects invalid syntax before Worker search.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#x5AdvancedSearchOverridesSemanticPipelineAndKeepsExplicitFilters",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#x6SearchRejectsInvalidSyntaxBeforeWorkerSearch"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A0/X7: plain Search and SIMPLE dispatch identical requests and retain expansion, query understanding and reranking eligibility.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A0/X7: plain Search and SIMPLE dispatch identical requests and retain expansion, query understanding and reranking eligibility.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#x7PlainSearchKeepsSimpleDispatchAndExpansionEligibility"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/FacetQuerySyntaxCouplingTest.java"
+      ],
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A4/X5: even explicit dense/SPLADE/auto/expansion input at the in-process Worker port resolves to lexical results, matchCount and facets satisfying the advanced phrase, with and without requested facets. This fixture has no model service; model-enabled runtime evidence is separate.",
+          "label": "agent choice"
+        }
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The existing fixed corpus gains metaSource=fixture so the new advanced-query case can distinguish exact metadata restrictions. No existing input query, expected result, count, facet, error, tag or condition changed. All six pre-existing checks execute and pass on baseline and candidate; their custom JUnit display names are retained in gates/test-intent/evidence/wp24a-syntax/worker-before.xml and worker-candidate.xml. The unchanged official selector captures the full class in java.json because method-name ids cannot match those display names."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/FacetQuerySyntaxCouplingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A4/X5: even explicit dense/SPLADE/auto/expansion input at the in-process Worker port resolves to lexical results, matchCount and facets satisfying the advanced phrase, with and without requested facets. This fixture has no model service; model-enabled runtime evidence is separate.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A4/X5: even explicit dense/SPLADE/auto/expansion input at the in-process Worker port resolves to lexical results, matchCount and facets satisfying the advanced phrase, with and without requested facets. This fixture has no model service; model-enabled runtime evidence is separate.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/FacetQuerySyntaxCouplingTest.java#x5SearchSubsetKeepsResultsCountsAndFacetsLexicalOnBothPasses"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A0/A4/A5/X5/X6/X8: mounted Search sends the new syntax, displays the Engine reason only on submit while retaining text, suppresses automatic 400 and refinement, clears pending indicators, withholds stale population facts, and retains URL operator text.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A0/A4/A5/X5/X6/X8: mounted Search sends the new syntax, displays the Engine reason only on submit while retaining text, suppresses automatic 400 and refinement, clears pending indicators, withholds stale population facts, and retains URL operator text.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 explicit submit keeps text and renders the Engine reason under the bar without stale rows",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 automatic 400 stays quiet and schedules no refined request then a correction resumes",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x5 withholds prior counts and facets while the new query awaits its Engine classification",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x5 advanced quick results keep counts and facets pending until refinement",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x8 legacy URL restoration keeps operator text and uses Search syntax"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A5/X6: edits supersede both response and asynchronous error-body reads; valid → incomplete → corrected never adopts an earlier answer.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A5/X6: edits supersede both response and asynchronous error-body reads; valid → incomplete → corrected never adopts an earlier answer.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 each edit supersedes an older success and an older error body"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/searchState.test.ts"
+      ],
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A0: the existing request-body oracles acquire querySyntax: search on both stages, retaining every existing filter/pipeline/facet expectation.",
+          "label": "agent choice"
+        }
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The two existing plain-query request-body oracles retain their inputs, timers, filter omission, limit, pipeline, excerpts and facet expectations. The wire encoding now explicitly names querySyntax: search. The added syntax discriminator is covered separately by the New entry and its two assertion fail-before checks; this adaptation covers the retained request contract around that discriminator."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/searchState.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A0: the two existing plain-query request constructors explicitly add querySyntax: search to quick and refined requests. Both modified assertions fail before on the absent discriminator and pass on the candidate; the surrounding request contract is retained as described in the Adaptation entry.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A0: the existing request-body oracles acquire querySyntax: search on both stages, retaining every existing filter/pipeline/facet expectation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) omits filters key when no active filter (quick pass carries the cheap pipeline)",
+        "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) buildSearchIntent is the one constructor: identical inputs → identical bodies"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A6/X8 preservation: Delegate sends operator characters without creating Search requests or a syntax claim.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A6/X8 preservation: Delegate sends operator characters without creating Search requests or a syntax claim.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 Delegate sends operator characters without a Search syntax claim"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A6/X8 preservation: Ask, Structured and model-only dispatch their original prompt characters and make no querySyntax claim or Search request.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A6/X8 preservation: Ask, Structured and model-only dispatch their original prompt characters and make no querySyntax claim or Search request.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 ask sends operator characters as prompt text",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 structured sends operator characters as prompt text",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 model-only sends operator characters as prompt text"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A0/A6/X8: a restored quoted and excluded Search draft keeps its text, blocks Enter until the existing explicit review, then sends its unchanged text using Search syntax on the next deliberate submit.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A0/A6/X8: a restored quoted and excluded Search draft keeps its text, blocks Enter until the existing explicit review, then sends its unchanged text using Search syntax on the next deliberate submit.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 restored quoted Search draft keeps its text and requires the existing review before Search"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java",
+        "modules/worker-services/src/test/resources/fixtures/authors/README.md",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.docx",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.odt",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.pdf",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.eml",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.msg"
+      ],
+      "class": "New",
+      "behaviour": "X3: document authors and mail senders reach author phrase search through normal extraction-to-index ingestion.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X3 normal ingestion preserves Tika creator/sender through structured policy extraction, sandbox routing, document production and the author index field for DOCX, ODT, PDF, EML and MSG. Markdown front matter retains its existing meta_author facet mapping.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/authors-java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#docxAuthorReachesIndex",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#odtAuthorReachesIndex",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#pdfAuthorReachesIndex",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#emlSenderReachesIndex",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#msgSenderReachesIndex"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java",
+        "modules/worker-services/src/test/resources/fixtures/authors/authored.md"
+      ],
+      "class": "New",
+      "behaviour": "X3 preservation: Markdown YAML author stays in the meta_author facet; this repair does not promote it into the author text field.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X3 normal ingestion preserves Tika creator/sender through structured policy extraction, sandbox routing, document production and the author index field for DOCX, ODT, PDF, EML and MSG. Markdown front matter retains its existing meta_author facet mapping.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/authors-java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#markdownAuthorRemainsFrontmatterFacet"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "X1–X3/X5/X7 × F2/F4/F7/F13–F14 preservation after rebase: actual Worker retrieval applies folder/date/size separately and together before a one-candidate budget despite stronger out-of-bounds matches, for phrases, exclusions, title and author. Counts/facets follow; inclusive equal bounds, unknown metadata exclusion, known zero, empty intersection and plain Search/SIMPLE equivalence remain intact.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X1–X3/X5/X7 × F2/F4/F7/F13–F14 preservation after rebase: actual Worker retrieval applies folder/date/size separately and together before a one-candidate budget despite stronger out-of-bounds matches, for phrases, exclusions, title and author. Counts/facets follow; inclusive equal bounds, unknown metadata exclusion, known zero, empty intersection and plain Search/SIMPLE equivalence remain intact.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/restrictions-java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#phraseHonoursEachRestrictionBeforeCandidateBudget",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#exclusionHonoursEachRestrictionBeforeCandidateBudget",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#titleHonoursEachRestrictionBeforeCandidateBudget",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#authorHonoursEachRestrictionBeforeCandidateBudget",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#combinedBoundsExcludeEachCrossedDecoyAndUnknownWithoutBroadening",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#plainSearchWithRestrictionsEqualsSimpleIncludingCountsAndFacets"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "X6 × F5 preservation: a request with invalid syntax and invalid size receives the restriction 400 before dispatch, retaining the existing HTTP-entry validation precedence.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X6 × F5 preservation: a request with invalid syntax and invalid size receives the restriction 400 before dispatch, retaining the existing HTTP-entry validation precedence.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/restrictions-java.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java#invalidRestrictionWinsOverInvalidSearchSyntaxBeforeDispatch"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "X1/X6 × F1/F5/F8: mounted Search combines querySyntax and folder/date/size, preserves filters through syntax errors, drops responses and delayed error bodies after restriction changes, displays Engine restriction errors, and reruns syntax after chip removal.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X1/X6 × F1/F5/F8: mounted Search combines querySyntax and folder/date/size, preserves filters through syntax errors, drops responses and delayed error bodies after restriction changes, displays Engine restriction errors, and reruns syntax after chip removal.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/combined-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters syntax requests carry querySyntax and every active restriction and chip removal reruns syntax",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters syntax errors show the Engine syntax message and preserve active filters",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters changing a restriction during syntax Search drops the old response and delayed error body",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters restriction errors on syntax queries retain the Engine restriction message"
+      ],
+      "repaired": true
+    }
+  ]
+}
+```
+
+## Acceptance records
+
+### WP2.4a author ingestion repair selectors
+
+Agent-adopted under the same design delegation above (delegated-choice), never owner-agreed.
+Evidence uses the committed candidate c6f56abaef5ea4e504b1820c43707f0ce5d7e106 and
+the adapted Java runner reproduced from `runner-machine-rules.patch`. Exact check arguments
+(also pass `--before-root` pointing to an owned TMPDIR containing the before shared clone):
+
+```text
+--before 0417bfd91363488ea2d639888f5767c069c2fe39
+--out gates/test-intent/evidence/wp24a-syntax/authors-java.json
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#docxAuthorReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#odtAuthorReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#pdfAuthorReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#emlSenderReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#msgSenderReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#markdownAuthorRemainsFrontmatterFacet
+--overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.docx
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.odt
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.pdf
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.eml
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.msg
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.md
+```
+
+Builder logs, before/after JUnit XML, installed-Engine HTTP requests/responses and process
+cleanup are recorded in `tmp/verify/wp2.4a-author-report.md` and its linked evidence directory.
+The evidence run, per-check outcomes, fixture coverage and gate result are recorded in
+`tmp/verify/wp2.4a-author-evidence-report.md`. Independent acceptance remains pending.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1858a-0239-7703-93c3-3cdb35980349",
+  "verdict": "accept",
+  "digest": "sha256:6bced3395aff4d1d9ec9c5f2a99004e2d47c7ccdd893fc812878c8b1aed53404",
+  "note": "Codex verifier round 2 PASS on 498b37c30e: X1-X8 incl. author repair on real ingestion; repaired checks fail before by assertion, preservation passes both"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a185ca-7eb7-7a62-82c9-6f82b66e1fdb",
+  "verdict": "accept",
+  "digest": "sha256:3b2451c0e15f1797376c173793393b553cec3954e06a6b8df826b6424cb2a708",
+  "note": "Codex verifier-a3 PASS on cb97bf8382 after rebase onto c542733154: syntax x restrictions 80/80 real HTTP, X6/X8 UI, 7 integration preservation checks honest"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18622-9a22-7612-ae8d-deff433133bc",
+  "verdict": "accept",
+  "digest": "sha256:2b4950898ea0399237a5d7a647acef090e028bbf4e2c776b3e824e2e5c9cfd07",
+  "note": "Codex verifier-a4 PASS on merge e0ab16a00e (syntax + Filters UI): combined checks fail before by assertion; real Engine+Chromium 18 cases; UTC and Berlin suites"
+}
+```

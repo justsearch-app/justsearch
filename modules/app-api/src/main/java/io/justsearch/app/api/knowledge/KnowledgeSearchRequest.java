@@ -55,7 +55,19 @@ public record KnowledgeSearchRequest(
       TimeRangeMs metaPublishedAt,
       List<String> docIds,
       // Tempdoc 585 §D Phase 4 (D4b) — scope search to Lucene collection tag(s) (e.g. "agent-history").
-      List<String> collection) {
+      List<String> collection,
+      ByteRange sizeBytes) {
+    public Filters(
+        List<String> mime, List<String> language, List<String> fileKind, List<String> mimeBase,
+        String pathPrefix, Boolean includeChunks, TimeRangeMs modifiedAt,
+        List<String> entityPersons, List<String> entityOrganizations, List<String> entityLocations,
+        List<String> metaSource, List<String> metaAuthor, List<String> metaCategory,
+        TimeRangeMs metaPublishedAt, List<String> docIds, List<String> collection) {
+      this(mime, language, fileKind, mimeBase, pathPrefix, includeChunks, modifiedAt,
+          entityPersons, entityOrganizations, entityLocations, metaSource, metaAuthor, metaCategory,
+          metaPublishedAt, docIds, collection, null);
+    }
+
     public Filters {
       mime = mime == null ? List.of() : List.copyOf(mime);
       language = language == null ? List.of() : List.copyOf(language);
@@ -73,6 +85,9 @@ public record KnowledgeSearchRequest(
   }
 
   public static record TimeRangeMs(Long fromMs, Long toMs) {}
+
+  /** Inclusive source-file byte bounds. Null is unset; zero is a real bound. */
+  public static record ByteRange(Long fromBytes, Long toBytes) {}
 
   public static record Facets(Boolean include, Integer maxDocsScanned, List<FieldSpec> fields) {
     public Facets {

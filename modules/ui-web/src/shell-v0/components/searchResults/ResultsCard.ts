@@ -84,6 +84,7 @@ export interface CardSnapshot {
   readonly query: string;
   readonly results: readonly CardHit[];
   readonly matchCount: number;
+  readonly countsPending?: boolean;
   readonly totalHits: number;
   readonly facetsTruncated: boolean;
   readonly isSearching: boolean;
@@ -452,6 +453,7 @@ export class ResultsCard extends JfElement {
       query: raw?.query ?? '',
       results: raw?.results ?? [],
       matchCount: raw?.matchCount ?? 0,
+      countsPending: raw?.countsPending ?? false,
       totalHits: raw?.totalHits ?? 0,
       facetsTruncated: raw?.facetsTruncated ?? false,
       isSearching: raw?.isSearching ?? false,
@@ -468,7 +470,7 @@ export class ResultsCard extends JfElement {
                 ? 'Searching your documents — almost there…'
                 : 'Searching…'}`
           : s.results.length > 0
-            ? html`${matchCountLabel(
+            ? html`${s.countsPending ? `${s.results.length} results · counts pending` : matchCountLabel(
                 s.matchCount,
                 s.results.length,
                 (s.searchTrace as SearchTrace | null | undefined)?.effectiveMode === 'VECTOR',
@@ -724,7 +726,7 @@ export class ResultsCard extends JfElement {
     if (!s || (!s.isSearching && results.length === 0 && !(s.query ?? '').trim())) return nothing;
     return html`
       ${this.renderMeta()}
-      ${renderFacetChips(s.facets as Parameters<typeof renderFacetChips>[0], this.facetSelections, {
+      ${renderFacetChips((s.countsPending ? null : s.facets) as Parameters<typeof renderFacetChips>[0], this.facetSelections, {
         onToggle: (field, value) => this.emitCard('card-facet-toggle', { field, value }),
       })}
       ${results.length > 0
