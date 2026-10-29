@@ -251,6 +251,81 @@ class RecordedMigrationRestartRecoveryTest {
     switching.stop();
   }
 
+  @Test
+  // A failed row left from an unrelated earlier job adds no document: the empty refusal still fires
+  void provablyEmptyCandidateFailsPromptlyDespiteAnUnrelatedFailedRow(@TempDir Path tempDir)
+      throws Exception {
+    Switching switching = new Switching(tempDir, "current-model");
+    when(switching.queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 1));
+    switching.start();
+    assertEquals("FAILED", switching.awaitStateOtherThanSwitching(5_000));
+    assertEquals(switching.active, switching.state().active_generation(), "A stays active");
+    switching.stop();
+  }
+
+  @Test
+  void installerEmptyCandidateCanFinalizeWithoutEarningAStamp(@TempDir Path tempDir) throws Exception {
+    Switching switching = new Switching(tempDir, "current-model", true);
+    try {
+      assertTrue(switching.finalizeCandidate(), "installer-only structural admission must succeed");
+      assertEquals("SWITCHING", switching.state().migration_state());
+      assertEquals(switching.active, switching.state().active_generation());
+      verify(switching.server.embeddingCompatController, never()).fingerprintToStamp();
+      verify(switching.green.commitOps(), never()).commitWithBuildState(any(), any());
+    } finally { switching.stop(); }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"document", "planned-unit", "issued-claim",
+      "pending-row", "processing-row", "failed-row", "help-enqueued", "running-enumerator", "unfinished-enumerator", "incomplete-walk",
+      "uncaptured-walk", "unreadable-count", "upsert", "projection", "projection-source", "replay-uncertain"})
+  void installerEmptyExceptionRequiresEachProof(String missing, @TempDir Path tempDir) throws Exception {
+    Switching switching = new Switching(tempDir, "current-model", true,
+        missing.equals("projection-source") ? List.of("seed") : List.of());
+    try {
+      switch (missing) {
+        case "document" -> when(switching.greenCounts.docCountOrThrow()).thenReturn(1L);
+        case "planned-unit" -> when(switching.queue.recordedWalk(OPERATION)).thenReturn(Optional.of(walk(1)));
+        case "issued-claim" -> when(switching.queue.hasIssuedRecordedClaims(OPERATION)).thenReturn(true);
+        case "pending-row" -> when(switching.queue.jobStateCountsStrict())
+            .thenReturn(new JobQueue.JobStateCounts(1, 0, 0, 0, 0));
+        case "processing-row" -> when(switching.queue.jobStateCountsStrict())
+            .thenReturn(new JobQueue.JobStateCounts(0, 0, 1, 0, 0));
+        case "failed-row" -> when(switching.queue.jobStateCountsStrict())
+            .thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 1));
+        case "help-enqueued" -> ((java.util.concurrent.atomic.AtomicLong)
+            field(switching.server, "migrationEnumeratorFilesEnqueued")).set(1L);
+        case "running-enumerator" -> ((AtomicBoolean) field(switching.server, "migrationEnumeratorRunning")).set(true);
+        case "unfinished-enumerator" -> setField(switching.server, "migrationEnumeratorDone", false);
+        case "incomplete-walk" -> when(switching.queue.recordedWalk(OPERATION))
+            .thenReturn(Optional.of(new JobQueue.WalkProgress(OPERATION, SHA, 1, null, null,
+                0, 0, 1, null, null, 0, true, null, null)));
+        case "uncaptured-walk" -> when(switching.queue.recordedWalk(OPERATION))
+            .thenReturn(Optional.of(new JobQueue.WalkProgress(OPERATION, SHA, 1, 1L,
+                JobQueue.WalkEnumerationOutcome.COMPLETE, 0, 0, 1, null, null, 0)));
+        case "unreadable-count" -> when(switching.greenCounts.docCountOrThrow()).thenThrow(new IOException("unreadable"));
+        case "upsert", "projection" -> when(switching.queue.listSwitchBufferOpsStrictForGeneration(switching.building))
+            .thenReturn(List.of(new SwitchBufferCapableQueue.SwitchBufferOp(switching.building,
+                "obligation", missing.equals("upsert") ? "UPSERT" : "PROJECTION", "{}", 1, "v1")));
+        case "projection-source" -> { } // The exact manifest already retains this source obligation.
+        case "replay-uncertain" -> switching.admission.markReplayUncertain();
+        default -> throw new IllegalArgumentException(missing);
+      }
+      assertFalse(switching.finalizeCandidate(), "missing proof: " + missing);
+      assertEquals(switching.active, switching.state().active_generation());
+    } finally { switching.stop(); }
+  }
+
+  @Test
+  void installerEmptyProofIsNotReusedAfterAnInterveningWrite(@TempDir Path tempDir) throws Exception {
+    Switching switching = new Switching(tempDir, "current-model", true);
+    try {
+      assertTrue(switching.finalizeCandidate());
+      when(switching.greenCounts.docCountOrThrow()).thenReturn(1L);
+      assertFalse(switching.finalizeCandidate(), "an earlier empty proof grants no later admission");
+    } finally { switching.stop(); }
+  }
+
   // M5: a candidate that is not provably empty keeps earning its stamp
   @Test
   void aCandidateWithADocumentKeepsWaiting(@TempDir Path tempDir) throws Exception {
@@ -776,14 +851,25 @@ class RecordedMigrationRestartRecoveryTest {
     final String building;
 
     Switching(Path tempDir, String embeddingFingerprint) throws Exception {
+      this(tempDir, embeddingFingerprint, false);
+    }
+
+    Switching(Path tempDir, String embeddingFingerprint, boolean installer) throws Exception {
+      this(tempDir, embeddingFingerprint, installer, List.of());
+    }
+
+    Switching(Path tempDir, String embeddingFingerprint, boolean installer, List<String> sources) throws Exception {
       var layout = preparedLayout(tempDir);
       server = new KnowledgeServer(new TestEngineExecutors(),
           WorkerBootFixture.workerConfig(layout.dataDir()), null,
           io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle);
       manager = layout.genManager();
       active = manager.readStateBestEffort().active_generation();
-      building = manager.startRecordedMigration(OPERATION, "recorded-test", "a".repeat(64),
-          active, List.of()).building_generation();
+      String source = installer ? "installer_model_activation" : "recorded-test";
+      String targetFingerprint = installer ? java.util.HexFormat.of().formatHex(java.security.MessageDigest
+          .getInstance("SHA-256").digest("fixture".getBytes(java.nio.charset.StandardCharsets.UTF_8))) : "a".repeat(64);
+      building = manager.startRecordedMigration(OPERATION, source, targetFingerprint,
+          active, sources).building_generation();
       manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
       when(lifecycle.recordedCutoverReady(OPERATION)).thenReturn(true);
       when(green.indexCountOps()).thenReturn(greenCounts);
@@ -802,7 +888,15 @@ class RecordedMigrationRestartRecoveryTest {
       server.appServices = producer;
       server.embeddingCompatController = ecc;
       setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
-          OPERATION, active, "recorded-test", "a".repeat(64), true, true, List.of()));
+          OPERATION, active, source, targetFingerprint, true, true, sources));
+      if (installer) {
+        var target = new io.justsearch.app.api.operations.IndexTargetSnapshot(targetFingerprint, "fixture");
+        var config = io.justsearch.configuration.resolved.ResolvedConfig.builder().build();
+        setField(server, "recordedCandidate", new RecordedIngestionLifecycle.RecordedCandidate(config,
+            target, java.util.Map.of("embedding", new IndexGenerationManager.ModelArtifact(
+                tempDir.resolve("model.onnx").toString(), SHA))));
+        setField(server, "candidateEmbeddingCompatController", ecc);
+      }
       setField(server, "indexGenerationManager", manager);
       setField(server, "activeIndexPath", layout.activePath());
       setField(server, "buildingIndexPath", manager.resolveGenerationPathStrict(building));
@@ -811,6 +905,12 @@ class RecordedMigrationRestartRecoveryTest {
       setField(server, "jobQueue", queue);
       setField(server, "migrationEnumeratorDone", true);
       setField(server, "migrationRestartAction", (Runnable) () -> {});
+    }
+
+    boolean finalizeCandidate() throws Exception {
+      var method = KnowledgeServer.class.getDeclaredMethod("finalizeOrRefuseRecordedCandidateBeforeCutover");
+      method.setAccessible(true);
+      return (boolean) method.invoke(server);
     }
 
     IndexGenerationManager.State state() {

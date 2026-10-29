@@ -1,0 +1,952 @@
+{
+  "kind": "installed-model-activation-round3-results",
+  "baseline": "a74847e434",
+  "candidate": "repair commit containing this evidence",
+  "firstSelected": {
+    "kind": "round3-first-selected-run",
+    "log": "/tmp/rel-act-round3-20261028/candidate-selected.log",
+    "result": "60 worker cases passed; two new cases failed because the fixture installed its hook after start; 10 app-engine cases passed; one installDist completed",
+    "modules": {
+      "indexer-worker": [
+        {
+          "class": "io.justsearch.indexerworker.server.GenerationEmbeddingAttestationTest",
+          "tests": 1,
+          "failures": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-28T20:10:26.208Z",
+          "cases": [
+            {
+              "name": "aSelectedModelCannotStampAnUnattachedEmptyCandidateOrBorrowTheSourceStamp(Path)",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "class": "io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest",
+          "tests": 48,
+          "failures": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-28T20:10:28.995Z",
+          "cases": [
+            {
+              "name": "aCutAfterTheJournalAcknowledgementResumesToCleanFailure(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aCandidateWhoseEnumeratorRunsKeepsWaiting(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "unprovedAdmissionStillRetainsGreen(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "installerEmptyProofIsNotReusedAfterAnInterveningWrite(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aRetiredLaterAdmissionWaitsForTheAJobItQueues(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "anUnlatchedMigratingCandidateKeepsBuilding(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "installerEmptyCandidateCanFinalizeWithoutEarningAStamp(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aCandidateWithAPendingRowKeepsWaiting(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "keywordOnlyEmptyCandidateIsNotRefused(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "[1] document",
+              "status": "passed"
+            },
+            {
+              "name": "[2] planned-unit",
+              "status": "passed"
+            },
+            {
+              "name": "[3] issued-claim",
+              "status": "passed"
+            },
+            {
+              "name": "[4] pending-row",
+              "status": "passed"
+            },
+            {
+              "name": "[5] processing-row",
+              "status": "passed"
+            },
+            {
+              "name": "[6] failed-row",
+              "status": "passed"
+            },
+            {
+              "name": "[7] help-enqueued",
+              "status": "passed"
+            },
+            {
+              "name": "[8] running-enumerator",
+              "status": "passed"
+            },
+            {
+              "name": "[9] unfinished-enumerator",
+              "status": "passed"
+            },
+            {
+              "name": "[10] incomplete-walk",
+              "status": "passed"
+            },
+            {
+              "name": "[11] uncaptured-walk",
+              "status": "passed"
+            },
+            {
+              "name": "[12] unreadable-count",
+              "status": "passed"
+            },
+            {
+              "name": "[13] upsert",
+              "status": "passed"
+            },
+            {
+              "name": "[14] projection",
+              "status": "passed"
+            },
+            {
+              "name": "[15] projection-source",
+              "status": "passed"
+            },
+            {
+              "name": "[16] replay-uncertain",
+              "status": "passed"
+            },
+            {
+              "name": "aCandidateWithAnUnreadableWalkKeepsWaiting(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aCandidateWithAPlannedUnitKeepsWaiting(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "cleanupRetriesUntilTheEngineRecordsTheRefusal(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aCandidateWithAProjectionObligationKeepsWaiting(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aCutAfterTheSourceCommitResumesToCleanFailure(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "latchedWatcherUncertaintyDoesNotBlockRollback(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "latchedSwitchingCandidateFailsPromptly(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aCutAfterAbandonmentResumesToCleanFailure(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aCutAfterPhysicalRetirementResumesToCleanFailure(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "claimedRowStillRetainsGreen(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aCandidateWithAJournalObligationKeepsWaiting(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aLatchedMigratingCandidateFailsBeforeItsEnumerationEnds(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aLaterFinishedAdmissionWaitsForTheAJobItQueues(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aCandidateWithADocumentKeepsWaiting(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "provablyEmptyCandidateFailsPromptly(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aPendingLaterAdmissionHandsOverOnceACommitsIt(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "anInFlightMutationDelaysTheRefusalWithoutHoldingTheSwapLock(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "aLaterAdmissionCommittedOnAHandsTheUpdateToA(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "anEmptyCandidateWithOnlyACollectionDeleteFailsPromptly(Path)",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "class": "io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest",
+          "tests": 5,
+          "failures": 2,
+          "skipped": 0,
+          "timestamp": "2026-10-28T20:10:27.963Z",
+          "cases": [
+            {
+              "name": "settledInstallerCanRecoverItsPromotedEncodersWithoutAnotherMigration(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "[1] document",
+              "status": "failed"
+            },
+            {
+              "name": "[2] failed-help",
+              "status": "failed"
+            },
+            {
+              "name": "installerReplaysBundledHelpDespiteTheStartupMarker(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "installerBudgetChangeGovernsTheNextFailedNativeMigration(Path)",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "class": "io.justsearch.indexerworker.IndexerWorkerGuardrailsTest",
+          "tests": 6,
+          "failures": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-28T20:10:26.114Z",
+          "cases": [
+            {
+              "name": "indexerWorkerMustNotDependOnTestSupport",
+              "status": "passed"
+            },
+            {
+              "name": "indexerWorkerMustNotDoMemoryMappedIo",
+              "status": "passed"
+            },
+            {
+              "name": "plannerMustNotDependOnIoPrimitives",
+              "status": "passed"
+            },
+            {
+              "name": "responseBuilderMustNotDependOnEncoders",
+              "status": "passed"
+            },
+            {
+              "name": "embeddingAutoRescueMustGoThroughEmbeddingRecoveryOps",
+              "status": "passed"
+            },
+            {
+              "name": "forcedReindexTriggerMustNotBypassTheRescueSeam",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "class": "io.justsearch.indexerworker.server.ops.InstallerEmptyMetadataTest",
+          "tests": 2,
+          "failures": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-28T20:10:55.380Z",
+          "cases": [
+            {
+              "name": "installerEmptyProofOmitsOnlyTheMissingStamp()",
+              "status": "passed"
+            },
+            {
+              "name": "emptyProofRetainsTargetCompletionAndContradictionChecks()",
+              "status": "passed"
+            }
+          ]
+        }
+      ],
+      "app-engine": [
+        {
+          "class": "io.justsearch.app.engine.RecordedInstallerCallbacksTest",
+          "tests": 3,
+          "failures": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-28T20:10:19.185Z",
+          "cases": [
+            {
+              "name": "forwardsPhysicalOwnerLockAroundPromotion()",
+              "status": "passed"
+            },
+            {
+              "name": "forwardsPrecommitAbortToOwner()",
+              "status": "passed"
+            },
+            {
+              "name": "forwardsPublicationCallbacksWithInstallerBoundariesInOrder()",
+              "status": "passed"
+            }
+          ]
+        },
+        {
+          "class": "io.justsearch.indexerworker.server.InstallerEncoderConfigurationTest",
+          "tests": 7,
+          "failures": 0,
+          "skipped": 0,
+          "timestamp": "2026-10-28T20:10:20.410Z",
+          "cases": [
+            {
+              "name": "settingsOutsideBsPhysicalProjectionCannotBeConsumed(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "unknownObservationsDoNotCertifyGenerationSettings(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "selectedMetadataForDisabledRolesIsNotSettingsDrift(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "changedAutomaticCapCannotBeCertifiedByIndexIdentityDigest(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "missingRequestedRoleDoesNotCertifyGenerationSettings(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "generationCapChangesPublishThroughBWithoutCallingAsQueryOnlyOwner(Path)",
+              "status": "passed"
+            },
+            {
+              "name": "plannerDiagnosticsMustMatchTheComposedCandidate(Path)",
+              "status": "passed"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "focusedRecheck": {
+    "log": "/tmp/rel-act-round3-20261028/candidate-recheck.log",
+    "exitCode": 0,
+    "result": "Executed KnowledgeServerLiveInstallerMigrationTest with the hook installed before start and a closed zero-unit captured walk; all five cases passed. The evidence producer subsequently reran all five."
+  },
+  "candidateWorker": [
+    {
+      "class": "io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest",
+      "tests": 5,
+      "failures": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "settledInstallerCanRecoverItsPromotedEncodersWithoutAnotherMigration(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[1] document",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[2] failed-help",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "installerReplaysBundledHelpDespiteTheStartupMarker(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "installerBudgetChangeGovernsTheNextFailedNativeMigration(Path)",
+          "status": "passed",
+          "message": null
+        }
+      ]
+    },
+    {
+      "class": "io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest",
+      "tests": 48,
+      "failures": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "aCutAfterTheJournalAcknowledgementResumesToCleanFailure(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWhoseEnumeratorRunsKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "unprovedAdmissionStillRetainsGreen(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "installerEmptyProofIsNotReusedAfterAnInterveningWrite(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aRetiredLaterAdmissionWaitsForTheAJobItQueues(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "anUnlatchedMigratingCandidateKeepsBuilding(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "installerEmptyCandidateCanFinalizeWithoutEarningAStamp(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAPendingRowKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "keywordOnlyEmptyCandidateIsNotRefused(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[1] document",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[2] planned-unit",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[3] issued-claim",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[4] pending-row",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[5] processing-row",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[6] failed-row",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[7] help-enqueued",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[8] running-enumerator",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[9] unfinished-enumerator",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[10] incomplete-walk",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[11] uncaptured-walk",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[12] unreadable-count",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[13] upsert",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[14] projection",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[15] projection-source",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[16] replay-uncertain",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAnUnreadableWalkKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAPlannedUnitKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "cleanupRetriesUntilTheEngineRecordsTheRefusal(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAProjectionObligationKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCutAfterTheSourceCommitResumesToCleanFailure(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "latchedWatcherUncertaintyDoesNotBlockRollback(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "latchedSwitchingCandidateFailsPromptly(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCutAfterAbandonmentResumesToCleanFailure(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCutAfterPhysicalRetirementResumesToCleanFailure(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "claimedRowStillRetainsGreen(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAJournalObligationKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLatchedMigratingCandidateFailsBeforeItsEnumerationEnds(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLaterFinishedAdmissionWaitsForTheAJobItQueues(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithADocumentKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "provablyEmptyCandidateFailsPromptly(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aPendingLaterAdmissionHandsOverOnceACommitsIt(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "anInFlightMutationDelaysTheRefusalWithoutHoldingTheSwapLock(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLaterAdmissionCommittedOnAHandsTheUpdateToA(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "anEmptyCandidateWithOnlyACollectionDeleteFailsPromptly(Path)",
+          "status": "passed",
+          "message": null
+        }
+      ]
+    }
+  ],
+  "beforeWorker": [
+    {
+      "class": "io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest",
+      "tests": 5,
+      "failures": 1,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "settledInstallerCanRecoverItsPromotedEncodersWithoutAnotherMigration(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[1] document",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[2] failed-help",
+          "status": "failed",
+          "message": "org.opentest4j.AssertionFailedError: expected: <g-20261028-205113> but was: <g-01994180-0000-7000-8000-000000000206>"
+        },
+        {
+          "name": "installerReplaysBundledHelpDespiteTheStartupMarker(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "installerBudgetChangeGovernsTheNextFailedNativeMigration(Path)",
+          "status": "passed",
+          "message": null
+        }
+      ]
+    },
+    {
+      "class": "io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest",
+      "tests": 48,
+      "failures": 2,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "aCutAfterTheJournalAcknowledgementResumesToCleanFailure(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWhoseEnumeratorRunsKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "unprovedAdmissionStillRetainsGreen(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "installerEmptyProofIsNotReusedAfterAnInterveningWrite(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aRetiredLaterAdmissionWaitsForTheAJobItQueues(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "anUnlatchedMigratingCandidateKeepsBuilding(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "installerEmptyCandidateCanFinalizeWithoutEarningAStamp(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAPendingRowKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "keywordOnlyEmptyCandidateIsNotRefused(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[1] document",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[2] planned-unit",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[3] issued-claim",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[4] pending-row",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[5] processing-row",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[6] failed-row",
+          "status": "failed",
+          "message": "org.opentest4j.AssertionFailedError: missing proof: failed-row ==> expected: <false> but was: <true>"
+        },
+        {
+          "name": "[7] help-enqueued",
+          "status": "failed",
+          "message": "org.opentest4j.AssertionFailedError: missing proof: help-enqueued ==> expected: <false> but was: <true>"
+        },
+        {
+          "name": "[8] running-enumerator",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[9] unfinished-enumerator",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[10] incomplete-walk",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[11] uncaptured-walk",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[12] unreadable-count",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[13] upsert",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[14] projection",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[15] projection-source",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "[16] replay-uncertain",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAnUnreadableWalkKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAPlannedUnitKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "cleanupRetriesUntilTheEngineRecordsTheRefusal(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAProjectionObligationKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCutAfterTheSourceCommitResumesToCleanFailure(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "latchedWatcherUncertaintyDoesNotBlockRollback(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "latchedSwitchingCandidateFailsPromptly(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCutAfterAbandonmentResumesToCleanFailure(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCutAfterPhysicalRetirementResumesToCleanFailure(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "claimedRowStillRetainsGreen(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithAJournalObligationKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLatchedMigratingCandidateFailsBeforeItsEnumerationEnds(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLaterFinishedAdmissionWaitsForTheAJobItQueues(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aCandidateWithADocumentKeepsWaiting(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "provablyEmptyCandidateFailsPromptly(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aPendingLaterAdmissionHandsOverOnceACommitsIt(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "anInFlightMutationDelaysTheRefusalWithoutHoldingTheSwapLock(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "aLaterAdmissionCommittedOnAHandsTheUpdateToA(Path)",
+          "status": "passed",
+          "message": null
+        },
+        {
+          "name": "anEmptyCandidateWithOnlyACollectionDeleteFailsPromptly(Path)",
+          "status": "passed",
+          "message": null
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "The first selected run executed 62 worker cases (60 pass, two new fixture errors) and 10 app-engine cases (all pass). The focused fixture rerun and subsequent evidence producer cover the repaired fixture. There are 72 unique passing selected Java cases across these runs; no selected case was skipped.",
+    "The first temporary evidence batch omitted --continue. An expected app-engine baseline assertion prevented the independent worker test task from executing; its incorrect compile classification is excluded. The corrected producer rerun executes all selected tasks and returns the real failures.",
+    "Producer transport uses js-gradle-slot, shared before-clones in /tmp, one combined invocation for the selected module tasks, per-task --rerun and --continue, and reuse of this task's a74847e434 before-clone. Parsers, assertions and evidence writer remain the official producer's."
+  ],
+  "governance": {
+    "requiredCommand": "node scripts/governance/gates/test-intent/cli.mjs --base origin/main",
+    "exitCode": 1,
+    "resolvedBase": "fda69956dff0b13132b94f17dcb6114422c2c54a",
+    "problems": "12 unrelated uncovered test differences against the advanced origin/main plus missing independent acceptance",
+    "originalBaseCommand": "node scripts/governance/gates/test-intent/cli.mjs --base b744db87446b",
+    "originalBaseExitCode": 1,
+    "originalBaseProblems": "independent acceptance missing only"
+  }
+}

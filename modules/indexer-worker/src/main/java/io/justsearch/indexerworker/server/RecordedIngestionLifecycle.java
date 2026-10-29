@@ -124,6 +124,13 @@ public interface RecordedIngestionLifecycle {
     };
   }
 
+  default PreparedCompositeProjection prepareRecordedGenerationProjection(
+      String operationKey, JobQueue queue,
+      io.justsearch.app.api.settings.SettingsCommitOwner.GenerationEncoders encoders) throws IOException {
+    // Legacy projections consume no B-owned settings; their existing preparation stays guarded.
+    return prepareRecordedGenerationProjection(operationKey, queue);
+  }
+
   @FunctionalInterface
   interface CheckedCompositePromotion {
     IndexGenerationManager.State promote(CommittedProjection projection) throws IOException;

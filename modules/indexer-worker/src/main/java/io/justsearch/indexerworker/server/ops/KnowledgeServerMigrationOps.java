@@ -485,16 +485,24 @@ public final class KnowledgeServerMigrationOps {
   /** A recorded Green verifies against its frozen candidate target, not A's global providers. */
   public static boolean verifyGreenCommitMetadataBestEffort(
       LuceneRuntime ingestLifecycle, String expectedIndexFp, String expectedEmbeddingFp, Logger log) {
+    return verifyGreenCommitMetadataBestEffort(ingestLifecycle, expectedIndexFp, expectedEmbeddingFp, false, log);
+  }
+
+  /** Only a freshly fenced installer-empty proof may omit a missing embedding stamp. */
+  public static boolean verifyGreenCommitMetadataBestEffort(
+      LuceneRuntime ingestLifecycle, String expectedIndexFp, String expectedEmbeddingFp,
+      boolean installerEmpty, Logger log) {
     try {
       if (ingestLifecycle == null) {
         return false;
       }
       if (!ingestLifecycle.commitMetadataEnabled()) {
+        if (installerEmpty) return false; // Empty admission still requires COMPLETE and its exact target.
         log.warn("Green verification skipped because commit metadata is disabled");
         return true;
       }
       return verifyGreenMetadata(
-          ingestLifecycle.latestCommitUserDataBestEffort(), expectedIndexFp, expectedEmbeddingFp, log);
+          ingestLifecycle.latestCommitUserDataBestEffort(), expectedIndexFp, expectedEmbeddingFp, installerEmpty, log);
     } catch (Exception e) {
       log.warn("Green verification failed (best-effort): {}", e.getMessage());
       return false;
@@ -506,8 +514,8 @@ public final class KnowledgeServerMigrationOps {
    * {@link #verifyGreenCommitMetadataBestEffort}). Package-private so the build-state /
    * index-fingerprint / embedding-fp rules can be unit-tested without a (sealed) {@link LuceneRuntime} double.
    */
-  static boolean verifyGreenMetadata(
-      Map<String, String> ud, String expectedIndexFp, String expectedEmbeddingFp, Logger log) {
+  static boolean verifyGreenMetadata(Map<String, String> ud, String expectedIndexFp,
+      String expectedEmbeddingFp, boolean installerEmpty, Logger log) {
     String buildState = ud.get("build_state");
     if (!"COMPLETE".equalsIgnoreCase(buildState)) {
       log.warn("Green verification failed: build_state={} (expected COMPLETE)", buildState);
@@ -543,6 +551,7 @@ public final class KnowledgeServerMigrationOps {
       String committedEmbeddingFp =
           ud.get(io.justsearch.indexerworker.embed.EmbeddingCompatibilityController.COMMIT_META_KEY);
       if (committedEmbeddingFp == null || committedEmbeddingFp.isBlank()) {
+        if (installerEmpty) return true; // Structural proof grants no permission to write a stamp.
         log.warn(
             "Green verification failed: embedding_model_sha256 missing on a green that should be "
                 + "embedded (expected={})",
