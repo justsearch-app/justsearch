@@ -520,6 +520,105 @@ try {
     assert.ok(!badArgument.stderr.includes(PRIVATE_EMAIL));
   }
 
+  {
+    const repo = makeRepo();
+    const remote = makeBareRepo();
+    temporaryRepos.push(repo, remote);
+    const base = commit(repo, {
+      authorName: 'Contributor', authorEmail: CONTRIBUTOR_EMAIL, message: 'push base',
+    });
+    git(repo, ['remote', 'add', 'origin', remote]);
+    const hook = installHookFixture(repo);
+    const capture = path.join(repo, 'git-lfs-stdin.txt');
+    const calls = path.join(repo, 'gate-calls.txt');
+    // Install the same LFS stub used by the protocol tests, then let Git invoke the hook.
+    assert.equal(runHook(repo, hook, remote, '', capture).status, 0);
+    git(repo, ['config', 'core.hooksPath', '.githooks']);
+    function push(args, env = {}) {
+      fs.rmSync(capture, { force: true });
+      fs.rmSync(calls, { force: true });
+      return childProcess.spawnSync('git', ['push', ...args], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${path.join(repo, 'fake-bin')}${path.delimiter}${process.env.PATH ?? ''}`,
+          CAPTURE_FILE: capture,
+          JUSTSEARCH_SKIP_PUSH_GATES: '1',
+          FAIL_PUSH_GATE: '',
+          ...env,
+        },
+        windowsHide: true,
+      });
+    }
+    function allowed(args) {
+      const result = push(args);
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(fs.existsSync(capture), 'allowed pushes reach Git LFS');
+    }
+    function refused(args, oldSha, newSha, ref, env = {}, message = /history replacement is not allowed/) {
+      const result = push(args, env);
+      assert.equal(result.status, 1, `expected push refusal: ${args.join(' ')}\n${result.stderr}`);
+      assert.match(result.stderr, message);
+      for (const value of [ref, oldSha, newSha]) assert.ok(result.stderr.includes(value), result.stderr);
+      assert.ok(!fs.existsSync(calls), 'ancestry refusal precedes expensive gates');
+      assert.ok(!fs.existsSync(capture), 'ancestry refusal precedes Git LFS');
+      assert.equal(git(remote, ['rev-parse', ref]), oldSha, 'refused pushes preserve the remote ref');
+    }
+    allowed(['origin', 'HEAD:refs/heads/topic']);
+    const head = commit(repo, {
+      authorName: 'Contributor', authorEmail: CONTRIBUTOR_EMAIL, message: 'fast-forward',
+    });
+    allowed(['origin', 'HEAD:refs/heads/topic']);
+    assert.equal(git(remote, ['rev-parse', 'refs/heads/topic']), head);
+    for (const args of [
+      ['--force', 'origin', `${base}:refs/heads/topic`],
+      ['-f', 'origin', `${base}:refs/heads/topic`],
+      ['origin', `+${base}:refs/heads/topic`],
+      [`--force-with-lease=refs/heads/topic:${head}`, 'origin', `${base}:refs/heads/topic`],
+      ['--force-if-includes', 'origin', '--force', `${base}:refs/heads/topic`],
+      ['--quiet', 'origin', `${base}:refs/heads/topic`, '--force'],
+    ]) refused(args, head, base, 'refs/heads/topic');
+    refused(['--force', 'origin', `${base}:refs/heads/topic`], head, base, 'refs/heads/topic', {
+      JUSTSEARCH_SKIP_PUSH_GATES: '', FAIL_PUSH_GATE: 'test-intent',
+    });
+
+    // A later rejected update must block the entire batch, even after a new branch.
+    const batch = `refs/heads/new ${head} refs/heads/new ${ZERO_SHA}\nrefs/heads/topic ${base} refs/heads/topic ${head}\n`;
+    let result = runHook(repo, hook, remote, batch, capture, { JUSTSEARCH_SKIP_PUSH_GATES: '1' });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /history replacement is not allowed/);
+    assert.ok(!fs.existsSync(capture));
+
+    for (const annotated of [false, true]) {
+      const tag = annotated ? 'annotated' : 'lightweight';
+      const tagArgs = annotated
+        ? ['-c', 'user.name=Contributor', '-c', `user.email=${CONTRIBUTOR_EMAIL}`, 'tag', '-a', '-m', 'tag']
+        : ['tag'];
+      git(repo, [...tagArgs, tag, base]);
+      allowed(['origin', `refs/tags/${tag}`]);
+      git(repo, [...tagArgs, '-f', tag, head]);
+      allowed(['--force', 'origin', `refs/tags/${tag}`]);
+      const oldTag = git(repo, ['rev-parse', `refs/tags/${tag}`]);
+      git(repo, [...tagArgs, '-f', tag, base]);
+      const newTag = git(repo, ['rev-parse', `refs/tags/${tag}`]);
+      refused(['--force', 'origin', `refs/tags/${tag}`], oldTag, newTag, `refs/tags/${tag}`);
+    }
+    allowed(['origin', '--delete', 'topic']);
+    assert.equal(git(remote, ['for-each-ref', '--format=%(refname)', 'refs/heads/topic']), '');
+
+    const unfetchedRepo = makeRepo();
+    temporaryRepos.push(unfetchedRepo);
+    const unknown = commit(unfetchedRepo, {
+      authorName: 'Contributor', authorEmail: CONTRIBUTOR_EMAIL, message: 'unfetched remote commit',
+    });
+    git(unfetchedRepo, ['push', '-q', remote, 'HEAD:refs/heads/unfetched']);
+    assert.notEqual(childProcess.spawnSync('git', ['cat-file', '-e', unknown], { cwd: repo }).status, 0);
+    refused(['--force', 'origin', 'HEAD:refs/heads/unfetched'], unknown, head, 'refs/heads/unfetched', {}, /fetch first/i);
+    allowed(['origin', '--delete', 'unfetched']);
+    console.log('pre-push ancestry: new branch, fast-forward, force spellings, batch, tags, deletion, missing object: PASS');
+  }
+
   console.log('test-check-commit-identity-privacy: PASS');
 } finally {
   for (const repo of temporaryRepos) fs.rmSync(repo, { recursive: true, force: true });

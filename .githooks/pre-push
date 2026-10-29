@@ -11,6 +11,22 @@ remote_url="$2"
 input_file="$(mktemp "${TMPDIR:-/tmp}/justsearch-pre-push.XXXXXX")"
 trap 'rm -f "$input_file"' EXIT HUP INT TERM
 cat >"$input_file"
+
+# Git supplies the actual old and new object IDs regardless of push flags.
+# Check every update before privacy checks, expensive gates, or LFS run.
+while read -r local_ref local_sha remote_ref remote_sha || [ -n "$local_ref" ]; do
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac # Deletions stay allowed.
+  case "$remote_sha" in *[!0]*) ;; *) continue ;; esac # New refs have no history to replace.
+  if ! git cat-file -e "$remote_sha" 2>/dev/null; then
+    printf >&2 'pre-push: %s (%s -> %s): remote old object is missing locally; fetch first, then retry.\n' "$remote_ref" "$remote_sha" "$local_sha"
+    exit 1
+  fi
+  if ! git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+    printf >&2 'pre-push: %s (%s -> %s): history replacement is not allowed.\n' "$remote_ref" "$remote_sha" "$local_sha"
+    exit 1
+  fi
+done <"$input_file"
+
 node "$repo_root/scripts/ci/check-commit-identity-privacy.mjs" --pre-push-input "$input_file" --remote-name "$remote_name" --remote-url "$remote_url"
 
 run_push_gates=0

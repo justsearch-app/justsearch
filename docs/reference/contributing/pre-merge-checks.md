@@ -18,6 +18,7 @@ Always: `node scripts/lib/tool-invoker.cjs gradle build -x test` from the candid
 
 | Edited subject | Check(s) |
 |---|---|
+| Java sources | `node scripts/dev/java-prepush.mjs` (see below) |
 | `.github/workflows/*.yml` · root README | `check-workflow-triggers` · `check-root-readme` |
 | repo history publication settings ([ADR-0045](../../decisions/0045-public-main-history-publication.md)) | `check-repo-history-policy` |
 | PR title/body plus managed review record | `preview-squash-message` · `pr-review-record check` |
@@ -44,6 +45,12 @@ Always: `node scripts/lib/tool-invoker.cjs gradle build -x test` from the candid
 | `scripts/**` · `packaging/**` js · `*.ps1` | `npm run lint:scripts` · `check-ps1-warning-comments` |
 
 Frontend: from `modules/ui-web`, `npm run typecheck` and `npm run test:unit:run`.
+
+Java: run `node scripts/dev/java-prepush.mjs` for test and integration-test compilation
+and all PMD checks through `js-gradle-slot`. Add `--unreferenced` when replacing or
+overloading a non-public method to include `UnreferencedCodeTest` in the same Gradle
+invocation. Use `--dry-run` to print the command. This check is run manually; the
+pre-push hook does not run it.
 
 ## Publication and main verification
 
