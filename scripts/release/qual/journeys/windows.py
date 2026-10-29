@@ -437,7 +437,8 @@ if ([QualWindow]::GetForegroundWindow().ToInt64() -ne $a.window.handle) {throw '
                     return dict(window, process=process)
         window = wait_for(picker, 'System folder picker belonging to the installed app', seconds=30, error=ProductFailure)
         # Operate the real common-item dialog using its UIA Value/Invoke patterns.
-        payload = base64.b64encode(json.dumps({'window': window, 'folder': folder}).encode()).decode()
+        payload = base64.b64encode(json.dumps({'window': window, 'folder': folder,
+            'diagnostics':str(self.evidence / 'J2-picker-controls.json')}).encode()).decode()
         result = ps_json(UIA + r"""
 $a=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('""" + payload + r"""')) | ConvertFrom-Json
 $p=Get-CimInstance Win32_Process -Filter "ProcessId=$($a.window.process.pid)"
@@ -445,14 +446,16 @@ if (!$p -or ([Diagnostics.Process]::GetProcessById($p.ProcessId)).StartTime.ToUn
 $w=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$a.window.handle)
 if ($w.Current.ProcessId -ne $a.window.pid -or $w.Current.ClassName -ne '#32770') {throw 'Folder picker identity changed'}
 $entries=@($w.FindAll($descendants,$all))
-$edit=$entries | Where-Object {$_.Current.AutomationId -eq '1152' -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Edit'} | Select-Object -First 1
-$button=$entries | Where-Object {$_.Current.AutomationId -eq '1' -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button'} | Select-Object -First 1
-if (!$edit -or !$button) {throw 'Native folder picker controls unavailable'}
-$value=$edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+$controls=@($entries | ForEach-Object {@{name=$_.Current.Name;automationId=$_.Current.AutomationId;type=$_.Current.ControlType.ProgrammaticName;class=$_.Current.ClassName}})
+[IO.File]::WriteAllText($a.diagnostics,($controls | ConvertTo-Json -Depth 5))
+$edit=@($entries | Where-Object {$_.Current.ControlType.ProgrammaticName -eq 'ControlType.Edit' -and $_.Current.Name.Trim().TrimEnd(':') -eq 'Folder'})
+$button=@($entries | Where-Object {$_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button' -and $_.Current.Name.Replace('&','').Trim() -eq 'Select Folder'})
+if ($edit.Count -ne 1 -or $button.Count -ne 1) {throw 'Unique native folder picker controls unavailable; see J2-picker-controls.json'}
+$value=$edit[0].GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
 $value.SetValue($a.folder)
 $observed=$value.Current.Value
 if ($observed -cne $a.folder) {throw 'Folder picker did not accept the requested path'}
-$button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+$button[0].GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
 @{handle=$a.window.handle;pid=$a.window.pid;value=$observed;invoked=$true}
 """)
         self.shot('J2-folder-picker-submitted')
@@ -564,7 +567,22 @@ foreach($d in $disks) {$devices[$d.Name]=[long]$d.DiskWriteBytesPersec;$total+=[
                             '--native-driver', self.args.native_driver], self.work + '/driver.log')
         self.wd = WebDriver(self.target, 4444)
         wait_for(lambda: self.target.http(4444, '/status'), 'tauri-driver ready', seconds=20, error=Infrastructure)
-        self.wd.start(self.binary)
+        # EdgeDriver otherwise creates a fresh temporary profile on every
+        # launch, which cannot exercise the app's persisted Web Storage.
+        profile = ntpath.join(os.environ['LOCALAPPDATA'], 'io.justsearch.shell')
+        self.wd.start(self.binary, webview_options={'userDataFolder': profile})
+        observed = []
+        for process in self.target.owned():
+            if ntpath.basename(process['exe']).lower() != 'msedgewebview2.exe':
+                continue
+            match = re.search(r'(?:^|\s)--user-data-dir=(?:"([^"]+)"|(\S+))', process.get('command', ''))
+            if match:
+                observed.append({'process': process, 'userDataDir': match[1] or match[2]})
+        self.evidence('webdriver-profile', {'userDataFolder': profile, 'observed': observed,
+            'source': 'Normal installed Tauri profile, also observed in J1 normal-launch process arguments'})
+        expected = ntpath.normcase(ntpath.join(profile, 'EBWebView'))
+        if not observed or any(ntpath.normcase(ntpath.normpath(v['userDataDir'])) != expected for v in observed):
+            raise Infrastructure('WebDriver did not use the normal installed app profile; see webdriver-profile.json')
         self.observe_window('automation')
         self.ready()
         wait_for(lambda: self.wd.execute("return all(document,'button[data-surface-id]').length>0"),

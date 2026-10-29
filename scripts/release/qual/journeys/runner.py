@@ -456,9 +456,12 @@ class WebDriver:
             raise Infrastructure(f"WebDriver {value['error']}: {value.get('message')}")
         return value
 
-    def start(self, binary):
+    def start(self, binary, *, webview_options=None):
+        options = {'application': binary}
+        if webview_options is not None:
+            options['webviewOptions'] = webview_options
         value = self.call('/session', {'capabilities': {'alwaysMatch':
-            {'tauri:options': {'application': binary}}}})
+            {'tauri:options': options}}})
         self.session = value['sessionId']
 
     def execute(self, script, args=None):

@@ -518,15 +518,19 @@ class WindowsInstallationTests(unittest.TestCase):
         run.wd.click.assert_any_call('button','Get started')
 
     def test_start_ui_matches_the_app_webview_build_before_launching_driver(self):
-        view=process(55,r'C:\EdgeWebView\143.0.12.1\msedgewebview2.exe')
+        view=dict(process(55,r'C:\EdgeWebView\143.0.12.1\msedgewebview2.exe'),command=r'msedgewebview2.exe --user-data-dir="C:\Users\qual\AppData\Local\io.justsearch.shell\EBWebView"')
         run=Mock(facts={'driverIdentity':{'version':'2.0.4','sha256':'tool-sha'}},binary=r'C:\app\JustSearch.exe',work='C:/work',args=SimpleNamespace(driver='tauri-driver.exe',native_driver='msedgedriver.exe'))
         run.target.owned.return_value=[view]
         run.target.run.return_value=SimpleNamespace(stdout='MSEdgeDriver 143.0.12.1')
         driver=Mock();driver.execute.return_value=True
-        with patch('socket.socket'),patch.object(windows,'digest',return_value='tool-sha'),patch.object(windows,'WebDriver',return_value=driver),patch.object(windows,'wait_for',once):
+        with patch.dict(windows.os.environ,LOCALAPPDATA=r'C:\Users\qual\AppData\Local'),patch('socket.socket'),patch.object(windows,'digest',return_value='tool-sha'),patch.object(windows,'WebDriver',return_value=driver),patch.object(windows,'wait_for',once):
             windows.Run.start_ui(run)
         self.assertTrue(run.facts['ui'])
-        driver.start.assert_called_once_with(run.binary)
+        driver.start.assert_called_once_with(run.binary, webview_options={'userDataFolder':r'C:\Users\qual\AppData\Local\io.justsearch.shell'})
+        run.target.owned.return_value=[dict(view,command=r'msedgewebview2.exe --user-data-dir=C:\Temp\scoped_dir\EBWebView')]
+        with patch.dict(windows.os.environ,LOCALAPPDATA=r'C:\Users\qual\AppData\Local'),patch('socket.socket'),patch.object(windows,'digest',return_value='tool-sha'),patch.object(windows,'WebDriver',return_value=driver),patch.object(windows,'wait_for',once),self.assertRaisesRegex(Infrastructure,'normal installed app profile'):
+            windows.Run.start_ui(run)
+        run.target.owned.return_value=[view]
         run.target.run.return_value=SimpleNamespace(stdout='MSEdgeDriver 143.0.12.2')
         run.desktop_spawn.reset_mock()
         with patch('socket.socket'),patch.object(windows,'digest',return_value='tool-sha'),self.assertRaises(Infrastructure):windows.Run.start_ui(run)

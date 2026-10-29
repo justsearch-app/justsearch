@@ -14,6 +14,19 @@ class RunnerTests(unittest.TestCase):
         self.r = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.r)
 
+    def test_windows_webdriver_profile_option_and_default_linux_request(self):
+        from unittest.mock import Mock
+        target=Mock()
+        target.http.return_value={'value':{'sessionId':'owned'}}
+        driver=self.r.WebDriver(target,4444)
+        driver.start('/installed/app')
+        self.assertEqual(target.http.call_args.args[2],{'capabilities':{'alwaysMatch':{'tauri:options':{'application':'/installed/app'}}}})
+        profile={'userDataFolder':r'C:\Users\qual\AppData\Local\io.justsearch.shell'}
+        driver.start('C:/installed/app.exe',webview_options=profile)
+        self.assertEqual(target.http.call_args.args[2]['capabilities']['alwaysMatch']['tauri:options'],
+                         {'application':'C:/installed/app.exe','webviewOptions':profile})
+        self.assertEqual(driver.session,'owned')
+
     def test_assertion_is_product_failure(self):
         self.assertEqual(self.r.classify(AssertionError('wrong search result')), 'failed-product')
 
