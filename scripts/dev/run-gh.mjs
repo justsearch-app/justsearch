@@ -193,8 +193,8 @@ function parsePaginatedArrays(text) {
   return rows;
 }
 
-function capturedJson(bin, args) {
-  const result = runGhCaptured(bin, args);
+function capturedJson(bin, args, run = runGhCaptured) {
+  const result = run(bin, args);
   if (args[0] === 'pr' && args[1] === 'checks') return parseRequiredChecksResult(result);
   if (result.error) return { error: result.error };
   if (result.status !== 0) return { error: new Error(`${result.stderr || result.stdout || `gh exited ${result.status}`}`.trim()), stderr: result.stderr };
@@ -644,14 +644,11 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
 
 function parseShepherdArgs(args) {
   let timeoutSec = 5400;
-  let rerunFailedOnce = false;
   let hasTimeout = false;
   const enqueueArgs = [args[0]];
   for (let index = 1; index < args.length; index += 1) {
     const flag = args[index];
-    if (flag === '--rerun-failed-once' && !rerunFailedOnce) {
-      rerunFailedOnce = true;
-    } else if (flag === '--timeout-sec' && !hasTimeout) {
+    if (flag === '--timeout-sec' && !hasTimeout) {
       hasTimeout = true;
       timeoutSec = Number(args[++index]);
       if (!Number.isFinite(timeoutSec) || timeoutSec <= 0) throw new Error('--timeout-sec requires a positive number');
@@ -661,7 +658,7 @@ function parseShepherdArgs(args) {
       throw new Error(`unexpected shepherd argument ${JSON.stringify(flag)}`);
     }
   }
-  return { ...parseEnqueueArgs(enqueueArgs), timeoutSec, rerunFailedOnce };
+  return { ...parseEnqueueArgs(enqueueArgs), timeoutSec };
 }
 
 function actionsRun(check) {
@@ -675,99 +672,105 @@ function actionsRun(check) {
   }
 }
 
-function shepherdGh(bin, args) {
-  const result = spawnSync(bin, args, { encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
-  if (result.error) throw result.error;
-  if (result.status !== 0 || result.signal) {
-    throw new Error(`gh ${args.slice(0, 3).join(' ')}: ${result.stderr || result.signal || `exit ${result.status}`}`);
-  }
-  return result.stdout;
+function shortMessage(message) {
+  return String(message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300);
 }
 
-function printFailureExcerpts(bin, failures, repo) {
+function clipUtf8(text, maxBytes) {
+  const buffer = Buffer.from(text);
+  if (buffer.length <= maxBytes) return text;
+  let end = maxBytes;
+  // Do not split a UTF-8 character at the byte limit.
+  while (end > 0 && (buffer[end] & 0xc0) === 0x80) end -= 1;
+  return buffer.subarray(0, end).toString('utf8');
+}
+
+function printFailureExcerpts(bin, failures, repo, run) {
+  let remainingBytes = 16 * 1024;
   for (const check of failures) {
-    const run = actionsRun(check);
-    process.stdout.write(`${check.name.replace(/[\r\n]/g, ' ')}: ${run?.url || check.link}\n`);
-    if (!run) {
-      process.stdout.write('  Failed-job log unavailable: not a GitHub Actions run link.\n');
-      continue;
+    const workflow = actionsRun(check);
+    process.stdout.write(`${shortMessage(check.name)}: ${workflow?.url || shortMessage(check.link)}\n`);
+    if (remainingBytes <= 3) continue;
+    let excerpt;
+    try {
+      if (!workflow) throw new Error('not a GitHub Actions run link');
+      const args = ['run', 'view', workflow.id, '--log-failed', '--repo', repo || workflow.repo];
+      if (workflow.job) args.push('--job', workflow.job);
+      const result = run(bin, args, { encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
+      if (result.error) throw result.error;
+      if (result.status !== 0 || result.signal) {
+        throw new Error(result.stderr || result.signal || `gh exited ${result.status}`);
+      }
+      const lines = (result.stdout || '').split(/\r?\n/).filter((line) => line.trim());
+      const preferred = lines.filter((line) => /\b(error|fail(?:ed|ure|ures)?|exception|assert(?:ion)?|\w+Error|panic|fatal)\b|✗|not ok\b/i.test(line));
+      excerpt = preferred.length ? preferred.slice(0, 20) : lines.slice(-20);
+      if (!excerpt.length) throw new Error('no failed-step log lines available');
+    } catch (error) {
+      if (error.code === 'ETIMEDOUT') throw error;
+      excerpt = [`log unavailable: ${shortMessage(error.message).trim() || 'log fetch failed'}`];
     }
-    const args = ['run', 'view', run.id, '--log-failed', '--repo', repo || run.repo];
-    if (run.job) args.push('--job', run.job);
-    const lines = shepherdGh(bin, args).split(/\r?\n/).filter((line) => line.trim());
-    const preferred = lines.filter((line) => /\b(error|fail(?:ed|ure|ures)?|exception|assert(?:ion)?|\w+Error|panic|fatal)\b|✗|not ok\b/i.test(line));
-    const excerpt = preferred.length ? preferred.slice(0, 20) : lines.slice(-20);
-    for (const line of excerpt) process.stdout.write(`  ${line.slice(0, 1000)}\n`);
-    if (!excerpt.length) process.stdout.write('  No failed-step log lines available.\n');
+    let excerptBytes = Math.min(4096, remainingBytes);
+    for (const line of excerpt) {
+      if (excerptBytes <= 3) break;
+      const output = `  ${clipUtf8(line, Math.min(1000, excerptBytes - 3))}\n`;
+      const bytes = Buffer.byteLength(output);
+      process.stdout.write(output);
+      excerptBytes -= bytes;
+      remainingBytes -= bytes;
+    }
   }
 }
 
 /** Compose the publication gateway and its observer; the observer owns all polling. */
-export async function shepherd(bin, prNumber, { repo, timeoutSec, rerunFailedOnce }) {
+export async function shepherd(bin, prNumber, { repo, timeoutSec }) {
   let result;
-  let reran = false;
+  const deadline = Date.now() + timeoutSec * 1000;
+  const timedOut = () => Object.assign(new Error(`TIMEOUT after ${timeoutSec}s; waiting for merge, required checks or failure logs`), { code: 'ETIMEDOUT' });
+  const remaining = () => {
+    const ms = Math.floor(deadline - Date.now());
+    if (ms <= 0) throw timedOut();
+    return Math.min(ms, 2 ** 31 - 1);
+  };
+  const run = (command, args, options) => {
+    const response = spawnSync(command, args, { ...options, timeout: remaining(), killSignal: 'SIGKILL' });
+    if (response.error?.code === 'ETIMEDOUT' || Date.now() >= deadline) throw timedOut();
+    return response;
+  };
   const finish = (code, verdict, message) => {
-    process.stdout.write(`run-gh shepherd PR #${prNumber}: ${verdict}${reran ? ' after a rerun' : ''}; ${String(message).replace(/[\r\n]+/g, ' ')}\n`);
+    if (Date.now() >= deadline) {
+      code = 3;
+      verdict = 'TIMEOUT';
+      message = timedOut().message;
+    }
+    process.stdout.write(`run-gh shepherd PR #${prNumber}: ${verdict}; ${shortMessage(message)}\n`);
     return code;
   };
   try {
     let head;
     let enqueueMessage = '';
     const enqueued = enqueuePullRequest(bin, prNumber, repo, {
+      run,
       onEnqueued: (sha) => { head = sha; },
       writeError: (message) => { enqueueMessage = message.trim(); process.stderr.write(message); },
     });
     if (enqueued) return finish(enqueued, 'ENQUEUE-REFUSED', enqueueMessage);
-    // A rerun shares the original observation deadline rather than buying another timeout.
-    const deadline = Date.now() + timeoutSec * 1000;
-    const observe = (loadJson = capturedJson) => mergeWait(bin, prNumber, Math.max(0, (deadline - Date.now()) / 1000), {
-      repo, head, loadJson, onResult: (terminal) => { result = terminal; },
+    const code = await mergeWait(bin, prNumber, remaining() / 1000, {
+      repo, head,
+      loadJson: (command, args) => capturedJson(command, args, (command, args) => run(command, args, { encoding: 'utf8' })),
+      pause: (ms) => sleep(Math.min(ms, remaining())),
+      onResult: (terminal) => { result = terminal; },
     });
-    let code = await observe();
+    if (Date.now() >= deadline) throw timedOut();
     if (result.key === 'CHECKS_FAILED') {
-      const failures = classifyRequiredChecks(result.rows).failures;
-      printFailureExcerpts(bin, failures, repo);
-      if (rerunFailedOnce) {
-        const runs = new Map();
-        for (const check of failures) {
-          const run = actionsRun(check);
-          if (!run) throw new Error(`cannot rerun required check ${check.name}: not a GitHub Actions run link`);
-          runs.set(`${run.repo}/${run.id}`, run);
-        }
-        const readAttempt = (run) => {
-          const loaded = capturedJson(bin, ['api', `repos/${repo || run.repo}/actions/runs/${run.id}`]);
-          if (loaded.error) throw loaded.error;
-          const value = loaded.value;
-          if (!Number.isSafeInteger(value?.run_attempt) || value.run_attempt < 1) throw new Error(`run ${run.id}: invalid run_attempt`);
-          if (value.head_sha !== head) throw new Error(`run ${run.id}: head does not match enqueued head ${head}`);
-          return value.run_attempt;
-        };
-        // Validate every target before starting any reruns.
-        const attempts = [...runs.values()].map((run) => ({ run, attempt: readAttempt(run) }));
-        for (const { run, attempt } of attempts) {
-          shepherdGh(bin, ['run', 'rerun', run.id, '--failed', '--repo', repo || run.repo]);
-          reran = true;
-          if (readAttempt(run) <= attempt) throw new Error(`run ${run.id}: run_attempt did not increase after rerun`);
-        }
-        // Check rollups can briefly retain the previous attempt's failed job links.
-        // Reruns create new jobs; let merge-wait keep observing while those old rows linger.
-        const oldJobs = new Set(failures.filter((check) => actionsRun(check)?.job).map((check) => check.link));
-        code = await observe((command, args) => {
-          const loaded = capturedJson(command, args);
-          if (args[0] === 'pr' && args[1] === 'checks' && !loaded.error) {
-            return { value: loaded.value.map((row) => oldJobs.has(row.link) && classifyRequiredChecks([row]).failures.length
-              ? { ...row, state: 'PENDING', bucket: 'pending' } : row) };
-          }
-          return loaded;
-        });
-        if (result.key === 'CHECKS_FAILED') printFailureExcerpts(bin, classifyRequiredChecks(result.rows).failures, repo);
-      }
+      printFailureExcerpts(bin, classifyRequiredChecks(result.rows).failures, repo, run);
+      process.stdout.write('To retry failed jobs, run gh run rerun <run-id> --failed, then shepherd or merge-wait again.\n');
     }
     const verdict = result.key.startsWith('MERGED:') ? 'MERGED' :
       result.key === 'NEW_HEAD' ? 'HEAD-CHANGED' :
       ['CLOSED', 'STALLED', 'TIMEOUT', 'ERROR'].includes(result.key) ? result.key : 'FAILED';
     return finish(code, verdict, result.message);
   } catch (error) {
+    if (error.code === 'ETIMEDOUT' || Date.now() >= deadline) return finish(3, 'TIMEOUT', timedOut().message);
     return finish(2, 'ERROR', error.message);
   }
 }
@@ -781,7 +784,7 @@ async function main() {
       const options = parseShepherdArgs(argv.slice(1));
       process.exitCode = await shepherd(bin, options.prNumber, options);
     } catch (error) {
-      process.stdout.write(`run-gh shepherd PR #${argv[1] || '?'}: ERROR; ${error.message}\n`);
+      process.stdout.write(`run-gh shepherd PR #${shortMessage(argv[1] || '?')}: ERROR; ${shortMessage(error.message)}\n`);
       process.exitCode = 2;
     }
     return;

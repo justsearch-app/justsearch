@@ -814,7 +814,8 @@ function shepherdCli(options = {}, args = []) {
     const callsPath = ${JSON.stringify(callsPath)};
     const open = ${JSON.stringify(openMergePr)};
     const snapshot = ${JSON.stringify(snapshot)};
-    let clock = 0, poll = 0, views = 0, reruns = 0, attemptReads = 0;
+    let clock = 0, poll = 0, views = 0;
+    const realSpawnSync = childProcess.spawnSync;
     Date.now = () => clock;
     globalThis.setTimeout = (fn, ms) => { clock += ms; poll++; views = 0; queueMicrotask(fn); };
     const json = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: '' });
@@ -824,33 +825,34 @@ function shepherdCli(options = {}, args = []) {
       if (args[0] !== 'pr' && args[0] !== 'api' && args[0] !== 'run')
         return { status: options.refuse ?? 0 };
       if (args[0] === 'api') {
-        if (args[1].includes('/actions/runs/')) {
-          const attempt = options.attempts ? options.attempts[attemptReads++] : (reruns ? 2 : 1);
-          return json({ run_attempt: attempt, head_sha: options.runHead ?? snapshot.headRefOid });
-        }
         return json(args[1].includes('/protection/') ? { contexts: ['required'], checks: [] } : []);
       }
       if (args[0] === 'run') {
-        if (args[1] === 'rerun') { reruns++; poll = 0; views = 0; return { status: options.rerunStatus ?? 0 }; }
-        return { status: options.logStatus ?? 0, stdout: options.log ?? 'setup\\nError: assertion expected true\\nteardown\\n', stderr: 'log unavailable' };
+        if (options.hungLog) {
+          return realSpawnSync(process.execPath, ['-e', 'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500)'], spawnOptions);
+        }
+        if (options.logError) return { error: Object.assign(new Error(options.logError), { code: 'ENOENT' }) };
+        return { status: options.logStatus ?? 0, stdout: options.log ?? 'setup\\nError: assertion expected true\\nteardown\\n', stderr: options.logStderr ?? 'log unavailable' };
       }
       if (args[1] === 'merge') return { status: options.mergeStatus ?? 0 };
       if (args[1] === 'view' && args[4].startsWith('headRefOid,title')) return json(snapshot);
-      const frames = reruns ? options.afterRerun ?? options.polls : options.polls;
+      const frames = options.polls;
       const frame = frames?.[Math.min(poll, frames.length - 1)] ?? {};
       if (args[1] === 'checks') {
-        if (frame.checkError) return { status: 1, stdout: 'not JSON', stderr: 'network failed' };
+        if (frame.checkError) return { status: 1, stdout: 'not JSON', stderr: options.errorText ?? 'network failed' };
         const rows = frame.checks ?? [${JSON.stringify(requiredRow('PENDING', 'pending'))}];
         return json(args.includes('--required') ? rows.filter((row) => !row.advisory) : rows);
       }
-      if (frame.viewError) return { status: 1, stdout: 'not JSON', stderr: 'network failed' };
+      if (frame.viewError) return { status: 1, stdout: 'not JSON', stderr: options.errorText ?? 'network failed' };
       return json({ ...open, ...(views++ % 2 ? frame.after ?? frame.before : frame.before) });
     };
     syncBuiltinESMExports();
   `;
+  const preloadPath = path.join(directory, 'preload.mjs');
+  fs.writeFileSync(preloadPath, preload);
   try {
     const result = spawnSync(process.execPath, [
-      '--import', `data:text/javascript,${encodeURIComponent(preload)}`,
+      '--import', preloadPath,
       path.join(import.meta.dirname, 'run-gh.mjs'), 'shepherd', '7', ...args,
     ], { encoding: 'utf8', timeout: 3000 });
     assert.ifError(result.error);
@@ -925,6 +927,71 @@ run('shepherd explains non-Actions check log unavailability without guessing a r
   assert.match(result.stdout, /unavailable|not a GitHub Actions/i);
   assert.equal(result.calls.some(({ args }) => args[0] === 'run'), false);
 });
+for (const [label, options] of [
+  ['missing log', { log: '' }],
+  ['fetch error', { logStatus: 1, logStderr: 'job logs expired' }],
+  ['spawn error', { logError: 'log transport unavailable' }],
+]) run(`shepherd preserves FAILED with ${label}`, () => {
+  const result = shepherdCli({ polls: [{ checks: [actionCheck('unit'), actionCheck('lint', 102, 202)] }], ...options });
+  assert.equal(result.status, 1, result.final);
+  assert.match(result.final, /FAILED.*unit.*lint/);
+  assert.match(result.stdout, /unit:.*runs\/101/);
+  assert.match(result.stdout, /lint:.*runs\/102/);
+  assert.equal(result.lines.filter((line) => /log unavailable: \S/.test(line)).length, 2);
+  assert.match(result.stdout, /gh run rerun <run-id> --failed/);
+});
+run('shepherd times out a hung log subprocess within the remaining deadline', () => {
+  const started = performance.now();
+  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], hungLog: true }, ['--timeout-sec', '0.15']);
+  const elapsed = performance.now() - started;
+  assert.equal(result.status, 3, result.final);
+  assert.match(result.final, /TIMEOUT/);
+  assert.ok(elapsed < 1200, `hung log took ${elapsed}ms`);
+  const logCall = result.calls.find(({ args }) => args.includes('--log-failed'));
+  assert.ok(logCall.spawnOptions.timeout > 0 && logCall.spawnOptions.timeout <= 150);
+});
+run('shepherd bounds reused merge-wait reads and polling by its deadline', () => {
+  const result = shepherdCli({ polls: [{}] }, ['--timeout-sec', '0.15']);
+  assert.equal(result.status, 3, result.final);
+  for (const { spawnOptions } of result.calls) {
+    assert.ok(spawnOptions.timeout > 0 && spawnOptions.timeout <= 150, JSON.stringify(spawnOptions));
+  }
+  // One poll fits; the next must not launch after the deadline.
+  assert.equal(result.calls.filter(({ args }) => args[1] === 'checks').length, 1);
+});
+run('shepherd caps huge log excerpts by lines, bytes, and total bytes', () => {
+  const checks = Array.from({ length: 8 }, (_, i) => actionCheck(`check${i}`, 101 + i, 201 + i));
+  const result = shepherdCli({ polls: [{ checks }], log: Array.from({ length: 100 }, () => 'Error: ' + '💥'.repeat(3000)).join('\n') });
+  assert.equal(result.status, 1, result.final);
+  const excerpts = result.stdout.split(/check\d: https:[^\n]+\n/).slice(1).map((text) =>
+    text.split('\n').filter((line) => line.startsWith('  ')));
+  assert.equal(excerpts.length, 8);
+  let total = 0;
+  for (const lines of excerpts) {
+    const bytes = Buffer.byteLength(lines.join('\n') + (lines.length ? '\n' : ''));
+    assert.ok(lines.length <= 20, `${lines.length} lines`);
+    assert.ok(bytes <= 4096, `${bytes} excerpt bytes`);
+    total += bytes;
+  }
+  assert.ok(total <= 16384, `${total} total excerpt bytes`);
+  assert.doesNotMatch(result.stdout, /�/);
+});
+for (const options of [
+  { polls: [{ viewError: true }], errorText: 'Error: ' + 'x'.repeat(200 * 1024) },
+  { polls: [{ checks: [actionCheck()] }], logStatus: 1, logStderr: 'Error: ' + 'x'.repeat(200 * 1024) },
+]) run(`shepherd caps 200 KB error text (${options.logStatus ? 'log' : 'read'})`, () => {
+  const result = shepherdCli(options);
+  assert.equal(result.status, options.logStatus ? 1 : 2, result.final.slice(0, 400));
+  assert.ok(result.final.length <= 350, `${result.final.length} final characters`);
+  for (const line of result.lines.filter((line) => line.startsWith('  '))) {
+    assert.ok(Buffer.byteLength(line) <= 4096, `${Buffer.byteLength(line)} diagnostic bytes`);
+  }
+});
+run('shepherd bounds argument-error verdicts', () => {
+  const result = shepherdCli({}, ['x'.repeat(1000)]);
+  assert.equal(result.status, 2);
+  assert.ok(result.final.length <= 350, `${result.final.length} final characters`);
+});
 run('shepherd ignores failed advisory checks', () => {
   const result = shepherdCli({ polls: [
     { checks: [requiredRow(), { ...actionCheck('advisory'), advisory: true }] }, mergedFrame,
@@ -932,27 +999,6 @@ run('shepherd ignores failed advisory checks', () => {
   assert.equal(result.status, 0);
   assert.match(result.final, /MERGED/);
   assert.equal(result.calls.some(({ args }) => args[0] === 'run'), false);
-});
-for (const [label, afterRerun, status, verdict] of [
-  ['success', [mergedFrame], 0, 'MERGED'],
-  ['second failure', [{ checks: [actionCheck('required', 101, 301)] }], 1, 'FAILED'],
-  ['pending then success', [{}, mergedFrame], 0, 'MERGED'],
-]) run(`shepherd explicit rerun happens once: ${label}`, () => {
-  const result = shepherdCli({ polls: [{ checks: [actionCheck('unit'), actionCheck('lint', 101, 202)] }], afterRerun }, ['--rerun-failed-once', '--repo', 'owner/repo']);
-  assert.equal(result.status, status, result.stderr);
-  assert.match(result.final, new RegExp(`: ${verdict}\\b.*after.*rerun`));
-  const reruns = result.calls.filter(({ args }) => args[1] === 'rerun');
-  assert.deepEqual(reruns.map(({ args }) => args), [['run', 'rerun', '101', '--failed', '--repo', 'owner/repo']]);
-  assert.equal(result.calls.filter(({ args }) => args[0] === 'api' && args[1].includes('/actions/runs/')).length, 2);
-});
-run('shepherd waits through stale failed job links before judging the rerun', () => {
-  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], afterRerun: [
-    { checks: [actionCheck()] }, { checks: [actionCheck('required', 101, 301)] },
-  ] }, ['--rerun-failed-once']);
-  assert.equal(result.status, 1);
-  assert.match(result.final, /FAILED after a rerun/);
-  const logs = result.calls.filter(({ args }) => args.includes('--log-failed'));
-  assert.deepEqual(logs.map(({ args }) => args[args.indexOf('--job') + 1]), ['201', '301']);
 });
 run('enqueue prints shepherd as its one-step alternative', () => {
   let message = '';
@@ -962,29 +1008,8 @@ run('enqueue prints shepherd as its one-step alternative', () => {
   }), 0);
   assert.match(message, /one-step alternative: node scripts\/dev\/run-gh.mjs shepherd 7 --repo owner\/repo --timeout-sec 5400/);
 });
-for (const attempts of [[1, 1], [2, 1], [null], [1, '2']]) run(`shepherd refuses unconfirmed run_attempt increase ${JSON.stringify(attempts)}`, () => {
-  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], attempts }, ['--rerun-failed-once']);
-  assert.equal(result.status, 2);
-  assert.match(result.final, /ERROR.*run_attempt/);
-  assert.ok(result.calls.filter(({ args }) => args[1] === 'rerun').length <= 1);
-});
-run('shepherd checks the workflow head before rerunning', () => {
-  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], runHead: 'b'.repeat(40) }, ['--rerun-failed-once']);
-  assert.equal(result.status, 2); assert.match(result.final, /ERROR.*head/i);
-  assert.equal(result.calls.some(({ args }) => args[1] === 'rerun'), false);
-});
-run('shepherd reports rerun command errors and never waits on an unconfirmed rerun', () => {
-  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], rerunStatus: 1 }, ['--rerun-failed-once']);
-  assert.equal(result.status, 2); assert.match(result.final, /ERROR.*rerun/i);
-  assert.equal(result.calls.filter(({ args }) => args[1] === 'rerun').length, 1);
-});
-run('shepherd refuses rerunning an external required check', () => {
-  const result = shepherdCli({ polls: [{ checks: [requiredRow('ERROR', 'fail')] }] }, ['--rerun-failed-once']);
-  assert.equal(result.status, 2); assert.match(result.final, /ERROR/);
-  assert.equal(result.calls.some(({ args }) => args[1] === 'rerun'), false);
-});
 for (const args of [['--timeout-sec', '0'], ['--timeout-sec'], ['--timeout-sec', 'oops'],
-  ['--repo'], ['--repo', 'invalid'], ['--rerun-failed-once', '--rerun-failed-once'], ['--unknown']]) {
+  ['--repo'], ['--repo', 'invalid'], ['--unknown']]) {
   run(`shepherd rejects invalid arguments before enqueue ${JSON.stringify(args)}`, () => {
     const result = shepherdCli({}, args);
     assert.equal(result.status, 2); assert.match(result.final, /ERROR/);

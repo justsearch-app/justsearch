@@ -604,7 +604,7 @@ Four `gh` CLI quirks (tempdoc 695, 930) worth knowing at merge/wait time:
 
 Follow [ADR-0053 § Decision](../../decisions/0053-one-pr-ci-run-and-squash-auto-merge.md#decision) for validated squash enqueueing.
 For one-step enqueue and observation, run `node scripts/dev/run-gh.mjs shepherd N --timeout-sec 5400` in the background (optional `--repo owner/repo`); it prints a final verdict and bounded failed-job excerpts.
-Add `--rerun-failed-once` only when you have decided to rerun failed required checks; it confirms the run attempt increased, then waits again, with at most one rerun per failed workflow run.
+For failed jobs, decide and run `gh run rerun <run-id> --failed` yourself, then run `shepherd` or `merge-wait` again.
 After enqueue, run its printed command in the background:
 `node scripts/dev/run-gh.mjs merge-wait N --head <validated-head-sha> --timeout-sec 5400`
 (include `--repo owner/repo` if enqueue used it). The 40-hex `--head` binds observation to
