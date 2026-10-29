@@ -252,6 +252,18 @@ class RecordedMigrationRestartRecoveryTest {
   }
 
   @Test
+  // A failed row left from an unrelated earlier job adds no document: the empty refusal still fires
+  void provablyEmptyCandidateFailsPromptlyDespiteAnUnrelatedFailedRow(@TempDir Path tempDir)
+      throws Exception {
+    Switching switching = new Switching(tempDir, "current-model");
+    when(switching.queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 1));
+    switching.start();
+    assertEquals("FAILED", switching.awaitStateOtherThanSwitching(5_000));
+    assertEquals(switching.active, switching.state().active_generation(), "A stays active");
+    switching.stop();
+  }
+
+  @Test
   void installerEmptyCandidateCanFinalizeWithoutEarningAStamp(@TempDir Path tempDir) throws Exception {
     Switching switching = new Switching(tempDir, "current-model", true);
     try {

@@ -9872,13 +9872,16 @@ public final class KnowledgeServer implements Closeable {
         && !Boolean.TRUE.equals(state.migration_paused())
         && recorded.sourceGeneration().equals(state.active_generation())
         && candidate.equals(state.building_generation())
+        // Installer admission only: queued help or a failed row means B may lack content A
+        // holds. The plain refusal keeps the older proof; a failed row adds no document there.
+        && migrationEnumeratorFilesEnqueued.get() == 0L
+        && jobQueue.jobStateCountsStrict().failedCount() == 0
         && recordedCandidateProvablyEmpty(recorded, candidate);
   }
 
   /**
    * Provably empty: the captured walk closed complete with no planned unit, no recorded claim
-   * was issued, the enumerator queued no file (including help), no queue row is pending,
-   * claimed or failed, no projection source seeds the candidate,
+   * was issued, no queue row is pending or claimed, no projection source seeds the candidate,
    * every accepted journal obligation for B is a removal (which leaves an empty B empty; the
    * refusal cleanup still settles it on A before acknowledging it), and B holds no document.
    * An UPSERT, projection, VDU result or root sync could add content, so it is never empty.
@@ -9890,7 +9893,6 @@ public final class KnowledgeServer implements Closeable {
         || (recordedCandidateInPlace && recordedCandidate == null) || buildingIndexPath == null
         || !indexGenerationManager.resolveGenerationPathStrict(candidate).equals(buildingIndexPath)
         || !migrationEnumeratorDone || migrationEnumeratorRunning.get()
-        || migrationEnumeratorFilesEnqueued.get() != 0L
         || !expectedProjectionSourceIds().isEmpty()) return false;
     var walk = jobQueue.recordedWalk(recorded.operationKey()).orElse(null);
     if (walk == null || !walk.capturedPlan()
@@ -9898,7 +9900,7 @@ public final class KnowledgeServer implements Closeable {
         || walk.plannedUnits() == null || walk.plannedUnits() != 0L
         || jobQueue.hasIssuedRecordedClaims(recorded.operationKey())) return false;
     var counts = jobQueue.jobStateCountsStrict();
-    if (counts.pendingCount() != 0 || counts.processingCount() != 0 || counts.failedCount() != 0
+    if (counts.pendingCount() != 0 || counts.processingCount() != 0
         || !(jobQueue instanceof SwitchBufferCapableQueue journal)
         || !journal.listSwitchBufferOpsStrictForGeneration(candidate).stream()
             .allMatch(op -> REMOVAL_JOURNAL_OPS.contains(op.op()))) return false;
