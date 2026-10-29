@@ -73,12 +73,14 @@ class LinuxGpuPlanTest {
     String previous = System.getProperty("os.arch");
     try {
       System.setProperty("os.arch", "unlisted-architecture");
-      var registry = registry(true);
+      var registry = assertDoesNotThrow(() -> registry(true),
+          "Registry loading must tolerate an unlisted native target");
       assertNotNull(registry.findPackage("cuda-runtime"));
       assertNull(registry.findPackage("cuda-runtime-linux"));
       assertEquals(List.of("cuda-runtime"), registry.findPackage("chat").dependsOn());
       var hardware = HardwareProfile.gpuFull(12_000_000_000L);
-      var plan = InstallPlanner.plan(registry, hardware, root.resolve("models"));
+      var plan = assertDoesNotThrow(() -> InstallPlanner.plan(registry, hardware, root.resolve("models")),
+          "Install planning must exclude native packages on an unlisted native target without throwing");
       assertEquals(DownloadProfile.CPU, plan.profile());
       assertTrue(plan.downloads().stream().anyMatch(d -> "search".equals(d.packageId())));
       for (String id : List.of("cuda-runtime", "chat")) {
