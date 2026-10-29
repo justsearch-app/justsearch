@@ -718,35 +718,23 @@ def deep_links(run):
     require_candidate(run)
     run.require('folder')
     query = 'link ' + hashlib.sha256(run.run_id.encode()).hexdigest()[:10]
-    # The composer position changes with restored conversations. Measure it in
-    # the installed UI, then retain only geometry for the normal cold launch.
+    # Restored J2 text cannot certify dispatch. Prove this run's token absent
+    # in both the live DOM and the owned app window before a normal cold launch.
     run.start_ui()
     run.nav('Search')
-    # Incoming query links dock the composer even when the restored draft was
-    # centred. Measure the same layout first, using only an existing query.
-    run.wd.keys('textarea[data-testid="sv3-composer-input"]', QUERY + '\ue007')
-    regions = wait_for(lambda: run.wd.execute("""
-const composer=all(document,'jf-sv3-composer[state="docked"]').find(e=>e.getBoundingClientRect().height>0);
-if(!composer) return null;
-const input=all(composer,'textarea[data-testid="sv3-composer-input"]').find(e=>e.getBoundingClientRect().height>0);
-if(!input) return null;
-const r=input.getBoundingClientRect();
-return [{x:160,y:0,width:innerWidth-160,height:40,viewportWidth:innerWidth,viewportHeight:innerHeight},
- {x:Math.floor(r.x),y:Math.floor(r.y),width:Math.ceil(r.width),height:Math.ceil(r.height),viewportWidth:innerWidth,viewportHeight:innerHeight}];
-"""), 'Docked deep-link destination composer measured', seconds=30, error=Infrastructure)
     before = run.wd.execute("return all(document,'*').map(e=>(e.textContent||'')+' '+(e.value||'')).join('\\n');")
-    if query in before:
+    native_before = run.native.matching_text('J7-deep-link-before', re.escape(query))
+    if query in before or native_before:
         raise Infrastructure('Unique deep-link query already appears before dispatch')
-    run.evidence('J7-cold-before', {'query': query, 'absent': True, 'regions': regions})
+    run.evidence('J7-cold-before', {'query': query, 'absent': True, 'scope': 'owned-app-window',
+                                    'domAbsent': True, 'nativeAbsent': True})
     run.stop_app()
     from urllib.parse import quote
     run.desktop_spawn(['xdg-open', 'justsearch://query?q=' + quote(query)], run.work + '/cold-deep-link.log')
     run.observe_window('cold-deep-link')
     run.ready()
-    cold = wait_for(lambda: next((text for i, region in enumerate(regions)
-                    if (text := run.native.matching_text('J7-deep-link-cold-' + str(i),
-                        re.escape(query), region))), None),
-                    'Cold OS deep link unique query in top bar or composer; OCR absence uncorroborated',
+    cold = wait_for(lambda: run.native.matching_text('J7-deep-link-cold', re.escape(query)),
+                    'Cold OS deep link unique query in app window; OCR absence uncorroborated',
                     seconds=45, error=Infrastructure)
     interaction_observation(run, 'J7-warm-dispatch')
     run.desktop_spawn(['xdg-open', 'justsearch://surface/core.library-surface'], run.work + '/warm-deep-link.log')

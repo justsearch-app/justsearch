@@ -191,9 +191,10 @@ private signing key is needed or used for these tests.
   invoked GNOME Wayland `--focus-search` binding (Ctrl+Super+J, avoiding the
   default input-source switch chord), and scanned-PDF OCR. Cold and
   warm OS links run without WebDriver; the receiving app must be focused and
-  its measured top bar or composer must contain a query derived from this run
-  ID for the cold link. That query must be absent before dispatch. The warm
-  link must name Library in the cropped top bar. Shortcut input stays in a
+  its app window must contain a query derived from this run ID for the cold
+  link. That query must be absent from the DOM and app-window OCR before
+  dispatch. The warm link must name Library in the cropped top bar.
+  Shortcut input stays in a
   WebDriver session, where compositor focus, document focus, the actual focused
   search control, and its exact newly typed value must agree. The Wayland binding
   runs a wrapper that records invocation before executing `--focus-search`. Missing

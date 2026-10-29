@@ -139,8 +139,7 @@ class Repair4Tests(unittest.TestCase):
 
     def test_cold_link_ignoring_dispatch_cannot_pass_from_restored_orchid(self):
         run = Mock(work='/tmp/owned', run_id='w4a-123456789')
-        run.wd.execute.side_effect = lambda script: 'Search v3 orchid lighthouse' if 'map(e=>' in script else [
-            {'x': 160, 'y': 0, 'width': 400, 'height': 40, 'viewportWidth': 1024, 'viewportHeight': 700}]
+        run.wd.execute.return_value = 'Search v3 orchid lighthouse'
         run.native.app_text.side_effect = lambda name, *a, **kw: 'Library' if 'warm' in name else 'Search v3 orchid lighthouse'
         run.native.matching_text.return_value = None
         run.native.app_window.return_value = {'pid': 1, 'rect': {'width': 1024, 'height': 700}}
@@ -151,42 +150,40 @@ class Repair4Tests(unittest.TestCase):
         before = next(c.args[1] for c in run.evidence.call_args_list if c.args[0] == 'J7-cold-before')
         self.assertTrue(before['absent'])
         self.assertNotIn(before['query'], 'Search v3 orchid lighthouse')
-        self.assertEqual(run.native.matching_text.call_args.args[2], before['regions'][0])
+        self.assertEqual(before['scope'], 'owned-app-window')
+        self.assertEqual(len(run.native.matching_text.call_args.args), 2)
 
-    def test_cold_link_measures_docked_composer_before_stopping_ui(self):
-        run = Mock(work='/tmp/owned', run_id='w4a-geometry')
-        run.native.app_text.return_value = 'Search v3 orchid lighthouse Library'
+    def test_cold_link_accepts_unique_token_anywhere_in_owned_window(self):
+        run = Mock(work='/tmp/owned', run_id='w4a-moving-composer')
+        query = 'link ' + hashlib.sha256(run.run_id.encode()).hexdigest()[:10]
+        run.wd.execute.return_value = 'Search v3 orchid lighthouse'
+        run.native.matching_text.side_effect = [None, query, 'Library']
         run.native.app_window.return_value = {'rect': {'width': 1024, 'height': 700}}
-        docked = False
-        measured = {'x': 320, 'y': 586, 'width': 660, 'height': 70, 'viewportWidth': 1024, 'viewportHeight': 700}
-        def keys(selector, value):
-            nonlocal docked
-            self.assertEqual(value, linux.QUERY + '\ue007')
-            docked = True
-        def execute(script):
-            if 'map(e=>' in script: return 'old restored draft'
-            self.assertTrue(docked, 'Geometry before docking observes the restored hero position')
-            self.assertIn('jf-sv3-composer[state="docked"]', script)
-            return [measured]
-        run.wd.keys.side_effect = keys
-        run.wd.execute.side_effect = execute
-        run.native.matching_text.side_effect = ['unique query', 'Library']
         with patch.object(linux, 'require_candidate'), patch.object(linux, 'interaction_observation'), \
              patch.object(linux, 'wait_for', immediate):
-            linux.deep_links(run)
-        self.assertTrue(docked)
-        self.assertEqual(run.native.matching_text.call_args_list[0].args[2], measured)
+            result = linux.deep_links(run)
+        self.assertEqual(result['cold'], query)
+        run.wd.keys.assert_not_called()
+        before, cold, warm = run.native.matching_text.call_args_list
+        self.assertEqual(before.args, ('J7-deep-link-before', re.escape(query)))
+        self.assertEqual(cold.args, ('J7-deep-link-cold', re.escape(query)))
+        self.assertEqual(warm.args[2]['height'], 40)
+        self.assertTrue(run.desktop_spawn.call_args_list[0].args[0][1].endswith(query.replace(' ', '%20')))
 
     def test_cold_query_present_before_dispatch_is_rejected(self):
-        run = Mock(work='/tmp/owned', run_id='w4a-123456789')
-        query = 'link ' + hashlib.sha256(run.run_id.encode()).hexdigest()[:10]
-        run.wd.execute.side_effect = [[{'width': 100}], query]
-        run.native.app_text.return_value = 'Search v3 orchid lighthouse Library'
-        run.native.app_window.return_value = {'rect': {'width': 1024, 'height': 700}}
-        with patch.object(linux, 'require_candidate'), patch.object(linux, 'interaction_observation'), \
-             patch.object(linux, 'wait_for', immediate), self.assertRaisesRegex(runner.Infrastructure, 'already appears'):
-            linux.deep_links(run)
-        run.desktop_spawn.assert_not_called()
+        for source in ('dom', 'native'):
+            with self.subTest(source=source):
+                run = Mock(work='/tmp/owned', run_id='w4a-123456789')
+                query = 'link ' + hashlib.sha256(run.run_id.encode()).hexdigest()[:10]
+                run.wd.execute.return_value = query if source == 'dom' else 'Search v3 orchid lighthouse'
+                run.native.matching_text.return_value = query if source == 'native' else None
+                # Baseline ignores the unique token and falsely passes restored J2 text.
+                run.native.app_text.side_effect = lambda name, *a, **kw: 'Library' if 'warm' in name else 'Search v3 orchid lighthouse'
+                run.native.app_window.return_value = {'rect': {'width': 1024, 'height': 700}}
+                with patch.object(linux, 'require_candidate'), patch.object(linux, 'interaction_observation'), \
+                     patch.object(linux, 'wait_for', immediate), self.assertRaisesRegex(runner.Infrastructure, 'already appears'):
+                    linux.deep_links(run)
+                run.desktop_spawn.assert_not_called()
 
     def update_run(self, package='JustSearch_0.3.1_amd64.deb'):
         run = Mock(binary='/usr/lib/JustSearch/JustSearch', work='/tmp/owned')
