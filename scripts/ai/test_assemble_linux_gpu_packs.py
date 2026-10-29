@@ -1,8 +1,10 @@
 import importlib.util
+import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -41,6 +43,35 @@ class LinuxGpuPackTest(unittest.TestCase):
             self.assertIn("libfixture_gpu.so.1", archive.namelist())
             self.assertTrue(all(item.external_attr >> 16 & 0o170000 == 0o100000 for item in archive.infolist()))
 
+    def test_release_assembly_keeps_candidate_hashes_and_sizes_out_of_workflow_logs(self):
+        """S13: nothing is public before the owner publishes, including candidate metadata."""
+        cuda, cudnn, ort, notices = (self.root / name for name in ("cuda", "cudnn", "ort", "notices"))
+        for directory in (cuda, cudnn, ort, notices):
+            directory.mkdir()
+        c = self.root / "runtime.c"
+        c.write_text("int cudaRuntimeGetVersion(int *v) { *v = 12080; return 0; }\n")
+        for directory, names in ((cuda, assembler.CUDA_NAMES), (cudnn, assembler.CUDNN_NAMES),
+                                 (ort, assembler.ORT_NAMES), (self.source, ("libggml-cuda.so",))):
+            for name in names:
+                subprocess.run(["gcc", "-shared", "-fPIC", "-Wl,-soname," + name,
+                                "-o", str(directory / name), str(c)], check=True)
+        (notices / "LICENSE").write_text("Fixture notices\n")
+        provenance = self.root / "inputs.json"
+        provenance.write_text(json.dumps(dict(inputs=[dict(url="https://example.org/fixture", sha256="a" * 64)])))
+        output = self.root / "output"
+        result = subprocess.run([sys.executable, str(Path(assembler.__file__)),
+            "--llama-dir", str(self.source), "--cuda-dir", str(cuda), "--cudnn-dir", str(cudnn),
+            "--ort-dir", str(ort), "--notices", str(notices), "--output", str(output),
+            "--input-manifest", str(provenance), "--patchelf", self.patchelf],
+            text=True, capture_output=True, check=True)
+        artifacts = json.loads((output / "registry-artifacts.json").read_text())["artifacts"]
+        self.assertEqual(2, len(artifacts))
+        logs = result.stdout + result.stderr
+        for artifact in artifacts:
+            self.assertEqual(artifact["sha256"], assembler.digest(output / artifact["filename"]))
+            self.assertNotIn(artifact["sha256"], logs)
+            self.assertNotIn(str(artifact["sizeBytes"]), logs)
+
     def test_ggml_dlopen_alias_is_materialized_without_input_symlinks(self):
         library = self.source / "libggml-cuda.so.0.9"
         subprocess.run(["gcc", "-shared", "-fPIC", "-Wl,-soname,libggml-cuda.so.0",
@@ -50,6 +81,45 @@ class LinuxGpuPackTest(unittest.TestCase):
         for name in ("libggml-cuda.so", "libggml-cuda.so.0"):
             self.assertTrue((output / name).is_file())
             self.assertFalse((output / name).is_symlink())
+
+    def test_inputs_are_unchanged_and_aliases_share_one_patched_payload(self):
+        before = {p.name: assembler.digest(p) for p in self.source.iterdir() if p.is_file()}
+        library = self.source / "libggml-cuda.so.0.9"
+        subprocess.run(["gcc", "-shared", "-fPIC", "-Wl,-soname,libggml-cuda.so.0",
+                        "-o", str(library), str(self.source / "dependency.c")], check=True)
+        before[library.name] = assembler.digest(library)
+        output = self.root / "one-copy"
+        assembler.copy_elf(self.source, output, self.patchelf)
+        self.assertEqual(before, {p.name: assembler.digest(p) for p in self.source.iterdir() if p.is_file()})
+        self.assertEqual((output / "libggml-cuda.so").stat().st_ino,
+                         (output / "libggml-cuda.so.0").stat().st_ino)
+
+    def test_driverless_audit_substitutes_only_driver_abi_and_never_archives_stub(self):
+        stub = self.root / "driver-stub.so"
+        subprocess.run(["gcc", "-shared", "-fPIC", "-Wl,-soname,libcuda.so.1", "-o", str(stub),
+                        str(self.source / "dependency.c")], check=True)
+        subprocess.run(["gcc", "-o", str(self.source / "llama-server"), str(self.source / "main.c"),
+                        "-L" + str(self.source), "-l:libfixture_gpu.so.1", "-Wl,--no-as-needed", str(stub)], check=True)
+        payload = self.root / "payload"
+        assembler.copy_elf(self.source, payload, self.patchelf)
+        combined = self.root / "audit"
+        combined.mkdir()
+        for path in payload.iterdir():
+            (combined / path.name).hardlink_to(path)
+        self.assertEqual(2, len(assembler.audit(combined, driver_stub=stub)))
+        output = self.root / "payload.zip"
+        assembler.archive(payload, output)
+        with assembler.zipfile.ZipFile(output) as archive:
+            self.assertNotIn("libcuda.so.1", archive.namelist())
+            self.assertFalse(any("driver-audit" in name for name in archive.namelist()))
+        # A driver with a misleading filename is still forbidden by its SONAME.
+        driver_source = self.root / "driver-input"
+        driver_source.mkdir()
+        (driver_source / "renamed.so").symlink_to(stub)
+        with self.assertRaisesRegex(ValueError, "Driver libraries must come from the OS"):
+            assembler.copy_elf(driver_source, self.root / "bad-pack", self.patchelf)
+        with self.assertRaisesRegex(ValueError, "Driver audit stub must have SONAME"):
+            assembler.audit(payload, driver_stub=payload / "libfixture_gpu.so.1")
 
     def test_missing_dependency_is_rejected_even_when_host_loader_can_find_it(self):
         (self.pack / "libfixture_gpu.so.1").unlink()
