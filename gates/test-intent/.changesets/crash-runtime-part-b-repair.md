@@ -47,3 +47,14 @@ The orchestrator generates execution evidence after committing; the builder does
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-91c3ab-b2-claude",
+  "verdict": "accept",
+  "digest": "sha256:ebd6ea80f3f9034e5e51f152ec05d2dfb3dbf4dc6bc7c6eaf87368a6975de619",
+  "note": "Candidate efe584d532. 6 repair checks fail on 5dcc5db048 by assertion (named refusal thrown) and pass on candidate. Real Linux Engine: malformed, second malformed, future-schema (live unrelated PID) and invalid-children manifests start up, one 600 quarantine with original bytes, named WARN, unclean narration on log and health stream, no child seeded, unrelated process untouched, planted token only in the quarantine; ledger mode 000 and directory start with PREDECESSOR_LEDGER_UNREADABLE; harness children/handoff/boot-quit/boot-failure pass; ui 2275 and app-api 470 tests pass. Mutations: refusal, ledger refusal, multi-quarantine, unclean flag, token-in-log caught; owner-only restrict not caught (redundant with runtime-dir repair except hard/symbolic links)."
+}
+```
