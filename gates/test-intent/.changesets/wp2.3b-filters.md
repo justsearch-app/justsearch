@@ -97,3 +97,14 @@ The new cases use the existing mounted production Search harness; existing oracl
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a185b9-5ff2-7e73-87a3-21e1fab71a2e",
+  "verdict": "accept",
+  "digest": "sha256:2e144f29024388f22e84c6e03d52366f4f4ff5b27e895028b9fc607e7e9b6e8a",
+  "note": "Codex verifier round 2 PASS on a98f50caa1: F1,F4b,F5,F7-F12,F16,F18,P1,P2 and the unchanged-field repair; checks fail before by assertion"
+}
+```
