@@ -58,12 +58,23 @@ async function fixture(options, check) {
     // Override even a machine-wide true setting: the runner must supply long-path support.
     git('config', 'core.longpaths', 'false');
     git('config', 'core.autocrlf', 'false');
+    git('config', 'lfs.repositoryformatversion', '0');
     for (const name of ['run-evidence', 'changeset', 'evidence', 'evidence-runners', 'rust-tests', 'classifications']) {
       write(`scripts/governance/gates/test-intent/${name}.mjs`, fs.readFileSync(path.join(HERE, `${name}.mjs`), 'utf8'));
     }
     write('scripts/governance/lib/frontmatter.mjs', fs.readFileSync(path.join(HERE, '../../lib/frontmatter.mjs'), 'utf8'));
     write(CHECK.split('#')[0], '// deterministic CLI boundary fixture\n');
     write('.gitignore', 'modules/core/build/\n');
+    if (options.lfs) {
+      const globalConfig = path.join(scratch, 'global.config');
+      fs.writeFileSync(globalConfig, '[filter "lfs"]\n'
+        + 'clean = git-lfs clean -- %f\nsmudge = git-lfs smudge -- %f\n'
+        + 'process = git-lfs filter-process\nrequired = true\n');
+      env.GIT_CONFIG_GLOBAL = globalConfig;
+      env.GIT_CONFIG_NOSYSTEM = '1';
+      write('.gitattributes', '*.lfs-test filter=lfs diff=lfs merge=lfs -text\n');
+      write('modified.lfs-test', 'original LFS content\n');
+    }
     write('probe.cjs', `
 const fs = require('node:fs'), path = require('node:path');
 const before = process.cwd() !== process.env.PROBE_ROOT;
@@ -98,7 +109,7 @@ const failure = !before ? '' : process.env.PROBE_MODE === 'exception'
   : '<failure type="org.opentest4j.AssertionFailedError" message="before assertion"/>';
 fs.mkdirSync('modules/core/build/test-results/test', { recursive: true });
 fs.writeFileSync('modules/core/build/test-results/test/TEST-io.x.ProbeTest.xml',
-  '<testsuite><testcase classname="io.x.ProbeTest" name="probe">' + failure + '</testcase></testsuite>');
+  '<testsuite><testcase classname="io.x.ProbeTest" name="probe">' + failure + '</testcase><testcase classname="io.x.ProbeTest" name="skipped"><skipped/></testcase></testsuite>');
 if (before && process.env.PROBE_MODE === 'exception') console.error('java.lang.IllegalStateException: before probe exploded');
 process.exitCode = before ? 1 : 0;
 `);
@@ -181,9 +192,32 @@ try {
       locker.stderr.on('data', data => { lockerOutput += data; });
       lockerClosed = once(locker, 'close');
     }
-    const result = spawnSync(process.execPath, [path.join(root, CLI), '--out', out, '--check', CHECK,
-      '--before', options.invalidRef ? 'NO-SUCH-REVISION' : 'HEAD', '--before-root', beforeRoot],
-    { cwd: root, env, encoding: 'utf8' });
+    if (options.candidate) write(CHECK.split('#')[0], '// changed candidate check\n');
+    if (options.lfs) {
+      write('modified.lfs-test', 'changed LFS content\n');
+      write('added.lfs-test', 'new LFS content\n');
+    }
+    if (options.missingLfsFormat) git('config', '--unset', 'lfs.repositoryformatversion');
+    const gitBefore = options.lfs ? gitSnapshot(path.join(root, '.git')) : null;
+    const gitEvents = [];
+    const watcher = options.lfs ? fs.watch(path.join(root, '.git'), { recursive: true },
+      (event, file) => gitEvents.push({ event, file })) : null;
+    let result;
+    try {
+      const child = spawn(process.execPath, [path.join(root, CLI), '--out', out, '--check', CHECK,
+        ...(options.mixed ? ['--check', CHECK.replace('#probe', '#noSuchMethod'),
+          '--check', CHECK.replace('#probe', '#skipped')] : []),
+        ...(options.candidate ? [] : ['--before', options.invalidRef ? 'NO-SUCH-REVISION' : 'HEAD', '--before-root', beforeRoot])],
+      { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      let stdout = '', stderr = '';
+      child.stdout.on('data', data => { stdout += data; });
+      child.stderr.on('data', data => { stderr += data; });
+      const [status] = await once(child, 'close');
+      await new Promise(setImmediate);
+      result = { status, stdout, stderr };
+    } finally {
+      watcher?.close();
+    }
     const output = `${result.stdout}\n${result.stderr}`;
     if (options.lock) {
       assert.equal(fs.readFileSync(path.join(scratch, 'lock-ready'), 'utf8'), 'held');
@@ -195,7 +229,7 @@ try {
       assert.match(interrupted.output, /interrupted: CTRL_BREAK_EVENT/);
       assert.match(fs.readFileSync(path.join(scratch, 'interrupt-identity'), 'utf8'), /^\d+\/\d+$/);
     }
-    await check({ result, output, out, beforeRoot, git, scratch });
+    await check({ result, output, out, beforeRoot, git, scratch, root, env, gitBefore, gitEvents });
   } finally {
     fs.writeFileSync(path.join(scratch, 'lock-release'), 'release');
     if (locker) {
@@ -219,6 +253,60 @@ function readEvidence(out) {
   assert.equal(evidence.digest, evidenceSelfDigest(evidence));
   return evidence;
 }
+
+function gitSnapshot(dir) {
+  return Object.fromEntries(fs.readdirSync(dir, { recursive: true }).sort().map(rel => {
+    const file = path.join(dir, rel);
+    return [rel, fs.statSync(file).isFile() ? fs.readFileSync(file).toString('base64') : null];
+  }));
+}
+
+test('CLI: candidate-only LFS hashing leaves Git untouched and preserves the filtered tree', async t => {
+  const lfs = spawnSync('git-lfs', ['version'], { encoding: 'utf8' });
+  if (lfs.error?.code === 'ENOENT') return t.skip('git-lfs is not installed');
+  assert.equal(lfs.status, 0, lfs.stderr);
+  await fixture({ candidate: true, lfs: true }, ({ result, output, out, scratch, root, env, gitBefore }) => {
+    assert.equal(result.status, 0, output);
+    const gitAfter = gitSnapshot(path.join(root, '.git'));
+    assert.deepEqual([...new Set([...Object.keys(gitBefore), ...Object.keys(gitAfter)])]
+      .filter(rel => gitBefore[rel] !== gitAfter[rel]), [],
+      'candidate-only hashing must not write Git objects, LFS objects or LFS temporary files');
+    const copy = path.join(scratch, 'writable-copy');
+    const copyGit = (...args) => {
+      const result = spawnSync('git', args, { cwd: copy, env, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout.trim();
+    };
+    fs.mkdirSync(copy);
+    copyGit('clone', '--quiet', '--shared', '--no-checkout', root, '.');
+    fs.cpSync(root, copy, { recursive: true, filter: source => source !== path.join(root, '.git') });
+    copyGit('lfs', 'install', '--local', '--skip-smudge');
+    copyGit('add', '-A');
+    const expected = copyGit('write-tree');
+    for (const file of ['added.lfs-test', 'modified.lfs-test']) {
+      assert.match(copyGit('show', `${expected}:${file}`), /^version https:\/\/git-lfs.github.com\/spec\/v1\n/,
+        'the reference tree must contain cleaned LFS pointers');
+    }
+    assert.equal(readEvidence(out).tree, expected);
+    // Git may refresh the timestamps of existing objects it finds through the alternate (object
+    // freshening); contents and the file set stay unchanged (snapshot above), and a read-only Git
+    // directory still works. Timestamp events are therefore not asserted here.
+  });
+});
+
+test('CLI: missing local LFS format refuses hashing without writing into Git', async t => {
+  const lfs = spawnSync('git-lfs', ['version'], { encoding: 'utf8' });
+  if (lfs.error?.code === 'ENOENT') return t.skip('git-lfs is not installed');
+  assert.equal(lfs.status, 0, lfs.stderr);
+  await fixture({ candidate: true, lfs: true, missingLfsFormat: true },
+    ({ result, output, out, root, gitBefore, gitEvents }) => {
+      assert.deepEqual(gitEvents, [], 'missing local LFS format must not cause config or temporary writes');
+      assert.deepEqual(gitSnapshot(path.join(root, '.git')), gitBefore);
+      assert.equal(result.status, 2, output);
+      assert.match(output, /lfs\.repositoryformatversion.*git lfs install --local/);
+      assert.equal(fs.existsSync(out), false, 'a refused hash must not produce evidence');
+    });
+});
 
 test('CLI: invalid before revision removes its empty reservation without a second error', async () => {
   await fixture({ invalidRef: true }, ({ result, output, beforeRoot, git }) => {
@@ -281,3 +369,15 @@ test('CLI: candidate and historical runners isolate profiles while retaining Gra
     }
   });
 });
+
+for (const mixed of [false, true]) {
+  test(`CLI: candidate-only ${mixed ? 'mixed results exit 1' : 'passing checks exit 0'} with valid JSON`, async () => {
+    await fixture({ candidate: true, mixed }, ({ result, output, out }) => {
+      assert.equal(result.status, mixed ? 1 : 0, output);
+      const evidence = readEvidence(out);
+      assert.equal(evidence.failBefore, null);
+      assert.deepEqual(evidence.checks.map(c => c.outcome), mixed ? ['passed', 'not-found', 'skipped'] : ['passed']);
+      assert.deepEqual(evidence.checks.map(c => c.executed), mixed ? [true, false, false] : [true]);
+    });
+  });
+}

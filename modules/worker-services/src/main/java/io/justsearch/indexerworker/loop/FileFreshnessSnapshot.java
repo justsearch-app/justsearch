@@ -54,7 +54,7 @@ record FileFreshnessSnapshot(
 
   /**
    * Re-observes the source. Only a "not found" answer is {@link SourceValidationResult#DELETED};
-   * any other failure is {@link SourceValidationResult#UNREADABLE} (task t-20261013-ef3c41). Even
+   * any other failure is {@link SourceValidationResult#UNREADABLE} (#758). Even
    * {@code DELETED} is only a candidate: a deletion additionally needs {@link SourcePresence} to
    * confirm the folder holding the source is present.
    */

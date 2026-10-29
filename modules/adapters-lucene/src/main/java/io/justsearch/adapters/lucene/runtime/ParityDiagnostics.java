@@ -121,7 +121,7 @@ public final class ParityDiagnostics {
   }
 
   /**
-   * True when what the index recorded about its shape cannot be read (task t-20261013-ef3c41): a
+   * True when what the index recorded about its shape cannot be read (#758): a
    * stored digest that is not a digest this runtime could have written, compared against one it
    * did compute; or no digest and recorded inputs that are not a readable JSON object. The answer
    * to "is this index compatible?" is then unknown — never compatible, never "rebuild required" —

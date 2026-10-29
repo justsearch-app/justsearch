@@ -15,13 +15,13 @@
  * Exit: 0 pass, 1 fail, 2 usage or runner error. Rules: docs/reference/testing/test-intent.md.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { analyzeTestIntent, formatReport } from './analyze.mjs';
 import { RECORD_KINDS, VERDICTS } from './classifications.mjs';
-import { appendRecord, writeSkeleton } from './changeset.mjs';
+import { appendRecord, parseChangeset, writeSkeleton } from './changeset.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
@@ -72,7 +72,13 @@ function main() {
     const rel = (args.positional[0] ?? '').replaceAll('\\', '/');
     const cs = result.changesets.find((c) => c.path === rel);
     if (!cs) {
-      console.error(`${rel || '<changeset>'} is not a parseable test-intent changeset in this branch`);
+      const abs = resolve(repoRoot, rel);
+      if (rel && existsSync(abs) && parseChangeset(readFileSync(abs, 'utf8')).ok) {
+        console.error(`${rel} is not among the test-intent changesets added or modified against the selected base. ` +
+          'Use --base <a commit before the changeset was added>.');
+      } else {
+        console.error(`${rel || '<changeset>'} is not a parseable test-intent changeset in this branch`);
+      }
       return 2;
     }
     if (!cs.digest) {

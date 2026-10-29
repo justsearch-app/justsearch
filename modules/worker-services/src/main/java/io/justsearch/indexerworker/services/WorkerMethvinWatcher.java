@@ -73,7 +73,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   static final int STARTUP_EVENT_BUFFER_LIMIT = 4_096;
 
   /**
-   * Task t-20261013-ef3c41: how long a witnessed DELETE waits before its absence is confirmed.
+   * #758: how long a witnessed DELETE waits before its absence is confirmed.
    *
    * <p>An atomic save (write a temp file, delete or rename over the original), a case-only rename
    * and a delete-then-recreate all report a DELETE for a path that is present again moments later.
@@ -87,8 +87,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private final ConcurrentHashMap<Path, PendingDelete> pendingDeletes = new ConcurrentHashMap<>();
 
   /**
-   * The root-identity check a settled DELETE asks before it counts as confirmed (task
-   * t-20261013-ef3c41, round 4); the composed Worker wires its service's persistent one in.
+   * The root-identity check a settled DELETE asks before it counts as confirmed (#758); the
+   * composed Worker wires its service's persistent one in.
    */
   private volatile io.justsearch.indexerworker.loop.SourcePresence.RootCheck rootCheck =
       RootWitness.inMemory();
@@ -133,7 +133,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private volatile Runnable pendingReceipts = () -> {};
   private final Map<Path, PendingReconcile> pendingReconciliations = new ConcurrentHashMap<>();
   /**
-   * Round 8 (task t-20261013-ef3c41, S8): how many times each root was removed. A reconcile asked
+   * #758: how many times each root was removed. A reconcile asked
    * for before a removal is dropped instead of syncing the removed root, even when the root was
    * added again by the time it would run.
    */

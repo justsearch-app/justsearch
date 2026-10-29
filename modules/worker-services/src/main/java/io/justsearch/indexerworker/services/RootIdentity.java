@@ -121,7 +121,7 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
 
 
   /**
-   * Test seam (task t-20261013-ef3c41, round 9): while set, {@link #volume()} answers as on a
+   * Test seam (#758): while set, {@link #volume()} answers as on a
    * platform that exposes no volume identity, so a run on Windows covers that path.
    * Nothing in production sets it.
    */
@@ -131,7 +131,7 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
 
   /**
    * The volume this root lives on, comparable across restarts, or {@code null} when stable volume
-   * evidence is unavailable (task t-20261013-ef3c41: a different volume at the same path must
+   * evidence is unavailable (#761: a different volume at the same path must
    * not vouch for the original's deletions).
    */
   String volume() {

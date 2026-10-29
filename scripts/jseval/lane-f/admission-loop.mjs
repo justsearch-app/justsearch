@@ -322,7 +322,7 @@ async function selfTest() {
     checked++;
   }
   assert.equal(analyzePair(null, null).verdict, 'FAIL');
-  // Task t-20261005-b6d536, FP11: full inference threads and queue are their own legal 429.
+  // #759: full inference threads and queue are their own legal 429.
   const busy = capture('context-many');
   busy.requests[1] = { ...busy.requests[1], code: 'ADMISSION_INFERENCE_BUSY', retrySafe: false };
   const busyArm = analyzeArm(busy, 'context-many');

@@ -13,6 +13,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { changesetText, runScenario } from './scenario.mjs';
+
 import { appendRecord, computeDigest, parseChangeset, skeletonEntry } from './changeset.mjs';
 import { contentDigest, evidenceSelfDigest, EVIDENCE_PRODUCER, EVIDENCE_SCHEMA, validateEvidence } from './evidence.mjs';
 import {
@@ -744,6 +746,7 @@ function withNativeFixture(fn) {
   try {
     // Reuse existing Git history without creating a fixture commit or checking out the product.
     execFileSync('git', ['clone', '--shared', '--no-checkout', REPO, root], { stdio: 'pipe' });
+    execFileSync('git', ['config', '--local', 'lfs.repositoryformatversion', '0'], { cwd: root, stdio: 'pipe' });
     const write = (rel, text) => {
       const dest = path.join(root, rel);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -835,6 +838,32 @@ test('run-evidence: a native source named through a junction is copied in full',
     assert.equal(fs.readFileSync(path.join(source, 'native.dll'), 'utf8'), 'top-level-library');
   });
 });
+
+for (const changed of [false, true]) {
+  test(`CLI digest: ${changed ? 'unparseable changeset keeps parse diagnostic' : 'unchanged changeset reports selected-base scope'}`, () => {
+    const rel = 'gates/test-intent/.changesets/probe.md';
+    const text = changesetText({ entries: [] });
+    const { root, cleanup } = runScenario({
+      main: { [rel]: text },
+      ...(changed ? { uncommitted: { write: { [rel]: 'unparseable changeset' } } } : {}),
+    });
+    try {
+      const result = spawnSync(process.execPath, [path.join(HERE, 'cli.mjs'), 'digest', rel, '--repo', root, '--base', 'main'],
+        { encoding: 'utf8' });
+      assert.equal(result.status, 2, result.stderr);
+      if (changed) {
+        assert.match(result.stderr, /not a parseable test-intent changeset/);
+        assert.doesNotMatch(result.stderr, /--base <a commit before the changeset was added>/);
+      } else {
+        assert.match(result.stderr, /not among.*changesets added or modified.*selected base/);
+        assert.match(result.stderr, /--base <a commit before the changeset was added>/);
+        assert.doesNotMatch(result.stderr, /not a parseable/);
+      }
+    } finally {
+      cleanup();
+    }
+  });
+}
 
 if (failures.length > 0) {
   console.error(`test-intent units: ${failures.length} FAILED, ${passed} passed`);

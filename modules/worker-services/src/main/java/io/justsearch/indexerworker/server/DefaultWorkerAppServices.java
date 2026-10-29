@@ -821,7 +821,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       workerWatcher.startRootRecovery(executors.watcherReturnPoll(), executors.watcherReturn(),
           watcherCallbacks::recoveryRoots, watcherCallbacks::recoverRoot);
     }
-    // Task t-20261013-ef3c41, round 4: the indexing loop's admission, freshness, re-hash and
+    // #758: the indexing loop's admission, freshness, re-hash and
     // pre-write decisions and the watcher's DELETE confirmation all ask the service's one
     // root-identity check, the same question the prune asks.
     if (indexingLoop != null) {
@@ -980,7 +980,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
     searchService.setActiveGenerationSupplier(ingestService.activeGenerationSupplier());
     searchService.setPresenceGeneration(ingestService::captureRebuildGeneration);
-    // Task t-20261013-ef3c41, round 4: the shared loop and watcher ask this service's root check.
+    // #758: the shared loop and watcher ask this service's root check.
     if (indexingLoop != null) {
       indexingLoop.useRootCheck(ingestService.rootCheck());
       indexingLoop.useFileExclusions(ingestService::isUserExcluded);

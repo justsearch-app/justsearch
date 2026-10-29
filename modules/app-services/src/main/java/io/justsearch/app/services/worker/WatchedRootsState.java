@@ -57,7 +57,8 @@ public final class WatchedRootsState {
   private final Object lifecycleLock = new Object();
   private static final String INITIALIZATION_PENDING = "ROOT_INITIALIZATION_PENDING";
   // Persisted retry identity in walkError; keep the text stable for existing saved roots.
-  static final String REMOVAL_INCOMPLETE = "Removal incomplete. Live watching is not confirmed; retry Remove.";
+  static final String REMOVAL_INCOMPLETE =
+      io.justsearch.configuration.persistence.WatchedRootsFormat.REMOVAL_INCOMPLETE;
 
   Object lifecycleLock() {
     return lifecycleLock;
@@ -254,7 +255,7 @@ public final class WatchedRootsState {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 5 (S8): the Worker refused a sync of this root with the
+   * #758: the Worker refused a sync of this root with the
    * root-level {@code reason} (the folder at its path is not the volume it was first seen on).
    * The root reads unavailable at once; its last-indexed time is kept. Returns whether the state
    * changed.
@@ -391,6 +392,19 @@ public final class WatchedRootsState {
 
   boolean isRemovalIncomplete(Path root) {
     return REMOVAL_INCOMPLETE.equals(walkErrors.get(root));
+  }
+
+  /** Restore only a fresh intent after the Worker explicitly acknowledges zero effects. */
+  synchronized void cancelRemoval(Path root, String previousWalkError) {
+    var restoredErrors = new java.util.HashMap<>(walkErrors);
+    if (previousWalkError == null) restoredErrors.remove(root);
+    else restoredErrors.put(root, previousWalkError);
+    // A failed durable cancellation must leave the in-memory intent fail-closed too.
+    rootsStore.persistRoots(watchedRoots, restoredErrors, walkCompleted, collections);
+    var statusBefore = statusContent();
+    if (previousWalkError == null) walkErrors.remove(root);
+    else walkErrors.put(root, previousWalkError);
+    io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   synchronized void removeRootAndPersist(Path root) {

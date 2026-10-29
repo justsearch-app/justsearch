@@ -1986,7 +1986,7 @@ public final class KnowledgeServerMigrationOps {
         case "PRUNE_PREFIX" -> {
           if (context.ingestLifecycle() != null && !payload.isBlank()) {
             try {
-              // Task t-20261013-ef3c41: replay prunes only confirmed absences. The root holding the
+              // #803: replay prunes only confirmed absences. The root holding the
               // prefix must be present, listable, the folder a watch registered and on the volume
               // recorded for it, re-checked every batch; each batch is applied inside the live
               // Worker's file-mutation fence. A prune that could not finish stays unapplied and is
@@ -3503,6 +3503,31 @@ public final class KnowledgeServerMigrationOps {
     var roots = readMigrationRootDeclarations(dataDir, collections, json);
     for (Path root : roots.keySet()) requireMigrationRoot(root);
     return withMigrationHelpRoot(roots, collections);
+  }
+
+  /** Only frozen, scoped candidate receipts can account for withdrawn enumeration roots. */
+  public static List<ResolvedConfig.FileSource> migrationRootsAfterRecordedRemovals(
+      List<ResolvedConfig.FileSource> frozen, List<ResolvedConfig.FileSource> current,
+      JobQueue queue, String generation) throws IOException {
+    var prior = new java.util.HashSet<>(frozen);
+    if (!prior.containsAll(current)) {
+      throw new IOException("Migration declarations changed since enumeration");
+    }
+    prior.removeAll(current);
+    if (prior.isEmpty()) return current;
+    if (!(queue instanceof SwitchBufferCapableQueue journal) || generation == null) {
+      throw new IOException("Migration removal has no candidate journal");
+    }
+    var scopes = journal.listSwitchBufferOpsStrictForGeneration(generation).stream()
+        .filter(receipt -> "DELETE_PREFIX".equals(receipt.op()))
+        .map(receipt -> PathPrefixScope.decode(receipt.payload())).toList();
+    for (var removed : prior) {
+      String prefix = new PathPrefixScope(removed.path().toString(), List.of()).prefix();
+      boolean recorded = scopes.stream().anyMatch(scope -> scope.prefix().equals(prefix)
+          && current.stream().noneMatch(retained -> scope.contains(retained.path().toString())));
+      if (!recorded) throw new IOException("Migration declaration removal has no scoped deletion receipt");
+    }
+    return current;
   }
 
   /** Freeze authored ownership separately from the walk's availability checks. */

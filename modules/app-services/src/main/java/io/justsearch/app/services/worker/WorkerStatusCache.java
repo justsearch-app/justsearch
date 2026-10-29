@@ -146,7 +146,7 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
           0L,
           false,
           workerStateName(),
-          // Task t-20261013-ef3c41: no Worker answered, so the 0 above is not a document count.
+          // #758: no Worker answered, so the 0 above is not a document count.
           unavailableExtras());
     }
 
@@ -206,7 +206,7 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
     // 258-B1: cache for cross-encoder document-length gate
     cachedAvgContentLengthChars = avgChars;
 
-    // Task t-20261013-ef3c41: the Worker could not count the index and has no earlier count, so
+    // #758: the Worker could not count the index and has no earlier count, so
     // docCount below carries 0 that is not a count. Present only then; absent means known.
     if (s.getCore().getDocCountUnknown()) {
       extras.put(KnowledgeStatusView.DOC_COUNT_UNKNOWN_EXTRA, Boolean.TRUE);
