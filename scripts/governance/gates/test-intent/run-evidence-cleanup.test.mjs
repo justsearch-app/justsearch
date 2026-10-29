@@ -90,6 +90,22 @@ fs.writeFileSync(out, JSON.stringify({ testResults: [{ name: 'src/probe.test.ts'
   }
 });
 
+test('cargo checks in a before copy reuse the candidate crate target folder', () => {
+  const root = path.join(os.tmpdir(), 'evidence-candidate');
+  const before = path.join(os.tmpdir(), 'evidence-before');
+  const seen = [];
+  const spawnSync = (command, opts) => { seen.push(opts.env.CARGO_TARGET_DIR); return { status: 0, stdout: '', stderr: '' }; };
+  const run = (env) => vm.runInNewContext(`${functions}
+    sh('cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml', before);`, {
+    ...evidence, ...runners, fs, path, os, spawnSync, process: { ...process, env }, REPO_ROOT: root,
+    IS_WIN: process.platform === 'win32', before,
+  });
+  const { CARGO_TARGET_DIR: _ignored, ...plain } = process.env;
+  run(plain);
+  run({ ...plain, CARGO_TARGET_DIR: '/explicit/target' });
+  assert.deepEqual(seen, [path.join(root, 'modules', 'shell', 'src-tauri', 'target'), '/explicit/target']);
+});
+
 function fixture(options, check) {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-cleanup-'));
   const root = path.join(scratch, 'repo');
