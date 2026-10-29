@@ -165,8 +165,10 @@ Before pushing Java changes, run `node scripts/dev/java-prepush.mjs`. In one Gra
 runs `pmdAll`, and runs integration tests for changed JVM modules and their transitive dependents.
 Changes are measured against the merge base with `origin/main`, including both sides of renames.
 Production, runtime, test and test-fixture dependencies all count. Integration tasks are limited to
-the hosted module tier: app-api, app-services, indexing, reranker and ui. Shared Gradle build changes
-select all five; changes outside JVM modules select none. The system-tests integration tier remains
+the hosted module tier: app-api, app-services, indexing, reranker and ui. Any file in a module
+counts except Markdown outside its `src/`. Shared Gradle build changes, `SSOT/` and the exclusion
+list select all five; other files outside JVM modules select none, so a change to a script or data
+file a test reads from elsewhere is caught only by main's module-tier run. The system-tests integration tier remains
 separate. Use `--dry-run` to print the full command or `--unreferenced` to add the launcher audit.
 Publication preflight also runs this helper.
 
