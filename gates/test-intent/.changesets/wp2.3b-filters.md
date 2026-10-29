@@ -99,3 +99,14 @@ The new cases use the existing mounted production Search harness; existing oracl
 ## Acceptance records
 
 Pending independent acceptance of the refreshed UTC execution evidence.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a185fb-73cd-7803-a5a2-df7ed86c5ead",
+  "verdict": "accept",
+  "digest": "sha256:cb51a7355ea5266331dd9bd15c87bb7afaf3ad907a85e596ee7dd4b75543458b",
+  "note": "Codex verifier-b3 PASS on d13efa3e6a: test-only TZ portability; 62/62 in UTC, Berlin, LA, Sydney; 19 evidence checks fail before by assertion"
+}
+```
