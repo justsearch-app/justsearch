@@ -181,7 +181,7 @@ $logs=@(Get-ChildItem (Join-Path $data 'logs') -File -Recurse -ErrorAction Silen
 
 
 def guest_ps(source, timeout=60):
-    result = vm.ssh('windows', vm.powershell('$ErrorActionPreference="Stop";' + source),
+    result = vm.ssh('windows', vm.powershell('$ErrorActionPreference="Stop";[Console]::OutputEncoding=[Text.UTF8Encoding]::new();' + source),
                     capture_output=True, text=True, timeout=timeout)
     if result.returncode:
         raise Infrastructure('Guest PowerShell failed: ' + result.stderr[-3000:])
