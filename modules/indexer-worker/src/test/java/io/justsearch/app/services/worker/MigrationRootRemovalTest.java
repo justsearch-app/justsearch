@@ -270,7 +270,7 @@ final class MigrationRootRemovalTest extends LuceneExecutorTestBase {
       var refusal = assertThrows(io.justsearch.app.api.knowledge.KnowledgeClientException.class,
           () -> f.ops.removeWatchedPath(f.parent, context()));
       assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE, refusal.status());
-      assertEquals("Removal did not start because the index is switching. "
+      assertEquals("Removal did not complete because the index is rebuilding. "
           + "Retry Remove when the rebuild finishes.", refusal.getMessage());
       assertNotEquals("FAILED", f.manager.readStateBestEffort().migration_state(),
           "removal must complete or be deferred before it can consume the SWITCHING deadline");
@@ -292,7 +292,7 @@ final class MigrationRootRemovalTest extends LuceneExecutorTestBase {
       var refusal = assertThrows(io.justsearch.app.api.knowledge.KnowledgeClientException.class,
           () -> f.ops.removeWatchedPath(f.parent, context()));
       assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE, refusal.status());
-      assertEquals("Removal did not start because the index is switching. "
+      assertEquals("Removal did not complete because the index is rebuilding. "
           + "Retry Remove when the rebuild finishes.", refusal.getMessage());
       assertFalse(f.state.isRemovalIncomplete(f.parent), "a refused fresh attempt must not block promotion");
       assertFalse(new WatchedRootsStore(f.data.resolve("watched_roots.json"), null)

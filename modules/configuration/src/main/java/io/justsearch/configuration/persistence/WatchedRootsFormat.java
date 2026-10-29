@@ -10,7 +10,7 @@ public final class WatchedRootsFormat {
       "Removal incomplete. Live watching is not confirmed; retry Remove.";
   /** Worker acknowledgement: no watcher, journal, index or queue effect was performed. */
   public static final String REMOVAL_REFUSED_DURING_SWITCHING =
-      "Removal did not start because the index is switching. Retry Remove when the rebuild finishes.";
+      "Removal did not complete because the index is rebuilding. Retry Remove when the rebuild finishes.";
 
   private WatchedRootsFormat() {}
 
