@@ -160,6 +160,24 @@ advisory budget) — `pmdAll` compiles every source set of every module either w
 is decided by which job has wall-time headroom, not by which already compiles tests.
 `-PskipPmd=true` is the local fast-iteration escape hatch; CI never sets it.
 
+Before pushing Java changes, run `node scripts/dev/java-prepush.mjs`. In one Gradle invocation
+(wrapped by `js-gradle-slot` when available), it compiles unit and integration tests with Error Prone,
+runs `pmdAll`, and runs integration tests for changed JVM modules and their transitive dependents.
+Changes are measured against the merge base with `origin/main`, including both sides of renames.
+Production, runtime, test and test-fixture dependencies all count. Integration tasks are limited to
+the hosted module tier: app-api, app-services, indexing, reranker and ui. Any file in a module
+counts except Markdown outside its `src/`. Shared Gradle build changes, `SSOT/` and the exclusion
+list select all five; other files outside JVM modules select none, so a change to a script or data
+file a test reads from elsewhere is caught only by main's module-tier run. The system-tests integration tier remains
+separate. Use `--dry-run` to print the full command or `--unreferenced` to add the launcher audit.
+Publication preflight also runs this helper.
+
+The helper sets `JUSTSEARCH_PREPUSH=true`, which applies `scripts/dev/prepush-excluded-tests.tsv`
+through the same exclusion loader as the PR flake list. Its one excluded class,
+`LinuxWatchedDriveReturnIntegrationTest`, mounts real drives in the user's desktop session and
+is red locally until its fixture is isolated. CI and other callers retain their normal test selection
+when the variable is unset.
+
 **Exception handling policy:**
 
 An audit of ~100 `catch (Exception ignored) {}` sites found that silent exception swallowing was the codebase default because it was 1 line while proper handling was 5-10 lines. This created invisible failures: config reload errors, health endpoint crashes, index cleanup leaks, and streaming truncation — all with no log, no metric, no signal. The `Faults` utility was built to make the right thing equally convenient, and the PMD rule was tightened to prevent recurrence.

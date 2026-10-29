@@ -14,6 +14,7 @@ fn credential_waits_for_both_fields_and_keeps_their_incarnation_together() {
     let first_pid = admit();
     assert!(session_credential(&state).is_none());
     state.observe_manifest(&ManifestFields {
+        incarnation: Some((fixture.host.session(), u64::from(fixture.host.incarnation_number()))),
         instance_id: Some("first".into()),
         pid: Some(first_pid),
         session_token: Some("first-token".into()),
@@ -24,6 +25,7 @@ fn credential_waits_for_both_fields_and_keeps_their_incarnation_together() {
         "assertion failed: token alone must not be issued"
     );
     state.observe_manifest(&ManifestFields {
+        incarnation: Some((fixture.host.session(), u64::from(fixture.host.incarnation_number()))),
         instance_id: Some("first".into()),
         pid: Some(first_pid),
         api_port: Some(43311),
@@ -37,6 +39,7 @@ fn credential_waits_for_both_fields_and_keeps_their_incarnation_together() {
     fixture.host.reset_for_successor().unwrap();
     let next_pid = admit();
     state.observe_manifest(&ManifestFields {
+        incarnation: Some((fixture.host.session(), u64::from(fixture.host.incarnation_number()))),
         instance_id: Some("next".into()),
         pid: Some(next_pid),
         api_port: Some(43312),
@@ -47,6 +50,7 @@ fn credential_waits_for_both_fields_and_keeps_their_incarnation_together() {
         "assertion failed: new port must not inherit the predecessor token"
     );
     state.observe_manifest(&ManifestFields {
+        incarnation: Some((fixture.host.session(), u64::from(fixture.host.incarnation_number()))),
         instance_id: Some("next".into()),
         pid: Some(next_pid),
         session_token: Some("next-token".into()),

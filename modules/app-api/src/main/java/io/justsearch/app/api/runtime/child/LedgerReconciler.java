@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -26,14 +28,14 @@ import tools.jackson.databind.JsonNode;
  *
  * <ul>
  *   <li>Open means a {@code child-spawn}, {@code child-start} or {@code stop-intent} without a
- *       {@code child-exit}, {@code owner-died} or {@code child-survived owner_died_alive}.
+ *       {@code child-exit} or {@code owner-died}.
  *   <li>The OS check compares the recorded pid, creation FILETIME (or JDK start time) and
  *       executable with the live process: GONE → {@code owner-died OWNER_DIED}; ALIVE_MATCH → {@code
  *       child-survived owner_died_alive}; unreadable, or no start record → {@code owner-died
  *       UNKNOWN}.
  * </ul>
  *
- * Each record it writes closes the child, so a second boot writes nothing more.
+ * A surviving child stays open; its identity is carried forward until its exit is confirmed.
  */
 public final class LedgerReconciler {
 
@@ -84,24 +86,7 @@ public final class LedgerReconciler {
     } catch (IOException | RuntimeException unreadable) {
       return new Result(0, 0, 0, 0);
     }
-    Map<String, Open> open = new LinkedHashMap<>();
-    for (LedgerRecord record : read.records()) {
-      Optional<String> childId = record.text("childId");
-      if (childId.isEmpty()) continue;
-      switch (record.type()) {
-        case CHILD_SPAWN -> open.computeIfAbsent(childId.get(), id -> new Open(id)).spawn = record;
-        case CHILD_START -> open.computeIfAbsent(childId.get(), id -> new Open(id)).start = record;
-        case STOP_INTENT -> open.computeIfAbsent(childId.get(), id -> new Open(id)).intent = record;
-        case CHILD_EXIT, OWNER_DIED -> open.computeIfAbsent(childId.get(), id -> new Open(id))
-            .closed = true;
-        case CHILD_SURVIVED -> {
-          if ("owner_died_alive".equals(record.text("basis").orElse(null))) {
-            open.computeIfAbsent(childId.get(), id -> new Open(id)).closed = true;
-          }
-        }
-        default -> {}
-      }
-    }
+    Map<String, Open> open = openChildren(read.records());
     int ownerDied = 0;
     int unknown = 0;
     int survived = 0;
@@ -135,6 +120,80 @@ public final class LedgerReconciler {
       else unknown++;
     }
     return new Result(ownerDied, unknown, survived, read.skippedLines());
+  }
+
+  private static Map<String, Open> openChildren(List<LedgerRecord> records) {
+    Map<String, Open> open = new LinkedHashMap<>();
+    for (LedgerRecord record : records) {
+      Optional<String> childId = record.text("childId");
+      if (childId.isEmpty()) continue;
+      switch (record.type()) {
+        case CHILD_SPAWN -> open.computeIfAbsent(childId.get(), id -> new Open(id)).spawn = record;
+        case CHILD_START -> open.computeIfAbsent(childId.get(), id -> new Open(id)).start = record;
+        case STOP_INTENT -> open.computeIfAbsent(childId.get(), id -> new Open(id)).intent = record;
+        case CHILD_EXIT, OWNER_DIED -> open.computeIfAbsent(childId.get(), id -> new Open(id))
+            .closed = true;
+        case CHILD_SURVIVED -> open.computeIfAbsent(childId.get(), id -> new Open(id)).survived = record;
+        default -> {}
+      }
+    }
+    return open;
+  }
+
+  /** Original receipts for surviving children, copied unchanged at rotation to retain ownership. */
+  public static List<LedgerRecord> openChildRecords(List<LedgerRecord> records) {
+    var open = openChildren(records);
+    // Keep every distinct identity receipt, including conflicting starts: cleanup must still
+    // refuse ambiguous ownership. Retry history is bounded per child in the current generation.
+    var receipts = records.stream().filter(record -> record.text("childId")
+        .map(id -> !open.get(id).closed && open.get(id).survived != null).orElse(false))
+        .filter(record -> record.type() == LedgerRecordType.CHILD_SPAWN
+            || record.type() == LedgerRecordType.CHILD_START
+            || record.type() == LedgerRecordType.STOP_INTENT
+            || record.type() == LedgerRecordType.CHILD_SURVIVED)
+        .filter(record -> record.type() != LedgerRecordType.CHILD_SURVIVED
+            || record.equals(open.get(record.text("childId").orElseThrow()).survived))
+        .distinct().toList();
+    Map<String, Integer> intentCounts = new LinkedHashMap<>();
+    var retainedIntents = new java.util.HashSet<LedgerRecord>();
+    for (int i = receipts.size() - 1; i >= 0; i--) {
+      LedgerRecord receipt = receipts.get(i);
+      if (receipt.type() == LedgerRecordType.STOP_INTENT
+          && intentCounts.merge(receipt.text("childId").orElseThrow(), 1, Integer::sum) <= 4) {
+        retainedIntents.add(receipt);
+      }
+    }
+    return receipts.stream().filter(record -> record.type() != LedgerRecordType.STOP_INTENT
+        || retainedIntents.contains(record)).toList();
+  }
+
+  /** Recover ledger-only starts before registration, including survivors carried across rotation. */
+  public static List<ManagedChild> predecessorChildren(Path dataDir) throws IOException {
+    List<ManagedChild> result = new ArrayList<>();
+    for (Open child : openChildren(ExitLedgerReader.read(
+        LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN).records()).values()) {
+      if (child.closed || child.start == null || child.spawn == null) continue;
+      String kind = child.spawn.text("kind").orElse("");
+      if (!kind.equals("EXTRACTION") && !kind.equals("LLAMA_SERVER")
+          && !kind.equals("LLAMA_SELF_TEST")) continue;
+      var start = child.start.text("processStartedAt").flatMap(LedgerTimestamps::known);
+      String executable = child.start.text("executable").orElse("");
+      long childPid = child.start.field("pid").asLong(0);
+      if (childPid <= 0 || start.isEmpty() || executable.isBlank()) continue;
+      Path executablePath;
+      try {
+        executablePath = Path.of(executable);
+      } catch (java.nio.file.InvalidPathException invalid) {
+        continue; // An invalid ledger path never grants process ownership.
+      }
+      if (!executablePath.isAbsolute()) continue;
+      result.add(new ManagedChild("ledger-" + child.childId,
+          kind.equals("EXTRACTION") ? ManagedChild.Kind.EXTRACTION : ManagedChild.Kind.LLAMA_SERVER,
+          childPid, start.get().toString(), ManagedChild.normalizePath(executablePath),
+          null, null, null, child.start.text("argvHash").orElse(null),
+          LinuxProcessIdentity.fromJson(child.start.field("processIdentity")).orElse(null)));
+    }
+    return List.copyOf(result);
   }
 
   /** A successor owns receipts its crashed predecessor could no longer write. */
@@ -307,6 +366,7 @@ public final class LedgerReconciler {
     LedgerRecord spawn;
     LedgerRecord start;
     LedgerRecord intent;
+    LedgerRecord survived;
     boolean closed;
 
     Open(String childId) {

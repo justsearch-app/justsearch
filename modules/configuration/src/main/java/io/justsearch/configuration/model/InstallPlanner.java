@@ -45,7 +45,7 @@ public final class InstallPlanner {
         || registry.packages().stream().noneMatch(pkg -> pkg.tier() == CapabilityTier.RUNTIME
             && pkg.requiresCuda())
         || registry.packages().stream().anyMatch(pkg -> !pkg.devOnly()
-            && pkg.tier() == CapabilityTier.RUNTIME && pkg.requiresCuda()
+            && pkg.tier() == CapabilityTier.RUNTIME && pkg.requiresCuda() && !pkg.hasUnpublishedArtifacts()
             && (pkg.nativeTarget() == null || target.targetId().equals(pkg.nativeTarget())));
     return cudaSupplied ? detected
         : new HardwareProfile(detected.gpuDetected(), false, detected.vramBytes());
@@ -539,6 +539,9 @@ public final class InstallPlanner {
       return "Runtime artifacts target " + pkg.nativeTarget()
           + "; configure an external runtime for " + target + ".";
     }
+    if (pkg.tier() == CapabilityTier.RUNTIME && pkg.hasUnpublishedArtifacts()) {
+      return pkg.label() + " is unavailable: Linux GPU packs have not been published yet.";
+    }
     // ONNX search can run without llama-server. A chat model cannot use a runtime package
     // whose native artifacts belong to another platform, even though the GGUF is portable.
     if (registry != null
@@ -546,7 +549,8 @@ public final class InstallPlanner {
       for (String id : pkg.dependsOn()) {
         ModelPackage runtime = registry.findPackage(id);
         if (runtime != null && runtime.tier() == CapabilityTier.RUNTIME
-            && runtime.nativeTarget() != null && !runtime.nativeTarget().equals(target)) {
+            && (runtime.hasUnpublishedArtifacts()
+                || (runtime.nativeTarget() != null && !runtime.nativeTarget().equals(target)))) {
           return pkg.label() + " is unavailable: its runtime is not supplied for " + target + ".";
         }
       }

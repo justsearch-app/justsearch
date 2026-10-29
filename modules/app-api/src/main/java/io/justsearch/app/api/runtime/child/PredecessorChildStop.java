@@ -55,7 +55,7 @@ final class PredecessorChildStop {
       records = List.of(); // ledger failure degrades accounting; it does not disable cleanup
     }
     List<LedgerRecord> matches = new ArrayList<>();
-    for (LedgerRecord r : records) {
+    for (LedgerRecord r : records.stream().distinct().toList()) {
       if (r.type() != LedgerRecordType.CHILD_START || r.field("pid").asLong() != child.pid()) continue;
       if (!child.executable().equals(ManagedChild.normalizePath(
           Path.of(r.text("executable").orElse(""))))) continue;

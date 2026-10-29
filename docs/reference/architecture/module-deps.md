@@ -83,13 +83,14 @@ These edges exist only in test suites and should not be treated as production la
 - `:modules:app-agent` has test dependencies on `:modules:app-observability`
 - `:modules:app-api-tck` has test dependencies on `:modules:ai-backend`
 - `:modules:app-engine` has test dependencies on `:modules:app-agent`, `:modules:indexing`
-- `:modules:app-launcher` has test dependencies on `:modules:gpu-bridge`
+- `:modules:app-launcher` has test dependencies on `:modules:core`, `:modules:gpu-bridge`
+- `:modules:app-observability` has test dependencies on `:modules:core`
 - `:modules:app-services` has test dependencies on `:modules:app-engine`
-- `:modules:indexer-worker` has test dependencies on `:modules:app-services`
+- `:modules:indexer-worker` has test dependencies on `:modules:app-services`, `:modules:core`
 - `:modules:indexing` has test dependencies on `:modules:adapters-lucene`
-- `:modules:system-tests` has test dependencies on `:modules:app-services`, `:modules:indexer-worker`, `:modules:worker-services`
+- `:modules:system-tests` has test dependencies on `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-engine`, `:modules:app-services`, `:modules:configuration`, `:modules:core`, `:modules:gpu-bridge`, `:modules:indexer-worker`, `:modules:indexing`, `:modules:ort-common`, `:modules:reranker`, `:modules:ui`, `:modules:worker-services`
 - `:modules:ui` has test dependencies on `:modules:indexer-worker`, `:modules:indexing`, `:modules:worker-services`
-- `:modules:worker-services` has test dependencies on `:modules:ai-backend`
+- `:modules:worker-services` has test dependencies on `:modules:ai-backend`, `:modules:core`
 - `:modules:dead-code-audit` uses `testImplementation` on every module in its `auditedModules` list (most production modules).
 
 ### A3. Build dependency graph (production)

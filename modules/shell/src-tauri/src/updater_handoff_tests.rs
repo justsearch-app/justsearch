@@ -372,7 +372,7 @@ async fn coordinator_reconciles_real_registered_child_before_installer_launch() 
     let (child, identity) = crate::tests::owned_sleep_child();
     *fixture.registered_child.lock().unwrap() = Some(child);
     fs::create_dir_all(fixture.root.path().join("runtime")).unwrap();
-    let manifest = serde_json::json!({"schemaVersion": 2, "children": [{
+    let manifest = serde_json::json!({"schemaVersion": 2, "pid": fixture.host.child_pid().unwrap(), "children": [{
         "pid": identity.pid, "startedAt": identity.started_at, "executable": identity.executable
     }]});
     fs::write(

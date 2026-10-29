@@ -86,7 +86,7 @@
         "ort-cuda": "ai/onnxruntime/native/linux-x64/libonnxruntime_providers_cuda.so"
       },
       "capabilities": {
-        "runtimePacks": false,
+        "runtimePacks": true,
         "cpuBaselineRuntime": false
       },
       "paths": {

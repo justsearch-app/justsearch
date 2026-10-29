@@ -44,8 +44,20 @@ import org.slf4j.bridge.SLF4JBridgeHandler;
  */
 public class HeadlessApp {
   static {
-    // All Engine tokenizer paths must start without DJL's EC2 telemetry or automatic CUDA
-    // native-library download. Offline mode uses the bundled CPU tokenizer library.
+    // Tokenization is CPU work. Select DJL's bundled native flavour before any tokenizer loads,
+    // independently of offline mode or CUDA discovery, so it cannot pull a system CUDA runtime.
+    String flavor = SystemAccess.rawEnvVar("RUST_FLAVOR");
+    if ((flavor != null && !flavor.equals("cpu"))
+        || SystemAccess.rawEnvVar("RUST_LIBRARY_PATH") != null
+        || SystemAccess.rawSysProp("RUST_LIBRARY_PATH") != null) {
+      throw new IllegalStateException(
+          "Tokenizers require bundled CPU natives: remove RUST_LIBRARY_PATH and use RUST_FLAVOR=cpu");
+    }
+    SystemAccess.setSysProp("RUST_FLAVOR", "cpu");
+    // DJL still probes CUDA before choosing a flavour. Keep that probe's libcudart out of this
+    // JVM too; DJL runs its short-lived discovery helper and waits for its result.
+    SystemAccess.setSysProp("ai.djl.util.cuda.fork", "true");
+    // All Engine tokenizer paths must start without DJL's EC2 telemetry or automatic downloads.
     // DJL gives environment overrides precedence; preserve explicit system properties too.
     for (String key : new String[] {"OPT_OUT_TRACKING", "ai.djl.offline"}) {
       if (SystemAccess.rawSysProp(key) == null) {
@@ -2797,8 +2809,7 @@ public class HeadlessApp {
    * </ol>
    */
   static Path maybeAutoSelectCuda12Variant(UiSettings settings, ConfigStore activeConfigStore) {
-    // cuda12 is the packaged Windows backend. Linux uses the validated operator runtime.
-    if (!PlatformPaths.isWindows()) return null;
+    if (!io.justsearch.configuration.NativeTargets.current().supportsRuntimePacks()) return null;
     try {
       // Check if GPU acceleration is requested
       int gpuLayers = settings.getGpuLayers();
@@ -2816,6 +2827,13 @@ public class HeadlessApp {
       if (source != null && source.isResolved() && source.sourceOrdinal() >= 300) {
         log.info("GPU auto-selection: SKIPPED (explicit server source={})", source.sourceName());
         return null;
+      }
+
+      if (!io.justsearch.configuration.NativeTargets.current().hasCpuBaselineRuntime()) {
+        Path downloaded = PlatformPaths.resolveDataDir()
+            .resolve("native-bin/llama-server/variants/cuda12")
+            .resolve(io.justsearch.configuration.NativeTargets.current().executableName("llama-server"));
+        return Files.isRegularFile(downloaded) && Files.isExecutable(downloaded) ? downloaded : null;
       }
 
       // Find the current/default server executable

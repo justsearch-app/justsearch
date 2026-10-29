@@ -174,7 +174,8 @@ impl Actuator for ShellActuator {
     }
     fn spawn_engine(&mut self) -> Result<u32, String> {
         let _ = std::fs::remove_file(self.request_path());
-        let _ = std::fs::remove_file(self.data_dir.join("runtime").join("manifest.json"));
+        // The successor reads crash ownership and planned handoff evidence under app.lock.
+        // Keep it through spawn; admission checks the spawned child's supervised incarnation.
         let pid = (self.spawn)()?;
         self.n = self.host.incarnation_number();
         self.pid = Some(pid);

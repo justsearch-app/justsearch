@@ -36,6 +36,11 @@ public final class RuntimeRestoreUtil {
     if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
       ConfigStore store = ConfigStore.globalOrNull();
       Path external = store == null ? null : store.get().ai().serverExe();
+      if (external == null && NativeTargets.current().supportsRuntimePacks()) {
+        external = homeDir.resolve("native-bin/llama-server/variants/cuda12")
+            .resolve(NativeTargets.current().executableName("llama-server"));
+        if (!Files.isRegularFile(external)) return false;
+      }
       if (external == null) return false;
       if (!Files.isRegularFile(external) || !Files.isExecutable(external)) {
         throw new IllegalStateException("JUSTSEARCH_SERVER_EXE must name a regular executable file: " + external);

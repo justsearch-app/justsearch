@@ -4,6 +4,34 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { parseProjectDependencies, parseSettings } from './module-deps.mjs';
+
+test('pure parsers include runtime, test fixtures and add configuration forms', () => {
+  assert.deepEqual(parseSettings('// include(":modules:ignored")\nval example = """include(":modules:string")"""\ninclude(":modules:one")\ninclude(":modules:two", ":reports")'),
+    [':modules:one', ':modules:two', ':reports']);
+  const deps = parseProjectDependencies(`
+dependencies {
+  api(project(":modules:core"))
+  runtimeOnly(project(":modules:runtime"))
+  testImplementation(testFixtures(project(":modules:fixture")))
+  testFixturesApi(project(":modules:fixture-api"))
+  add("integrationTestRuntimeOnly", project(":modules:ui"))
+  add("integrationTestImplementation", testFixtures(project(":modules:core")))
+  add("runtimeOnly", /* comment */ project(":modules:added-runtime"))
+  add(customRuntime.name, project(":modules:custom-runtime"))
+  // add("runtimeOnly", project(":modules:comment"))
+  val example = """implementation(project(":modules:string"))"""
+}
+buildscript { dependencies { add("runtimeOnly", project(":modules:build-tool")) } }
+testing { suites { val integrationTest by registering(JvmTestSuite::class) { dependencies {
+  implementation(testFixtures(project(":modules:suite-fixture")))
+  runtimeOnly(project(":modules:suite-runtime"))
+} } } }
+`);
+  assert.deepEqual([...deps.production].sort(), ['added-runtime', 'core', 'runtime']);
+  assert.deepEqual([...deps.test].sort(), ['core', 'fixture', 'fixture-api', 'suite-fixture', 'suite-runtime', 'ui']);
+  assert.deepEqual([...deps.all].sort(), ['added-runtime', 'core', 'custom-runtime', 'fixture', 'fixture-api', 'runtime', 'suite-fixture', 'suite-runtime', 'ui']);
+});
 
 test('only main dependencies are production; suite dependencies stay test-only', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'module-deps-'));

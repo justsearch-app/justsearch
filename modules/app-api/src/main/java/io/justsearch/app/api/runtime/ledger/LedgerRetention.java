@@ -50,6 +50,19 @@ final class LedgerRetention {
 
   static void rotate(Path current, Path rotated, long bound) throws IOException {
     List<Path> before = files(current);
+    Path carried = null;
+    if (current.getFileName().toString().equals(LedgerFamily.CHILDREN.currentFileName())) {
+      var records = io.justsearch.app.api.runtime.child.LedgerReconciler.openChildRecords(
+          ExitLedgerReader.read(current.getParent(), LedgerFamily.CHILDREN).records());
+      carried = current.resolveSibling(current.getFileName() + ".pending");
+      StringBuilder lines = new StringBuilder();
+      for (LedgerRecord record : records) {
+        lines.append(JSON.writeValueAsString(record.line())).append('\n');
+      }
+      Files.writeString(carried, lines, StandardCharsets.UTF_8);
+      try (var channel = java.nio.channels.FileChannel.open(carried,
+          java.nio.file.StandardOpenOption.WRITE)) { channel.force(true); }
+    }
     if (Files.exists(rotated)) {
       long next = before.stream().filter(p -> p.toString().matches(".*\\.[0-9]+\\.jsonl"))
           .mapToLong(LedgerRetention::generation).max().orElse(1) + 1;
@@ -57,7 +70,11 @@ final class LedgerRetention {
           .replace(".1.jsonl", "." + next + ".jsonl")));
     }
     Files.move(current, rotated);
-    List<Path> candidates = files(current).stream().filter(p -> !p.equals(lossPath(current))).toList();
+    // Publish the original open receipts before retention can evict their old generations.
+    // If killed before publication, no eviction has run and readers still see those archives.
+    if (carried != null) Files.move(carried, current, StandardCopyOption.REPLACE_EXISTING);
+    List<Path> candidates = files(current).stream()
+        .filter(p -> !p.equals(lossPath(current)) && !p.equals(current)).toList();
     long size = 0;
     for (Path file : candidates) size += Files.size(file);
     for (Path file : candidates) {

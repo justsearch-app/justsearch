@@ -31,6 +31,16 @@ public final class RerankerDeadlineBench {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   public static void main(String[] args) throws Exception {
+    // This standalone tokenizer JVM needs the same bundled CPU native flavour as the Engine.
+    String flavor = io.justsearch.configuration.SystemAccess.rawEnvVar("RUST_FLAVOR");
+    if ((flavor != null && !flavor.equals("cpu"))
+        || io.justsearch.configuration.SystemAccess.rawEnvVar("RUST_LIBRARY_PATH") != null
+        || io.justsearch.configuration.SystemAccess.rawSysProp("RUST_LIBRARY_PATH") != null) {
+      throw new IllegalStateException(
+          "Tokenizers require bundled CPU natives: remove RUST_LIBRARY_PATH and use RUST_FLAVOR=cpu");
+    }
+    io.justsearch.configuration.SystemAccess.setSysProp("RUST_FLAVOR", "cpu");
+    io.justsearch.configuration.SystemAccess.setSysProp("ai.djl.util.cuda.fork", "true");
     String outDir = "tmp/bench/reranker";
     String modelDir = "models/reranker/ms-marco-MiniLM-L6-v2";
     int maxSeqLen = 512; // BERT/MiniLM max sequence length (model architecture limit)

@@ -1,0 +1,310 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8ee2b1c48fbaa4138734be96a505230c2752d3450ae878330a84167494cba0b2"
+  },
+  "createdAt": "2026-10-29T15:59:11.105Z",
+  "revision": "7fb20ec60549eee4b8b85876b26e0b86ab91dfe9",
+  "tree": "4afe7604bd9ac594a85892e93e2e7669a5688936",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot -w 5400 ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.LinuxGpuInstallTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeNativeResolutionTest.linuxDownloadedPackIsUsedForExplicitAndDefaultActivation\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeNativeResolutionTest.linuxNeverDiscoversAnUnconfiguredFlatCpuFallback\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeLinuxDeactivationTest.noFallbackDisablesChatAndRetainsRuntimeAndGpuSettings\" --tests \"io.justsearch.app.services.ai.install.LinuxSearchOnlyInstallTest.laterLinuxCudaRuntimePackageCanSupplyTheRuntime\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 31286
+    },
+    {
+      "command": "js-gradle-slot -w 5400 ./gradlew :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppServerAutoSelectionTest.linuxRestartFindsDownloadedRuntimeAndRespectsOperatorSelection\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 43365
+    },
+    {
+      "command": "js-gradle-slot -w 5400 ./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.model.NativeRuntimePlannerTest.shippedLinuxRegistryUsesCpuModelsAndOmitsForeignRuntime\" --tests \"io.justsearch.configuration.model.LinuxGpuPlanTest\" --tests \"io.justsearch.configuration.model.ModelRegistryLoaderTest\" --tests \"io.justsearch.configuration.model.WindowsPlanGoldenTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 36314
+    },
+    {
+      "command": "js-gradle-slot -w 5400 ./gradlew :modules:ort-common:test --tests \"io.justsearch.ort.OrtCudaHelperTest.linuxJitLinkIsPreloadedBeforeSparseAndSolver\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 36398
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxGpuInstallTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxGpuInstallTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:28bd7995a9b257e533da3e9696e6f3a999a3ebf58ddad38824b353283725dd5c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linuxGpuRequiresDriver570OrNewer()",
+          "status": "passed"
+        },
+        {
+          "name": "downloadedRuntimeIsRestoredInPlaceAndRepairUsesIt()",
+          "status": "passed"
+        },
+        {
+          "name": "missingDownloadedExecutableDoesNotBlockPlannedPackRepair()",
+          "status": "passed"
+        },
+        {
+          "name": "postInstallSelectsDownloadedExecutableThroughSettingsOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "existingInstallContractAndActivationSettingsRoundTripWithoutMigration()",
+          "status": "passed"
+        },
+        {
+          "name": "linuxRuntimeAcquisitionDoesNotMutateRestartRequiredNativePath()",
+          "status": "passed"
+        },
+        {
+          "name": "coreStageWaitsForChatModelBeforeCommittingDownloadedExecutable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java#linuxDownloadedPackIsUsedForExplicitAndDefaultActivation",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4c81d0738050bbaf20eb02b358297444596b69f59fc33370440ca1a946e8212b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linuxDownloadedPackIsUsedForExplicitAndDefaultActivation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java#linuxNeverDiscoversAnUnconfiguredFlatCpuFallback",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4c81d0738050bbaf20eb02b358297444596b69f59fc33370440ca1a946e8212b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linuxNeverDiscoversAnUnconfiguredFlatCpuFallback()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeLinuxDeactivationTest.java#noFallbackDisablesChatAndRetainsRuntimeAndGpuSettings",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeLinuxDeactivationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fdf51ca07c25c38d470036210f470f9a5dff4917296e55c5552d04c13ad6ec99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "noFallbackDisablesChatAndRetainsRuntimeAndGpuSettings()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppServerAutoSelectionTest.java#linuxRestartFindsDownloadedRuntimeAndRespectsOperatorSelection",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppServerAutoSelectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b7b60eb1e1d6a2a31f077d213cd31788342f0bf267c20e49fe7cc816a4bbf0be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linuxRestartFindsDownloadedRuntimeAndRespectsOperatorSelection()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxSearchOnlyInstallTest.java#laterLinuxCudaRuntimePackageCanSupplyTheRuntime",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxSearchOnlyInstallTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9bb84389d6b77f1439b598dcd10d6e1ae007447eb90ff209b00c011ad4f887d8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "laterLinuxCudaRuntimePackageCanSupplyTheRuntime()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/model/NativeRuntimePlannerTest.java#shippedLinuxRegistryUsesCpuModelsAndOmitsForeignRuntime",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/model/NativeRuntimePlannerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eef7b118ba1dd04bc718409fc01cf261dff604ddd8a96a06fe0b6a9f73ecf1f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shippedLinuxRegistryUsesCpuModelsAndOmitsForeignRuntime()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/model/LinuxGpuPlanTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/model/LinuxGpuPlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c37520dce02eae1e4f7b9ba78e286bc29779c6ed42f176eec0b1e692608deb3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "publishedLinuxRuntimeEnablesGpuAndPreviewMatchesEveryPlanGate()",
+          "status": "passed"
+        },
+        {
+          "name": "unpublishedLinuxRuntimeKeepsCpuSearchAndChatUnavailable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/model/ModelRegistryLoaderTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/model/ModelRegistryLoaderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc8d8cea2f6ed4aebfafb202d8d2e2e1dd226c761fa6c2d9a9694e28994b30bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyDownloadUrlResolvesFromPublicHost()",
+          "status": "passed"
+        },
+        {
+          "name": "spladePackageHasCorrectVariants()",
+          "status": "passed"
+        },
+        {
+          "name": "absentOrUnrecognizedNecessity_defaultsToRequired(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "registryContainsExpectedPackages()",
+          "status": "passed"
+        },
+        {
+          "name": "everyPackageNeedingTheCudaRuntimeDeclaresTheDependency()",
+          "status": "passed"
+        },
+        {
+          "name": "loadsV2RegistryFromClasspath()",
+          "status": "passed"
+        },
+        {
+          "name": "chatCompactPackageHasOneVariantAndItsOwnMmproj()",
+          "status": "passed"
+        },
+        {
+          "name": "cudaRuntimeDeclaresRequiresCuda_othersDefaultFalse()",
+          "status": "passed"
+        },
+        {
+          "name": "everyPackageDeclaresALicense()",
+          "status": "passed"
+        },
+        {
+          "name": "nerPackageUsesInt8ForCpu()",
+          "status": "passed"
+        },
+        {
+          "name": "chatPackageHasMmprojAsSupportingFile()",
+          "status": "passed"
+        },
+        {
+          "name": "cudaRuntimeShipsRelocatedOrtNativePack()",
+          "status": "passed"
+        },
+        {
+          "name": "chatPackageHasVramRequirement()",
+          "status": "passed"
+        },
+        {
+          "name": "everyPackageDeclaresItsNecessity()",
+          "status": "passed"
+        },
+        {
+          "name": "embeddingPackageHasBothVariants()",
+          "status": "passed"
+        },
+        {
+          "name": "everyPackageDeclaresATier()",
+          "status": "passed"
+        },
+        {
+          "name": "citationScorerIsCpuOnly_fallsBackForGpuProfiles()",
+          "status": "passed"
+        },
+        {
+          "name": "chatCompactIsDevOnly_othersDefaultFalse()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/model/WindowsPlanGoldenTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/model/WindowsPlanGoldenTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:76e8c7582a50a31c62e02c4a54f720a9b71e0878d1ab79b854d1894c8c6cbd9b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyWindowsPlanRetainsBaselineBytes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/OrtCudaHelperTest.java#linuxJitLinkIsPreloadedBeforeSparseAndSolver",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/OrtCudaHelperTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c1ed76a2749dfcd0f87d08237176a1cd3c95969069dfd3a34c7de44f2ea12598",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linuxJitLinkIsPreloadedBeforeSparseAndSolver()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ac7812e6d818ae6b31fd1cf66094cbedaf46b857e910b59e4a65cd8df9e5bba6"
+}

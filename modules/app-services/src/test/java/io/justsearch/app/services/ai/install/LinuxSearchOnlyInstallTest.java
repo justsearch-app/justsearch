@@ -160,18 +160,13 @@ final class LinuxSearchOnlyInstallTest {
     NativeTargets linux = NativeTargets.forTarget("linux-x86_64");
     try (var target = mockStatic(NativeTargets.class, CALLS_REAL_METHODS)) {
       target.when(NativeTargets::current).thenReturn(linux);
-      var runtime = new ModelPackage("cuda-runtime", "Linux runtime", "Fixture", "cuda", List.of(),
-          List.of(new SupportingFile("runtime.zip", "abc", 10, "https://example.invalid/runtime.zip", true)),
-          0, null, "native-bin", null, CapabilityTier.RUNTIME, true, false,
-          Necessity.INFRASTRUCTURE, List.of(), "linux-x86_64");
-      var chat = ModelRegistryLoader.loadFromClasspath("ai/model-registry.v2.json").findPackage("chat");
-      var registry = new ModelRegistry(2, "future runtime fixture", List.of(runtime, chat));
+      var registry = ModelRegistryLoader.loadFromClasspath("ai/linux-gpu-registry.fixture.json");
       var hardware = HardwareProfile.gpuFull(12_000_000_000L);
       var plan = InstallPlanner.plan(registry, hardware, home.resolve("models"), home);
       assertTrue(plan.downloads().stream().anyMatch(d -> d.packageId().equals("chat")));
       assertTrue(AiInstallService.runtimePreconditionMet(false, plan, registry));
       var installed = new InstallPlan(DownloadProfile.GPU_FULL, List.of(), List.of(), 0,
-          List.of("cuda-runtime"));
+          List.of("cuda-runtime-linux"));
       assertTrue(AiInstallService.runtimePreconditionMet(false, installed, registry));
     }
   }
