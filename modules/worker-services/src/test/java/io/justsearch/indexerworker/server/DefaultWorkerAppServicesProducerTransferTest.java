@@ -95,13 +95,15 @@ final class DefaultWorkerAppServicesProducerTransferTest {
 
   @ParameterizedTest(name = "{displayName} [{index}]")
   @CsvSource({"false,false", "false,true", "true,false", "true,true"})
-  void healthyCpuRerankerStaysActiveAfterGpuReleaseOrFailure(
+  void cpuRerankerBecomesActiveAfterDeferredFallbackSearch(
       boolean reload, boolean failed, @TempDir Path temp) throws Exception {
     var gpuAllowed = new AtomicBoolean(true);
     try (Fixture fixture = rerankerFixture(temp);
         var sessions = rerankerSessions(temp, true, gpuAllowed::get);
         var reranker = reranker(sessions)) {
       if (failed) {
+        // ort-common has no reusable GPU failure-injection fixture. Inject the failed state
+        // without creating a GPU session or accessing hardware, as its own handle tests do.
         setSessionField(sessions, "gpuSessionAttempted", true);
         setSessionField(sessions, "gpuAvailable", false);
         setSessionField(sessions, "ortCudaStatus",
@@ -112,9 +114,18 @@ final class DefaultWorkerAppServicesProducerTransferTest {
       }
       var services = rerankerServices(fixture, reranker, reload);
       try {
-        assertTrue(sessions.isQueryWarm(), "the real CPU session is ready after GPU handoff/failure");
+        // Production defers the CPU backup when GPU memory is reserved. Current behaviour:
+        // releasing/failing the GPU alone leaves the reranker inactive until a search creates it.
+        assertFalse(sessions.isQueryWarm(), "the deferred CPU session does not exist yet");
+        assertFalse(rerankerActive(services), "a missing CPU session is currently inactive");
         var cuda = services.searchService().getOrtCudaStatus();
         assertFalse(cuda.available());
+        var response = services.searchService().rerank(RerankRequest.newBuilder()
+            .setQuery("question").addDocumentTexts("document").setDeadlineMs(30_000).build(),
+            io.justsearch.indexerworker.services.CallContext.none());
+        assertFalse(response.getSkipped(), response.getSkipReason());
+        assertEquals(List.of(1.0f), response.getScoresList());
+        assertTrue(sessions.isQueryWarm(), "the search created a healthy CPU session");
         assertTrue(rerankerActive(services), "GPU availability must not hide a healthy CPU session");
         assertEquals(cuda, services.searchService().getOrtCudaStatus(), "health must not mutate diagnostics");
       } finally {
@@ -127,7 +138,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
   @ValueSource(booleans = {false, true})
   void warmGpuRerankerIsActive(boolean reload, @TempDir Path temp) throws Exception {
     try (Fixture fixture = rerankerFixture(temp)) {
-      // GPU readiness is simulated; this check never creates a GPU session or touches a GPU.
+      // Wiring-level check with a mocked reranker; no real GPU readiness or hardware is tested.
       var reranker = mock(CrossEncoderReranker.class);
       when(reranker.isQueryWarm()).thenReturn(true);
       when(reranker.getOrtCudaStatus()).thenReturn(OrtCudaStatus.ready("test", temp));
@@ -199,7 +210,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
         "CAk6nQEKJAoJaW5wdXRfaWRzEgZsb2dpdHMiBENhc3QqCQoCdG8YAaABAhINdGlueS1yZXJhbmtlclogCglpbnB1dF9pZHMSEwoRCAcSDQoHEgViYXRjaAoCCAFaJQoOYXR0ZW50aW9uX21hc2sSEwoRCAcSDQoHEgViYXRjaAoCCAFiHQoGbG9naXRzEhMKEQgBEg0KBxIFYmF0Y2gKAggBQgIQEQ=="));
     var policy = ModelSessionPolicy.forFallback(
         gpuConfigured ? new GpuSessionConfig(0, 1024 * 1024) : null,
-        null, false, false, 60_000L);
+        null, gpuConfigured, gpuConfigured, 60_000L);
     return (NativeSessionHandle) OrtSessionAssembler.buildManager("reranker",
         new Composition(RuntimePolicy.defaults(), policy, new ModelArtifacts(model, model)),
         gpuAllowed::getAsBoolean);

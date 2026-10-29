@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:f0a99efd7db65d966ac470b847948194b3983f80a880262fc9c9035e98c3ca89"
   },
-  "createdAt": "2026-10-29T07:40:48.190Z",
-  "revision": "e9d569f1b09a0e1514485aa845d232d1028bcbc5",
-  "tree": "3785e01ee3fb620f7c34b24d24096a2fed6de32d",
+  "createdAt": "2026-10-29T08:08:43.411Z",
+  "revision": "7d120d858374c34449e9e0f643ef90ef57529bd5",
+  "tree": "95e0c3a130b524648cc5785faf829145b54c1509",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.warmGpuRerankerIsActive\" --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.unbuiltRerankerIsInactive\" --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.retiredOrFailedCpuRerankerIsInactive\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 279966
+      "durationMs": 4851
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#warmGpuRerankerIsActive",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a953ab3e42306bf25980e79c3ca45ba5dff63f9239d888b0219811e77162163a",
+      "contentDigest": "sha256:a425e100b8ee6b37af66342896f1372e540a503b8570e17f514758149b9a7db7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -48,7 +48,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#unbuiltRerankerIsInactive",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a953ab3e42306bf25980e79c3ca45ba5dff63f9239d888b0219811e77162163a",
+      "contentDigest": "sha256:a425e100b8ee6b37af66342896f1372e540a503b8570e17f514758149b9a7db7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -67,7 +67,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#retiredOrFailedCpuRerankerIsInactive",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a953ab3e42306bf25980e79c3ca45ba5dff63f9239d888b0219811e77162163a",
+      "contentDigest": "sha256:a425e100b8ee6b37af66342896f1372e540a503b8570e17f514758149b9a7db7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -92,5 +92,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:39e1ebe7a0c8d67c486d9feb891ab94a35d963f8baeef9350f89bfeae519e404"
+  "digest": "sha256:cf90e5a25be7e0455cbdecaefc959818c9740e87ff8d823f743ca09de46f4e5d"
 }
