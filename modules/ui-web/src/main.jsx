@@ -344,16 +344,28 @@ async function bootstrap() {
     const { clearFilters } = await import('./shell-v0/state/searchFiltersState.ts')
     const { resetSearchState } = await import('./shell-v0/state/searchState.ts')
     const { resetInspectorState } = await import('./shell-v0/state/inspectorState.ts')
-    subscribeProfileSwitch(() => {
-      try { rebindUserKeybindings() } catch (e) {
-        appLog.error('Keybinding rebind on profile switch failed', { error: e instanceof Error ? e.message : String(e) })
+    const { subscribeProfiles, getActiveProfileId: getWorkspaceProfileId } = await import('./shell-v0/substrates/profiles/index.ts')
+    // These stores outlive detached Search views. Reset generations before notifying filter readers.
+    const resetProfileSearch = () => {
+      try { resetSearchState() } catch (e) {
+        appLog.error('Search state reset on profile switch failed', { error: e instanceof Error ? e.message : String(e) })
       }
       try { clearFilters() } catch (e) {
         appLog.error('Search filter clear on profile switch failed', { error: e instanceof Error ? e.message : String(e) })
       }
-      try { resetSearchState() } catch (e) {
-        appLog.error('Search state reset on profile switch failed', { error: e instanceof Error ? e.message : String(e) })
+    }
+    let workspaceProfile = getWorkspaceProfileId()
+    subscribeProfiles(() => {
+      const next = getWorkspaceProfileId()
+      if (next === workspaceProfile) return
+      workspaceProfile = next
+      resetProfileSearch()
+    })
+    subscribeProfileSwitch(() => {
+      try { rebindUserKeybindings() } catch (e) {
+        appLog.error('Keybinding rebind on profile switch failed', { error: e instanceof Error ? e.message : String(e) })
       }
+      resetProfileSearch()
       try { resetInspectorState() } catch (e) {
         appLog.error('Inspector reset on profile switch failed', { error: e instanceof Error ? e.message : String(e) })
       }

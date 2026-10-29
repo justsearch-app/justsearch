@@ -152,7 +152,7 @@ export function run(repoRoot, now) {
 
   const detail = missing.map((m) => `      - ${m}`).join('\n');
   warnings.push(
-    `The Search v3 promotion is incomplete (today ${now}):\n${detail}\n`
+    `The Search window promotion is incomplete (today ${now}):\n${detail}\n`
       + '      This is report-only at every date; finishing the promotion is still pending'
       + ` (tempdoc 852). Owner decision ${OWNER_DECISION_DATE} (tempdoc 851) retired search-v2;`
       + ' restoring that window still fails this check.',
@@ -164,7 +164,9 @@ function main() {
   const { errors, warnings } = run(repoRootFromCwd(), resolveNow());
   for (const w of warnings) console.warn(`check-window-cutover: WARN\n  - ${w}`);
   if (errors.length === 0) {
-    console.log('check-window-cutover: OK');
+    console.log(warnings.length === 0
+      ? 'check-window-cutover: OK — cutover complete'
+      : 'check-window-cutover: OK — incomplete cutover is report-only');
     return;
   }
   console.error('check-window-cutover: FAIL');

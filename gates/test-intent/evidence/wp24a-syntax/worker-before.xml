@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Facet/matchCount parse is coupled to the retrieval leg's parse (tempdoc 821 §L.3 + §P)" tests="7" skipped="0" failures="1" errors="0" timestamp="2026-10-29T01:02:34.467Z" hostname="elias-systemproductname" time="1.95">
+  <properties/>
+  <testcase name="Malformed LUCENE on a DENSE-ONLY leg still signals — the counts parse it too" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="1.256"/>
+  <testcase name="No-facets multi-leg LUCENE request: computeMatchCount tallies the leg's parse" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.217"/>
+  <testcase name="LUCENE-syntax multi-leg request: leg honours LUCENE, facets + matchCount follow it" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.085"/>
+  <testcase name="SIMPLE-syntax multi-leg request is unchanged — and now diverges from the LUCENE one" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.1"/>
+  <testcase name="LUCENE quoted phrase retrieves phrase matches, not a token OR — counts follow" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.092"/>
+  <testcase name="Malformed LUCENE query: multi-leg mirrors the sparse shortcut's INVALID_ARGUMENT" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.087"/>
+  <testcase name="x5SearchSubsetKeepsResultsCountsAndFacetsLexicalOnBothPasses()" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.094">
+    <failure message="org.opentest4j.AssertionFailedError: expected: &lt;1&gt; but was: &lt;3&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: expected: &lt;1&gt; but was: &lt;3&gt;
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)
+	at io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest.x5SearchSubsetKeepsResultsCountsAndFacetsLexicalOnBothPasses(FacetQuerySyntaxCouplingTest.java:324)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  
+  
+</testsuite>

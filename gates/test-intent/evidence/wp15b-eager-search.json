@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
   },
-  "createdAt": "2026-10-28T17:09:39.779Z",
-  "revision": "edf31674779d432098809d29f711951d64110cf1",
-  "tree": "8156911f27460be10e8aba08884ddba8ade26131",
+  "createdAt": "2026-10-28T18:41:23.780Z",
+  "revision": "e5631395009169b150b2258d3bf7608cc1ff3952",
+  "tree": "69c03735e5e81f3c5a1e8fce9d25b3805abb75bc",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2915680-1793207377421.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3776711-1793212878034.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2356
+      "durationMs": 5745
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#registers eagerly as the landing window without a lazy loader",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0f439f3adb59237227d11df9a3cbb5bf05736b63d45a8e2f0a40b93c096267d4",
+      "contentDigest": "sha256:08bb36c49ec53ac0fbc95a45543e674cc8f60a655d14eec1d5cbd05b3d34bd23",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:ace30b1ad2e7369a2c8ddd6c23b3139f4fd34192087c59b0e1e0c6ffcd549104"
+  "digest": "sha256:045ca907ab6984e6b148bbc34bb7742c9141d41178e4a86f04d15128156f2bb9"
 }

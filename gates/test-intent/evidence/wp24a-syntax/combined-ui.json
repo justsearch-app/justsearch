@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-29T05:20:51.960Z",
+  "revision": "be35c1c0dd225aeae9286cc7910174375c32d89a",
+  "tree": "9778033925a80f995a4b77d4559dbd000dcf502c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/oyu1itmv/tmp/wp24a-merge-ui-v2/test-intent-vitest-553-1793251231895.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8019
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters syntax requests carry querySyntax and every active restriction and chip removal reruns syntax",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d64df853d3439e9b58e56ad50fdf5a4d32c6358219f1edb2992285a84e587c14",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XFilters syntax requests carry querySyntax and every active restriction and chip removal reruns syntax",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters syntax errors show the Engine syntax message and preserve active filters",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d64df853d3439e9b58e56ad50fdf5a4d32c6358219f1edb2992285a84e587c14",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XFilters syntax errors show the Engine syntax message and preserve active filters",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters changing a restriction during syntax Search drops the old response and delayed error body",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d64df853d3439e9b58e56ad50fdf5a4d32c6358219f1edb2992285a84e587c14",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XFilters changing a restriction during syntax Search drops the old response and delayed error body",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters restriction errors on syntax queries retain the Engine restriction message",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d64df853d3439e9b58e56ad50fdf5a4d32c6358219f1edb2992285a84e587c14",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XFilters restriction errors on syntax queries retain the Engine restriction message",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8363d7b9386b796c38bb7ef777df37a2c4ad1b2f",
+    "revision": "8363d7b9386b796c38bb7ef777df37a2c4ad1b2f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/oyu1itmv/tmp/wp24a-merge-ui-v2/test-intent-vitest-553-1793251243224.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8095,
+        "output": "JSON report written to /home/elias/.cache/am/oyu1itmv/tmp/wp24a-merge-ui-v2/test-intent-vitest-553-1793251243224.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters syntax requests carry querySyntax and every active restriction and chip removal reruns syntax",
+        "classification": "assertion",
+        "detail": "XFilters syntax requests carry querySyntax and every active restriction and chip removal reruns syntax:  AssertionError: expected { …(5) } to match object { …(3) }\n(5 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/oyu1itmv/tmp/wp24a-merge-ui-v2/before-root/test-intent-before-Y6Pdu2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters syntax errors show the Engine syntax message and preserve active filters",
+        "classification": "assertion",
+        "detail": "XFilters syntax errors show the Engine syntax message and preserve active filters:  AssertionError: expected undefined to be 'Close the quoted phrase with a matchi…' // Object.is equality\n    at /home/elias/.cache/am/oyu1itmv/tmp/wp24a-merge-ui-v2/before-root/test-intent-before-Y6Pdu2/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1696:56\n    at file://"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters changing a restriction during syntax Search drops the old response and delayed error body",
+        "classification": "assertion",
+        "detail": "XFilters changing a restriction during syntax Search drops the old response and delayed error body:  AssertionError: expected undefined to be 'search' // Object.is equality\n    at /home/elias/.cache/am/oyu1itmv/tmp/wp24a-merge-ui-v2/before-root/test-intent-before-Y6Pdu2/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1708:48\n    at file:///home/elias/.cache/am/oyu1itmv/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters restriction errors on syntax queries retain the Engine restriction message",
+        "classification": "assertion",
+        "detail": "XFilters restriction errors on syntax queries retain the Engine restriction message:  AssertionError: expected { query: 'title:budget', …(4) } to match object { query: 'title:budget', …(2) }\n(5 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/oyu1itmv/tmp/wp24a-merge-ui-v2/before-root/test-intent-before-Y6Pdu2/modules/ui-web/node_modules"
+      }
+    ]
+  },
+  "digest": "sha256:c5725f7ff7e9e5c3e60da93a527227ccbd6560a886bb5c06dd0331ae1dd4a0e6"
+}

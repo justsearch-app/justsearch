@@ -81,6 +81,8 @@ public final class LuceneRuntimeTypes {
     SIMPLE,
     /** Interpret user input as Lucene QueryParser syntax (phrases/boolean/field qualifiers). */
     LUCENE,
+    /** Search subset with document-wide required/prohibited clauses. */
+    SEARCH,
   }
 
   /**
@@ -111,7 +113,9 @@ public final class LuceneRuntimeTypes {
       Long metaPublishedToMs,
       List<String> docIds,
       // Tempdoc 585 §D Phase 4 (D4b) — scope to Lucene collection tag(s) (e.g. "agent-history").
-      List<String> collection)
+      List<String> collection,
+      Long sizeFromBytes,
+      Long sizeToBytes)
       implements LuceneRuntimeTypesRuntimeSearchFiltersBuilder.With {}
 
   // ==========================================================================

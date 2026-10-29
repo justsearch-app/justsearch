@@ -144,6 +144,13 @@ message SearchFilters {
   TimeRangeMs meta_published_at = 14 [json_name = "metaPublishedAt"];
   repeated string doc_ids = 15 [json_name = "docIds"];
   repeated string collection = 16;
+  ByteRange size_bytes = 17 [json_name = "sizeBytes"];
+}
+
+// Inclusive source-file byte range. Presence distinguishes unset from a real zero bound.
+message ByteRange {
+  optional int64 from_bytes = 1 [json_name = "fromBytes"];
+  optional int64 to_bytes = 2 [json_name = "toBytes"];
 }
 
 // A millisecond epoch range. Mirrors app-api KnowledgeSearchRequest.TimeRangeMs.

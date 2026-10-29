@@ -36,6 +36,10 @@ export interface Filters {
   mimeBase?: string[] | null;
   modifiedAt?: TimeRangeMsNullable;
   pathPrefix?: string | null;
+  sizeBytes?: {
+    fromBytes?: number | null;
+    toBytes?: number | null;
+  } | null;
 }
 export const filtersSchema = z.strictObject({
   "collection": z.array(z.string()).nullable().optional(),
@@ -54,6 +58,10 @@ export const filtersSchema = z.strictObject({
   "mimeBase": z.array(z.string()).nullable().optional(),
   "modifiedAt": timeRangeMsNullableSchema.optional(),
   "pathPrefix": z.string().nullable().optional(),
+  "sizeBytes": z.strictObject({
+    "fromBytes": z.number().int().nullable().optional(),
+    "toBytes": z.number().int().nullable().optional(),
+  }).nullable().optional(),
 });
 
 export interface MatchSpan {

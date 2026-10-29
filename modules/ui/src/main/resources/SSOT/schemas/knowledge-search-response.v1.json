@@ -87,6 +87,17 @@
         },
         "pathPrefix" : {
           "type" : [ "string", "null" ]
+        },
+        "sizeBytes" : {
+          "type" : [ "object", "null" ],
+          "properties" : {
+            "fromBytes" : {
+              "type" : [ "integer", "null" ]
+            },
+            "toBytes" : {
+              "type" : [ "integer", "null" ]
+            }
+          }
         }
       }
     },
