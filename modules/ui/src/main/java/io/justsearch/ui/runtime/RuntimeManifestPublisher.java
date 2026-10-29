@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
@@ -177,18 +178,26 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
       // HeadlessApp acquired app.lock before construction: a live owner cannot be displaced.
       // Keep the original bytes private, outside redacted instance history, with bounded retention.
       Path quarantine = runtimeDir.resolve("manifest.quarantine.json");
+      Path pending = runtimeDir.resolve("manifest.quarantine-" + UUID.randomUUID() + ".tmp");
       try {
-        OwnerOnlyFile.restrict(manifestPath);
+        byte[] evidence = Files.isSymbolicLink(manifestPath)
+            ? mapper.writeValueAsBytes(java.util.Map.of("symbolicLink", true,
+                "target", Files.readSymbolicLink(manifestPath).toString()))
+            : readManifestBytes(manifestPath);
         try {
-          Files.move(manifestPath, quarantine,
+          OwnerOnlyFile.createNew(pending);
+          Files.write(pending, evidence, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+          Files.move(pending, quarantine,
               StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException atomicFailed) {
-          Files.move(manifestPath, quarantine, StandardCopyOption.REPLACE_EXISTING);
+          Files.delete(manifestPath);
+          log.warn("{}; predecessor evidence moved to {}", invalid.getMessage(), quarantine);
+        } finally {
+          Files.deleteIfExists(pending);
         }
-      } catch (IOException failure) {
-        throw new UncheckedIOException("Cannot quarantine predecessor manifest", failure);
+      } catch (IOException | RuntimeException failure) {
+        log.warn("PREDECESSOR_MANIFEST_QUARANTINE_FAILED; {}; continuing startup",
+            invalid.getMessage(), failure);
       }
-      log.warn("{}; predecessor evidence moved to {}", invalid.getMessage(), quarantine);
       previous = new PreviousShutdown(true, previous.pid());
     }
     this.uncleanPreviousShutdown = previous.unclean();
@@ -219,10 +228,19 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     appendStartLog("publisher-constructed pid=" + pid + " startedAt=" + startedAt);
   }
 
+  private static byte[] readManifestBytes(Path path) throws IOException {
+    try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
+      return input.readAllBytes();
+    }
+  }
+
   private static List<ManagedChild> readPredecessorChildren(Path path, ObjectMapper mapper) {
     try {
-      if (!Files.isRegularFile(path)) return List.of();
-      JsonNode root = mapper.readTree(Files.readString(path));
+      if (Files.isSymbolicLink(path)) {
+        throw new IllegalStateException("PREDECESSOR_MANIFEST_SYMBOLIC_LINK");
+      }
+      if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) return List.of();
+      JsonNode root = mapper.readTree(readManifestBytes(path));
       if (root == null || !root.isObject()) {
         throw new IllegalStateException("PREDECESSOR_MANIFEST_MALFORMED: expected an object");
       }
@@ -303,10 +321,10 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
       long currentPid,
       LongFunction<OptionalLong> pidStartMillis) {
     try {
-      if (!Files.exists(manifestPath)) {
+      if (!Files.exists(manifestPath, LinkOption.NOFOLLOW_LINKS)) {
         return PreviousShutdown.clean();
       }
-      JsonNode root = mapper.readTree(manifestPath.toFile());
+      JsonNode root = mapper.readTree(readManifestBytes(manifestPath));
       JsonNode pidNode = root.get("pid");
       if (pidNode == null) {
         return PreviousShutdown.clean();

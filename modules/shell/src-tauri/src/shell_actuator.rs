@@ -176,6 +176,8 @@ impl Actuator for ShellActuator {
         let _ = std::fs::remove_file(self.request_path());
         // The successor reads crash ownership and planned handoff evidence under app.lock.
         // A failed spawn or a competing shell must leave that evidence with its owner.
+        self.host.prepare_manifest_admission(
+            binding::read_manifest_if_present(&self.data_dir.join("runtime/manifest.json")), epoch());
         let pid = (self.spawn)()?;
         self.n = self.host.incarnation_number();
         self.pid = Some(pid);

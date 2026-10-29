@@ -44,6 +44,79 @@ final class RuntimeManifestPredecessorRecoveryTest {
         "{\"schemaVersion\":3,\"pid\":424242,\"sessionToken\":\"quarantine-secret\"}"));
   }
 
+  @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void symlinkQuarantineNeverChangesOrReadsReferent(@TempDir Path data) throws Exception {
+    Path target = data.resolve("outside-executable");
+    String content = "#!/bin/sh\necho private-referent\n";
+    Files.writeString(target, content);
+    var mode = PosixFilePermissions.fromString("rwxr-xr-x");
+    Files.setPosixFilePermissions(target, mode);
+    Path runtime = Files.createDirectories(data.resolve("runtime"));
+    Path manifest = runtime.resolve("manifest.json");
+    Files.createSymbolicLink(manifest, target);
+    try (var publisher = assertDoesNotThrow(() -> new RuntimeManifestPublisher(data))) {
+      assertEquals(mode, Files.getPosixFilePermissions(target), "referent mode must not change");
+      assertEquals(content, Files.readString(target), "referent content must not change");
+      Path quarantine = runtime.resolve("manifest.quarantine.json");
+      assertTrue(Files.isRegularFile(quarantine, java.nio.file.LinkOption.NOFOLLOW_LINKS));
+      assertPrivate(quarantine);
+      var evidence = new ObjectMapper().readTree(quarantine.toFile());
+      assertTrue(evidence.path("symbolicLink").asBoolean(), "record the link, never dereference it");
+      assertEquals(target.toString(), evidence.path("target").asString());
+      assertFalse(Files.readString(quarantine).contains("private-referent"));
+      assertFalse(Files.exists(manifest, java.nio.file.LinkOption.NOFOLLOW_LINKS));
+      publisher.publishHead(54321, "new-token");
+    }
+  }
+
+  @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void hardLinkQuarantineNeverChangesSharedInode(@TempDir Path data) throws Exception {
+    Path target = data.resolve("outside-evidence");
+    String content = "{\"sessionToken\":\"quarantine-secret\",";
+    Files.writeString(target, content);
+    var mode = PosixFilePermissions.fromString("rwxr-xr-x");
+    Files.setPosixFilePermissions(target, mode);
+    Path runtime = Files.createDirectories(data.resolve("runtime"));
+    Path manifest = runtime.resolve("manifest.json");
+    Files.createLink(manifest, target);
+    try (var publisher = assertDoesNotThrow(() -> new RuntimeManifestPublisher(data))) {
+      assertEquals(mode, Files.getPosixFilePermissions(target), "shared inode mode must not change");
+      assertEquals(content, Files.readString(target));
+      Path quarantine = runtime.resolve("manifest.quarantine.json");
+      assertTrue(Files.isRegularFile(quarantine, java.nio.file.LinkOption.NOFOLLOW_LINKS));
+      assertFalse(Files.isSameFile(target, quarantine), "quarantine owns a fresh inode");
+      assertEquals(content, Files.readString(quarantine));
+      assertPrivate(quarantine);
+      assertFalse(Files.exists(manifest));
+      publisher.publishHead(54321, "new-token");
+    }
+  }
+
+  @Test
+  void quarantineFailureIsNamedAndDoesNotPreventStartup(@TempDir Path data) throws Exception {
+    Path runtime = Files.createDirectories(data.resolve("runtime"));
+    Path manifest = runtime.resolve("manifest.json");
+    Files.writeString(manifest, "malformed");
+    Path blocked = Files.createDirectories(runtime.resolve("manifest.quarantine.json"));
+    Files.writeString(blocked.resolve("keep"), "existing-evidence");
+    var logger = (Logger) LoggerFactory.getLogger(RuntimeManifestPublisher.class);
+    var messages = new ListAppender<ILoggingEvent>();
+    messages.start();
+    logger.addAppender(messages);
+    try (var publisher = assertDoesNotThrow(() -> new RuntimeManifestPublisher(data))) {
+      assertTrue(publisher.detectedUncleanPreviousShutdown());
+      assertEquals("malformed", Files.readString(manifest), "failed quarantine keeps the source");
+      assertTrue(messages.list.stream().anyMatch(event -> event.getLevel() == Level.WARN
+          && event.getFormattedMessage().contains("PREDECESSOR_MANIFEST_QUARANTINE_FAILED")));
+      publisher.publishHead(54321, "new-token");
+    } finally {
+      logger.detachAppender(messages);
+      messages.stop();
+    }
+  }
+
   private static void recover(Path data, String reason, List<String> fixtures) throws Exception {
     var logger = (Logger) LoggerFactory.getLogger(RuntimeManifestPublisher.class);
     var messages = new ListAppender<ILoggingEvent>();

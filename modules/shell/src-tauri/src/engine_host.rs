@@ -46,6 +46,8 @@ struct HostInner {
     next_generation: u64,
     binding: Binding,
     discovery: Discovery,
+    predecessor_manifest: Option<ManifestFields>,
+    manifest_not_before: Option<u64>,
     spawn_error: Option<String>,
     latest_record: Option<StateRecord>,
     #[cfg(target_os = "linux")]
@@ -65,6 +67,8 @@ impl Default for HostInner {
             next_generation: 1,
             binding: Binding::default(),
             discovery: Discovery::AwaitingSuccessor { predecessor: None },
+            predecessor_manifest: None,
+            manifest_not_before: None,
             spawn_error: None,
             latest_record: None,
             #[cfg(target_os = "linux")]
@@ -243,6 +247,13 @@ impl EngineHost {
         Ok(())
     }
 
+    /// Snapshot retained evidence before a spawn can publish anything of its own.
+    pub(crate) fn prepare_manifest_admission(&self, predecessor: Option<ManifestFields>, at: u64) {
+        let mut inner = self.inner.lock().expect("engine host mutex poisoned");
+        inner.predecessor_manifest = predecessor;
+        inner.manifest_not_before = Some(at);
+    }
+
     pub(crate) fn observe_manifest(&self, manifest: &ManifestFields) -> Option<BindingChange> {
         let mut inner = self.inner.lock().expect("engine host mutex poisoned");
         if inner.closing {
@@ -253,13 +264,18 @@ impl EngineHost {
         };
         let (pid, predecessor) = match &inner.discovery {
             Discovery::AwaitingManifest { pid, predecessor } => (*pid, predecessor.clone()),
-            Discovery::Bound { pid, instance_id } if instance_id == id => (*pid, None),
+            Discovery::Bound { pid, .. } => (*pid, None),
             _ => return None,
         };
         if inner.child.as_ref().map(|owned| owned.child.id()) != Some(pid) {
             return None;
         }
-        if manifest.pid != Some(pid) || predecessor.as_deref() == Some(id) {
+        if manifest.pid != Some(pid) || predecessor.as_deref() == Some(id)
+            || inner.predecessor_manifest.as_ref()
+                .and_then(|previous| previous.instance_id.as_deref()) == Some(id)
+            || inner.manifest_not_before.is_some_and(|spawned|
+                manifest.started_at.is_none_or(|started| started < spawned))
+        {
             return None;
         }
         let change = apply_manifest_observation(&mut inner.binding, manifest, Some(pid));
@@ -1247,6 +1263,7 @@ mod tests {
             lifecycle: Some("READY".into()),
             instance_id: Some(id.into()),
             pid: Some(pid),
+            ..Default::default()
         }
     }
 

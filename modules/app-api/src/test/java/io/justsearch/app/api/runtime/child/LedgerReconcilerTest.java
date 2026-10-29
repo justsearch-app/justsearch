@@ -137,6 +137,46 @@ final class LedgerReconcilerTest {
     }
   }
 
+  @Test
+  void rotationsCarryOnlyFourRecentStopIntentsAndAllIdentityReceipts() throws Exception {
+    Path ledgerDir = LedgerFamily.directory(dataDir);
+    var writer = writer(ledgerDir, 4242L, "2026-10-06T08:00:00Z");
+    spawnAndStart(writer, "stuck", 919191, null,
+        Instant.parse("2026-10-06T08:00:01Z"), Path.of("java").toAbsolutePath().toString());
+    // Conflicting original starts must still prevent ambiguous cleanup after rotation.
+    spawnAndStart(writer, "stuck", 919192, null,
+        Instant.parse("2026-10-06T08:00:02Z"), Path.of("java").toAbsolutePath().toString());
+    var identity = read(ledgerDir);
+    for (int boot = 0; boot < 5; boot++) {
+      for (int attempt = 0; attempt < 6; attempt++) {
+        String id = "s-" + (boot * 6 + attempt);
+        assertTrue(writer.append(LedgerRecordType.STOP_INTENT, fields("childId", "stuck",
+            "intentId", id, "reason", "CRASH_RECOVERY", "mode", "NOW",
+            "requestedAt", Instant.now(), "requestedBy", "predecessor-fallback")));
+        assertTrue(writer.append(LedgerRecordType.CHILD_SURVIVED, fields("childId", "stuck",
+            "intentId", id, "attempts", 2, "basis", "terminate_timeout")));
+      }
+      Files.writeString(LedgerFamily.CHILDREN.current(ledgerDir), "\n".repeat(1024 * 1024),
+          java.nio.file.StandardOpenOption.APPEND);
+      writer.startSession();
+      // Read just the new generation: old retries may remain in retention-managed archives.
+      var carried = Files.readAllLines(LedgerFamily.CHILDREN.current(ledgerDir)).stream()
+          .map(new tools.jackson.databind.ObjectMapper()::readTree).toList();
+      assertTrue(carried.containsAll(identity.stream().map(LedgerRecord::line).toList()),
+          "all original identity receipts remain intact, including conflicting starts");
+      var intents = carried.stream().filter(r -> r.path("type").asString().equals("stop-intent"))
+          .map(r -> r.path("intentId").asString()).toList();
+      assertEquals(List.of("s-" + (boot * 6 + 2), "s-" + (boot * 6 + 3),
+          "s-" + (boot * 6 + 4), "s-" + (boot * 6 + 5)), intents,
+          "only the four latest failed cleanup intents carry forward per child");
+      assertEquals(1, carried.stream().filter(r -> r.path("type").asString()
+          .equals("child-survived")).count(), "only the latest survivor receipt carries");
+      for (var line : carried) {
+        assertTrue((line.toString() + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 4096);
+      }
+    }
+  }
+
   private static void assertOwnerDied(
       LedgerRecord record, String basis, String osCheck, String exitClass) {
     assertEquals(LedgerRecordType.OWNER_DIED, record.type());

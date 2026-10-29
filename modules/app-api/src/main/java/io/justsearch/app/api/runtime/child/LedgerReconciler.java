@@ -143,9 +143,9 @@ public final class LedgerReconciler {
   /** Original receipts for surviving children, copied unchanged at rotation to retain ownership. */
   public static List<LedgerRecord> openChildRecords(List<LedgerRecord> records) {
     var open = openChildren(records);
-    // Keep every distinct original receipt, including conflicting starts: cleanup must still
-    // refuse ambiguous ownership. Copies from earlier rotations carry the same envelope.
-    return records.stream().filter(record -> record.text("childId")
+    // Keep every distinct identity receipt, including conflicting starts: cleanup must still
+    // refuse ambiguous ownership. Retry history is bounded per child in the current generation.
+    var receipts = records.stream().filter(record -> record.text("childId")
         .map(id -> !open.get(id).closed && open.get(id).survived != null).orElse(false))
         .filter(record -> record.type() == LedgerRecordType.CHILD_SPAWN
             || record.type() == LedgerRecordType.CHILD_START
@@ -154,6 +154,17 @@ public final class LedgerReconciler {
         .filter(record -> record.type() != LedgerRecordType.CHILD_SURVIVED
             || record.equals(open.get(record.text("childId").orElseThrow()).survived))
         .distinct().toList();
+    Map<String, Integer> intentCounts = new LinkedHashMap<>();
+    var retainedIntents = new java.util.HashSet<LedgerRecord>();
+    for (int i = receipts.size() - 1; i >= 0; i--) {
+      LedgerRecord receipt = receipts.get(i);
+      if (receipt.type() == LedgerRecordType.STOP_INTENT
+          && intentCounts.merge(receipt.text("childId").orElseThrow(), 1, Integer::sum) <= 4) {
+        retainedIntents.add(receipt);
+      }
+    }
+    return receipts.stream().filter(record -> record.type() != LedgerRecordType.STOP_INTENT
+        || retainedIntents.contains(record)).toList();
   }
 
   /** Recover ledger-only starts before registration, including survivors carried across rotation. */

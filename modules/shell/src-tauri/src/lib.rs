@@ -2403,6 +2403,7 @@ mod tests {
             lifecycle: Some("READY".into()),
             instance_id: Some("abc".into()),
             pid: Some(7),
+            ..Default::default()
         };
         let payload: Option<u16> = backend_restart_payload(&manifest);
         assert_eq!(payload, Some(40404));

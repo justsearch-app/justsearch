@@ -44,6 +44,47 @@ fn pidless_predecessor_never_supplies_successor_port_or_token() {
     assert_eq!(observed.token, None);
 }
 
+#[test]
+fn retained_same_pid_manifest_cannot_bind_a_fresh_shell() {
+    use crate::supervisor::Actuator;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("runtime")).unwrap();
+    let path = dir.path().join("runtime/manifest.json");
+    let host = Arc::new(EngineHost::default());
+    let mut command = crate::containment::engine_command(std::env::current_exe().unwrap()).unwrap();
+    command.arg("--list").stdout(std::process::Stdio::null());
+    let child = host.admit(crate::engine_host::PreparedCommand { command }).unwrap();
+    // Install the admitted child's PID in predecessor evidence to deterministically model reuse.
+    let publish = |id: &str, started: &str, port: u16| {
+        std::fs::write(&path, json!({"instanceId":id,"pid":child.pid,"startedAt":started,
+            "head":{"apiPort":port,"sessionToken":format!("secret-{id}")}}).to_string()).unwrap();
+    };
+    publish("predecessor", "2026-01-01T00:00:00Z", 42424);
+    let mut actuator = ShellActuator::new(host.clone(), dir.path().into(),
+        move || Ok(child.pid), |_| {});
+    actuator.spawn_engine().unwrap();
+    actuator.discovery();
+    let stale = host.binding_snapshot();
+    publish("too-early", "2026-01-01T00:00:01Z", 42425);
+    actuator.discovery();
+    let early = host.binding_snapshot();
+    let now = supervisor::epoch_ms_to_iso(epoch());
+    publish("successor", &now, 42426);
+    actuator.discovery();
+    let successor = host.binding_snapshot();
+    publish("successor-republished", &now, 42427);
+    actuator.discovery();
+    let rebound = host.binding_snapshot();
+    host.fixture_kill_and_reap();
+    assert_eq!(stale.port, None, "retained same-PID predecessor cannot supply credentials");
+    assert_eq!(stale.token, None);
+    assert_eq!(early.port, None, "an instance predating spawn cannot supply credentials");
+    assert_eq!(successor.port, Some(42426));
+    assert_eq!(successor.token.as_deref(), Some("secret-successor"));
+    assert_eq!(rebound.port, Some(42427), "same child with a different instance rebinds");
+    assert_eq!(rebound.token.as_deref(), Some("secret-successor-republished"));
+}
+
 // Exercise the same proven connection and write boundary with a listener owned by this fixture.
 fn post_before_send(
     port: u16, token: &str, path: &str, body: &Value, timeout_ms: u64,

@@ -176,6 +176,7 @@ const manifestPath = path.join(runtimeDir, 'manifest.json');
 const requestPath = path.join(runtimeDir, 'shutdown-request.v1.json');
 const requestedPort = num(args.apiPort ?? env.JUSTSEARCH_API_PORT, 0);
 const instanceId = crypto.randomUUID();
+const startedAt = new Date().toISOString();
 const sessionToken = crypto.randomUUID();
 
 function log(message) {
@@ -245,6 +246,7 @@ function publishManifest(port) {
   writeJsonAtomic(manifestPath, {
     schemaVersion: 1,
     instanceId,
+    startedAt,
     pid: process.pid,
     lifecycle: 'READY',
     head: { apiPort: port, sessionToken },
