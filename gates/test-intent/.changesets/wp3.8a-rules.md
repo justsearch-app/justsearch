@@ -556,6 +556,14 @@ All sources remain agent choices under the specified design delegation. Builder 
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java"
+      ],
+      "class": "Structural rule kept",
+      "rule": "All six registry shape validators report zero ERROR findings for the core, agent-tools and composed catalogs, including executable handler bindings and resolvable presentation keys.",
+      "whySurvives": "Mirror the existing production registration of core.set-indexing-rules with IndexingRulesHandler and the same unused lazy store supplier as Pause/Resume. No assertions, expected findings, catalogs, validators or validator selection change; the fixture now includes the operation already in the core and composed catalogs. The missing label and description are supplied in the production message catalog rather than exempted from validation."
     }
   ]
 }
