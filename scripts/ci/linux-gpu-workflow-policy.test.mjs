@@ -39,3 +39,12 @@ test('S13: draft creation cannot promote or overwrite assets and the cross-repo 
     assert.doesNotMatch(step.run ?? '', /\$\{\{\s*inputs\./, 'dispatch inputs must enter the shell through env');
   }
 });
+
+test('S13: candidate payloads leave only through the private draft', () => {
+  for (const step of producer.jobs.build.steps) {
+    if (step.uses?.startsWith('actions/upload-artifact')) {
+      assert.equal(step.with.path, '${{ runner.temp }}/linux-gpu/build-io.txt');
+      assert.doesNotMatch(step.with.path, /dist|zip|registry|verified-inputs/);
+    }
+  }
+});

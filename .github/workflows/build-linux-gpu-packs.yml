@@ -43,15 +43,16 @@ jobs:
           python3 scripts/ai/update-linux-gpu-registry.py --tag "$PACK_TAG" \
             --checksums dist/linux-gpu/SHA256SUMS --sizes dist/linux-gpu/SIZES \
             --output dist/linux-gpu/model-registry.v2.json
-      - name: Retain candidate and IO evidence
+      # The source repository's Actions artifacts can be publicly downloadable.
+      # Candidate ZIPs and registry/provenance files leave only through the private draft.
+      - name: Retain IO evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: linux-gpu-packs-${{ github.run_id }}
-          path: |
-            dist/linux-gpu/
-            ${{ runner.temp }}/linux-gpu/build-io.txt
+          name: linux-gpu-build-io-${{ github.run_id }}
+          path: ${{ runner.temp }}/linux-gpu/build-io.txt
           if-no-files-found: warn
+          retention-days: 7
       - name: Create draft in payload repository (never publish)
         env:
           GH_TOKEN: ${{ secrets.JUSTSEARCH_RELEASES_PACK_TOKEN }}

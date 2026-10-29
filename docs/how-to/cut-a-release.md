@@ -350,7 +350,10 @@ Linux GPU packs are produced once per pin bump by
 `main` with a new immutable tag such as `linux-cuda12-1`. The workflow builds on Ubuntu
 24.04, verifies every input's SHA-256 before using it, audits the glibc 2.39 ceiling and
 pack dependency closure, and creates a **draft** in `eliasjustus/justsearch-releases`.
-It never publishes or replaces an existing release. CUDA 12.8.1 and cuDNN 9.8.0 archives
+Candidate ZIPs are never uploaded as source-repository Actions artifacts, which could expose them
+before publication; only non-payload IO counters are retained there. The draft is the sole upload
+destination for the candidate ZIPs and registry/provenance files. It never publishes or replaces an
+existing release. CUDA 12.8.1 and cuDNN 9.8.0 archives
 come from NVIDIA's official redistrib channel with redistribution notices in both packs.
 The pack manifest records input sources and hashes; `verified-inputs.json` also records
 compiler versions and build configuration. Ordinary application releases reuse these
