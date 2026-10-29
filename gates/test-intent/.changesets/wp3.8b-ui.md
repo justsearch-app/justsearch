@@ -66,3 +66,16 @@ per-check before failures are in `gates/test-intent/evidence/wp3.8b-ui/README.md
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a186f1-82fa-76d0-b7e6-b8b0ac622fad",
+  "verdict": "accept",
+  "digest": "sha256:66a40968ace54faab901e5ed9df5ee84c1123ef9a99063dd698fd32fcc23cd1e",
+  "note": "Codex verifier-b2 on e535494115: PASS; classifications and evidence accepted"
+}
+```
