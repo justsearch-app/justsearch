@@ -18,8 +18,8 @@
  *     [--delete-branch] [--merge-commit <sha>] [--session-id <id|unknown>]
  *
  * Safety: admission comes from the owning repository's exact registered-worktree list, not a
- * pathname convention. Main, aliases, nested registrations, locks, changes, and relevant live or
- * unknown runtime provenance are refused before filesystem mutation.
+ * pathname convention. Main, aliases, nested registrations and locks are refused before directory
+ * access repair; changes and relevant live or unknown runtime provenance block unlink/deletion.
  *
  * Tempdoc 746 item 4 — junction-unlink KEPT (not superseded by Claude Code >=2.1.205's native
  * junction handling), for two independent reasons:
@@ -268,20 +268,22 @@ function reportHolders(p) {
   }
 }
 
-// Repair directory access before the first unlink, so a test's 0555/000 directory cannot
-// leave a partially deleted tree. Walk top-down to reach inaccessible children; never follow
-// links or chmod files (which may be hard-linked outside the worktree).
-function makeDirectoriesWritable(dir) {
+// Repair access before status/archive enumeration and again before the first unlink. Otherwise
+// Git may omit drafts in a 000 directory, only for deletion to open it and discard those drafts.
+// Walk top-down; never follow links or chmod files (which may be hard-linked outside the tree).
+function makeDirectoriesWritable(dir, { dryRun = false } = {}) {
+  if (process.platform === 'win32') return;
   const st = fs.lstatSync(dir);
   if (st.isSymbolicLink() || !st.isDirectory()) return;
   if ((st.mode & 0o700) !== 0o700) {
+    if (dryRun) fail(`worktree directory needs access repair before inspection: ${dir}; re-run without --dry-run`);
     try {
       fs.chmodSync(dir, (st.mode & 0o7777) | 0o700);
     } catch (err) {
       fail(`cannot make worktree directory writable: ${dir} (${err.message})`);
     }
   }
-  for (const name of fs.readdirSync(dir)) makeDirectoriesWritable(path.join(dir, name));
+  for (const name of fs.readdirSync(dir)) makeDirectoriesWritable(path.join(dir, name), { dryRun });
 }
 
 // 2. Delete the remaining tree, long-path aware, with a bounded retry for held handles.
@@ -505,7 +507,7 @@ function assertPhysicalProtections({ repoRoot, admission }) {
   }
 }
 
-function inspectGitAdmission({ repoRoot, target, allowIgnored }) {
+function inspectGitAdmission({ repoRoot, target, allowIgnored, dryRun = false }) {
   const abs = path.resolve(target);
   const entries = listRegisteredWorktrees(repoRoot);
   const facts = repositoryFacts(repoRoot, entries);
@@ -572,6 +574,9 @@ function inspectGitAdmission({ repoRoot, target, allowIgnored }) {
     fail(`refusing: target branch ${targetBranchRef || '(detached)'} does not match registered branch ${entry.branchRef || '(detached)'}`);
   }
 
+  // Identity and protected-path checks above admit this exact worktree before any chmod.
+  // A preview refuses when repair is needed, preserving its no-mutation contract.
+  makeDirectoriesWritable(abs, { dryRun });
   const changes = parseNulList(requireGit(
     repoRoot,
     ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignored=no'],
@@ -1055,7 +1060,7 @@ function deleteCapturedBranch(repoRoot, captured) {
 async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '..', '..') } = {}) {
   const options = parseArgs(argv);
   const mainRepoRoot = resolveMainRepoRoot(repoRoot);
-  const admission = inspectGitAdmission({ repoRoot, target: options.target, allowIgnored: options.allowIgnored });
+  const admission = inspectGitAdmission({ repoRoot, target: options.target, allowIgnored: options.allowIgnored, dryRun: options.dryRun });
   let firstExceptionIdentity = null;
   // Tempdoc 952 Amendment A: ignored files leave only through a verified archive. A bare
   // `--allow-ignored` used to delete them with the tree; it now needs the manifest that
@@ -1129,7 +1134,7 @@ async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '.
     fail(`refusing to remove ${admission.abs}: a registered agent-spawn holder could not be reaped`);
   }
 
-  // No asynchronous work occurs between this final membership check and the first mutation.
+  // No asynchronous work occurs between this final membership check and deletion.
   const finalAdmission = inspectGitAdmission({
     repoRoot,
     target: admission.abs,
@@ -1205,6 +1210,7 @@ module.exports = {
   sleepSync,
   reportHolders,
   removeJunctions,
+  makeDirectoriesWritable,
   main,
   getProcessTable,
   ancestorPids,
