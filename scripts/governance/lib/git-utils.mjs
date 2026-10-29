@@ -246,9 +246,6 @@ export function readFileAtRef(ref, filePath, cwd) {
   }
 }
 
-/** Back-compat alias for the original contract-governance API. */
-export const readVersionAtRef = readFileAtRef;
-
 /**
  * Files added or modified between baseline ref and HEAD under a path filter.
  *

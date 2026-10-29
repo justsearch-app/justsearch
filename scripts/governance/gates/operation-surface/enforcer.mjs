@@ -15,8 +15,8 @@
  *   - registry: path to governance/registry.v1.json (to resolve gate:<id> guards).
  */
 
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { resolve, join, relative } from 'node:path';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve, relative } from 'node:path';
 
 import { OPERATION_SURFACE_RULE_DESCRIPTIONS } from './rule-descriptions.mjs';
 import {
@@ -29,9 +29,9 @@ import {
 } from './truth-table.mjs';
 import { statusToSarifLevel } from '../../lib/truth-table-runner.mjs';
 import { verdictForVacuousScan } from '../../lib/population-floor.mjs';
+import { walk, parseGuards, loadGateIds } from '../../lib/guard-resolver.mjs';
 
 const TOOL = { toolName: 'justsearch-operation-surface', toolVersion: '0.1.0' };
-const WALK_EXCLUDES = new Set(['build', 'node_modules', 'dist', '.git', '.gradle', 'tmp']);
 
 export async function enforceOperationSurface(options) {
   const { repoRoot, gate, fixtureMode = false, fixtureRoot } = options;
@@ -178,59 +178,6 @@ function scanTs(root, scan) {
     }
   }
   return out;
-}
-
-/** Bounded recursive walk; skips build/node_modules/etc. Returns absolute file paths matching `keep`. */
-function walk(dir, keep) {
-  const out = [];
-  if (!existsSync(dir)) return out;
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const e of entries) {
-    if (WALK_EXCLUDES.has(e.name)) continue;
-    const abs = join(dir, e.name);
-    let isDir = e.isDirectory();
-    if (e.isSymbolicLink()) {
-      try {
-        isDir = statSync(abs).isDirectory();
-      } catch {
-        continue;
-      }
-    }
-    if (isDir) out.push(...walk(abs, keep));
-    else if (keep(e.name)) out.push(abs);
-  }
-  return out;
-}
-
-/** Parse a guard string like "gate:wire + test:Foo" / "self" / "none-yet" into tokens. */
-function parseGuards(guard) {
-  if (!guard || guard === 'self' || guard === 'none-yet') return [];
-  return String(guard)
-    .split('+')
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((tok) => {
-      const i = tok.indexOf(':');
-      if (i < 0) return { kind: 'other', value: tok };
-      return { kind: tok.slice(0, i).trim(), value: tok.slice(i + 1).trim() };
-    });
-}
-
-function loadGateIds(root, registryRel) {
-  const abs = resolve(root, registryRel);
-  if (!existsSync(abs)) return new Set();
-  try {
-    const r = JSON.parse(readFileSync(abs, 'utf8'));
-    const gates = Array.isArray(r.gates) ? r.gates : Array.isArray(r) ? r : [];
-    return new Set(gates.map((g) => g.id).filter(Boolean));
-  } catch {
-    return new Set();
-  }
 }
 
 /**

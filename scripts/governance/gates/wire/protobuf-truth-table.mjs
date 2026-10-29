@@ -14,8 +14,6 @@
  *   pass-noop — no diff at all; no-op PR (treated as pass for gating)
  */
 
-const VALID_BUMPS = new Set(['patch', 'minor', 'major', 'none']);
-
 /**
  * @param {{classification: {rule: string|null, requiredBump: string|null}, breaks: boolean, currentVersion: string|null, baselineVersion: string|null}} input
  */

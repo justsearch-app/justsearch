@@ -45,7 +45,6 @@ jobs:
       devrunner: ${{ steps.classify.outputs.devrunner }}
       rust: ${{ steps.classify.outputs.rust }}
       lifecycle: ${{ steps.classify.outputs.lifecycle }}
-      integration: ${{ steps.classify.outputs.integration }}
       jseval: ${{ steps.classify.outputs.jseval }}
       frontend: ${{ steps.classify.outputs.frontend }}
     steps:
@@ -785,7 +784,8 @@ jobs:
       - name: Run jseval test suite
         # `-p no:cacheprovider`: a fresh runner has no cache to reuse and the plugin
         # would only write .pytest_cache into the checkout.
-        run: python -m pytest scripts/jseval/tests -q -p no:cacheprovider
+        # Release composition runs in Public claims above.
+        run: python -m pytest scripts/jseval/tests --ignore=scripts/jseval/tests/test_release.py -q -p no:cacheprovider
 
   measured-axe:
     needs: changes
