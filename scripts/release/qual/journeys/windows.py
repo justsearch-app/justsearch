@@ -1068,10 +1068,10 @@ def search_open(run):
 return all(document,'[data-testid="search-result-row"]').find(e =>
  (e.getAttribute('data-addressable-id') || '').toLowerCase() === arguments[0].toLowerCase()) || null;
 """, [fixture]), 'Exact fixture row in search DOM', seconds=45, error=ProductFailure)
-    run.wd.call(f'/session/{run.wd.session}/actions', {'actions': [{'type': 'pointer', 'id': 'result-menu',
-        'parameters': {'pointerType': 'mouse'}, 'actions': [
-            {'type': 'pointerMove', 'duration': 0, 'origin': hit, 'x': 0, 'y': 0},
-            {'type': 'pointerDown', 'button': 2}, {'type': 'pointerUp', 'button': 2}]}]})
+    action = run.wd.execute("return arguments[0].querySelector('button[data-testid=\"row-actions\"]')", [hit])
+    if not action:
+        raise ProductFailure('Exact fixture row has no Actions button')
+    run.wd.click_element(action)
     run.wd.click('button,[role="menuitem"]', 'Open file', error=ProductFailure)
     def receiving():
         rows = ps_json(ARGV + '$rows=' + PROCESSES + r""";

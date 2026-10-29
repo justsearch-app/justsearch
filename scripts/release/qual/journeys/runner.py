@@ -479,6 +479,9 @@ return all(document,arguments[0]).find(e => {
 
     def click(self, selector, text=None, *, error=Infrastructure):
         element = self.element(selector, text, error=error)
+        return self.click_element(element)
+
+    def click_element(self, element):
         point = self.execute("arguments[0].scrollIntoView({block:'center',inline:'nearest'});const r=arguments[0].getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)}", [element])
         # Resolve the viewport point explicitly: WebKitGTK's element-origin
         # hit test can report an ancestor shadow host for nested components.

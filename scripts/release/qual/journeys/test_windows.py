@@ -252,7 +252,8 @@ class WindowsOperationalTests(unittest.TestCase):
         run.target.roots=[];run.native.windows.return_value=[{'pid':60,'handle':300,'automationId':'GraphicalPowerShellMainWindow'}]
         first={'element-6066-11e4-a52e-4f735466cecf':'unrelated-first'}
         exact={'element-6066-11e4-a52e-4f735466cecf':'fixture-second'}
-        run.wd.element.return_value=first;run.wd.execute.return_value=exact;run.wd.text.return_value=OPEN_FILE
+        action={'element-6066-11e4-a52e-4f735466cecf':'fixture-actions'}
+        run.wd.element.return_value=first;run.wd.execute.side_effect=[exact,action];run.wd.text.return_value=OPEN_FILE
         tools=Mock();tools.read_text.return_value=json.dumps({'viewer':image})
         path=lambda p:tools if str(p)=='C:/Qual/tools.json' else Path(p)
         with patch.object(windows,'Path',side_effect=path),patch.object(linux,'search_api',return_value={'results':[OPEN_FILE.lower()]}), \
@@ -260,10 +261,11 @@ class WindowsOperationalTests(unittest.TestCase):
              patch.object(windows,'ps_json',side_effect=[[],[receiver]]),patch.object(windows,'wait_for',once):
             windows.search_open(run)
         run.wd.element.assert_not_called()
-        self.assertIn('data-addressable-id',run.wd.execute.call_args.args[0])
-        self.assertEqual(run.wd.execute.call_args.args[1],[fixture])
-        actions=run.wd.call.call_args.args[1]['actions'][0]['actions']
-        self.assertEqual(actions[0]['origin'],exact)
+        self.assertIn('data-addressable-id',run.wd.execute.call_args_list[0].args[0])
+        self.assertEqual(run.wd.execute.call_args_list[0].args[1],[fixture])
+        self.assertIn('row-actions',run.wd.execute.call_args_list[1].args[0])
+        self.assertEqual(run.wd.execute.call_args_list[1].args[1],[exact])
+        run.wd.click_element.assert_called_once_with(action)
         self.assertTrue(run.facts['search'])
 
     def test_default_viewer_needs_exact_argv_path_image_new_lifetime_and_window(self):
