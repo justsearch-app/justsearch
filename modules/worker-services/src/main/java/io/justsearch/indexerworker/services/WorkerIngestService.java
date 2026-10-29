@@ -2531,7 +2531,7 @@ public final class WorkerIngestService {
           boolean removingRoot = io.justsearch.configuration.persistence.WatchedRootsFormat
               .pendingRemovals(declaredRootsDirectory)
               .contains(Path.of(pathPrefix).toAbsolutePath().normalize());
-          if (!removingRoot && rootWatcherRegistry.current().declaredRoots()
+          if (declaredRootsDirectory == null && rootWatcherRegistry.current().declaredRoots()
               .contains(Path.of(pathPrefix).toAbsolutePath().normalize())) {
             throw WorkerServiceException.unavailable(
                 "Removal intent is not confirmed; retry Remove after watched-root declarations recover");
