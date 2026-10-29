@@ -353,7 +353,7 @@ pack dependency closure, and creates a **draft** in `eliasjustus/justsearch-rele
 Candidate ZIPs are never uploaded as source-repository Actions artifacts, which could expose them
 before publication; only non-payload IO counters are retained there. The draft is the sole upload
 destination for the candidate ZIPs and registry/provenance files. It never publishes or replaces an
-existing release. CUDA 12.8.1 and cuDNN 9.8.0 archives
+existing release. CUDA 12.8.2 and cuDNN 9.8.0 archives
 come from NVIDIA's official redistrib channel with redistribution notices in both packs.
 The pack manifest records input sources and hashes; `verified-inputs.json` also records
 compiler versions and build configuration. Ordinary application releases reuse these

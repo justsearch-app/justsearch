@@ -66,4 +66,4 @@ jobs:
             dist/linux-gpu/model-registry.v2.json \
             --repo eliasjustus/justsearch-releases --draft --latest=false \
             --title "Linux CUDA12 packs $PACK_TAG" \
-            --notes "Pinned llama.cpp b8571, CUDA 12.8.1 and cuDNN 9.8.0; Ubuntu 24.04, driver 570+. Build: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID . Owner: validate this exact draft before publishing. Registry JSON is a PR input, not an automatic registry change."
+            --notes "Pinned llama.cpp b8571, CUDA 12.8.2 and cuDNN 9.8.0; Ubuntu 24.04, driver 570+. Build: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID . Owner: validate this exact draft before publishing. Registry JSON is a PR input, not an automatic registry change."

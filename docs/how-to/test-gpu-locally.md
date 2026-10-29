@@ -76,7 +76,7 @@ overrides executable discovery in `InferenceConfig`. See `docs/explanation/13-ai
 ## Linux GPU pack build and assembly
 
 The app supports Linux runtime packs, but none are registered in the shipped registry yet.
-The pinned producer builds llama.cpp **b8571 against CUDA 12.8.1**, with cuDNN **9.8.0**
+The pinned producer builds llama.cpp **b8571 against CUDA 12.8.2**, with cuDNN **9.8.0**
 and ORT **1.24.3**, on **Ubuntu 24.04** (glibc ceiling 2.39). It does not need a GPU.
 The source URLs, versions and SHA-256 values live in
 [`linux-gpu-inputs.v1.json`](../../scripts/ai/linux-gpu-inputs.v1.json); NVIDIA inputs come only

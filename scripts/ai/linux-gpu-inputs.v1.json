@@ -39,9 +39,9 @@
     },
     {
       "id": "libcublas",
-      "version": "12.8.4.1",
-      "url": "https://developer.download.nvidia.com/compute/cuda/redist/libcublas/linux-x86_64/libcublas-linux-x86_64-12.8.4.1-archive.tar.xz",
-      "sha256": "21718957c2cf000bacd69d36c95708a2319199e39e056f8b4f0f68e3b9f323bb",
+      "version": "12.8.5.5",
+      "url": "https://developer.download.nvidia.com/compute/cuda/redist/libcublas/linux-x86_64/libcublas-linux-x86_64-12.8.5.5-archive.tar.xz",
+      "sha256": "f732baf6e55de1844f9bea6646ceae13f30b10592f87b12406bf4713b7f67521",
       "license": "CUDA Toolkit"
     },
     {

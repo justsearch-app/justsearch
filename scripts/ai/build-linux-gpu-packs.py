@@ -22,11 +22,22 @@ import zipfile
 HERE = Path(__file__).resolve().parent
 PINS = HERE / "linux-gpu-inputs.v1.json"
 ARCHITECTURES = "70-virtual;75-real;80-real;86-real;89-real;90-real;100-real;120a-real"
+SOURCE_DATE_EPOCH = "1760000000"
 
 
 def digest(path):
     with path.open("rb") as source:
         return hashlib.file_digest(source, "sha256").hexdigest()
+
+
+def compile_key(pins, compilers):
+    """Reuse objects only with the same source, headers, compiler and target contract."""
+    return hashlib.sha256(json.dumps({
+        "inputs": [item for item in pins["inputs"] if item["id"] in
+                   ("llama", "cuda_nvcc", "cuda_cudart", "cuda_cccl", "libcublas")],
+        "compilers": compilers, "architectures": ARCHITECTURES,
+        "sourceDateEpoch": SOURCE_DATE_EPOCH,
+    }, sort_keys=True).encode()).hexdigest()[:16]
 
 
 def fetch(item, cache):
@@ -135,7 +146,9 @@ def build(args):
         for index, path in enumerate(licenses):
             shutil.copyfile(path, notices / (item["id"] + "-" + str(index) + "-" + path.name))
     toolkit = work / "toolkit"
-    toolkit.mkdir(exist_ok=True)
+    if toolkit.exists():
+        shutil.rmtree(toolkit)  # Links only; an input pin bump must not retain stale SDK links.
+    toolkit.mkdir()
     for name in ("cuda_nvcc", "cuda_cudart", "cuda_cccl", "libcublas"):
         link_tree(directories[name], toolkit)
     # NVIDIA's archives use lib/; CMake/nvcc also look for lib64/.
@@ -144,8 +157,10 @@ def build(args):
     env = {k: v for k, v in os.environ.items() if not k.startswith("LD_")
            and k not in ("CUDA_HOME", "CUDA_PATH", "LIBRARY_PATH", "CPATH", "CPLUS_INCLUDE_PATH")}
     env.update(CUDACXX=str(toolkit / "bin/nvcc"), CUDA_HOME=str(toolkit),
-               SOURCE_DATE_EPOCH="1760000000", LC_ALL="C", TZ="UTC")
-    build_dir = work / "llama-build"
+               SOURCE_DATE_EPOCH=SOURCE_DATE_EPOCH, LC_ALL="C", TZ="UTC")
+    compiler_versions = {name: subprocess.check_output([name, "--version"], text=True).splitlines()[0]
+                         for name in ("gcc-13", "g++-13", "cmake")}
+    build_dir = work / ("llama-build-" + compile_key(pins, compiler_versions))
     llama = next(item for item in pins["inputs"] if item["id"] == "llama")
     configure = ["cmake", "-S", str(directories["llama"]), "-B", str(build_dir), "-G", "Ninja",
                  "-DCMAKE_BUILD_TYPE=Release", "-DGGML_CUDA=ON", "-DGGML_NATIVE=OFF",

@@ -1,4 +1,5 @@
 import hashlib
+import copy
 import importlib.util
 import io
 import json
@@ -38,6 +39,19 @@ class LinuxGpuBuildTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
             build.fetch(item, self.cache)
         self.assertFalse(cached.exists())
+
+    def test_compiler_input_changes_invalidate_objects_but_runtime_only_changes_reuse_them(self):
+        pins = json.loads(build.PINS.read_text())
+        compilers = {"gcc-13": "version one", "cmake": "version one"}
+        original = build.compile_key(pins, compilers)
+        changed = copy.deepcopy(pins)
+        next(p for p in changed["inputs"] if p["id"] == "libcublas")["sha256"] = "0" * 64
+        self.assertNotEqual(original, build.compile_key(changed, compilers))
+        changed = copy.deepcopy(pins)
+        next(p for p in changed["inputs"] if p["id"] == "cudnn")["sha256"] = "0" * 64
+        self.assertEqual(original, build.compile_key(changed, compilers))
+        self.assertNotEqual(original, build.compile_key(pins, dict(compilers, **{"gcc-13": "version two"})))
+        self.assertEqual(original, build.compile_key(copy.deepcopy(pins), dict(compilers)))
 
     def test_archive_cannot_write_outside_its_private_tree(self):
         archive = self.root / "unsafe.tar"
