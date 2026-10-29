@@ -12,7 +12,7 @@ test('O1 docs and agent files need no scoped lanes', () => {
 test('the generated legal document selects only its notice-producing lane', () => {
   assert.deepEqual(selected(['docs/reference/legal/ai-runtime-and-model-redistribution.md']), ['license']);
 });
-for (const file of ['scripts/ci/pr-flakes.tsv', 'scripts/ci/pr-flakes.mjs']) {
+for (const file of ['scripts/ci/pr-flakes.tsv', 'scripts/ci/pr-flakes.mjs', 'scripts/dev/prepush-excluded-tests.tsv']) {
   test(`shared PR filter selects every lane: ${file}`, () => all(classifyPaths([file])));
 }
 for (const [path, lanes] of [

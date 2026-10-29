@@ -132,6 +132,7 @@ final class RootLifecycleOpsIdempotencyTest {
       var ops = new RootLifecycleOps(watchedRoots, state, ExcludeMatcher::empty,
           (path, collection, mode, globs, progress, context) -> null, watcher,
           (path, context) -> {
+            watcher.unwatch(path.toString(), context); // Retire before the simulated index effect.
             deleteCalls.incrementAndGet();
             if (failing.get()) {
               if (failure.equals("capacityDelete")) throw refusal;

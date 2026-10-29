@@ -1740,6 +1740,44 @@
           ]
         },
         {
+          "id": "data-dir-lock-wait-renews-only-after-ready",
+          "why": "R7: readiness renews one bounded lock retry without resetting the crash budget; both recovery cycles reach readiness.",
+          "faultMode": "hang",
+          "drives": [
+            "start"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "locked-renewed",
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 0,
+              "waitForRunning": true
+            },
+            {
+              "mode": "die-before-manifest",
+              "exitCode": 2,
+              "exitAfterMs": 0
+            },
+            {
+              "mode": "crash",
+              "exitAfterMs": 0,
+              "waitForRunning": true
+            },
+            {
+              "mode": "die-before-manifest",
+              "exitCode": 2,
+              "exitAfterMs": 0
+            },
+            {
+              "mode": "honour"
+            }
+          ]
+        },
+        {
           "id": "suspend-gap-is-not-a-hang",
           "why": "Reported sleep freezes active deadlines and must not spend the hang budget.",
           "faultMode": "hang",

@@ -140,13 +140,20 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
           }
         }
         // Keep the known Linux flake cases visible on main, while PRs prove the remaining cases.
+        val excludedTestLists = mutableListOf<Pair<List<String>, String>>()
         if (!isWindowsHost && project.providers.environmentVariable("JUSTSEARCH_PR_CI").orNull == "true") {
-          project.rootProject.file("scripts/ci/pr-flakes.tsv").readLines()
+          excludedTestLists.add(project.rootProject.file("scripts/ci/pr-flakes.tsv").readLines() to "PR flake")
+        }
+        if (project.providers.environmentVariable("JUSTSEARCH_PREPUSH").orNull == "true") {
+          excludedTestLists.add(project.rootProject.file("scripts/dev/prepush-excluded-tests.tsv").readLines() to "pre-push exclusion")
+        }
+        for ((lines, reason) in excludedTestLists) {
+          lines
               .filter { it.startsWith("gradle\t") }
               .map { it.split('\t')[2] }
               .forEach { identifier ->
                 filter.excludeTestsMatching(identifier)
-                logger.lifecycle("SKIP PR flake: $identifier")
+                logger.lifecycle("SKIP $reason: $identifier")
               }
         }
         useJUnitPlatform {

@@ -1,0 +1,30 @@
+--- candidate/modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java
++++ presearch/modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java
+@@ -462,10 +462,23 @@
+           // the retrieval each waited out a full sub-budget (8 s on the CPU cap) and the answer
+           // outlived its caller's limit with neither result nor reason.
+           long answerDeadline = openRetrievalDeadline(client);
+-          PreSearch preSearch =
+-              HeadSearchDeadline.within(
+-                  answerDeadline,
+-                  () -> preSearchForDocIds(params, params.topK() * 2, engineContext, client));
++          PreSearch preSearch;
++          try {
++            preSearch = HeadSearchDeadline.within(answerDeadline,
++                () -> preSearchForDocIds(params, params.topK() * 2, engineContext, client));
++          } catch (Exception failure) {
++            if (params.hasRestrictions()) {
++              var unrestricted = client.search(params.question(), 20,
++                  io.justsearch.ipc.PipelineConfigs.TEXT, engineContext);
++              Set<String> fallbackIds = new LinkedHashSet<>();
++              for (var hit : unrestricted.getResultsList()) {
++                String path = hit.getFieldsMap().get("path");
++                if (path != null && !path.isEmpty()) fallbackIds.add(path);
++              }
++              return retrieveContextFallback(fallbackIds, engineContext, client);
++            }
++            throw failure;
++          }
+           if (!preSearch.docIds().isEmpty()) {
+             effectiveParams = params.withDocIds(preSearch.docIds());
+           }

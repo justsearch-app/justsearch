@@ -11,12 +11,9 @@ use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Discovery {
-    AwaitingSuccessor {
-        predecessor: Option<String>,
-    },
+    AwaitingSuccessor,
     AwaitingManifest {
         pid: u32,
-        predecessor: Option<String>,
     },
     Bound {
         pid: u32,
@@ -64,7 +61,7 @@ impl Default for HostInner {
             replacement_held: false,
             next_generation: 1,
             binding: Binding::default(),
-            discovery: Discovery::AwaitingSuccessor { predecessor: None },
+            discovery: Discovery::AwaitingSuccessor,
             spawn_error: None,
             latest_record: None,
             #[cfg(target_os = "linux")]
@@ -209,11 +206,7 @@ impl EngineHost {
             );
         }
         inner.shell_containment_error = containment_error;
-        let predecessor = match &inner.discovery {
-            Discovery::AwaitingSuccessor { predecessor } => predecessor.clone(),
-            _ => inner.binding.instance_id.clone(),
-        };
-        inner.discovery = Discovery::AwaitingManifest { pid, predecessor };
+        inner.discovery = Discovery::AwaitingManifest { pid };
         inner.spawn_error = None;
         inner.predecessor_job.take();
         inner.predecessor_empty = None;
@@ -235,10 +228,9 @@ impl EngineHost {
         if inner.child.is_some() {
             return Err("Cannot reset backend state while Engine is still running".into());
         }
-        let predecessor = inner.binding.instance_id.clone();
         inner.binding.port = None;
         inner.binding.token = None;
-        inner.discovery = Discovery::AwaitingSuccessor { predecessor };
+        inner.discovery = Discovery::AwaitingSuccessor;
         inner.spawn_error = None;
         Ok(())
     }
@@ -251,15 +243,19 @@ impl EngineHost {
         let Some(id) = manifest.instance_id.as_deref() else {
             return None;
         };
-        let (pid, predecessor) = match &inner.discovery {
-            Discovery::AwaitingManifest { pid, predecessor } => (*pid, predecessor.clone()),
-            Discovery::Bound { pid, instance_id } if instance_id == id => (*pid, None),
+        let pid = match &inner.discovery {
+            Discovery::AwaitingManifest { pid } | Discovery::Bound { pid, .. } => *pid,
             _ => return None,
         };
-        if inner.child.as_ref().map(|owned| owned.child.id()) != Some(pid) {
+        let Some(owned) = inner.child.as_ref().filter(|owned| owned.child.id() == pid) else {
             return None;
-        }
-        if manifest.pid != Some(pid) || predecessor.as_deref() == Some(id) {
+        };
+        // PID reuse and wall-clock changes cannot identify the writer. Require the exact
+        // session/generation supplied to this child at admission, even after binding.
+        if manifest.pid != Some(pid)
+            || manifest.incarnation.as_ref().is_none_or(|(session, n)|
+                session != &self.session() || *n != owned.generation)
+        {
             return None;
         }
         let change = apply_manifest_observation(&mut inner.binding, manifest, Some(pid));
@@ -433,8 +429,7 @@ impl EngineHost {
             inner.exit_signal = status.signal();
         }
         let owned = inner.child.take().expect("the child was just observed");
-        let predecessor = inner.binding.instance_id.clone();
-        inner.discovery = Discovery::AwaitingSuccessor { predecessor };
+        inner.discovery = Discovery::AwaitingSuccessor;
         Self::end_owned(&mut inner, owned);
         // Negative signals are an internal policy observation, never persisted as program codes.
         #[cfg(target_os = "linux")]
@@ -1005,8 +1000,7 @@ mod tests {
         pub(crate) fn fixture_take_child(&self) -> Option<Child> {
             let mut inner = self.inner.lock().expect("engine host mutex poisoned");
             let owned = inner.child.take()?;
-            let predecessor = inner.binding.instance_id.clone();
-            inner.discovery = Discovery::AwaitingSuccessor { predecessor };
+            inner.discovery = Discovery::AwaitingSuccessor;
             Some(Self::end_owned(&mut inner, owned))
         }
 
@@ -1240,13 +1234,15 @@ mod tests {
         assert_eq!(host.child_pid(), None);
     }
 
-    fn manifest(id: &str, pid: u32, port: u16) -> ManifestFields {
+    fn manifest(host: &EngineHost, id: &str, pid: u32, port: u16) -> ManifestFields {
         ManifestFields {
             api_port: Some(port),
             session_token: Some(format!("token-{id}")),
             lifecycle: Some("READY".into()),
             instance_id: Some(id.into()),
             pid: Some(pid),
+            incarnation: Some((host.session(), u64::from(host.incarnation_number()))),
+            ..Default::default()
         }
     }
 
@@ -1302,7 +1298,7 @@ mod tests {
         assert!(host
             .observe_current_binding(|_| panic!("no admitted manifest"))
             .is_none());
-        host.observe_manifest(&manifest("current", child.pid, 40404));
+        host.observe_manifest(&manifest(&host, "current", child.pid, 40404));
         assert!(host.observe_current_binding(|port| port == 40404).is_some());
         assert!(host
             .observe_current_binding(|_| {
@@ -1320,7 +1316,7 @@ mod tests {
     fn current_value_retains_probe_result_for_the_unchanged_admitted_binding() {
         let host = EngineHost::default();
         let child = host.admit(sleeper()).unwrap();
-        host.observe_manifest(&manifest("current", child.pid, 40404));
+        host.observe_manifest(&manifest(&host, "current", child.pid, 40404));
 
         let observed = host
             .observe_current_value(|port| (port == 40404).then_some("ready-epoch-a"))
@@ -1335,7 +1331,7 @@ mod tests {
     fn current_value_discards_probe_result_when_the_binding_changes_during_the_probe() {
         let host = EngineHost::default();
         let child = host.admit(sleeper()).unwrap();
-        let mut incomplete = manifest("current", child.pid, 40404);
+        let mut incomplete = manifest(&host, "current", child.pid, 40404);
         incomplete.session_token = None;
         host.observe_manifest(&incomplete);
         assert_eq!(host.binding_snapshot().token, None);
@@ -1343,7 +1339,7 @@ mod tests {
         let observed = host.observe_current_value(|port| {
             assert_eq!(port, 40404);
             let change = host
-                .observe_manifest(&manifest("current", child.pid, 40404))
+                .observe_manifest(&manifest(&host, "current", child.pid, 40404))
                 .expect("the current instance may fill a missing token");
             assert!(
                 change.token_available,
@@ -1364,7 +1360,7 @@ mod tests {
     fn current_value_discards_probe_result_when_the_child_incarnation_changes() {
         let host = EngineHost::default();
         let first = host.admit(sleeper()).unwrap();
-        host.observe_manifest(&manifest("first", first.pid, 40404));
+        host.observe_manifest(&manifest(&host, "first", first.pid, 40404));
 
         let observed = host.observe_current_value(|port| {
             assert_eq!(port, 40404);
@@ -1373,7 +1369,7 @@ mod tests {
             child.wait().unwrap();
             host.reset_for_successor().unwrap();
             let second = host.admit(sleeper()).unwrap();
-            host.observe_manifest(&manifest("second", second.pid, 50505));
+            host.observe_manifest(&manifest(&host, "second", second.pid, 50505));
             Some("stale-ready-epoch")
         });
 
@@ -1624,9 +1620,10 @@ mod tests {
     fn real_reset_rejects_stale_manifests_and_emits_once_for_successor() {
         let host = EngineHost::default();
         let first = host.admit(sleeper()).unwrap();
+        let mut predecessor_manifest = manifest(&host, "old", first.pid, 1111);
         assert!(
             !host
-                .observe_manifest(&manifest("old", first.pid, 1111))
+                .observe_manifest(&predecessor_manifest)
                 .unwrap()
                 .restarted
         );
@@ -1634,7 +1631,7 @@ mod tests {
         let _ = child.kill();
         let _ = child.wait();
         assert_eq!(
-            host.observe_manifest(&manifest("ghost", first.pid, 9999)),
+            host.observe_manifest(&manifest(&host, "ghost", first.pid, 9999)),
             None,
             "a reaped child cannot continue admitting manifests"
         );
@@ -1648,30 +1645,44 @@ mod tests {
             }
         );
         assert_eq!(
-            host.observe_manifest(&manifest("residue", first.pid, 9999)),
+            host.observe_manifest(&manifest(&host, "residue", first.pid, 9999)),
             None,
             "no successor is installed, so no manifest is admissible"
         );
 
         let second = host.admit(sleeper()).unwrap();
         let mut events = 0;
+        predecessor_manifest.pid = Some(second.pid);
+        assert_eq!(
+            host.observe_manifest_with_sinks(
+                &predecessor_manifest,
+                |_| events += 1,
+                |_| {},
+            ),
+            None,
+            "a predecessor incarnation cannot bind to the successor PID"
+        );
+        assert_eq!(
+            host.binding_snapshot(),
+            Binding {
+                instance_id: Some("old".into()),
+                port: None,
+                token: None
+            }
+        );
+        assert_eq!(events, 0, "a predecessor manifest cannot emit a restart event");
         host.observe_manifest_with_sinks(
-            &manifest("old", second.pid, 1111),
+            &manifest(&host, "new", first.pid, 2222),
             |_| events += 1,
             |_| {},
         );
         host.observe_manifest_with_sinks(
-            &manifest("new", first.pid, 2222),
+            &manifest(&host, "new", second.pid, 2222),
             |_| events += 1,
             |_| {},
         );
         host.observe_manifest_with_sinks(
-            &manifest("new", second.pid, 2222),
-            |_| events += 1,
-            |_| {},
-        );
-        host.observe_manifest_with_sinks(
-            &manifest("new", second.pid, 2222),
+            &manifest(&host, "new", second.pid, 2222),
             |_| events += 1,
             |_| {},
         );
@@ -1972,7 +1983,7 @@ mod tests {
         let host = EngineHost::default();
         let admitted = host.admit(sleeper()).unwrap();
         let calls = AtomicUsize::new(0);
-        let mut residue = manifest("residue", admitted.pid.saturating_add(1), 9999);
+        let mut residue = manifest(&host, "residue", admitted.pid.saturating_add(1), 9999);
         residue.lifecycle = Some("ERROR".into());
         assert!(host
             .observe_manifest_with_sinks(
@@ -1983,7 +1994,7 @@ mod tests {
                 }
             )
             .is_none());
-        let current = manifest("current", admitted.pid, 40404);
+        let current = manifest(&host, "current", admitted.pid, 40404);
         assert!(host
             .observe_manifest_with_sinks(
                 &current,

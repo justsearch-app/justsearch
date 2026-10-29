@@ -2544,6 +2544,18 @@ public final class WorkerIngestService {
 
         try {
           var scope = prefixScope(pathPrefix);
+          boolean removingRoot = io.justsearch.configuration.persistence.WatchedRootsFormat
+              .pendingRemovals(declaredRootsDirectory)
+              .contains(Path.of(pathPrefix).toAbsolutePath().normalize());
+          if (declaredRootsDirectory == null && rootWatcherRegistry.current().declaredRoots()
+              .contains(Path.of(pathPrefix).toAbsolutePath().normalize())) {
+            throw WorkerServiceException.unavailable(
+                "Removal intent is not confirmed; retry Remove after watched-root declarations recover");
+          }
+          if (switchBufferOps.isSwitching() && removingRoot) {
+            return deleteByPathResponse(0, io.justsearch.configuration.persistence.WatchedRootsFormat
+                .REMOVAL_REFUSED_DURING_SWITCHING);
+          }
           if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
             if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
               return switchBufferOps.bufferDeleteByPathDuringSwitching(sbq, scope);
@@ -2551,7 +2563,18 @@ public final class WorkerIngestService {
             throw IngestSwitchBufferOps.switchingUnavailable();
           }
 
+          // Only the Head's durable removal intent authorizes watcher retirement here. Ordinary
+          // unwatch remains uncertain; a plain prefix deletion leaves the registration alone.
+          if (removingRoot) {
+            String generation = switchBufferOps.buildingGenerationForFileAdmission();
+            if (generation != null) switchBufferOps.journalDeletePrefixForGeneration(generation, scope);
+            // No file fence while draining callbacks: an issued DELETE may need that fence.
+            forgetWatchRoot(pathPrefix);
+          }
+
           return withFileMutationFence(() -> {
+            // Reissue after the watcher drain, ordering the removal after its last issued event.
+            // The admission lease also keeps promotion out through commit and queue cleanup.
             journalAndProjectPrefixDeleteToServing(scope);
             if (scope.excludedSubtrees().isEmpty()) ingestLifecycle.indexingCoordinator().deleteByPathPrefix(pathPrefix);
             else deletePrefix(ingestLifecycle.indexingCoordinator(), scope);
@@ -4252,7 +4275,7 @@ public final class WorkerIngestService {
         }
         // A registration change can leave an event gap after an earlier root scan even if that
         // scan's incarnation check succeeded. Keep the existing final cutover fence conservative.
-        markReplayUncertainForWatchChangeDuringMigration();
+        markReplayUncertainForRegistrationDuringMigration(rootPath);
         try {
           // #921: no watcher is registered on another volume at the
           // root's path, so its creates and changes are never indexed into the root. The watch is
@@ -4287,7 +4310,7 @@ public final class WorkerIngestService {
         } finally {
           // A migration can begin after the first check but before registry mutation completes.
           // Recheck while this request still holds its mutation lease so the final fence sees it.
-          markReplayUncertainForWatchChangeDuringMigration();
+          markReplayUncertainForRegistrationDuringMigration(rootPath);
         }
       }
     }
@@ -4380,6 +4403,21 @@ public final class WorkerIngestService {
       log.warn("unwatchRoot: could not drop the recorded volume under {}: {}", rootPath,
           notForgotten.getMessage());
       throw WorkerServiceException.unavailable("Removed-root volume cleanup failed; retry shortly");
+    }
+  }
+
+  private void markReplayUncertainForRegistrationDuringMigration(String rootPath) {
+    markReplayUncertainForWatchChangeDuringMigration();
+    if (mutationAdmission == null || !(jobQueue instanceof SwitchBufferCapableQueue journal)) return;
+    Path root = parsedRoot(rootPath);
+    if (root == null) return;
+    String generation = switchBufferOps.buildingGenerationForFileAdmission();
+    if (generation != null && journal.listSwitchBufferOpsStrictForGeneration(generation).stream()
+        .anyMatch(receipt -> "DELETE_PREFIX".equals(receipt.op())
+            && PathPrefixScope.decode(receipt.payload()).contains(root.toString()))) {
+      // Replaying an earlier removal could erase this later registration. Keep serving the
+      // current index and refuse promotion, including before a distinct candidate writer opens.
+      mutationAdmission.markReplayUncertain();
     }
   }
 

@@ -80,6 +80,7 @@ fn every_reconnect_requires_fresh_proof() {
         .unwrap();
     assert_ne!(fixture.host.child_pid(), predecessor);
     fixture.host.observe_manifest(&binding::ManifestFields {
+        incarnation: Some((fixture.host.session(), u64::from(fixture.host.incarnation_number()))),
         instance_id: Some("successor".into()),
         pid: fixture.host.child_pid(),
         api_port: Some(second),

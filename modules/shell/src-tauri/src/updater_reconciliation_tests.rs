@@ -63,6 +63,7 @@ while True:
         std::thread::sleep(Duration::from_millis(2));
     };
     fixture.host.observe_manifest(&ManifestFields {
+        incarnation: Some((fixture.host.session(), u64::from(fixture.host.incarnation_number()))),
         instance_id: Some("reconciliation-fixture".into()),
         pid: Some(pid),
         api_port: Some(port),

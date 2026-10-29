@@ -44,7 +44,7 @@ final class LedgerReconcilerTest {
 
   @Test
   @DisplayName("T10: gone → OWNER_DIED; alive and matching → child-survived, untouched;"
-      + " start unreadable → UNKNOWN; a second boot writes nothing")
+      + " start unreadable → UNKNOWN; a second boot carries the survivor")
   void closesOpenRecordsWithoutKilling() throws Exception {
     Path ledgerDir = LedgerFamily.directory(dataDir);
     ProcessTerminator terminator = ProcessTerminator.forCurrentOs();
@@ -97,14 +97,14 @@ final class LedgerReconcilerTest {
     assertOwnerDied(byChild.get("c-intent"), "OPEN_INTENT", "GONE", "OWNER_DIED");
     assertOwnerDied(byChild.get("c-spawn-only"), "OPEN_SPAWN", "IDENTITY_UNKNOWN", "UNKNOWN");
 
-    // Incarnation C: everything is closed, so nothing more is written.
+    // Incarnation C: only the live survivor stays open and is carried forward.
     long lines = Files.readAllLines(LedgerFamily.CHILDREN.current(ledgerDir)).size();
     ExitLedgerWriter c = writer(ledgerDir, 6262L, "2026-10-06T10:00:00Z");
     LedgerReconciler.Result second =
         new LedgerReconciler(ledgerDir, LedgerSink.of(c), LedgerReconciler.osIdentity(terminator))
             .reconcile();
-    assertEquals(new LedgerReconciler.Result(0, 0, 0, 0), second);
-    assertEquals(lines, Files.readAllLines(LedgerFamily.CHILDREN.current(ledgerDir)).size());
+    assertEquals(new LedgerReconciler.Result(0, 0, 1, 0), second);
+    assertEquals(lines + 1, Files.readAllLines(LedgerFamily.CHILDREN.current(ledgerDir)).size());
     assertTrue(alive.isAlive());
 
     for (String line : Files.readAllLines(LedgerFamily.CHILDREN.current(ledgerDir))) {

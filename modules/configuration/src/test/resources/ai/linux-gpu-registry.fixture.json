@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 2,
+  "packages": [
+    {
+      "id": "cuda-runtime",
+      "nativeTarget": "windows-x86_64",
+      "tier": "runtime",
+      "minVramBytes": 0,
+      "requiresCuda": true,
+      "targetDir": "cuda12",
+      "supportingFiles": []
+    },
+    {
+      "id": "cuda-runtime-linux",
+      "replaces": "cuda-runtime",
+      "nativeTarget": "linux-x86_64",
+      "tier": "runtime",
+      "minVramBytes": 0,
+      "requiresCuda": true,
+      "targetDir": "cuda12",
+      "supportingFiles": [
+        {
+          "filename": "gpu.zip",
+          "sizeBytes": 100,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "downloadUrl": "https://example/gpu.zip",
+          "extract": true
+        }
+      ],
+      "installRoot": "native-bin/llama-server/variants"
+    },
+    {
+      "id": "search",
+      "minVramBytes": 0,
+      "tier": "retrieval-core",
+      "targetDir": "search",
+      "variants": [
+        {
+          "filename": "cpu.onnx",
+          "targetEP": "CPU",
+          "precision": "FP32",
+          "sizeBytes": 10,
+          "sha256": "abc",
+          "downloadUrl": "https://example/cpu"
+        },
+        {
+          "filename": "gpu.onnx",
+          "targetEP": "CUDA",
+          "precision": "FP16",
+          "sizeBytes": 10,
+          "sha256": "abc",
+          "downloadUrl": "https://example/gpu"
+        }
+      ],
+      "dependsOn": [
+        "cuda-runtime"
+      ]
+    },
+    {
+      "id": "chat",
+      "label": "Chat",
+      "tier": "llm",
+      "targetDir": "chat",
+      "minVramBytes": 7500000000,
+      "dependsOn": [
+        "cuda-runtime"
+      ],
+      "variants": [
+        {
+          "filename": "chat.gguf",
+          "targetEP": "LLAMA_SERVER",
+          "precision": "GGUF",
+          "sizeBytes": 10,
+          "sha256": "abc",
+          "downloadUrl": "https://example/chat"
+        }
+      ]
+    }
+  ],
+  "purpose": "Test only: published Linux GPU packs, never release coordinates"
+}

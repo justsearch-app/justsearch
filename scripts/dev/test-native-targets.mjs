@@ -17,7 +17,7 @@ assert.throws(() => executableName('unknown'), /Unknown native executable/);
 const gradleArgs = [':modules:configuration:test', '--tests', '*NativeTargetsContractTest',
   ':modules:app-inference:test', '--tests', '*InferenceLinuxResolutionTest',
   ':modules:app-services:test', '--tests', '*RuntimeNativeResolutionTest', '--tests', '*NativeExecutableModeTest', '--tests', '*DownloadLinuxCommandTest',
-  '-PskipWebBuild=true', '--no-daemon'];
+  '-PskipWebBuild=true'];
 const result = runToolSync('gradle', gradleArgs, { repoRoot: root, cwd: root, stdio: 'inherit' });
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);

@@ -593,13 +593,27 @@ final class RootLifecycleOps {
 
         // Membership plus its retry reason must survive a stop at any later step.
         // Keep durable-store failures visible to the caller, as before.
+        String previousWalkError = watchedRootsState.getWalkError(normalized);
         watchedRootsState.beginRemoval(normalized);
         int deletedJobs = 0;
         try {
             // Independently declared descendants retain their watchers and documents.
-            workerWatchFn.unwatch(normalized.toString(), engineContext);
-            if (!coveredByAncestor) {
+            if (coveredByAncestor) {
+                workerWatchFn.unwatch(normalized.toString(), engineContext);
+            } else {
+                // The durable removal marker authorizes watcher retirement inside the scoped
+                // deletion. Keep retirement, journalling and deletion in one Worker admission.
                 DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
+                if (response != null && response.getDeletedJobs() == 0 && !response.getBuffered()
+                        && io.justsearch.configuration.persistence.WatchedRootsFormat
+                                .REMOVAL_REFUSED_DURING_SWITCHING.equals(response.getError())) {
+                    if (!WatchedRootsState.REMOVAL_INCOMPLETE.equals(previousWalkError)) {
+                        watchedRootsState.cancelRemoval(normalized, previousWalkError);
+                    }
+                    throw new io.justsearch.app.api.knowledge.KnowledgeClientException(
+                            io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE,
+                            response.getError());
+                }
                 if (response != null && response.getBuffered()) {
                     throw new io.justsearch.app.api.knowledge.KnowledgeClientException(
                             io.justsearch.app.api.knowledge.KnowledgeClientException.Status.UNAVAILABLE,

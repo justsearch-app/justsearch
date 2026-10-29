@@ -23,6 +23,8 @@ node scripts/docs/docs-validate.mjs
 python -m jseval --help
 ```
 
+For fresh named-check evidence, ingest verification and other [recurring jobs](../docs/reference/contributing/agent-guide.md#recurring-jobs), see the contributor guide.
+
 ## Choose Your Tool
 
 | What you want to do | Script/Directory |
@@ -89,6 +91,9 @@ python -m jseval --help
 | `verify-prerequisites.mjs` | Verify AI prerequisites (models, VRAM). |
 
 There is no single "canonical gate" wrapper (slice 3a-1-8f §B.12 + §B.14, 2026-05-12). Pre-merge verification is per-subject — see [Pre-merge Checks](../docs/reference/contributing/pre-merge-checks.md).
+
+Run `node scripts/dev/run-gh.mjs shepherd N --timeout-sec 5400` in the background for validated enqueue and merge observation in one process (optional `--repo owner/repo`), ending with a verdict and bounded failure excerpts.
+For failed jobs, decide and run `gh run rerun <run-id> --failed` yourself, then run `shepherd` or `merge-wait` again. [The agent guide](../docs/reference/contributing/agent-guide.md) documents the enqueue/merge-wait exit contract.
 
 ## Prerequisites
 

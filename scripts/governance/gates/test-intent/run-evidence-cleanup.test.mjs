@@ -1,10 +1,12 @@
-/** Filesystem boundary checks. Git and test commands are intercepted; no product process runs. */
+/** Filesystem boundary checks with intercepted runners and isolated real Git repositories. */
 import assert from 'node:assert/strict';
+import { spawnSync as realSpawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import * as changesets from './changeset.mjs';
@@ -49,6 +51,44 @@ test('--copy-node-modules creates independent ordinary files including linked de
     assert.equal(fs.readFileSync(path.join(dependency, 'marker'), 'utf8'), 'original',
       'changes in the before-worktree must not modify the candidate dependency');
     assert.ok(fs.lstatSync(sourceDependency).isSymbolicLink(), 'the candidate dependency link stays intact');
+  } finally {
+    for (const entry of linksIn(scratch)) fs.unlinkSync(entry);
+    assert.equal(path.dirname(scratch), path.resolve(os.tmpdir()));
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('vitest checks run in a --copy-node-modules before-worktree', (t) => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-vitest-copy-'));
+  // A shell-special checkout path must reach Vitest unexpanded.
+  const root = path.join(scratch, 'candidate$HOME');
+  const worktree = path.join(scratch, 'before$HOME');
+  const modules = path.join(root, 'modules', 'ui-web', 'node_modules');
+  const check = 'modules/ui-web/src/probe.test.ts#probe';
+  try {
+    // A package whose bin imports a sibling module, linked from .bin as npm installs it.
+    fs.mkdirSync(path.join(modules, 'vitest', 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(modules, '.bin'));
+    fs.writeFileSync(path.join(modules, 'vitest', 'package.json'), JSON.stringify({ name: 'vitest', bin: { vitest: 'vitest.mjs' } }));
+    fs.writeFileSync(path.join(modules, 'vitest', 'vitest.mjs'), "#!/usr/bin/env node\nimport './dist/cli.js';\n", { mode: 0o755 });
+    fs.writeFileSync(path.join(modules, 'vitest', 'dist', 'cli.js'), `import fs from 'node:fs';
+const out = process.argv.find((a) => a.startsWith('--outputFile=')).slice('--outputFile='.length);
+fs.writeFileSync(out, JSON.stringify({ testResults: [{ name: 'src/probe.test.ts', status: 'passed',
+  assertionResults: [{ title: 'probe', fullName: 'probe', status: 'passed' }] }] }));
+`);
+    try {
+      fs.symlinkSync(path.join('..', 'vitest', 'vitest.mjs'), path.join(modules, '.bin', 'vitest'));
+    } catch (e) {
+      if (process.platform === 'win32' && e.code === 'EPERM') return t.skip('file symlink privilege is unavailable');
+      throw e;
+    }
+    fs.mkdirSync(path.join(worktree, 'modules', 'ui-web'), { recursive: true });
+    const result = vm.runInNewContext(`${functions}
+      prepareNodeModules(worktree, true);
+      runChecks([check], worktree).results.get(check);`, {
+      ...evidence, ...runners, fs, path, os, spawnSync, process, REPO_ROOT: root, IS_WIN: process.platform === 'win32', worktree, check,
+    });
+    assert.deepEqual(result.cases.map((c) => c.status), ['passed'], `vitest must run from the copied dependencies:\n${result.buildOutput}`);
   } finally {
     for (const entry of linksIn(scratch)) fs.unlinkSync(entry);
     assert.equal(path.dirname(scratch), path.resolve(os.tmpdir()));
@@ -243,3 +283,97 @@ test('partial worktree creation still detaches links and attempts removal after 
     assert.match(result.error?.message ?? '', /checkout interrupted/);
   });
 });
+
+// Real Git repositories exercise object storage and linked-worktree path resolution.
+function hashFixture(linked, check) {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-hash-'));
+  const repo = path.join(scratch, 'repo');
+  const git = (args, cwd = repo, env = process.env) => {
+    const result = realSpawnSync('git', args, { cwd, env, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  try {
+    fs.mkdirSync(repo);
+    git(['init', '-q']);
+    git(['config', 'core.autocrlf', 'false']);
+    git(['config', 'lfs.repositoryformatversion', '0']);
+    fs.writeFileSync(path.join(repo, 'modified'), 'original\n');
+    fs.writeFileSync(path.join(repo, 'deleted'), 'delete me\n');
+    git(['add', '-A']);
+    git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+      '-c', 'commit.gpgsign=false', 'commit', '-qm', 'baseline']);
+    const root = linked ? path.join(scratch, 'linked') : repo;
+    if (linked) git(['worktree', 'add', '--detach', root, 'HEAD']);
+    fs.writeFileSync(path.join(root, 'modified'), 'changed\n');
+    fs.writeFileSync(path.join(root, 'added'), 'new content\n');
+    fs.rmSync(path.join(root, 'deleted'));
+    check({ scratch, repo, root, git });
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+function gitSnapshot(dir) {
+  return Object.fromEntries(fs.readdirSync(dir, { recursive: true }).sort().flatMap(rel => {
+    const file = path.join(dir, rel);
+    return fs.statSync(file).isFile() ? [[rel, fs.readFileSync(file).toString('base64')]] : [];
+  }));
+}
+
+for (const linked of [false, true]) {
+  test(`working-tree hash leaves Git directories untouched (${linked ? 'linked' : 'ordinary'} worktree)`, () => {
+    hashFixture(linked, ({ scratch, repo, root, git }) => {
+      // A split index and an index-change hook must not escape into the real Git directory.
+      git(['config', 'core.splitIndex', 'true']);
+      git(['update-index', '--split-index'], root);
+      const hooks = path.join(scratch, 'hooks');
+      fs.mkdirSync(hooks);
+      const marker = path.join(scratch, 'hook-ran');
+      fs.writeFileSync(path.join(hooks, 'post-index-change'), '#!/bin/sh\necho hook > "' + marker.replaceAll('\\', '/') + '"\n');
+      fs.chmodSync(path.join(hooks, 'post-index-change'), 0o755);
+      git(['config', 'core.hooksPath', hooks]);
+      const before = gitSnapshot(path.join(repo, '.git'));
+      const calls = [];
+      const spawnSync = (command, args, options) => {
+        calls.push({ args, env: options.env });
+        return realSpawnSync(command, args, options);
+      };
+      const hash = vm.runInNewContext(`${functions}\nworkingTreeHash(root)`, { fs, path, os, process, spawnSync, root });
+      assert.match(hash, /^[0-9a-f]{40,64}$/);
+      const after = gitSnapshot(path.join(repo, '.git'));
+      assert.deepEqual([...new Set([...Object.keys(before), ...Object.keys(after)])]
+        .filter(rel => before[rel] !== after[rel]), [], 'hashing must not write into Git directories');
+      for (const { args } of calls) {
+        assert.ok(args.some((arg, i) => arg === '-c' && args[i + 1] === 'core.fsmonitor=false'),
+          `every hashing Git invocation must disable fsmonitor: ${args.join(' ')}`);
+      }
+      const indexCalls = calls.filter(({ args }) => ['read-tree', 'add', 'write-tree'].some(cmd => args.includes(cmd)));
+      assert.equal(indexCalls.length, 3);
+      const objectDirectory = indexCalls[0].env.GIT_OBJECT_DIRECTORY;
+      for (const { args, env } of indexCalls) {
+        assert.ok(objectDirectory && path.isAbsolute(objectDirectory), 'hashing must use scratch object storage');
+        assert.equal(env.GIT_OBJECT_DIRECTORY, objectDirectory);
+        assert.notEqual(objectDirectory, path.join(repo, '.git', 'objects'));
+        assert.equal(JSON.parse(env.GIT_ALTERNATE_OBJECT_DIRECTORIES), path.join(repo, '.git', 'objects'));
+        assert.ok(args.includes('core.splitIndex=false'));
+        assert.ok(args.includes('core.hooksPath=/dev/null'));
+      }
+      assert.equal(fs.existsSync(marker), false, 'index hooks must not run');
+      assert.equal(fs.existsSync(objectDirectory), false, 'scratch objects must be removed');
+    });
+  });
+
+  test(`working-tree hash preserves the old added/modified/deleted tree (${linked ? 'linked' : 'ordinary'} worktree)`, () => {
+    hashFixture(linked, ({ scratch, root, git }) => {
+      const env = { ...process.env, GIT_INDEX_FILE: path.join(scratch, 'old-index') };
+      git(['read-tree', 'HEAD'], root, env);
+      git(['add', '-A'], root, env);
+      const expected = git(['write-tree'], root, env);
+      const actual = vm.runInNewContext(`${functions}\nworkingTreeHash(root)`, {
+        fs, path, os, process, spawnSync: realSpawnSync, root,
+      });
+      assert.equal(actual, expected);
+    });
+  });
+}

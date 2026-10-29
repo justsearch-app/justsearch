@@ -9944,6 +9944,10 @@ public final class KnowledgeServer implements Closeable {
         if (ignoredFence == null) {
           throw new IllegalStateException("Migration mutation admission did not drain");
         }
+        if (!io.justsearch.configuration.persistence.WatchedRootsFormat.pendingRemovals(dataDir).isEmpty()) {
+          services.ingestService().watcherReplayRefusal("Root removal incomplete; retry Remove before cutover");
+          return; // The durable intent may precede its receipt, including after a restart.
+        }
         if (!services.mutationAdmission().runtimeReplayCertain()) {
           indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
           throw new IOException("Migration has an unrecorded watcher mutation; rescan before retry");
@@ -9991,7 +9995,7 @@ public final class KnowledgeServer implements Closeable {
   private IndexGenerationManager.State promoteServingSuccessor(
       IndexGenerationManager.BootOwnership.Recorded recorded, int cutoverMaxFailedJobs)
       throws IOException, InterruptedException {
-    if (recorded != null || nativePolicyRootBindings == null) {
+    if (nativePolicyRootBindings == null) {
       return promoteServingSuccessorUnderRoots(recorded, cutoverMaxFailedJobs, null);
     }
     if (runtimeSwapLock.isHeldByCurrentThread()) throw new IOException("Native root owner must precede runtime ownership");
@@ -10055,6 +10059,10 @@ public final class KnowledgeServer implements Closeable {
       try (var fence = current.mutationAdmission().beginFinalFence(
           current.mutationOwnerToken(), 10_000)) {
         if (fence == null) return null;
+        if (!io.justsearch.configuration.persistence.WatchedRootsFormat.pendingRemovals(dataDir).isEmpty()) {
+          current.ingestService().watcherReplayRefusal("Root removal incomplete; retry Remove before cutover");
+          return null;
+        }
         if (!current.mutationAdmission().runtimeReplayCertain()) {
           throw new IOException("Unrecorded watcher mutation prevents certified promotion");
         }
@@ -10779,11 +10787,11 @@ public final class KnowledgeServer implements Closeable {
     if (snapshot == null || frozen == null) throw new IOException("Native policy waits for complete migration declarations");
     var current = nativePolicyDeclaredRoots(snapshot, official);
     var available = KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, snapshot.collections(), JSON);
-    if (!new java.util.HashSet<>(current).equals(new java.util.HashSet<>(available))
-        || !new java.util.HashSet<>(frozen).equals(new java.util.HashSet<>(current))) {
+    if (!new java.util.HashSet<>(current).equals(new java.util.HashSet<>(available))) {
       throw new IOException("Native policy declarations changed since migration enumeration");
     }
-    return frozen;
+    return KnowledgeServerMigrationOps.migrationRootsAfterRecordedRemovals(
+        frozen, current, jobQueue, indexGenerationManager.readStateBestEffort().building_generation());
   }
 
   private List<ResolvedConfig.FileSource> watcherReplayMigrationRoots() throws IOException {
@@ -10793,14 +10801,12 @@ public final class KnowledgeServer implements Closeable {
     if (frozen == null) throw new IOException("Watcher replay waits for migration declarations");
     try {
       var current = loadMigrationRoots(startupConfiguration);
-      if (!new java.util.HashSet<>(frozen).equals(new java.util.HashSet<>(current))) {
-        throw new IOException("Watcher replay declarations changed since migration enumeration");
-      }
+      return KnowledgeServerMigrationOps.migrationRootsAfterRecordedRemovals(
+          frozen, current, jobQueue, indexGenerationManager.readStateBestEffort().building_generation());
     } catch (IOException incomplete) {
       if (replayPublisher() != null) replayPublisher().watcherReplayRefusal(incomplete.getMessage());
       throw incomplete;
     }
-    return frozen;
   }
 
   private List<ResolvedConfig.FileSource> loadMigrationRoots(ResolvedConfig rc) throws IOException {

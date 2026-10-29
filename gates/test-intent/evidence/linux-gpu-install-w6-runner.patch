@@ -1,0 +1,32 @@
+--- a/scripts/governance/gates/test-intent/run-evidence.mjs
++++ b/scripts/governance/gates/test-intent/run-evidence.mjs
+@@ -184,7 +184,7 @@
+   for (const group of gradleGroups.values()) {
+     for (const { t } of group) fs.rmSync(path.join(root, t.resultFile), { force: true });
+     const filters = [...new Set(group.map(({ t }) => (t.method ? `${t.fqcn}.${t.method}` : t.fqcn)))];
+-    const wrapper = IS_WIN ? '.\\gradlew.bat' : './gradlew';
++    const wrapper = IS_WIN ? '.\\gradlew.bat' : 'js-gradle-slot -w 5400 ./gradlew';
+     const { project, task } = group[0].t;
+     const run = sh(`${wrapper} ${project}:${task} ${filters.map((f) => `--tests ${JSON.stringify(f)}`).join(' ')} --rerun -PskipWebBuild=true --console=plain`, root);
+     runs.push(run);
+@@ -285,8 +285,7 @@
+   // not only the node_modules link we created: a check or partial checkout can leave others.
+   // An unreadable directory or failed unlink aborts removal, leaving the tree for inspection.
+   unlinkWorktreeLinks(worktree);
+-  const removed = spawnSync('git', ['-c', 'core.longpaths=true', 'worktree', 'remove', '--force', worktree], { cwd: REPO_ROOT });
+-  if (removed.status !== 0) throw new Error(`before-state cleanup failed (${worktree}): ${removed.error?.message ?? removed.stderr}`);
++  fs.rmSync(worktree, { recursive: true });
+ }
+ 
+ function parseArgs(argv) {
+@@ -352,8 +351,9 @@
+     try {
+       // Git accepts the reserved empty directory. Keep creation inside the cleanup scope so a
+       // failed checkout cannot leave links behind without even attempting to detach them.
+-      gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
++      gitOut(['clone', '--quiet', '--shared', '--no-checkout', '.', wt], REPO_ROOT);
+       created = true;
++      gitOut(['-C', wt, 'checkout', '--quiet', '--detach', args.before], REPO_ROOT);
+       // Explicit compatibility scaffolding for checks using newly added interfaces. Its bytes are
+       // part of the evidence; repaired behavior must remain absent from this before-state patch.
+       const patches = args.beforePatches.map((rel) => {

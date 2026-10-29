@@ -1,0 +1,133 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-29T13:50:04.256Z",
+  "revision": "66b7e40f6befbceadeba7a6c8d31d4652f24e7af",
+  "tree": "d74f17928003c4910dfd16f852aa3fa22c20ee16",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17388
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2471
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2598
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds",
+      "file": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:fcc6ec96bc80b674c701dfb37bf4e75e81eaebcc2d2e558daf39b453f4bdbbdb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back",
+      "file": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:fcc6ec96bc80b674c701dfb37bf4e75e81eaebcc2d2e558daf39b453f4bdbbdb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds",
+      "file": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:fcc6ec96bc80b674c701dfb37bf4e75e81eaebcc2d2e558daf39b453f4bdbbdb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "11bcf0561c",
+    "revision": "11bcf0561c33a0156b935f975aea66a648ded9e6",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 13055,
+        "output": "\nrunning 1 test\ntest shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds ... FAILED\n\nfailures:\n\n---- shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds stdout ----\n\nthread 'shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds' (2125125) panicked at src/shell_commit_transport_tests.rs:72:13:\nassertion `left == right` failed: isolated manifest admission check failed:\n\nrunning 1 test\ntest shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds ... FAILED\n\nfailures:\n\nfailures:\n    shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.01s\n\n\n\nthread 'shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds' (2125132) panicked at src/shell_commit_transport_tests.rs:177:5:\nassertion `left == right` failed: another session with a reused PID cannot supply credentials\n  left: Some(42425)\n right: None\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  left: Some(101)\n right: Some(0)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.13s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/fix-91c3ab-b/tmp/evidence-before/test-intent-before-uzi7tb/modules/shell/src-tauri)\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:986:15\n    |\n986 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:572:19\n    |\n139 | impl EngineHost {\n    | --------------- method in this implementation\n...\n572 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:643:8\n    |\n599 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n643 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n646 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1733:10\n     |\n1733 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2118:4\n     |\n2118 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 10 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.84s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/fix-91c3ab-b/tmp/review-before-target/debug/deps/shell_lib-ac9bb47b2a700085)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 2583,
+        "output": "\nrunning 1 test\ntest shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back ... FAILED\n\nfailures:\n\n---- shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back stdout ----\n\nthread 'shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back' (2125569) panicked at src/shell_commit_transport_tests.rs:72:13:\nassertion `left == right` failed: isolated manifest admission check failed:\n\nrunning 1 test\ntest shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back ... FAILED\n\nfailures:\n\nfailures:\n    shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.01s\n\n\n\nthread 'shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back' (2125577) panicked at src/shell_commit_transport_tests.rs:211:5:\nassertion `left == right` failed: wall-clock rollback cannot reject the owned incarnation\n  left: None\n right: Some(42426)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  left: Some(101)\n right: Some(0)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.12s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/fix-91c3ab-b/tmp/evidence-before/test-intent-before-uzi7tb/modules/shell/src-tauri)\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:986:15\n    |\n986 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:572:19\n    |\n139 | impl EngineHost {\n    | --------------- method in this implementation\n...\n572 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:643:8\n    |\n599 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n643 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n646 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1733:10\n     |\n1733 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2118:4\n     |\n2118 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 10 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.39s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/fix-91c3ab-b/tmp/review-before-target/debug/deps/shell_lib-ac9bb47b2a700085)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 2622,
+        "output": "\nrunning 1 test\ntest shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds ... FAILED\n\nfailures:\n\n---- shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds stdout ----\n\nthread 'shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds' (2126056) panicked at src/shell_commit_transport_tests.rs:72:13:\nassertion `left == right` failed: isolated manifest admission check failed:\n\nrunning 1 test\ntest shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds ... FAILED\n\nfailures:\n\nfailures:\n    shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.01s\n\n\n\nthread 'shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds' (2126071) panicked at src/shell_commit_transport_tests.rs:242:9:\nassertion `left == right` failed: an absent or malformed incarnation cannot supply credentials\n  left: Some(42427)\n right: None\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  left: Some(101)\n right: Some(0)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.12s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/fix-91c3ab-b/tmp/evidence-before/test-intent-before-uzi7tb/modules/shell/src-tauri)\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:986:15\n    |\n986 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:572:19\n    |\n139 | impl EngineHost {\n    | --------------- method in this implementation\n...\n572 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:643:8\n    |\n599 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n643 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n646 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1733:10\n     |\n1733 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2118:4\n     |\n2118 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 10 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.43s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/fix-91c3ab-b/tmp/review-before-target/debug/deps/shell_lib-ac9bb47b2a700085)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds",
+        "classification": "assertion",
+        "detail": "shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds:  ---- shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds stdout ----\n\nthread 'shell_actuator::commit_transport_tests::competing_incarnation_with_reused_pid_never_binds' (2125125) panicked at src/shell_commit_transport_tests.rs:72:13:\nassertion `left == right` failed: isolated manifest admission check failed:\n\nrunning 1 test\ntest shell_actuator::commit_transport_tests:"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back",
+        "classification": "assertion",
+        "detail": "shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back:  ---- shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back stdout ----\n\nthread 'shell_actuator::commit_transport_tests::own_incarnation_binds_after_wall_clock_steps_back' (2125569) panicked at src/shell_commit_transport_tests.rs:72:13:\nassertion `left == right` failed: isolated manifest admission check failed:\n\nrunning 1 test\ntest shell_actuator::commit_transport_tests:"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds",
+        "classification": "assertion",
+        "detail": "shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds:  ---- shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds stdout ----\n\nthread 'shell_actuator::commit_transport_tests::manifest_without_incarnation_never_binds' (2126056) panicked at src/shell_commit_transport_tests.rs:72:13:\nassertion `left == right` failed: isolated manifest admission check failed:\n\nrunning 1 test\ntest shell_actuator::commit_transport_tests::manifest_without_incarnati"
+      }
+    ]
+  },
+  "digest": "sha256:26968283f15a0887b473d9eee6cb632beef1880ffba29bffce9df9e4833f1446"
+}

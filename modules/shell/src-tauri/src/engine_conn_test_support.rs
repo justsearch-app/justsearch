@@ -18,6 +18,7 @@ impl Fixture {
         command.arg("60");
         let pid = host.admit(PreparedCommand { command }).unwrap().pid;
         host.observe_manifest(&ManifestFields {
+            incarnation: Some((host.session(), u64::from(host.incarnation_number()))),
             instance_id: Some("fixture-instance".into()),
             pid: Some(pid),
             api_port: Some(port),
@@ -144,6 +145,7 @@ while True:
             std::thread::sleep(Duration::from_millis(2));
         };
         self.host.observe_manifest(&ManifestFields {
+            incarnation: Some((self.host.session(), u64::from(self.host.incarnation_number()))),
             instance_id: Some(instance.into()),
             pid: Some(pid),
             api_port: Some(port),

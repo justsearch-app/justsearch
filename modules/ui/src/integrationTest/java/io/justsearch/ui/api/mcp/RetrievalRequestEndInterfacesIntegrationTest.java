@@ -49,6 +49,57 @@ final class RetrievalRequestEndInterfacesIntegrationTest extends MmrEngineFixtur
   private static final ConversationShapeRef SHAPE = new ConversationShapeRef("core.request-end");
 
   @Test
+  void preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted() throws Exception {
+    start(null);
+    try (var interfaces = new Interfaces()) {
+      // Fail the real hybrid pre-search, before the rich retrieval port is reached.
+      var provider = new MmrFailureInterfacesIntegrationTest.ScriptedProvider(
+          MmrFailureInterfacesIntegrationTest.Failure.QUERY_NAN);
+      worker.setEmbeddingProvider(provider);
+      clearInvocations(interfaces.adapter);
+      var rest = interfaces.request("rest", false, QUESTION);
+      var body = JSON.readTree(rest.body());
+      var mcp = interfaces.mcp(QUESTION);
+      System.out.println("PRESEARCH_FAILURE_REST status=" + rest.statusCode() + " body=" + body);
+      System.out.println("PRESEARCH_FAILURE_MCP " + mcp);
+      assertAll("restricted pre-search failure",
+          () -> assertEquals(500, rest.statusCode(), rest.body()),
+          () -> assertFalse(body.path("ok").asBoolean(true), body.toString()),
+          () -> assertTrue(body.path("error").asText().contains("non-finite"), body.toString()),
+          () -> assertFalse(body.has("context"), body.toString()),
+          () -> assertFalse(rest.body().contains(OUTSIDE), rest.body()),
+          () -> assertTrue(mcp.path("isError").asBoolean(), mcp.toString()),
+          () -> assertError(mcp.path("structuredContent"), "INTERNAL_ERROR"),
+          () -> assertTrue(mcp.path("structuredContent").path("error").asText()
+              .contains("non-finite"), mcp.toString()),
+          () -> assertFalse(mcp.toString().contains(OUTSIDE), mcp.toString()),
+          () -> verify(interfaces.adapter, never()).retrieveContext(any(RetrieveContextParams.class), any()),
+          () -> verify(interfaces.adapter, never()).fetchDocuments(any(), any()),
+          () -> assertEquals(2, provider.queries.get(), "one failed pre-search per interface"),
+          () -> assertEquals(0, provider.passages.get(), "pre-search fails before MMR"));
+
+      // P1: the same invalid pre-search vector without restrictions still recovers through
+      // BM25; the invalid MMR query then retains the positional passage pool.
+      var recovered = interfaces.request("rest", false, false, QUESTION);
+      var fallback = JSON.readTree(recovered.body());
+      var recoveredMcp = interfaces.mcp(QUESTION, false);
+      assertAll("unrestricted pre-search recovery",
+          () -> assertEquals(200, recovered.statusCode(), recovered.body()),
+          () -> assertTrue(fallback.path("ok").asBoolean(), fallback.toString()),
+          () -> assertEquals("BM25", fallback.path("quality").path("retrieval_mode").asText()),
+          () -> assertEquals(K, fallback.path("chunks").size(), fallback.toString()),
+          () -> assertFalse(recoveredMcp.path("isError").asBoolean(), recoveredMcp.toString()),
+          () -> assertEquals("BM25", recoveredMcp.path("structuredContent")
+              .path("quality").path("retrievalMode").asText()),
+          () -> assertEquals(K, recoveredMcp.path("structuredContent").path("citations").size()),
+          () -> verify(interfaces.adapter, times(2)).retrieveContext(any(RetrieveContextParams.class), any()),
+          () -> verify(interfaces.adapter, never()).fetchDocuments(any(), any()),
+          () -> assertEquals(6, provider.queries.get(), "unrestricted interfaces reach pre-search and MMR"),
+          () -> assertEquals(0, provider.passages.get(), "invalid MMR query avoids passage inference"));
+    }
+  }
+
+  @Test
   void realEngineBudgetExpiresThroughHttpAndSavedConversation() throws Exception {
     start(null);
     try (var interfaces = new Interfaces()) {
@@ -69,8 +120,18 @@ final class RetrievalRequestEndInterfacesIntegrationTest extends MmrEngineFixtur
     start(null);
     try (var interfaces = new Interfaces()) {
       interfaces.mode = Mode.DEADLINE;
-      // Chosen-file retrieval expiry remains an uncited whole-document answer (D2b/P10).
-      var scoped = JSON.readTree(interfaces.request("rest", true, QUESTION).body());
+      // WP2.3 D7/F3: an active folder restriction cannot broaden to an unchecked fetch.
+      clearInvocations(interfaces.adapter);
+      var restricted = interfaces.request("rest", true, QUESTION);
+      assertEquals(504, restricted.statusCode(), restricted.body());
+      assertError(JSON.readTree(restricted.body()), "TIMEOUT");
+      var mcp = interfaces.mcp(QUESTION);
+      assertTrue(mcp.path("isError").asBoolean(), mcp.toString());
+      assertError(mcp.path("structuredContent"), "TIMEOUT");
+      verify(interfaces.adapter, never()).fetchDocuments(any(), any());
+
+      // P1: chosen-file expiry without restrictions still answers from whole documents.
+      var scoped = JSON.readTree(interfaces.request("rest", true, false, QUESTION).body());
       assertTrue(scoped.path("ok").asBoolean(), scoped.toString());
       assertEquals("FULLTEXT_FALLBACK", scoped.path("quality").path("retrieval_mode").asText());
       assertEquals(0, scoped.path("chunks").size());
@@ -138,10 +199,20 @@ final class RetrievalRequestEndInterfacesIntegrationTest extends MmrEngineFixtur
       interfaces.assertSuccessfulConversation(true, false, missing);
 
       interfaces.mode = Mode.ORDINARY;
-      var fallback = JSON.readTree(interfaces.request("rest", false, QUESTION).body());
+      // WP2.3 D7/F3: ordinary rich-port failure also fails closed when restricted.
+      clearInvocations(interfaces.adapter);
+      var restricted = JSON.readTree(interfaces.request("rest", false, QUESTION).body());
+      assertFalse(restricted.path("ok").asBoolean(), restricted.toString());
+      assertTrue(restricted.path("error").asText().contains("ordinary retrieval failure"));
+      assertFalse(restricted.toString().contains("No relevant passages found"));
+      assertTrue(interfaces.mcp(QUESTION).path("isError").asBoolean());
+      verify(interfaces.adapter, never()).fetchDocuments(any(), any());
+
+      // P1: unrestricted recovery keeps the previous fallback and no-content distinction.
+      var fallback = JSON.readTree(interfaces.request("rest", false, false, QUESTION).body());
       assertTrue(fallback.path("ok").asBoolean(), fallback.toString());
       assertEquals("FULLTEXT_FALLBACK", fallback.path("quality").path("retrieval_mode").asText());
-      assertFalse(interfaces.mcp(QUESTION).path("isError").asBoolean());
+      assertFalse(interfaces.mcp(QUESTION, false).path("isError").asBoolean());
       interfaces.assertTerminalConversation(false, "NO_CONTENT", null);
       interfaces.assertSuccessfulConversation(true, false);
     }
@@ -234,12 +305,17 @@ final class RetrievalRequestEndInterfacesIntegrationTest extends MmrEngineFixtur
     }
 
     HttpResponse<String> request(String path, boolean chosen, String question) throws Exception {
+      return request(path, chosen, true, question);
+    }
+
+    HttpResponse<String> request(String path, boolean chosen, boolean restricted, String question)
+        throws Exception {
       Map<String, Object> body = new LinkedHashMap<>();
       body.put("query", question);
       body.put("top_k", K);
       body.put("max_tokens", 6000);
       body.put("auto_entity_extract", false);
-      body.put("filters", Map.of("path_prefix", article.getParent().toString()));
+      if (restricted) body.put("filters", Map.of("path_prefix", article.getParent().toString()));
       if (chosen) body.put("doc_ids", List.of(article.toString()));
       if (path.equals("mcp")) body = Map.of("jsonrpc", "2.0", "id", 1, "method", "tools/call",
           "params", Map.of("name", "justsearch_answer", "arguments", body));
@@ -252,7 +328,11 @@ final class RetrievalRequestEndInterfacesIntegrationTest extends MmrEngineFixtur
     }
 
     JsonNode mcp(String question) throws Exception {
-      var response = request("mcp", false, question);
+      return mcp(question, true);
+    }
+
+    JsonNode mcp(String question, boolean restricted) throws Exception {
+      var response = request("mcp", false, restricted, question);
       assertEquals(200, response.statusCode(), response.body());
       var envelope = JSON.readTree(response.body());
       assertFalse(envelope.has("error"), envelope.toString());

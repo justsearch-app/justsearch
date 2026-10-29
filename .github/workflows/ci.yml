@@ -193,6 +193,14 @@ jobs:
       - name: Workflow trigger policy guard
         run: node scripts/ci/check-workflow-triggers.mjs
 
+      - name: Test runtime manifest closure guard
+        run: node scripts/ci/test-check-runtime-manifest-closure.mjs
+
+      - name: Runtime manifest closure guard
+        # Advisory: literal-path regexes match comments and non-dataDir bases; zero real violations found so far.
+        continue-on-error: true
+        run: node scripts/ci/check-runtime-manifest-closure.mjs
+
       - name: Governance production coverage regression tests
         run: node scripts/ci/test-check-governance-ci-coverage.mjs
 
@@ -354,8 +362,10 @@ jobs:
       - name: Test managed PR review record
         run: node scripts/ci/test-pr-review-record.mjs
 
-      - name: Test validated publication enqueue
-        run: node scripts/dev/run-gh.test.mjs
+      - name: Test developer publication and pre-push commands
+        run: |
+          node scripts/dev/run-gh.test.mjs
+          node scripts/dev/java-prepush.test.mjs
 
       - name: Test bounded advisory reporting
         run: node scripts/ci/test-report-github-advisories.mjs

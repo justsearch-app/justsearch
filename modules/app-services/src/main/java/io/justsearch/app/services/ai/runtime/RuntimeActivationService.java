@@ -823,7 +823,7 @@ public final class RuntimeActivationService
   public Attempt startActivate(String variantId, String chatProfile) {
     String v = variantId == null ? "" : variantId.trim();
     if (v.isBlank()) {
-      if (NativeTargets.current().supportsRuntimePacks()) {
+      if (NativeTargets.current().hasCpuBaselineRuntime()) {
         throw new IllegalArgumentException("variantId is required");
       }
       v = "default";
@@ -1155,11 +1155,18 @@ public final class RuntimeActivationService
 
   /** Resolve one candidate, preserving the operator's exact Linux runtime path. */
   static Path activationExecutable(Path root, String variantId, Path operatorExe) {
-    boolean runtimePacks = NativeTargets.current().supportsRuntimePacks();
     boolean defaultVariant = variantId == null || variantId.isBlank() || "default".equals(variantId);
+    // Linux has no bundled default runtime. An omitted/default variant preserves operator paths.
+    if (!NativeTargets.current().hasCpuBaselineRuntime() && defaultVariant && operatorExe != null) {
+      if (!Files.isRegularFile(operatorExe) || !Files.isExecutable(operatorExe)) {
+        throw new IllegalStateException("JUSTSEARCH_SERVER_EXE must name a regular executable file: " + operatorExe);
+      }
+      return operatorExe;
+    }
+    boolean runtimePacks = NativeTargets.current().supportsRuntimePacks();
     if (!runtimePacks) {
       if (!defaultVariant) {
-        throw new IllegalStateException("Runtime packs are Windows-only; use the default variant with JUSTSEARCH_SERVER_EXE.");
+        throw new IllegalStateException("Runtime packs are unavailable on this target; use JUSTSEARCH_SERVER_EXE.");
       }
       if (operatorExe == null || !Files.isRegularFile(operatorExe) || !Files.isExecutable(operatorExe)) {
         throw new IllegalStateException("JUSTSEARCH_SERVER_EXE must name a regular executable file: " + operatorExe);
@@ -1167,9 +1174,15 @@ public final class RuntimeActivationService
       return operatorExe;
     }
     String name = NativeTargets.current().executableName("llama-server");
-    Path exe = root.resolve(variantId).resolve(name);
-    if (!Files.isRegularFile(exe) && defaultVariant) exe = root.getParent().resolve(name);
+    Path exe = root.resolve(defaultVariant && !NativeTargets.current().hasCpuBaselineRuntime()
+        ? "cuda12" : variantId).resolve(name);
+    if (!Files.isRegularFile(exe) && defaultVariant && NativeTargets.current().hasCpuBaselineRuntime()) {
+      exe = root.getParent().resolve(name);
+    }
     if (!Files.isRegularFile(exe)) throw new IllegalStateException("Variant not installed: " + variantId);
+    if (!NativeTargets.current().hasCpuBaselineRuntime() && !Files.isExecutable(exe)) {
+      throw new IllegalStateException("Variant not executable: " + variantId);
+    }
     return exe;
   }
 
@@ -1618,12 +1631,13 @@ public final class RuntimeActivationService
 
   private List<AiRuntimeStatusResponse.InstalledVariant> listInstalledVariants() {
     List<AiRuntimeStatusResponse.InstalledVariant> out = new ArrayList<>();
-    if (!NativeTargets.current().supportsRuntimePacks()) {
+    if (!NativeTargets.current().hasCpuBaselineRuntime()
+        || !NativeTargets.current().supportsRuntimePacks()) {
       Path operator = operatorServerExeOrNull();
       if (operator != null && Files.isRegularFile(operator) && Files.isExecutable(operator)) {
         out.add(new AiRuntimeStatusResponse.InstalledVariant("default", operator.toString()));
       }
-      return out;
+      if (!NativeTargets.current().supportsRuntimePacks()) return out;
     }
 
     // G17: Include the baseline exe as a synthetic "default" variant if it exists
@@ -1631,7 +1645,8 @@ public final class RuntimeActivationService
     Path root = variantsRoot();
     Path baselineExe = root.getParent().resolve(NativeTargets.current().executableName("llama-server"));
     boolean hasDefaultVariantDir = Files.isDirectory(root.resolve("default"));
-    if (Files.isRegularFile(baselineExe) && !hasDefaultVariantDir) {
+    if (NativeTargets.current().hasCpuBaselineRuntime()
+        && Files.isRegularFile(baselineExe) && !hasDefaultVariantDir) {
       out.add(
           new AiRuntimeStatusResponse.InstalledVariant(
               "default", baselineExe.toAbsolutePath().toString()));
@@ -1647,7 +1662,9 @@ public final class RuntimeActivationService
             .forEach(
                 dir -> {
                   Path exe = dir.resolve(NativeTargets.current().executableName("llama-server"));
-                  if (Files.isRegularFile(exe)) {
+                  if (Files.isRegularFile(exe)
+                      && (NativeTargets.current().hasCpuBaselineRuntime() || Files.isExecutable(exe))
+                      && out.stream().noneMatch(v -> v.variantId().equals(dir.getFileName().toString()))) {
                     out.add(
                         new AiRuntimeStatusResponse.InstalledVariant(
                             dir.getFileName().toString(),

@@ -11,6 +11,8 @@ const contracts = [...java, 'rust', 'frontend'];
 export const RULES = [
   // Shared PR filter changes must exercise every lane, including Gradle and Rust conformance.
   [/^scripts\/ci\/pr-flakes\.(?:mjs|tsv)$/, LANES],
+  // Shared Gradle conventions read this test filter when local pre-push mode is enabled.
+  [/^scripts\/dev\/prepush-excluded-tests\.tsv$/, LANES],
   // Documentation consumed by scoped code is an input, even though ordinary docs are cheap.
   [/^docs\/reference\/legal\/ai-runtime-and-model-redistribution\.md$/, ['license']],
   // The advisory axe sweep consumes Vite, the Python capture/gate and its fixtures,
