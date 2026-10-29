@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import runpy
 import shutil
 import subprocess
 import tarfile
@@ -168,12 +169,21 @@ def build(args):
                                            for name in ("gcc-13", "g++-13", "cmake", "ninja", "patchelf")}})
     manifest = work / "verified-inputs.json"
     manifest.write_text(json.dumps(provenance, indent=2) + "\n")
-    # Avoid copying redist libraries into another aggregate directory just for assembly.
+    # Link only runtime SONAMEs used by ORT/cuDNN and llama. Compiler stubs,
+    # NVBLAS and the unused multi-GPU solver do not belong in the pack.
     cuda = work / "cuda-runtime"
-    cuda.mkdir(exist_ok=True)
-    for name, directory in directories.items():
-        if name not in ("llama", "ort", "cudnn", "cuda_nvcc", "cuda_cccl"):
-            link_tree(directory / "lib", cuda / name)
+    if cuda.exists():
+        shutil.rmtree(cuda)  # This tree contains links only, never original inputs.
+    cuda.mkdir()
+    runtime_names = runpy.run_path(str(HERE / "assemble-linux-gpu-packs.py"))["CUDA_NAMES"]
+    for name in runtime_names:
+        candidates = {p.resolve() for key, directory in directories.items()
+                      if key not in ("llama", "ort", "cudnn", "cuda_nvcc", "cuda_cccl")
+                      for p in (directory / "lib").rglob(name)
+                      if p.is_file() and "stubs" not in p.parts}
+        if len(candidates) != 1:
+            raise ValueError(f"Expected one pinned runtime input for {name}: {candidates}")
+        (cuda / name).symlink_to(candidates.pop())
     command("python3", HERE / "assemble-linux-gpu-packs.py", "--llama-dir", build_dir / "bin",
             "--cuda-dir", cuda, "--cudnn-dir", directories["cudnn"] / "lib",
             "--ort-dir", directories["ort"], "--notices", notices, "--input-manifest", manifest,
