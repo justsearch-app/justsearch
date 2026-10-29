@@ -355,8 +355,9 @@ class CrashTests(unittest.TestCase):
             self.assertFalse(report['passed'])
             row=next(c for j in report['journeys'] for c in j['checks'] if c['status']=='owner-validation')
             self.assertIn('/usr/bin/other',row['reason'])
-            self.assertTrue(any(p.endswith('.png') for p in row['evidence']))
-            native.return_value.shot.assert_called_once()
+            self.assertIn('../guest-crashes.json', row['evidence'])
+            self.assertFalse(any(p.endswith('.png') for p in row['evidence']))
+            native.assert_not_called()
 
 
 if __name__=='__main__':unittest.main()

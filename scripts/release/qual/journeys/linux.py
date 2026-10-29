@@ -64,6 +64,7 @@ def package_install(run):
     run.facts['initialPackage'] = {'name': initial.name, 'sha256': digest(initial)}
     apt(run, 'install', target)
     paths = run.target.run(['dpkg-query', '-L', 'just-search']).stdout.splitlines()
+    run.facts['engineWorkingDirectories'] = sorted({str(Path(p).parent) for p in paths if p.endswith('/ui-headless.jar')})
     binaries = [p for p in paths if p.endswith('/JustSearch') and '/bin/' in p]
     assert len(binaries) == 1, 'Package has no unique installed executable'
     run.binary = binaries[0]
@@ -526,7 +527,7 @@ def open_update_offer(run, evidence):
     banner = wait_for(lambda: update_banner(run),
                       'Update banner visible', seconds=45, error=Infrastructure)
     expected_candidate = run.require('initialVersion')
-    assert expected_candidate in banner, 'Update banner does not name the candidate version'
+    assert re.search(r'(?<![\w.+~-])' + re.escape(expected_candidate) + r'(?![\w+~-]|\.\w)', banner), 'Update banner does not name the candidate version'
     run.native.shot(evidence + '-banner')
     action = run.wd.execute("return all(document,'button[aria-label=\"Open app update settings\"]').some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0})")
     if action:
@@ -754,10 +755,13 @@ def remove_reinstall(run):
 def desktop_entry(run):
     require_candidate(run)
     run.require('ready')
+    exists = run.target.run(['test', '-e', '/usr/share/applications/JustSearch.desktop'], check=False)
+    if exists.returncode == 1:
+        raise ProductFailure('Installed package is missing JustSearch.desktop')
+    if exists.returncode:
+        raise Infrastructure('Cannot test installed desktop entry existence: ' + exists.stderr)
     result = run.target.run(['cat', '/usr/share/applications/JustSearch.desktop'], check=False)
     if result.returncode:
-        if 'No such file or directory' in result.stderr:
-            raise ProductFailure('Installed package is missing JustSearch.desktop')
         raise Infrastructure('Cannot read installed desktop entry: ' + result.stderr)
     entry = result.stdout
     assert 'MimeType=x-scheme-handler/justsearch;' in entry, 'Desktop entry lacks the deep-link handler'

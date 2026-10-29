@@ -92,6 +92,8 @@ jobs:
           sys.path.insert(0, 'scripts/release/qual/journeys')
           from runner import collect_hosted_crashes
           out = Path(os.environ['RUNNER_TEMP']) / 'journey-evidence'
+          # Collection is not proven armed or finished; its owner-validation row
+          # caps a successful hosted result at pending validation (exit 2).
           crash_result = collect_hosted_crashes(out, sys.argv[1])
           summary = Path(os.environ['RUNNER_TEMP']) / 'journey-evidence/summary.json'
           status = json.loads(summary.read_text())['status'] if summary.exists() else 'summary unavailable'

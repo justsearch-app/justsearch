@@ -137,18 +137,33 @@ product pass: shell banners, notification-center text and foreign windows can
 cover app pixels even when its compositor PID and geometry are stable. Shell
 modal/banner guards, repeated OCR before-reads and unique OCR tokens are removed.
 Apport still records crashes; only bounded diagnostic fields are transferred.
-Crashes collected before installation are retained separately under `before-install/`.
+Crashes collected while dpkg-query confirms the package is absent are retained
+separately under `before-install/`. On an installed snapshot, the setup sweep
+attributes crashes normally; snapshot boot never exempts product crashes.
 The hosted workflow installs systemd-coredump and attributes its JSON entries after
 the run, using the same crash rules and recorded app processes. Product crashes
 fail the lane; unknown crashes require owner validation; collection errors fail as
-infrastructure. CoreDump bytes are skipped while scanning, so later diagnostic fields are retained.
+infrastructure. Hosted collection is not proven armed or finished: every hosted
+collection summary includes the owner-validation row `hosted crash collection unproven`,
+linking `coredumps.json` and `hosted-crashes.json`. Even an empty journal cannot
+yield better than `passed-pending-owner-validation` (exit 2); a product crash
+still fails the lane. CoreDump bytes are skipped while scanning, so later diagnostic fields are retained.
 Installed package paths are read and every report is attributed
 before reports move aside, so a lookup failure leaves reports available for retry.
 A report naming Package: just-search, an installed package executable, a bundled
 JVM or a WebKit subprocess is a product finding, as is a report belonging to the
 observed app process tree. Process observations retain PID/start identities and
-parent relationships. Other reports add an owner-validation row with their
-summary and a plain screenshot; command-line mentions alone do not blame the product.
+parent relationships. Other reports add an owner-validation row with their summary
+and crash record as evidence; crash owner-validation rows in both VM and hosted
+lanes do not require a screenshot. Every other owner-validation row still requires
+a screenshot. Command-line mentions alone do not blame the product.
+Both lanes also collect `hs_err_pid*.log` files modified during the run from the
+Engine working directory, `/tmp`, the app user's home and the app's `crashes/`
+directory. The shared runner records its start timestamp on the target before
+launches, ignores older snapshot logs, and collects after stopping its processes.
+`jvm-crashes.json` retains source paths and diagnostic contents (up to 4 MB per
+file and 20 MB total, with truncation recorded). Any such file fails the lane as
+a bundled JVM product crash, even without an Apport or coredump record.
 Journald and swap remain enabled.
 Every journey records synced whole-device write and swap-counter deltas,
 without double-counting disk partitions. Overlay summaries record boot through
@@ -279,9 +294,10 @@ attribution if the last observation is an infrastructure error.
 A complete lane without failed or unavailable checks reports `status: passed`
 only when every executed result is automatically proven. Any owner-validation
 rows change it to `passed-pending-owner-validation`; `ownerValidation` lists
-journey/check IDs and screenshot paths. Its `passed` boolean stays false and
+journey/check IDs and screenshot paths, or crash evidence paths for crash rows.
+Its `passed` boolean stays false and
 its process exits with code 2 (failed or incomplete lanes use code 1). Review those
-screenshots as part of the owner's final
+screenshots and crash records as part of the owner's final
 visual release validation and record that validation alongside the release
 evidence. The runner never converts an owner-validation row into a pass.
 Failed or unavailable rows keep the lane failing and cannot be cleared by visual

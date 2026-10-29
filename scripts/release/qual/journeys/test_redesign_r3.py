@@ -56,8 +56,9 @@ class HostedCrashTests(unittest.TestCase):
     def test_empty_coredump_journal_is_not_a_collection_error(self):
         with tempfile.TemporaryDirectory() as temp:
             code, report = self.collect(Path(temp), [], code=1, stderr='No coredumps found.\n')
-            self.assertEqual(code, 0)
-            self.assertTrue(report['passed'])
+            self.assertEqual(code, 2)
+            self.assertEqual(report['status'], 'passed-pending-owner-validation')
+            self.assertFalse(report['passed'])
 
     def test_workflow_provisions_and_collects_crashes_after_hosted_run(self):
         workflow = (runner.HERE.parents[3] / '.github/workflows/qualify-release-linux.yml').read_text()
@@ -178,6 +179,7 @@ class ClassificationReviewTests(unittest.TestCase):
             out = Path(temp)
             target = Mock()
             target.run.return_value.stdout = 'false'
+            target.run.return_value.returncode = 1
             with patch.object(wrapper,'Target',return_value=target), \
                  patch.object(wrapper,'crash_evidence') as crashes, \
                  patch.object(wrapper.vm,'QMP',MagicMock()), patch('screen.key'):

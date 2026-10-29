@@ -191,6 +191,7 @@ class Repair4Tests(unittest.TestCase):
         for persistent in (False, True):
             with self.subTest(persistent=persistent), tempfile.TemporaryDirectory() as temp:
                 target = Mock(); target.run.return_value.stdout = 'false'
+                target.run.return_value.returncode = 1
                 def wait(fn, description, **kw):
                     if 'GNOME command dialog' in description and (persistent or root.call_count == 0):
                         raise runner.Infrastructure('Black compositor screen')

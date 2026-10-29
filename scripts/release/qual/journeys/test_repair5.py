@@ -161,6 +161,7 @@ class Round2Tests(unittest.TestCase):
             descriptions.append(description); return True
         with tempfile.TemporaryDirectory() as temp:
             target=Mock(); target.run.return_value.stdout='false'
+            target.run.return_value.returncode=1
             self.desktop(target,Path(temp),wait)
         self.assertNotIn('Logged-in desktop is visible',descriptions)
         self.assertIn('GNOME command dialog',descriptions)

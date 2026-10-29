@@ -140,6 +140,10 @@ def collect_hosted_crashes(out, since):
         report['journeys'].append({'id': 'hosted-crashes', 'checks': [{
             'name': 'collection', 'status': 'failed-infrastructure', 'reason': str(exc),
             'evidence': ['coredumpctl.stderr.txt']}]})
+    report['journeys'].append({'id': 'hosted-crashes', 'checks': [{
+        'name': 'hosted crash collection unproven', 'status': 'owner-validation',
+        'reason': 'Hosted crash collection is not proven armed or finished; owner validation is required',
+        'evidence': ['coredumps.json', 'hosted-crashes.json']}]})
     report.update(summarize(report['journeys'], report.get('fullSelection', False)))
     (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
     return report_exit_code(report)
@@ -173,7 +177,9 @@ def summarize(journeys, full_selection=True):
                 raise ValueError(f"Unknown check status: {check['status']}")
             counts[check['status']] += 1
     pending = [{'journey': j['id'], 'check': c['name'],
-                'screenshots': [p for p in c.get('evidence', []) if p.endswith('.png')]}
+                **({'evidence': c.get('evidence', [])}
+                   if j['id'] in ('guest-crashes-owner-validation', 'hosted-crashes') else
+                   {'screenshots': [p for p in c.get('evidence', []) if p.endswith('.png')]})}
                for j in journeys for c in j['checks'] if c['status'] == 'owner-validation']
     failed = any(counts[s] for s in ('failed-product', 'failed-infrastructure', 'unavailable'))
     complete = full_selection and counts['passed'] + counts['owner-validation'] > 0 and not failed
@@ -601,6 +607,7 @@ class Run:
         self.work = None
         self.data = None
         self.binary = None
+        self.crash_since_ns = None
 
     def evidence(self, name, value):
         (self.out / (name + '.json')).write_text(json.dumps(redact(value), indent=2) + '\n')
@@ -787,6 +794,39 @@ except TimeoutError as exc:
         key = element['element-6066-11e4-a52e-4f735466cecf']
         self.wd.call(f'/session/{self.wd.session}/element/{key}/click', {})
 
+    def jvm_crashes(self):
+        if self.crash_since_ns is None:
+            raise Infrastructure('JVM crash collection has no run start timestamp')
+        crashes = self.target.json("""
+import json,subprocess,sys
+from pathlib import Path
+a=json.loads(sys.argv[1])
+package=subprocess.run(['dpkg-query','-L','just-search'],capture_output=True,text=True)
+if package.returncode not in (0,1):raise RuntimeError('Cannot locate Engine working directory for JVM crash collection')
+roots={Path.home(),Path('/tmp'),Path.cwd(),Path(a['work']),Path(a['data'])/'crashes'}
+roots.update(Path(p).parent for p in package.stdout.splitlines() if p.endswith('/ui-headless.jar'))
+roots.update(Path(p) for p in a['engineDirectories'])
+rows=[];seen=set();budget=20_000_000
+for root in sorted(roots):
+ try:files=sorted(root.iterdir())
+ except FileNotFoundError:continue
+ for path in files:
+  if not path.match('hs_err_pid*.log'):continue
+  if path.is_symlink():raise RuntimeError('JVM crash report is a symlink: '+str(path))
+  stat=path.stat()
+  if stat.st_mtime_ns<a['since'] or (stat.st_dev,stat.st_ino) in seen:continue
+  seen.add((stat.st_dev,stat.st_ino))
+  with path.open('rb') as stream:content=stream.read(min(4_000_000,budget))
+  budget-=len(content)
+  rows.append({'file':str(path),'bytes':stat.st_size,'truncated':len(content)<stat.st_size,
+               'content':content.decode(errors='replace'),'attribution':'product'})
+print(json.dumps(rows))
+""", {'since': self.crash_since_ns, 'work': self.work, 'data': self.data,
+      'engineDirectories': self.facts.get('engineWorkingDirectories', [])})
+        self.evidence('jvm-crashes', crashes)
+        if crashes:
+            raise ProductFailure('Bundled JVM crash: ' + ', '.join(c['file'] for c in crashes))
+
     def finish(self):
         errors = []
         try:
@@ -809,6 +849,9 @@ except TimeoutError as exc:
                 self.target.stop(self.target.owned())
             except Exception as exc:
                 errors.append(str(exc))
+            row = {'id': 'jvm-crashes', 'checks': []}
+            self.results.append(row)
+            self.check(row, 'bundled-jvm-crashes', self.jvm_crashes)
             if errors:
                 self.results.append({'id': 'cleanup', 'checks': [{'name': 'cleanup',
                     'status': 'failed-infrastructure', 'reason': '; '.join(errors), 'evidence': []}]})
@@ -848,6 +891,7 @@ def main():
             run.evidence('journey-source-sha256', {p.name: digest(p) for p in HERE.iterdir()
                                                    if p.suffix in ('.py', '.json')})
             run.target.prepare(args.lane, run.run_id)
+            run.crash_since_ns = int(run.target.py('import time;print(time.time_ns())').strip())
             run.work = run.target.py('import tempfile;from pathlib import Path;p=Path.home()/".cache/justsearch-journeys";p.mkdir(parents=True,exist_ok=True);print(tempfile.mkdtemp(prefix="run-",dir=p))').strip()
             run.data = run.target.py('import os;from pathlib import Path;print(Path(os.environ.get("XDG_DATA_HOME",str(Path.home()/".local/share")))/"io.justsearch.shell")').strip()
             if args.resume:

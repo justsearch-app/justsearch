@@ -253,12 +253,10 @@ def record_unattributed_crashes(report, out):
     crashes = json.loads(record.read_text()) if record.exists() else []
     unknown = [c for c in crashes if c['attribution'] == 'unattributed']
     if unknown:
-        # Triage is a plain screenshot; OCR is never needed for an owner row.
-        Native(Target('ubuntu'), out).shot('guest-crashes-owner-validation')
         report['journeys'].append({'id': 'guest-crashes-owner-validation', 'checks': [{
             'name': 'unattributed-crashes', 'status': 'owner-validation',
             'reason': 'Guest crashes require owner attribution: ' + json.dumps(unknown),
-            'evidence': ['../guest-crashes.json', '../guest-crashes.tar', '../guest-crashes-owner-validation.png']}]})
+            'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
         report.update(summarize(report['journeys'], report.get('fullSelection', False)))
 
 
@@ -275,7 +273,11 @@ def prepare_desktop(args, out):
                     raise
                 time.sleep(2)
     ready()
-    crash_evidence(out / 'before-install', before_install=True)
+    package = target.run(['dpkg-query', '-W', '-f=${db:Status-Status}', 'just-search'], check=False)
+    if package.returncode not in (0, 1):
+        raise Infrastructure('Cannot establish package absence for the setup crash sweep')
+    before_install = package.returncode == 1 or package.stdout.strip() in ('not-installed', 'config-files')
+    crash_evidence(out / 'before-install' if before_install else out, before_install=before_install)
     # Ubuntu's release-upgrade checker can crash before qualification starts.
     # Disable only desktop notifications; apport still writes crash reports.
     notify = ['gsettings', 'get', 'com.ubuntu.update-notifier', 'show-apport-crashes']
@@ -434,7 +436,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
                 record_unattributed_crashes(report, out)
             except Exception as exc:
                 report['journeys'].append({'id': 'guest-crash-triage', 'checks': [{
-                    'name': 'screenshot', 'status': 'failed-infrastructure', 'reason': str(exc), 'evidence': []}]})
+                    'name': 'record', 'status': 'failed-infrastructure', 'reason': str(exc), 'evidence': []}]})
                 report.update(summarize(report['journeys'], report.get('fullSelection', False)))
             (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
             try:
