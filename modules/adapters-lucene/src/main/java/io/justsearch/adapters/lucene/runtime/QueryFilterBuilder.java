@@ -172,6 +172,17 @@ public final class QueryFilterBuilder {
     return true;
   }
 
+  private static boolean addSizeRangeFilter(BooleanQuery.Builder qb, Long from, Long to) {
+    if (from == null && to == null) return false;
+    long min = from == null ? Long.MIN_VALUE : from;
+    long max = to == null ? Long.MAX_VALUE : to;
+    qb.add(new IndexOrDocValuesQuery(
+        LongPoint.newRangeQuery(SchemaFields.SIZE_BYTES, min, max),
+        NumericDocValuesField.newSlowRangeQuery(SchemaFields.SIZE_BYTES, min, max)),
+        BooleanClause.Occur.FILTER);
+    return true;
+  }
+
   /**
    * Applies runtime filters to a content query.
    *
@@ -230,6 +241,8 @@ public final class QueryFilterBuilder {
 
     // modified_at range filter (IndexOrDocValuesQuery for optimal performance)
     addLongRangeFilter(qb, filters.modifiedFromMs(), filters.modifiedToMs(), SchemaFields.MODIFIED_AT);
+
+    addSizeRangeFilter(qb, filters.sizeFromBytes(), filters.sizeToBytes());
 
     // meta_published_at range filter
     addLongRangeFilter(qb, filters.metaPublishedFromMs(), filters.metaPublishedToMs(),
@@ -293,6 +306,8 @@ public final class QueryFilterBuilder {
     hasFilters |= addLongRangeFilter(qb, filters.modifiedFromMs(), filters.modifiedToMs(),
         SchemaFields.MODIFIED_AT);
 
+    hasFilters |= addSizeRangeFilter(qb, filters.sizeFromBytes(), filters.sizeToBytes());
+
     // meta_published_at range filter
     hasFilters |= addLongRangeFilter(qb, filters.metaPublishedFromMs(),
         filters.metaPublishedToMs(), SchemaFields.META_PUBLISHED_AT);
@@ -333,8 +348,8 @@ public final class QueryFilterBuilder {
    * chunk-PATH-is-parent-path fact for per-root coverage counting — tempdoc 813.)
    *
    * <p>Still skipped, because chunk documents genuinely do not carry these fields: IS_CHUNK
-   * exclusion (chunks are the target), modifiedAt / metaPublishedAt ranges, entity filters, and
-   * metadata filters.
+   * exclusion (chunks are the target), metaPublishedAt ranges, entity filters, and
+   * metadata filters. Date and size are resolved against parents on the query snapshot.
    *
    * @param raw optional structured filters (null == the default scope, see {@link #NO_FILTERS})
    * @return filter query for chunk search, or null if no applicable filters exist
@@ -363,6 +378,16 @@ public final class QueryFilterBuilder {
       hasClause = true;
     }
     hasClause |= addTermOrFilter(qb, filters.docIds(), SchemaFields.PATH);
+
+    if ((filters.modifiedFromMs() != null && filters.modifiedFromMs() > 0)
+        || (filters.modifiedToMs() != null && filters.modifiedToMs() > 0)
+        || filters.sizeFromBytes() != null || filters.sizeToBytes() != null) {
+      // D2: parent eligibility intersects the bounds with every supplied scope/facet. Resolve on
+      // this query's snapshot, before any chunk budget; retain standalone legacy facet behavior.
+      qb.add(new ParentMetadataQuery(buildFilterQueryOnly(filters.withIncludeChunks(false))),
+          BooleanClause.Occur.FILTER);
+      hasClause = true;
+    }
 
     // Mirrors buildFilterQueryOnly: with no positive include-filter the builder holds only the
     // default agent-history MUST_NOT, and a pure-negative BooleanQuery matches nothing — anchor it.

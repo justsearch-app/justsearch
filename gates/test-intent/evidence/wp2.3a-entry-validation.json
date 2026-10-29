@@ -1,0 +1,51 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:43a785d7580a8b25bd55895a88e6300605bf7adcd38a4fa7b5c901d687dac8e9",
+    "adapterPatch": "gates/test-intent/evidence/wp2.3a-filters/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, vitest with two workers, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-28T23:48:40.888Z",
+  "revision": "ae33f45a2e429c6a63b52ca8f971d12d408c2419",
+  "tree": "8c19befb59cd49f69668d5c6d1d92dc627af6221",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.RestrictionValidationEntryTest.searchAndAskRejectTheExactValidationMatrixBeforeAdmission\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4188
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java#searchAndAskRejectTheExactValidationMatrixBeforeAdmission",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:de95d25a487d7ff6d7db3893abb4ea8f825ac2a87e8f543ccfd4c3d02092cc77",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchAndAskRejectTheExactValidationMatrixBeforeAdmission()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f9b06ed56274656e782d715c87284b263030948975f4648c6f8320f68d70fb96"
+}

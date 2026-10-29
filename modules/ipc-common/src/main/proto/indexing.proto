@@ -264,6 +264,12 @@ message TimeRangeMs {
   int64 to_ms = 2;
 }
 
+// Inclusive byte bounds, with presence: zero is a real bound.
+message ByteRange {
+  optional int64 from_bytes = 1;
+  optional int64 to_bytes = 2;
+}
+
 message SearchFilters {
   repeated string mime = 1;        // Exact mime values (e.g., "application/pdf")
   repeated string language = 2;    // Exact language codes (e.g., "en")
@@ -280,6 +286,7 @@ message SearchFilters {
   repeated string meta_category = 13;       // Filter by frontmatter category (lowercased)
   TimeRangeMs meta_published_at = 14;       // Range filter on frontmatter published_at (epoch millis)
   repeated string doc_ids = 15;              // Exact match on document path/ID (TermInSetQuery on PATH field)
+  ByteRange size_bytes = 17;
   repeated string collection = 16;           // Tempdoc 585 D4b — scope to Lucene collection tag(s) (e.g. "agent-history")
 }
 
@@ -423,6 +430,7 @@ message RetrieveContextRequest {
   // with BM25 at once, retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED and cause "loading". Once they
   // are ready, the field changes nothing. False = today's behaviour.
   bool semantic_loading_observed = 26;
+  ByteRange size_bytes = 27;
 }
 
 // Tempdoc 610 §J.3 — a structured (parentDocId, chunkIndex) reference to one retrieved chunk.

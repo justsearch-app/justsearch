@@ -120,18 +120,15 @@ final class QueryFilterBuilderTest {
   }
 
   @Test
-  void buildChunkFilterQuery_ignoresDateRange() {
-    // modified_at is NOT stored on chunks — should be ignored
+  void buildChunkFilterQuery_resolvesDateRangeThroughParent() {
+    // Chunks lack modified_at: resolve eligible parents before chunk candidate budgets.
     RuntimeSearchFilters filters =
         LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder()
             .modifiedFromMs(1000L)
             .modifiedToMs(2000L)
             .build();
-    assertEquals(
-        DEFAULT_CHUNK_SCOPE_ONLY,
-        QueryFilterBuilder.buildChunkFilterQuery(filters).toString(),
-        "a modified_at range must add no chunk clause — chunks do not carry the field; only the "
-            + "default collection scope remains");
+    assertTrue(QueryFilterBuilder.buildChunkFilterQuery(filters).toString().contains("parentMetadata("));
+    assertTrue(QueryFilterBuilder.buildChunkFilterQuery(filters).toString().contains("modified_at"));
   }
 
   @Test

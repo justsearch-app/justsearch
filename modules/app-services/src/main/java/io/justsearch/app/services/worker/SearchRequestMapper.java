@@ -59,6 +59,12 @@ final class SearchRequestMapper {
         fb.setModifiedAt(TimeRangeMs.newBuilder().setFromMs(fromMs).setToMs(toMs).build());
       }
     }
+    if (filters.sizeBytes() != null) {
+      var size = io.justsearch.ipc.ByteRange.newBuilder();
+      if (filters.sizeBytes().fromBytes() != null) size.setFromBytes(filters.sizeBytes().fromBytes());
+      if (filters.sizeBytes().toBytes() != null) size.setToBytes(filters.sizeBytes().toBytes());
+      fb.setSizeBytes(size);
+    }
     // Entity filters
     for (String v : filters.entityPersons()) {
       if (v != null && !v.isBlank()) fb.addEntityPersons(v);

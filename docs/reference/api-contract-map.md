@@ -900,7 +900,7 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
   index half) instead of being silently
   parsed as plain text.
 - `projection[]`
-- `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`)
+- `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`, `sizeBytes`)
 - Entity filter fields: `entityPersons`, `entityOrganizations`, `entityLocations` (repeated string) (362)
 - Metadata filter fields: `metaSource`, `metaAuthor`, `metaCategory` (repeated string), `metaPublishedAt` (long range) (362)
 - `doc_ids` (repeated string, TermInSetQuery on PATH field — scopes search to specific documents) (366)
@@ -910,6 +910,54 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
 - `debug` (tempdoc 549 Phase D2: requests the optional numeric per-hit detail tier on
   `searchTrace`'s per-hit `HitStage.detail`; alias for `include_detail`. The structural per-hit
   trace slice is always-on regardless.)
+
+Folder, modified date and source-file size restrictions also apply to retrieval-backed Ask:
+`POST /api/chat/dispatch` with `shapeId: "core.rag-ask"` (or the fixed Ask route) accepts the
+same three restriction fields under `filters`; its existing collection scope stays in top-level
+`collection`. Other chat shapes keep their existing scope. This Engine capability adds no controls
+or saved filter state.
+
+```json
+{
+  "query": "quarterly report",
+  "filters": {
+    "pathPrefix": "/home/me/Reports",
+    "modifiedAt": { "fromMs": 1, "toMs": 253402300799999 },
+    "sizeBytes": { "fromBytes": 0, "toBytes": 1048576 }
+  }
+}
+```
+
+- `pathPrefix` is one literal absolute folder, including descendants. It must contain 1–4,096
+  characters. `/a` includes `/a/file` and excludes `/ab/file`; trailing separators, spaces,
+  Unicode, `%` and `_` are literal. Windows drive/UNC/case behavior is not verified here.
+- `modifiedAt.fromMs` and `toMs` are inclusive indexed filesystem modification times in exact epoch
+  milliseconds, in the range 1–253,402,300,799,999 (end of year 9999 UTC). Zero remains unset for
+  compatibility. This is neither publication time nor ingestion time.
+- `sizeBytes.fromBytes` and `toBytes` are inclusive source-file byte counts, integers from 0 through
+  9,007,199,254,740,991 (2^53 − 1). **Zero is an active bound.** The internal `ByteRange` wire uses
+  explicit presence for both endpoints (`SearchFilters.size_bytes = 17`,
+  `RetrieveContextRequest.size_bytes = 27`), independently of the date wire's zero sentinel.
+- Any endpoint, range or folder may be absent or JSON `null` to mean unset. Lower-only, upper-only,
+  equal and two-sided bounds are supported. Dimensions intersect with each other, explicit document
+  IDs, collection scope and hidden-source rules. Search facets retain their current behavior;
+  Ask carries folder, date and size only. Explicit passage/trace material keeps its existing meaning.
+- Search and Ask reject wrong types/shapes, fractional/negative/over-limit numbers, reversed ranges
+  and invalid folders with HTTP **400 / `INVALID_REQUEST`**, naming the field. Ask validates before
+  SSE or model admission. Bounds are never swapped, rounded or discarded. Unrelated publication
+  date and boost parsing is unchanged.
+- Unknown parent metadata does not match an active bound; known zero does. Whole-document,
+  chunkless-union and chunk retrieval apply eligibility before candidate budgets, including
+  `FULL_DOCUMENT_REQUESTED` and `FULLTEXT_FALLBACK`. Chunks use parent metadata; existing indexes
+  require no rebuild or new fields.
+- A capped RAG parent prefilter refuses more than 10,000 eligible parents with typed
+  `RESOURCE_EXHAUSTED` (knowledge-port status; HTTP 429 on Search and the same error code in Ask's
+  existing failure event). Explicit document IDs are applied before enumeration. This is a failure,
+  never `NO_CONTENT`, partial retrieval or an unrestricted retry.
+- A restricted Ask whose pre-search, rich retrieval or Head wait fails returns the existing
+  retrieval failure/timeout presentation without a model answer or chosen-file fetch. A completed
+  empty intersection returns `NO_CONTENT` mentioning restrictions. Unrestricted recovery is unchanged.
+  Earlier answers and summaries already in conversation context retain their existing controls.
 
 `POST /api/knowledge/collection-facet` is the observation read used by Library mount and
 corpus-growth hydration. Its body contains only a positive integer `maxDocsScanned`.
