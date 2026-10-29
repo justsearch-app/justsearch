@@ -21,6 +21,8 @@ Round 3 regenerated the changed test sources' execution evidence. The 53 Empty/H
 
 The A1 live sequence is blocked after two stale-fixture layout attempts. Both activated B and retained revision 1, its stamp and five help rows over restart; vector-only help retrieval was confirmed before restart. Installer completeness still fails because the retained fixture stages legacy directories instead of the current candidate-owned directory for every ONNX role. These partial trials do not certify A1. The genuinely empty starting point, new-file retrieval/first stamp, and six crash cuts were not run. The builder stops that sequence per the two-attempt rule; independent acceptance remains unwritten. The final moving-base gate also sees twelve unrelated test differences because `origin/main` advanced from the brief's `b744db87446b` to `fda69956dff0`; a comparison pinned to the original base has only acceptance missing. See [round-3 live evidence](../evidence/installed-model-activation-live-round3.json).
 
+PR preparation rebased all four commits unchanged onto `c54273315406`, including #1010, without conflict hunks. The cited execution evidence was regenerated against the rebased check sources. The ordinary empty-refusal regression has its own delegated-choice entry and assertion fail-before on `1c8c8ffec1`. All six installer crash cuts and all #1010 tests passed on the rebased candidate; six unrelated operation-harness parameters fail their Windows-only identity precondition on Linux. The exact compile/PMD command passed. See the coverage map for the launcher correction, individual execution scopes and remaining historical gaps. No product or test source was changed during this preparation, and no independent acceptance is authored here.
+
 See [the condition-by-condition coverage map](../evidence/installed-model-activation-coverage.md). A passing unit check does not certify a missing live scenario. No acceptance is authored here.
 
 ```json
@@ -176,6 +178,28 @@ See [the condition-by-condition coverage map](../evidence/installed-model-activa
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "An ordinary provably empty recorded candidate fails promptly despite an unrelated failed queue row. On 1c8c8ffec1 the candidate instead remains SWITCHING; the repair keeps the original refusal proof independent of installer admission conditions.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "label": "agent choice",
+          "delegationQuote": "well then proceed with researching, validating and derisking the plan. once thats passed you can proceed with implementation",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27 (the owner's grant to derisk and implement the release workflow)",
+          "delegationScope": "the activation repair, constrained by the orchestrator: \"do not weaken ... RecordedMigrationRestartRecoveryTest's empty-failure protection outside the installer-empty case\"",
+          "choice": "Retain prompt ordinary empty-candidate refusal even when an unrelated failed queue row exists; failed/enqueued conditions apply only to installer empty admission."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/installed-model-activation-empty-refusal.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#provablyEmptyCandidateFailsPromptlyDespiteAnUnrelatedFailedRow"
       ]
     }
   ]
