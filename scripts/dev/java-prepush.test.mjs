@@ -141,14 +141,15 @@ try {
   assert.deepEqual(select('modules/system-tests/src/test/java/Test.java'), []);
   assert.deepEqual(select('modules/ui-web/src/index.ts', 'modules/shell/src/main.rs', 'docs/guide.md'), []);
   assert.deepEqual(select(), []);
-  assert.deepEqual(select('modules/core/Old.java', 'modules/runtime/New.java'), [
+  assert.deepEqual(select('modules/ui/README.md', 'modules/core/docs/notes.md'), []);
+  assert.deepEqual(select('modules/core/src/main/java/Old.java', 'modules/runtime/src/main/java/New.java'), [
     ':modules:app-api:integrationTest', ':modules:app-services:integrationTest', ':modules:indexing:integrationTest',
   ]);
   const allTasks = ['app-api', 'app-services', 'indexing', 'reranker', 'ui'].map((module) => `:modules:${module}:integrationTest`);
   for (const file of ['settings.gradle.kts', 'build.gradle.kts', 'gradle.properties', 'gradle.lockfile', 'gradlew', 'gradlew.bat', 'build-logic/src/main/kotlin/Plugin.kt', 'gradle/libs.versions.toml']) {
     assert.deepEqual(select(file), allTasks, file);
   }
-  assert.throws(() => selectIntegrationTasks({ settings, changedPaths: ['modules/core/Core.java'], buildFiles: {} }), /Missing module build file/);
+  assert.throws(() => selectIntegrationTasks({ settings, changedPaths: ['modules/core/src/main/java/Core.java'], buildFiles: {} }), /Missing module build file/);
 
   // Exercise merge-base and rename handling through real Git in an isolated repository.
   const repository = path.join(temporary, 'git-fixture');

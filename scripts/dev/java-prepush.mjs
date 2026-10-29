@@ -18,7 +18,9 @@ export function selectIntegrationTasks({ changedPaths, settings, buildFiles }) {
   const modules = parseSettings(settings).filter((module) => module.startsWith(':modules:'));
   const reached = new Set(modules.filter((module) => {
     const directory = `${module.slice(1).replaceAll(':', '/')}/`;
-    return changedPaths.some((file) => file.startsWith(directory));
+    // Only sources and the module's build file change what its tests see; docs beside them do not.
+    return changedPaths.some((file) => file.startsWith(`${directory}src/`)
+      || file === `${directory}build.gradle.kts`);
   }));
   if (reached.size === 0) return [];
   const dependents = new Map();
