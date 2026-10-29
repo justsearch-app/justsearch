@@ -89,7 +89,7 @@ public final class BoundChildProcess {
     argv.add("--");
     argv.addAll(command);
     original.command(argv);
-    FutureTask<Process> task = new FutureTask<>(() -> spawn(original, executable));
+    FutureTask<Process> task = new FutureTask<>(() -> spawn(original, executable, Files::readSymbolicLink));
     Spawner.QUEUE.add(task);
     // Cancellation must not abandon an already queued or running spawn. Return its exact owner
     // object with the interrupt preserved, so the caller's existing cancellation path owns cleanup.
@@ -111,7 +111,12 @@ public final class BoundChildProcess {
     }
   }
 
-  private static Process spawn(ProcessBuilder builder, Path helper) throws IOException {
+  @FunctionalInterface
+  interface ExeLinkReader {
+    Path read(Path link) throws IOException;
+  }
+
+  static Process spawn(ProcessBuilder builder, Path helper, ExeLinkReader exeLinkReader) throws IOException {
     Process process = builder.start();
     try {
       Optional<LinuxProcessIdentity> identity = LinuxProcessIdentity.captureSpawned(process);
@@ -121,9 +126,9 @@ public final class BoundChildProcess {
       boolean executed = false;
       while (process.isAlive()) {
         try {
-          Path image = Files.readSymbolicLink(Path.of("/proc", Long.toString(process.pid()), "exe"));
+          Path image = exeLinkReader.read(Path.of("/proc", Long.toString(process.pid()), "exe"));
           if (!image.equals(helper)) { executed = true; break; }
-        } catch (java.nio.file.NoSuchFileException racingExit) {
+        } catch (java.nio.file.NoSuchFileException | java.nio.file.AccessDeniedException racingExit) {
           // The kernel may have reaped it before the JDK's reaper updates Process.isAlive().
         }
         if (System.nanoTime() >= deadline) throw new IOException("Linux child wrapper did not exec");
