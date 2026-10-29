@@ -615,9 +615,16 @@ final class RuntimeReloadProducersHttpIntegrationTest {
 
     Fixture(boolean production,
         io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook migrationHook) throws Exception {
+      this(production, migrationHook, 60_000);
+    }
+
+    Fixture(boolean production,
+        io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook migrationHook,
+        long telemetryFlushMs) throws Exception {
       System.setProperty("user.home", Files.createDirectories(directory.resolve("home")).toString());
       System.setProperty(EnvRegistry.DATA_DIR.configKey(), directory.resolve("data").toString());
       var builder = ResolvedConfig.builder();
+      builder.putDefault(EnvRegistry.TELEMETRY_FLUSH_MS.configKey(), Long.toString(telemetryFlushMs));
       builder.putDefault(EnvRegistry.DATA_DIR.configKey(), directory.resolve("data").toString());
       builder.putDefault(EnvRegistry.INDEX_BASE_PATH.configKey(), directory.resolve("index").toString());
       builder.putDefault("justsearch.ssot.path", directory.resolve("SSOT").toString());

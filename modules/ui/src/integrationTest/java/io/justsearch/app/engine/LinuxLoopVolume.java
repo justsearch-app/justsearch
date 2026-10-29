@@ -216,7 +216,7 @@ final class LinuxLoopVolume implements AutoCloseable {
   static String run(String... args) throws Exception {
     Process process = new ProcessBuilder(args).redirectErrorStream(true).start();
     try {
-      if (!process.waitFor(5, TimeUnit.SECONDS)) throw new IOException("Command timed out: " + args[0]);
+      if (!process.waitFor(stopping ? 5 : 30, TimeUnit.SECONDS)) throw new IOException("Command timed out: " + args[0]);
       String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
       if (process.exitValue() != 0) throw new IOException(String.join(" ", args) + ": " + output);
       return output;

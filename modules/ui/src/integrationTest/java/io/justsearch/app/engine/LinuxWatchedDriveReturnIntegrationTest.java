@@ -850,13 +850,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
   }
 
   private Fixture descriptorFixture() throws Exception {
-    String key = "justsearch.telemetry.flushMs";
-    String previous = System.setProperty(key, "1000");
-    try { return fixture(); }
-    finally {
-      if (previous == null) System.clearProperty(key);
-      else System.setProperty(key, previous);
-    }
+    return fixture(null, 1_000);
   }
 
   private void awaitTelemetryStoreOpen() throws Exception {
@@ -951,9 +945,14 @@ final class LinuxWatchedDriveReturnIntegrationTest {
 
   private Fixture fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook hook)
       throws Exception {
+    return fixture(hook, 60_000);
+  }
+
+  private Fixture fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook hook,
+      long telemetryFlushMs) throws Exception {
     var host = new RuntimeReloadProducersHttpIntegrationTest();
     host.directory = directory;
-    Fixture fixture = host.new Fixture(true, hook);
+    Fixture fixture = host.new Fixture(true, hook, telemetryFlushMs);
     var folders = new IndexingController(() -> fixture.client, null, directory.resolve("home"), null);
     var capability = mock(io.justsearch.app.api.lifecycle.Capability.class);
     when(capability.available()).thenReturn(true);

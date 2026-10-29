@@ -157,7 +157,7 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
                 logger.lifecycle("SKIP $reason: $identifier")
               }
         }
-        if (!includeRealDrives) {
+        if (!includeRealDrives && name == "integrationTest") {
           doFirst {
             logger.lifecycle("SKIP real-drives tests ($path): opt in with -PincludeRealDrives=true")
           }
