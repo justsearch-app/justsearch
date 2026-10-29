@@ -244,8 +244,10 @@ def assemble(args):
                  (cuda, "ort-cuda12-cudnn9-linux-x86_64.zip"))
         artifacts = [archive(source, args.output / (prefix + name)) for source, name in names]
         result = {"testOnly": args.test_only, "artifacts": artifacts}
-        (args.output / (prefix + "registry-artifacts.json")).write_text(json.dumps(result, indent=2) + "\n")
-        print(json.dumps(result, indent=2))
+        registry = args.output / (prefix + "registry-artifacts.json")
+        registry.write_text(json.dumps(result, indent=2) + "\n")
+        # Workflow logs are public before the payload repository's draft is published.
+        print(f"Assembled {len(artifacts)} packs; metadata written to {registry}")
 
 
 def main():

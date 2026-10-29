@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -280,6 +281,17 @@ public final class DefaultChildControl implements ChildControl {
     if (spec.workingDir() != null) builder.directory(spec.workingDir().toFile());
     if (!spec.envOverrides().isEmpty()) builder.environment().putAll(spec.envOverrides());
     if (!spec.pathPrefix().isEmpty()) prependPath(builder.environment(), spec.pathPrefix());
+    if (CHAT_SERVER_KINDS.contains(spec.kind()) && io.justsearch.configuration.PlatformPaths.isLinux()) {
+      Path executable = Path.of(spec.argv().getFirst()).toAbsolutePath().normalize();
+      Path directory = executable.getParent();
+      if (executable.getFileName().toString().equals("llama-server")
+          && Files.isRegularFile(directory.resolve("linux-gpu-pack.json"))) {
+        // $ORIGIN RUNPATH yields to LD_LIBRARY_PATH. The downloaded pack must win over
+        // host CUDA directories, while preserving the rest of the child's environment.
+        builder.environment().compute("LD_LIBRARY_PATH", (key, inherited) ->
+            directory + (inherited == null || inherited.isEmpty() ? "" : ":" + inherited));
+      }
+    }
     if (spec.stdio() instanceof ChildSpec.Stdio.AppendToLog log) {
       builder.redirectErrorStream(true);
       builder.redirectOutput(ProcessBuilder.Redirect.appendTo(log.file().toFile()));

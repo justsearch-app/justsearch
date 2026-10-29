@@ -1,8 +1,10 @@
 import importlib.util
+import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -40,6 +42,35 @@ class LinuxGpuPackTest(unittest.TestCase):
         with assembler.zipfile.ZipFile(output) as archive:
             self.assertIn("libfixture_gpu.so.1", archive.namelist())
             self.assertTrue(all(item.external_attr >> 16 & 0o170000 == 0o100000 for item in archive.infolist()))
+
+    def test_release_assembly_keeps_candidate_hashes_and_sizes_out_of_workflow_logs(self):
+        """S13: nothing is public before the owner publishes, including candidate metadata."""
+        cuda, cudnn, ort, notices = (self.root / name for name in ("cuda", "cudnn", "ort", "notices"))
+        for directory in (cuda, cudnn, ort, notices):
+            directory.mkdir()
+        c = self.root / "runtime.c"
+        c.write_text("int cudaRuntimeGetVersion(int *v) { *v = 12080; return 0; }\n")
+        for directory, names in ((cuda, assembler.CUDA_NAMES), (cudnn, assembler.CUDNN_NAMES),
+                                 (ort, assembler.ORT_NAMES), (self.source, ("libggml-cuda.so",))):
+            for name in names:
+                subprocess.run(["gcc", "-shared", "-fPIC", "-Wl,-soname," + name,
+                                "-o", str(directory / name), str(c)], check=True)
+        (notices / "LICENSE").write_text("Fixture notices\n")
+        provenance = self.root / "inputs.json"
+        provenance.write_text(json.dumps(dict(inputs=[dict(url="https://example.org/fixture", sha256="a" * 64)])))
+        output = self.root / "output"
+        result = subprocess.run([sys.executable, str(Path(assembler.__file__)),
+            "--llama-dir", str(self.source), "--cuda-dir", str(cuda), "--cudnn-dir", str(cudnn),
+            "--ort-dir", str(ort), "--notices", str(notices), "--output", str(output),
+            "--input-manifest", str(provenance), "--patchelf", self.patchelf],
+            text=True, capture_output=True, check=True)
+        artifacts = json.loads((output / "registry-artifacts.json").read_text())["artifacts"]
+        self.assertEqual(2, len(artifacts))
+        logs = result.stdout + result.stderr
+        for artifact in artifacts:
+            self.assertEqual(artifact["sha256"], assembler.digest(output / artifact["filename"]))
+            self.assertNotIn(artifact["sha256"], logs)
+            self.assertNotIn(str(artifact["sizeBytes"]), logs)
 
     def test_ggml_dlopen_alias_is_materialized_without_input_symlinks(self):
         library = self.source / "libggml-cuda.so.0.9"

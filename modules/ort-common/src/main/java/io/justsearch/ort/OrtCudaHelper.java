@@ -4,6 +4,7 @@ package io.justsearch.ort;
 import io.justsearch.configuration.NativeTargets;
 import io.justsearch.configuration.ConfigPrecedence;
 import io.justsearch.configuration.EnvRegistry;
+import io.justsearch.configuration.model.ArchiveExtractionState;
 import io.justsearch.configuration.resolved.ConfigStore;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -177,8 +178,7 @@ public final class OrtCudaHelper {
         Path home = store.get().paths().dataDir();
         if (home != null) {
           Path pack = home.resolve("native-bin/llama-server/variants/cuda12");
-          if (Files.isDirectory(pack) && !cudaDependencyDllOrder().isEmpty()
-              && cudaDependencyDllOrder().stream().allMatch(name -> Files.isRegularFile(pack.resolve(name)))) {
+          if (linuxRuntimePackComplete(pack)) {
             return pack;
           }
         }
@@ -207,6 +207,30 @@ public final class OrtCudaHelper {
           "Ignoring invalid ORT native path '{}': {}", ortNativePathStr, e.getMessage());
     }
     return defaultPath;
+  }
+
+  private static boolean linuxRuntimePackComplete(Path pack) {
+    Path receipts = pack.resolve(ArchiveExtractionState.DIRECTORY);
+    List<String> preloads = cudaDependencyDllOrder();
+    if (!Files.isDirectory(receipts) || preloads.isEmpty()) return false;
+    // The runtime archive's verified inventory includes dlopen-only dependencies such as
+    // NVRTC/builtins and zlib. The preload order alone is not a completeness contract.
+    try (var files = Files.list(receipts)) {
+      var json = tools.jackson.databind.json.JsonMapper.builder().build();
+      for (Path receipt : files.filter(p -> p.getFileName().toString().endsWith(".zip.json")).toList()) {
+        var recorded = json.readValue(Files.readAllBytes(receipt), ArchiveExtractionState.Receipt.class);
+        if (recorded == null || recorded.entries() == null) continue;
+        var declared = recorded.entries().stream().map(ArchiveExtractionState.Entry::name).toList();
+        if (declared.containsAll(preloads)) {
+          String name = receipt.getFileName().toString();
+          Path archive = pack.resolve(name.substring(0, name.length() - ".json".length()));
+          return ArchiveExtractionState.isApplied(archive, recorded.sha256(), true);
+        }
+      }
+    } catch (IOException | RuntimeException invalid) {
+      log.debug("Linux CUDA runtime inventory unavailable at {}: {}", pack, invalid.getMessage());
+    }
+    return false;
   }
 
   /**

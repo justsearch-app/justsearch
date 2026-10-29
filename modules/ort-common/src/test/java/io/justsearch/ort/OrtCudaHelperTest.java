@@ -136,13 +136,37 @@ class OrtCudaHelperTest {
       Path pack = Files.createDirectories(tmp.resolve("native-bin/llama-server/variants/cuda12"));
       // W6b precondition: a newly created or partial extraction is not an ORT pack.
       org.junit.jupiter.api.Assertions.assertEquals(fallback, OrtCudaHelper.resolveOrtNativePath(fallback));
-      for (String name : OrtCudaHelper.cudaDependencyDllOrder()) touch(pack.resolve(name));
+      // Independently specified pack inventory, including dlopen-only NVRTC and zlib.
+      List<String> required = List.of("libcudart.so.12", "libcublas.so.12", "libcublasLt.so.12",
+          "libcufft.so.11", "libnvJitLink.so.12", "libcurand.so.10", "libcusparse.so.12",
+          "libcusolver.so.11", "libnvrtc.so.12", "libnvrtc-builtins.so.12.8", "libz.so.1",
+          "libcudnn.so.9", "libcudnn_graph.so.9", "libcudnn_heuristic.so.9", "libcudnn_ops.so.9",
+          "libcudnn_cnn.so.9", "libcudnn_adv.so.9", "libcudnn_engines_runtime_compiled.so.9",
+          "libcudnn_engines_precompiled.so.9");
+      for (String name : required) touch(pack.resolve(name));
+      Path archive = pack.resolve("ort-cuda12-cudnn9-linux-x86_64.zip");
+      try (var zip = new java.util.zip.ZipOutputStream(Files.newOutputStream(archive))) {
+        for (String name : required) {
+          zip.putNextEntry(new java.util.zip.ZipEntry(name));
+          zip.write(Files.readAllBytes(pack.resolve(name)));
+          zip.closeEntry();
+        }
+      }
+      try (var zip = new java.util.zip.ZipFile(archive.toFile())) {
+        io.justsearch.configuration.model.ArchiveExtractionState.complete(archive, "a".repeat(64),
+            io.justsearch.configuration.model.ArchiveExtractionState.entries(zip, pack, archive));
+      }
       org.junit.jupiter.api.Assertions.assertEquals(pack, OrtCudaHelper.resolveOrtNativePath(fallback));
-      for (String name : OrtCudaHelper.cudaDependencyDllOrder()) {
+      for (String name : required) {
         Files.delete(pack.resolve(name));
         org.junit.jupiter.api.Assertions.assertEquals(fallback, OrtCudaHelper.resolveOrtNativePath(fallback), name);
         touch(pack.resolve(name));
       }
+      Files.writeString(pack.resolve("libnvrtc.so.12"), "truncated");
+      org.junit.jupiter.api.Assertions.assertEquals(fallback, OrtCudaHelper.resolveOrtNativePath(fallback));
+      touch(pack.resolve("libnvrtc.so.12"));
+      io.justsearch.configuration.model.ArchiveExtractionState.begin(archive);
+      org.junit.jupiter.api.Assertions.assertEquals(fallback, OrtCudaHelper.resolveOrtNativePath(fallback));
       org.junit.jupiter.api.Assertions.assertNull(boot.paths().ortNativePath());
       Path operator = Files.createDirectories(tmp.resolve("operator"));
       var explicit = io.justsearch.configuration.resolved.ResolvedConfig.builder()
