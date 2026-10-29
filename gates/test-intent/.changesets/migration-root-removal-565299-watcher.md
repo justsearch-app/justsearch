@@ -57,3 +57,14 @@ No evidence or acceptance record is authored here.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-565299-codex-r3",
+  "verdict": "accept",
+  "digest": "sha256:527cbd95cf46873c013e4e58f45d3e593c003b60cb3fbf16664ff1d41dde80d5",
+  "note": "Verified production authority wiring with all 11 retirement cases; missing-directory fails before and passes after; plain prefix deletion passes before/after and catches both widened refusal variants; scoped Engine and removal checks pass."
+}
+```
