@@ -58,9 +58,6 @@ function sh(command, cwd) {
   // Native test extraction must be private to this invocation and checkout. Sharing the default
   // path with another Gradle run silently skips app-services' native checks on Windows.
   const env = { ...process.env };
-  // The before copy builds the shell crate in the candidate's target folder: dependencies are
-  // compiled once instead of cold in every copy, and Cargo's fingerprints still rebuild the crate.
-  if (/^cargo /.test(command)) env.CARGO_TARGET_DIR ||= path.join(REPO_ROOT, 'modules', 'shell', 'src-tauri', 'target');
   if (/gradlew/.test(command)) {
     // Isolate Gradle tests and their children, including historical builds without the convention.
     // Retain Gradle's cache location before replacing HOME/USERPROFILE.
