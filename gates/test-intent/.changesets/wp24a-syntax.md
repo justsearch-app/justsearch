@@ -492,3 +492,14 @@ The evidence run, per-check outcomes, fixture coverage and gate result are recor
   "note": "Codex verifier-a3 PASS on cb97bf8382 after rebase onto c542733154: syntax x restrictions 80/80 real HTTP, X6/X8 UI, 7 integration preservation checks honest"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18622-9a22-7612-ae8d-deff433133bc",
+  "verdict": "accept",
+  "digest": "sha256:2b4950898ea0399237a5d7a647acef090e028bbf4e2c776b3e824e2e5c9cfd07",
+  "note": "Codex verifier-a4 PASS on merge e0ab16a00e (syntax + Filters UI): combined checks fail before by assertion; real Engine+Chromium 18 cases; UTC and Berlin suites"
+}
+```
