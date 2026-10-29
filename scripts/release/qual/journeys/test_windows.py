@@ -87,7 +87,7 @@ import os
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, PropertyMock
 import zipfile
 
 import linux
@@ -184,14 +184,21 @@ class WindowsOperationalTests(unittest.TestCase):
             folder=r'C:\folder+name{one}'
             value=edit.GetCurrentPattern.return_value.QueryInterface.return_value;value.CurrentValue=folder
             invoke=button.GetCurrentPattern.return_value.QueryInterface.return_value
+            closed=[False]
+            def edit_handle():
+                if closed[0]:raise RuntimeError('Picker control retired after submission')
+                return 201
+            invoke.Invoke.side_effect=lambda:closed.__setitem__(0,True)
             with patch.object(native,'windows',return_value=[dict(window,pid=99),window]), \
                  patch.object(windows,'wait_for',once),patch.object(native,'automation',return_value=(client,module)), \
-                 patch.object(native,'descendants',return_value=[edit,button]),patch.object(native,'shot'):
+                 patch.object(native,'descendants',return_value=[edit,button]),patch.object(native,'shot'), \
+                 patch.object(type(edit),'CurrentNativeWindowHandle',create=True,new_callable=PropertyMock) as handle:
+                handle.side_effect=edit_handle
                 result=native.select_folder(folder)
                 self.assertTrue(result['invoked']);self.assertEqual(result['value'],folder)
                 value.SetValue.assert_called_once_with(folder);invoke.Invoke.assert_called_once()
                 self.assertGreaterEqual(client.ElementFromHandle.call_count,2)
-                invoke.Invoke.reset_mock();value.CurrentValue='wrong path'
+                invoke.Invoke.reset_mock();value.CurrentValue='wrong path';closed[0]=False
                 with self.assertRaisesRegex(Infrastructure,'did not accept'):native.select_folder(folder)
                 invoke.Invoke.assert_not_called()
             with patch.object(native,'windows',return_value=[dict(window,pid=99)]), \

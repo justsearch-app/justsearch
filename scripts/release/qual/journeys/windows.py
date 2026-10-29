@@ -492,10 +492,10 @@ if ([QualWindow]::GetForegroundWindow().ToInt64() -ne $a.window.handle) {throw '
         if value.CurrentValue != folder:
             raise Infrastructure('Native picker did not accept the requested path')
         invoke = button.GetCurrentPattern(module.UIA_InvokePatternId).QueryInterface(module.IUIAutomationInvokePattern)
-        self.element(window)
-        invoke.Invoke()
         result = {'handle':window['handle'], 'pid':window['pid'], 'value':folder, 'invoked':True,
                   'interface':'IUIAutomation', 'editHandle':edit.CurrentNativeWindowHandle}
+        self.element(window)
+        invoke.Invoke()
         self.shot('J2-folder-picker-submitted')
         return result
 
