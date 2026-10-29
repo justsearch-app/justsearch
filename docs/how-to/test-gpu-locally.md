@@ -81,7 +81,8 @@ and ORT **1.24.3**, on **Ubuntu 24.04** (glibc ceiling 2.39). It does not need a
 The source URLs, versions and SHA-256 values live in
 [`linux-gpu-inputs.v1.json`](../../scripts/ai/linux-gpu-inputs.v1.json); NVIDIA inputs come only
 from NVIDIA's official redistrib channel. A hash-pinned Ubuntu zlib runtime and its license
-are also bundled because cuDNN links to `libz.so.1`. On an Ubuntu 24.04 machine with Python 3.12,
+are also bundled because cuDNN links to `libz.so.1`. CUDA NVRTC and its builtins are
+included for cuDNN's runtime-compiled engines, which load NVRTC dynamically. On an Ubuntu 24.04 machine with Python 3.12,
 GCC/G++ 13, CMake, Ninja, binutils and patchelf already available:
 
 ```bash

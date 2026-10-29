@@ -66,7 +66,7 @@ class LinuxGpuBuildTest(unittest.TestCase):
             else:
                 self.assertTrue(item["url"].startswith("https://developer.download.nvidia.com/compute/"))
                 self.assertIn("/redist/", item["url"])
-        self.assertTrue({"llama", "ort", "cuda_nvcc", "cuda_cudart", "cuda_cccl", "libcublas", "libcufft",
+        self.assertTrue({"llama", "ort", "cuda_nvcc", "cuda_cudart", "cuda_cccl", "cuda_nvrtc", "libcublas", "libcufft",
                          "libcurand", "libcusparse", "libcusolver", "libnvjitlink", "cudnn", "zlib"} <= {i["id"] for i in pins})
 
 

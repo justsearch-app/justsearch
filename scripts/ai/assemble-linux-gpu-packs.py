@@ -29,7 +29,8 @@ import zipfile
 SYSTEM_LIBS = re.compile(r"^(?:ld-linux-x86-64\.so\.2|lib(?:c|m|dl|rt|pthread|resolv|util)\.so\.[0-9]+|libstdc\+\+\.so\.6|libgcc_s\.so\.1|libcuda\.so\.1|libnvidia-[\w-]+\.so\.[\d.]+)$")
 ORT_NAMES = ("libonnxruntime.so", "libonnxruntime4j_jni.so", "libonnxruntime_providers_shared.so", "libonnxruntime_providers_cuda.so")
 CUDA_NAMES = ("libcudart.so.12", "libcublas.so.12", "libcublasLt.so.12", "libcufft.so.11",
-              "libnvJitLink.so.12", "libcurand.so.10", "libcusparse.so.12", "libcusolver.so.11", "libz.so.1")
+              "libnvJitLink.so.12", "libcurand.so.10", "libcusparse.so.12", "libcusolver.so.11", "libz.so.1",
+              "libnvrtc.so.12", "libnvrtc-builtins.so.12.8")
 CUDNN_NAMES = tuple("libcudnn" + suffix + ".so.9" for suffix in
                     ("", "_graph", "_heuristic", "_ops", "_cnn", "_adv", "_engines_runtime_compiled", "_engines_precompiled"))
 
