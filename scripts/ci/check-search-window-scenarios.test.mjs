@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /** Durable contract tests for catalog freshness, explicit gaps, and lossless scenario retirement. */
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { CATALOG, checkSearchWindowScenarios, readBaseCatalog, testTitles } from './check-search-window-scenarios.mjs';
 import { parseUiWebGateCommands } from './run-ui-web-gates.mjs';
@@ -77,11 +77,20 @@ try {
     value.entries[0].observations[2].file = 'missing.test.ts';
     has(check(value), /unbound observation cannot also declare a binding/);
   });
-  test('invalid catalogs, kinds, races and repeated layers fail', () => {
+  test('several observations in one layer bind each clause independently', () => {
+    const value = catalog();
+    writeFileSync(join(root, 'second.test.ts'), "it('keeps the accepted draft', () => {});\n");
+    value.entries[0].observations.push({ layer: 'view', file: 'second.test.ts', test: 'keeps the accepted draft' });
+    const result = check(value);
+    assert.deepEqual(result.failures, []);
+    assert.deepEqual(result.counts.view, { bound: 2, unbound: 0 });
+    value.entries[0].observations[3].test = 'removed clause observation';
+    has(check(value), /test title "removed clause observation" is not present/);
+  });
+  test('invalid catalogs, kinds and races fail', () => {
     has(check({}), /catalog requires/);
     const value = catalog(); value.entries[0].kind = 'verified'; value.entries[0].races = ['unknown'];
-    value.entries[0].observations.push({ layer: 'view', binding: null, reason: 'No observation.' });
-    has(check(value), /valid kind/); has(check(value), /race vocabulary/); has(check(value), /duplicate observation layer/);
+    has(check(value), /valid kind/); has(check(value), /race vocabulary/);
   });
   test('test titles are declarations, not comments, descriptions or unrelated strings', () => {
     assert.deepEqual([...testTitles(`
@@ -99,6 +108,54 @@ try {
       it(\`static template\`, () => {});
     `)], ['single', 'double', 'parameter %s', 'object $case', 'table %s', "reader's title", 'static template']);
   });
+  test('disabled declarations and tests inside disabled suites cannot bind', () => {
+    const disabled = [
+      "it.skip('ignores an empty search', () => {});",
+      "it.skip.each([1])('ignores an empty search', () => {});",
+      "it.each([1]).skip('ignores an empty search', () => {});",
+      "test.todo('ignores an empty search');",
+      "test.concurrent.skip('ignores an empty search', () => {});",
+      "xit('ignores an empty search', () => {});",
+      "xtest('ignores an empty search', () => {});",
+      "describe.skip('disabled', () => { it('ignores an empty search', () => {}); });",
+      "describe.skip.each([1])('disabled %s', () => { describe('nested', () => { it('ignores an empty search', () => {}); }); });",
+      "xdescribe('disabled', () => { test('ignores an empty search', () => {}); });",
+      "describe.todo('disabled', () => { it('ignores an empty search', () => {}); });",
+      "it.skipIf(true)('ignores an empty search', () => {});",
+      "describe.runIf(false)('disabled', () => { it('ignores an empty search', () => {}); });",
+    ];
+    try {
+      for (const source of disabled) {
+        writeFileSync(join(root, 'search.test.ts'), source);
+        has(check(), /test title "ignores an empty search" is not present/);
+      }
+      assert.deepEqual([...testTitles(`
+        describe('enabled', () => { it('before', () => {});
+          describe.skip('disabled', () => { it('hidden', () => {}); });
+          describe.only('nested', () => { test('after', () => {}); });
+        });
+        it('outside', () => {});
+      `)], ['before', 'after', 'outside']);
+    } finally {
+      writeFileSync(join(root, 'search.test.ts'), "it('ignores an empty search', () => {});\n");
+    }
+  });
+  test('a title must be the complete literal argument, never a literal prefix', () => {
+    try {
+      for (const title of [
+        '"ignores an empty search" + " extended"',
+        '"ignores an empty search".trim()',
+        '`ignores an empty search${suffix}`',
+        'title',
+      ]) {
+        writeFileSync(join(root, 'search.test.ts'), `it(${title}, () => {});`);
+        has(check(), /test title "ignores an empty search" is not present/);
+      }
+      assert.deepEqual([...testTitles('it(`static`, () => {}); test("complete", () => {});')], ['static', 'complete']);
+    } finally {
+      writeFileSync(join(root, 'search.test.ts'), "it('ignores an empty search', () => {});\n");
+    }
+  });
   test('repository-relative paths cannot escape to unrelated files', () => {
     const value = catalog(); value.entries[0].observations[0].file = '../search.test.ts';
     has(check(value), /file must be inside the repository/);
@@ -113,6 +170,40 @@ try {
     const result = spawnSync(process.execPath, [join(ROOT, 'scripts/ci/check-search-window-scenarios.mjs'), '--base-ref', badRef], { cwd: ROOT, encoding: 'utf8' });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /search-window-scenarios gate FAILED/);
+  });
+  test('first introduction at a valid merge base passes, while missing or shallow history fails closed', () => {
+    const history = join(root, 'history');
+    mkdirSync(history);
+    const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    const commit = message => git(history, ['-c', 'user.name=Catalog test', '-c', 'user.email=catalog-test@example.invalid', 'commit', '--quiet', '--allow-empty', '-m', message]);
+    git(history, ['init', '--quiet']);
+    commit('before catalog');
+    const firstBase = git(history, ['rev-parse', 'HEAD']);
+    mkdirSync(join(history, 'governance'));
+    writeFileSync(join(history, CATALOG), JSON.stringify(catalog()));
+    git(history, ['add', CATALOG]);
+    commit('introduce catalog');
+    assert.deepEqual(readBaseCatalog(history, firstBase), { base: firstBase, catalog: null });
+    assert.deepEqual(check(catalog(), readBaseCatalog(history, firstBase).catalog).failures, []);
+    const sharedBase = git(history, ['rev-parse', 'HEAD']);
+    git(history, ['branch', 'base-side']);
+    commit('head side');
+    const headSide = git(history, ['rev-parse', 'HEAD']);
+    git(history, ['checkout', '--quiet', 'base-side']);
+    commit('base side');
+    assert.deepEqual(readBaseCatalog(history, headSide), { base: sharedBase, catalog: catalog() });
+    assert.throws(() => readBaseCatalog(history, 'refs/heads/missing'));
+
+    const shallow = join(root, 'shallow');
+    git(root, ['clone', '--quiet', '--depth=1', pathToFileURL(history).href, shallow]);
+    git(shallow, ['fetch', '--quiet', '--depth=1', 'origin', headSide]);
+    git(shallow, ['update-ref', 'refs/heads/head-side', 'FETCH_HEAD']);
+    assert.equal(git(shallow, ['rev-parse', '--is-shallow-repository']), 'true');
+    assert.throws(() => readBaseCatalog(shallow, 'head-side'));
+    // A shallow repository is sufficient when the merge base itself is available.
+    assert.deepEqual(readBaseCatalog(shallow, 'HEAD').catalog, catalog());
+    git(shallow, ['fetch', '--quiet', '--unshallow', 'origin']);
+    assert.deepEqual(readBaseCatalog(shallow, 'head-side'), { base: sharedBase, catalog: catalog() });
   });
   test('the always-on UI recipe runs the catalog check and its contract tests', () => {
     const register = JSON.parse(readFileSync(join(ROOT, 'governance/consult-register.v1.json'), 'utf8'));

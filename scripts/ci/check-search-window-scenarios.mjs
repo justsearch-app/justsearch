@@ -20,25 +20,42 @@ export function testTitles(source) {
   // Tokenize strings before punctuation so parentheses inside a title or each row stay inert.
   const tokens = [...source.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|`(?:\\[\s\S]|[^`\\])*`|\/(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\n\\[])+\/[dgimsuvy]*|[\w$]+|[^\s]/g)]
     .map(match => match[0]).filter(token => !token.startsWith('//') && !token.startsWith('/*'));
-  const titles = new Set();
+  // Pair delimiters once: a disabled suite excludes its entire call, including nested suites.
+  const closes = new Map();
+  const stack = [];
   for (let i = 0; i < tokens.length; i++) {
-    if (!['it', 'test'].includes(tokens[i]) || tokens[i - 1] === '.') continue;
-    let j = i + 1;
-    while (tokens[j] === '.' && ['only', 'skip', 'concurrent', 'fails', 'each'].includes(tokens[j + 1])) {
-      const modifier = tokens[j + 1];
-      j += 2;
-      if (modifier !== 'each') continue;
-      if (tokens[j]?.startsWith('`')) { j++; continue; }
-      if (tokens[j] !== '(') break;
-      let depth = 0;
-      do {
-        if (tokens[j] === '(') depth++;
-        if (tokens[j] === ')') depth--;
-        j++;
-      } while (j < tokens.length && depth > 0);
+    if (['(', '[', '{'].includes(tokens[i])) stack.push(i);
+    else if ([')', ']', '}'].includes(tokens[i])) {
+      const open = stack.pop();
+      if (tokens[open] === ({ ')': '(', ']': '[', '}': '{' })[tokens[i]]) closes.set(open, i);
     }
+  }
+  const declarations = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (!['it', 'test', 'describe', 'xit', 'xtest', 'xdescribe'].includes(tokens[i]) || tokens[i - 1] === '.') continue;
+    const suite = ['describe', 'xdescribe'].includes(tokens[i]);
+    let disabled = tokens[i].startsWith('x');
+    let j = i + 1;
+    while (tokens[j] === '.' && ['only', 'skip', 'todo', 'concurrent', 'sequential', 'fails', 'each', 'skipIf', 'runIf'].includes(tokens[j + 1])) {
+      const modifier = tokens[j + 1];
+      // Conditional declarations are unbindable: do not guess their runtime environment.
+      if (['skip', 'todo', 'skipIf', 'runIf'].includes(modifier)) disabled = true;
+      j += 2;
+      if (!['each', 'skipIf', 'runIf'].includes(modifier)) continue;
+      if (modifier === 'each' && tokens[j]?.startsWith('`')) { j++; continue; }
+      if (tokens[j] !== '(' || !closes.has(j)) break;
+      j = closes.get(j) + 1;
+    }
+    if (tokens[j] === '(' && closes.has(j)) declarations.push({ start: i, call: j, end: closes.get(j), suite, disabled });
+  }
+  const disabledSuites = declarations.filter(declaration => declaration.suite && declaration.disabled);
+  const titles = new Set();
+  for (const declaration of declarations) {
+    if (declaration.suite || declaration.disabled || disabledSuites.some(suite => suite.call < declaration.start && declaration.start < suite.end)) continue;
+    const j = declaration.call;
     const literal = tokens[j + 1];
-    if (tokens[j] !== '(' || !/^['"`]/.test(literal ?? '')) continue;
+    // The entire first argument must be one literal, not a concatenation or other expression.
+    if (!/^['"`]/.test(literal ?? '') || tokens[j + 2] !== ',') continue;
     // Decode escapes without evaluating repository code. Titles with substitutions are not static.
     if (literal[0] === '`' && literal.includes('${')) continue;
     titles.add(literal.slice(1, -1).replace(/\\(u\{[\da-fA-F]+\}|u[\da-fA-F]{4}|x[\da-fA-F]{2}|[\s\S])/g, (_, escaped) => {
@@ -87,12 +104,9 @@ export function checkSearchWindowScenarios({ root, catalog, stepIndex, baseline 
       failures.push(`${label}: observations are required`);
       continue;
     }
-    const layers = new Set();
     for (const observation of entry.observations) {
       const layer = observation?.layer;
       if (!LAYERS.includes(layer)) { failures.push(`${label}: unknown observation layer ${layer}`); continue; }
-      if (layers.has(layer)) failures.push(`${label}: duplicate observation layer ${layer}`);
-      layers.add(layer);
       if (observation.binding === null) {
         counts[layer].unbound++;
         if (!nonempty(observation.reason)) failures.push(`${label}/${layer}: unbound observation requires a reason`);
