@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Run against a before checkout with: node --test scripts/dev/test-prepare-ui-checks.mjs
+// Run against a before checkout with: node --test scripts/dev/test-dev-runner-prepare-ui-checks.mjs
 // PREPARE_UI_CHECKS_SCRIPT can select that checkout's preparation script.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -174,6 +174,25 @@ test('clears inherited npm and Python settings during preparation and after sour
     assert.equal(env.PYTHONPATH, path.join(f.root, 'scripts/jseval'));
   }
   assert.deepEqual(fs.readdirSync(f.outside), []);
+});
+
+test('env.sh also clears settings the shell gained after preparation', t => {
+  const f = fixture(t);
+  const result = f.run({});
+  assert.equal(result.status, 0, result.stderr);
+  const later = {
+    PIP_PREFIX: f.outside, PYTHONUSERBASE: f.outside, PYTHONHOME: f.outside,
+    npm_config_prefix: f.outside, NPM_CONFIG_USERCONFIG: path.join(f.outside, 'npmrc'),
+  };
+  const sourced = spawnSync('bash', ['--noprofile', '--norc', '-c',
+    'source "$1" && exec "$2" -e "console.log(JSON.stringify(process.env))"',
+    'source-env', path.join(f.root, 'tmp/ui-checks/env.sh'), process.execPath,
+  ], { encoding: 'utf8', env: { ...process.env, ...later } });
+  assert.equal(sourced.status, 0, sourced.stderr);
+  const env = JSON.parse(sourced.stdout);
+  for (const key of Object.keys(later)) assert.equal(env[key], undefined, key);
+  assert.equal(env.__ui_checks_var, undefined);
+  assert.equal(env.PYTHONPATH, path.join(f.root, 'scripts/jseval'));
 });
 
 test('confines state roots in preparation and the sourced environment', t => {

@@ -129,7 +129,8 @@ The venv installs the base and `ui` dependencies declared in
 `scripts/jseval/pyproject.toml` (including `httpx`). It imports jseval from this
 checkout through `PYTHONPATH`, without installing jseval or writing metadata or
 bytecode under `scripts/`. Python 3.13 with CI's constraint file,
-`-c scripts/jseval/requirements.lock.txt`, is the reproducible path. Other
+`-c scripts/jseval/requirements.lock.txt`, pins the base dependencies as CI does; the
+`ui` extra (Playwright, and with it the Chromium revision) is not pinned there or in CI. Other
 interpreters resolve dependencies freely without that file: its NumPy pin predates
 Python 3.14 wheels.
 

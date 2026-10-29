@@ -163,7 +163,14 @@ const variables = {
   JUSTSEARCH_JOB_RECORD_DIR: env.JUSTSEARCH_JOB_RECORD_DIR,
   PLAYWRIGHT_BROWSERS_PATH: browsers,
 };
-const environment = inheritedSettings.map(key => `unset ${quote(key)}`);
+// Clear the families at source time, so settings the caller's shell gained after
+// preparation are reset too, not only the names preparation saw.
+const environment = [
+  'for __ui_checks_var in $(compgen -e); do',
+  '  case "$__ui_checks_var" in npm_config_*|NPM_CONFIG_*|PIP_*|PYTHON*|VIRTUAL_ENV) unset "$__ui_checks_var" ;; esac',
+  'done',
+  'unset __ui_checks_var',
+];
 environment.push(...Object.entries(variables).map(([key, value]) => `export ${key}=${quote(value)}`));
 environment.push(`export PATH=${quote(path.join(prep, 'venv/bin'))}:"$PATH"`);
 const envFile = path.join(prep, 'env.sh');
