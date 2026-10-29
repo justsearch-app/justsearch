@@ -396,3 +396,14 @@ Builder logs, before/after JUnit XML, installed-Engine HTTP requests/responses a
 cleanup are recorded in `tmp/verify/wp2.4a-author-report.md` and its linked evidence directory.
 The evidence run, per-check outcomes, fixture coverage and gate result are recorded in
 `tmp/verify/wp2.4a-author-evidence-report.md`. Independent acceptance remains pending.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1858a-0239-7703-93c3-3cdb35980349",
+  "verdict": "accept",
+  "digest": "sha256:6bced3395aff4d1d9ec9c5f2a99004e2d47c7ccdd893fc812878c8b1aed53404",
+  "note": "Codex verifier round 2 PASS on 498b37c30e: X1-X8 incl. author repair on real ingestion; repaired checks fail before by assertion, preservation passes both"
+}
+```
