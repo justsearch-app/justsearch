@@ -182,3 +182,14 @@ The acceptor (not the author) appends the acceptance record under the heading at
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-565299-codex-r2",
+  "verdict": "accept",
+  "digest": "sha256:9f907d23ab9ce5240d53a802c1512a7159c622ea87273fa5f71335e6a338ca40",
+  "note": "Real Engine: baseline fails on unrecorded watcher mutation; candidate preserves nested collection and watcher through cutover. Controls, 16 component cases, exact refusal text and SWITCHING guard mutation verified."
+}
+```
