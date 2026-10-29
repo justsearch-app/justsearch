@@ -48,7 +48,7 @@
       "mode": "local-subset",
       "commands": [
         "node scripts/lib/tool-invoker.cjs gradle assemble -PskipWebBuild=false",
-        "node scripts/lib/tool-invoker.cjs gradle pmdAll --console=plain"
+        "node scripts/dev/java-prepush.mjs"
       ]
     },
     {
