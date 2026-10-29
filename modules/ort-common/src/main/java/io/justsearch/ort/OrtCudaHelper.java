@@ -45,6 +45,13 @@ public final class OrtCudaHelper {
    * Version-pinned to CUDA 12 / cuDNN 9 / cuFFT 11. Update this list when upgrading CUDA toolkit.
    */
   static List<String> cudaDependencyDllOrder() {
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      // Linux's sparse/solver libraries need nvJitLink first. SONAME preloading works even
+      // after a CPU session initialized ORT; changing ORT's one-shot native.path does not.
+      return nativeLibraryNames("nvJitLink", "cudart", "cublasLt", "cublas", "cufft", "curand",
+          "cusparse", "cusolver", "cudnn", "cudnn_graph", "cudnn_heuristic", "cudnn_ops",
+          "cudnn_cnn", "cudnn_adv", "cudnn_engines_runtime_compiled", "cudnn_engines_precompiled");
+    }
     return nativeLibraryNames("cudart", "cublasLt", "cublas", "cufft", "curand", "cusparse", "cusolver",
           "nvJitLink", "cudnn", "cudnn_graph", "cudnn_heuristic", "cudnn_ops", "cudnn_cnn",
           "cudnn_adv", "cudnn_engines_runtime_compiled", "cudnn_engines_precompiled");
@@ -164,6 +171,15 @@ public final class OrtCudaHelper {
               "JUSTSEARCH_NATIVE_PATH", "onnxruntime.native.path", null);
     }
     if (ortNativePathStr == null || ortNativePathStr.isBlank()) {
+      // Install AI can populate this directory after CPU sessions initialized ORT. Resolve
+      // its dependencies on demand instead of changing a restart-required process source.
+      if (store != null && io.justsearch.configuration.PlatformPaths.isLinux()) {
+        Path home = store.get().paths().dataDir();
+        if (home != null) {
+          Path pack = home.resolve("native-bin/llama-server/variants/cuda12");
+          if (Files.isDirectory(pack)) return pack;
+        }
+      }
       log.info("ORT native path: no env/sysprop configured, using default: {}", defaultPath);
       return defaultPath;
     }

@@ -188,6 +188,14 @@ public record ModelPackage(
         installRoot, license, tier, requiresCuda, false, null, null);
   }
 
+  /** Unpublished pack coordinates can be committed, but must never enter an install plan. */
+  public boolean hasUnpublishedArtifacts() {
+    return supportingFiles.stream().anyMatch(file -> file.sizeBytes() <= 0
+        || file.sha256() == null || file.sha256().isBlank() || file.sha256().matches("0{64}")
+        || ("linux-x86_64".equals(nativeTarget) && !file.sha256().matches("[a-fA-F0-9]{64}"))
+        || file.downloadUrl() == null || file.downloadUrl().contains("not-yet-published.invalid"));
+  }
+
   /** Returns true if this package requires a minimum VRAM threshold to be useful. */
   public boolean hasVramRequirement() {
     return minVramBytes > 0;

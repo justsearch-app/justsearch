@@ -15,9 +15,10 @@ description: "How to run llama-server with GPU offload for local development and
   A development build staged with the CUDA variant uses
   `modules/ui/build/llama-server/stage/variants/cuda12/` instead; no Gradle task mirrors it
   into `modules/ui/native-bin`.
-- Linux: provide a CUDA-enabled `llama-server` built from the pinned llama.cpp version `b8571`,
-  set `JUSTSEARCH_SERVER_EXE` to its executable path, and make its shared libraries available
-  to the loader. The Windows runtime downloaded by Install AI is not used on Linux.
+- Linux: the shipped registry currently has no Linux GPU packs, so Install AI offers CPU search
+  and shows chat unavailable. For an operator-managed runtime, provide a CUDA-enabled
+  `llama-server` built from pinned llama.cpp `b8571`, set `JUSTSEARCH_SERVER_EXE`, and make its
+  shared libraries available to the loader. To exercise pack installation, use the test recipe below.
 - Provide a local chat GGUF model. The examples below use the model downloaded by Install AI.
 
 ## Preflight Check
@@ -71,6 +72,120 @@ Use `llama-server.exe` on Windows and `llama-server` on Linux. The equivalent ex
 is `JUSTSEARCH_SERVER_EXE`; `JUSTSEARCH_GPU_LAYERS=99` sets the layer count. These configure the managed
 server; the app still needs valid model/runtime settings and activation. `justsearch.server.exe`
 overrides executable discovery in `InferenceConfig`. See `docs/explanation/13-ai-setup-and-verification.md` section 3.3 for how variant selection works.
+
+## Linux GPU pack assembly and the later release workflow
+
+The app supports Linux runtime packs, but none are registered in the shipped registry yet.
+The later workflow should build llama.cpp **b8571 against CUDA 12 on ubuntu-24.04**, supply
+CUDA **12.8+**, cuDNN **9**, and the four Linux x64 native libraries extracted from the pinned
+ORT **1.24.3 GPU JAR**, then call:
+
+```bash
+python3 scripts/ai/assemble-linux-gpu-packs.py \
+  --llama-dir /inputs/llama/bin --cuda-dir /inputs/cuda/lib \
+  --cudnn-dir /inputs/cudnn/lib --ort-dir /inputs/ort-linux-x64 \
+  --notices /inputs/licenses --output /output/linux-gpu
+```
+
+Inputs must include their redistribution notices. Required tools are Python 3, `patchelf`,
+`readelf`, and `ldd`; tests also use `gcc`. `--patchelf /path/to/patchelf` selects an existing
+local tool. The later pack workflow installs `patchelf` on its Ubuntu runner with
+`sudo apt-get update && sudo apt-get install -y patchelf`. For local assembler tests without
+a host installation, install the PyPI wheel into a fresh scratch directory and expose its
+executable only to the test command:
+
+```bash
+python3 -m pip install --target "$TMPDIR/patchelf-wheel" patchelf
+PATH="$TMPDIR/patchelf-wheel/bin:$PATH" \
+  python3 -m unittest discover -s scripts/ai -p 'test_assemble_linux_gpu_packs.py'
+```
+
+The assembler copies inputs, materializes SONAMEs and ggml backend aliases as
+regular ZIP entries, rewrites RUNPATH to `$ORIGIN`, and audits the combined dependency closure
+with `readelf`, `ldd`, and the loader with its cache disabled. It rejects dependencies outside
+the pack except the explicit OS/driver ABI allowlist, CUDA 13 release inputs, and GLIBC symbols
+above **2.39**. Both ZIPs extract into the same `cuda12` directory. ORT natives are audit inputs;
+the Engine's GPU ORT JAR continues to supply ORT itself.
+
+After publishing the two ZIPs, use their actual URLs, `sizeBytes`, and `sha256` from
+`registry-artifacts.json` in a new package in
+`modules/configuration/src/main/resources/ai/model-registry.v2.json`. Use a distinct
+`id: cuda-runtime-linux`, `replaces: cuda-runtime`, `nativeTarget: linux-x86_64`, `tier: runtime`,
+`requiresCuda: true`, `necessity: infrastructure`, `minVramBytes: 0`,
+`installRoot: native-bin/llama-server/variants`, `targetDir: cuda12`, `variants: []`, and two
+`supportingFiles` entries with `extract: true`. Retain NVIDIA terms and license metadata.
+The loader rewrites dependencies to that target's package ID before planning; Windows keeps
+its existing runtime package and plan. Linux hardware selection requires driver major **570+**.
+Do not register placeholder assets. The build/publish workflow is a later assignment.
+
+## Host-only Install AI check with a registry override
+
+Use existing input directories and a disposable application distribution and state directory.
+Host-built binaries needing a newer glibc or extra CUDA-major libraries are suitable only for
+this check. Supply every such dependency among the inputs; the closure audit still applies.
+Add `--test-only` to the assembly command. It emits `TEST-ONLY-` ZIPs and
+`TEST-ONLY-registry-artifacts.json`, and labels the pack metadata. Never publish these outputs.
+
+Install AI reads `AiInstallService.getManifest()` → `ModelRegistryLoader.loadFromClasspath()` →
+**`ai/model-registry.v2.json` using the configuration class's own classloader**. There is no
+registry environment variable or filesystem override. For this check, override that resource
+inside a **disposable copy** of the configuration JAR:
+
+1. Copy a prepared Linux distribution (for example `modules/ui/build/install/ui`) into a temporary
+   directory. Keep the source distribution unchanged. Do not start the dev stack manually;
+   dev-stack runs require the justsearch-dev MCP lease workflow.
+2. Copy the shipped registry to `<work>/override/ai/model-registry.v2.json`. Append the Linux
+   package described above, using the two TEST-ONLY artifact hashes and sizes. Set each URL to
+   `http://127.0.0.1:8769/<filename>`. Keep the existing model entries so search and chat can be
+   installed normally. The small fixtures under configuration/app-services `src/test/resources/ai/`
+   demonstrate the `replaces` relationship; their example URLs and tiny model bytes are not live inputs.
+3. Serve only the output directory: `python3 -m http.server 8769 --bind 127.0.0.1 --directory /output/linux-gpu`.
+   Record its PID and stop that process after the check. Use an unused port if necessary and match
+   the registry URLs to it.
+4. Locate the configuration JAR in the **copied** distribution's `lib/` (its `jar --list --file`
+   output includes `ai/model-registry.v2.json`). Replace only that copy's resource:
+
+   ```bash
+   jar --update --file /work/distribution/lib/configuration-VERSION.jar \
+     -C /work/override ai/model-registry.v2.json
+   ```
+
+5. Launch the copied distribution with fresh `JUSTSEARCH_HOME` and `JUSTSEARCH_DATA_DIR` pointing
+   to the same private state directory, private XDG roots, an unused `JUSTSEARCH_API_PORT`, and
+   `JUSTSEARCH_MODE=full-desktop`. Scrub inherited `JUSTSEARCH_SERVER_EXE`,
+   `JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH`, `JUSTSEARCH_NATIVE_PATH`, `LD_LIBRARY_PATH`,
+   `LD_PRELOAD`, and Java option executable/native-path overrides. Leave GPU acceleration enabled.
+   See [headless launch](headless-runtime.md) and the
+   [local API contract](../reference/api-contract-map.md#ai-install-apiaiinstall) for launch/auth details.
+6. Confirm `GET /api/ai/install/manifest` contains `cuda-runtime-linux` with the local URLs.
+   The plan preview should be `GPU_FULL` and include chat and that runtime. Run **Install AI**
+   (`POST /api/ai/install/start`, `{"acceptTerms":true}`), wait for completion, and use **Start AI**
+   to activate. Check that the executable selected is
+   `<state>/native-bin/llama-server/variants/cuda12/llama-server`.
+7. Index a small source document and ask a question it answers. Require an answer with citations,
+   successful activation, and llama logs confirming layers offloaded to GPU. Inspect
+   `/proc/<engine-pid>/maps` and `/proc/<llama-pid>/maps`: every CUDA/cuDNN library must resolve
+   under the installed pack directory, never this host's globally configured `/opt` paths.
+   Restart the copied Engine against the same state and repeat; delete only its downloaded
+   executable, run **Repair**, and check activation again. Stop only the Engine/server processes
+   you started, using their recorded PIDs.
+
+For ORT's CPU-before-CUDA case, extract **both** test ZIPs into one fresh directory and run this
+normal JUnit test alone (the UI module uses the Engine's GPU ORT dependency):
+
+```bash
+JUSTSEARCH_LINUX_GPU_PACK_DIR=/absolute/path/to/extracted-pack \
+  js-gradle-slot ./gradlew :modules:ui:test --tests '*LinuxOrtAfterCpuTest' -PskipWebBuild=true
+```
+
+It executes a real CPU session, then preloads the pack dependencies without changing ORT's
+one-shot native-path property, executes a CUDA kernel in the same JVM, checks the profiler's
+execution provider, and verifies CUDA/cuDNN mappings are pack-owned. This path does **not**
+restart the Engine. The test is skipped when the pack variable is absent; a skip is not GPU
+verification. The ordinary `OrtCudaHelperTest` also checks that Linux preloads nvJitLink before
+sparse/solver libraries. Check assembler fixtures with
+`python3 -m unittest discover -s scripts/ai -p 'test_assemble_linux_gpu_packs.py'` (use `PATCHELF`
+to select an existing tool).
 
 ## Troubleshooting
 
