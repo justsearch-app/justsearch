@@ -289,10 +289,34 @@ public final class WorkerIngestService {
   }
 
   private Path declaredRootsDirectory;
+  private DeclarationSnapshot declarationSnapshot;
+
+  private record RegistryIdentity(Object fileKey, long size, java.nio.file.attribute.FileTime modified) {}
+  private record DeclarationSnapshot(RegistryIdentity identity, Map<Path, String> collections) {}
+
+  /** One metadata probe per use; official registry writes replace the file atomically. */
+  private synchronized Map<Path, String> persistedDeclaredCollections() throws IOException {
+    if (declaredRootsDirectory == null) return Map.of();
+    Path file = declaredRootsDirectory.resolve("watched_roots.json");
+    RegistryIdentity identity;
+    try {
+      var attributes = Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes.class);
+      identity = new RegistryIdentity(attributes.fileKey(), attributes.size(), attributes.lastModifiedTime());
+    } catch (java.nio.file.NoSuchFileException absent) {
+      if (!Files.notExists(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) throw absent;
+      identity = null;
+    }
+    if (declarationSnapshot == null || !Objects.equals(identity, declarationSnapshot.identity())) {
+      declarationSnapshot = new DeclarationSnapshot(identity,
+          io.justsearch.configuration.persistence.WatchedRootsFormat.declaredCollections(declaredRootsDirectory));
+    }
+    return declarationSnapshot.collections();
+  }
 
   /** The authored declarations include roots whose worker watch has not initialized yet. */
-  public void setDeclaredRootsDirectory(Path dataDir) {
+  public synchronized void setDeclaredRootsDirectory(Path dataDir) {
     declaredRootsDirectory = dataDir;
+    declarationSnapshot = null;
     if (jobQueue != null) jobQueue.useDeclaredCollectionRoots(this::declaredCollectionRoots);
   }
 
@@ -301,8 +325,7 @@ public final class WorkerIngestService {
     configuredRecoveryRoots.forEach(root -> bindings.put(root, creatorRootCollection.apply(root)));
     rootWatcherRegistry.current().collectionBindings().forEach(binding -> bindings.put(binding.path(), binding.collection()));
     try {
-      io.justsearch.configuration.persistence.WatchedRootsFormat.declaredCollections(declaredRootsDirectory)
-          .forEach(bindings::put);
+      persistedDeclaredCollections().forEach(bindings::put);
     } catch (IOException | RuntimeException unreadable) {
       throw WorkerServiceException.unavailable("Watched-root declarations are unreadable");
     }
@@ -316,8 +339,7 @@ public final class WorkerIngestService {
     declarations.addAll(configuredRecoveryRoots);
     try {
       if (declaredRootsDirectory == null) declarations.addAll(exclusionRoots.get());
-      else declarations.addAll(io.justsearch.configuration.persistence.WatchedRootsFormat
-          .declaredPaths(declaredRootsDirectory));
+      else declarations.addAll(persistedDeclaredCollections().keySet());
     } catch (IOException | RuntimeException unreadable) {
       throw WorkerServiceException.unavailable("Watched-root declarations are unreadable");
     }

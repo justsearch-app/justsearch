@@ -70,7 +70,7 @@ accepted. The builder does not generate execution evidence or acceptance records
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionScanSnapshotTest.java"
       ],
       "class": "New",
-      "behaviour": "R2: for 32 files, ordinary and candidate scans and hintless normal/migration batches read declarations once per scan or batch, with every file sharing that snapshot. A changed registry is reread by the next scan/batch and changes its reconciliation/admission result. No cache outlives the operation. Scan snapshots load only at the first collection comparison, retaining the old absence of lookup for deletion-only, forced, or reserved-only scans. The unchanged WatcherReloadRetryTest preserves the real deletion-only reload path; it passed on 0172c39092 and caught the intermediate eager-load regression.",
+      "behaviour": "R2: for 32 files, ordinary and candidate scans and hintless normal/migration batches read declarations once per scan or batch, with every file sharing that snapshot. A changed registry is observed by the next scan/batch and changes its reconciliation/admission result. Each operation keeps one snapshot; the composed service now reuses parsed declarations between operations until the registry file identity changes (F2/K3-K5 below). Scan snapshots load only at the first collection comparison, retaining the old absence of lookup for deletion-only, forced, or reserved-only scans. The unchanged WatcherReloadRetryTest preserves the real deletion-only reload path; it passed on 0172c39092 and caught the intermediate eager-load regression.",
       "repaired": true,
       "sources": [
         {
@@ -80,6 +80,11 @@ accepted. The builder does not generate execution evidence or acceptance records
           "delegationScope": "the testing task and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
           "label": "agent choice",
           "choice": "R2: avoid reading and parsing watched-root declarations for each file; read once per scan/batch, before the queue lock where ordering permits, and refresh next time. Preserve frozen-plan, explicit and reserved collection authority."
+        },
+        {
+          "kind": "owner-words",
+          "quote": "the declaration supplier parses the registry at most once per registry change: cache the parsed declarations and revalidate with one cheap check of the file's identity (inode/fileKey, size, modification time) before reuse; re-parse when any differs.",
+          "location": "Builder assignment, user turn 2026-10-29, Settled design F2"
         }
       ],
       "evidence": "gates/test-intent/evidence/b68264-collection-ownership-review.json",
@@ -104,3 +109,52 @@ accepted. The builder does not generate execution evidence or acceptance records
   "note": "R1 restart/cutover, deletion boundaries, snapshot refresh, C1-C7 and merge checks pass; all 96 full-suite failures match baseline."
 }
 ```
+
+## Final bounded repair: F1 and F2 (K1–K5)
+
+Source: the builder assignment, user turn of 2026-10-29, “close two review findings on the
+collection-label fix (b68264), third and last repair round”. Its settled design says:
+“live hintless admission uses the same authority order as replay” and “the declaration supplier
+parses the registry at most once per registry change”. K1–K5 below reproduce those supplied
+scenarios. These two additional test classes are isolated new sources, exempt under the
+isolated-new-test rule; their fail-before logs and JUnit XML remain for the independent verifier.
+The R2 entry retains the operation snapshots introduced in the preceding repair and now states
+the parsed-registry cache policy too. Its prior acceptance must be refreshed by the verifier.
+
+- `EngineFrozenCollectionAdmissionTest#unseenLiveFileUsesFrozenDefaultUntilCutoverThenScanRelabels`
+  (K1): prepare and dispatch an actual durable bulk operation whose accepted root plan freezes
+  default. Pause its recorded migration before publishing Green, replace the persisted declaration
+  with C, then submit a previously unseen hintless file through the live Engine. Compare its actual
+  indexed label with the independently asserted default label of an equivalent legacy NULL receipt
+  repaired using that same accepted plan. Delete C, assert the parent and chunks survive, resume
+  and publish Green, scan, and await C. The first fixture used the native start RPC and was rejected
+  as evidence for a recorded scenario; final evidence uses the durable operation path.
+- `DeclaredCollectionRegistryCacheTest#candidateReconciliationParsesRegistryOnceWithRealQueue`
+  (K3): reconcile 64 new files on a default subscription using the composed ingest service,
+  generation manager and real SQLite queue/journal. Count actual `WatchedRootsFormat.declaredCollections`
+  calls with a scoped static counting wrapper which calls the real parser; require exactly one.
+- `DeclaredCollectionRegistryCacheTest#watcherAndSingleFileAdmissionsReuseParseAndSeeRegistryChanges`
+  (K4): independently exercise 64 watcher admissions and 64 single-file batch requests. Require one
+  actual parse per unchanged registry; atomically replace A with equal-length B at the same mtime,
+  then remove and re-add the declaration. Each next admission must use the new authority and each
+  revision adds one parse. The counting wrapper is closed at test exit.
+- `DeclaredCollectionRegistryCacheTest#reappearedFileFetchesDeclarationSnapshotOutsideQueueLock`
+  (K5): wrap the real service declaration supplier, inspect the actual queue's ReentrantLock on
+  every supplier invocation, and assert it is not held by this thread before calling through.
+  This observes even the cache's metadata read, rather than only counting parser calls.
+- K2 and preservation: existing `DeclaredCollectionAdmissionTest`, all earlier collection,
+  snapshot and recovery checks, plus the three complete module suites remain unchanged.
+
+Execution evidence is in `tmp/round3-*-results/` and matching `tmp/round3-*.log`; the final delivery
+names the authoritative before/after runs and their counts. The before checkout is a shared clone
+of 3241ebf1a3, with only the new test sources overlaid, and its own build directories. There is no
+`.agents/preflight` in this checkout.
+
+Registry identity: `WatchedRootsFormat` is the reader. `WatchedRootsStore.persist` writes through
+`AtomicFileWrites.replace`, which creates a temporary file and renames it over the target (atomic
+move where supported, replacement fallback otherwise). On filesystems exposing fileKey, an
+adjacent replacement has a new identity even with equal size and mtime. The cache probes fileKey,
+size and full FileTime together. An external in-place rewrite preserving all three can be missed;
+a filesystem without fileKey, or inode reuse over multiple unseen replacements with matching size
+and timestamp, can also collide. A change racing a probe is observed on the next call. Failed
+parses do not replace the previous snapshot, and are retried rather than served as a cache hit.

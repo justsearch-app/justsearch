@@ -76,6 +76,20 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     declaredCollectionRoots = Objects.requireNonNull(roots);
   }
 
+  private java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> frozenCollectionRoots = List::of;
+
+  /** In-memory recorded-plan snapshot, owned and retired by the generation publisher. */
+  public void useFrozenCollectionRoots(
+      java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> roots) {
+    frozenCollectionRoots = Objects.requireNonNull(roots);
+  }
+
+  private static IngestCollectionPolicy.RootBinding collectionOwner(Path path,
+      List<IngestCollectionPolicy.RootBinding> frozen, List<IngestCollectionPolicy.RootBinding> declared) {
+    var owner = IngestCollectionPolicy.owningRoot(path, frozen);
+    return owner == null ? IngestCollectionPolicy.owningRoot(path, declared) : owner;
+  }
+
   /** Repair pre-fix NULL admissions before any boot writer or replay can observe them. */
   public void recoverLegacyCollections(String generation,
       List<IngestCollectionPolicy.RootBinding> declared,
@@ -105,8 +119,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             String unit = rows.getString(2);
             if (unattributed.contains(path) || RootOrigin.fromUnit(unit) != null
                 || (unit != null && unit.startsWith("release030/"))) continue;
-            var owner = IngestCollectionPolicy.owningRoot(Path.of(path), frozen);
-            if (owner == null) owner = IngestCollectionPolicy.owningRoot(Path.of(path), declared);
+            var owner = collectionOwner(Path.of(path), frozen, declared);
             if (owner != null) owners.put(path, owner);
           }
         }
@@ -118,8 +131,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           if (receipts.stream().anyMatch(later -> later.acceptedOrder() > op.acceptedOrder()
               && later.key().equals(op.key()) && "UPSERT".equals(later.op())
               && SwitchBufferUpsert.decode(later.payload()).collection() != null)) continue;
-          var owner = IngestCollectionPolicy.owningRoot(Path.of(file.path()), frozen);
-          if (owner == null) owner = IngestCollectionPolicy.owningRoot(Path.of(file.path()), declared);
+          var owner = collectionOwner(Path.of(file.path()), frozen, declared);
           // Unknown ownership alone does not prove removal. A later scoped deletion is
           // production Remove's durable evidence; never turn an unrelated NULL admission into DELETE.
           boolean removed = owner == null && receipts.stream().anyMatch(later ->
@@ -3053,8 +3065,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       boolean exactCollection, String unitRevision) throws SQLException {
     return enqueueEntriesInTransaction(
         entries, collection, scanId, now, exactCollection, unitRevision, false,
-        !exactCollection && unitRevision == null && (collection == null || collection.isBlank())
-            ? declaredCollectionRoots.get() : List.of());
+        List.of());
   }
 
   private int enqueueEntriesInTransaction(
@@ -3082,6 +3093,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // still revived; explicit/forced scans, watcher events and ordinary sync are unchanged.
       sql += " WHERE NOT (" + MAINTENANCE_RETRY_WAIT + ")";
     }
+    var frozen = frozenCollectionRoots.get();
     int accepted = 0;
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
       for (JobQueue.EnqueueEntry entry : entries) {
@@ -3099,7 +3111,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         boolean exact = exactCollection;
         if (!exact && unitRevision == null && membership.epoch() == null
             && (collection == null || collection.isBlank())) {
-          var owner = IngestCollectionPolicy.owningRoot(entry.path(), declared);
+          var owner = collectionOwner(entry.path(), frozen, declared);
           if (owner != null) {
             effectiveCollection = owner.collection() == null || owner.collection().isBlank() ? null : owner.collection();
             exact = true;
@@ -6439,6 +6451,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public boolean enqueueReappearedFile(JobQueue.EnqueueEntry entry, String collection) {
+    var declared = collection == null || collection.isBlank()
+        ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
     lock.lock();
     try {
       ensureOpen();
@@ -6453,7 +6467,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         return enqueueEntriesInTransaction(List.of(entry), collection, null,
-            System.currentTimeMillis(), false, null) == 1;
+            System.currentTimeMillis(), false, null, false, declared) == 1;
       });
     } catch (SQLException failure) {
       log.warn("Cannot admit recreated file {}", entry.path(), failure);
