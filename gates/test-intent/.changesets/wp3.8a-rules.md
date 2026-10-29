@@ -535,6 +535,27 @@ All sources remain agent choices under the specified design delegation. Builder 
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java",
+        "modules/app-services/src/test/resources/registry/emitter/ui-operation-wire.golden.json"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "D4 adds the UI-only operation core.set-indexing-rules to the core catalog. Adapt the exact seed-entry expectation (now 41 unique ids) and recapture the pinned operation wire through the test's documented delete-and-rerun mechanism; a decoded comparison shows exactly one added operation, no removed or changed entries. Uniqueness, exact membership and byte-identical wire verification are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "WP3.8 indexing-hours, battery and verification design within existing user policy choices",
+          "choice": "Implement settled revision 3 D1-D9 and S38.1-S38.6/S38.8/S38.9 Engine behavior and adopted BP38 test-only supplier seam; S38.7 and UI wording remain in the following package.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }

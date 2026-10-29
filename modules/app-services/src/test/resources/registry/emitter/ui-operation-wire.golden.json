@@ -262,20 +262,14 @@
         },
         "scope" : {
           "type" : "string",
-          "enum" : [
-            "FILE",
-            "FOLDER"
-          ]
+          "enum" : [ "FILE", "FOLDER" ]
         }
       },
-      "required" : [
-        "path",
-        "scope"
-      ]
+      "required" : [ "path", "scope" ]
     },
-    "result" : {},
-    "errors" : [],
-    "uiHints" : {}
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
   },
   "policy" : {
     "risk" : "HIGH",
@@ -286,21 +280,19 @@
     "undoSupported" : false,
     "inverseOperationId" : null
   },
-  "availability" : {},
+  "availability" : { },
   "lineage" : {
-    "affects" : [],
-    "supersedes" : []
+    "affects" : [ ],
+    "supersedes" : [ ]
   },
   "provenance" : {
     "tier" : "CORE",
     "contributorId" : "core",
     "version" : "1.0"
   },
-  "executors" : [
-    "UI"
-  ],
+  "executors" : [ "UI" ],
   "audience" : "USER",
-  "consumers" : []
+  "consumers" : [ ]
 }, {
   "id" : "core.retry-forget",
   "type" : "operation",
@@ -321,13 +313,11 @@
           "maxLength" : 36
         }
       },
-      "required" : [
-        "forgetKey"
-      ]
+      "required" : [ "forgetKey" ]
     },
-    "result" : {},
-    "errors" : [],
-    "uiHints" : {}
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
   },
   "policy" : {
     "risk" : "HIGH",
@@ -338,21 +328,19 @@
     "undoSupported" : false,
     "inverseOperationId" : null
   },
-  "availability" : {},
+  "availability" : { },
   "lineage" : {
-    "affects" : [],
-    "supersedes" : []
+    "affects" : [ ],
+    "supersedes" : [ ]
   },
   "provenance" : {
     "tier" : "CORE",
     "contributorId" : "core",
     "version" : "1.0"
   },
-  "executors" : [
-    "UI"
-  ],
+  "executors" : [ "UI" ],
   "audience" : "USER",
-  "consumers" : []
+  "consumers" : [ ]
 }, {
   "id" : "core.withdraw-forget",
   "type" : "operation",
@@ -373,13 +361,11 @@
           "maxLength" : 36
         }
       },
-      "required" : [
-        "forgetKey"
-      ]
+      "required" : [ "forgetKey" ]
     },
-    "result" : {},
-    "errors" : [],
-    "uiHints" : {}
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
   },
   "policy" : {
     "risk" : "HIGH",
@@ -390,21 +376,19 @@
     "undoSupported" : false,
     "inverseOperationId" : null
   },
-  "availability" : {},
+  "availability" : { },
   "lineage" : {
-    "affects" : [],
-    "supersedes" : []
+    "affects" : [ ],
+    "supersedes" : [ ]
   },
   "provenance" : {
     "tier" : "CORE",
     "contributorId" : "core",
     "version" : "1.0"
   },
-  "executors" : [
-    "UI"
-  ],
+  "executors" : [ "UI" ],
   "audience" : "USER",
-  "consumers" : []
+  "consumers" : [ ]
 }, {
   "id" : "core.ping-backend",
   "type" : "operation",
@@ -1054,99 +1038,141 @@
   "audience" : "USER",
   "consumers" : [ ]
 }, {
-  "id": "core.indexing-pause",
-  "type": "operation",
-  "presentation": {
-    "labelKey": "ops.indexing-pause.label",
-    "descriptionKey": "ops.indexing-pause.description"
+  "id" : "core.indexing-pause",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.indexing-pause.label",
+    "descriptionKey" : "ops.indexing-pause.description"
   },
-  "intf": {
-    "inputs": {
-      "type": "object",
-      "properties": {
-        "untilEpochMs": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "properties" : {
+        "untilEpochMs" : {
+          "type" : [ "integer", "null" ],
+          "minimum" : 0
         }
       },
-      "additionalProperties": false
+      "additionalProperties" : false
     },
-    "result": {
-      "type": "object"
+    "result" : {
+      "type" : "object"
     },
-    "errors": [],
-    "uiHints": {}
+    "errors" : [ ],
+    "uiHints" : { }
   },
-  "policy": {
-    "risk": "LOW",
-    "confirm": {
-      "kind": "NONE"
+  "policy" : {
+    "risk" : "LOW",
+    "confirm" : {
+      "kind" : "NONE"
     },
-    "audit": "METADATA_ONLY",
-    "undoSupported": false,
-    "inverseOperationId": null
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
   },
-  "availability": {},
-  "lineage": {
-    "affects": [],
-    "supersedes": []
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
   },
-  "provenance": {
-    "tier": "CORE",
-    "contributorId": "core",
-    "version": "1.0"
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
   },
-  "executors": [
-    "UI"
-  ],
-  "audience": "USER",
-  "consumers": []
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
 }, {
-  "id": "core.indexing-resume",
-  "type": "operation",
-  "presentation": {
-    "labelKey": "ops.indexing-resume.label",
-    "descriptionKey": "ops.indexing-resume.description"
+  "id" : "core.indexing-resume",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.indexing-resume.label",
+    "descriptionKey" : "ops.indexing-resume.description"
   },
-  "intf": {
-    "inputs": {
-      "type": "object",
-      "properties": {},
-      "additionalProperties": false
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "properties" : { },
+      "additionalProperties" : false
     },
-    "result": {
-      "type": "object"
+    "result" : {
+      "type" : "object"
     },
-    "errors": [],
-    "uiHints": {}
+    "errors" : [ ],
+    "uiHints" : { }
   },
-  "policy": {
-    "risk": "LOW",
-    "confirm": {
-      "kind": "NONE"
+  "policy" : {
+    "risk" : "LOW",
+    "confirm" : {
+      "kind" : "NONE"
     },
-    "audit": "METADATA_ONLY",
-    "undoSupported": false,
-    "inverseOperationId": null
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
   },
-  "availability": {},
-  "lineage": {
-    "affects": [],
-    "supersedes": []
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
   },
-  "provenance": {
-    "tier": "CORE",
-    "contributorId": "core",
-    "version": "1.0"
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
   },
-  "executors": [
-    "UI"
-  ],
-  "audience": "USER",
-  "consumers": []
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
+}, {
+  "id" : "core.set-indexing-rules",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.set-indexing-rules.label",
+    "descriptionKey" : "ops.set-indexing-rules.description"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "required" : [ "schedule", "pauseOnBattery" ],
+      "properties" : {
+        "schedule" : {
+          "type" : [ "object", "null" ]
+        },
+        "pauseOnBattery" : {
+          "type" : "boolean"
+        }
+      },
+      "additionalProperties" : false
+    },
+    "result" : {
+      "type" : "object"
+    },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "LOW",
+    "confirm" : {
+      "kind" : "NONE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
 }, {
   "id" : "core.trigger-offline-processing",
   "type" : "operation",
