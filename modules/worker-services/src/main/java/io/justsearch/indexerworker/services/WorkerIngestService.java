@@ -134,9 +134,9 @@ public final class WorkerIngestService {
   private final IndexingPacing indexingPacing;
   private final io.justsearch.adapters.lucene.runtime.RunningRuntime ingestLifecycle;
   private final IndexGenerationManager indexGenerationManager;
-  /** Volume each root was first pruned from, kept across restarts (task t-20261013-ef3c41, S8). */
+  /** Volume each root was first pruned from, kept across restarts (#758). */
   private final RootVolumeLedger rootVolumes;
-  /** Task t-20261013-ef3c41, round 4: the root-identity check every deletion decision asks. */
+  /** #758: the root-identity check every deletion decision asks. */
   private final RootWitness rootWitness;
   private final boolean ingestIsServing;
   private final boolean hasServingRuntime;
@@ -895,7 +895,7 @@ public final class WorkerIngestService {
         requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
       }
       if (skipUnlessConfirmedAbsent && !confirmedAbsent(normalizedPath, requiredRoot)) {
-        // Task t-20261013-ef3c41: re-checked under the fence, because the file may have come back
+        // #758: re-checked under the fence, because the file may have come back
         // (or its root gone away) since the watcher confirmed the delete. Nothing is removed; a
         // present file is re-admitted by its own CREATE/MODIFY event or the next sync.
         log.debug("Watcher delete skipped: absence of {} no longer confirmed", normalizedPath);
@@ -1144,8 +1144,7 @@ public final class WorkerIngestService {
 
   /**
    * The root-identity check this service's deletion decisions ask; the composition root hands it to
-   * the indexing loop and the watcher so every deletion decision asks the same one (task
-   * t-20261013-ef3c41, round 4).
+   * the indexing loop and the watcher so every deletion decision asks the same one (#758).
    */
   public io.justsearch.indexerworker.loop.SourcePresence.RootCheck rootCheck() {
     return rootWitness;
@@ -1153,7 +1152,7 @@ public final class WorkerIngestService {
 
   /**
    * The reason a walk, a sync or a watch of a root refused it because the folder at its path is
-   * not on the volume recorded for it (task t-20261013-ef3c41, S8). The Head records it as the
+   * not on the volume recorded for it (#758). The Head records it as the
    * root's walk error, which shows the root-level "unavailable" state.
    */
   static final String ROOT_ON_ANOTHER_VOLUME = "ROOT_NOT_DIRECTORY";
@@ -1200,10 +1199,10 @@ public final class WorkerIngestService {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 6 (S8): whether the folder at {@code rootPath} is a real folder
+   * #758: whether the folder at {@code rootPath} is a real folder
    * that is not on the volume recorded for it, or whose volume cannot be told. One volume
    * identity read, no walk: the Head asks it of every watched root each periodic cycle, so a
-   * root whose turn to be walked is far off still reads unavailable within one cycle. Round 8: it
+   * root whose turn to be walked is far off still reads unavailable within one cycle. It
    * records nothing, except that a root awaiting its upgrade seeding is first checked on evidence.
    */
   public boolean refusesRootVolume(String rootPath, CallContext ctx) {
@@ -1731,7 +1730,7 @@ public final class WorkerIngestService {
 
   /**
    * What the Worker's boot held back by the repeat-rebuild brake, or {@code null} when nothing
-   * (task t-20261013-ef3c41, round 3). The status reports it for the rest of the boot.
+   * (#758). The status reports it for the rest of the boot.
    */
   public void setBootRebuildHoldSupplier(
       Supplier<IndexGenerationManager.AutoRebuildBrake> supplier) {
@@ -2528,6 +2527,18 @@ public final class WorkerIngestService {
 
         try {
           var scope = prefixScope(pathPrefix);
+          boolean removingRoot = io.justsearch.configuration.persistence.WatchedRootsFormat
+              .pendingRemovals(declaredRootsDirectory)
+              .contains(Path.of(pathPrefix).toAbsolutePath().normalize());
+          if (declaredRootsDirectory == null && rootWatcherRegistry.current().declaredRoots()
+              .contains(Path.of(pathPrefix).toAbsolutePath().normalize())) {
+            throw WorkerServiceException.unavailable(
+                "Removal intent is not confirmed; retry Remove after watched-root declarations recover");
+          }
+          if (switchBufferOps.isSwitching() && removingRoot) {
+            return deleteByPathResponse(0, io.justsearch.configuration.persistence.WatchedRootsFormat
+                .REMOVAL_REFUSED_DURING_SWITCHING);
+          }
           if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
             if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
               return switchBufferOps.bufferDeleteByPathDuringSwitching(sbq, scope);
@@ -2535,7 +2546,18 @@ public final class WorkerIngestService {
             throw IngestSwitchBufferOps.switchingUnavailable();
           }
 
+          // Only the Head's durable removal intent authorizes watcher retirement here. Ordinary
+          // unwatch remains uncertain; a plain prefix deletion leaves the registration alone.
+          if (removingRoot) {
+            String generation = switchBufferOps.buildingGenerationForFileAdmission();
+            if (generation != null) switchBufferOps.journalDeletePrefixForGeneration(generation, scope);
+            // No file fence while draining callbacks: an issued DELETE may need that fence.
+            forgetWatchRoot(pathPrefix);
+          }
+
           return withFileMutationFence(() -> {
+            // Reissue after the watcher drain, ordering the removal after its last issued event.
+            // The admission lease also keeps promotion out through commit and queue cleanup.
             journalAndProjectPrefixDeleteToServing(scope);
             if (scope.excludedSubtrees().isEmpty()) ingestLifecycle.indexingCoordinator().deleteByPathPrefix(pathPrefix);
             else deletePrefix(ingestLifecycle.indexingCoordinator(), scope);
@@ -2715,7 +2737,7 @@ public final class WorkerIngestService {
       // that stops half-way on user activity leaves orphans behind, which is what the breath-hold
       // did. `aborted` therefore stays false on this path; the response field remains for the
       // force/abort contract PruneOps still exposes.
-      // Task t-20261013-ef3c41: a document is pruned only when its file is reported not found
+      // #758: a document is pruned only when its file is reported not found
       // while the root holding it (its registered identity, re-checked every batch) is present.
       Path pruneRoot = pruneRootFor(pathPrefix);
       io.justsearch.adapters.lucene.runtime.PruneOps.PruneResult result =
@@ -2954,8 +2976,8 @@ public final class WorkerIngestService {
   }
 
   /**
-   * Returns {@code false}, changing nothing, when the root is deferred (task t-20261013-ef3c41,
-   * round 7, S8): the folder at its path is not on the volume recorded for it. Its watch is then
+   * Returns {@code false}, changing nothing, when the root is deferred (#758): the folder at its
+   * path is not on the volume recorded for it. Its watch is then
    * held until that volume is back, nothing of the other volume is read, and the caller leaves
    * the root out of its convergence check and keeps the previous generation until the root has
    * been reconciled through {@link #reconcileReturnedBootRoot}. A deferral is not a failure, so
@@ -3198,8 +3220,7 @@ public final class WorkerIngestService {
 
   /**
    * The presence authority for one prune of {@code root}: present, listable, the registered
-   * identity while watched, and the volume recorded at the root's first prune (task
-   * t-20261013-ef3c41, S2 and S8).
+   * identity while watched, and the volume recorded at the root's first prune (#758).
    */
   private io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard pruneGuard(Path root) {
     var authority = RootPresenceGuard.capture(root, registeredRootIdentity(root), rootVolumes);
@@ -4174,7 +4195,7 @@ public final class WorkerIngestService {
               ? rootWitness.refusesRoot(root)
               : rootWitness.refusesWalk(root));
       if (refused) {
-        // Task t-20261013-ef3c41, round 4, S8: a drive letter that now holds another volume, or a
+        // #758: a drive letter that now holds another volume, or a
         // root whose volume cannot be told, shows the root-level unavailable state; its files are
         // not taken for the original's and nothing of the original's is touched. A root that is
         // itself a link walks as before.
@@ -4237,12 +4258,12 @@ public final class WorkerIngestService {
         }
         // A registration change can leave an event gap after an earlier root scan even if that
         // scan's incarnation check succeeded. Keep the existing final cutover fence conservative.
-        markReplayUncertainForWatchChangeDuringMigration();
+        markReplayUncertainForRegistrationDuringMigration(rootPath);
         try {
-          // Task t-20261013-ef3c41, round 5 (S8): no watcher is registered on another volume at the
+          // #921: no watcher is registered on another volume at the
           // root's path, so its creates and changes are never indexed into the root. The watch is
-          // held and registered once a walk or sync finds the recorded volume back. Round 8 (refined
-          // decision 2): only the person's add records the root's volume; a root with none recorded
+          // held and registered once a walk or sync finds the recorded volume back. Only the
+          // person's add records the root's volume; a root with none recorded
           // is held the same way.
           if (request.getRootAdded()) {
             Path added = parsedRoot(rootPath);
@@ -4272,7 +4293,7 @@ public final class WorkerIngestService {
         } finally {
           // A migration can begin after the first check but before registry mutation completes.
           // Recheck while this request still holds its mutation lease so the final fence sees it.
-          markReplayUncertainForWatchChangeDuringMigration();
+          markReplayUncertainForRegistrationDuringMigration(rootPath);
         }
       }
     }
@@ -4350,7 +4371,7 @@ public final class WorkerIngestService {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 8: the person removed this root (the Head's removal unwatches it
+   * #758: the person removed this root (the Head's removal unwatches it
    * before deleting its documents), so the volume recorded for it and anything awaiting its upgrade
    * seeding no longer stand; the same folder added again is recorded at that add. A deletion of
    * documents by path alone is not a removal and keeps the record of a root that stays declared.
@@ -4365,6 +4386,21 @@ public final class WorkerIngestService {
       log.warn("unwatchRoot: could not drop the recorded volume under {}: {}", rootPath,
           notForgotten.getMessage());
       throw WorkerServiceException.unavailable("Removed-root volume cleanup failed; retry shortly");
+    }
+  }
+
+  private void markReplayUncertainForRegistrationDuringMigration(String rootPath) {
+    markReplayUncertainForWatchChangeDuringMigration();
+    if (mutationAdmission == null || !(jobQueue instanceof SwitchBufferCapableQueue journal)) return;
+    Path root = parsedRoot(rootPath);
+    if (root == null) return;
+    String generation = switchBufferOps.buildingGenerationForFileAdmission();
+    if (generation != null && journal.listSwitchBufferOpsStrictForGeneration(generation).stream()
+        .anyMatch(receipt -> "DELETE_PREFIX".equals(receipt.op())
+            && PathPrefixScope.decode(receipt.payload()).contains(root.toString()))) {
+      // Replaying an earlier removal could erase this later registration. Keep serving the
+      // current index and refuse promotion, including before a distinct candidate writer opens.
+      mutationAdmission.markReplayUncertain();
     }
   }
 

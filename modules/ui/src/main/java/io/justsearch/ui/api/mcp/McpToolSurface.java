@@ -1533,7 +1533,7 @@ public final class McpToolSurface {
   // =========================================================================
 
   /**
-   * Task t-20261013-ef3c41: whether the status's document count is not a count — the Worker could
+   * #758: whether the status's document count is not a count — the Worker could
    * not count the index and had no earlier count, or no Worker answered.
    */
   static boolean documentCountUnknown(KnowledgeStatus status) {

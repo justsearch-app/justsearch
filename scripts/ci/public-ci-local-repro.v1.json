@@ -1,7 +1,7 @@
 {
   "kind": "justsearch-public-ci-local-repro.v1",
   "version": 1,
-  "note": "Versioned local reproduction inventory for every required public check. local-subset entries are deterministic candidate-side approximations, not substitutes for the selected hosted required lanes on PRs and the full suite on main; hosted-only entries state why no honest local analogue exists.",
+  "note": "Versioned local reproduction inventory for every required public check. local-subset entries are deterministic candidate-side approximations, not substitutes for the selected hosted required lanes on PRs and the full suite on main; hosted-only entries state why no honest local analogue exists. Advisory steps are omitted from commands.",
   "contexts": [
     {
       "check": "Public claims",
@@ -11,6 +11,7 @@
         "npm ci --audit=false",
         "node scripts/agent-analytics/run-all-tests.mjs",
         "node scripts/ci/check-workflow-triggers.mjs",
+        "node scripts/ci/test-check-runtime-manifest-closure.mjs",
         "node scripts/ci/test-check-workflow-npm-audit-policy.mjs",
         "node scripts/ci/check-workflow-npm-audit-policy.mjs",
         "node scripts/ci/test-check-lockfile-completeness.mjs",

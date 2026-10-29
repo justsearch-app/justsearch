@@ -297,7 +297,7 @@ final class IndexStatusOps {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 3: what the Worker's boot held back, or {@code null} when it held
+   * #758: what the Worker's boot held back, or {@code null} when it held
    * nothing. A boot that stopped an automatic rebuild keeps ingestion stopped for the rest of that
    * boot, so the status must keep saying so even after the brake record reads differently.
    */
@@ -325,7 +325,7 @@ final class IndexStatusOps {
     long queueDepth = counts.pendingCount() + counts.processingCount();
     JobQueue.FailureSummary failures = jobQueue.failureSummary();
 
-    // Task t-20261013-ef3c41: a count that has never been read successfully is unknown, not 0. The
+    // #758: a count that has never been read successfully is unknown, not 0. The
     // numeric fields keep carrying 0 there for readers that predate doc_count_unknown, and the flag
     // tells every newer reader that the 0 is not a count.
     long activeDocCount = 0;
@@ -1244,7 +1244,7 @@ final class IndexStatusOps {
   }
 
   /**
-   * Whole-document count (documents minus chunks) of {@code ops}. Task t-20261013-ef3c41: a read
+   * Whole-document count (documents minus chunks) of {@code ops}. #758: a read
    * failure used to be counted as 0 documents — a status that told the user their index was empty
    * because a reader was briefly unavailable. A failed read now reports the last count this
    * process read successfully from the same reader. Before any successful read there is no count to
@@ -1294,7 +1294,7 @@ final class IndexStatusOps {
   }
 
   /**
-   * As {@link #storedCommitUserData()}, but empty when the read FAILED (task t-20261013-ef3c41).
+   * As {@link #storedCommitUserData()}, but empty when the read FAILED (#758).
    * "The index recorded nothing" and "the record could not be read" get different answers: the
    * first may be a legacy index, the second is unknown.
    */
@@ -1337,7 +1337,7 @@ final class IndexStatusOps {
   /**
    * The schema compatibility state the status surface reports.
    *
-   * <p>Task t-20261013-ef3c41: every answer below is one the inputs can support. When the stored
+   * <p>#758: every answer below is one the inputs can support. When the stored
    * commit metadata cannot be read, when what it recorded cannot be parsed, or when the document
    * count cannot be read and the answer depends on it, the state is {@code UNAVAILABLE} (unknown):
    * never {@code COMPATIBLE}, and never a {@code BLOCKED_*} state that tells the user to rebuild.
@@ -1346,7 +1346,7 @@ final class IndexStatusOps {
    */
   private String safeSchemaCompatState() {
     if (bootRebuildHold() != null) {
-      // Task t-20261013-ef3c41, round 3: this boot stopped an automatic rebuild, and with it
+      // #758: this boot stopped an automatic rebuild, and with it
       // ingestion, for the rest of the boot. Reported first and for the whole boot, so the status
       // agrees with what the Worker does even when the brake record or the index later reads as
       // if nothing were held (a state.json that becomes readable, a compatible Blue under a held
@@ -1364,7 +1364,7 @@ final class IndexStatusOps {
     if (brake == IndexGenerationManager.AutoRebuildBrake.EXHAUSTED
         || brake == IndexGenerationManager.AutoRebuildBrake.UNREADABLE) {
       // The Worker has stopped rebuilding this shape by itself. Reported ahead of the plain
-      // mismatch because the remedy is different: waiting will not fix it. Task t-20261013-ef3c41:
+      // mismatch because the remedy is different: waiting will not fix it. #758:
       // a brake record for this shape whose count cannot be read holds exactly like a spent one.
       return "BLOCKED_REBUILD_BRAKE";
     }
@@ -1372,7 +1372,7 @@ final class IndexStatusOps {
     if ((brake == IndexGenerationManager.AutoRebuildBrake.STATE_UNREADABLE
             || brake == IndexGenerationManager.AutoRebuildBrake.STATE_LOST)
         && ("BLOCKED_MISMATCH".equals(state) || "BLOCKED_LEGACY".equals(state))) {
-      // Task t-20261013-ef3c41: the state record holding the brake cannot be read, and a brake that
+      // #758: the state record holding the brake cannot be read, and a brake that
       // cannot be read holds, so an index that needs a rebuild is not being rebuilt automatically.
       // Said only where a rebuild is called for: nothing records one for a compatible or unknown index.
       return "BLOCKED_REBUILD_BRAKE";
@@ -1420,7 +1420,7 @@ final class IndexStatusOps {
   }
 
   /**
-   * The repeat-rebuild brake for the current target shape. Task t-20261013-ef3c41: a failed read is
+   * The repeat-rebuild brake for the current target shape. #758: a failed read is
    * {@code UNREADABLE}, never "no brake" — the answer used to be {@code false} there, so the status
    * described an index the Worker would not rebuild as one that resolves itself.
    */

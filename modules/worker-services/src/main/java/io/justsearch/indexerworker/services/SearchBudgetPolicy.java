@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
  * {@code KnowledgeServerConfig.DEFAULT_DEADLINE_MS}); this policy only divides it.
  *
  * @param semanticCapGpuMs cap when every requested leg runs on a GPU session. 2 000 ms: the
- *     orchestrator's start value for item 5a (task t-20261005-b6d536); R7 GPU hybrid 300-336 ms.
+ *     initial value (#759); R7 GPU hybrid 300-336 ms.
  * @param semanticCapCpuMs cap when any requested leg runs on CPU. 8 000 ms: provisional (Spec D §0;
  *     M4's CPU-only arm is pending), so CPU-only machines are not made keyword-only (P2).
  * @param lexicalReserveMs time kept for the lexical leg after the semantic deadline. 250 ms: the

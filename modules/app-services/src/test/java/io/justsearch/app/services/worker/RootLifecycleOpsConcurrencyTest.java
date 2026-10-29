@@ -510,7 +510,10 @@ final class RootLifecycleOpsConcurrencyTest {
       RootLifecycleOps.WorkerWatchFn watcher,
       BiFunction<Path, EngineContext, DeleteByPathResponse> delete) {
     return new RootLifecycleOps(roots, state, ExcludeMatcher::empty,
-        (path, collection, mode, globs, progress, context) -> null, watcher, delete,
+        (path, collection, mode, globs, progress, context) -> null, watcher, (path, context) -> {
+          watcher.unwatch(path.toString(), context);
+          return delete.apply(path, context);
+        },
         (id, context) -> null, mock(SyncOps.class), mock(ExecutorService.class),
         (body, context) -> {});
   }

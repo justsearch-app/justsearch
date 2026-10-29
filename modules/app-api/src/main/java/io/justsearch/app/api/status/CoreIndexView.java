@@ -52,7 +52,7 @@ package io.justsearch.app.api.status;
  * (not reported) normalizes to true, so a reported backlog is read as being worked on, never as
  * idle. Operating status skips a backlog in an unavailable stage when deciding IDLE.
  *
- * <p>Task t-20261013-ef3c41 added {@code indexedDocumentsUnknown}: true when {@code
+ * <p>#758 added {@code indexedDocumentsUnknown}: true when {@code
  * indexedDocuments} and {@code searchableDocuments} are not counts — the index could not be counted
  * and no earlier count exists. Both then carry 0 for older readers; a surface that knows this field
  * shows the count as checking or unknown, never as an empty index. False means the counts are known.
@@ -86,7 +86,7 @@ public record CoreIndexView(
   }
 
   /**
-   * Count-aware ctor from task t-20261013-ef3c41; {@code vduAvailable} is not reported.
+   * Count-aware ctor from #759; {@code vduAvailable} is not reported.
    */
   public CoreIndexView(
       boolean indexHealthy,

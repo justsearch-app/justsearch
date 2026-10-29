@@ -523,7 +523,7 @@ const CAUSE_ROWS: ReadonlyArray<{
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'warn',
   },
-  // Task t-20261013-ef3c41 — the repeat-rebuild brake itself could not be read. A brake that cannot be
+  // #758 — the repeat-rebuild brake itself could not be read. A brake that cannot be
   // read holds like a spent one: no automatic rebuild starts, ingestion does not resume, and a person's
   // rebuild is the way forward. Same consequence as the row above, so the same severity and remedy.
   {

@@ -397,7 +397,7 @@ public final class IndexFingerprint {
 
   /**
    * True when {@code digest} has the shape {@link #compute} writes: 64 lowercase hex characters
-   * (task t-20261013-ef3c41). Anything else stored under {@link #COMMIT_META_KEY} cannot be compared
+   * (#758). Anything else stored under {@link #COMMIT_META_KEY} cannot be compared
    * to a computed digest; a difference from it is unknown, not a shape change.
    */
   public static boolean isWellFormedDigest(String digest) {

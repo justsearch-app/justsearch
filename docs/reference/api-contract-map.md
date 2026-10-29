@@ -1460,7 +1460,7 @@ Other debug endpoints: `/api/debug/commit-metadata`, `/api/debug/effective-confi
 
 ### AI Runtime Status
 
-`GET /api/ai/runtime/status` returns ONNX feature status including a `modelActive: boolean` field per feature entry, derived from the actual ORT session state (not file discovery). This is the canonical source of truth for "is this model loaded and running". Both reranker (via `OrtCudaStatus`) and citation-scorer (via `CitationScorer.isAvailable()`) report runtime session state through this field. See [ADR-0023](../decisions/0023-api-responses-declare-runtime-context.md) for the general principle: endpoints whose behavior varies by runtime mode must declare that mode in the response.
+`GET /api/ai/runtime/status` returns ONNX feature status including a `modelActive: boolean` field per feature entry, derived from the actual ORT session state (not file discovery). This is the canonical source of truth for "is this model loaded and running". Both reranker (via `CrossEncoderReranker.isQueryWarm()`, through `WorkerSearchService.isRerankerActive()`) and citation-scorer (via `CitationScorer.isAvailable()`) report runtime session state through this field. See [ADR-0023](../decisions/0023-api-responses-declare-runtime-context.md) for the general principle: endpoints whose behavior varies by runtime mode must declare that mode in the response.
 
 ### AI install (`/api/ai/install/*`)
 

@@ -60,7 +60,8 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { buildPublicSquashRecord } from '../ci/lib/squash-message-projection.mjs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { setTimeout as deadlineTimer, clearTimeout } from 'node:timers';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const POLL_INTERVAL_MS = 15_000;
@@ -193,8 +194,8 @@ function parsePaginatedArrays(text) {
   return rows;
 }
 
-function capturedJson(bin, args) {
-  const result = runGhCaptured(bin, args);
+function capturedJson(bin, args, run = runGhCaptured) {
+  const result = run(bin, args);
   if (args[0] === 'pr' && args[1] === 'checks') return parseRequiredChecksResult(result);
   if (result.error) return { error: result.error };
   if (result.status !== 0) return { error: new Error(`${result.stderr || result.stdout || `gh exited ${result.status}`}`.trim()), stderr: result.stderr };
@@ -288,14 +289,19 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
   emit = emitTransition,
   repo = null,
   head = null,
+  onResult = () => {},
 } = {}) {
+  const finish = (code, result, rows = []) => {
+    onResult({ ...result, rows });
+    return code;
+  };
   const deadline = now() + timeoutSec * 1000;
   const viewArgs = ['pr', 'view', String(prNumber), '--json',
     'state,mergedAt,mergeCommit,headRefOid,baseRefName,isDraft,mergeStateStatus,autoMergeRequest'];
   const checksArgs = ['pr', 'checks', String(prNumber), '--required', '--json', 'name,state,bucket,link'];
   if (repo) { viewArgs.push('--repo', repo); checksArgs.push('--repo', repo); }
-  const readSnapshot = () => {
-    const loaded = loadJson(bin, viewArgs);
+  const readSnapshot = async () => {
+    const loaded = await loadJson(bin, viewArgs);
     if (loaded.error) return loaded;
     const snapshot = loaded.value;
     if (!snapshot || !['OPEN', 'CLOSED', 'MERGED'].includes(snapshot.state) ||
@@ -312,22 +318,22 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
   let requiredContexts = null;
   let passingSince = null;
   for (;;) {
-    const before = readSnapshot();
+    const before = await readSnapshot();
     if (before.error) {
       process.stderr.write(`run-gh merge-wait: ${before.error.message}\n`);
-      return 2;
+      return finish(2, { key: 'ERROR', message: before.error.message });
     }
     if (watchedHead === null) watchedHead = before.value.headRefOid;
     const mergedBefore = classifyMergeSnapshot(before.value);
     if (mergedBefore.verdict === 'pass') {
       emit(`run-gh merge-wait PR #${prNumber}`, mergedBefore, previousKey);
-      return 0;
+      return finish(0, mergedBefore);
     }
     if (requiredContexts === null) {
       const base = encodeURIComponent(before.value.baseRefName);
       const repository = `repos/${repo || '{owner}/{repo}'}`;
-      const classic = loadJson(bin, ['api', `${repository}/branches/${base}/protection/required_status_checks`]);
-      const rules = loadJson(bin, ['api', `${repository}/rules/branches/${base}`, '--paginate']);
+      const classic = await loadJson(bin, ['api', `${repository}/branches/${base}/protection/required_status_checks`]);
+      const rules = await loadJson(bin, ['api', `${repository}/rules/branches/${base}`, '--paginate']);
       // gh reports API failures as "gh: <message> (HTTP <status>)" on stderr.
       const classicStatus = classic.error ? /\bHTTP (403|404)\b/.exec(classic.stderr || '')?.[1] : null;
       const unprotected = classicStatus === '404' && /Branch not protected/i.test(classic.stderr);
@@ -361,22 +367,22 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
         if (reason) process.stderr.write(`run-gh merge-wait: stall detection disabled: ${reason}; timeout still applies\n`);
       } catch (error) {
         process.stderr.write(`run-gh merge-wait: ${error.message}\n`);
-        return 2;
+        return finish(2, { key: 'ERROR', message: error.message });
       }
     }
-    const checks = loadJson(bin, checksArgs);
-    const after = readSnapshot();
+    const checks = await loadJson(bin, checksArgs);
+    const after = await readSnapshot();
     let classified = classifyMergeSnapshot(before.value);
     if (classified.verdict !== 'pass') {
       if (after.error) {
         process.stderr.write(`run-gh merge-wait: ${after.error.message}\n`);
-        return 2;
+        return finish(2, { key: 'ERROR', message: after.error.message });
       }
       classified = classifyMergeSnapshot(after.value);
       if (classified.verdict !== 'pass') {
         if (checks.error) {
           process.stderr.write(`run-gh merge-wait: ${checks.error.message}\n`);
-          return 2;
+          return finish(2, { key: 'ERROR', message: checks.error.message });
         }
         classified = classifyMergePoll(before.value, after.value, checks.value, watchedHead, 0, requiredContexts);
         if (classified.allPassed) {
@@ -388,12 +394,13 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
       }
     }
     previousKey = emit(`run-gh merge-wait PR #${prNumber}`, classified, previousKey);
-    if (classified.verdict === 'pass') return 0;
-    if (classified.verdict === 'fail') return 1;
+    if (classified.verdict === 'pass') return finish(0, classified);
+    if (classified.verdict === 'fail') return finish(1, classified, checks.value);
     if (now() >= deadline) {
       const missing = requiredContexts.filter((context) => !checks.value.some((row) => row.name === context));
-      process.stderr.write(`run-gh merge-wait: TIMEOUT after ${timeoutSec}s; required checks: ${requiredChecksSummary(classifyRequiredChecks(checks.value))}${missing.length ? `; not reported yet: ${missing.join(', ')}` : ''}\n`);
-      return 3;
+      const message = `TIMEOUT after ${timeoutSec}s; required checks: ${requiredChecksSummary(classifyRequiredChecks(checks.value))}${missing.length ? `; not reported yet: ${missing.join(', ')}` : ''}`;
+      process.stderr.write(`run-gh merge-wait: ${message}\n`);
+      return finish(3, { key: 'TIMEOUT', message });
     }
     await pause(MERGE_POLL_INTERVAL_MS);
   }
@@ -579,15 +586,27 @@ function childFailure(label, result, writeError) {
 
 export function enqueuePullRequest(bin, prNumber, repo = null, {
   run = spawnSync,
+  ...options
+} = {}) {
+  const steps = enqueueSteps(bin, prNumber, repo, options);
+  let step = steps.next();
+  while (!step.done) step = steps.next(run(...step.value));
+  return step.value;
+}
+
+// Share the validation sequence between enqueue's synchronous API and shepherd's
+// asynchronous runner, which must keep its deadline timer alive during every child.
+function* enqueueSteps(bin, prNumber, repo, {
   nodeBin = process.execPath,
   previewScript = PREVIEW_SCRIPT,
   reviewRecordScript = REVIEW_RECORD_SCRIPT,
   writeError = (message) => process.stderr.write(message),
+  onEnqueued = (head) => writeError(`run-gh enqueue: run node scripts/dev/run-gh.mjs merge-wait ${prNumber}${repo ? ` --repo ${repo}` : ''} --head ${head} --timeout-sec 5400 in the background; one-step alternative: node scripts/dev/run-gh.mjs shepherd ${prNumber}${repo ? ` --repo ${repo}` : ''} --timeout-sec 5400.\n`),
 } = {}) {
-  const readSnapshot = () => {
+  const readSnapshot = function* () {
     const args = ['pr', 'view', String(prNumber), '--json', 'headRefOid,title,body,isDraft,mergeable'];
     if (repo) args.push('--repo', repo);
-    const response = run(bin, args, { encoding: 'utf8', windowsHide: true });
+    const response = yield [bin, args, { encoding: 'utf8', windowsHide: true }];
     const failure = childFailure('PR snapshot', response, writeError);
     if (failure) return { failure };
     try {
@@ -602,7 +621,7 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
       return { failure: 2 };
     }
   };
-  const before = readSnapshot();
+  const before = yield* readSnapshot();
   if (before.failure) return before.failure;
   const commonArgs = ['--pr', String(prNumber)];
   if (repo) commonArgs.push('--repo', repo);
@@ -611,12 +630,12 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
     ['managed review-record check', nodeBin, [reviewRecordScript, 'check', ...commonArgs]],
   ];
   for (const [label, command, args] of steps) {
-    const result = run(command, args, { stdio: 'inherit', windowsHide: true });
+    const result = yield [command, args, { stdio: 'inherit', windowsHide: true }];
     const failure = childFailure(label, result, writeError);
     if (failure !== 0) return failure;
   }
 
-  const after = readSnapshot();
+  const after = yield* readSnapshot();
   if (after.failure) return after.failure;
   if (['headRefOid', 'title', 'body', 'isDraft', 'mergeable'].some((key) => before.value[key] !== after.value[key])) {
     writeError('run-gh enqueue: PR changed during validation; enqueue again.\n');
@@ -627,17 +646,232 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
   const mergeArgs = ['pr', 'merge', String(prNumber), '--squash', '--auto',
     '--match-head-commit', after.value.headRefOid, '--subject', preview.expectedLandedSubject, '--body', preview.body];
   if (repo) mergeArgs.push('--repo', repo);
-  const result = run(bin, mergeArgs, { stdio: 'inherit', windowsHide: true });
+  const result = yield [bin, mergeArgs, { stdio: 'inherit', windowsHide: true }];
   const failure = childFailure('squash auto-merge request', result, writeError);
   if (failure === 0) {
-    writeError(`run-gh enqueue: run node scripts/dev/run-gh.mjs merge-wait ${prNumber}${repo ? ` --repo ${repo}` : ''} --head ${after.value.headRefOid} --timeout-sec 5400 in the background.\n`);
+    onEnqueued(after.value.headRefOid);
   }
   return failure;
+}
+
+function parseShepherdArgs(args) {
+  let timeoutSec = 5400;
+  let hasTimeout = false;
+  const enqueueArgs = [args[0]];
+  for (let index = 1; index < args.length; index += 1) {
+    const flag = args[index];
+    if (flag === '--timeout-sec' && !hasTimeout) {
+      hasTimeout = true;
+      timeoutSec = Number(args[++index]);
+      if (!Number.isFinite(timeoutSec) || timeoutSec <= 0) throw new Error('--timeout-sec requires a positive number');
+    } else if (flag === '--repo') {
+      enqueueArgs.push(flag, args[++index]);
+    } else {
+      throw new Error(`unexpected shepherd argument ${JSON.stringify(flag)}`);
+    }
+  }
+  return { ...parseEnqueueArgs(enqueueArgs), timeoutSec };
+}
+
+function actionsRun(check) {
+  try {
+    const url = new URL(check.link);
+    const match = /^\/([^/]+\/[^/]+)\/actions\/runs\/(\d+)(?:\/(?:job|jobs)\/(\d+))?\/?$/.exec(url.pathname);
+    if (!match) return null;
+    return { repo: match[1], id: match[2], job: match[3], url: `${url.origin}/${match[1]}/actions/runs/${match[2]}` };
+  } catch {
+    return null;
+  }
+}
+
+function shortMessage(message) {
+  return String(message).replace(/[\r\n\u2028\u2029]+/g, ' ').slice(0, 300);
+}
+
+function clipUtf8(text, maxBytes) {
+  const buffer = Buffer.from(text);
+  if (buffer.length <= maxBytes) return text;
+  let end = maxBytes;
+  // Do not split a UTF-8 character at the byte limit.
+  while (end > 0 && (buffer[end] & 0xc0) === 0x80) end -= 1;
+  return buffer.subarray(0, end).toString('utf8');
+}
+
+async function printFailureExcerpts(bin, failures, repo, run) {
+  let remainingBytes = 16 * 1024;
+  for (const check of failures) {
+    const workflow = actionsRun(check);
+    process.stdout.write(`${shortMessage(check.name)}: ${workflow?.url || shortMessage(check.link)}\n`);
+    if (remainingBytes <= 3) continue;
+    let excerpt;
+    try {
+      if (!workflow) throw new Error('not a GitHub Actions run link');
+      const args = ['run', 'view', workflow.id, '--log-failed', '--repo', repo || workflow.repo];
+      if (workflow.job) args.push('--job', workflow.job);
+      const result = await run(bin, args, { encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
+      if (result.error) throw result.error;
+      if (result.status !== 0 || result.signal) {
+        throw new Error(result.stderr || result.signal || `gh exited ${result.status}`);
+      }
+      const lines = (result.stdout || '').split(/\r?\n/).filter((line) => line.trim());
+      const preferred = lines.filter((line) => /\b(error|fail(?:ed|ure|ures)?|exception|assert(?:ion)?|\w+Error|panic|fatal)\b|✗|not ok\b/i.test(line));
+      excerpt = preferred.length ? preferred.slice(0, 20) : lines.slice(-20);
+      if (!excerpt.length) throw new Error('no failed-step log lines available');
+    } catch (error) {
+      if (error.code === 'ETIMEDOUT') throw error;
+      excerpt = [`log unavailable: ${shortMessage(error.message).trim() || 'log fetch failed'}`];
+    }
+    let excerptBytes = Math.min(4096, remainingBytes);
+    for (const line of excerpt) {
+      if (excerptBytes <= 3) break;
+      const output = `  ${clipUtf8(line, Math.min(1000, excerptBytes - 3))}\n`;
+      const bytes = Buffer.byteLength(output);
+      process.stdout.write(output);
+      excerptBytes -= bytes;
+      remainingBytes -= bytes;
+    }
+  }
+}
+
+/** Compose the publication gateway and its observer; the observer owns all polling. */
+export async function shepherd(bin, prNumber, { repo, timeoutSec }) {
+  let result;
+  let verdictLine;
+  const owned = new Set();
+  const deadline = Date.now() + timeoutSec * 1000;
+  const timedOut = () => Object.assign(new Error(`TIMEOUT after ${timeoutSec}s; waiting for merge, required checks or failure logs`), { code: 'ETIMEDOUT' });
+  const remaining = () => {
+    const ms = Math.floor(deadline - Date.now());
+    if (ms <= 0) throw timedOut();
+    return Math.min(ms, 2 ** 31 - 1);
+  };
+  const signalGroup = (pid, signal) => {
+    try { process.kill(-pid, signal); return true; } catch (error) {
+      if (error.code === 'ESRCH') return false;
+      throw error;
+    }
+  };
+  const stopTree = async (pid) => {
+    if (!owned.has(pid)) return;
+    if (process.platform === 'win32') {
+      const stopped = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+        windowsHide: true, encoding: 'utf8', timeout: 2000,
+      });
+      if (stopped.error) throw stopped.error;
+      if (stopped.status !== 0) throw new Error(`taskkill failed: ${stopped.stderr || stopped.stdout}`);
+    } else if (signalGroup(pid, 'SIGTERM')) {
+      // The root may exit before descendants do. Keep the group authority until
+      // the grace expires, even when the ChildProcess has already emitted close.
+      await new Promise((resolve) => deadlineTimer(resolve, 150));
+      if (signalGroup(pid, 0)) signalGroup(pid, 'SIGKILL');
+    }
+    owned.delete(pid);
+  };
+  const run = async (command, args, options = {}) => {
+    const timeout = remaining();
+    const response = await new Promise((resolve, reject) => {
+      const child = spawn(command, args, { ...options, detached: process.platform !== 'win32' });
+      // Record only the PID returned by this spawn; no ancestry/name discovery.
+      const pid = child.pid;
+      if (Number.isSafeInteger(pid) && pid > 0) owned.add(pid);
+      const response = { status: null, signal: null, stdout: null, stderr: null };
+      const buffers = { stdout: [], stderr: [] };
+      let bytes = 0;
+      let stopping;
+      const finish = () => {
+        clearTimeout(timer);
+        for (const stream of ['stdout', 'stderr']) {
+          if (child[stream]) {
+            response[stream] = Buffer.concat(buffers[stream]).toString(options.encoding || 'utf8');
+            child[stream].destroy();
+          }
+        }
+        resolve(response);
+      };
+      const stop = (error) => {
+        if (stopping) return;
+        response.error = error;
+        stopping = stopTree(pid).then(finish, (error) => { clearTimeout(timer); reject(error); });
+      };
+      const timer = deadlineTimer(() => stop(timedOut()), timeout);
+      for (const stream of ['stdout', 'stderr']) child[stream]?.on('data', (chunk) => {
+        bytes += chunk.length;
+        if (bytes > (options.maxBuffer ?? 1024 * 1024)) {
+          stop(Object.assign(new Error('subprocess output exceeds maxBuffer'), { code: 'ENOBUFS' }));
+        } else buffers[stream].push(chunk);
+      });
+      child.on('error', (error) => { response.error = error; });
+      child.on('close', (status, signal) => {
+        response.status = status;
+        response.signal = signal;
+        if (process.platform === 'win32' || !owned.has(pid) || !signalGroup(pid, 0)) owned.delete(pid);
+        if (!stopping) finish();
+      });
+    });
+    if (response.error?.code === 'ETIMEDOUT' || Date.now() >= deadline) throw timedOut();
+    return response;
+  };
+  const finish = (code, verdict, message) => {
+    if (Date.now() >= deadline) {
+      code = 3;
+      verdict = 'TIMEOUT';
+      message = timedOut().message;
+    }
+    verdictLine = `run-gh shepherd PR #${prNumber}: ${verdict}; ${shortMessage(message)}\n`;
+    return code;
+  };
+  try {
+    let head;
+    let enqueueMessage = '';
+    const steps = enqueueSteps(bin, prNumber, repo, {
+      onEnqueued: (sha) => { head = sha; },
+      writeError: (message) => { enqueueMessage = message.trim(); process.stderr.write(message); },
+    });
+    let step = steps.next();
+    while (!step.done) step = steps.next(await run(...step.value));
+    const enqueued = step.value;
+    if (enqueued) return finish(enqueued, 'ENQUEUE-REFUSED', enqueueMessage);
+    const code = await mergeWait(bin, prNumber, remaining() / 1000, {
+      repo, head,
+      loadJson: async (command, args) => {
+        const response = await run(command, args, { encoding: 'utf8' });
+        return capturedJson(command, args, () => response);
+      },
+      pause: (ms) => sleep(Math.min(ms, remaining())),
+      onResult: (terminal) => { result = terminal; },
+    });
+    if (Date.now() >= deadline) throw timedOut();
+    if (result.key === 'CHECKS_FAILED') {
+      await printFailureExcerpts(bin, classifyRequiredChecks(result.rows).failures, repo, run);
+      process.stdout.write('To retry failed jobs, run gh run rerun <run-id> --failed, then shepherd or merge-wait again.\n');
+    }
+    const verdict = result.key.startsWith('MERGED:') ? 'MERGED' :
+      result.key === 'NEW_HEAD' ? 'HEAD-CHANGED' :
+      ['CLOSED', 'STALLED', 'TIMEOUT', 'ERROR'].includes(result.key) ? result.key : 'FAILED';
+    return finish(code, verdict, result.message);
+  } catch (error) {
+    if (error.code === 'ETIMEDOUT' || Date.now() >= deadline) return finish(3, 'TIMEOUT', timedOut().message);
+    return finish(2, 'ERROR', error.message);
+  } finally {
+    for (const pid of owned) await stopTree(pid);
+    process.stdout.write(verdictLine);
+  }
 }
 
 async function main() {
   const argv = process.argv.slice(2);
   const bin = resolveGhBin();
+
+  if (argv[0] === 'shepherd') {
+    try {
+      const options = parseShepherdArgs(argv.slice(1));
+      process.exitCode = await shepherd(bin, options.prNumber, options);
+    } catch (error) {
+      process.stdout.write(`run-gh shepherd PR #${shortMessage(argv[1] || '?')}: ERROR; ${shortMessage(error.message)}\n`);
+      process.exitCode = 2;
+    }
+    return;
+  }
 
   if (argv[0] === 'checks-wait') {
     const { timeoutSec, rest: afterTimeout } = parseTimeoutSec(argv.slice(1));

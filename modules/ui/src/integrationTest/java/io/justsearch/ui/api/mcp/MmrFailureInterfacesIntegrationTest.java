@@ -69,8 +69,18 @@ final class MmrFailureInterfacesIntegrationTest extends MmrEngineFixture {
     assertEquals(identities(position), identities(result));
     assertEquals(1, provider.queries.get());
     assertEquals(0, provider.passages.get(), "invalid query must avoid rank-only passage inference");
+    // REST/MCP start with a hybrid pre-search, then BM25 retrieval with rank-only MMR.
+    // D7 makes a restricted pre-search failure terminal, so inject NaN only into MMR.
+    var outwardProvider = new ScriptedProvider(Failure.QUERY_NAN) {
+      @Override public float[] embedQuery(String text) {
+        float[] invalid = super.embedQuery(text);
+        return queries.get() % 2 == 1 ? new float[] {1, 0} : invalid;
+      }
+    };
+    worker.setEmbeddingProvider(outwardProvider);
     assertOutward(result);
-    assertEquals(0, provider.passages.get(), "REST and MCP also avoid passage inference");
+    assertEquals(4, outwardProvider.queries.get(), "each interface runs pre-search then MMR");
+    assertEquals(0, outwardProvider.passages.get(), "REST and MCP also avoid passage inference");
   }
 
   @Test

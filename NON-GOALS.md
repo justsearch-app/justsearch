@@ -1,14 +1,20 @@
 # Non-Goals
 
-JustSearch is a **local-first, private neural search engine for your own files.** That focus implies some things
+JustSearch is for **finding what is inside your files, quickly and accurately, whether you know exactly what you are looking for or only vaguely.** That focus implies some things
 it deliberately is **not**. These boundaries keep the project coherent and maintainable by a small team —
 they're not judgments about other tools.
 
-### Privacy & locality (hard invariants — these will never change)
+### Privacy & locality (design decision)
+
+Everything runs on your machine. Cloud processing would add running costs and privacy obligations this
+project cannot carry, so it is out of scope by design: no cloud inference, no hosted services, no telemetry.
+The local core will not require an account. An outside AI client you connect through MCP is your own choice. The existing update checks, Install AI downloads, and optional tracing are
+described below.
+
 - **No telemetry, analytics, or phone-home.** The product does not report usage anywhere. A PR that adds outbound
   reporting will be declined.
   Desktop builds with an embedded release URL check for updates by default about 30 seconds after the desktop chrome mounts,
-  including CI-built branch candidates and pre-releases. They fetch `release.v1.json`, `release.v1.json.sig`, and
+  including CI-built branch candidates and pre-releases. They fetch `release.v2.json`, `release.v2.json.sig`, and
   `latest.json` from GitHub (following redirects to download/CDN hosts); these checks send no document
   content, queries or usage reports. The contacted hosts see the request IP and time. Installer bytes
   are downloaded only when you request installation. Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before
@@ -23,15 +29,13 @@ they're not judgments about other tools.
   downloads models and runtimes from `github.com` and `huggingface.co` with consent. Trace export is off by
   default; only if you enable tracing and set an OTLP endpoint are traces sent there. They can include paths
   and document excerpts. These network paths and external integrations are described in [Privacy](README.md#privacy).
-- **Not a (required) cloud service.** JustSearch runs on *your* machine; we won't make a cloud component, an
-  account, or server-side processing of your documents *mandatory* for the local core.
 - **We don't train on your data**, and we never upload your files. Retrieval and inference are local.
   Today, connected AI clients and tools receive the data you pass to them; an enabled trace exporter receives
   paths and document excerpts included in traces.
 
 ### Product scope (what it is *for*)
 - **Not built to be a general-purpose chatbot.** A free-chat mode is available, but the product is *for*
-  answering questions *grounded in your files* with citations — that's where the tuning and engineering go;
+  finding what is inside your files and answering questions *grounded in your files* with citations: that's where the tuning and engineering go;
   it isn't positioned or optimized as an open-domain assistant.
 - **Not a model trainer or fine-tuning platform.** It *uses* models (BYO-LLM via llama.cpp); it doesn't train them.
 - **Not a note-taking / PKM app.** It searches the files you already have in the formats you already use; it

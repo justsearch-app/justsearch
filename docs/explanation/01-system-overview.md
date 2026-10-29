@@ -7,9 +7,9 @@ description: "The Engine JVM, the process boundaries that survive, and the modul
 
 # System Overview
 
-JustSearch is a **local-first** application: everything runs on the user's own machine, and the design is shaped by desktop constraints — OS file locking on Windows, UI responsiveness guarantees, and a single shared GPU.
+JustSearch finds what is inside your files, quickly and accurately, whether you know exactly what you are looking for or only vaguely. It is for anyone who keeps files on their computer, as a search app of its own or as a tool inside other apps and AI agents through MCP. Indexing, retrieval, and built-in AI inference run on your own machine; the design is shaped by desktop constraints: OS file locking on Windows, UI responsiveness guarantees, and a single shared GPU.
 
-Functionally it is more than a search index: over the local corpus it layers an optional on-device **LLM agent** (cited Q&A, summarize, extract, and gated file actions — see [22. Agent System Architecture](22-agent-system-architecture.md)) and ships a **production MCP server** (`POST /mcp`) so external AI agents (Claude Code, Cursor, Claude Desktop) can drive that same search and retrieval — see [Production MCP Server](../reference/mcp-production-server.md). That agent-facing capability is JustSearch's public center: it is exposed as a small, versioned **local runtime contract** (see [28. The Runtime Contract](28-runtime-contract.md)), and the desktop app is that runtime's first-party **reference client**. The processes below are how the runtime is delivered on the desktop.
+The desktop app provides search and an optional on-device **AI assistant** for cited answers about your files (Q&A, summarize, extract, and gated file actions; see [22. Agent System Architecture](22-agent-system-architecture.md)). A **production MCP server** (`POST /mcp`) also lets external AI agents (Claude Code, Cursor, Claude Desktop) drive that same search and retrieval; see [Production MCP Server](../reference/mcp-production-server.md). The MCP surface forms part of a small, versioned **local runtime contract** (see [28. The Runtime Contract](28-runtime-contract.md)); the desktop app also uses local APIs outside that contract. The processes below are how the runtime is delivered on the desktop.
 
 ## The process model
 

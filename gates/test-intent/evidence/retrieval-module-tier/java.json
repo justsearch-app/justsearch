@@ -1,0 +1,131 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:bcc1082d55b5c5687827865cc19cf3037fa17f5c7657cc5c44f8962bbc9ed296",
+    "adapterPatch": "gates/test-intent/evidence/retrieval-module-tier/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm; each Gradle call launched through env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew, with slots held only for Gradle, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, vitest with two workers, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-29T13:05:11.382Z",
+  "revision": "ac184991e28efa5176f1bf61b83325085649c0d9",
+  "tree": "da3546b547c484f022bb38064c1ab7c7b848b0df",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.mcp.RetrievalRequestEndInterfacesIntegrationTest.preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted\" --tests \"io.justsearch.ui.api.mcp.MmrFailureInterfacesIntegrationTest.invalidQueryGoesStraightToPositionWithoutPassageInference\" --tests \"io.justsearch.ui.api.mcp.RetrievalRequestEndInterfacesIntegrationTest.successfulEmptyAndOrdinaryFailureOutcomesStayDifferentThroughInterfaces\" --tests \"io.justsearch.ui.api.mcp.RetrievalRequestEndInterfacesIntegrationTest.chosenFileDeadlineKeepsWholeDocumentFallbackThroughInterfaces\" --rerun -PskipWebBuild=true --console=plain --max-workers=2",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1377166
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f80880c2c0c183d6b60bc277794de4b780d778f749a5eef3372e0254cb6af53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrFailureInterfacesIntegrationTest.java#invalidQueryGoesStraightToPositionWithoutPassageInference",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrFailureInterfacesIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:88d538f0ba805aba7c280028251c8d92196f583a19aa75ffbfe9de23cce311c7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidQueryGoesStraightToPositionWithoutPassageInference()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#successfulEmptyAndOrdinaryFailureOutcomesStayDifferentThroughInterfaces",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f80880c2c0c183d6b60bc277794de4b780d778f749a5eef3372e0254cb6af53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successfulEmptyAndOrdinaryFailureOutcomesStayDifferentThroughInterfaces()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#chosenFileDeadlineKeepsWholeDocumentFallbackThroughInterfaces",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f80880c2c0c183d6b60bc277794de4b780d778f749a5eef3372e0254cb6af53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chosenFileDeadlineKeepsWholeDocumentFallbackThroughInterfaces()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "63cce47daa3a87d9e7192f5178a88bcade94bcaa",
+    "revision": "63cce47daa3a87d9e7192f5178a88bcade94bcaa",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.mcp.RetrievalRequestEndInterfacesIntegrationTest.preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted\" --tests \"io.justsearch.ui.api.mcp.MmrFailureInterfacesIntegrationTest.invalidQueryGoesStraightToPositionWithoutPassageInference\" --tests \"io.justsearch.ui.api.mcp.RetrievalRequestEndInterfacesIntegrationTest.successfulEmptyAndOrdinaryFailureOutcomesStayDifferentThroughInterfaces\" --tests \"io.justsearch.ui.api.mcp.RetrievalRequestEndInterfacesIntegrationTest.chosenFileDeadlineKeepsWholeDocumentFallbackThroughInterfaces\" --rerun -PskipWebBuild=true --console=plain --max-workers=2",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 0,
+        "durationMs": 83872
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrFailureInterfacesIntegrationTest.java#invalidQueryGoesStraightToPositionWithoutPassageInference",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#successfulEmptyAndOrdinaryFailureOutcomesStayDifferentThroughInterfaces",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#chosenFileDeadlineKeepsWholeDocumentFallbackThroughInterfaces",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:65ba1a4acfede28d7ca17ebd156492631a5a984e26a0148d9222ed7579442bc9"
+}

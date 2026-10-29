@@ -287,7 +287,7 @@ says so explicitly: `schemaCompatState = BLOCKED_REBUILD_BRAKE` →
 `reindexRequiredReason = rebuild_brake_exhausted` → the `index.rebuild_brake_exhausted` readiness
 reason code, worded and given a rebuild remedy on the frontend.
 
-The brake holds the same way when its answer cannot be read (task t-20261013-ef3c41): a brake record
+The brake holds the same way when its answer cannot be read (PR #758): a brake record
 without a readable count, a state record that cannot be read, a target fingerprint that cannot be
 computed, or a state record that had to be re-established because neither `state.json` nor its
 backup could be read (recorded as `auto_rebuild_key = "<state-lost>"` until a completed cutover).
@@ -679,7 +679,7 @@ and [migration replay](../../modules/indexer-worker/src/main/java/io/justsearch/
 
 ## Removing documents whose source is gone
 
-Task t-20261013-ef3c41. A document is removed because its file is gone only when the file is
+PR #758. A document is removed because its file is gone only when the file is
 **confirmed absent**: reported not found while the root that holds it is present, can be listed,
 and is the same folder on the same volume it was. Admission, the pre-publish freshness check, the
 post-extraction re-hash, the writer's pre-write check and the watcher's delete confirmation all ask

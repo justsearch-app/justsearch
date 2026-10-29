@@ -1,0 +1,32 @@
+{
+  "createdAt": "2026-10-29T12:40:48.235Z",
+  "check": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted",
+  "productionRevision": "ac184991e28efa5176f1bf61b83325085649c0d9",
+  "mutation": "gates/test-intent/evidence/retrieval-module-tier/mutation-presearch.diff",
+  "mutationDigest": "sha256:1735bda7719e95a935bdc3ba501101bfd5ddcc6dd2e076541b8983c1d9264e7d",
+  "checkFileDigest": "sha256:0f80880c2c0c183d6b60bc277794de4b780d778f749a5eef3372e0254cb6af53",
+  "classification": "assertion",
+  "detail": "preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: restricted pre-search failure (10 failures)&#10;&#9;org.opentest4j.AssertionFailedError: {\"chunks\":[],\"context\":\"[1] decoy.txt\\nquokka catalyst telemetry OUTSIDE_SCOPE_SECRET. quokka catalyst telemetry OUTSIDE_SCOPE_SECRET. quokka catalyst telemetry OUTSIDE_SCOP",
+  "cases": [
+    {
+      "name": "preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted()",
+      "classname": "io.justsearch.ui.api.mcp.RetrievalRequestEndInterfacesIntegrationTest",
+      "status": "failed",
+      "failureType": "org.opentest4j.MultipleFailuresError",
+      "message": "org.opentest4j.MultipleFailuresError: restricted pre-search failure (10 failures)&#10;&#9;org.opentest4j.AssertionFailedError: {\"chunks\":[],\"context\":\"[1] decoy.txt\\nquokka catalyst telemetry OUTSIDE_SCOPE_SECRET. quokka catalyst telemetry OUTSIDE_SCOPE_SECRET. quokka catalyst telemetry OUTSIDE_SCOP"
+    }
+  ],
+  "runExitCode": 1,
+  "command": "2026-10-29T12:27:51.853009+00:00 cwd=<owned TMPDIR mutation clone> command=['env', '-u', 'DISPLAY', '-u', 'WAYLAND_DISPLAY', 'js-gradle-slot', './gradlew', ':modules:ui:integrationTest', '--tests', 'io.justsearch.ui.api.mcp.RetrievalRequestEndInterfacesIntegrationTest.preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted', '-PskipWebBuild=true', '--max-workers=2', '--console=plain']",
+  "rest": {
+    "httpStatus": 200,
+    "ok": true,
+    "retrievalMode": "FULLTEXT_FALLBACK",
+    "outsideMaterialPresent": true
+  },
+  "mcp": {
+    "isError": false,
+    "retrievalMode": "FULLTEXT_FALLBACK",
+    "outsideMaterialPresent": true
+  }
+}

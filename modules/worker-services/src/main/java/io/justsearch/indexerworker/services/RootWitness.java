@@ -16,10 +16,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The one root-identity question every path that can end in a deletion asks before a file counts
- * as confirmed absent (task t-20261013-ef3c41, round 4, S8): admission, the pre-publish freshness
+ * as confirmed absent (#758): admission, the pre-publish freshness
  * check, the post-extraction re-hash, the writer's pre-write check and the watcher's delete
  * confirmation, through {@link SourcePresence}. The prune asks the same question through {@link
- * RootPresenceGuard}. Every path that adds or updates content asks its other half (round 5):
+ * RootPresenceGuard}. Every path that adds or updates content asks its other half:
  * admission of a present source through {@link #admits}, and the walks, the sync and the watcher
  * registration through {@link #refusesRoot}.
  *
@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * cannot be read is "cannot tell". Content beneath a folder is admitted only while it is a
  * present, listable folder on that recorded volume.
  *
- * <p>Round 8 (refined decision 2) and round 8b (decisions 1 and 2): only a deliberate add records
+ * <p>Only a deliberate add records
  * a volume, which is a request carrying the add marker: the person's add of a root, or an explicit
  * ingest request of a folder or of files, a person's or an agent's ({@link #recordDeliberateAdd}).
  * No walk ever records. Every other path (admission, the walks, the sync, the watcher, the boot
@@ -345,10 +345,10 @@ public final class RootWitness implements SourcePresence.RootCheck {
 
   /**
    * True when the root at {@code root} is a real folder (not a link) that is not on the volume
-   * recorded for it, whose volume cannot be told, or that has nothing recorded (round 8).
+   * recorded for it, whose volume cannot be told, or that has nothing recorded.
    * The walks, the sync and the watcher registration then refuse the root: they add nothing,
    * remove nothing and the root shows its root-level unavailable state instead of being walked as
-   * if it were the original (task t-20261013-ef3c41, rounds 4 and 5, S8). A missing root or a root
+   * if it were the original (#758). A missing root or a root
    * that is itself a link is not refused here; those keep their own handling.
    */
   boolean refusesRoot(Path root) {

@@ -1,6 +1,6 @@
 # Job-closure exit code (Spec F step 0, M-F1) - 2026-10-06
 
-Task t-20261005-b6d536, Spec F §1.5 (CH8). Measures the exit code a process gets when
+PR #759. Measures the exit code a process gets when
 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` ends it, on the target machine.
 
 Machine: Windows 11 Pro 10.0.26200, Temurin JDK 25.0.2+10, Node v24.12.0. Not elevated.
