@@ -333,7 +333,7 @@ is involved. Its first step rejects a non-GitHub-hosted runner.
 
 The guest/hosted tooling script is `windows-tools.ps1`. It requires a disposable
 runner or the VM marker and runs elevated during provisioning. It installs Python
-3.13.7, Pillow 11.3.0, Node 22.20.0 and a pinned, checksummed Notepad++ 8.9.8 portable
+3.13.7, Pillow 11.3.0, comtypes 1.4.13, Node 22.20.0 and a pinned, checksummed Notepad++ 8.9.8 portable
 viewer, then makes that viewer this disposable user's `.txt` default. It downloads
 Microsoft's signed msedgedriver for the installed WebView2 version. Supply a
 separately built **tauri-driver 2.0.4 Windows binary** and an adjacent
@@ -406,7 +406,12 @@ Windows native-window discovery enumerates visible top-level HWNDs and reads
 each through UI Automation. UIA's desktop children omit owned dialogs, including
 the folder picker. Picker input still requires the exact installed image, PID
 and creation time; the app's returned DOM path and Engine roots decide success.
-The picker control inventory is retained for diagnosis.
+Native actions use the OS IUIAutomation COM interface through comtypes; the
+legacy managed PowerShell client exposes standard Win32 controls as panes with
+no action patterns in this guest. The pinned client and generated interface
+bindings are cached before sealing (`uia-client.json`). Picker input uses UIA
+Value and Invoke patterns, with exact returned-value checks. The picker control
+inventory is retained for diagnosis.
 
 WebDriver uses the normal installed app's `LOCALAPPDATA/io.justsearch.shell`
 profile through `tauri:options.webviewOptions.userDataFolder`. Owned WebView2
