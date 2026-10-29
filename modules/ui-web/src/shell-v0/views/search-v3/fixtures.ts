@@ -16,7 +16,7 @@ import { reasonFor } from '../../state/readinessNotice.js';
  */
 export type Sv3RowStatus = 'resting' | 'in-motion' | 'act-now' | 'broken';
 
-export const WINDOW_TITLE = 'Search v3';
+export const WINDOW_TITLE = 'Search';
 
 export const COMPOSER_PLACEHOLDER = 'Ask or search…';
 

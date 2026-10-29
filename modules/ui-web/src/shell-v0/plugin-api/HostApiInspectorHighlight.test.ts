@@ -10,7 +10,7 @@ import { __resetConversationListForTest } from '../state/conversationListStore.j
 import { __resetDraftProvidersForTest } from '../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../controllers/draftKeptHint.js';
 import { deactivateProjection } from '../router/URLProjector.js';
-import { takePendingSelection, takePendingForceShape, takePendingAutoRun } from '../utils/compose.js';
+import { takePendingSelection, } from '../utils/compose.js';
 import '../views/search-v3/SearchV3View.js';
 import type { SearchV3View } from '../views/search-v3/SearchV3View.js';
 
@@ -32,8 +32,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   deactivateProjection();
-  takePendingSelection(); takePendingForceShape(); takePendingAutoRun();
-  document.body.replaceChildren();
+  takePendingSelection(); document.body.replaceChildren();
   await new Promise<void>(resolve => setTimeout(resolve, 0));
   resetInspectorState(); resetSearchState(); __resetAiStateForTest(); __resetAgentSessionStore();
   vi.unstubAllGlobals(); vi.restoreAllMocks();

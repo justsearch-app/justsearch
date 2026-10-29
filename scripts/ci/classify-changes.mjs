@@ -14,9 +14,9 @@ export const RULES = [
   // Documentation consumed by scoped code is an input, even though ordinary docs are cheap.
   [/^docs\/reference\/legal\/ai-runtime-and-model-redistribution\.md$/, ['license']],
   // The advisory axe sweep consumes Vite, the Python capture/gate and its fixtures,
-  // the shared register, and schema/token data. It has its own selector so a Java
-  // closure alone does not start a browser sweep.
-  [/^(?:modules\/ui-web\/|scripts\/jseval\/|governance\/(?:ui-a11y-baseline|ui-proportion-baseline|status-facts)\.v1\.json$|modules\/configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json$|package(?:-lock)?\.json$)/, ['frontend']],
+  // the shared register, schema/token data and the surface catalog its fixtures serve.
+  // It has its own selector so a Java closure alone does not start a browser sweep.
+  [/^(?:modules\/ui-web\/|scripts\/jseval\/|governance\/(?:ui-a11y-baseline|ui-proportion-baseline|status-facts)\.v1\.json$|modules\/configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json$|modules\/app-api\/src\/main\/resources\/messages\/registry-surface\.en\.properties$|package(?:-lock)?\.json$)/, ['frontend']],
   [/^(?:docs\/|\.claude\/|\.codex\/|\.agents\/|AGENTS\.md$|[^/]+\.md$)/, []],
   [/^modules\/(?:adapters-lucene|ai-backend|api-contract-projection-java|app-agent|app-agent-api|app-api|app-config|app-engine|app-inference|app-observability|app-services|app-util|configuration|core|core-contracts|extension-substrate|gpu-bridge|indexer-worker|indexing|infra-core|ipc-common|ort-common|prompt-support|reranker|telemetry|worker-core|worker-services)\//, java],
   [/^modules\/ui\//, java.filter((lane) => lane !== 'search')],

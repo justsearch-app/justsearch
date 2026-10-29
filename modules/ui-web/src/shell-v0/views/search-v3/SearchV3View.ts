@@ -45,6 +45,9 @@
  *
  * Side-effect registers <jf-sv3-window> and its four regions.
  */
+import { subscribeProfileSwitch } from '../../state/UserStateDocument.js';
+import { subscribeProfiles, getActiveProfileId as getWorkspaceProfileId } from '../../substrates/profiles/index.js';
+import type { Sv3RecentItem } from './Sv3Composer.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
 import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
 import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/coreInteractionShapes.js';
@@ -61,7 +64,7 @@ import { FrameLatch } from '../../primitives/frameLatch.js';
 import { sv3Tokens } from './sv3-tokens.css.js';
 import { sv3Shared } from './sv3-shared-styles.js';
 import { COMPOSER_STATE_DEFAULT, WINDOW_TITLE, type Sv3ComposerState } from './fixtures.js';
-import { removeScopeChip, setSearchApiBase } from '../../state/searchState.js';
+import { removeScopeChip, resetSearchState, setSearchApiBase } from '../../state/searchState.js';
 import { clearFilters, toggleFacetValue } from '../../state/searchFiltersState.js';
 import {
   adoptSv3MorphSheet,
@@ -696,6 +699,12 @@ export class SearchV3View extends JfElement {
         inset-inline: 0;
         inset-block-end: 0;
         z-index: var(--z-sticky);
+        max-block-size: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      :host([composer-state='docked']) .dock > jf-sv3-composer {
+        min-block-size: 0;
       }
       /* THE VEIL (859 §B / D12). Below the glass box there is the composer host's own
          --floating-content-inset of clear space, through which UNBLURRED transcript would slide
@@ -849,6 +858,9 @@ export class SearchV3View extends JfElement {
     renamingId: { state: true },
     recordNotice: { state: true },
     historyLocked: { state: true },
+    recentSearches: { state: true },
+    recentClearTime: { state: true },
+    recentConversationsReady: { state: true },
     lockedRefusal: { state: true },
     effort: { state: true },
     tier: { state: true },
@@ -997,6 +1009,7 @@ export class SearchV3View extends JfElement {
   private boxObserver: ResizeObserver | null = null;
   /** 859 §B — the dock's own box watcher, and the node it is currently bound to. */
   private dockObserver: ResizeObserver | null = null;
+  private observedRecentList: HTMLElement | null = null;
   private observedDock: HTMLElement | null = null;
   private aiUnsubscribe: (() => void) | null = null;
   private uiModeUnsubscribe: (() => void) | null = null;
@@ -1013,6 +1026,42 @@ export class SearchV3View extends JfElement {
   private clearForkReads(): void {
     for (const read of this.forkReads.values()) read.abort.abort();
     this.forkReads.clear();
+  }
+
+  declare private recentSearches: readonly string[];
+  declare private recentClearTime: number;
+  declare private recentConversationsReady: boolean;
+  private recentEpoch = 0;
+  private recentProfileUnsubscribe: (() => void) | null = null;
+
+  private get recentItems(): readonly Sv3RecentItem[] {
+    const searches: Sv3RecentItem[] = this.recentSearches.map(value => ({ kind: 'search', value, label: value }));
+    if (this.historyLocked || !this.recentConversationsReady) return searches;
+    return [...searches, ...this.conversations.filter(c => c.lastActiveAt > this.recentClearTime)
+      .sort((a, b) => b.lastActiveAt - a.lastActiveAt).slice(0, 5)
+      .map(c => ({ kind: 'conversation' as const, value: c.id,
+        label: c.title || '' }))];
+  }
+
+  private onRecentSelect(event: Event): void {
+    const item = (event as CustomEvent<Sv3RecentItem>).detail;
+    if (item.kind === 'search') {
+      // Do not replace a retained preparation before its existing guards accept the move.
+      if (this.searchNow(item.value)) this.writeDraft(item.value);
+    } else {
+      this.onSessionSelect(new CustomEvent('sv3-session-select', { detail: { id: item.value } }));
+    }
+  }
+
+  private async refreshRecents(): Promise<void> {
+    const epoch = this.recentEpoch;
+    const loaded = await loadConversations();
+    if (loaded && epoch === this.recentEpoch && !this.historyLocked) this.recentConversationsReady = true;
+  }
+
+  private clearRecents(): void {
+    this.recentSearches = [];
+    this.recentClearTime = Date.now();
   }
 
   private convListUnsubscribe: (() => void) | null = null;
@@ -1720,6 +1769,9 @@ export class SearchV3View extends JfElement {
     this.renamingId = null;
     this.recordNotice = false;
     this.historyLocked = false;
+    this.recentSearches = [];
+    this.recentClearTime = -Infinity;
+    this.recentConversationsReady = true;
     this.lockedRefusal = false;
     this.effort = SV3_EFFORT_DEFAULT;
     this.tier = SV3_TIER_DEFAULT;
@@ -1790,6 +1842,7 @@ export class SearchV3View extends JfElement {
       this.sessions = mergeStoreConversations(this.sessions, state.conversations);
       // Retain the recent rows separately from the transcript projection for sidebar actions.
       this.conversations = state.conversations;
+
       // Tempdoc 864 PR C — a REHYDRATION is the ADDRESS being applied (a Back press, a deep link,
       // this tab's own reload pointer), and the address is where this window is. A `claim` is not:
       // the active-conversation pointer is app-wide and another window claiming it is that
@@ -1800,6 +1853,24 @@ export class SearchV3View extends JfElement {
         this.followStoreConversation(state.activeId);
       }
     });
+    const resetProfileRecents = (): void => {
+      this.recentEpoch += 1;
+      this.recentSearches = [];
+      this.recentClearTime = -Infinity;
+      this.recentConversationsReady = false;
+      this.composer?.closeRecents();
+      resetSearchState();
+      void this.refreshRecents();
+    };
+    const stopUserProfile = subscribeProfileSwitch(resetProfileRecents);
+    let workspaceProfile = getWorkspaceProfileId();
+    const stopWorkspaceProfile = subscribeProfiles(() => {
+      const next = getWorkspaceProfileId();
+      if (next === workspaceProfile) return;
+      workspaceProfile = next;
+      resetProfileRecents();
+    });
+    this.recentProfileUnsubscribe = () => { stopUserProfile(); stopWorkspaceProfile(); };
     void loadConversations();
     window.addEventListener('sv3-handoff', this.receiveHandoff);
     if (!this.receiveHandoff()) {
@@ -1916,6 +1987,8 @@ export class SearchV3View extends JfElement {
     releaseSv3MorphSheet();
     this.inspectorUnsubscribe?.();
     this.inspectorUnsubscribe = null;
+    this.recentProfileUnsubscribe?.();
+    this.recentProfileUnsubscribe = null;
     this.convListUnsubscribe?.();
     this.convListUnsubscribe = null;
     this.clearForkReads();
@@ -1952,6 +2025,7 @@ export class SearchV3View extends JfElement {
     this.dockObserver?.disconnect();
     this.dockObserver = null;
     this.observedDock = null;
+    this.observedRecentList = null;
     this.removeEventListener('keydown', this.onHostKeydown, true);
     this.removeEventListener('focusout', this.onHostFocusOut);
     window.removeEventListener('jf-focus-composer', this.onFocusComposerEvent);
@@ -2015,6 +2089,7 @@ export class SearchV3View extends JfElement {
     this.boxObserver = new ResizeObserver(() => {
       this.paneOverlay = !sv3PaneIsInline(this.availableWidth());
       this.reflowSidebar();
+      this.composer?.keepRecentSelectionVisible();
     });
     this.boxObserver.observe(this);
   }
@@ -2032,16 +2107,25 @@ export class SearchV3View extends JfElement {
    */
   private syncDockObserver(): void {
     const dock = this.shadowRoot?.querySelector<HTMLElement>('.dock') ?? null;
-    if (dock === null || this.observedDock === dock) return;
-    this.dockObserver?.disconnect();
-    this.observedDock = dock;
-    if (typeof ResizeObserver === 'function') {
-      this.dockObserver = new ResizeObserver(() => this.publishOcclusion());
-      this.dockObserver.observe(dock);
+    if (dock === null) return;
+    if (this.observedDock !== dock) {
+      this.dockObserver?.disconnect();
+      this.observedDock = dock;
+      this.observedRecentList = null;
+      if (typeof ResizeObserver === 'function') {
+        this.dockObserver = new ResizeObserver(() => this.publishOcclusion());
+        this.dockObserver.observe(dock);
+      }
+      // Also publish before the first ResizeObserver delivery (and in DOM-only tests).
+      this.publishOcclusion();
     }
-    // Publish once at bind time as well: a DOM without the API still gets a correct band on the
-    // first render, and happy-dom defines a ResizeObserver that never fires.
-    this.publishOcclusion();
+    // Hero's dock has zero height; its inner list can resize without changing that box.
+    const list = this.composer?.shadowRoot?.getElementById('sv3-recent-list') ?? null;
+    if (list !== this.observedRecentList) {
+      if (this.observedRecentList) this.dockObserver?.unobserve(this.observedRecentList);
+      this.observedRecentList = list;
+      if (list) this.dockObserver?.observe(list);
+    }
   }
 
   /**
@@ -2070,6 +2154,7 @@ export class SearchV3View extends JfElement {
    * keystroke that changed the band.
    */
   private publishOcclusion(): void {
+    this.composer?.keepRecentSelectionVisible();
     const current = this.style.getPropertyValue(OCCLUSION_VAR);
     if (this.composerState !== 'hero') {
       const px = this.observedDock?.getBoundingClientRect().height ?? 0;
@@ -2138,6 +2223,10 @@ export class SearchV3View extends JfElement {
     // 859 §B — the dock exists only after a render, and the hero↔docked morph changes what the
     // band MEANS, not just how tall it is (see publishOcclusion's two zeroes).
     this.syncDockObserver();
+    // Child rendering creates/removes the list after this parent's update.
+    void this.composer?.updateComplete.then(() => {
+      if (this.isConnected) this.syncDockObserver();
+    });
     if (changed.has('composerState')) this.publishOcclusion();
     // The restored draft reaches the composer on the first update that produced one. Once only: a
     // later re-application would clobber what the reader has typed since.
@@ -3141,7 +3230,12 @@ export class SearchV3View extends JfElement {
     const locked = deriveSv3HistoryLocked(this.historyLocked, snapshot);
     if (locked === this.historyLocked) return;
     this.historyLocked = locked;
-    if (!locked) this.lockedRefusal = false;
+    this.recentEpoch += 1;
+    if (!locked) {
+      this.lockedRefusal = false;
+      this.recentConversationsReady = false;
+      void this.refreshRecents();
+    }
   }
 
   /**
@@ -3150,6 +3244,7 @@ export class SearchV3View extends JfElement {
    * transcript readable until the next poll agrees.
    */
   private noteRefusedWhileLocked(): void {
+    this.recentEpoch += 1;
     this.historyLocked = true;
     this.lockedRefusal = true;
   }
@@ -3558,6 +3653,8 @@ export class SearchV3View extends JfElement {
     // so the row's `stopPropagation` cannot defend it — the window has to decline. Without this,
     // an Escape pressed while typing in the rename field closed the PANE, silently, in a region
     // the reader was not looking at, and left the edit open (F-series fit audit, DEFECT-7).
+    if (event.key === 'Escape' && !event.isComposing && this.composer?.recentsOpen
+      && event.composedPath().includes(this.composer)) return;
     if (event.key === 'Escape' && renamingRowInPath(event)) return;
     // An open control menu is served the same way and for the same reason: it is the most local
     // transient the reader is inside, it closes itself (`Sv3Composer.onMenuKeydown`), and without
@@ -3813,10 +3910,14 @@ export class SearchV3View extends JfElement {
   }
 
   /** Enter in Search mode, or the palette's search: the full pass, now. */
-  private searchNow(text: string): void {
-    if (!this.draftMayIssue()) return;
-    if (!this.enterResults(this.currentDraft(), text)) return;
-    this.search.submit(text);
+  private searchNow(text: string): boolean {
+    if (!this.draftMayIssue()) return false;
+    if (!this.enterResults(this.currentDraft(), text)) return false;
+    const query = text.trim();
+    this.recentSearches = [query, ...this.recentSearches.filter(value => value !== query)].slice(0, 8);
+    this.composer?.closeRecents();
+    this.search.submit(query);
+    return true;
   }
 
   /**
@@ -4704,6 +4805,8 @@ export class SearchV3View extends JfElement {
             settle('left');
             return;
           }
+          // A terminal Structured turn without accepted output is final, never a retryable
+          // delivery uncertainty or an answer for the next turn's context.
           if (code === 'NO_CONTENT') this.retireHumanTask(task);
           else { task.saved.delivery = 'unknown'; task.revoked = true; this.saveRecovery(task); }
           const noEvidence = shapeId === SV3_ASK_SHAPE_ID && code === 'NO_CONTENT' && scope === null;
@@ -5908,6 +6011,11 @@ export class SearchV3View extends JfElement {
           effort=${this.effort}
           tier=${this.tier}
           .schemaDraft=${this.schemaDraft}
+          .recentItems=${this.recentItems}
+          .recentLocked=${this.historyLocked}
+          @sv3-recents-refresh=${() => { void this.refreshRecents(); }}
+          @sv3-recents-clear=${this.clearRecents}
+          @sv3-recent-select=${this.onRecentSelect}
           .structuredError=${this.structuredError}
           task-notice=${this.retiredHandoffNotice || this.handoffNotice || (this.preparedHandoff?.shapeId === 'core.summarize' ? 'Summarize prepared. Edit the instruction and send.' : '')}
           scope-label=${scope !== null ? sv3ScopeLabel(scope) : ''}

@@ -46,7 +46,7 @@ describe('CorePlugin surface labels — single authority (557 Q10)', () => {
         pluginId: 'core',
         contribution: {
           id: 'core.unified-chat-surface',
-          mountTag: 'jf-unified-chat-view',
+          mountTag: 'jf-sv3-window',
           labelKey: 'registry-surface.unified-chat-surface.label',
           descriptionKey: 'registry-surface.unified-chat-surface.description',
           audience: 'USER',
@@ -70,7 +70,7 @@ describe('CorePlugin surface labels — single authority (557 Q10)', () => {
         pluginId: 'core',
         contribution: {
           id: 'core.unified-chat-surface',
-          mountTag: 'jf-unified-chat-view',
+          mountTag: 'jf-sv3-window',
           labelKey: 'registry-surface.unified-chat-surface.label',
           descriptionKey: 'registry-surface.unified-chat-surface.description',
           audience: 'USER',
@@ -91,7 +91,7 @@ describe('CorePlugin surface labels — single authority (557 Q10)', () => {
         pluginId: 'core',
         contribution: {
           id: 'core.unified-chat-surface',
-          mountTag: 'jf-unified-chat-view',
+          mountTag: 'jf-sv3-window',
           labelKey: 'registry-surface.unified-chat-surface.label',
           descriptionKey: 'registry-surface.unified-chat-surface.description',
           audience: 'USER',

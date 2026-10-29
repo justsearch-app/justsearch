@@ -9,7 +9,6 @@
     "modules/ui-web/src/shell-v0/components/ContextMenu.ts",
     "modules/ui-web/src/shell-v0/components/Peek.ts",
     "modules/ui-web/src/shell-v0/components/BookmarksPopover.ts",
-    "modules/ui-web/src/shell-v0/components/SelectionActionsMenu.ts",
     "modules/ui-web/src/shell-v0/components/advisory/AdvisoryInboxDrawer.ts",
     "modules/ui-web/src/shell-v0/components/AgentActivityPanel.ts",
     "modules/ui-web/src/shell-v0/components/RetrospectivePanel.ts",

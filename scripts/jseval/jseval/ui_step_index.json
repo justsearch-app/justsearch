@@ -18,20 +18,27 @@
     "search-results", "search-results-rich", "snippets-expanded"
   ],
   "shell-v0/components/documentPane/DocumentPane.ts": [
-    "inspector-open", "citation-highlight",
-    "sv3-citation-selected", "sv3-citation-dropped"
+    "inspector-open", "citation-highlight", "sv3-citation-selected",
+    "sv3-citation-dropped", "chat-occlusion", "qa-response"
   ],
   "shell-v0/views/SummarizeView.ts": [
-    "streaming", "summarize-done", "qa-response"
+    "streaming", "summarize-done"
   ],
   "shell-v0/components/chat/MarkdownBlock.ts": [
     "citation-highlight", "sv3-citation-selected"
   ],
-  "shell-v0/components/chat/CitationsPanel.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
+  "shell-v0/components/chat/CitationsPanel.ts": [
+    "sv3-citation-selected", "sv3-citation-dropped", "chat-evidence-rail",
+    "qa-response"
+  ],
   "shell-v0/state/selectedSource.ts": ["sv3-citation-selected", "citation-highlight"],
   "shell-v0/views/search-v3/Sv3Main.ts": [
     "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion",
-    "sv3-search-results"
+    "sv3-search-results", "chat-proportion", "chat-occlusion",
+    "chat-bands", "chat-bands-detailed", "chat-composer-small",
+    "chat-evidence-rail", "chat-activity-rail-open", "chat-wide-docked",
+    "chat-mode", "qa-response", "chat-budget",
+    "chat-model-only", "chat-structured"
   ],
   "shell-v0/views/search-v3/Sv3Results.ts": ["sv3-search-results"],
   "shell-v0/views/search-v3/sv3-search.ts": ["sv3-search-results"],
@@ -40,27 +47,34 @@
     "sv3-hero-forced-colors", "sv3-docked-forced-colors", "sv3-palette-forced-colors",
     "sv3-search-results"
   ],
-  "shell-v0/views/search-v3/Sv3Pane.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
+  "shell-v0/views/search-v3/Sv3Pane.ts": [
+    "sv3-citation-selected", "sv3-citation-dropped", "chat-occlusion",
+    "qa-response"
+  ],
   "shell-v0/views/search-v3/SearchV3View.ts": [
     "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion",
-    "sv3-search-results", "chat-chip-yield"
+    "sv3-search-results", "chat-chip-yield", "chat-proportion",
+    "chat-occlusion", "chat-bands", "chat-bands-detailed",
+    "chat-composer-small", "chat-evidence-rail", "chat-activity-rail-open",
+    "chat-wide-docked", "chat-mode", "qa-response",
+    "chat-budget", "chat-model-only", "chat-structured",
+    "sv3-recents-hero-normal-dark", "sv3-recents-hero-normal-light", "sv3-recents-hero-normal-forced", "sv3-recents-hero-narrow-dark", "sv3-recents-hero-narrow-light", "sv3-recents-hero-narrow-forced", "sv3-recents-docked-normal-dark", "sv3-recents-docked-normal-light", "sv3-recents-docked-normal-forced", "sv3-recents-docked-narrow-dark", "sv3-recents-docked-narrow-light", "sv3-recents-docked-narrow-forced",
+    "sv3-recents-hero-1280x720-dark", "sv3-recents-hero-1280x720-light", "sv3-recents-hero-1280x720-forced", "sv3-recents-hero-760x720-dark", "sv3-recents-hero-760x720-light", "sv3-recents-hero-760x720-forced", "sv3-recents-hero-600x400-dark", "sv3-recents-hero-600x400-light", "sv3-recents-hero-600x400-forced", "sv3-recents-docked-1280x720-dark", "sv3-recents-docked-1280x720-light", "sv3-recents-docked-1280x720-forced", "sv3-recents-docked-760x720-dark", "sv3-recents-docked-760x720-light", "sv3-recents-docked-760x720-forced", "sv3-recents-docked-600x400-dark", "sv3-recents-docked-600x400-light", "sv3-recents-docked-600x400-forced"
   ],
-  "shell-v0/views/search-v3/Sv3Composer.ts": ["sv3-composer-occlusion", "sv3-search-results", "chat-chip-yield"],
-  "shell-v0/views/search-v3/Sv3ContextBar.ts": ["sv3-composer-occlusion"],
+  "shell-v0/views/search-v3/Sv3Composer.ts": [
+    "sv3-composer-occlusion", "sv3-search-results", "chat-chip-yield",
+    "chat-proportion", "chat-occlusion", "chat-bands",
+    "chat-bands-detailed", "chat-composer-small", "chat-evidence-rail",
+    "chat-activity-rail-open", "chat-wide-docked", "chat-mode",
+    "qa-response", "chat-budget", "chat-model-only",
+    "chat-structured",
+    "sv3-recents-hero-normal-dark", "sv3-recents-hero-normal-light", "sv3-recents-hero-normal-forced", "sv3-recents-hero-narrow-dark", "sv3-recents-hero-narrow-light", "sv3-recents-hero-narrow-forced", "sv3-recents-docked-normal-dark", "sv3-recents-docked-normal-light", "sv3-recents-docked-normal-forced", "sv3-recents-docked-narrow-dark", "sv3-recents-docked-narrow-light", "sv3-recents-docked-narrow-forced",
+    "sv3-recents-hero-1280x720-dark", "sv3-recents-hero-1280x720-light", "sv3-recents-hero-1280x720-forced", "sv3-recents-hero-760x720-dark", "sv3-recents-hero-760x720-light", "sv3-recents-hero-760x720-forced", "sv3-recents-hero-600x400-dark", "sv3-recents-hero-600x400-light", "sv3-recents-hero-600x400-forced", "sv3-recents-docked-1280x720-dark", "sv3-recents-docked-1280x720-light", "sv3-recents-docked-1280x720-forced", "sv3-recents-docked-760x720-dark", "sv3-recents-docked-760x720-light", "sv3-recents-docked-760x720-forced", "sv3-recents-docked-600x400-dark", "sv3-recents-docked-600x400-light", "sv3-recents-docked-600x400-forced"
+  ],
+  "shell-v0/views/search-v3/Sv3ContextBar.ts": [
+    "sv3-composer-occlusion", "chat-proportion", "chat-bands-detailed"
+  ],
   "shell-v0/components/chat/evidenceProjection.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
-  "shell-v0/views/UnifiedChatView.ts": [
-    "chat-mode", "qa-response", "chat-proportion", "chat-occlusion",
-    "chat-bands", "chat-bands-detailed", "chat-composer-small",
-    "chat-spine-single", "chat-spine-multi",
-    "chat-evidence-rail", "chat-activity-rail-open", "chat-wide-docked"
-  ],
-  "shell-v0/views/unifiedChatStyles.ts": [
-    "chat-bands", "chat-bands-detailed", "chat-spine-multi",
-    "chat-evidence-rail", "chat-activity-rail-open", "chat-wide-docked"
-  ],
-  "shell-v0/primitives/compositionLayout.ts": [
-    "chat-bands", "chat-bands-detailed", "chat-occlusion", "chat-wide-docked"
-  ],
   "shell-v0/components/StatusDeck.ts": ["chat-chip-yield"],
   "shell-v0/components/ContextMenu.ts": ["context-menu"],
 
@@ -84,21 +98,24 @@
   "shell-v0/state/searchState.ts": ["search-failure", "sv3-search-results"],
   "shell-v0/state/folderStatus.ts": ["library-enriching"],
   "shell-v0/state/uiModeState.ts": [
-    "home", "library", "ai-brain", "health", "settings", "security", "help",
-    "home-light", "library-light", "ai-brain-light", "health-light",
-    "settings-light", "security-light", "help-light",
-    "ai-brain-advanced", "ai-brain-advanced-light", "ai-brain-components",
-    "ai-brain-consent", "ai-brain-components-light", "ai-brain-consent-light",
-    "search-results", "command-mode", "zero-results", "input-focus", "filters-chips",
-    "search-simple-mode", "search-advanced-mode", "multi-select", "row-hover",
-    "snippets-expanded", "selection-preserved", "search-results-light",
-    "search-results-compact", "search-results-rich",
-    "inspector-open", "citation-highlight", "sv3-citation-selected",
-    "sv3-citation-dropped", "sv3-composer-occlusion",
-    "chat-mode", "qa-response", "chat-proportion", "chat-bands",
-    "chat-bands-detailed", "chat-composer-small", "chat-spine-single",
-    "chat-spine-multi", "chat-chip-yield", "chat-evidence-rail",
-    "chat-activity-rail-open", "chat-wide-docked"
+    "home", "library", "ai-brain",
+    "health", "settings", "security",
+    "help", "home-light", "library-light",
+    "ai-brain-light", "health-light", "settings-light",
+    "security-light", "help-light", "ai-brain-advanced",
+    "ai-brain-advanced-light", "ai-brain-components", "ai-brain-consent",
+    "ai-brain-components-light", "ai-brain-consent-light", "search-results",
+    "command-mode", "zero-results", "input-focus",
+    "filters-chips", "search-simple-mode", "search-advanced-mode",
+    "multi-select", "row-hover", "snippets-expanded",
+    "selection-preserved", "search-results-light", "search-results-compact",
+    "search-results-rich", "inspector-open", "citation-highlight",
+    "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion",
+    "chat-mode", "qa-response", "chat-proportion",
+    "chat-bands", "chat-bands-detailed", "chat-composer-small",
+    "chat-chip-yield", "chat-evidence-rail", "chat-activity-rail-open",
+    "chat-wide-docked", "chat-budget", "chat-model-only",
+    "chat-structured"
   ],
   "shell-v0/views/BrainSurface.ts": [
     "ai-brain", "ai-brain-advanced", "ai-brain-light", "ai-brain-advanced-light",
@@ -129,5 +146,8 @@
   "shell-v0/components/Table.ts": ["shell-v0-demo-table"],
   "shell-v0/demo/presentation-demo.ts": ["presentation-demo"],
   "shell-v0/components/DeclaredSurface.ts": ["presentation-demo"],
-  "shell-v0/substrates/interaction/index.ts": ["presentation-demo"]
+  "shell-v0/substrates/interaction/index.ts": ["presentation-demo"],
+  "shell-v0/components/chat/ToolCallCard.ts": ["chat-bands", "chat-activity-rail-open"],
+  "shell-v0/views/search-v3/sv3-run.ts": ["chat-budget"],
+  "shell-v0/views/search-v3/sv3-record.ts": ["chat-bands", "chat-evidence-rail", "chat-activity-rail-open"]
 }

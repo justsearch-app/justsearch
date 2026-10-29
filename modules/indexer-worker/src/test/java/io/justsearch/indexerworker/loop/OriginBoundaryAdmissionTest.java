@@ -83,7 +83,7 @@ final class OriginBoundaryAdmissionTest {
 
   private void assertConsumedWithoutDirectoryExclusion(JobQueue.IndexJob claim) throws Exception {
     var fields = mock(DocumentFieldOps.class);
-    when(fields.isUnmodified(anyString(), anyLong())).thenReturn(true);
+    when(fields.isUnmodified(anyString(), anyLong(), anyLong())).thenReturn(true);
     var counts = mock(IndexCountOps.class);
     when(counts.docCount()).thenReturn(7L);
     // Task t-20261013-ef3c41: the extractor decides "empty index" from the count it actually read.
@@ -103,6 +103,6 @@ final class OriginBoundaryAdmissionTest {
     extractor.extractAll(List.of(claim));
 
     // Reaching the index freshness check proves production consumer admission accepted this file.
-    verify(fields).isUnmodified(eq(PathNormalizer.normalizeKey(claim.path())), anyLong());
+    verify(fields).isUnmodified(eq(PathNormalizer.normalizeKey(claim.path())), anyLong(), anyLong());
   }
 }

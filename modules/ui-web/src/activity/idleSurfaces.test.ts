@@ -10,7 +10,6 @@ import '../shell-v0/views/MemorySurface.js';
 import '../shell-v0/views/BrowseSurface.js';
 import '../shell-v0/views/SettingsSurface.js';
 import '../shell-v0/views/HealthSurface.js';
-import '../shell-v0/views/UnifiedChatView.js';
 import '../shell-v0/views/ApiExplorerView.js';
 import '../shell-v0/views/search-v3/SearchV3View.js';
 import { __resetConversationListForTest } from '../shell-v0/state/conversationListStore.js';
@@ -39,16 +38,21 @@ const constants = new Map<string, string>();
 for (const entry of readdirSync(api, { recursive: true }).filter((name) => String(name).endsWith('.java'))) {
   const source = readFileSync(resolve(api, String(entry)), 'utf8');
   const className = String(entry).split(/[\\/]/).at(-1)!.replace('.java', '');
-  for (const constant of source.matchAll(/String\s+(\w+)\s*=\s*"([^"]+)"/g)) constants.set(`${className}.${constant[1]}`, constant[2]!);
+  for (const constant of source.matchAll(/String\s+(\w+)\s*=\s*(?:"([^"]+)"|([\w.]+)\s*\+\s*"([^"]+)")/g)) {
+    const prefix = constant[3] ? constants.get(constant[3].includes('.') ? constant[3] : `${className}.${constant[3]}`) : '';
+    if (prefix !== undefined) constants.set(`${className}.${constant[1]}`, constant[2] ?? prefix + constant[4]!);
+  }
 }
 for (const entry of readdirSync(api, { recursive: true }).filter((name) => String(name).endsWith('.java'))) {
   const source = readFileSync(resolve(api, String(entry)), 'utf8');
   for (const m of source.matchAll(/app\.(get|post|put|patch|delete|sse|head|options)\(\s*"([^"]+)"[\s\S]*?ActivityRole\.(\w+)\)/g)) {
     roles.set(`${m[1] === 'sse' ? 'GET' : m[1]!.toUpperCase()} ${m[2]}`, m[3]!);
   }
-  for (const m of source.matchAll(/app\.(get|post|put|patch|delete|sse|head|options)\(\s*(\w+\.\w+)\s*,[\s\S]*?ActivityRole\.(\w+)\)/g)) {
-    const path = constants.get(m[2]!);
-    if (path) roles.set(`${m[1] === 'sse' ? 'GET' : m[1]!.toUpperCase()} ${path}`, m[3]!);
+  const className = String(entry).split(/[\\/]/).at(-1)!.replace('.java', '');
+  for (const m of source.matchAll(/app\.(get|post|put|patch|delete|sse|head|options)\(\s*([\w.]+)(?:\s*\+\s*"([^"]+)")?\s*,[\s\S]*?ActivityRole\.(\w+)\)/g)) {
+    const prefix = constants.get(m[2]!.includes('.') ? m[2]! : `${className}.${m[2]}`);
+    const path = prefix === undefined ? undefined : prefix + (m[3] ?? '');
+    if (path) roles.set(`${m[1] === 'sse' ? 'GET' : m[1]!.toUpperCase()} ${path}`, m[4]!);
   }
 }
 function roleOf(method: string, path: string): string | undefined {
@@ -68,7 +72,8 @@ afterEach(() => {
   vi.unstubAllGlobals(); vi.useRealTimers();
 });
 
-it('mount, render, timers, and corpus-growth updates send only observations with no person acting', async () => {
+it.each(['shared surfaces', 'Search alone'] as const)('%s: mount, render, timers, and corpus-growth updates send only observations with no person acting', async surface => {
+  localStorage.clear(); sessionStorage.clear(); __resetConversationListForTest();
   __resetAiStateForTest(); resetPaths();
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
   const calls: Array<{ method: string; path: string }> = [];
@@ -107,8 +112,8 @@ it('mount, render, timers, and corpus-growth updates send only observations with
       } },
   });
   const elements: Array<HTMLElement & { host_: PluginHostApi; apiBase: string; updateComplete: Promise<unknown> }> = [];
-  for (const tag of ['jf-library-surface', 'jf-brain-surface', 'jf-memory-surface', 'jf-browse-surface',
-    'jf-settings-surface', 'jf-health-surface', 'jf-unified-chat-view', 'jf-api-explorer-view']) {
+  for (const tag of surface === 'Search alone' ? ['jf-sv3-window'] : ['jf-library-surface', 'jf-brain-surface', 'jf-memory-surface', 'jf-browse-surface',
+    'jf-settings-surface', 'jf-health-surface', 'jf-api-explorer-view']) {
     const element = document.createElement(tag) as typeof elements[number];
     element.host_ = host; element.apiBase = '';
     elements.push(element); document.body.appendChild(element);
@@ -120,17 +125,24 @@ it('mount, render, timers, and corpus-growth updates send only observations with
     }
   }
   await settle();
+  if (surface === 'Search alone') {
+  const search = elements.find(element => element.localName === 'jf-sv3-window')!;
+  expect(search.constructor).toBe(customElements.get('jf-sv3-window'));
+  const composer = search.shadowRoot!.querySelector('jf-sv3-composer') as HTMLElement & { updateComplete: Promise<unknown> };
+  expect(composer).not.toBeNull(); await composer.updateComplete;
+  expect(composer.shadowRoot!.querySelector('[data-testid="sv3-composer-input"]')).not.toBeNull();
+  }
   const mountCount = calls.filter((call) => call.path.includes('/knowledge/')).length;
-  expect(mountCount, 'the Library must really issue its mount-time facet probe').toBeGreaterThan(0);
+  if (surface === 'shared surfaces') expect(mountCount, 'the Library must really issue its mount-time facet probe').toBeGreaterThan(0);
   __feedForTest({ status: { worker: { core: { indexedDocuments: 900_000, searchableDocuments: 900_000,
     indexState: 'INDEXING', indexHealthy: true } },
     readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } } } as unknown as StatusSnapshot });
   __tickClockForTest(); await settle();
-  expect(calls.filter((call) => call.path.includes('/knowledge/')).length,
+  if (surface === 'shared surfaces') expect(calls.filter((call) => call.path.includes('/knowledge/')).length,
     'corpus growth must really issue a second facet probe').toBeGreaterThan(mountCount);
   await vi.advanceTimersByTimeAsync(10_000);
-  expect(calls.some((call) => call.path === '/api/inference/transitions'), 'Brain timer must really fire').toBe(true);
-  expect(calls.some((call) => call.path === '/api/library/path-label' || call.path.includes('core.resolve-path-hash')),
+  if (surface === 'shared surfaces') expect(calls.some((call) => call.path === '/api/inference/transitions'), 'Brain timer must really fire').toBe(true);
+  if (surface === 'shared surfaces') expect(calls.some((call) => call.path === '/api/library/path-label' || call.path.includes('core.resolve-path-hash')),
     'nonempty rows must exercise path-label hydration').toBe(true);
   expect(calls.filter((call) => roleOf(call.method, call.path) !== 'OBSERVATION')
     .map((call) => `${call.method} ${call.path}: ${roleOf(call.method, call.path)}`),

@@ -1,63 +1,72 @@
 {
   "$schema": "./ui-proportion-baseline.schema.json",
   "version": 1,
-  "description": "Chrome proportion shrink-only ratchet baseline (tempdoc 697). ONE authority for the per-ui-shot-step persistent-chrome elements whose rendered HEIGHT must not GROW beyond a recorded ceiling (maxHeightPx). Shrinking is always allowed; growth beyond maxHeightPx + tolerancePx is a violation, enforced by `jseval ui-proportion-gate` (which reuses the ui-shot `.measure.json` geometry — see scripts/jseval/jseval/ui_measure.py). Regenerate via scripts/jseval/experiments/regen_proportion_baseline.py. ACTIVE (tempdoc 697 activation): both target elements were DATA-DEPENDENT (a degraded readiness verdict for the collapsed pill; a rendered turn for the one-line user bubble) and are now captured deterministically by the dedicated isolated `chat-proportion` ui-shot step (scripts/jseval/jseval/ui_check.py), which installs the `degraded` fixtures variant (ui_fixtures._status_body — flips `readiness.composites.retrieval` to DEGRADED with `worker.health.embedding_not_ready`, a 'warn'-severity LifecycleReasonCode so the banner renders collapsed) and actually submits a chat turn (a `?`-bearing draft + Enter, escalating to UnifiedChatView.send()). `chat-mode` (the shared chain step) is untouched — it documents chat-INPUT mode only and never submits, so it was not repurposed. Both elements' `maxHeightPx` were filled in by regen_proportion_baseline.py from this step's live `--fixtures` capture; with the top-level `tolerancePx` of 2px folded in, the effective ceilings are 44px (pill) and 38px (bubble).",
-  "captureState": "ui-shot --fixtures (deterministic); the `chat-proportion` isolated step (degraded status fixture + a submitted chat turn) — see tempdoc 697; the `chat-occlusion` isolated step (1250x800, document pane opened, a toast burst at exactly the cap) — see below. The 814 closure adds `chat-bands-detailed`: the same band family in DETAILED disclosure (the `degraded-detailed` fixtures variant — identical to `degraded` except it does NOT flip the compatible `ui.mode` wire value to `simple`, so the app boots into Detailed and the banner force-expands) at 1366x900, ABOVE the 820px block-axis breakpoint so Detailed genuinely expands, with one overflowing user turn so the conversation actually scrolls. Round 8 moved that step from 1050x800 to 1250x800: the wide breakpoint became a `@container` query on the chat SURFACE box (viewport minus the Shell rail minus the surface padding), so 1050 no longer mounts the wide grid at all and `.document-pane` would leave the capture; 1250 gives the surface ~1042px, the same just-over-1024 worst case the original width was reaching for. The `tasks-occlusion` isolated step (tempdoc 813 Slice D) captures at 1280x800 with the `indexing` fixtures variant (ui_fixtures._status_body: a live INDEXING worker with a real backlog), which is what puts the Tasks panel's aggregate card on screen — under every other fixture the worker reports the fallback state \"SERVING\", which the progress projection refuses to read, so the panel is correctly invisible. Tempdoc 859 §B adds `sv3-composer-occlusion`, the first Search v3 step deterministic enough to register: 1280x800 with the `sv3-sources` fixtures variant (a thread record carrying populated `attributes.citations` plus long answers so the transcript overflows), Sources disclosure opened and the scroller driven to max — the only position at which 'the floating composer does not cover the end of the transcript' is a real assertion.",
-  "constraintKinds": "An element declares at least one of: `maxHeightPx` (shrink-only chrome ratchet, tempdoc 697); `minHeightPx` (the 814 review pass's anti-vacuity FLOOR companion to a ceiling — a band registered because it EXPANDS must not pass its ceiling by collapsing: `.degradation-banner`'s 176px Detailed ceiling was satisfied at the 34px collapsed pill, i.e. precisely in the regression the row exists to catch; same move as `minScrollableRegions` beside `maxScrollableRegions`); `minWidthPx` (a FLOOR for primary content that surrounding chrome must not starve); `maxWidthPx` (tempdoc 816 — that floor's symmetric CEILING, for an element whose function-derived bound is its CONTAINER rather than a line length: §3's `control-row` max is `fit-content`, which no `ch` number can express, so the chip row's 'does not sprawl past the reading column' is asserted physically on a pinned-viewport step, exactly like `maxHeightPx`); `inlineSizeRole` (tempdoc 816 — bind the element to a `roles` entry; the gate resolves that role's `ch` bounds against the element's OWN captured `chPx`, and a role-bound row with no floor — neither the role's `minInlineSizeCh` nor its own `minWidthPx` — is an ERROR); `mustNotOverlapSelector` (two rects must not intersect — occlusion, which no per-element size budget can express); `minShareOfSelector` (tempdoc 814 D1/D7.1 — this element's rect.h / a named denominator selector's rect.h must be >= floor, the 'owner of the sum' share assertion); `maxBottomPx` (tempdoc 814 D6/D7.2, the F5 close — rect.y + rect.h must stay within a pinned viewport height). A STEP may also declare `maxScrollableRegions` (tempdoc 814 D3/D7.2 — geometry.scrollableCount must not exceed this) and/or `minScrollableRegions` (the 814 closure audit's finding C — the anti-vacuity FLOOR: a ceiling alone passes trivially on a capture with zero scrollers, so a step whose state is supposed to overflow declares the floor too; the pair 1/1 is what makes the one-scroller rule witness a real scroller) and/or `statusFactsSingleton: true` (tempdoc 814 D5/D7.3 — every governance/status-facts.v1.json phrase must not exceed its registered maxPersistentRenders) and/or `absentSelectors` (a selector that must NOT appear in the captured geometry) and/or `requiredSelectors` (its positive twin — a selector that MUST appear; the spine pair's positive half) and/or `nonScrollableSelectors` (tempdoc 814 §D8 — a NAMED element that must be present AND must not be a scroller: §D3's direct witness, which `maxScrollableRegions` structurally cannot be because a total count cannot say WHICH element is allowed to scroll; judged off the element's own `geometry.elements[sel].scrollable` flag, computed by `ui_measure.py` with the same predicate that builds `scrollableRegions`) and/or `forbiddenVisibleText` (814 D5 review pass — literal phrases that must not render VISIBLY in this step's state, counted by the same visibility-filtered statusFacts probe with a step-scoped ceiling of 0; the chip-yield witness, which the register-wide phrase counter structurally cannot be because that duplication is cross-worded). Enforced by `jseval ui-proportion-gate`; an element with no constraint, or a selector missing from the captured geometry, is an ERROR, never a silent pass.",
-  "occlusionNote": "Sandbox round 7 registered two layout defects on the `chat-occlusion` capture. (1) `.conversation` — the RAG reading column measured 102px wide (about one word per line) at 1050x800 with the document pane open, because CONVERSATION_ZONES declared its grid track `minmax(0, 50rem)` while its neighbours reserved real min-widths; the track floor is now 24rem, so the floor here is 384px. (2) `.toast` vs `.header` — the OverlayHost `.top-right` column docked at 48px, inside the chat surface's 56-88px header band, completely covering the shape badge; the dock now clears the surface header row as well as the topbar. Round 8 then showed the dock offset alone was not enough for the toast column: a `REQUIRES_ACK` toast had NO timeout, so two of them were still covering the Library header's control row ~6 minutes and several navigations later. That is fixed at the toast, not at the slot — every toast is now time-bounded (AdvisoryToastHost's TOAST_DURATION_MS / ACK_TOAST_DURATION_MS), the record keeping its durable home in the advisory inbox drawer + rail badge. HONEST RESIDUAL: the `top: calc(2.5rem + 3rem + 0.5rem)` reservation is calibrated against the CHAT surface's header band (measured y 56-88) and does NOT clear surfaces that stack a `<jf-surface-tabs>` strip above their own header — Library's header band ends at y=143 against chat's y=89, so the slot's persistent occupants (jf-provenance-badge, jf-plugin-error-overlay) can still land on a Library-shaped header. A per-surface header offset, not a single global constant, is what would close it. (3) `jf-task-list` vs the rail's bottom controls — tempdoc 813 Slice D. The OverlayHost `.bottom-left` slot docked at `left: 1rem`, i.e. INSIDE the 3.25rem rail column, so the Tasks panel covered the Settings button and the Help affordance outright; the slot now reserves the rail's band via the `--rail-width` token Shell.ts lays its grid track out with, so the reservation follows rail expansion (11rem) instead of being calibrated to one state. Registered as TWO overlap rows (panel vs Settings, Help vs panel) plus a `minWidthPx: 140` floor on `jf-task-list` itself — the NON-VACUITY companion: a hidden element is still found by `ui_measure`'s deepQuery but yields a 0x0 rect, which satisfies `_rects_overlap` trivially, so without a size constraint the two overlap rows would report clean precisely when the panel failed to render. 140px is a deliberate FLOOR, not a measured width (the panel is content-sized under a 24rem cap; measured 159px at this step — the floor was lowered from 160, which passed only on the 2px tolerance). The pre-existing `.toast` row shares this latent vacuity and does NOT yet carry a companion — noted for Lane-2/T-B rather than fixed here.",
-  "rolesNote": "Tempdoc 816 — the INLINE axis joins the block axis in this register, and it joins it with a different KIND of invariant, deliberately (816 §2b). Height is zero-sum inside a viewport, so its invariant is a budget over the sum (814's share floors / chrome ceilings above). Width is handed out top-down and rows stack, so the unconsidered default is greedy 100% and the right invariant is a PER-ELEMENT functional bound in CONTENT units: an element's width claim must be justified by its function, not by available space. Hence `roles` below: each role cites the function that produces its number, element rows reference a role via `inlineSizeRole` instead of repeating it, and the number is resolved at measure time against the bound element's own rendered font (`chPx`) rather than being stored as px. THE SAME NUMBER RENDERS: each role's `token` names the CSS custom property in modules/ui-web/src/styles/tokens.css that applies it, and the gate fails on drift between the two — one authority renders AND judges (§4a.3). ANTI-VACUITY, inherited from this register's doctrine: a ceiling alone is satisfied by an element that failed to render, so a role-bound row must also carry a floor (the role's `minInlineSizeCh` or the row's own `minWidthPx`), and a selector missing from the capture stays an ERROR. ADOPTION IS BY EXPLICIT ROW, one surface at a time (§4a's adoption path) — 'every text-bearing element declares a role' is the named end-state, NOT the current rule; `pane` is declared `documentational` because the existing minWidthPx/minShareOfSelector rows already cover panes physically and force-migrating them would buy nothing.",
+  "description": "Measured Search geometry ratchet (WP1.5b/S3), using real registered jf-sv3-window captures. Ceilings, overlap counterparts and required selectors must be visible with positive width and height. Legacy names identify retained camera recipes, not an old component mount.",
+  "captureState": "Built UI, isolated headless Chromium, deterministic HTTP fixtures. Search captures run in dark and light; forced-colors hero/dock/palette and 760px narrow result/composer states are explicit. Each changed bound was measured on 2026-10-28. agent-budget owns an open loopback SSE fixture for the real waiting decision, closed with its context.",
+  "constraintKinds": "Element size/reading bounds, positive visible required selectors, overlap relations, named non-scrollers, min/max scrollable-region bands, viewport bottom bounds and visible-text/status assertions. Any absentSelectors assertion needs a positive visible requiredSelectors witness in the same step. Hidden, zero-size, missing or incomplete constrained geometry is an error, never a clean ceiling or overlap.",
+  "occlusionNote": "Search reader crowding is measured at 1250x800 with an actual result and reader plus three visible toasts. Sources/composer overlap is measured at max scroll. Retired: chat-spine-single/multi, because Search has no minimap; three-zone 55/45 shares, because Search owns a different layout; wide full-bleed banner and escalation-strip assertions, because Search keeps composer, prose and notice together at its current 48rem reading measure. Surviving budgets, activity, message, notice, reader and composer checks below use Search controls. The activity expansion floor remains essential: a positive 43px collapsed card must fail a 100px expanded floor (217px measured open).",
+  "rolesNote": "Tempdoc 816 \u2014 the INLINE axis joins the block axis in this register, and it joins it with a different KIND of invariant, deliberately (816 \u00a72b). Height is zero-sum inside a viewport, so its invariant is a budget over the sum (814's share floors / chrome ceilings above). Width is handed out top-down and rows stack, so the unconsidered default is greedy 100% and the right invariant is a PER-ELEMENT functional bound in CONTENT units: an element's width claim must be justified by its function, not by available space. Hence `roles` below: each role cites the function that produces its number, element rows reference a role via `inlineSizeRole` instead of repeating it, and the number is resolved at measure time against the bound element's own rendered font (`chPx`) rather than being stored as px. THE SAME NUMBER RENDERS: each role's `token` names the CSS custom property in modules/ui-web/src/styles/tokens.css that applies it, and the gate fails on drift between the two \u2014 one authority renders AND judges (\u00a74a.3). ANTI-VACUITY, inherited from this register's doctrine: a ceiling alone is satisfied by an element that failed to render, so a role-bound row must also carry a floor (the role's `minInlineSizeCh` or the row's own `minWidthPx`), and a selector missing from the capture stays an ERROR. ADOPTION IS BY EXPLICIT ROW, one surface at a time (\u00a74a's adoption path) \u2014 'every text-bearing element declares a role' is the named end-state, NOT the current rule; `pane` is declared `documentational` because the existing minWidthPx/minShareOfSelector rows already cover panes physically and force-migrating them would buy nothing.",
   "roles": {
     "prose": {
-      "why": "Line-length legibility — the reading measure. External authorities cluster below this (USWDS ~75ch, Tailwind 65ch, WCAG 1.4.8 AAA <= 80ch); 88ch is the value this surface already shipped and is kept for the first instance so exactly one thing changes, with narrowing judged live (816 §5's open owner decision).",
+      "why": "Line-length legibility \u2014 the reading measure. External authorities cluster below this (USWDS ~75ch, Tailwind 65ch, WCAG 1.4.8 AAA <= 80ch); 88ch is the value this surface already shipped and is kept for the first instance so exactly one thing changes, with narrowing judged live (816 \u00a75's open owner decision).",
       "maxInlineSizeCh": 88,
       "token": "--measure-prose"
     },
     "text-entry": {
-      "why": "Max: what you type you immediately re-read, so an entry field takes the reading measure. Min: a typical query unwrapped (~30ch) — below that the field stops being usable for its own content, which is the floor that keeps the ceiling non-vacuous.",
+      "why": "Max: what you type you immediately re-read, so an entry field takes the reading measure. Min: a typical query unwrapped (~30ch) \u2014 below that the field stops being usable for its own content, which is the floor that keeps the ceiling non-vacuous.",
       "minInlineSizeCh": 30,
       "maxInlineSizeCh": 88,
       "token": "--measure-text-entry"
     },
     "notice": {
-      "why": "A notice's content box is its own text at reading measure and no more; its BACKGROUND may still bleed edge to edge (816 §2's full-bleed-chrome role: the chrome is full-width, the content is content-sized). No `minInlineSizeCh` — a notice's floor is its longest word plus its action control, which is content-dependent, so rows binding this role carry their own `minWidthPx` floor instead.",
+      "why": "A notice's content box is its own text at reading measure and no more; its BACKGROUND may still bleed edge to edge (816 \u00a72's full-bleed-chrome role: the chrome is full-width, the content is content-sized). No `minInlineSizeCh` \u2014 a notice's floor is its longest word plus its action control, which is content-dependent, so rows binding this role carry their own `minWidthPx` floor instead.",
       "maxInlineSizeCh": 88,
       "token": "--measure-notice"
     },
     "pane": {
-      "why": "A space-sharing pane's function genuinely IS 'share of workspace', so its bounds belong to the container-% family (`minWidthPx` floors and `minShareOfSelector`), NOT to content units — 816 §2b's crossover case. Declared for vocabulary completeness; the `.conversation` / `.document-pane` / `jf-task-list` rows above already express it physically, so nothing is force-migrated.",
+      "why": "A space-sharing pane's function genuinely IS 'share of workspace', so its bounds belong to the container-% family (`minWidthPx` floors and `minShareOfSelector`), NOT to content units \u2014 816 \u00a72b's crossover case. Declared for vocabulary completeness; the `.conversation` / `.document-pane` / `jf-task-list` rows above already express it physically, so nothing is force-migrated.",
       "documentational": true
     }
   },
   "tolerancePx": 2,
   "steps": [
     {
+      "$comment": "WP1.5b measured Search: Submitted Ask with compact degradation; measured notice 36px, question 47px. Both remain bounded.",
       "uiShotStep": "chat-proportion",
       "elements": [
         {
-          "selector": ".degradation-banner-collapsed",
-          "maxHeightPx": 42
+          "selector": "[data-testid=\"sv3-degradation\"]",
+          "maxHeightPx": 36
         },
         {
-          "selector": ".message.user",
-          "maxHeightPx": 36
+          "selector": "[data-testid=\"sv3-turn-question\"]",
+          "maxHeightPx": 47
         }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-turn-answer\"]"
       ]
     },
     {
+      "$comment": "WP1.5b measured Search: 1250x800: Search main 790px, reader 360px; three 288x50 toasts begin below the 52px Search topbar. Reading/reader floors replace old pane/zone allocation.",
       "uiShotStep": "chat-occlusion",
       "elements": [
         {
-          "selector": ".conversation",
-          "minWidthPx": 384
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minWidthPx": 600
         },
         {
-          "selector": ".document-pane",
-          "minWidthPx": 384
+          "selector": "[data-testid=\"sv3-pane-surface\"]",
+          "minWidthPx": 320
         },
         {
           "selector": ".toast",
-          "mustNotOverlapSelector": ".header"
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
         }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-results-card\"]",
+        "[data-testid=\"sv3-pane-document\"]"
       ]
     },
     {
@@ -75,7 +84,7 @@
       ]
     },
     {
-      "$comment": "Tempdoc 859 §B — the FIRST occlusion row on the Search v3 window, and the first sv3 step that runs under `--fixtures` at all. §B moved the composer out of document flow and onto a floating `div.dock` over the transcript's one scroller; the whole correctness claim is that the scroller's padding + scroll-padding grow by the dock's MEASURED height, so 'scrolled to the end' means 'the last line is above the glass'. That is a RELATION between two rects and no per-element size budget can express it. Captured at 1280x800 with the `sv3-sources` fixtures variant (a thread record whose last assistant message carries populated `attributes.citations`, plus deliberately long answers so the transcript overflows), Sources disclosure OPEN, scrolled to max — the only position where the assertion means anything, since at rest the last element is nowhere near the dock. NON-VACUITY, per this register's own occlusionNote: two 0x0 rects never intersect, so BOTH selectors carry a `minHeightPx` floor; without them the overlap row would report clean precisely when neither element rendered. The floors are deliberate minima, not measured widths — the dock's resting docked height is the composer's glass box plus its inset (~104-140px in source geometry, which is what bounds how far the floor can be raised) and the three-source panel is taller than one row. CALIBRATED 2026-08-25 against an ACTUAL `--fixtures` capture of this step (the state this gate enforces — the earlier landing note's numbers were never captured, and the 859 live-leg audit reported the same three values from the running app): Sources panel h=237 at y=380, docked band h=155 at y=617, so the dock's bottom edge is 772 in the 800px viewport. `sv3-turn-citations.minHeightPx` moves 40 -> 120 and `sv3-dock.minHeightPx` 60 -> 120 — an effective floor of 118 after tolerance, still under the source-geometry minimum above, so a real dock cannot trip it while a stub instead of a real disclosure now fails rather than reporting clean. `sv3-dock.maxBottomPx` moves 800 -> 780: at 800 the bound WAS the capture viewport and could never fail; 780 sits 8px under the measurement and outside the 2px tolerance, making it an assertion about the dock rather than a restatement of the window size. On the overlap row: the panel's bottom (617) and the dock's top (617) sit at an EXACT 0px boundary in this state, where the live app shows a 12px inset gap because the last element under the dock differs. That is not fragility — the gate requires more than tolerancePx of REAL intersection on both axes, so a flush edge is clean by construction and only a genuine cover-up goes red. Verified: `jseval ui-proportion-gate` exit 0, all six rows of this step ok. It is still not part of hosted CI, so re-seat these at the next capture if the fixture state moves.",
+      "$comment": "Tempdoc 859 \u00a7B \u2014 the FIRST occlusion row on the Search window, and the first sv3 step that runs under `--fixtures` at all. \u00a7B moved the composer out of document flow and onto a floating `div.dock` over the transcript's one scroller; the whole correctness claim is that the scroller's padding + scroll-padding grow by the dock's MEASURED height, so 'scrolled to the end' means 'the last line is above the glass'. That is a RELATION between two rects and no per-element size budget can express it. Captured at 1280x800 with the `sv3-sources` fixtures variant (a thread record whose last assistant message carries populated `attributes.citations`, plus deliberately long answers so the transcript overflows), Sources disclosure OPEN, scrolled to max \u2014 the only position where the assertion means anything, since at rest the last element is nowhere near the dock. NON-VACUITY, per this register's own occlusionNote: two 0x0 rects never intersect, so BOTH selectors carry a `minHeightPx` floor; without them the overlap row would report clean precisely when neither element rendered. The floors are deliberate minima, not measured widths \u2014 the dock's resting docked height is the composer's glass box plus its inset (~104-140px in source geometry, which is what bounds how far the floor can be raised) and the three-source panel is taller than one row. CALIBRATED 2026-08-25 against an ACTUAL `--fixtures` capture of this step (the state this gate enforces \u2014 the earlier landing note's numbers were never captured, and the 859 live-leg audit reported the same three values from the running app): Sources panel h=237 at y=380, docked band h=155 at y=617, so the dock's bottom edge is 772 in the 800px viewport. `sv3-turn-citations.minHeightPx` moves 40 -> 120 and `sv3-dock.minHeightPx` 60 -> 120 \u2014 an effective floor of 118 after tolerance, still under the source-geometry minimum above, so a real dock cannot trip it while a stub instead of a real disclosure now fails rather than reporting clean. `sv3-dock.maxBottomPx` moves 800 -> 780: at 800 the bound WAS the capture viewport and could never fail; 780 sits 8px under the measurement and outside the 2px tolerance, making it an assertion about the dock rather than a restatement of the window size. On the overlap row: the panel's bottom (617) and the dock's top (617) sit at an EXACT 0px boundary in this state, where the live app shows a 12px inset gap because the last element under the dock differs. That is not fragility \u2014 the gate requires more than tolerancePx of REAL intersection on both axes, so a flush edge is clean by construction and only a genuine cover-up goes red. Verified: `jseval ui-proportion-gate` exit 0, all six rows of this step ok. It is still not part of hosted CI, so re-seat these at the next capture if the fixture state moves.",
       "uiShotStep": "sv3-composer-occlusion",
       "elements": [
         {
@@ -93,7 +102,7 @@
       "maxScrollableRegions": 1
     },
     {
-      "$comment": "WP1.1 S1.12 — Search mode's result list stays reachable beside the floating composer at a narrow width with a long list. Captured at 760x720 with the `sv3-results` fixtures variant (24 hits), scrolled to the end; the step itself fails if the list did not overflow and reach its end, so the overlap row cannot pass on a list that never scrolled. NON-VACUITY per this register's occlusionNote: both selectors carry a `minHeightPx` floor. CALIBRATED against the first `--fixtures` capture: card h=1947 with its bottom at 581, dock h=99 at y=593 (bottom 692), scroller delta 1499 — a 12px gap between the last row and the glass. The card floor (600) is far under the measurement but over anything a short list or a stub renders; `maxBottomPx` is 700, not the 720 viewport, so it asserts something about the dock.",
+      "$comment": "WP1.1 S1.12 \u2014 Search mode's result list stays reachable beside the floating composer at a narrow width with a long list. Captured at 760x720 with the `sv3-results` fixtures variant (24 hits), scrolled to the end; the step itself fails if the list did not overflow and reach its end, so the overlap row cannot pass on a list that never scrolled. NON-VACUITY per this register's occlusionNote: both selectors carry a `minHeightPx` floor. CALIBRATED against the first `--fixtures` capture: card h=1947 with its bottom at 581, dock h=99 at y=593 (bottom 692), scroller delta 1499 \u2014 a 12px gap between the last row and the glass. The card floor (600) is far under the measurement but over anything a short list or a stub renders; `maxBottomPx` is 700, not the 720 viewport, so it asserts something about the dock.",
       "uiShotStep": "sv3-search-results",
       "elements": [
         {
@@ -111,78 +120,55 @@
       "maxScrollableRegions": 1
     },
     {
+      "$comment": "WP1.5b measured Search: Recorded Delegate tool card collapsed at 43px; composer shell 75px. Retires the three-zone share and keeps bounded activity.",
       "uiShotStep": "chat-bands",
       "elements": [
         {
-          "selector": ".degradation-banner-collapsed",
-          "maxHeightPx": 42
+          "selector": "jf-tool-call-card",
+          "maxHeightPx": 43
         },
         {
-          "selector": ".activity-rail",
-          "maxHeightPx": 40
-        },
-        {
-          "selector": ".composer",
-          "maxHeightPx": 220
-        },
-        {
-          "selector": ".conversation-zone",
-          "minShareOfSelector": { "selector": "jf-unified-chat-view", "floor": 0.55 }
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "maxHeightPx": 75
         }
       ],
-      "maxScrollableRegions": 1,
-      "statusFactsSingleton": true
-    },
-    {
-      "uiShotStep": "chat-bands-detailed",
-      "elements": [
-        {
-          "selector": ".degradation-banner",
-          "maxHeightPx": 176,
-          "minHeightPx": 64
-        },
-        {
-          "selector": ".activity-rail",
-          "maxHeightPx": 40
-        },
-        {
-          "selector": ".composer",
-          "maxHeightPx": 220
-        },
-        {
-          "selector": ".conversation-zone",
-          "minShareOfSelector": { "selector": "jf-unified-chat-view", "floor": 0.45 }
-        }
-      ],
-      "minScrollableRegions": 1,
-      "maxScrollableRegions": 1,
-      "statusFactsSingleton": true
-    },
-    {
-      "uiShotStep": "chat-composer-small",
-      "elements": [
-        {
-          "selector": ".composer",
-          "maxBottomPx": 768
-        }
+      "requiredSelectors": [
+        "[data-testid=\"sv3-record-activity\"]",
+        "[data-testid=\"sv3-run-receipt\"]"
       ]
     },
     {
-      "uiShotStep": "chat-spine-single",
-      "elements": [],
-      "absentSelectors": [".run-spine"]
-    },
-    {
-      "$comment": "Compatibility-component geometry through the real inert UNTRUSTED plugin; no former CORE-main/global-status composition equivalence is claimed. Tempdoc 814 D7.2's spine PAIR, positive half (landed in the 2026-08-06 review pass; W4 had deferred it as needing DOM changes that have since merged). Two user turns + the agent affordance MUST mount the spine — the regression `chat-spine-single`'s absence assertion cannot catch on its own (a spine that never mounts at all passes the negative row trivially). DIVISION: the capture witnesses PRESENCE; 'marker count == segment count' stays unit-tier (adaptiveSpacing / UnifiedChatView tests) because segmented nodeIds need a real agent SSE run, which `install_fixtures` stubs empty.",
-      "uiShotStep": "chat-spine-multi",
+      "$comment": "WP1.5b measured Search: Detailed notice 76px vs compact 36px; 64px floor discriminates expansion. Composer shell stays 75px.",
+      "uiShotStep": "chat-bands-detailed",
       "elements": [
         {
-          "selector": ".composer",
-          "maxHeightPx": 220
+          "selector": "[data-testid=\"sv3-degradation\"]",
+          "minHeightPx": 64,
+          "maxHeightPx": 76
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "maxHeightPx": 75
         }
       ],
-      "requiredSelectors": [".run-spine"],
-      "maxScrollableRegions": 1
+      "requiredSelectors": [
+        "[data-testid=\"sv3-degradation-detail\"]",
+        "[data-testid=\"sv3-turn-answer\"]"
+      ]
+    },
+    {
+      "$comment": "WP1.5b measured Search: 760x600: dock 99px, bottom 572px. 580px bottom cap leaves usable viewport space.",
+      "uiShotStep": "chat-composer-small",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-dock\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 580
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-composer-input\"]"
+      ]
     },
     {
       "$comment": "Actual main Search ownership witness, idle and without plugin or override. The visible compact authority banner owns the degraded fact; the global Service degraded chip must yield. Required compact banner plus the unchanged42px bound prevents empty-success captures. Canonical stale status/settings bytes are preserved: Indexing status unconfirmed may still appear twice, outside this bounded sentinel and registered same-string singleton claim.",
@@ -193,99 +179,1366 @@
           "maxHeightPx": 42
         }
       ],
-      "requiredSelectors": ["[data-testid=\"sv3-degradation\"][data-open=\"false\"]"],
-      "forbiddenVisibleText": ["Service degraded"],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-degradation\"][data-open=\"false\"]"
+      ],
+      "forbiddenVisibleText": [
+        "Service degraded"
+      ],
       "statusFactsSingleton": true
     },
     {
-      "$comment": "Compatibility-component geometry through the real inert UNTRUSTED plugin; no former CORE-main/global-status composition equivalence is claimed. Tempdoc 814 §D8.1 — the RECORD-path capture that closes half of §V residual 1 ('the evidence rail is fixture-unreachable'). The `agent-run` fixtures variant hangs `attributes.sources` on the record's last assistant message, and `hydrateAnswerEvidenceFromRecord` mounts `.evidence-rail` from it after the run's post-terminal thread refresh. FOUR rows, each non-vacuous only because of the others: `requiredSelectors` says the rail MOUNTED (without it every other row passes on a capture where it never rendered); `nonScrollableSelectors` is §D3's DIRECT witness, which the surface-wide `maxScrollableRegions` structurally cannot be (a capture where `.conversation` stopped scrolling and the rail started still counts 1); `absentSelectors` on `.sources-affordance` is §D5's source-count single authority on camera (the chip must not RENDER while the rail owns the count, not merely be CSS-hidden); and the share floor says §D1 still holds WITH the rail in the grid. `forbiddenVisibleText` pins the mechanism correction itself: before this variant the unmapped `/api/chat/dispatch` fell through to `{}`, both parsers saw no terminal frame, and every agent-mode capture painted 'Connection lost'.",
+      "$comment": "WP1.5b measured Search: Search Sources disclosure replaces the old docked evidence rail. Three real source cards; panel 297px, one overflowing transcript scroller, no panel scroller.",
       "uiShotStep": "chat-evidence-rail",
       "elements": [
         {
-          "selector": ".activity-rail",
-          "maxHeightPx": 40
-        },
-        {
-          "selector": ".composer",
-          "maxHeightPx": 220
-        },
-        {
-          "selector": ".conversation-zone",
-          "minShareOfSelector": { "selector": "jf-unified-chat-view", "floor": 0.55 }
-        }
-      ],
-      "requiredSelectors": [".evidence-rail"],
-      "nonScrollableSelectors": [".evidence-rail"],
-      "absentSelectors": [".sources-affordance"],
-      "forbiddenVisibleText": ["Connection lost"],
-      "maxScrollableRegions": 1
-    },
-    {
-      "$comment": "Compatibility-component geometry through the real inert UNTRUSTED plugin; no former CORE-main/global-status composition equivalence is claimed. Tempdoc 814 §D8.2 — the EXPANDED activity-rail body, the other half of §V residual 1, and the home of §D2's bounded-expansion assertion (the half the closure audit recorded as untested because no capture could open a POPULATED rail). The three body rows come from the two fixture halves: `.activity-budget` + `.activity-context` from the SSE `budget_update` (the context meter needs promptTokens AND contextWindow > 0 or `projectContextHorizon` returns null and the meter silently does not render — which is why the payload carries both), `.activity-lifecycle` from the record's DONE lifecycle. `.activity-rail` carries BOTH bounds, and the floor is the load-bearing half: this is the one step where the rail is supposed to be EXPANDED, so a ceiling alone would be satisfied exactly by the regression that collapsed it back to its 25px summary (the same anti-vacuity move `chat-bands-detailed`'s banner floor makes). Measured 86px expanded vs 25px collapsed, so a 64px floor discriminates the two with room on both sides. MEASURED, not assumed (the §D8 negative-control pass): with the `<details>` left CLOSED, all three body `requiredSelectors` rows still report ok — `ui_measure`'s deepQuery finds a collapsed `<details>`' children in the DOM — so presence alone does NOT witness expansion. `minHeightPx` is the only row that went red (UNDER_MIN_HEIGHT 25 < 64). Read the two kinds of row accordingly: the presence rows say the run REPORTED these facts, the floor says the rail is actually OPEN. SHARE FLOOR 0.45, NOT the 0.55 the sibling Simple-mode steps carry, and this is a deliberate register decision rather than a measured accommodation: §D2 says in-flow chrome is summary-height and DETAIL IS ON-DEMAND, so a user-opened disclosure is licensed to spend more of the surface — bounded, which is exactly §D1's Detailed-mode floor (0.45, the same number `chat-bands-detailed` registers for the force-expanded banner). Measured 0.4729 with the body open. What the row forbids is the thing D2 actually forbids: an expansion that keeps growing at the conversation's expense.",
-      "uiShotStep": "chat-activity-rail-open",
-      "elements": [
-        {
-          "selector": ".activity-rail",
-          "maxHeightPx": 110,
-          "minHeightPx": 64
-        },
-        {
-          "selector": ".composer",
-          "maxHeightPx": 220
-        },
-        {
-          "selector": ".conversation-zone",
-          "minShareOfSelector": { "selector": "jf-unified-chat-view", "floor": 0.45 }
+          "selector": "[data-testid=\"sv3-turn-citations\"]",
+          "minHeightPx": 200
         }
       ],
       "requiredSelectors": [
-        ".activity-budget",
-        ".activity-context",
-        ".activity-lifecycle",
-        ".evidence-rail"
+        "[data-testid=\"sv3-turn-citations\"]"
       ],
-      "nonScrollableSelectors": [".evidence-rail"],
-      "forbiddenVisibleText": ["Connection lost"],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-turn-citations\"]"
+      ],
+      "minScrollableRegions": 1,
       "maxScrollableRegions": 1
     },
     {
-      "$comment": "Compatibility-component geometry through the real inert UNTRUSTED plugin; no former CORE-main/global-status composition equivalence is claimed. Tempdoc 816 §5 — the INLINE-axis camera, and the register's first role-bound rows. A WIDE viewport (1920x900) on purpose: the defect class grows with monitor width, so every existing camera (1250-1366, 814's pinned design basis) sat exactly where full-bleed stretching is least visible, and fourteen agent rounds plus a measured review pass read 'unbounded' as 'nothing broken'. Measured here BEFORE the fix, at 1920: `.composer` 1836, its textarea 1760 (251ch), `.escalation-strip-docked` 1836, the banner's content row 1804 (209ch) — while `.conversation` was already bound and centred at 800. Six rows, each non-vacuous only because of another: the textarea's role ceiling is paired with the role's own 30ch floor; the composer/strip ceilings are paired with presence floors (a hidden element yields a 0x0 rect, which satisfies a ceiling trivially — the same latent vacuity `jf-task-list` records above); `.degradation-banner`'s 1600px FLOOR is the full-bleed-chrome companion to its content row's `notice` ceiling — it says the background still bleeds edge to edge, so 'content box capped' cannot be satisfied by shrinking the whole banner; and `.conversation`'s floor keeps the alignment anchor honest. `.composer`'s height ceiling is 816 §2b's wrapping-coupling guard ON THIS CAMERA: tightening an inline bound makes wrapped content taller, so the step that tightens it watches its own height too.",
+      "$comment": "WP1.5b measured Search: Tool-card expansion: 217px vs 43px collapsed. Floor 100px keeps expansion distinct even when hidden body nodes exist. Body and activity must also be visible.",
+      "uiShotStep": "chat-activity-rail-open",
+      "elements": [
+        {
+          "selector": "jf-tool-call-card",
+          "minHeightPx": 100,
+          "maxHeightPx": 217
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "maxHeightPx": 75
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-record-activity\"]",
+        ".tool-card-body"
+      ],
+      "minScrollableRegions": 1,
+      "maxScrollableRegions": 1
+    },
+    {
+      "$comment": "WP1.5b measured Search: 1920x900: Search prose/composer/notice 768px, textarea 744px, composer height 75px. Current 48rem measure replaces old text-entry 88ch and full-bleed banner bounds.",
       "uiShotStep": "chat-wide-docked",
       "elements": [
         {
-          "selector": ".conversation",
-          "minWidthPx": 384
+          "selector": "[data-testid=\"sv3-turn-answer\"]",
+          "minWidthPx": 600,
+          "maxWidthPx": 768
         },
         {
-          "selector": "jf-composer",
-          "minWidthPx": 320,
-          "maxWidthPx": 816
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minWidthPx": 600,
+          "maxWidthPx": 768,
+          "maxHeightPx": 75
         },
         {
-          "selector": "jf-composer textarea",
-          "inlineSizeRole": "text-entry"
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minWidthPx": 500,
+          "maxWidthPx": 744
         },
         {
-          "selector": ".escalation-strip-docked",
-          "minWidthPx": 160,
-          "maxWidthPx": 816
-        },
-        {
-          "selector": ".degradation-banner",
-          "minWidthPx": 1600
-        },
-        {
-          "selector": ".degradation-banner .notice-row",
-          "inlineSizeRole": "notice",
-          "minWidthPx": 200
-        },
-        {
-          "selector": ".composer",
-          "maxHeightPx": 220
+          "selector": "[data-testid=\"sv3-degradation\"]",
+          "minWidthPx": 600,
+          "maxWidthPx": 768,
+          "maxHeightPx": 36
         }
       ],
-      "requiredSelectors": [".degradation-banner-collapsed", ".message.user"],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-turn-question\"]"
+      ]
+    },
+    {
+      "$comment": "Real Delegate budget decision waiting on open SSE, not a terminal/error approximation. Prompt 239px high and facts 18px. Actions must be visible before axe.",
+      "uiShotStep": "chat-budget",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-run-prompt\"]",
+          "minHeightPx": 160,
+          "maxHeightPx": 239
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-run-budget-facts\"]",
+        "[data-testid=\"sv3-run-budget-finalize\"]",
+        "[data-testid=\"sv3-run-budget-stop\"]"
+      ]
+    },
+    {
+      "$comment": "WP1.5b measured Search: Submitted Ask with compact degradation; measured notice 36px, question 47px. Both remain bounded.",
+      "uiShotStep": "chat-proportion-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-degradation\"]",
+          "maxHeightPx": 36
+        },
+        {
+          "selector": "[data-testid=\"sv3-turn-question\"]",
+          "maxHeightPx": 47
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-turn-answer\"]"
+      ]
+    },
+    {
+      "$comment": "WP1.5b measured Search: 1250x800: Search main 790px, reader 360px; three 288x50 toasts begin below the 52px Search topbar. Reading/reader floors replace old pane/zone allocation.",
+      "uiShotStep": "chat-occlusion-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minWidthPx": 600
+        },
+        {
+          "selector": "[data-testid=\"sv3-pane-surface\"]",
+          "minWidthPx": 320
+        },
+        {
+          "selector": ".toast",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-results-card\"]",
+        "[data-testid=\"sv3-pane-document\"]"
+      ]
+    },
+    {
+      "$comment": "Tempdoc 859 \u00a7B \u2014 the FIRST occlusion row on the Search window, and the first sv3 step that runs under `--fixtures` at all. \u00a7B moved the composer out of document flow and onto a floating `div.dock` over the transcript's one scroller; the whole correctness claim is that the scroller's padding + scroll-padding grow by the dock's MEASURED height, so 'scrolled to the end' means 'the last line is above the glass'. That is a RELATION between two rects and no per-element size budget can express it. Captured at 1280x800 with the `sv3-sources` fixtures variant (a thread record whose last assistant message carries populated `attributes.citations`, plus deliberately long answers so the transcript overflows), Sources disclosure OPEN, scrolled to max \u2014 the only position where the assertion means anything, since at rest the last element is nowhere near the dock. NON-VACUITY, per this register's own occlusionNote: two 0x0 rects never intersect, so BOTH selectors carry a `minHeightPx` floor; without them the overlap row would report clean precisely when neither element rendered. The floors are deliberate minima, not measured widths \u2014 the dock's resting docked height is the composer's glass box plus its inset (~104-140px in source geometry, which is what bounds how far the floor can be raised) and the three-source panel is taller than one row. CALIBRATED 2026-08-25 against an ACTUAL `--fixtures` capture of this step (the state this gate enforces \u2014 the earlier landing note's numbers were never captured, and the 859 live-leg audit reported the same three values from the running app): Sources panel h=237 at y=380, docked band h=155 at y=617, so the dock's bottom edge is 772 in the 800px viewport. `sv3-turn-citations.minHeightPx` moves 40 -> 120 and `sv3-dock.minHeightPx` 60 -> 120 \u2014 an effective floor of 118 after tolerance, still under the source-geometry minimum above, so a real dock cannot trip it while a stub instead of a real disclosure now fails rather than reporting clean. `sv3-dock.maxBottomPx` moves 800 -> 780: at 800 the bound WAS the capture viewport and could never fail; 780 sits 8px under the measurement and outside the 2px tolerance, making it an assertion about the dock rather than a restatement of the window size. On the overlap row: the panel's bottom (617) and the dock's top (617) sit at an EXACT 0px boundary in this state, where the live app shows a 12px inset gap because the last element under the dock differs. That is not fragility \u2014 the gate requires more than tolerancePx of REAL intersection on both axes, so a flush edge is clean by construction and only a genuine cover-up goes red. Verified: `jseval ui-proportion-gate` exit 0, all six rows of this step ok. It is still not part of hosted CI, so re-seat these at the next capture if the fixture state moves.",
+      "uiShotStep": "sv3-composer-occlusion-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-turn-citations\"]",
+          "minHeightPx": 120,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-dock\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-dock\"]",
+          "minHeightPx": 120,
+          "maxBottomPx": 780
+        }
+      ],
+      "minScrollableRegions": 1,
       "maxScrollableRegions": 1
+    },
+    {
+      "$comment": "WP1.1 S1.12 \u2014 Search mode's result list stays reachable beside the floating composer at a narrow width with a long list. Captured at 760x720 with the `sv3-results` fixtures variant (24 hits), scrolled to the end; the step itself fails if the list did not overflow and reach its end, so the overlap row cannot pass on a list that never scrolled. NON-VACUITY per this register's occlusionNote: both selectors carry a `minHeightPx` floor. CALIBRATED against the first `--fixtures` capture: card h=1947 with its bottom at 581, dock h=99 at y=593 (bottom 692), scroller delta 1499 \u2014 a 12px gap between the last row and the glass. The card floor (600) is far under the measurement but over anything a short list or a stub renders; `maxBottomPx` is 700, not the 720 viewport, so it asserts something about the dock.",
+      "uiShotStep": "sv3-search-results-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-results-card\"]",
+          "minHeightPx": 600,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-dock\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-dock\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 700
+        }
+      ],
+      "minScrollableRegions": 1,
+      "maxScrollableRegions": 1
+    },
+    {
+      "$comment": "WP1.5b measured Search: Recorded Delegate tool card collapsed at 43px; composer shell 75px. Retires the three-zone share and keeps bounded activity.",
+      "uiShotStep": "chat-bands-light",
+      "elements": [
+        {
+          "selector": "jf-tool-call-card",
+          "maxHeightPx": 43
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "maxHeightPx": 75
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-record-activity\"]",
+        "[data-testid=\"sv3-run-receipt\"]"
+      ]
+    },
+    {
+      "$comment": "WP1.5b measured Search: Detailed notice 76px vs compact 36px; 64px floor discriminates expansion. Composer shell stays 75px.",
+      "uiShotStep": "chat-bands-detailed-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-degradation\"]",
+          "minHeightPx": 64,
+          "maxHeightPx": 76
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "maxHeightPx": 75
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-degradation-detail\"]",
+        "[data-testid=\"sv3-turn-answer\"]"
+      ]
+    },
+    {
+      "$comment": "WP1.5b measured Search: 760x600: dock 99px, bottom 572px. 580px bottom cap leaves usable viewport space.",
+      "uiShotStep": "chat-composer-small-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-dock\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 580
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-composer-input\"]"
+      ]
+    },
+    {
+      "$comment": "Actual main Search ownership witness, idle and without plugin or override. The visible compact authority banner owns the degraded fact; the global Service degraded chip must yield. Required compact banner plus the unchanged42px bound prevents empty-success captures. Canonical stale status/settings bytes are preserved: Indexing status unconfirmed may still appear twice, outside this bounded sentinel and registered same-string singleton claim.",
+      "uiShotStep": "chat-chip-yield-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-degradation\"][data-open=\"false\"]",
+          "maxHeightPx": 42
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-degradation\"][data-open=\"false\"]"
+      ],
+      "forbiddenVisibleText": [
+        "Service degraded"
+      ],
+      "statusFactsSingleton": true
+    },
+    {
+      "$comment": "WP1.5b measured Search: Search Sources disclosure replaces the old docked evidence rail. Three real source cards; panel 297px, one overflowing transcript scroller, no panel scroller.",
+      "uiShotStep": "chat-evidence-rail-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-turn-citations\"]",
+          "minHeightPx": 200
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-turn-citations\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-turn-citations\"]"
+      ],
+      "minScrollableRegions": 1,
+      "maxScrollableRegions": 1
+    },
+    {
+      "$comment": "WP1.5b measured Search: Tool-card expansion: 217px vs 43px collapsed. Floor 100px keeps expansion distinct even when hidden body nodes exist. Body and activity must also be visible.",
+      "uiShotStep": "chat-activity-rail-open-light",
+      "elements": [
+        {
+          "selector": "jf-tool-call-card",
+          "minHeightPx": 100,
+          "maxHeightPx": 217
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "maxHeightPx": 75
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-record-activity\"]",
+        ".tool-card-body"
+      ],
+      "minScrollableRegions": 1,
+      "maxScrollableRegions": 1
+    },
+    {
+      "$comment": "WP1.5b measured Search: 1920x900: Search prose/composer/notice 768px, textarea 744px, composer height 75px. Current 48rem measure replaces old text-entry 88ch and full-bleed banner bounds.",
+      "uiShotStep": "chat-wide-docked-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-turn-answer\"]",
+          "minWidthPx": 600,
+          "maxWidthPx": 768
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minWidthPx": 600,
+          "maxWidthPx": 768,
+          "maxHeightPx": 75
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minWidthPx": 500,
+          "maxWidthPx": 744
+        },
+        {
+          "selector": "[data-testid=\"sv3-degradation\"]",
+          "minWidthPx": 600,
+          "maxWidthPx": 768,
+          "maxHeightPx": 36
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-turn-question\"]"
+      ]
+    },
+    {
+      "$comment": "Real Delegate budget decision waiting on open SSE, not a terminal/error approximation. Prompt 239px high and facts 18px. Actions must be visible before axe.",
+      "uiShotStep": "chat-budget-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-run-prompt\"]",
+          "minHeightPx": 160,
+          "maxHeightPx": 239
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-run-budget-facts\"]",
+        "[data-testid=\"sv3-run-budget-finalize\"]",
+        "[data-testid=\"sv3-run-budget-stop\"]"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-normal-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-normal-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-normal-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-narrow-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-narrow-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-hero-narrow-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-normal-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-normal-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-normal-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-narrow-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-narrow-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "uiShotStep": "sv3-recents-docked-narrow-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 350,
+          "maxHeightPx": 400,
+          "maxBottomPx": 770,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 760
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-1280x720-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-1280x720-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-1280x720-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-760x720-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-760x720-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-760x720-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-600x400-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-600x400-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-hero-600x400-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-headline\"]",
+          "minHeightPx": 40,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-topbar\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+        "[data-testid=\"sv3-composer-headline\"]"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-1280x720-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-1280x720-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-1280x720-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-760x720-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-760x720-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-760x720-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 692,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 692
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 692
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-600x400-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-600x400-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
+    },
+    {
+      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "uiShotStep": "sv3-recents-docked-600x400-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 70,
+          "maxHeightPx": 400,
+          "maxBottomPx": 372,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-composer-shell\"]",
+          "minHeightPx": 60,
+          "maxBottomPx": 372
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
+          "minHeightPx": 24,
+          "maxHeightPx": 32,
+          "maxBottomPx": 372
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-recent-clear\"]",
+        "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child"
+      ],
+      "nonScrollableSelectors": [
+        "[data-testid=\"sv3-recents\"]",
+        "jf-sv3-composer"
+      ]
     }
   ]
 }

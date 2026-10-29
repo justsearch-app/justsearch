@@ -28,7 +28,7 @@ class TestApiPathPredicate:
 
 class TestFixtureBodies:
     def test_chat_capture_variants_report_ready_operating_chat(self):
-        for variant in ("degraded", "degraded-detailed", "degraded-thread", "agent-run"):
+        for variant in ("degraded", "degraded-detailed", "agent-run", "agent-budget"):
             status = json.loads(ui_fixtures._status_body(variant))
             inference = json.loads(ui_fixtures._inference_body(variant))
             chat = status["operating"]["chat"]
@@ -76,6 +76,11 @@ class TestFixtureBodies:
             "core.copy-diagnostic-summary",
             "core.export-diagnostics",
         }
+
+    def test_empty_thread_and_history_are_wire_shaped(self):
+        body = json.loads(ui_fixtures.fixture_body("http://x/api/thread/capture-conversation", "degraded"))
+        assert body == {"conversationId": "capture-conversation", "events": [], "lifecycles": []}
+        assert json.loads(ui_fixtures.fixture_body("http://x/api/chat/conversations/capture-conversation/history")) == {"messages": []}
 
     def test_unmapped_api_path_gets_empty_object(self):
         assert ui_fixtures.fixture_body("http://x/api/something/unmapped") == "{}"
@@ -221,16 +226,25 @@ class TestAgentRunVariant:
         assert lc["budget"]["remaining"] == budget["tokensRemaining"]
         assert lc["budget"]["initial"] == budget["totalTokensConsumed"] + budget["tokensRemaining"]
 
-    def test_the_degraded_thread_variant_is_unchanged(self):
-        # `chat-spine-multi` reads this record; §D8 must not move it.
-        body = self._thread("degraded-thread")
+    def test_retrieval_record_has_no_agent_lifecycle_or_tool_activity(self):
+        body = self._thread("sv3-sources")
         assert body["lifecycles"] == []
-        assert all(e["attributes"] == {} for e in body["events"])
+        assert all(e["kind"] != "TOOL_ACTIVITY" for e in body["events"])
+        assert body["events"][-1]["attributes"]["citations"]
+
+    def test_record_events_have_unique_ids_and_ordered_valid_instants(self):
+        from datetime import datetime
+        for variant in ("agent-run", "sv3-sources"):
+            events = self._thread(variant)["events"]
+            assert len({e["id"] for e in events}) == len(events)
+            instants = [datetime.fromisoformat(e["occurredAt"].replace("Z", "+00:00")) for e in events]
+            assert instants == sorted(instants)
 
     def test_agent_availability_is_reported_only_for_this_variant(self):
         url = "http://localhost:5174/api/chat/agent/tools"
-        assert json.loads(ui_fixtures.fixture_body(url, "agent-run"))["available"] is True
+        for variant in ("agent-run", "agent-budget"):
+            assert json.loads(ui_fixtures.fixture_body(url, variant))["available"] is True
         # Every other variant leaves it unmapped — an agent run must not become reachable
         # from a step that does not model one.
-        for other in ("default", "degraded", "degraded-thread", "degraded-detailed"):
+        for other in ("default", "degraded", "degraded-detailed"):
             assert json.loads(ui_fixtures.fixture_body(url, other)) == {}

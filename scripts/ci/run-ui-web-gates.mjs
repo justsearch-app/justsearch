@@ -59,7 +59,8 @@ export function parseUiWebGateCommands(register) {
  * runner would print `6/6 passed` — the exact failure it exists to prevent. The floor is the
  * count on the day it was set; raise it when the recipe grows, never lower it silently.
  */
-export const EXPECTED_MIN = 28;
+// SA15 retires the old window's sole composition-surfaces register and guard: 28 → 27.
+export const EXPECTED_MIN = 27;
 
 function main() {
   const register = JSON.parse(fs.readFileSync(REGISTER, 'utf8'));

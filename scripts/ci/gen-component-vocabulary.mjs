@@ -33,7 +33,8 @@ const OUT = join(REPO_ROOT, OUT_REL);
 // Only host `jf-*` elements are admissible authoring targets (560 PresentationVocabulary).
 const DEFINE_RE = /customElements\.define\(\s*['"](jf-[a-z0-9-]*)['"]/g;
 
-const tags = new Set();
+// SA15: retained authoring tokens whose implementations have retired.
+const tags = new Set(['jf-unified-chat-view', 'jf-selection-actions-menu']);
 // 574 Move 3 — the ATOM subset: generic visual-atom primitives (jf-status-dot, jf-button, …) that
 // surfaces/molecules COMPOSE. A file opts in with an `@atom` marker in its header; every jf-* it
 // defines is registered as an atom. This is the §21/P6 register-coverage model (the atom set is a

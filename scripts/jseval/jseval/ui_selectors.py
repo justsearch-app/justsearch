@@ -25,10 +25,9 @@ TID_INSTALL_CONSENT_DIALOG = "install-consent-dialog"
 # the surface; there are NO per-view `activity-*` testids. Nav clicks therefore target the
 # surface id (Playwright pierces the rail's open shadow root). Repointed from the stale
 # `activity-*` testids that no longer exist on the rail (559/571 rail rework).
-# Search Thread S5b — the standalone `core.search-surface` rail surface is retired; the retrieve
-# tier folded into the one window (`core.unified-chat-surface`), which is the rail button "home"/
-# "search" now click (labeled "Search" post-rename, id unchanged).
-RAIL_SURFACE_SEARCH = "core.unified-chat-surface"
+RAIL_SURFACE_SEARCH = "core.search-v3-surface"
+# Synthetic readiness control for historical bundles; never used by current cameras.
+RAIL_SURFACE_OLDER_MAIN = "core.unified-chat-surface"
 RAIL_SURFACE_LIBRARY = "core.library-surface"
 RAIL_SURFACE_BRAIN = "core.brain-surface"
 RAIL_SURFACE_HEALTH = "core.health-surface"
@@ -45,7 +44,6 @@ def rail_css(surface_id: str) -> str:
 
 # CSS selectors (for locator()-based queries)
 CSS_SEARCH_INPUT = f'[data-testid="{TID_SEARCH_INPUT}"]'
-CSS_SEARCH_INPUT_TEXTAREA = f'textarea[data-testid="{TID_SEARCH_INPUT}"]'
 CSS_SEARCH_RESULT_ROW = f'[data-testid="{TID_SEARCH_RESULT_ROW}"]'
 # tempdoc 615 §6.1b: live Lit hooks (no retired React testids). The inspector is the custom element
 # `<jf-inspector-pane>` (chrome/Shell.ts); a citation mark is `.cite-ref`/`[data-cite-key]`
@@ -64,13 +62,11 @@ CSS_SETTINGS_WINDOW_CONTENT = 'jf-settings-window jf-settings-surface'
 # INSIDE the persistent `<jf-settings-surface>` — this is the readiness signal that the Security
 # category (not just Settings generally) is the one active/rendered.
 CSS_SETTINGS_WINDOW_SECURITY_CONTENT = 'jf-settings-window jf-settings-surface jf-security-surface'
-# The unified-chat composer remains the correct hook for chat-surface steps.
-CSS_COMPOSER_TEXTAREA = 'jf-composer textarea'
 # Search v3 has its own composer, which opens in Search mode: Enter in this textarea searches. The
 # retired standalone `search-input` testid above is retained only for old, independently-owned steps.
 CSS_SV3_WINDOW = 'jf-sv3-window'
 CSS_SV3_DEGRADATION_COMPACT = 'jf-sv3-window [data-testid="sv3-degradation"][data-open="false"]'
-CSS_SV3_COMPOSER_TEXTAREA = 'jf-sv3-window jf-sv3-composer textarea'
+CSS_SV3_COMPOSER_TEXTAREA = 'jf-sv3-window textarea[data-testid="sv3-composer-input"]'
 CSS_SV3_PALETTE = 'jf-sv3-window jf-sv3-palette'
 # Search v3's Search mode renders its results on the shared `<jf-results-card>`, inside its own
 # results region, so the row is the card's `search-result-row` scoped to that region.
@@ -81,38 +77,7 @@ CSS_DENSITY_SLIDER = (
     'jf-settings-window jf-settings-surface '
     'jf-discrete-slider input[type="range"][aria-label="Density"]'
 )
-# Tempdoc 697 activation — the two persistent-chrome, data-dependent elements the shrink-only
-# proportion ratchet (governance/ui-proportion-baseline.v1.json) tracks on the chat surface.
-# `.degradation-banner-collapsed` is UnifiedChatView.renderCollapsedDegradationBanner's one-line
-# pill (needs a DEGRADED readiness verdict); `.message.user` is a rendered user turn in the
-# thread (UnifiedChatView.ts:5189 `this.thread = [...]`).
-CSS_DEGRADATION_BANNER_COLLAPSED = '.degradation-banner-collapsed'
-CSS_MESSAGE_USER = '.message.user'
-# Tempdoc 814 closure (audit finding A) — the EXPANDED banner and the cause list only its
-# expanded branch renders. `.degradation-banner` is worn by BOTH forms (the pill's class is
-# `degradation-banner degradation-banner-collapsed`), so the causes list — not the banner
-# class — is what proves a capture actually reached Detailed expansion
-# (UnifiedChatView.renderDegradationBanner's `notice-causes` <ul>).
-CSS_DEGRADATION_BANNER = '.degradation-banner'
-CSS_DEGRADATION_CAUSES = '[data-testid="chat-degradation-causes"]'
-# Sandbox round 7 — the four elements whose RELATIONS the `chat-occlusion` step measures:
-# the reading column starved by the pane beside it, and the toast stack growing over the
-# chat header's control row. `.conversation` / `.document-pane` are UnifiedChatView zones
-# (unifiedChatStyles.ts); `.toast` is AdvisoryToastHost's wrapper; `.header` is the
-# New chat / Export / Activity control row (UnifiedChatView.ts renderAnswerPlane).
-CSS_CONVERSATION_COLUMN = '.conversation'
-CSS_DOCUMENT_PANE = '.document-pane'
 CSS_TOAST = '.toast'
-CSS_CHAT_HEADER = '.header'
-# Tempdoc 814 (W4 activation) — the D7 gate-registration elements for the "richest
-# all-bands" (`chat-bands`), small-viewport docked-composer (`chat-composer-small`), and
-# single-turn no-spine (`chat-spine-single`) steps.
-# `.conversation-zone` is the grid that owns the run-spine + `.conversation` scroller
-# (UnifiedChatView.renderAnswerPlane); `jf-unified-chat-view` is the surface HOST custom
-# element (`customElements.define('jf-unified-chat-view', ...)`), the D1 "owner of the
-# sum" denominator the D7.1 share assertion divides against.
-CSS_CONVERSATION_ZONE = '.conversation-zone'
-CSS_SURFACE_HOST = 'jf-unified-chat-view'
 # The Library surface's LOADING branch, for the `skeleton-library` step. There is no
 # `data-testid` here and none is added: the surface already has an observable loading state —
 # `LibrarySurface.render()` swaps in a single `<div class="empty">Loading…</div>` while the
@@ -123,34 +88,33 @@ CSS_SURFACE_HOST = 'jf-unified-chat-view'
 # the whole surface.
 CSS_LIBRARY_SURFACE_HOST = 'jf-library-surface'
 TEXT_LIBRARY_LOADING = 'Loading'
-# `.composer` is the composer BLOCK div (687 R5a's protected element — row-consolidation
-# happens inside it, never replacing it); `.activity-rail` is the agent-mode `<details>`
-# run-summary band (renders whenever `affordance === 'agent'`, even before a run reports
-# budget/lifecycle — UnifiedChatView.ts tempdoc-561-C-2 comment); `.run-spine` is the
-# agent-mode run-timeline minimap (mounts only when `spineItems()` is non-null — agent
-# affordance + wide zone + a run with more than one turn or real node boundaries).
-CSS_COMPOSER_BLOCK = '.composer'
-CSS_ACTIVITY_RAIL = '.activity-rail'
-CSS_RUN_SPINE = '.run-spine'
-# The "Delegate a multi-step task to the agent" escalation rung — the plain affordance
-# toggle (`this.affordance = 'agent'`) that mounts `.activity-rail` / gates `.run-spine`
-# WITHOUT requiring an actual agent run (no SSE stream needed; see chat-bands' setup
-# docstring for the fixture-reachability finding this selector exists to exploit).
-TID_ESCALATION_DELEGATE = "escalation-delegate"
-CSS_ESCALATION_DELEGATE = f'[data-testid="{TID_ESCALATION_DELEGATE}"]'
-# Tempdoc 814 §D8 — the two bands the agent-run fixture makes capture-reachable.
-# `.evidence-rail` is the DOCKED sources pane (mounts on `evidenceRailMounted()`: agent
-# affordance + a non-empty `answerSources` + wide zone); `.sources-affordance` is the
-# in-answer "Sources · N" chip, which by §D5 must NOT render while the rail owns the count.
-# `.activity-budget` is the FIRST body row of the expanded activity rail (the budget readout
-# + bar) and `.activity-context` its context-headroom sibling; `.activity-lifecycle` is the
-# turn/iteration/tool + state line the thread record's `lifecycles[]` feeds.
-CSS_EVIDENCE_RAIL = '.evidence-rail'
-CSS_SOURCES_AFFORDANCE = '.sources-affordance'
-CSS_ACTIVITY_RAIL_SUMMARY = '.activity-rail > summary'
-CSS_ACTIVITY_BUDGET = '.activity-budget'
-CSS_ACTIVITY_CONTEXT = '.activity-context'
-CSS_ACTIVITY_LIFECYCLE = '.activity-lifecycle'
+# Content witnesses run immediately before each Search screenshot AND axe measurement.
+# Presence of Shell or the rail alone cannot establish any of these states.
+SEARCH_STATE_WITNESSES = {
+    "home": ['[data-testid="sv3-composer-headline"]', 'jf-sv3-composer textarea'],
+    "chat-mode": ['jf-sv3-composer[tier="ask"] textarea'],
+    "qa-response": ['[data-testid="sv3-turn-answer"]', 'jf-document-pane :is(.blocks, .source)'],
+    "chat-proportion": ['[data-testid="sv3-turn-question"]', '[data-testid="sv3-turn-answer"]', '[data-testid="sv3-degradation"][data-open="false"]'],
+    "chat-occlusion": ['[data-testid="search-result-row"]', 'jf-document-pane :is(.blocks, .source)'],
+    "chat-bands": ['[data-testid="sv3-record-activity"]', '[data-testid="sv3-run-receipt"]'],
+    "chat-bands-detailed": ['[data-testid="sv3-turn-answer"]', '[data-testid="sv3-degradation-detail"]'],
+    "chat-composer-small": ['jf-sv3-composer textarea'],
+    "chat-wide-docked": ['[data-testid="sv3-turn-answer"]', '[data-testid="sv3-degradation"]'],
+    "chat-evidence-rail": ['[data-testid="sv3-turn-answer"]', '[data-testid="sv3-turn-citations"] button.source'],
+    "chat-activity-rail-open": ['[data-testid="sv3-record-activity"]', 'jf-tool-call-card[expanded] .tool-card-body'],
+    "chat-model-only": ['[data-testid="sv3-turn-markdown"]'],
+    "chat-structured": ['[data-testid="sv3-turn-json"]'],
+    "chat-budget": ['[data-testid="sv3-run-budget-facts"]', '[data-testid="sv3-run-budget-finalize"]', '[data-testid="sv3-run-budget-stop"]'],
+    "chat-chip-yield": ['[data-testid="sv3-degradation"][data-open="false"]'],
+    "sv3-composer-occlusion": ['[data-testid="sv3-turn-answer"]', '[data-testid="sv3-turn-citations"] button.source'],
+    "sv3-search-results": ['[data-testid="search-result-row"]'],
+    "sv3-hero-forced-colors": ['[data-testid="sv3-composer-headline"]', 'jf-sv3-composer textarea'],
+    "sv3-docked-forced-colors": ['[data-testid="sv3-turn-answer"]'],
+    "sv3-palette-forced-colors": ['jf-sv3-palette [role="option"]'],
+    "sv3-citation-selected": ['.cite-ref.cite-selected', 'jf-document-pane :is(.blocks, .source)'],
+    "sv3-citation-dropped": ['[data-testid="sv3-turn-citations"] .inclusion', 'jf-document-pane :is(.blocks, .source)'],
+    "legacy-token-plugin": ['jf-sv3-composer textarea'],
+}
 
 @dataclass(frozen=True)
 class Selector:

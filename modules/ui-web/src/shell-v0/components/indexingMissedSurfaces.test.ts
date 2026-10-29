@@ -5,7 +5,7 @@ import { render, type TemplateResult } from 'lit';
 import '../views/BrowseSurface.js';
 import '../views/BrainSurface.js';
 import '../views/HealthSurface.js';
-import '../views/UnifiedChatView.js';
+import '../views/search-v3/SearchV3View.js';
 import './StatusDeck.js';
 import './LivenessReadout.js';
 import { IndexingOverlay } from './IndexingOverlay.js';
@@ -67,20 +67,20 @@ function dom(tpl: TemplateResult): HTMLDivElement {
 function degraded(state: AiState, code: string): AiState {
   return { ...state, verdict: { kind: 'degraded', severity: 'warn', reasons: [code] } };
 }
-beforeEach(() => { vi.useFakeTimers(); __resetAiStateForTest(); __resetPresentationForTest(); });
+beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => new Response('{}'))); vi.useFakeTimers(); __resetAiStateForTest(); __resetPresentationForTest(); });
 afterEach(async () => {
   document.body.replaceChildren(); __resetAiStateForTest(); __resetPresentationForTest();
-  await Promise.resolve(); vi.useRealTimers();
+  await Promise.resolve(); vi.unstubAllGlobals(); vi.useRealTimers();
 });
 
 describe('WP3.3 independent inventory regressions', () => {
-  it('S33.4 S33.6 encoder and passage readiness observations are qualified on both Search paths', () => {
+  it('S33.4 S33.6 encoder and passage readiness observations are qualified on mounted Search', async () => {
     for (const which of CASES) for (const code of CODES) {
       const state = degraded(observe(which), code);
       const activity = selectIndexingProgress(state.status, state.indexingStatusLive, state.episodeMaxPendingJobs, state.enrichSettleSamples).activity;
       const notice = readinessNotice(state.verdict, activity)!;
       const v3 = projectSv3Degradation(state)!;
-      const banner = dom(surface('jf-unified-chat-view', state).renderDegradationBanner());
+      const banner = await searchBanner(state);
       for (const [name, text] of [['notice', notice.headline], ['v3', v3.headline], ['shipped', banner.textContent]]) {
         expect(text?.includes(UNKNOWN), `${which}: ${code}: ${name}`).toBe(isUnconfirmed(which));
       }
@@ -133,38 +133,6 @@ describe('WP3.3 independent inventory regressions', () => {
       expect(animation.includes('spin'), `${which}: ${jobs} files`).toBe(!isUnconfirmed(which) && (jobs > 0 || which === 'chat'));
     }
   });
-  it('S33.6 Search and deck announce an indexing transition once, with silent numeric and identical polls', async () => {
-    for (const expanded of [false, true]) {
-      const state = degraded(observe('chat'), 'index.throughput_stalled');
-      const search = surface('jf-unified-chat-view', state); Object.assign(search, { degradationBannerExpanded: expanded });
-      const deck = surface('jf-status-deck', state);
-      const searchDom = dom(search.renderDegradationBanner()); const deckDom = dom(deck.render()); document.body.append(searchDom, deckDom);
-      const settle = async () => { await Promise.resolve(); await Promise.all([...document.querySelectorAll('jf-system-notice')].map(n => (n as unknown as { updateComplete: Promise<unknown> }).updateComplete)); };
-      await settle(); const changed = new Set<Element>();
-      const observer = new MutationObserver(records => {
-        for (const record of records) {
-          const node = record.target.nodeType === Node.ELEMENT_NODE ? record.target as Element : record.target.parentElement;
-          const region = node?.closest('jf-system-notice');
-          if (region?.getAttribute('aria-live') === 'polite' && region.getAttribute('role') === 'status') changed.add(region);
-        }
-      });
-      observer.observe(document.body, { subtree: true, childList: true, characterData: true });
-      try {
-        for (const which of ['indexing stale', 'age', 'chat', 'energy'] as const) {
-          const next = degraded(observe(which), 'index.throughput_stalled'); search.aiState = next; deck.aiState = next;
-          render(search.renderDegradationBanner(), searchDom); render(deck.render(), deckDom); await settle();
-          expect(changed.size, `${which}, expanded=${expanded}`).toBe(which === 'age' ? 0 : 1); changed.clear();
-          next.status!.worker!.core!.pendingJobs = 17;
-          render(search.renderDegradationBanner(), searchDom); render(deck.render(), deckDom); await settle();
-          expect(changed.size, `numeric poll, ${which}`).toBe(0);
-          render(search.renderDegradationBanner(), searchDom); render(deck.render(), deckDom); await settle();
-          expect(changed.size, `identical poll, ${which}`).toBe(0);
-        }
-      } finally { observer.disconnect(); searchDom.remove(); deckDom.remove(); }
-      search.aiState = degraded(state, 'inference.model_not_configured');
-      expect(dom(search.renderDegradationBanner()).querySelector('jf-system-notice')?.getAttribute('live')).toBe('status');
-    }
-  });
   it('S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims', async () => {
     const initial = observe('chat', 4, true);
     const deck = surface('jf-status-deck', initial);
@@ -199,3 +167,16 @@ describe('WP3.3 independent inventory regressions', () => {
     }
   });
 });
+
+type MountedSearch = HTMLElement & { updateComplete: Promise<unknown>; requestUpdate(): void };
+async function searchBanner(state: AiState): Promise<HTMLElement> {
+  const view = document.createElement('jf-sv3-window') as MountedSearch;
+  document.body.append(view); await view.updateComplete;
+  Object.assign(view, { aiSnapshot: state }); view.requestUpdate(); await view.updateComplete;
+  const composer = view.shadowRoot!.querySelector('jf-sv3-composer') as MountedSearch;
+  expect(composer, 'positive mounted Search witness').not.toBeNull(); await composer.updateComplete;
+  const banner = composer.shadowRoot!.querySelector<HTMLElement>('[data-testid="sv3-degradation"]');
+  expect(banner).not.toBeNull();
+  expect(banner!.querySelector('[aria-live], [role="status"], [role="alert"]')).toBeNull();
+  view.remove(); return banner!;
+}
