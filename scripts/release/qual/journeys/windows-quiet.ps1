@@ -33,6 +33,13 @@ if ($Mode -eq 'Apply') {
  foreach($task in @($edgeTasks)+@(Get-ScheduledTask | Where-Object {$_.TaskPath -in $taskPaths -or $_.TaskPath -eq '\Microsoft\Windows\Windows Defender\'})) {
   try {$task | Disable-ScheduledTask | Out-Null} catch {$errors.Add("task $($task.TaskPath)$($task.TaskName): $($_.Exception.Message)")}
  }
+ # Windows and Defender can restart protected update services. Block only their
+ # outbound traffic in this disposable guest; app/model downloads remain allowed.
+ foreach($name in @('wuauserv','UsoSvc','WinDefend')) {
+  $rule='JustSearch-qual-background-'+$name
+  Remove-NetFirewallRule -Name $rule -ErrorAction SilentlyContinue
+  New-NetFirewallRule -Name $rule -DisplayName $rule -Direction Outbound -Action Block -Enabled True -Profile Any -Service $name | Out-Null
+ }
  try {Set-MpPreference -DisableRealtimeMonitoring $true -ScanScheduleDay 8 -DisableCatchupFullScan $true -DisableCatchupQuickScan $true}
  catch {$errors.Add("Defender disable: $($_.Exception.Message)")}
  # Tamper protection can refuse the disable without returning a PowerShell error.
@@ -60,6 +67,17 @@ if ($Mode -eq 'Apply') {
 }
 $rows=New-Object 'Collections.Generic.List[object]'
 $exceptions=New-Object 'Collections.Generic.List[object]'
+$profiles=@(Get-NetFirewallProfile | Select-Object Name,Enabled)
+$rows.Add(@{setting='firewall/profiles';observed=$profiles;verified=(@($profiles | Where-Object {!$_.Enabled}).Count -eq 0)})
+foreach($name in @('wuauserv','UsoSvc','WinDefend')) {
+ $r=Get-NetFirewallRule -PolicyStore ActiveStore -Name ('JustSearch-qual-background-'+$name) -ErrorAction SilentlyContinue
+ $filter=$r | Get-NetFirewallServiceFilter
+ $observed=@{rule=$r | Select-Object Name,Enabled,Direction,Action;service=$filter.Service}
+ $held=($r -and $r.Enabled -eq 'True' -and $r.Direction -eq 'Outbound' -and $r.Action -eq 'Block' -and $filter.Service -eq $name)
+ if(!$held -and $name -eq 'WinDefend') {
+  $exceptions.Add(@{setting="firewall/$name";observed=$observed;reason='Windows removed or reverted the Defender service rule after reboot; Windows Update service blocks remain; verify no download/install effects during each run'})
+ } else {$rows.Add(@{setting="firewall/$name";observed=$observed;verified=$held})}
+}
 foreach($name in $services) {
  $s=Get-CimInstance Win32_Service -Filter "Name='$name'"
  $protected=($name -in 'wuauserv','UsoSvc' -and $s -and $s.StartMode -ne 'Disabled')

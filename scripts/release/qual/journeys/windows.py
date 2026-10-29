@@ -1397,7 +1397,39 @@ def update_success(run):
     return {'observation': observed, 'installer': installation, 'actions': actions, 'engine': engine, 'state': state}
 
 
-from linux import install_ai, author_state, restart, mcp
+from linux import install_ai as shared_install_ai, author_state, restart, mcp
+
+
+def install_ai(run):
+    # A failed activation can leave valid production downloads in a stopped
+    # checkpoint. Observe that acquisition through the real API, without
+    # treating the earlier failed journey as readiness evidence.
+    if run.args.resume and not run.facts.get('resumedSetup'):
+        status = run.api('/api/ai/install/status')
+        required = {'embedding', 'splade', 'reranker', 'ner', 'citation-scorer'}
+        installed = {p.get('packageId') for p in status.get('packages', [])
+                     if p.get('state') == 'installed' and not p.get('error')}
+        if (status.get('state') == 'completed' and status.get('phase') in ('done', 'activation_required')
+                and status.get('repairNeeded') is False and not status.get('lastError')
+                and not status.get('errorCode') and required <= installed):
+            run.facts['resumedSetup'] = True
+            run.evidence('J3-cached-acquisition', status)
+    run.wd.execute("""
+window.__qualActivationEvents=[];
+document.addEventListener('click',e=>{
+ const b=e.composedPath().find(n=>n?.getAttribute?.('aria-label')==='Activate downloaded models');
+ if(b) window.__qualActivationEvents.push({at:Date.now(),label:b.getAttribute('aria-label'),disabled:b.disabled,trusted:e.isTrusted});
+},true);
+""")
+    try:
+        return shared_install_ai(run)
+    finally:
+        try:
+            run.evidence('J3-activation-input', run.wd.execute("""
+return {events:window.__qualActivationEvents||[],buttons:all(document,'button[aria-label="Activate downloaded models"]').map(e=>({disabled:e.disabled,label:e.getAttribute('aria-label')}))};
+"""))
+        except Exception as exc:
+            run.evidence('J3-activation-input', {'unavailable': str(exc)})
 
 CHECKS = {'install': package_install, 'first-run': first_run, 'folder-picker': add_folder,
           'search-open': search_open, 'cpu-ai': install_ai, 'author-state': author_state,

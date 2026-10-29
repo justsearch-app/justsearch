@@ -12,6 +12,28 @@ import windows
 
 
 class WindowsEvidenceTests(unittest.TestCase):
+    def test_cached_downloads_resume_only_from_positive_acquisition_evidence(self):
+        from unittest.mock import Mock, patch
+        required = ('embedding', 'splade', 'reranker', 'ner', 'citation-scorer')
+        complete = {'state': 'completed', 'phase': 'activation_required', 'repairNeeded': False, 'packages': [
+            {'packageId': name, 'state': 'installed', 'error': ''} for name in required]}
+        cases = [(complete, True), (dict(complete, state='failed'), False),
+                 (dict(complete, repairNeeded=True), False),
+                 (dict(complete, repairNeeded=None), False), (dict(complete, phase='unknown'), False),
+                 (dict(complete, lastError='failed'), False), (dict(complete, errorCode='failure'), False),
+                 (dict(complete, packages=complete['packages'][:-1]), False)]
+        for status, cached in cases:
+            with self.subTest(status=status):
+                run = Mock(facts={});run.args.resume='checkpoint.json';run.api.return_value=status
+                with patch.object(windows, 'shared_install_ai', return_value='all readiness checks retained') as shared:
+                    self.assertEqual(windows.install_ai(run), 'all readiness checks retained')
+                self.assertEqual(run.facts.get('resumedSetup', False), cached)
+                shared.assert_called_once_with(run)
+        run=Mock(facts={});run.args.resume=None
+        with patch.object(windows,'shared_install_ai'):
+            windows.install_ai(run)
+        run.api.assert_not_called()
+
     @unittest.skipUnless(windows.os.name == 'nt', 'Windows PowerShell fixture')
     def test_resource_log_tails_are_plain_strings_without_powershell_file_metadata(self):
         import ast

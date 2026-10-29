@@ -403,6 +403,9 @@ events. At each boundary the collector reapplies Stop to a restarted update
 service and records its original state and any refusal in `controlExceptions`.
 Changed download files or download/install events fail the environment
 check. The per-run measured write limit remains required.
+Guest-only outbound service rules also block `wuauserv` and `UsoSvc`. Windows
+removed the attempted WinDefend rule after reboot; that is a recorded exception,
+and the same per-run download/install evidence remains required.
 
 The wrapper owns one headless, eight-thread Windows VM at a time and honors the
 harness's 14 GiB host-memory threshold. It runs the adapter through a **limited,
@@ -417,6 +420,14 @@ recorded guest on every outcome. Both candidate and predecessor start with fresh
 J1–J2, then J3 downloads from production in its own thin overlay. A clean shutdown
 seals each stage by renaming its disk/firmware into a snapshot. Remaining journeys use thin child
 overlays; no model cache or candidate data is moved into the predecessor.
+Cleanly stopped failed stages retain their checkpoint as well as their
+failed summary, so a diagnostic rerun can reuse production downloads without
+certifying the failed stage. Refreshing an application snapshot's guest controls
+keeps its original phase and checkpoint. Cached J3 also recognizes complete
+acquisition through the production install-status API; activation, all four
+runtime components and semantic retrieval still have to pass. Windows J3 retains
+the actual activation click events and disabled control state through its own
+WebDriver session in `J3-activation-input.json`.
 
 Windows native-window discovery enumerates visible top-level HWNDs and reads
 each through UI Automation. UIA's desktop children omit owned dialogs, including

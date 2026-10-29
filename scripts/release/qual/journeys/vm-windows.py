@@ -409,7 +409,12 @@ def prepare_setup(args, out, source=None):
                 raise Infrastructure('Setup snapshot requires unchanged disk and same filesystem')
             disk.rename(out / 'disk.qcow2')
             disk.with_name('run-vars.fd').rename(out / 'vars.fd')
-        (out / 'manifest.json').write_text(json.dumps({'kind': 'tools', 'pins': pins(args, 'tools'),
+        application = source and (source / 'checkpoint.json').is_file()
+        phase = json.loads((source / 'manifest.json').read_text())['pins']['phase'] if application else 'tools'
+        if application:
+            shutil.copyfile(source / 'checkpoint.json', out / 'checkpoint.json')
+        (out / 'manifest.json').write_text(json.dumps({'kind': 'application' if application else 'tools', 'pins': pins(args, phase),
+            'sourceSnapshot': str(source) if source else None,
             'webview2': json.loads((out / 'webdriver-versions.json').read_text())['webview2'],
             'edgeDriver': json.loads((out / 'webdriver-versions.json').read_text())}, indent=2) + '\n')
         (out / 'summary.json').write_text(json.dumps({'status': 'setup-ready', 'journeysExecuted': False,
@@ -632,7 +637,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
             report.update(writeVolume=volume, execution={'mode': args.mode, 'snapshot': str(snapshot) if snapshot else None,
                 'requestedJourneys': journeys}, **summarize(report['journeys'], report.get('fullSelection', False)))
             (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
-            if seal and clean and not errors and not budget.error and (out / 'checkpoint.json').is_file():
+            if seal and clean and not budget.error and (out / 'checkpoint.json').is_file():
                 seal_snapshot(out, started, inode, args, phase)
         if budget:
             report = json.loads((out / 'summary.json').read_text())

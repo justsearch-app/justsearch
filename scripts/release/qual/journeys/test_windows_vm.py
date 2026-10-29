@@ -104,6 +104,9 @@ class WindowsVMTests(unittest.TestCase):
             root=Path(temp);disk=root/'run.qcow2';disk.write_bytes(b'cached tools')
             (root/'run-vars.fd').write_bytes(b'firmware')
             started={'disk':str(disk),'pid':999999999,'owner':'fixture'}
+            source=root/'source';source.mkdir()
+            (source/'checkpoint.json').write_text('{"retained":"actual-installed-state"}')
+            (source/'manifest.json').write_text(json.dumps({'kind':'application','pins':{'phase':'predecessor'}}))
             args=SimpleNamespace(mirror=None)
             events=[]
             def guest(source,**kwargs):
@@ -132,6 +135,8 @@ class WindowsVMTests(unittest.TestCase):
                 self.assertEqual(wrapper.prepare_setup(args,root/'out',root/'source'),0,(root/'out/summary.json').read_text())
             self.assertEqual(events,['viewer-configure','Apply','edge-cache','stop','Verify','viewer-verify','edge-verify','stop'])
             manifest=json.loads((root/'out/manifest.json').read_text())
+            self.assertEqual(manifest['kind'],'application')
+            self.assertEqual(json.loads((root/'out/checkpoint.json').read_text()),{'retained':'actual-installed-state'})
             self.assertEqual(manifest['webview2'],'156.0.4314.50')
             self.assertEqual(manifest['edgeDriver']['msedgedriver'],manifest['webview2'])
 
@@ -152,36 +157,40 @@ class WindowsVMTests(unittest.TestCase):
                 self.assertTrue(any('Unregister-ScheduledTask' in call.args[0] for call in guest.call_args_list))
 
     def test_application_snapshot_keeps_suspended_mirror_for_later_update(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root=Path(temp);disk=root/'run.qcow2';disk.write_bytes(b'installed state')
-            (root/'run-vars.fd').write_bytes(b'firmware')
-            snapshot=root/'source';snapshot.mkdir()
-            (snapshot/'manifest.json').write_text(json.dumps({'kind':'tools','pins':{}}))
-            (snapshot/'quiet-verify.json').write_text(json.dumps({'verified':True}))
-            started={'disk':str(disk),'pid':999999999,'owner':'fixture'};current=[started]
-            args=SimpleNamespace(session='vm',mode='fresh',mirror=Path('mirror'))
-            def execute(args,out,*rest):
-                (out/'summary.json').write_text(json.dumps({'journeys':[],'fullSelection':False}))
-                (out/'checkpoint.json').write_text('{}')
-                return 0
-            def stop():current[0]=None;return True
-            with patch.object(wrapper,'pins',return_value={}),patch.object(wrapper.vm,'wait_free'), \
-                 patch.object(wrapper,'wait_for',return_value=True),patch.object(wrapper,'start_snapshot'), \
-                 patch.object(wrapper.vm,'require_owner',return_value=started),patch.object(wrapper.vm,'wait_ssh'), \
-                 patch.object(wrapper.vm,'read_state',side_effect=lambda:current[0]), \
-                 patch.object(wrapper,'update_observation',return_value={'time':'2026-10-29T00:00:00Z'}) as updates,patch.object(wrapper,'verify_update_effect') as effects, \
-                 patch.object(wrapper,'guest_ps',return_value='True') as guest,patch.object(wrapper.vm,'mirror') as mirror, \
-                 patch.object(wrapper,'WriteBudget') as budget,patch.object(wrapper,'execute',side_effect=execute), \
-                 patch.object(wrapper.vm,'locked',return_value=contextlib.nullcontext()), \
-                 patch.object(wrapper.vm,'ensure_free'),patch.object(wrapper.vm,'stop',side_effect=stop):
-                budget.return_value.finish.return_value={};budget.return_value.initial=0;budget.return_value.error=None
-                self.assertEqual(wrapper.run_overlay(args,root/'out','candidate',['J1'],snapshot,seal=True),0)
-            self.assertTrue((root/'out/snapshot/disk.qcow2').is_file())
-            mirror.assert_not_called()
-            self.assertEqual(updates.call_count,2)
-            self.assertEqual(effects.call_count,2)
-            self.assertIn('after',json.loads((root/'out/update-activity.json').read_text()))
-            self.assertTrue(any('mirror-windows.py suspend' in call.args[0] for call in guest.call_args_list))
+        for failed_effect in (False,True):
+            with tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);disk=root/'run.qcow2';disk.write_bytes(b'installed state')
+                (root/'run-vars.fd').write_bytes(b'firmware')
+                snapshot=root/'source';snapshot.mkdir()
+                (snapshot/'manifest.json').write_text(json.dumps({'kind':'tools','pins':{}}))
+                (snapshot/'quiet-verify.json').write_text(json.dumps({'verified':True}))
+                started={'disk':str(disk),'pid':999999999,'owner':'fixture'};current=[started]
+                args=SimpleNamespace(session='vm',mode='fresh',mirror=Path('mirror'))
+                def execute(args,out,*rest):
+                    (out/'summary.json').write_text(json.dumps({'journeys':[],'fullSelection':False}))
+                    (out/'checkpoint.json').write_text('{}')
+                    return 0
+                def stop():current[0]=None;return True
+                with patch.object(wrapper,'pins',return_value={}),patch.object(wrapper.vm,'wait_free'), \
+                     patch.object(wrapper,'wait_for',return_value=True),patch.object(wrapper,'start_snapshot'), \
+                     patch.object(wrapper.vm,'require_owner',return_value=started),patch.object(wrapper.vm,'wait_ssh'), \
+                     patch.object(wrapper.vm,'read_state',side_effect=lambda:current[0]), \
+                     patch.object(wrapper,'update_observation',return_value={'time':'2026-10-29T00:00:00Z'}) as updates,patch.object(wrapper,'verify_update_effect') as effects, \
+                     patch.object(wrapper,'guest_ps',return_value='True') as guest,patch.object(wrapper.vm,'mirror') as mirror, \
+                     patch.object(wrapper,'WriteBudget') as budget,patch.object(wrapper,'execute',side_effect=execute), \
+                     patch.object(wrapper.vm,'locked',return_value=contextlib.nullcontext()), \
+                     patch.object(wrapper.vm,'ensure_free'),patch.object(wrapper.vm,'stop',side_effect=stop):
+                    effects.side_effect=[None,Infrastructure('Windows Update download folder changed')] if failed_effect else None
+                    budget.return_value.finish.return_value={};budget.return_value.initial=0;budget.return_value.error=None
+                    self.assertEqual(wrapper.run_overlay(args,root/'out','candidate',['J1'],snapshot,seal=True),0)
+                self.assertTrue((root/'out/snapshot/disk.qcow2').is_file())
+                mirror.assert_not_called()
+                self.assertEqual(updates.call_count,2)
+                self.assertEqual(effects.call_count,2)
+                self.assertIn('after',json.loads((root/'out/update-activity.json').read_text()))
+                self.assertEqual(any('mirror-windows.py suspend' in call.args[0] for call in guest.call_args_list),not failed_effect)
+                report=json.loads((root/'out/summary.json').read_text())
+                self.assertEqual(report['counts']['failed-infrastructure'],1 if failed_effect else 0)
 
     def test_write_limit_uses_written_bytes_and_overlay_growth_independently(self):
         for key in ('hostQemuWrittenBytes', 'guestWrittenBytes', 'overlayGrowthBytes'):
