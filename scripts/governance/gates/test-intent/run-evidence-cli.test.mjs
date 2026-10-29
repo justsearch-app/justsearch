@@ -58,6 +58,7 @@ async function fixture(options, check) {
     // Override even a machine-wide true setting: the runner must supply long-path support.
     git('config', 'core.longpaths', 'false');
     git('config', 'core.autocrlf', 'false');
+    git('config', 'lfs.repositoryformatversion', '0');
     for (const name of ['run-evidence', 'changeset', 'evidence', 'evidence-runners', 'rust-tests', 'classifications']) {
       write(`scripts/governance/gates/test-intent/${name}.mjs`, fs.readFileSync(path.join(HERE, `${name}.mjs`), 'utf8'));
     }
@@ -65,7 +66,12 @@ async function fixture(options, check) {
     write(CHECK.split('#')[0], '// deterministic CLI boundary fixture\n');
     write('.gitignore', 'modules/core/build/\n');
     if (options.lfs) {
-      git('lfs', 'install', '--local', '--skip-smudge');
+      const globalConfig = path.join(scratch, 'global.config');
+      fs.writeFileSync(globalConfig, '[filter "lfs"]\n'
+        + 'clean = git-lfs clean -- %f\nsmudge = git-lfs smudge -- %f\n'
+        + 'process = git-lfs filter-process\nrequired = true\n');
+      env.GIT_CONFIG_GLOBAL = globalConfig;
+      env.GIT_CONFIG_NOSYSTEM = '1';
       write('.gitattributes', '*.lfs-test filter=lfs diff=lfs merge=lfs -text\n');
       write('modified.lfs-test', 'original LFS content\n');
     }
@@ -191,12 +197,27 @@ try {
       write('modified.lfs-test', 'changed LFS content\n');
       write('added.lfs-test', 'new LFS content\n');
     }
+    if (options.missingLfsFormat) git('config', '--unset', 'lfs.repositoryformatversion');
     const gitBefore = options.lfs ? gitSnapshot(path.join(root, '.git')) : null;
-    const result = spawnSync(process.execPath, [path.join(root, CLI), '--out', out, '--check', CHECK,
-      ...(options.mixed ? ['--check', CHECK.replace('#probe', '#noSuchMethod'),
-        '--check', CHECK.replace('#probe', '#skipped')] : []),
-      ...(options.candidate ? [] : ['--before', options.invalidRef ? 'NO-SUCH-REVISION' : 'HEAD', '--before-root', beforeRoot])],
-    { cwd: root, env, encoding: 'utf8' });
+    const gitEvents = [];
+    const watcher = options.lfs ? fs.watch(path.join(root, '.git'), { recursive: true },
+      (event, file) => gitEvents.push({ event, file })) : null;
+    let result;
+    try {
+      const child = spawn(process.execPath, [path.join(root, CLI), '--out', out, '--check', CHECK,
+        ...(options.mixed ? ['--check', CHECK.replace('#probe', '#noSuchMethod'),
+          '--check', CHECK.replace('#probe', '#skipped')] : []),
+        ...(options.candidate ? [] : ['--before', options.invalidRef ? 'NO-SUCH-REVISION' : 'HEAD', '--before-root', beforeRoot])],
+      { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      let stdout = '', stderr = '';
+      child.stdout.on('data', data => { stdout += data; });
+      child.stderr.on('data', data => { stderr += data; });
+      const [status] = await once(child, 'close');
+      await new Promise(setImmediate);
+      result = { status, stdout, stderr };
+    } finally {
+      watcher?.close();
+    }
     const output = `${result.stdout}\n${result.stderr}`;
     if (options.lock) {
       assert.equal(fs.readFileSync(path.join(scratch, 'lock-ready'), 'utf8'), 'held');
@@ -208,7 +229,7 @@ try {
       assert.match(interrupted.output, /interrupted: CTRL_BREAK_EVENT/);
       assert.match(fs.readFileSync(path.join(scratch, 'interrupt-identity'), 'utf8'), /^\d+\/\d+$/);
     }
-    await check({ result, output, out, beforeRoot, git, scratch, root, env, gitBefore });
+    await check({ result, output, out, beforeRoot, git, scratch, root, env, gitBefore, gitEvents });
   } finally {
     fs.writeFileSync(path.join(scratch, 'lock-release'), 'release');
     if (locker) {
@@ -267,7 +288,24 @@ test('CLI: candidate-only LFS hashing leaves Git untouched and preserves the fil
         'the reference tree must contain cleaned LFS pointers');
     }
     assert.equal(readEvidence(out).tree, expected);
+    // Git may refresh the timestamps of existing objects it finds through the alternate (object
+    // freshening); contents and the file set stay unchanged (snapshot above), and a read-only Git
+    // directory still works. Timestamp events are therefore not asserted here.
   });
+});
+
+test('CLI: missing local LFS format refuses hashing without writing into Git', async t => {
+  const lfs = spawnSync('git-lfs', ['version'], { encoding: 'utf8' });
+  if (lfs.error?.code === 'ENOENT') return t.skip('git-lfs is not installed');
+  assert.equal(lfs.status, 0, lfs.stderr);
+  await fixture({ candidate: true, lfs: true, missingLfsFormat: true },
+    ({ result, output, out, root, gitBefore, gitEvents }) => {
+      assert.deepEqual(gitEvents, [], 'missing local LFS format must not cause config or temporary writes');
+      assert.deepEqual(gitSnapshot(path.join(root, '.git')), gitBefore);
+      assert.equal(result.status, 2, output);
+      assert.match(output, /lfs\.repositoryformatversion.*git lfs install --local/);
+      assert.equal(fs.existsSync(out), false, 'a refused hash must not produce evidence');
+    });
 });
 
 test('CLI: invalid before revision removes its empty reservation without a second error', async () => {

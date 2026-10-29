@@ -746,6 +746,7 @@ function withNativeFixture(fn) {
   try {
     // Reuse existing Git history without creating a fixture commit or checking out the product.
     execFileSync('git', ['clone', '--shared', '--no-checkout', REPO, root], { stdio: 'pipe' });
+    execFileSync('git', ['config', '--local', 'lfs.repositoryformatversion', '0'], { cwd: root, stdio: 'pipe' });
     const write = (rel, text) => {
       const dest = path.join(root, rel);
       fs.mkdirSync(path.dirname(dest), { recursive: true });

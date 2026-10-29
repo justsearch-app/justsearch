@@ -258,6 +258,7 @@ function hashFixture(linked, check) {
     fs.mkdirSync(repo);
     git(['init', '-q']);
     git(['config', 'core.autocrlf', 'false']);
+    git(['config', 'lfs.repositoryformatversion', '0']);
     fs.writeFileSync(path.join(repo, 'modified'), 'original\n');
     fs.writeFileSync(path.join(repo, 'deleted'), 'delete me\n');
     git(['add', '-A']);
@@ -296,9 +297,7 @@ for (const linked of [false, true]) {
       const before = gitSnapshot(path.join(repo, '.git'));
       const calls = [];
       const spawnSync = (command, args, options) => {
-        if (['read-tree', 'add', 'write-tree'].some(cmd => args.includes(cmd))) {
-          calls.push({ args, env: options.env });
-        }
+        calls.push({ args, env: options.env });
         return realSpawnSync(command, args, options);
       };
       const hash = vm.runInNewContext(`${functions}\nworkingTreeHash(root)`, { fs, path, os, process, spawnSync, root });
@@ -306,9 +305,14 @@ for (const linked of [false, true]) {
       const after = gitSnapshot(path.join(repo, '.git'));
       assert.deepEqual([...new Set([...Object.keys(before), ...Object.keys(after)])]
         .filter(rel => before[rel] !== after[rel]), [], 'hashing must not write into Git directories');
-      assert.equal(calls.length, 3);
-      const objectDirectory = calls[0].env.GIT_OBJECT_DIRECTORY;
-      for (const { args, env } of calls) {
+      for (const { args } of calls) {
+        assert.ok(args.some((arg, i) => arg === '-c' && args[i + 1] === 'core.fsmonitor=false'),
+          `every hashing Git invocation must disable fsmonitor: ${args.join(' ')}`);
+      }
+      const indexCalls = calls.filter(({ args }) => ['read-tree', 'add', 'write-tree'].some(cmd => args.includes(cmd)));
+      assert.equal(indexCalls.length, 3);
+      const objectDirectory = indexCalls[0].env.GIT_OBJECT_DIRECTORY;
+      for (const { args, env } of indexCalls) {
         assert.ok(objectDirectory && path.isAbsolute(objectDirectory), 'hashing must use scratch object storage');
         assert.equal(env.GIT_OBJECT_DIRECTORY, objectDirectory);
         assert.notEqual(objectDirectory, path.join(repo, '.git', 'objects'));
