@@ -118,3 +118,14 @@ These entries cover the settled final review repairs. Existing accepted changese
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-91c3ab-b3-claude",
+  "verdict": "accept",
+  "digest": "sha256:f0affabdf247428ac128d3cbe39ab1a7732189239e24e19544e5125f7d1d36c7",
+  "note": "Claude verifier on fe4172eab2: the 4 review checks fail on dabd685ad2 by assertion (port 42424 bound; referent 0755->0600; UncheckedIOException at construction; s-0..s-5 carried) and pass on candidate; mutations of snapshot, not-before, rebind, no-follow, continue-on-failure and intent bound are each caught (identity-only removal is not); real-Engine probes show no referent change, 0600 regular quarantine, no token in logs, start-up continues."
+}
+```

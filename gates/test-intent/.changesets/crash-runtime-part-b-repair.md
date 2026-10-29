@@ -58,3 +58,14 @@ The orchestrator generates execution evidence after committing; the builder does
   "note": "Candidate efe584d532. 6 repair checks fail on 5dcc5db048 by assertion (named refusal thrown) and pass on candidate. Real Linux Engine: malformed, second malformed, future-schema (live unrelated PID) and invalid-children manifests start up, one 600 quarantine with original bytes, named WARN, unclean narration on log and health stream, no child seeded, unrelated process untouched, planted token only in the quarantine; ledger mode 000 and directory start with PREDECESSOR_LEDGER_UNREADABLE; harness children/handoff/boot-quit/boot-failure pass; ui 2275 and app-api 470 tests pass. Mutations: refusal, ledger refusal, multi-quarantine, unclean flag, token-in-log caught; owner-only restrict not caught (redundant with runtime-dir repair except hard/symbolic links)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-91c3ab-b3-claude",
+  "verdict": "accept",
+  "digest": "sha256:18e5f5dc18167b1cd352d3cc283bf6d35662e9af1f7f507070b9c205d7f6d97b",
+  "note": "Claude verifier on fe4172eab2: re-accepted after regenerated evidence; RuntimeManifestPredecessorRecoveryTest 7/7 pass, :modules:ui:test 2280 tests 0 failures; real-Engine malformed and hostile-link manifests are quarantined and start-up continues."
+}
+```
