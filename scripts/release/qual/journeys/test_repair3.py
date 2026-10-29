@@ -53,7 +53,7 @@ class Repair3Tests(unittest.TestCase):
                     with tarfile.open(fileobj=kwargs['stdout'], mode='w') as archive:
                         member = tarfile.TarInfo('test.crash'); member.size = len(content)
                         archive.addfile(member, io.BytesIO(content))
-                with patch.object(wrapper.vm, 'ssh', ssh), patch.object(wrapper.vm, 'config', return_value={'password': 'guest'}):
+                with patch.object(wrapper.vm, 'ssh', ssh), patch.object(wrapper.vm, 'config', return_value={'password': 'guest'}), patch.object(wrapper.vm, 'guest_root'):
                     if product:
                         with self.assertRaisesRegex(AssertionError, 'Product crash in guest'):
                             wrapper.crash_evidence(Path(temp))
@@ -66,7 +66,7 @@ class Repair3Tests(unittest.TestCase):
     def test_notifications_disabled_before_compositor_preparation(self):
         with tempfile.TemporaryDirectory() as temp:
             target = Mock()
-            target.run.return_value.stdout = 'true\n'
+            target.run.side_effect = lambda args, **kw: Mock(stdout='false\n' if args[-1] == 'show-banners' else 'true\n')
             with patch.object(wrapper, 'Target', return_value=target), patch.object(wrapper, 'Native') as native, \
                  patch.object(wrapper, 'crash_evidence', create=True), patch.object(wrapper.vm, 'guest_root') as root, \
                  patch.object(wrapper.vm, 'QMP'), patch.object(wrapper, 'wait_for', return_value=True), \

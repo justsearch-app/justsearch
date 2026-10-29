@@ -12,7 +12,7 @@ import time
 import zipfile
 
 from corpus import generate, OPEN_FILE, QUERY, OCR_QUERY
-from runner import HERE, Infrastructure, Unavailable, digest, wait_for, require_disposable_host
+from runner import HERE, Infrastructure, Observation, Unavailable, digest, wait_for, require_disposable_host
 
 
 def apt(run, *args):
@@ -106,7 +106,11 @@ def first_run(run):
     if not run.binary:
         raise Unavailable('Package installation did not complete')
     run.normal_launch()
-    wait_for(run.native.app_window, 'Packaged window visible', seconds=60)
+    try:
+        wait_for(run.native.app_window, 'Packaged window visible', seconds=60)
+    except AssertionError:
+        run.native.window_failure('J1-packaged')
+        raise
     run.evidence('J1-normal-ready', run.ready())
     run.start_ui()
     wait_for(lambda: run.wd.execute("return all(document,'jf-shell').length > 0"),
@@ -118,7 +122,7 @@ def first_run(run):
     if run.wd.execute("return all(document,'jf-walkthrough-card').some(e=>!e.hidden)"):
         run.wd.click('button[aria-label="Dismiss"]')
     wait_for(lambda: 'Search' in run.native.screen_text('J1-first-run-visible'),
-             'Packaged UI visible after mounting', seconds=30, error=Infrastructure)
+             'Packaged UI visible after mounting', seconds=30, error=Observation)
     run.native.shot('J1-first-run')
     return {'normalLaunch': True, 'webDriver': 'installed executable', 'buttons': buttons}
 
@@ -459,12 +463,12 @@ def restart(run):
     # Engine readiness precedes restored UI state. Do not send Escape before
     # the Settings modal we left open has actually mounted in the normal UI.
     wait_for(lambda: 'Settings' in run.native.app_text('J4-restored-settings'),
-             'Restored Settings visible before dismissal', seconds=30, error=Infrastructure)
+             'Restored Settings visible before dismissal', seconds=30, error=Observation)
     run.native.key('escape')
     wait_for(lambda: 'Settings' not in run.native.app_text('J4-settings-closed'),
-             'Restored Settings closed before bookmarks click', seconds=30, error=Infrastructure)
-    before = run.native.app_text('J4-before-bookmarks', geometry['popup'])
-    if 'Library' in before:
+             'Restored Settings closed before bookmarks click', seconds=30, error=Observation)
+    before = run.native.matching_text('J4-before-bookmarks', r'\bLibrary\b', geometry['popup'])
+    if before:
         raise Infrastructure('Bookmark observation region already contains Library before clicking')
     interaction_observation(run, 'J4-bookmarks-click')
     window = run.native.app_window()
@@ -473,8 +477,8 @@ def restart(run):
     run.native.click(window['rect']['x'] + geometry['button']['x'],
                      window['rect']['y'] + geometry['button']['y'])
     text = wait_for(lambda: run.native.matching_text('J4-restarted-bookmark', r'\bLibrary\b', geometry['popup']),
-                    'Authored Library bookmark visible in normal restarted popup; retained app state contains the bookmark, OCR absence uncorroborated',
-                    seconds=30, error=Infrastructure)
+                    'Authored Library bookmark visible in normal restarted popup; persisted bookmark corroborates product absence',
+                    seconds=30)
     run.evidence('J4-native-bookmark', {'before': before, 'after': text, 'geometry': geometry,
                                        'automationAttached': False})
     run.native.shot('J4-restarted-bookmark')
@@ -717,17 +721,8 @@ def desktop_entry(run):
 def deep_links(run):
     require_candidate(run)
     run.require('folder')
-    query = 'link ' + hashlib.sha256(run.run_id.encode()).hexdigest()[:10]
-    # Restored J2 text cannot certify dispatch. Prove this run's token absent
-    # in both the live DOM and the owned app window before a normal cold launch.
-    run.start_ui()
-    run.nav('Search')
-    before = run.wd.execute("return all(document,'*').map(e=>(e.textContent||'')+' '+(e.value||'')).join('\\n');")
-    native_before = run.native.matching_text('J7-deep-link-before', re.escape(query))
-    if query in before or native_before:
-        raise Infrastructure('Unique deep-link query already appears before dispatch')
-    run.evidence('J7-cold-before', {'query': query, 'absent': True, 'scope': 'owned-app-window',
-                                    'domAbsent': True, 'nativeAbsent': True})
+    query = cold_link_query(run.run_id)
+    # The token is derived from this new run and is never entered before dispatch.
     run.stop_app()
     from urllib.parse import quote
     run.desktop_spawn(['xdg-open', 'justsearch://query?q=' + quote(query)], run.work + '/cold-deep-link.log')
@@ -735,15 +730,25 @@ def deep_links(run):
     run.ready()
     cold = wait_for(lambda: run.native.matching_text('J7-deep-link-cold', re.escape(query)),
                     'Cold OS deep link unique query in app window; OCR absence uncorroborated',
-                    seconds=45, error=Infrastructure)
+                    seconds=45, error=Observation)
+    if native_library_destination(run, 'J7-deep-link-warm-before'):
+        raise Infrastructure('Warm deep-link top bar already contains Library before dispatch')
     interaction_observation(run, 'J7-warm-dispatch')
     run.desktop_spawn(['xdg-open', 'justsearch://surface/core.library-surface'], run.work + '/warm-deep-link.log')
     warm = wait_for(lambda: native_library_destination(run),
-                    'Warm OS deep link Library destination; OCR absence uncorroborated', seconds=45, error=Infrastructure)
+                    'Warm OS deep link Library destination; OCR absence uncorroborated', seconds=45, error=Observation)
     return {'cold': cold, 'warm': warm}
 
 
-def native_library_destination(run):
+def cold_link_query(run_id):
+    # A hexadecimal digest encoded as distinct dictionary words avoids 0/o,
+    # 1/l, b/6 and e/c glyph ambiguity in the native observer.
+    words = ('map', 'sun', 'fox', 'ivy', 'jam', 'sky', 'wax', 'gym',
+             'pup', 'fin', 'rug', 'ash', 'hay', 'yak', 'gum', 'sum')
+    return ' '.join(words[int(n, 16)] for n in hashlib.sha256(run_id.encode()).hexdigest()[:8])
+
+
+def native_library_destination(run, name='J7-deep-link-warm'):
     # The top bar names the current surface. Body OCR depends on layout and
     # can miss the Add Folder button despite correct navigation.
     window = run.native.app_window()
@@ -752,7 +757,7 @@ def native_library_destination(run):
     rect = window['rect']
     region = {'x': 160, 'y': 0, 'width': min(400, rect['width'] - 160), 'height': 40,
               'viewportWidth': rect['width'], 'viewportHeight': rect['height']}
-    text = run.native.matching_text('J7-deep-link-warm', r'\bLibrary\b', region)
+    text = run.native.matching_text(name, r'\bLibrary\b', region)
     return {'topBar': text, 'window': window} if text else None
 
 

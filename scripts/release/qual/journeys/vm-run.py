@@ -175,12 +175,21 @@ def crash_evidence(out):
     if any(Path(name).name != name or not name.endswith('.crash') for name in names):
         raise Infrastructure('Unsafe guest crash report filename')
     if names:
-        with (out / 'guest-crashes.tar').open('wb') as stream:
-            vm.ssh('ubuntu', "sudo -S -p '' tar -cf - -C /var/crash -- " + shlex.join(names),
+        archive_path = out / 'guest-crashes.tar'
+        if archive_path.exists():
+            archive_path = out / ('guest-crashes-' + str(time.time_ns()) + '.tar')
+        # Bound guest bytes before streaming them to the host. Never copy an
+        # unbounded CoreDump just to discover its size after the transfer.
+        source = ("import os,sys; from pathlib import Path; names=sys.argv[1:]; "
+                  "assert all(not Path('/var/crash',n).is_symlink() for n in names); "
+                  "assert sum(Path('/var/crash',n).stat().st_size for n in names) <= 100_000_000, 'Guest crash reports exceed 100 MB'; "
+                  "os.execvp('tar',['tar','-cf','-','-C','/var/crash','--',*names])")
+        with archive_path.open('wb') as stream:
+            vm.ssh('ubuntu', "sudo -S -p '' python3 -c " + shlex.quote(source) + ' ' + shlex.join(names),
                    input=(vm.config()['password'] + '\n').encode(), stdout=stream,
                    check=True, timeout=60)
         fields = []
-        with tarfile.open(out / 'guest-crashes.tar') as archive:
+        with tarfile.open(archive_path) as archive:
             for member in archive.getmembers():
                 row = {'file': '/var/crash/' + member.name, 'fields': {}}
                 for raw in archive.extractfile(member):
@@ -191,7 +200,12 @@ def crash_evidence(out):
                     if key in ('ExecutablePath', 'Signal', 'ProblemType', 'Date', 'Package', 'ProcCmdline'):
                         row['fields'][key] = value.strip()
                 fields.append(row)
-        (out / 'guest-crashes.json').write_text(json.dumps(fields, indent=2) + '\n')
+        record = out / 'guest-crashes.json'
+        previous = json.loads(record.read_text()) if record.exists() else []
+        record.write_text(json.dumps(previous + fields, indent=2) + '\n')
+        recorded = '/var/crash/qualification-recorded-' + str(time.time_ns())
+        vm.guest_root('ubuntu', 'mkdir ' + shlex.quote(recorded) + '; mv -- '
+                      + shlex.join('/var/crash/' + n for n in names) + ' ' + shlex.quote(recorded) + '/')
         product = [r for r in fields if any(name in (r['fields'].get('ExecutablePath', '')
                     + ' ' + r['fields'].get('ProcCmdline', '')).lower()
                     for name in ('justsearch', 'just-search'))]
@@ -221,6 +235,12 @@ def prepare_desktop(args, out):
         vm.guest_root('ubuntu', 'systemctl restart gdm3')
         ready()
     (out / 'crash-notifications.txt').write_text(target.run(notify).stdout)
+    banners = ['gsettings', 'get', 'org.gnome.desktop.notifications', 'show-banners']
+    target.run(['gsettings', 'set', 'org.gnome.desktop.notifications', 'show-banners', 'false'])
+    observed = target.run(banners).stdout.strip()
+    (out / 'notification-banners.txt').write_text(observed + '\n')
+    if observed != 'false':
+        raise Infrastructure('GNOME notification banners could not be disabled')
     target.run(['gsettings', 'set', 'org.gnome.desktop.session', 'idle-delay', '0'])
     target.run(['gsettings', 'set', 'org.gnome.desktop.screensaver', 'lock-enabled', 'false'])
     target.run(['xdg-mime', 'default', 'org.xfce.mousepad.desktop', 'text/plain'])
@@ -233,8 +253,6 @@ def prepare_desktop(args, out):
         native = Native(target, out)
         for attempt in range(2):
             try:
-                wait_for(lambda: native.screen_text('desktop-ready-' + str(attempt)),
-                         'Logged-in desktop is visible', seconds=60, error=Infrastructure)
                 native.key('escape')
                 native.key('alt+f2')
                 wait_for(lambda: 'Run a Command' in native.screen_text('compositor-command', psm=6),

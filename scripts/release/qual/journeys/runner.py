@@ -31,6 +31,10 @@ class Infrastructure(Exception):
     """An observed harness, desktop or download failure, not a product verdict."""
 
 
+class Observation(Infrastructure):
+    """Native OCR did not establish an outcome, without product corroboration."""
+
+
 class Unavailable(Exception):
     """A prerequisite did not complete; the dependent check was not executed."""
 
@@ -43,12 +47,13 @@ def classify(exc):
 
 def require_disposable_host():
     marker = Path('/run/justsearch-qualification-guest')
-    if os.environ.get('GITHUB_ACTIONS') == 'true':
+    if (os.environ.get('GITHUB_ACTIONS') == 'true'
+            and os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted'):
         return
     if (not marker.is_symlink() and marker.is_file() and marker.stat().st_uid == 0
             and marker.read_text() == 'justsearch-vm\n'):
         return
-    raise Infrastructure('Hosted lane requires GITHUB_ACTIONS=true or the VM guest marker')
+    raise Infrastructure('Hosted lane requires GITHUB_ACTIONS=true and RUNNER_ENVIRONMENT=github-hosted or the VM guest marker')
 
 
 def full_selection(journeys, lane, definition=None):
@@ -129,6 +134,8 @@ def wait_for(fn, description, seconds=90, interval=1, error=AssertionError):
         time.sleep(interval)
     if last is not None:
         error = Infrastructure
+    if isinstance(last, Observation) and issubclass(error, Infrastructure):
+        error = Observation
     raise error(f'{description} timed out after {seconds}s; last observation: {last}')
 
 
@@ -392,6 +399,49 @@ print(json.dumps(result))
         return window if any(row['pid'] == window['pid'] and row['exe'].endswith('/JustSearch')
                              for row in self.target.owned()) else None
 
+    def window_failure(self, name):
+        pids = [row['pid'] for row in self.target.owned() if row['exe'].endswith('/JustSearch')]
+        windows = self.target.json("""
+import json,os,subprocess,sys
+pids=json.loads(sys.argv[1])
+if os.environ.get('WAYLAND_DISPLAY'):
+ from gi.repository import Gio,GLib
+ proxy=Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION,0,None,'org.gnome.Shell','/org/gnome/Shell','org.gnome.Shell',None)
+ script='global.get_window_actors().map(a=>a.meta_window).filter(w=>'+json.dumps(pids)+'.includes(w.get_pid())).map(w=>({pid:w.get_pid(),title:w.get_title()}))'
+ ok,raw=proxy.call_sync('Eval',GLib.Variant('(s)',(script,)),0,5000,None).unpack()
+ if not ok:raise RuntimeError('GNOME window list unavailable')
+ rows=json.loads(raw)
+else:
+ rows=[]
+ for pid in pids:
+  result=subprocess.run(['xdotool','search','--pid',str(pid)],capture_output=True,text=True)
+  if result.returncode not in (0,1):raise RuntimeError('X11 window list unavailable: '+result.stderr)
+  rows.extend({'pid':pid,'window':w} for w in result.stdout.splitlines())
+print(json.dumps(rows))
+""", pids)
+        focused = self.focused_window()
+        (self.evidence / (name + '-window-miss.json')).write_text(
+            json.dumps({'ownedPids': pids, 'windows': windows, 'focused': focused}, indent=2) + '\n')
+        if windows:
+            raise Infrastructure('App window exists but is not focused; focused window: ' + json.dumps(focused))
+        raise AssertionError('Installed app has no window')
+
+    def reject_notification(self, name):
+        if not self.target.env.get('WAYLAND_DISPLAY'):
+            return
+        banner = self.target.json("""
+import json
+from gi.repository import Gio,GLib
+proxy=Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION,0,None,'org.gnome.Shell','/org/gnome/Shell','org.gnome.Shell',None)
+script='(()=>{let b=Main.messageTray._banner;return !!(b && b.visible && b.get_paint_visibility())})()'
+ok,raw=proxy.call_sync('Eval',GLib.Variant('(s)',(script,)),0,5000,None).unpack()
+if not ok:raise RuntimeError('GNOME notification observation unavailable')
+print(json.dumps(json.loads(raw)))
+""")
+        if banner:
+            (self.evidence / (name + '-notification.json')).write_text(json.dumps({'visibleBanner': True}) + '\n')
+            raise Infrastructure('Visible compositor notification overlaps possible app pixels')
+
     def app_text(self, name, region=None, psm=6):
         """OCR only the focused, owned app, optionally a viewport-relative region."""
         window = self.app_window()
@@ -404,7 +454,9 @@ print(json.dumps(result))
                 raise Infrastructure('Native window size differs from the measured UI viewport')
             box.update(x=rect['x'] + region['x'], y=rect['y'] + region['y'],
                        width=region['width'], height=region['height'])
+        self.reject_notification(name)
         shot = self.shot(name)
+        self.reject_notification(name)
         from PIL import Image
         with Image.open(shot) as source:
             if box['width'] <= 0 or box['height'] <= 0 or box['x'] < 0 or box['y'] < 0 or box['x'] + box['width'] > source.width or box['y'] + box['height'] > source.height:
@@ -500,6 +552,8 @@ class Run:
                 self.evidence(journey['id'] + '-' + name, value)
         except Exception as exc:
             row.update(status=classify(exc), reason=str(exc))
+            if isinstance(exc, Observation):
+                row['reasonTag'] = 'observation'
             (self.out / f"{journey['id']}-{name}.error.txt").write_text(traceback.format_exc())
             if not isinstance(exc, Unavailable):
                 try:
@@ -519,30 +573,57 @@ class Run:
     def api(self, endpoint, body=None):
         # Follow the installed shell's production manifest, never a guessed port.
         # Verify its live instance before sending its owner-only credential.
-        return self.target.json("""
-import json,os,sys,urllib.request
+        result = self.target.json("""
+import json,os,sys,urllib.request,urllib.error
 from pathlib import Path
-a=json.loads(sys.argv[1]); m=json.loads((Path(a['data'])/'runtime/manifest.json').read_text())
-pid=m['pid']; os.kill(pid,0)
-assert ('QUAL_JOURNEY_RUN='+a['runId']).encode() in Path('/proc/'+str(pid)+'/environ').read_bytes().split(b'\\0'), 'Engine not owned by this run'
-port=m['head']['apiPort']; assert type(port) is int and 0<port<65536
-opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
-base='http://127.0.0.1:'+str(port)
-with opener.open(base+'/api/runtime/live',timeout=10) as r: live=json.load(r)
-assert live['pid']==pid and live['instanceId']==m['instanceId'], 'Engine identity changed'
-body=a['body']; req=urllib.request.Request(base+a['endpoint'],data=None if body is None else json.dumps(body).encode(),headers={'X-JustSearch-Session':m['head']['sessionToken'],'Content-Type':'application/json'})
-with opener.open(req,timeout=30) as r: print(json.dumps(json.load(r)))
+a=json.loads(sys.argv[1])
+try:
+ m=json.loads((Path(a['data'])/'runtime/manifest.json').read_text())
+ pid=m['pid']; os.kill(pid,0)
+ assert ('QUAL_JOURNEY_RUN='+a['runId']).encode() in Path('/proc/'+str(pid)+'/environ').read_bytes().split(b'\\0'), 'Engine not owned by this run'
+ port=m['head']['apiPort']; assert type(port) is int and 0<port<65536, 'Invalid Engine API port'
+ opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+ base='http://127.0.0.1:'+str(port)
+ with opener.open(base+'/api/runtime/live',timeout=10) as r: live=json.load(r)
+ assert live['pid']==pid and live['instanceId']==m['instanceId'], 'Engine identity changed'
+ body=a['body']; req=urllib.request.Request(base+a['endpoint'],data=None if body is None else json.dumps(body).encode(),headers={'X-JustSearch-Session':m['head']['sessionToken'],'Content-Type':'application/json'})
+ with opener.open(req,timeout=30) as r: value=json.load(r)
+ print(json.dumps({'status':'ok','value':value}))
+except (AssertionError,FileNotFoundError,ProcessLookupError,KeyError,ValueError,urllib.error.HTTPError) as exc:
+ print(json.dumps({'status':'product','reason':type(exc).__name__+': '+str(exc)}))
+except urllib.error.URLError as exc:
+ print(json.dumps({'status':'infrastructure' if isinstance(exc.reason,TimeoutError) else 'product','reason':str(exc)}))
+except TimeoutError as exc:
+ print(json.dumps({'status':'infrastructure','reason':str(exc)}))
 """, {'data': self.data, 'endpoint': endpoint, 'body': body, 'runId': self.run_id})
+        if result['status'] == 'product':
+            raise AssertionError('Installed Engine: ' + result['reason'])
+        if result['status'] != 'ok':
+            raise Infrastructure('Engine transport: ' + result.get('reason', 'invalid result'))
+        return result['value']
 
     def ready(self):
+        last_product = None
         def probe():
-            status = self.api('/api/status')
+            nonlocal last_product
+            # A newly launched Engine may not have published its manifest yet.
+            # Retry only within this startup deadline; persistent API failures
+            # retain their product verdict and their actual diagnostic.
+            try:
+                status = self.api('/api/status')
+                health = self.api('/api/health')
+            except AssertionError as exc:
+                last_product = str(exc)
+                self.evidence('engine-readiness', {'lastProductFailure': last_product})
+                return None
             if status.get('knowledgeServerStartError'):
                 raise AssertionError(status['knowledgeServerStartError'])
-            health = self.api('/api/health')
             if status.get('indexAvailable') and health.get('components', {}).get('index', {}).get('state') == 'READY':
                 return {'status': status, 'health': health}
-        result = wait_for(probe, 'Installed Engine ready', seconds=240)
+        try:
+            result = wait_for(probe, 'Installed Engine ready', seconds=240)
+        except AssertionError as exc:
+            raise AssertionError(str(exc) + '; last Engine failure: ' + str(last_product)) from exc
         self.facts['ready'] = True
         return result
 
@@ -581,7 +662,11 @@ with opener.open(req,timeout=30) as r: print(json.dumps(json.load(r)))
     def observe_window(self, name):
         name = name + '-' + str(time.time_ns())
         started = time.monotonic()
-        window = wait_for(self.native.app_window, 'Installed app window shown', seconds=60)
+        try:
+            window = wait_for(self.native.app_window, 'Installed app window shown', seconds=60)
+        except AssertionError:
+            self.native.window_failure(name)
+            raise
         self.native.shot('window-shown-' + name)
         self.facts['windowShownAt'] = time.monotonic()
         self.facts['windowShownEvidence'] = 'window-shown-' + name + '.json'

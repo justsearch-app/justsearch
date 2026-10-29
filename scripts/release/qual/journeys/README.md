@@ -28,7 +28,8 @@ preinstalled JDK packages; its wrapper also removes JDK-specific PATH entries.
 A remaining `javac` on PATH fails the clean-install prerequisite.
 
 The hosted entry point is for disposable runners only: it runs apt and changes
-that user's text-file association. It refuses to run unless `GITHUB_ACTIONS=true`
+that user's text-file association. It refuses to run unless both `GITHUB_ACTIONS=true` and
+`RUNNER_ENVIRONMENT=github-hosted`
 or a root-owned guest marker written by the VM wrapper is present. The apt
 adapter enforces this too, including direct runner invocations.
 **Do not run it on the release owner's host.**
@@ -131,7 +132,11 @@ Guest-only provisioning masks Snap refresh, firmware update, APT timers and
 the desktop file indexer, and sets swappiness to 1 to prefer reclaiming file
 cache over writing anonymous pages. At first boot, desktop preparation disables
 Ubuntu update-notifier crash pop-ups and renews the guest login session if needed.
-Apport still records crashes; raw reports and key fields are retained, and a
+GNOME notification banners are disabled and the setting is verified. Native app
+captures reject visible GNOME banners before and after capture.
+Apport still records crashes; reports are capped at 100 MB before transfer and
+moved aside after recording so snapshots do not repeat them.
+Raw reports and key fields are retained, and a
 JustSearch or bundled Engine crash is a product finding. Journald and swap remain enabled.
 Every journey records synced whole-device write and swap-counter deltas,
 without double-counting disk partitions. Overlay summaries record boot through
@@ -192,8 +197,10 @@ private signing key is needed or used for these tests.
   default input-source switch chord), and scanned-PDF OCR. Cold and
   warm OS links run without WebDriver; the receiving app must be focused and
   its app window must contain a query derived from this run ID for the cold
-  link. That query must be absent from the DOM and app-window OCR before
-  dispatch. The warm link must name Library in the cropped top bar.
+  link. The query uses dictionary words derived from the new run ID and is
+  never entered through WebDriver or typed before dispatch. The app is stopped
+  before the cold link. The warm link must transition from no Library to Library
+  using the same two OCR segmentations in the cropped top bar.
   Shortcut input stays in a
   WebDriver session, where compositor focus, document focus, the actual focused
   search control, and its exact newly typed value must agree. The Wayland binding
@@ -230,8 +237,10 @@ personal information, models or generated corpus binary files are committed.
 The small retained screenshot in `fixtures/predecessor-bookmark-ocr.png` is a
 regression fixture from the independent W4a verifier: block segmentation reads
 “Ubrary”, while sparse segmentation reads “Library”. Native destination OCR
-retries sparse segmentation on a miss. Missing OCR text without corroborating
-app state is infrastructure, rather than a product absence verdict.
+retries sparse segmentation on a miss, including before-state guards. A persistent
+J4 bookmark miss with the stored bookmark present is a product failure. Other
+missing OCR text without corroborating app state is infrastructure, with
+`reasonTag: observation` in the summary. Retry unit tests stub the OCR outputs.
 
 ## Results and tests
 
@@ -258,7 +267,7 @@ python3 -m unittest discover -s scripts/release/qual/journeys -p 'test_*.py' -v
 python3 -m unittest discover -s scripts/release/qual -p 'test_*.py' -v
 ```
 
-The OCR fixture check requires Tesseract. These isolated tests never touch
+These isolated tests never touch
 the shared VM data, a display, running app,
 network service or installed package. Before-state tests belong in a shared
 clone under `$TMPDIR`; do not stash or revert the worktree for a baseline check.
