@@ -1442,11 +1442,11 @@ it('F4b converts local DST calendar days and rounded binary units and keeps ente
 });
 
 it.each([
-  { key: 'folder', edited: '/another folder/', change: { pathPrefix: '/another folder/' } },
-  { key: 'from', edited: '2026-03-28', change: { modifiedFromMs: new Date(2026, 2, 28).getTime() } },
-  { key: 'to', edited: '2026-03-30', change: { modifiedToMs: new Date(2026, 2, 31).getTime() - 1 } },
-  { key: 'minimum', edited: '0.0005', change: { sizeFromBytes: 1, sizeFromInput: { text: '0.0005', unit: 'KB' } } },
-  { key: 'maximum', edited: '3.0005', change: { sizeToBytes: 3073, sizeToInput: { text: '3.0005', unit: 'KB' } } },
+  { key: 'folder', edited: '/another folder/', change: () => ({ pathPrefix: '/another folder/' }) },
+  { key: 'from', edited: '2026-03-28', change: () => ({ modifiedFromMs: new Date(2026, 2, 28).getTime() }) },
+  { key: 'to', edited: '2026-03-30', change: () => ({ modifiedToMs: new Date(2026, 2, 31).getTime() - 1 }) },
+  { key: 'minimum', edited: '0.0005', change: () => ({ sizeFromBytes: 1, sizeFromInput: { text: '0.0005', unit: 'KB' } }) },
+  { key: 'maximum', edited: '3.0005', change: () => ({ sizeToBytes: 3073, sizeToInput: { text: '3.0005', unit: 'KB' } }) },
 ])('F1 D12 unchanged $key preserves exact API restrictions on blur and Enter and an edit commits only that bound', async ({ key, edited, change }) => {
   vi.stubEnv('TZ', 'Europe/Berlin');
   aiOnline(); const el = await mount();
@@ -1479,7 +1479,7 @@ it.each([
   }
   if (pending) { pending.value = pendingOriginal!; pending.dispatchEvent(new Event('input')); await filters.updateComplete; }
   await filterEdit(el, key, edited, 'blur');
-  expect(getFilters()).toEqual({ ...original, ...change });
+  expect(getFilters()).toEqual({ ...original, ...change() });
   expect(backend.searches).toHaveLength(searches + 1);
   expect(backend.searches.at(-1)?.filters).toEqual({ pathPrefix: key === 'folder' ? edited : original.pathPrefix,
     modifiedAt: { fromMs: key === 'from' ? new Date(2026, 2, 28).getTime() : original.modifiedFromMs,
