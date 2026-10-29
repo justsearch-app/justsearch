@@ -59,10 +59,54 @@ fn reconcile_registered_children(data_dir: &std::path::Path) -> Result<(), Strin
             Ok(child)
         })
         .collect::<Result<_, String>>()?;
+    if !children.is_empty() {
+        let owner = root.get("pid").and_then(|value| value.as_u64())
+            .and_then(|pid| u32::try_from(pid).ok()).filter(|pid| *pid > 0)
+            .ok_or("Missing Engine owner; refusing terminal child cleanup")?;
+        // A losing shell has no authority over an incumbent's helpers. Only positive evidence
+        // that the recorded Engine PID is gone permits this fallback; unknown is a refusal.
+        if !terminal_owner_gone(owner)? {
+            return Err("Engine owner is still alive; refusing terminal child cleanup".into());
+        }
+    }
     for child in children {
         terminal_kill_if_identity_matches(&child)?;
     }
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn terminal_owner_gone(pid: u32) -> Result<bool, String> {
+    match linux_process::capture(pid) {
+        Ok(_) => Ok(false),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
+        Err(error) => Err(format!("Engine owner identity unavailable: {error}")),
+    }
+}
+
+#[cfg(windows)]
+fn terminal_owner_gone(pid: u32) -> Result<bool, String> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, GetLastError, ERROR_INVALID_PARAMETER, STILL_ACTIVE},
+        System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+    };
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if handle.is_null() {
+            return if GetLastError() == ERROR_INVALID_PARAMETER { Ok(true) }
+                else { Err("Engine owner identity unavailable".into()) };
+        }
+        let mut code = 0;
+        let ok = GetExitCodeProcess(handle, &mut code);
+        CloseHandle(handle);
+        if ok == 0 { return Err("Engine owner exit status unavailable".into()); }
+        Ok(code != STILL_ACTIVE as u32)
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
+fn terminal_owner_gone(_pid: u32) -> Result<bool, String> {
+    Err("Engine owner identity check is unsupported on this platform".into())
 }
 
 #[cfg(windows)]

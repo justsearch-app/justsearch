@@ -2115,6 +2115,61 @@ mod tests {
         (child, record)
     }
 
+    #[cfg(windows)]
+    fn dead_engine_pid() -> u32 {
+        let (mut owner, _) = owned_sleep_child();
+        let pid = owner.id();
+        owner.kill().unwrap();
+        owner.wait().unwrap();
+        pid
+    }
+
+    #[cfg(any(windows, target_os = "linux"))]
+    #[test]
+    fn losing_shell_cleanup_refuses_a_live_owners_helpers() {
+        let dir = tempdir().unwrap();
+        fs::create_dir(dir.path().join("runtime")).unwrap();
+        #[cfg(windows)]
+        let (mut child, record) = owned_sleep_child();
+        #[cfg(windows)]
+        let entry = serde_json::json!({
+            "pid":record.pid,"startedAt":record.started_at,"executable":record.executable
+        });
+        #[cfg(target_os = "linux")]
+        let mut child = std::process::Command::new("/bin/sh")
+            .args(["-c", "printf ready; read -r hold"])
+            .stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped())
+            .spawn().unwrap();
+        #[cfg(target_os = "linux")]
+        let entry = {
+            use std::io::Read;
+            let mut ready = [0; 5];
+            child.stdout.as_mut().unwrap().read_exact(&mut ready).unwrap();
+            let (identity, executable) = linux_process::capture(child.id()).unwrap();
+            serde_json::json!({"pid":child.id(),"executable":executable,"processIdentity":identity})
+        };
+        let path = dir.path().join("runtime/manifest.json");
+        let evidence = serde_json::json!({"schemaVersion":2,"pid":std::process::id(),"children":[entry]}).to_string();
+        fs::write(&path, &evidence).unwrap();
+        // Exercise both public terminal paths used by a failed or losing shell.
+        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
+            reason:"spawn_failed:fixture".into(),exit_code:1,
+        }, dir.path());
+        let after_exit_cleanup = child.try_wait().unwrap().is_none();
+        publish_terminal_spawn_failure(&EngineHost::default(), None, Some(dir.path()),
+            "fixture spawn failure", |_| {});
+        let after_spawn_failure = child.try_wait().unwrap().is_none();
+        let refusal = reconcile_registered_children(dir.path());
+        let unchanged = fs::read_to_string(&path).unwrap() == evidence;
+        let _ = child.kill();
+        child.wait().unwrap();
+        // Keep libtest's standard assertion diagnostic for fail-before evidence classification.
+        assert!(after_exit_cleanup);
+        assert!(after_spawn_failure);
+        assert!(refusal.unwrap_err().contains("Engine owner is still alive"));
+        assert!(unchanged, "a losing shell never edits the incumbent's evidence");
+    }
+
     #[test]
     fn m2_incomplete_reset_never_initializes_shortcuts_and_cancel_preserves_saved_choice() {
         let dir = tempdir().unwrap();
@@ -2203,7 +2258,7 @@ mod tests {
         let dir = tempdir().unwrap();
         fs::create_dir(dir.path().join("runtime")).unwrap();
         let (mut child, record) = owned_sleep_child();
-        let manifest = serde_json::json!({ "schemaVersion": 2, "children": [{
+        let manifest = serde_json::json!({ "schemaVersion": 2, "pid": dead_engine_pid(), "children": [{
             "pid": record.pid, "startedAt": record.started_at, "executable": record.executable
         }] });
         fs::write(
@@ -2240,7 +2295,7 @@ mod tests {
         let (mut matched, record) = owned_sleep_child();
         let (mut unrelated, mut mismatch) = owned_sleep_child();
         mismatch.executable.push_str(".unrelated");
-        let manifest = serde_json::json!({ "schemaVersion": 2, "children": [
+        let manifest = serde_json::json!({ "schemaVersion": 2, "pid": dead_engine_pid(), "children": [
             { "pid": record.pid, "startedAt": record.started_at, "executable": record.executable },
             { "pid": mismatch.pid, "startedAt": mismatch.started_at, "executable": mismatch.executable }
         ] });
@@ -2348,6 +2403,7 @@ mod tests {
             lifecycle: Some("READY".into()),
             instance_id: Some("abc".into()),
             pid: Some(7),
+            ..Default::default()
         };
         let payload: Option<u16> = backend_restart_payload(&manifest);
         assert_eq!(payload, Some(40404));

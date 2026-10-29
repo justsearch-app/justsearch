@@ -42,6 +42,8 @@ pub(crate) struct ManifestFields {
     /// Tempdoc 805 G.1: top-level `pid` of the process that published this manifest. When the
     /// shell spawned the child, a manifest naming a different pid is residue from another boot.
     pub(crate) pid: Option<u32>,
+    /// Supervised writer identity copied from JUSTSEARCH_ENGINE_INCARNATION.
+    pub(crate) incarnation: Option<(String, u64)>,
 }
 
 /// Apply a manifest observation to `binding` under the provenance rule.
@@ -131,5 +133,10 @@ pub(crate) fn read_manifest_if_present(path: &Path) -> Option<ManifestFields> {
             out.pid = Some(pid as u32);
         }
     }
+    out.incarnation = v.get("incarnation").and_then(|incarnation| {
+        let session = incarnation.get("session")?.as_str()?;
+        let n = incarnation.get("n")?.as_u64()?;
+        (!session.is_empty() && n > 0).then(|| (session.to_string(), n))
+    });
     Some(out)
 }

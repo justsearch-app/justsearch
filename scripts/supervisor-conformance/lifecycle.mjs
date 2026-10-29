@@ -13,7 +13,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
   const suspendFile=path.join(workDir,'suspend.json');
   if(['suspend','resume-hang'].includes(testCase.probe)) fs.writeFileSync(suspendFile,JSON.stringify([{fromMs:800,toMs:3300}]));
   io={...io,harnessOverrides:{...io.harnessOverrides,...(testCase.probe==='cooldown'?{JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS:'800',JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS:'800'}:{}),
-    ...(testCase.probe==='locked'?{JUSTSEARCH_SUPERVISOR_DATA_DIR_LOCKED_WAIT_MS:'5000'}:{}),
+    ...(['locked','locked-renewed'].includes(testCase.probe)?{JUSTSEARCH_SUPERVISOR_DATA_DIR_LOCKED_WAIT_MS:'5000'}:{}),
     ...(['suspend','resume-hang'].includes(testCase.probe)?{JUSTSEARCH_SUPERVISOR_HARNESS_SUSPEND_FILE:suspendFile,JUSTSEARCH_SUPERVISOR_RESUME_GRACE_MS:'1200'}:{})}};
   async function start() {
     if(testCase.probe==='stale') {
@@ -23,9 +23,10 @@ export async function runLifecycle({ name, testCase, policy, io }) {
     if(name==='dev-runner') {const run=await driveCase({testCase,policy,io,workDir,keepWorkDir:true});runs.push(run);return run;}
     const dataDir=path.join(workDir,'data');fs.mkdirSync(path.join(dataDir,'runtime'),{recursive:true});
     const planPath=path.join(workDir,'fake-engine.plan.json');if(!fs.existsSync(planPath))io.writeEnginePlan(workDir,enginePlanFor(testCase));
+    const faultGatePath=testCase.probe==='locked-renewed'?path.join(workDir,'running.json'):null;
     const run=runBinary({binary:binaryPath(io.repoRoot),workDir,dataDir,planPath,io,
-      env:{...process.env,...io.harnessOverrides,JUSTSEARCH_SUPERVISOR_START_DEADLINE_MS:String(testCase.startTimeoutMs??4000)},stopAfterIncarnation:0});
-    Object.assign(run,{dataDir,statePath:path.join(dataDir,'runtime/supervisor.v1.json'),seen:new Map()});runs.push(run);return run;
+      env:{...process.env,...io.harnessOverrides,...(faultGatePath?{JUSTSEARCH_FAKE_ENGINE_FAULT_GATE:faultGatePath}:{}),JUSTSEARCH_SUPERVISOR_START_DEADLINE_MS:String(testCase.startTimeoutMs??4000)},stopAfterIncarnation:0});
+    Object.assign(run,{dataDir,faultGatePath,statePath:path.join(dataDir,'runtime/supervisor.v1.json'),seen:new Map()});runs.push(run);return run;
   }
   function send(run,reason='quit',action=null) {
     if(name==='tauri') fs.writeFileSync(path.join(run.dataDir,'shell-control.json'),JSON.stringify({action,reason}));
@@ -49,8 +50,25 @@ export async function runLifecycle({ name, testCase, policy, io }) {
     }
     const run=await start();const probe=testCase.probe;
     if(probe) {
-      const state=await waitState(run,s=>s.state===(probe==='locked'?'exhausted':probe==='cooldown'?'restarting':probe==='start'?'starting':'running'),setupTimeoutMs);
+      const state=await waitState(run,s=>probe==='locked-renewed' ? s.state==='exhausted' || s.state==='running' && s.incarnation===5 : s.state===(probe==='locked'?'exhausted':probe==='cooldown'?'restarting':probe==='start'?'starting':'running'),setupTimeoutMs);
       assert(state,`reached trigger phase for ${probe}`);
+      if(probe==='locked-renewed') {
+        const exits=engineRecords(io,run.dataDir).filter(r=>r.type==='engine-exit');
+        assert.deepEqual(exits.map(exit=>exit.code),[1,2,1,2],
+          'the controlled sequence must reach both crashes and both recent lock exits');
+        assert.equal(state.state,'running','readiness must renew the second bounded lock retry');
+        assert.equal(state.incarnation,5,'the second lock retry must reach final readiness');
+        assert.equal(state.restartCount,2,'readiness renews the lock allowance, never the crash budget');
+        for (const index of [1,3]) {
+          assert.equal(exits[index].code,2);
+          assert.equal(exits[index].contract.counted,false);
+          assert.equal(exits[index].contract.action,'restart');
+          assert.equal(exits[index].phase,'STARTING');
+          assert.equal(exits[index].contract.exitClass,'NON_TRANSIENT');
+        }
+        send(run);assert(await waitState(run,s=>s.state==='stopped'),'quit after final readiness');
+        return {problems:[]};
+      }
       if(probe==='locked') {
         const records=engineRecords(io,run.dataDir);const exits=records.filter(r=>r.type==='engine-exit');
         assert.equal(exits.length,3,'one uncounted lock retry, then exhaustion');assert.equal(state.restartCount,1);
