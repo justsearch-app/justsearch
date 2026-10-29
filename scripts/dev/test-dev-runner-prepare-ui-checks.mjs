@@ -9,6 +9,13 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
+// The recipe and its stubs (shebang npm/python3, bash) are Linux-only; the shared
+// dev-runner lane also runs on Windows.
+if (process.platform !== 'linux') {
+  console.log('SKIP prepare-ui-checks: Linux-only recipe');
+  process.exit(0);
+}
+
 const script = process.env.PREPARE_UI_CHECKS_SCRIPT || fileURLToPath(new URL('./prepare-ui-checks.cjs', import.meta.url));
 const realPython = spawnSync('python3', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' });
 assert.equal(realPython.status, 0, realPython.stderr);
@@ -185,13 +192,12 @@ test('env.sh also clears settings the shell gained after preparation', t => {
     npm_config_prefix: f.outside, NPM_CONFIG_USERCONFIG: path.join(f.outside, 'npmrc'),
   };
   const sourced = spawnSync('bash', ['--noprofile', '--norc', '-c',
-    'source "$1" && exec "$2" -e "console.log(JSON.stringify(process.env))"',
+    'source "$1" && [[ ! -v __ui_checks_var ]] && exec "$2" -e "console.log(JSON.stringify(process.env))"',
     'source-env', path.join(f.root, 'tmp/ui-checks/env.sh'), process.execPath,
   ], { encoding: 'utf8', env: { ...process.env, ...later } });
   assert.equal(sourced.status, 0, sourced.stderr);
   const env = JSON.parse(sourced.stdout);
   for (const key of Object.keys(later)) assert.equal(env[key], undefined, key);
-  assert.equal(env.__ui_checks_var, undefined);
   assert.equal(env.PYTHONPATH, path.join(f.root, 'scripts/jseval'));
 });
 
