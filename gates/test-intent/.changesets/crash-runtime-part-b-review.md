@@ -2,12 +2,12 @@
 schema: test-intent.v1
 task: t-20261019-91c3ab
 author-role: builder
-author-session: 01a186cf-b9dd-7a31-98b6-d8666cee7dfa
+author-session: 01a18715-7ddb-75e1-965c-b02b66cb4d86
 ---
 
 # Test-intent entries
 
-These entries cover the settled final review repairs. Existing accepted changesets are unchanged. The orchestrator runs the evidence producer after committing and obtains independent acceptance.
+These entries cover the settled final review repairs. Existing accepted changesets are unchanged. The orchestrator runs the evidence producer after committing and obtains independent acceptance. The same-PID check builds the existing native helper in a private Linux fixture subprocess, retaining real admission without an installed bundle. The rotation check lives in LedgerSurvivorRotationTest and reuses ChildControlHarness; LedgerReconcilerTest is restored byte-for-byte to dabd685ad2.
 
 ```json
 {
@@ -68,7 +68,7 @@ These entries cover the settled final review repairs. Existing accepted changese
     },
     {
       "items": [
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerReconcilerTest.java"
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerSurvivorRotationTest.java"
       ],
       "class": "Defect pin",
       "sources": [
@@ -89,7 +89,7 @@ These entries cover the settled final review repairs. Existing accepted changese
       "reproduction": "On dabd685ad2, rotationsCarryOnlyFourRecentStopIntentsAndAllIdentityReceipts carries s-0 through s-5 instead of s-2 through s-5 on its first rotation, so repeated failed cleanup adds unbounded active retry history.",
       "evidence": "gates/test-intent/evidence/crash-runtime-part-b-review.json",
       "newChecks": [
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerReconcilerTest.java#rotationsCarryOnlyFourRecentStopIntentsAndAllIdentityReceipts"
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerSurvivorRotationTest.java#rotationsCarryOnlyFourRecentStopIntentsAndAllIdentityReceipts"
       ]
     },
     {

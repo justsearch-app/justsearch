@@ -46,6 +46,31 @@ fn pidless_predecessor_never_supplies_successor_port_or_token() {
 
 #[test]
 fn retained_same_pid_manifest_cannot_bind_a_fresh_shell() {
+    // Admission requires the native Linux helper. Build a private fixture instead of relying on
+    // installDist; isolate its process-wide bundle path from the other library tests.
+    #[cfg(target_os = "linux")]
+    {
+        const BUNDLE: &str = "JUSTSEARCH_SAME_PID_TEST_BUNDLE";
+        if let Some(bundle) = std::env::var_os(BUNDLE) {
+            crate::linux_process::set_bundle_dir(std::path::Path::new(&bundle));
+        } else {
+            let bundle = tempfile::tempdir().unwrap();
+            let helper = bundle.path().join(crate::native_targets::relative_path("bound-exec"));
+            std::fs::create_dir_all(helper.parent().unwrap()).unwrap();
+            let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../../native/bound-exec/bound-exec.c");
+            let compiled = std::process::Command::new("cc")
+                .args(["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"])
+                .arg(source).arg("-o").arg(helper).status().unwrap();
+            assert!(compiled.success(), "private bound-exec fixture must compile");
+            let result = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "shell_actuator::commit_transport_tests::retained_same_pid_manifest_cannot_bind_a_fresh_shell", "--nocapture"])
+                .env(BUNDLE, bundle.path()).output().unwrap();
+            assert_eq!(result.status.code(), Some(0), "isolated same-PID manifest check failed:\n{}\n{}",
+                String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+            return;
+        }
+    }
     use crate::supervisor::Actuator;
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("runtime")).unwrap();
