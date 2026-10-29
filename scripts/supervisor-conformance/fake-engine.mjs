@@ -177,6 +177,8 @@ const requestPath = path.join(runtimeDir, 'shutdown-request.v1.json');
 const requestedPort = num(args.apiPort ?? env.JUSTSEARCH_API_PORT, 0);
 const instanceId = crypto.randomUUID();
 const startedAt = new Date().toISOString();
+const incarnationRef = process.env.JUSTSEARCH_ENGINE_INCARNATION;
+const [incarnationSession, incarnationNumber] = (incarnationRef ?? '').split('/');
 const sessionToken = crypto.randomUUID();
 
 function log(message) {
@@ -247,6 +249,7 @@ function publishManifest(port) {
     schemaVersion: 1,
     instanceId,
     startedAt,
+    incarnation: incarnationRef ? { session: incarnationSession, n: Number(incarnationNumber) } : null,
     pid: process.pid,
     lifecycle: 'READY',
     head: { apiPort: port, sessionToken },
