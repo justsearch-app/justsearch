@@ -11,6 +11,7 @@ test('S13: Linux GPU packs have a manual, read-only Ubuntu producer and an advis
   assert.deepEqual(Object.keys(producer.on), ['workflow_dispatch']);
   assert.deepEqual(producer.permissions, { contents: 'read' });
   assert.equal(producer.jobs.build['runs-on'], 'ubuntu-24.04');
+  assert.equal(producer.jobs.build.environment, 'release-signing');
   assert.match(producer.jobs.build.if, /github.ref == 'refs\/heads\/main'/);
   assert.equal(producer.concurrency['cancel-in-progress'], false);
   const policy = JSON.parse(read('scripts/ci/workflow-signal-policy.v1.json')).workflows

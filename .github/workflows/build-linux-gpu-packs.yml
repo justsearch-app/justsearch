@@ -15,6 +15,7 @@ jobs:
   build:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    environment: release-signing
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v7
@@ -26,7 +27,7 @@ jobs:
           RELEASE_TOKEN: ${{ secrets.JUSTSEARCH_RELEASES_PACK_TOKEN }}
         run: |
           [[ "$PACK_TAG" =~ ^linux-cuda12-[1-9][0-9]*$ ]]
-          test -n "$RELEASE_TOKEN" || { echo 'Configure JUSTSEARCH_RELEASES_PACK_TOKEN (Contents write on eliasjustus/justsearch-releases)'; exit 1; }
+          test -n "$RELEASE_TOKEN" || { echo 'Configure release-signing secret JUSTSEARCH_RELEASES_PACK_TOKEN (Contents write on eliasjustus/justsearch-releases)'; exit 1; }
       - name: Install build tools
         run: |
           sudo apt-get update

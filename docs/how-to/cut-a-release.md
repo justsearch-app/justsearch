@@ -356,8 +356,9 @@ The pack manifest records input sources and hashes; `verified-inputs.json` also 
 compiler versions and build configuration. Ordinary application releases reuse these
 immutable packs; there is no per-release rebuild or owner preparation step.
 
-One-time owner setting: create repository Actions secret **`JUSTSEARCH_RELEASES_PACK_TOKEN`**
-in the source repository. Its value is a fine-grained personal access token restricted to
+One-time owner setting: create Actions secret **`JUSTSEARCH_RELEASES_PACK_TOKEN`** in the source
+repository's existing **`release-signing` environment**, which permits protected `main` as described
+above and has no required reviewer or wait timer. Its value is a fine-grained personal access token restricted to
 **`eliasjustus/justsearch-releases`**, with **Contents: read and write** (and the mandatory
 Metadata read permission). The source repository's ordinary `GITHUB_TOKEN` cannot write to
 that other repository. Do not give the token access to other repositories or workflows.
