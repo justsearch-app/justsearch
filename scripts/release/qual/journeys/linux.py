@@ -467,9 +467,14 @@ def restart(run):
     run.native.key('escape')
     wait_for(lambda: 'Settings' not in run.native.app_text('J4-settings-closed'),
              'Restored Settings closed before bookmarks click', seconds=30, error=Observation)
-    before = run.native.matching_text('J4-before-bookmarks', r'\bLibrary\b', geometry['popup'])
-    if before:
-        raise Infrastructure('Bookmark observation region already contains Library before clicking')
+    before = []
+    for sample in range(3):
+        before.append(run.native.matching_text('J4-before-bookmarks-' + str(sample), r'\bLibrary\b', geometry['popup']))
+        run.evidence('J4-before-bookmarks', before)
+        if before[-1]:
+            raise Infrastructure('Bookmark observation region already contains Library before clicking')
+        if sample < 2:
+            time.sleep(.5)
     interaction_observation(run, 'J4-bookmarks-click')
     window = run.native.app_window()
     if not window:
@@ -728,14 +733,48 @@ def deep_links(run):
     run.desktop_spawn(['xdg-open', 'justsearch://query?q=' + quote(query)], run.work + '/cold-deep-link.log')
     run.observe_window('cold-deep-link')
     run.ready()
-    cold = wait_for(lambda: run.native.matching_text('J7-deep-link-cold', re.escape(query)),
+    shells = [p for p in run.target.owned() if p['exe'] == run.binary]
+    run.evidence('J7-deep-link-cold-processes', shells)
+    assert len(shells) == 1, 'Cold OS deep link requires exactly one JustSearch UI process'
+    cold = wait_for(lambda: run.native.matching_text('J7-deep-link-cold', r'\s+'.join(map(re.escape, query.split()))),
                     'Cold OS deep link unique query in app window; OCR absence uncorroborated',
                     seconds=45, error=Observation)
+    before_window = run.native.app_window()
+    if not before_window:
+        raise Infrastructure('Warm deep-link receiving app is not focused before dispatch')
     if native_library_destination(run, 'J7-deep-link-warm-before'):
         raise Infrastructure('Warm deep-link top bar already contains Library before dispatch')
+    before_shells = [p for p in run.target.owned() if p['exe'] == run.binary]
+    run.evidence('J7-deep-link-warm-before', {'window': before_window, 'uiProcesses': before_shells})
+    assert len(before_shells) == 1, 'Cold OS deep link left multiple JustSearch UI processes'
     interaction_observation(run, 'J7-warm-dispatch')
     run.desktop_spawn(['xdg-open', 'justsearch://surface/core.library-surface'], run.work + '/warm-deep-link.log')
-    warm = wait_for(lambda: native_library_destination(run),
+    forwarding_failure = None
+    def warm_destination():
+        nonlocal forwarding_failure
+        if forwarding_failure:
+            raise forwarding_failure
+        try:
+            shells = [p for p in run.target.owned() if p['exe'] == run.binary]
+            run.evidence('J7-deep-link-warm-processes', shells)
+            assert len(shells) <= len(before_shells), 'Warm OS deep link started a second JustSearch UI process; forwarding failed'
+            window = run.native.app_window()
+            if not window:
+                raise Infrastructure('Warm deep-link receiving app is not focused')
+            assert window['pid'] == before_window['pid'], 'Warm OS deep link changed JustSearch receiver PID; forwarding failed'
+            destination = native_library_destination(run)
+            if destination:
+                assert destination['window']['pid'] == before_window['pid'], 'Warm OS deep link changed JustSearch receiver PID during capture'
+            shells = [p for p in run.target.owned() if p['exe'] == run.binary]
+            run.evidence('J7-deep-link-warm-processes-after-capture', shells)
+            assert len(shells) <= len(before_shells), 'Warm OS deep link started a second JustSearch UI process during capture; forwarding failed'
+            return destination
+        except AssertionError as exc:
+            # Once observed, broken forwarding cannot recover into a pass merely
+            # because the extra instance exits before the polling deadline.
+            forwarding_failure = exc
+            raise
+    warm = wait_for(warm_destination,
                     'Warm OS deep link Library destination; OCR absence uncorroborated', seconds=45, error=Observation)
     return {'cold': cold, 'warm': warm}
 
@@ -743,8 +782,8 @@ def deep_links(run):
 def cold_link_query(run_id):
     # A hexadecimal digest encoded as distinct dictionary words avoids 0/o,
     # 1/l, b/6 and e/c glyph ambiguity in the native observer.
-    words = ('map', 'sun', 'fox', 'ivy', 'jam', 'sky', 'wax', 'gym',
-             'pup', 'fin', 'rug', 'ash', 'hay', 'yak', 'gum', 'sum')
+    words = ('sun', 'fox', 'ivy', 'sky', 'pup', 'fin', 'rug', 'ash',
+             'hay', 'yak', 'sir', 'sip', 'fur', 'fig', 'jar', 'joy')
     return ' '.join(words[int(n, 16)] for n in hashlib.sha256(run_id.encode()).hexdigest()[:8])
 
 

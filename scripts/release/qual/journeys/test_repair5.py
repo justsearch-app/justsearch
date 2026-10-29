@@ -43,15 +43,16 @@ class Round2Tests(unittest.TestCase):
                 run.native.click.assert_not_called()
 
     def link_run(self):
-        run = Mock(work='/tmp/isolated-run', run_id='w4a-round-two')
+        run = Mock(work='/tmp/isolated-run', run_id='w4a-round-two', binary='/usr/bin/JustSearch')
+        run.target.owned.return_value = [{'pid':1,'exe':run.binary}]
         run.wd.execute.return_value = 'Search'
         run.native.app_text.return_value = ''
-        run.native.app_window.return_value = {'rect': {'width': 1024, 'height': 700}}
+        run.native.app_window.return_value = {'pid':1, 'rect': {'width': 1024, 'height': 700}}
         return run
 
     def test_02_warm_link_rejects_already_visible_library(self):
         run = self.link_run()
-        run.native.matching_text.side_effect = lambda name, *a: None if name == 'J7-deep-link-before' else ('Library' if 'warm' in name else 'unique cold query')
+        run.native.matching_text.side_effect = lambda name, *a: 'Library' if name == 'J7-deep-link-warm-before' else 'unique cold query'
         with patch.object(linux, 'require_candidate'), patch.object(linux, 'interaction_observation'), \
              patch.object(linux, 'wait_for', immediate), self.assertRaisesRegex(runner.Infrastructure, 'already contains Library'):
             linux.deep_links(run)
@@ -192,6 +193,8 @@ class Round2Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             run = runner.Run(SimpleNamespace(evidence=temp+'/run', vm=None, lane='vm-linux-wayland'), DEFINITION)
             run.work = '/tmp/isolated'; run.facts['folder'] = True
+            run.binary = '/usr/bin/JustSearch'
+            run.target.owned = Mock(return_value=[{'pid':1,'exe':run.binary}])
             run.native = Mock(); run.native.matching_text.return_value = None
             run.stop_app = Mock(); run.desktop_spawn = Mock(); run.observe_window = Mock(); run.ready = Mock()
             # Baseline also needs its obsolete before-read to succeed.
@@ -244,6 +247,8 @@ class Round2Tests(unittest.TestCase):
             command = command.replace('/var/crash',str(root))
             if command.startswith('find '):
                 return SimpleNamespace(stdout=''.join(p.name+'\n' for p in root.glob('*.crash')))
+            if command == 'dpkg-query -L just-search':
+                return SimpleNamespace(returncode=0, stdout='/opt/just-search/JustSearch\n')
             args = shlex.split(command)[4:]  # sudo -S -p ''
             return subprocess.run(args, stdout=kw['stdout'], stderr=subprocess.PIPE, check=True)
         return ssh
@@ -262,14 +267,19 @@ class Round2Tests(unittest.TestCase):
             self.assertEqual(json.loads((out/'guest-crashes.json').read_text())[0]['fields']['Signal'],'5')
             self.assertTrue((out/'guest-crashes.tar').is_file())
 
-    def test_11_crash_copy_is_capped_before_transfer(self):
+    def test_11_crash_copy_contains_bounded_headers_even_for_large_core(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)/'crash'; root.mkdir(); out=Path(temp)/'evidence'; out.mkdir()
-            with (root/'huge.crash').open('wb') as stream: stream.truncate(100_000_001)
+            with (root/'huge.crash').open('wb') as stream:
+                stream.write(b'ExecutablePath: /usr/bin/desktop-helper\nCoreDump: base64\n')
+                stream.truncate(100_000_001)
             with patch.object(wrapper.vm,'ssh',self.crash_ssh(root)), patch.object(wrapper.vm,'config',return_value={'password':'guest'}), \
-                 patch.object(wrapper.vm,'guest_root'), self.assertRaises(subprocess.CalledProcessError):
+                 patch.object(wrapper.vm,'guest_root') as move:
                 wrapper.crash_evidence(out)
-            self.assertEqual((out/'guest-crashes.tar').stat().st_size,0)
+            move.assert_called_once()
+            self.assertLess((out/'guest-crashes.tar').stat().st_size,100_000)
+            self.assertEqual(json.loads((out/'guest-crashes.json').read_text())[0]['fields'],
+                             {'ExecutablePath':'/usr/bin/desktop-helper'})
 
     def test_12_desktop_preparation_does_not_accept_arbitrary_ocr(self):
         descriptions = []

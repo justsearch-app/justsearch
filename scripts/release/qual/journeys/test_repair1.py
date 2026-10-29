@@ -55,7 +55,7 @@ class RepairTests(unittest.TestCase):
             events.append(name)
             return next(texts)
         run.native.app_text.side_effect = app_text
-        run.native.matching_text.side_effect = [None, 'Library just now']
+        run.native.matching_text.side_effect = [None, None, None, 'Library just now']
         run.native.key.side_effect = lambda key: events.append(key)
         with patch.object(linux, 'assert_state', return_value={'retained': True}), \
              patch.object(linux, 'interaction_observation'), patch.object(linux, 'wait_for', once):

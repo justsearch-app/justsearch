@@ -139,7 +139,8 @@ class Repair4Tests(unittest.TestCase):
             run.target.run.assert_not_called()
 
     def test_cold_link_ignoring_dispatch_cannot_pass_from_restored_orchid(self):
-        run = Mock(work='/tmp/owned', run_id='w4a-123456789')
+        run = Mock(work='/tmp/owned', run_id='w4a-123456789', binary='/usr/bin/JustSearch')
+        run.target.owned.return_value = [{'pid':1,'exe':run.binary}]
         run.wd.execute.return_value = 'Search v3 orchid lighthouse'
         run.native.app_text.side_effect = lambda name, *a, **kw: 'Library' if 'warm' in name else 'Search v3 orchid lighthouse'
         run.native.matching_text.return_value = None
@@ -154,17 +155,18 @@ class Repair4Tests(unittest.TestCase):
         self.assertEqual(len(run.native.matching_text.call_args.args), 2)
 
     def test_cold_link_accepts_unique_token_anywhere_in_owned_window(self):
-        run = Mock(work='/tmp/owned', run_id='w4a-moving-composer')
+        run = Mock(work='/tmp/owned', run_id='w4a-moving-composer', binary='/usr/bin/JustSearch')
+        run.target.owned.return_value = [{'pid':1,'exe':run.binary}]
         query = linux.cold_link_query(run.run_id)
         run.native.matching_text.side_effect = [query, None, 'Library']
-        run.native.app_window.return_value = {'rect': {'width': 1024, 'height': 700}}
+        run.native.app_window.return_value = {'pid':1, 'rect': {'width': 1024, 'height': 700}}
         with patch.object(linux, 'require_candidate'), patch.object(linux, 'interaction_observation'), \
              patch.object(linux, 'wait_for', immediate):
             result = linux.deep_links(run)
         self.assertEqual(result['cold'], query)
         run.wd.keys.assert_not_called()
         cold, before, warm = run.native.matching_text.call_args_list
-        self.assertEqual(cold.args, ('J7-deep-link-cold', re.escape(query)))
+        self.assertEqual(cold.args, ('J7-deep-link-cold', r'\s+'.join(map(re.escape, query.split()))))
         self.assertEqual(before.args[2], warm.args[2])
         self.assertEqual(warm.args[2]['height'], 40)
         self.assertTrue(run.desktop_spawn.call_args_list[0].args[0][1].endswith(query.replace(' ', '%20')))

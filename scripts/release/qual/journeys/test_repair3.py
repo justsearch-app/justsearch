@@ -50,6 +50,8 @@ class Repair3Tests(unittest.TestCase):
                 def ssh(_, command, **kwargs):
                     if command.startswith('find '):
                         return Mock(stdout='test.crash\n')
+                    if command == 'dpkg-query -L just-search':
+                        return Mock(returncode=0,stdout='/opt/just-search/runtime/bin/java\n/opt/just-search/JustSearch\n')
                     with tarfile.open(fileobj=kwargs['stdout'], mode='w') as archive:
                         member = tarfile.TarInfo('test.crash'); member.size = len(content)
                         archive.addfile(member, io.BytesIO(content))

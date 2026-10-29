@@ -126,14 +126,14 @@ def wait_for(fn, description, seconds=90, interval=1, error=AssertionError):
     while time.monotonic() < deadline:
         try:
             value = fn()
-            last = None
+            last = value
             if value:
                 return value
-        except (OSError, KeyError, ValueError, urllib.error.URLError, Infrastructure) as exc:
+        except (AssertionError, OSError, KeyError, ValueError, urllib.error.URLError, Infrastructure) as exc:
             last = exc
         time.sleep(interval)
-    if last is not None:
-        error = Infrastructure
+    if isinstance(last, Exception):
+        error = AssertionError if isinstance(last, AssertionError) else Infrastructure
     if isinstance(last, Observation) and issubclass(error, Infrastructure):
         error = Observation
     raise error(f'{description} timed out after {seconds}s; last observation: {last}')
@@ -379,9 +379,9 @@ import json,os,subprocess
 if os.environ.get('WAYLAND_DISPLAY'):
  from gi.repository import Gio,GLib
  proxy=Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION,0,None,'org.gnome.Shell','/org/gnome/Shell','org.gnome.Shell',None)
- script='(()=>{let w=global.display.focus_window;if(!w)return null;let r=w.get_frame_rect();return {pid:w.get_pid(),title:w.get_title(),rect:{x:r.x,y:r.y,width:r.width,height:r.height}}})()'
+ script='(()=>{if(typeof Main.modalCount!=="number")throw Error("GNOME modal observation unavailable");if(Main.modalCount!==0)throw Error("GNOME shell modal overlaps possible app pixels");let w=global.display.focus_window;if(!w)return null;let r=w.get_frame_rect();return {pid:w.get_pid(),title:w.get_title(),rect:{x:r.x,y:r.y,width:r.width,height:r.height}}})()'
  ok,raw=proxy.call_sync('Eval',GLib.Variant('(s)',(script,)),0,5000,None).unpack()
- if not ok:raise RuntimeError('GNOME window observation unavailable; prepare the disposable compositor debugger')
+ if not ok:raise RuntimeError('GNOME window observation unavailable; prepare the disposable compositor debugger: '+raw)
  result=json.loads(raw)
 else:
  def x(*args):return subprocess.check_output(['xdotool',*args],text=True).strip()
@@ -414,7 +414,7 @@ if os.environ.get('WAYLAND_DISPLAY'):
 else:
  rows=[]
  for pid in pids:
-  result=subprocess.run(['xdotool','search','--pid',str(pid)],capture_output=True,text=True)
+  result=subprocess.run(['xdotool','search','--onlyvisible','--pid',str(pid)],capture_output=True,text=True)
   if result.returncode not in (0,1):raise RuntimeError('X11 window list unavailable: '+result.stderr)
   rows.extend({'pid':pid,'window':w} for w in result.stdout.splitlines())
 print(json.dumps(rows))
@@ -433,7 +433,7 @@ print(json.dumps(rows))
 import json
 from gi.repository import Gio,GLib
 proxy=Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION,0,None,'org.gnome.Shell','/org/gnome/Shell','org.gnome.Shell',None)
-script='(()=>{let b=Main.messageTray._banner;return !!(b && b.visible && b.get_paint_visibility())})()'
+script='(()=>{if(!("_banner" in Main.messageTray))throw Error("GNOME banner field unavailable");let b=Main.messageTray._banner;return !!(b && b.visible && b.get_paint_visibility())})()'
 ok,raw=proxy.call_sync('Eval',GLib.Variant('(s)',(script,)),0,5000,None).unpack()
 if not ok:raise RuntimeError('GNOME notification observation unavailable')
 print(json.dumps(json.loads(raw)))
@@ -574,7 +574,7 @@ class Run:
         # Follow the installed shell's production manifest, never a guessed port.
         # Verify its live instance before sending its owner-only credential.
         result = self.target.json("""
-import json,os,sys,urllib.request,urllib.error
+import http.client,json,os,sys,urllib.request,urllib.error
 from pathlib import Path
 a=json.loads(sys.argv[1])
 try:
@@ -589,7 +589,7 @@ try:
  body=a['body']; req=urllib.request.Request(base+a['endpoint'],data=None if body is None else json.dumps(body).encode(),headers={'X-JustSearch-Session':m['head']['sessionToken'],'Content-Type':'application/json'})
  with opener.open(req,timeout=30) as r: value=json.load(r)
  print(json.dumps({'status':'ok','value':value}))
-except (AssertionError,FileNotFoundError,ProcessLookupError,KeyError,ValueError,urllib.error.HTTPError) as exc:
+except (AssertionError,FileNotFoundError,ProcessLookupError,KeyError,ValueError,urllib.error.HTTPError,http.client.HTTPException,ConnectionError) as exc:
  print(json.dumps({'status':'product','reason':type(exc).__name__+': '+str(exc)}))
 except urllib.error.URLError as exc:
  print(json.dumps({'status':'infrastructure' if isinstance(exc.reason,TimeoutError) else 'product','reason':str(exc)}))

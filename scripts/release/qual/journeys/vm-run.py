@@ -178,12 +178,29 @@ def crash_evidence(out):
         archive_path = out / 'guest-crashes.tar'
         if archive_path.exists():
             archive_path = out / ('guest-crashes-' + str(time.time_ns()) + '.tar')
-        # Bound guest bytes before streaming them to the host. Never copy an
-        # unbounded CoreDump just to discover its size after the transfer.
-        source = ("import os,sys; from pathlib import Path; names=sys.argv[1:]; "
-                  "assert all(not Path('/var/crash',n).is_symlink() for n in names); "
-                  "assert sum(Path('/var/crash',n).stat().st_size for n in names) <= 100_000_000, 'Guest crash reports exceed 100 MB'; "
-                  "os.execvp('tar',['tar','-cf','-','-C','/var/crash','--',*names])")
+        # Stream only bounded diagnostic fields before CoreDump. A large core
+        # must neither hide its product crash nor be copied to the host.
+        source = """
+import io,sys,tarfile
+from pathlib import Path
+keys=(b'ExecutablePath:',b'Signal:',b'ProblemType:',b'Date:',b'Package:',b'ProcCmdline:')
+with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
+ for name in sys.argv[1:]:
+  path=Path('/var/crash',name)
+  assert not path.is_symlink(), 'Crash report is a symlink'
+  fields={}
+  with path.open('rb') as report:
+   continuation=False
+   while True:
+    raw=report.readline(65536)
+    if not raw:break
+    if not continuation:
+     if raw.startswith(b'CoreDump:'):break
+     if raw.startswith(keys):fields[raw.split(b':',1)[0]]=raw.rstrip(b'\\n')+b'\\n'
+    continuation=not raw.endswith(b'\\n')
+  header=b''.join(fields.values()); member=tarfile.TarInfo(name);member.size=len(header)
+  archive.addfile(member,io.BytesIO(header))
+"""
         with archive_path.open('wb') as stream:
             vm.ssh('ubuntu', "sudo -S -p '' python3 -c " + shlex.quote(source) + ' ' + shlex.join(names),
                    input=(vm.config()['password'] + '\n').encode(), stdout=stream,
@@ -206,9 +223,14 @@ def crash_evidence(out):
         recorded = '/var/crash/qualification-recorded-' + str(time.time_ns())
         vm.guest_root('ubuntu', 'mkdir ' + shlex.quote(recorded) + '; mv -- '
                       + shlex.join('/var/crash/' + n for n in names) + ' ' + shlex.quote(recorded) + '/')
-        product = [r for r in fields if any(name in (r['fields'].get('ExecutablePath', '')
-                    + ' ' + r['fields'].get('ProcCmdline', '')).lower()
-                    for name in ('justsearch', 'just-search'))]
+        product = [r for r in fields if r['fields'].get('Package', '').split()[:1] == ['just-search']]
+        if product:
+            raise AssertionError('Product crash in guest: ' + json.dumps(product))
+        installed = vm.ssh('ubuntu', 'dpkg-query -L just-search', capture_output=True, text=True, timeout=30)
+        if installed.returncode not in (0, 1):
+            raise Infrastructure('Installed package paths unavailable for crash attribution')
+        paths = set(installed.stdout.splitlines()) if installed.returncode == 0 else set()
+        product = [r for r in fields if r['fields'].get('ExecutablePath', '') in paths]
         if product:
             raise AssertionError('Product crash in guest: ' + json.dumps(product))
 

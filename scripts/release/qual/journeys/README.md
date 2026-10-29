@@ -133,11 +133,13 @@ the desktop file indexer, and sets swappiness to 1 to prefer reclaiming file
 cache over writing anonymous pages. At first boot, desktop preparation disables
 Ubuntu update-notifier crash pop-ups and renews the guest login session if needed.
 GNOME notification banners are disabled and the setting is verified. Native app
-captures reject visible GNOME banners before and after capture.
-Apport still records crashes; reports are capped at 100 MB before transfer and
-moved aside after recording so snapshots do not repeat them.
-Raw reports and key fields are retained, and a
-JustSearch or bundled Engine crash is a product finding. Journald and swap remain enabled.
+captures reject visible GNOME banners before and after capture, and require a
+known zero shell modal count in the focus query. Missing observation fields fail
+as infrastructure. Apport still records crashes; only diagnostic header fields
+before CoreDump are transferred, even for oversized reports. Reports move aside
+after recording so snapshots do not repeat them. A crash of an installed package
+executable, or a report naming Package: just-search, is a product finding;
+command-line mentions alone do not attribute a crash. Journald and swap remain enabled.
 Every journey records synced whole-device write and swap-counter deltas,
 without double-counting disk partitions. Overlay summaries record boot through
 pre-shutdown guest counters, QMP counters and QEMU's host process I/O; the top
@@ -181,7 +183,8 @@ private signing key is needed or used for these tests.
   confirm it closed. A physical click at the
   previously DOM-measured bookmarks control opens the popup in that same normal
   process. The focused window must belong to this run; OCR is restricted to the
-  previously measured popup area and must transition from no Library to Library.
+  previously measured popup area and must transition from three samples without
+  Library to Library.
 - J5 (VM): parent-state preparation, signed HTTPS update offer, cancelled
   PolicyKit prompt with old Engine recovery and re-offer, the **real 300-second
   dpkg lock timeout**, then accepted elevation and automatic candidate relaunch.
@@ -199,8 +202,11 @@ private signing key is needed or used for these tests.
   its app window must contain a query derived from this run ID for the cold
   link. The query uses dictionary words derived from the new run ID and is
   never entered through WebDriver or typed before dispatch. The app is stopped
-  before the cold link. The warm link must transition from no Library to Library
-  using the same two OCR segmentations in the cropped top bar.
+  before the cold link, which must leave exactly one owned JustSearch UI process.
+  The warm link must retain the focused app PID without growing the owned UI
+  process count and transition from no Library to Library using the same two OCR
+  segmentations in the cropped top bar. Query words avoid m/w ambiguity and allow
+  whitespace wrapping in OCR.
   Shortcut input stays in a
   WebDriver session, where compositor focus, document focus, the actual focused
   search control, and its exact newly typed value must agree. The Wayland binding
@@ -234,9 +240,7 @@ and text reports, CSV, HTML, email, DOCX and an image-only PDF. The unique open
 fixture is `JustSearch-journey-orchid-open.txt`; only the scanned PDF contains
 `cobalt marmalade`. Per-run corpus hashes are retained. No external documents,
 personal information, models or generated corpus binary files are committed.
-The small retained screenshot in `fixtures/predecessor-bookmark-ocr.png` is a
-regression fixture from the independent W4a verifier: block segmentation reads
-“Ubrary”, while sparse segmentation reads “Library”. Native destination OCR
+Native destination OCR
 retries sparse segmentation on a miss, including before-state guards. A persistent
 J4 bookmark miss with the stored bookmark present is a product failure. Other
 missing OCR text without corroborating app state is infrastructure, with
@@ -269,5 +273,6 @@ python3 -m unittest discover -s scripts/release/qual -p 'test_*.py' -v
 
 These isolated tests never touch
 the shared VM data, a display, running app,
-network service or installed package. Before-state tests belong in a shared
+network service or installed package. The compositor query unit tests evaluate
+JavaScript with the existing Node tool. Before-state tests belong in a shared
 clone under `$TMPDIR`; do not stash or revert the worktree for a baseline check.
