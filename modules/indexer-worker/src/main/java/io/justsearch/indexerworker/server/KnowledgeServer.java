@@ -1352,6 +1352,7 @@ public final class KnowledgeServer implements Closeable {
       }
       this.recordedCandidate = candidate.orElse(null);
 
+
       genManager.reconcileActiveRecoveryOwnership(activeGenerationPath -> {
         if (!IndexRecoveryMarker.exists(activeGenerationPath)) {
           IndexRecoveryMarker.write(activeGenerationPath, "interrupted_backup_first");
@@ -1408,6 +1409,22 @@ public final class KnowledgeServer implements Closeable {
       this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
       this.persistedMigrationProgressSnapshot = this.migrationProgressStore.readBestEffort();
       IndexGenerationManager.State state = layout.state();
+      if (unfinishedMigration && !(bootOwnership instanceof IndexGenerationManager.BootOwnership.Fenced)) {
+        String replayGeneration = state == null ? null : state.building_generation() == null
+            ? state.active_generation() : state.building_generation();
+        String operationKey = bootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+            ? recorded.operationKey() : IndexGenerationManager.isRecordedGenerationIdentity(replayGeneration)
+                ? replayGeneration.substring(2) : null;
+        var frozen = operationKey == null
+            ? java.util.Optional.<io.justsearch.app.api.operations.RecordedRootPlan>empty()
+            : recordedIngestionLifecycle.recordedRootPlan(operationKey);
+        if (replayGeneration != null) {
+          sqliteQueue.recoverLegacyCollections(replayGeneration,
+              KnowledgeServerMigrationOps.loadMigrationRootDeclarations(dataDir, rc.collections(), JSON).stream()
+                  .map(source -> new RootBinding(source.path(), source.collection())).toList(),
+              frozen.orElse(null));
+        }
+      }
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
           && jobQueue instanceof SqliteJobQueue) {
         release030Recovery = ((SqliteJobQueue)jobQueue).release030RecoveryState();

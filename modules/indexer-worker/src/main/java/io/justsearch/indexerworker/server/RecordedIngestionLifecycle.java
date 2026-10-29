@@ -41,6 +41,12 @@ public interface RecordedIngestionLifecycle {
     }
   }
 
+  /** Frozen collection authority for legacy file receipts in this recorded migration. */
+  default Optional<io.justsearch.app.api.operations.RecordedRootPlan> recordedRootPlan(
+      String operationKey) throws IOException {
+    return Optional.empty();
+  }
+
   /** Bounded owner readiness before recorded cutover can advance phase or commit Green. */
   default boolean recordedCutoverReady(String operationKey) { return false; }
 

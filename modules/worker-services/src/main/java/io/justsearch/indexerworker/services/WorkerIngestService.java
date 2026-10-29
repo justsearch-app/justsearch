@@ -284,6 +284,8 @@ public final class WorkerIngestService {
     this.candidateDiscoveryOps.setPrefixScopeFactory(root -> prefixScope(root.toString()));
     this.switchBufferOps =
         new IngestSwitchBufferOps(jobQueue, this.indexGenerationManager);
+    this.syncOps.useDeclaredCollectionRoots(this::declaredCollectionRoots);
+    this.candidateDiscoveryOps.useDeclaredCollectionRoots(this::declaredCollectionRoots);
   }
 
   private Path declaredRootsDirectory;
@@ -291,6 +293,21 @@ public final class WorkerIngestService {
   /** The authored declarations include roots whose worker watch has not initialized yet. */
   public void setDeclaredRootsDirectory(Path dataDir) {
     declaredRootsDirectory = dataDir;
+    if (jobQueue != null) jobQueue.useDeclaredCollectionRoots(this::declaredCollectionRoots);
+  }
+
+  private List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> declaredCollectionRoots() {
+    var bindings = new java.util.LinkedHashMap<Path, String>();
+    configuredRecoveryRoots.forEach(root -> bindings.put(root, creatorRootCollection.apply(root)));
+    rootWatcherRegistry.current().collectionBindings().forEach(binding -> bindings.put(binding.path(), binding.collection()));
+    try {
+      io.justsearch.configuration.persistence.WatchedRootsFormat.declaredCollections(declaredRootsDirectory)
+          .forEach(bindings::put);
+    } catch (IOException | RuntimeException unreadable) {
+      throw WorkerServiceException.unavailable("Watched-root declarations are unreadable");
+    }
+    return bindings.entrySet().stream().map(entry ->
+        new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(entry.getKey(), entry.getValue())).toList();
   }
 
   public PathPrefixScope prefixScope(String prefix) {

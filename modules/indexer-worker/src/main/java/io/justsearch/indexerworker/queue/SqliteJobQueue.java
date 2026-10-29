@@ -68,6 +68,99 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   /** Job states on the {@code jobs} table. The vocabulary the change-feed projects onto the wire. */
   static final String STATE_PENDING = "PENDING";
 
+  private java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> declaredCollectionRoots = List::of;
+
+  @Override
+  public void useDeclaredCollectionRoots(
+      java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> roots) {
+    declaredCollectionRoots = Objects.requireNonNull(roots);
+  }
+
+  /** Repair pre-fix NULL admissions before any boot writer or replay can observe them. */
+  public void recoverLegacyCollections(String generation,
+      List<IngestCollectionPolicy.RootBinding> declared,
+      io.justsearch.app.api.operations.RecordedRootPlan plan) throws SQLException {
+    lockTimed();
+    try {
+      ensureOpen();
+      if (!activeClaims.isEmpty()) throw new IllegalStateException("Collection recovery requires a stopped writer");
+      var frozen = plan == null ? List.<IngestCollectionPolicy.RootBinding>of() : plan.roots().stream()
+          .map(root -> new IngestCollectionPolicy.RootBinding(root.path(), root.collection())).toList();
+      inTransaction(() -> {
+        var receipts = switchBufferOps.listAllStrict();
+        // A raw path does not record a NULL hint: it omits collection evidence altogether.
+        // Its original namespace (or uncertainty) remains owned by the existing legacy replay.
+        var unattributed = new HashSet<String>();
+        for (var op : receipts) {
+          if (!"UPSERT".equals(op.op()) || !(op.generation().isBlank() || generation.equals(op.generation()))) continue;
+          String path = SwitchBufferUpsert.decode(op.payload()).path();
+          if (op.payload().stripLeading().startsWith("{")) unattributed.remove(path);
+          else unattributed.add(path);
+        }
+        var owners = new java.util.LinkedHashMap<String, IngestCollectionPolicy.RootBinding>();
+        try (var query = connection.createStatement();
+            var rows = query.executeQuery("SELECT path,unit_revision FROM jobs WHERE collection IS NULL AND walk_seen_epoch IS NULL")) {
+          while (rows.next()) {
+            String path = rows.getString(1);
+            String unit = rows.getString(2);
+            if (unattributed.contains(path) || RootOrigin.fromUnit(unit) != null
+                || (unit != null && unit.startsWith("release030/"))) continue;
+            var owner = IngestCollectionPolicy.owningRoot(Path.of(path), frozen);
+            if (owner == null) owner = IngestCollectionPolicy.owningRoot(Path.of(path), declared);
+            if (owner != null) owners.put(path, owner);
+          }
+        }
+        for (var op : receipts) {
+          if (!"UPSERT".equals(op.op()) || !(op.generation().isBlank() || generation.equals(op.generation()))) continue;
+          if (!op.payload().stripLeading().startsWith("{")) continue;
+          var file = SwitchBufferUpsert.decode(op.payload());
+          if (file.collection() != null) continue;
+          if (receipts.stream().anyMatch(later -> later.acceptedOrder() > op.acceptedOrder()
+              && later.key().equals(op.key()) && "UPSERT".equals(later.op())
+              && SwitchBufferUpsert.decode(later.payload()).collection() != null)) continue;
+          var owner = IngestCollectionPolicy.owningRoot(Path.of(file.path()), frozen);
+          if (owner == null) owner = IngestCollectionPolicy.owningRoot(Path.of(file.path()), declared);
+          String label = owner == null ? null : owner.collection();
+          // A later reserved admission retains its search exclusions and receipt authority.
+          var current = watcherRowLocked(file.path());
+          if (current != null && IngestCollectionPolicy.isReserved(current.get("collection"))) continue;
+          if (owner != null && label == null) continue; // A frozen default is already exact.
+          String kind = owner == null ? "DELETE" : "UPSERT";
+          String payload = owner == null
+              ? new SwitchBufferDelete(file.path(), SwitchBufferDelete.Origin.EXPLICIT, null).encode()
+              : new SwitchBufferUpsert(file.path(), label, file.provenance(), file.unitRevision(),
+                  file.sourceSha256(), file.ingestionRoot()).encode();
+          // Preserve accepted_order: repair must not move an admission past a later deletion.
+          try (var update = connection.prepareStatement(
+              "UPDATE switch_buffer SET op=?,payload=?,revision=? WHERE generation=? AND key=? AND revision=?")) {
+            update.setString(1, kind); update.setString(2, payload);
+            update.setString(3, UUID.randomUUID().toString()); update.setString(4, op.generation());
+            update.setString(5, op.key()); update.setString(6, op.revision());
+            if (update.executeUpdate() != 1) throw new SQLException("Legacy receipt changed during recovery");
+          }
+          if (owner == null && current != null && current.get("collection") == null
+              && Objects.equals(file.unitRevision(), current.get("unit_revision"))) {
+            try (var delete = connection.prepareStatement("DELETE FROM jobs WHERE path=? AND collection IS NULL")) {
+              delete.setString(1, file.path()); delete.executeUpdate();
+            }
+          }
+        }
+        for (var entry : owners.entrySet()) {
+          if (entry.getValue().collection() == null) continue;
+          try (var update = connection.prepareStatement(
+              "UPDATE jobs SET collection=?,state='PENDING',content_hash=NULL WHERE path=? AND collection IS NULL")) {
+            update.setString(1, entry.getValue().collection()); update.setString(2, entry.getKey());
+            update.executeUpdate();
+          }
+        }
+        claimCursor = null;
+        return null;
+      });
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
   static final String STATE_PROCESSING = "PROCESSING";
 
   static final String STATE_DONE = "DONE";
@@ -2781,7 +2874,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               admitted=new JobQueue.EnqueueEntry(entry.path(),entry.sizeBytes(),entry.provenance(),source,entry.ingestionRoot());
             }
             String admittedUnit = exact && !replay ? null : root.retirementRootUnit();
-            if(enqueueEntriesInTransaction(List.of(admitted),collection,null,System.currentTimeMillis(),false,
+            // The retained ROOT already resolved its frozen inheritance above, including default.
+            if(enqueueEntriesInTransaction(List.of(admitted),effective,null,System.currentTimeMillis(),true,
                 admittedUnit)!=1)throw new SQLException("Short ROOT admission");
             if (!(exact && !replay)) {
               // Native enqueue has now resolved null collection/provenance inheritance. Bind
@@ -2962,9 +3056,28 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scanId);
         stmt.setString(1, normalizedPath);
         stmt.setLong(2, now);
-        stmt.setInt(3, exactCollection ? 1 : 0);
-        stmt.setString(4, collection);
-        stmt.setString(5, collection);
+        String effectiveCollection = collection;
+        boolean exact = exactCollection;
+        if (!exact && unitRevision == null && membership.epoch() == null
+            && (collection == null || collection.isBlank())) {
+          var owner = IngestCollectionPolicy.owningRoot(entry.path(), declaredCollectionRoots.get());
+          if (owner != null) {
+            effectiveCollection = owner.collection() == null || owner.collection().isBlank() ? null : owner.collection();
+            exact = true;
+            // Internal corpora retain their default-search exclusion on hintless readmission.
+            try (var prior = connection.prepareStatement("SELECT collection FROM jobs WHERE path=?")) {
+              prior.setString(1, normalizedPath);
+              try (var row = prior.executeQuery()) {
+                if (row.next() && IngestCollectionPolicy.isReserved(row.getString(1))) {
+                  effectiveCollection = row.getString(1);
+                }
+              }
+            }
+          }
+        }
+        stmt.setInt(3, exact ? 1 : 0);
+        stmt.setString(4, effectiveCollection);
+        stmt.setString(5, effectiveCollection);
         stmt.setString(6, normalizedPath); // carry-forward lookup for collection
         if (entry.sizeBytes() >= 0) {
           stmt.setLong(7, entry.sizeBytes());

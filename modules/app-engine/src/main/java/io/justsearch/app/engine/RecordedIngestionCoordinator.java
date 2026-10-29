@@ -235,6 +235,20 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   @Override
+  public Optional<RecordedRootPlan> recordedRootPlan(String operationKey) throws IOException {
+    synchronized (lock) {
+      var found = operations.find(operationKey);
+      if (found.isEmpty()) return Optional.empty();
+      var row = found.orElseThrow();
+      try {
+        return Optional.of(resolveGenerationPlan(row, preparation(row)).scope());
+      } catch (IllegalArgumentException invalid) {
+        throw new IOException("Recorded root plan is invalid", invalid);
+      }
+    }
+  }
+
+  @Override
   public Optional<RecordedCandidate> recordedCandidate(String operationKey) throws IOException {
     synchronized (lock) {
       OperationRecord row = operations.find(operationKey).orElseThrow(

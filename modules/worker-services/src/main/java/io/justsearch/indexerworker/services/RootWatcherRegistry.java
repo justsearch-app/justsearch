@@ -400,6 +400,15 @@ public final class RootWatcherRegistry {
     return Set.copyOf(roots);
   }
 
+  List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> collectionBindings() {
+    if (successor != null) return successor.collectionBindings();
+    var bindings = new java.util.HashMap<Path, String>();
+    awaitingVolume.forEach((root, awaiting) -> bindings.put(root, awaiting.collection()));
+    subscriptions.forEach((root, subscription) -> bindings.put(root, subscription.collection()));
+    return bindings.entrySet().stream().map(entry ->
+        new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(entry.getKey(), entry.getValue())).toList();
+  }
+
   /** Cheap health checks only: healthy always-present roots incur no filesystem observations. */
   Set<Path> recoveryRoots() {
     Set<Path> roots = new java.util.HashSet<>(awaitingVolume.keySet());
