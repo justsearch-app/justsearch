@@ -3604,7 +3604,7 @@ uncited fallback is preserved, not repaired. Future MMR policy, lambda, novelty,
 enablement, ranking utility and latency require qualified paired passage-level on-demand
 measurements; parent-only ranking or gold-context RAG evaluation cannot certify MMR.
 
-Measured 2026-10-27, after #959: MMR stays off at the default K=5. On 46 synthetic multi-document
+Measured 2026-10-27, after #959 (the measurement itself is not published): MMR stays off at the default K=5. On 46 synthetic multi-document
 queries its coverage gain was not significant and it showed no answer gain; in the earlier pilot it took
 about 2.4 s against 97 ms at K=5, because it re-embeds every candidate passage per query. Reusing stored
 chunk vectors to cut that cost is unbuilt. Reconsider if the default K

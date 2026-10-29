@@ -634,7 +634,7 @@ fixes rather than open a PR each):
 
 | Change | How it should reach `main` |
 |---|---|
-| **tempdoc** edit (`docs/tempdocs/**`) — dated working history | Ride along in the same PR as the code it documents, **or** batch several into one `docs(tempdocs): …` PR. Do not open a standalone PR per tempdoc append. |
+| **tempdoc** (`docs/tempdocs/**`) — dated working history | None: tempdocs are frozen since 2026-10-05. Current design goes to a canonical doc or an ADR. |
 | **canonical doc** (`docs/{explanation,reference,how-to,decisions}`) — durable current truth | May stand alone as its own PR/commit. |
 | **docs + code together** | Already a ride-along — publish normally. |
 
