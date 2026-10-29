@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import * as changesets from './changeset.mjs';
@@ -50,6 +51,44 @@ test('--copy-node-modules creates independent ordinary files including linked de
     assert.equal(fs.readFileSync(path.join(dependency, 'marker'), 'utf8'), 'original',
       'changes in the before-worktree must not modify the candidate dependency');
     assert.ok(fs.lstatSync(sourceDependency).isSymbolicLink(), 'the candidate dependency link stays intact');
+  } finally {
+    for (const entry of linksIn(scratch)) fs.unlinkSync(entry);
+    assert.equal(path.dirname(scratch), path.resolve(os.tmpdir()));
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('vitest checks run in a --copy-node-modules before-worktree', (t) => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-vitest-copy-'));
+  // A shell-special checkout path must reach Vitest unexpanded.
+  const root = path.join(scratch, 'candidate$HOME');
+  const worktree = path.join(scratch, 'before$HOME');
+  const modules = path.join(root, 'modules', 'ui-web', 'node_modules');
+  const check = 'modules/ui-web/src/probe.test.ts#probe';
+  try {
+    // A package whose bin imports a sibling module, linked from .bin as npm installs it.
+    fs.mkdirSync(path.join(modules, 'vitest', 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(modules, '.bin'));
+    fs.writeFileSync(path.join(modules, 'vitest', 'package.json'), JSON.stringify({ name: 'vitest', bin: { vitest: 'vitest.mjs' } }));
+    fs.writeFileSync(path.join(modules, 'vitest', 'vitest.mjs'), "#!/usr/bin/env node\nimport './dist/cli.js';\n", { mode: 0o755 });
+    fs.writeFileSync(path.join(modules, 'vitest', 'dist', 'cli.js'), `import fs from 'node:fs';
+const out = process.argv.find((a) => a.startsWith('--outputFile=')).slice('--outputFile='.length);
+fs.writeFileSync(out, JSON.stringify({ testResults: [{ name: 'src/probe.test.ts', status: 'passed',
+  assertionResults: [{ title: 'probe', fullName: 'probe', status: 'passed' }] }] }));
+`);
+    try {
+      fs.symlinkSync(path.join('..', 'vitest', 'vitest.mjs'), path.join(modules, '.bin', 'vitest'));
+    } catch (e) {
+      if (process.platform === 'win32' && e.code === 'EPERM') return t.skip('file symlink privilege is unavailable');
+      throw e;
+    }
+    fs.mkdirSync(path.join(worktree, 'modules', 'ui-web'), { recursive: true });
+    const result = vm.runInNewContext(`${functions}
+      prepareNodeModules(worktree, true);
+      runChecks([check], worktree).results.get(check);`, {
+      ...evidence, ...runners, fs, path, os, spawnSync, process, REPO_ROOT: root, IS_WIN: process.platform === 'win32', worktree, check,
+    });
+    assert.deepEqual(result.cases.map((c) => c.status), ['passed'], `vitest must run from the copied dependencies:\n${result.buildOutput}`);
   } finally {
     for (const entry of linksIn(scratch)) fs.unlinkSync(entry);
     assert.equal(path.dirname(scratch), path.resolve(os.tmpdir()));
