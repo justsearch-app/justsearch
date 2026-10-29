@@ -152,6 +152,13 @@ function toolVersion(cmd) {
   return r.status === 0 ? `${r.stdout}${r.stderr}`.trim().split(/\r?\n/)[0] : null;
 }
 
+/** Vitest's own bin script: a copied .bin entry no longer resolves the package's relative imports. */
+function vitestEntry(uiWeb) {
+  const dir = path.join(uiWeb, 'node_modules', 'vitest');
+  const { bin } = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  return path.join(dir, typeof bin === 'string' ? bin : bin.vitest);
+}
+
 /** Run every check in `root`; returns {runs, results: Map<checkId, {cases, buildOutput, fileStatus, fileMessage}>}. */
 function runChecks(checks, root) {
   const runs = [];
@@ -198,7 +205,8 @@ function runChecks(checks, root) {
     const out = path.join(os.tmpdir(), `test-intent-vitest-${process.pid}-${Date.now()}.json`);
     const files = [...new Set(ids.map((id) => checkFile(id).replace(/^modules\/ui-web\//, '')))];
     const config = kind === 'lockdown' ? ' --config vitest.config.lockdown.ts' : '';
-    const run = sh(`npx vitest run ${files.map((f) => JSON.stringify(f)).join(' ')}${config} --reporter=json --outputFile=${JSON.stringify(out)}`, path.join(root, 'modules', 'ui-web'));
+    const uiWeb = path.join(root, 'modules', 'ui-web');
+    const run = sh(`node ${JSON.stringify(vitestEntry(uiWeb))} run ${files.map((f) => JSON.stringify(f)).join(' ')}${config} --reporter=json --outputFile=${JSON.stringify(out)}`, uiWeb);
     runs.push(run);
     const parsed = fs.existsSync(out) ? parseVitestJson(fs.readFileSync(out, 'utf8')) : [];
     fs.rmSync(out, { force: true });
