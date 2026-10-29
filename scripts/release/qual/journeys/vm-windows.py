@@ -271,7 +271,7 @@ def prepare_setup(args, out, source=None):
         # Generate corpus once; subsequent runs verify these exact cached bytes.
         guest_ps("if(!(Test-Path C:/Qual/corpus-sha256.json)){ $hashes=& C:/Qual/Python/Scripts/python.exe C:/Qual/journeys/corpus.py C:/Qual/corpus; if($LASTEXITCODE){throw 'Corpus generation failed'}; [IO.File]::WriteAllText('C:/Qual/corpus-sha256.json',($hashes -join [Environment]::NewLine))}")
         quiet_guest('Apply', out)
-        guest_ps('& C:/Qual/journeys/windows-edge.ps1', timeout=300)
+        guest_ps('& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Qual/journeys/windows-edge.ps1; if($LASTEXITCODE){throw "Exact WebDriver setup failed"}', timeout=300)
         volumes.append(budget.finish()); budget.check(); budget = None
         if not vm.stop():
             raise Infrastructure('Guest settings reboot required a forced stop')
@@ -286,7 +286,7 @@ def prepare_setup(args, out, source=None):
         budget = WriteBudget(started, out); budget.thread.start()
         vm.wait_ssh('windows', timeout=600)
         quiet_guest('Verify', out)
-        guest_ps('& C:/Qual/journeys/windows-edge.ps1 -VerifyOnly', timeout=60)
+        guest_ps('& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Qual/journeys/windows-edge.ps1 -VerifyOnly; if($LASTEXITCODE){throw "Exact WebDriver verification failed"}', timeout=60)
         copy_out('C:/Qual/edge/versions.json', out / 'webdriver-versions.json')
         verify_crash_access(out)
         budget.check()

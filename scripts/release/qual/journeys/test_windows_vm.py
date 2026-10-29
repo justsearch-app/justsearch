@@ -15,6 +15,42 @@ wrapper=importlib.util.module_from_spec(spec);spec.loader.exec_module(wrapper)
 
 
 class WindowsVMTests(unittest.TestCase):
+    def test_setup_verifies_exact_driver_after_reboot_and_records_snapshot_versions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);disk=root/'run.qcow2';disk.write_bytes(b'cached tools')
+            (root/'run-vars.fd').write_bytes(b'firmware')
+            started={'disk':str(disk),'pid':999999999,'owner':'fixture'}
+            args=SimpleNamespace(mirror=None)
+            events=[]
+            def guest(source,**kwargs):
+                if 'windows-edge.ps1' in source:
+                    if '-ExecutionPolicy Bypass -File' not in source:
+                        raise Infrastructure('Guest execution policy refuses script')
+                    events.append('edge-verify' if '-VerifyOnly' in source else 'edge-cache')
+                return ''
+            def copy(source,destination,**kwargs):
+                destination.write_text(json.dumps({'webview2':'156.0.4314.50','msedgedriver':'156.0.4314.50'}))
+            def quiet(mode,out):
+                events.append(mode)
+                (out/('quiet-'+mode.lower()+'.json')).write_text(json.dumps({'verified':mode=='Verify'}))
+            def stop():events.append('stop');return True
+            with patch.object(wrapper.vm,'wait_free'),patch.object(wrapper,'wait_for',return_value=True), \
+                 patch.object(wrapper,'start_snapshot'),patch.object(wrapper.vm,'require_owner',return_value=started), \
+                 patch.object(wrapper.vm,'wait_ssh'),patch.object(wrapper,'WriteBudget') as budget, \
+                 patch.object(wrapper,'stage_inputs'),patch.object(wrapper,'guest_ps',side_effect=guest), \
+                 patch.object(wrapper,'copy_out',side_effect=copy),patch.object(wrapper,'quiet_guest',side_effect=quiet), \
+                 patch.object(wrapper,'verify_crash_access'),patch.object(wrapper.vm,'stop',side_effect=stop), \
+                 patch.object(wrapper.vm,'wait_host_memory'),patch.object(wrapper.vm,'locked',side_effect=lambda:contextlib.nullcontext(Mock())), \
+                 patch.object(wrapper.vm,'ensure_free'),patch.object(wrapper.vm,'launch'), \
+                 patch.object(wrapper.vm,'read_state',return_value=None),patch.object(wrapper,'pins',return_value={}):
+                budget.return_value.finish.side_effect=lambda:{'overlayInitialBytes':0}
+                budget.return_value.error=None
+                self.assertEqual(wrapper.prepare_setup(args,root/'out',root/'source'),0,(root/'out/summary.json').read_text())
+            self.assertEqual(events,['Apply','edge-cache','stop','Verify','edge-verify','stop'])
+            manifest=json.loads((root/'out/manifest.json').read_text())
+            self.assertEqual(manifest['webview2'],'156.0.4314.50')
+            self.assertEqual(manifest['edgeDriver']['msedgedriver'],manifest['webview2'])
+
     def test_crash_access_requires_the_limited_task_success_receipt(self):
         for verified in (False,True):
             with tempfile.TemporaryDirectory() as temp:
