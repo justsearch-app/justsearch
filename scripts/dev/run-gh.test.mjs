@@ -806,21 +806,52 @@ const actionCheck = (name = 'required', run = 101, job = 201) => ({
 function shepherdCli(options = {}, args = []) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'run-gh-shepherd-'));
   const callsPath = path.join(directory, 'calls.jsonl');
+  const treePath = path.join(directory, 'tree.jsonl');
+  const fixturePath = path.join(directory, 'tree.cjs');
+  fs.writeFileSync(fixturePath, `
+    const fs = require('node:fs');
+    const { spawn } = require('node:child_process');
+    const role = process.argv[2];
+    fs.appendFileSync(${JSON.stringify(treePath)}, JSON.stringify({role, pid:process.pid}) + '\\n');
+    if (role === 'leaf') process.on('SIGTERM', () => {});
+    else spawn(process.execPath, [__filename, role === 'helper' ? 'gh' : 'leaf'], {stdio:'inherit'});
+    setInterval(() => {}, 1000);
+  `);
+  const recordedTree = () => fs.existsSync(treePath) ? fs.readFileSync(treePath, 'utf8').trim().split('\n').map(JSON.parse) : [];
+  const isRunning = (pid) => {
+    try {
+      process.kill(pid, 0);
+      // Zombies have ended but may await the host's reaper in a container.
+      return process.platform !== 'linux' || !['Z', 'X', 'x'].includes(
+        fs.readFileSync(`/proc/${pid}/stat`, 'utf8').split(') ').at(-1).split(' ')[0]);
+    } catch (error) {
+      if (['ESRCH', 'ENOENT'].includes(error.code)) return false;
+      throw error;
+    }
+  };
   const preload = `
     import childProcess from 'node:child_process';
     import fs from 'node:fs';
+    import { EventEmitter } from 'node:events';
+    import { PassThrough } from 'node:stream';
     import { syncBuiltinESMExports } from 'node:module';
     const options = ${JSON.stringify(options)};
     const callsPath = ${JSON.stringify(callsPath)};
+    const fixturePath = ${JSON.stringify(fixturePath)};
     const open = ${JSON.stringify(openMergePr)};
     const snapshot = ${JSON.stringify(snapshot)};
     let clock = 0, poll = 0, views = 0;
-    const realSpawnSync = childProcess.spawnSync;
+    const realSpawn = childProcess.spawn;
     Date.now = () => clock;
     globalThis.setTimeout = (fn, ms) => { clock += ms; poll++; views = 0; queueMicrotask(fn); };
     const json = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: '' });
-    childProcess.spawnSync = (bin, args, spawnOptions) => {
+    const response = (bin, args, spawnOptions) => {
       fs.appendFileSync(callsPath, JSON.stringify({ bin, args, spawnOptions }) + '\\n');
+      if ((options.hungTree === 'validation' && args[0].endsWith('preview-squash-message.mjs')) ||
+          (options.hungTree === 'lookup' && args[1] === 'view') ||
+          (options.hungTree === 'log' && args.includes('--log-failed'))) {
+        return realSpawn(process.execPath, [fixturePath, options.hungTree === 'validation' ? 'helper' : 'gh'], spawnOptions);
+      }
       if (args[0] === 'shepherd') return { status: 0 }; // baseline's pass-through, never real gh
       if (args[0] !== 'pr' && args[0] !== 'api' && args[0] !== 'run')
         return { status: options.refuse ?? 0 };
@@ -829,7 +860,7 @@ function shepherdCli(options = {}, args = []) {
       }
       if (args[0] === 'run') {
         if (options.hungLog) {
-          return realSpawnSync(process.execPath, ['-e', 'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500)'], spawnOptions);
+          return realSpawn(process.execPath, ['-e', 'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500)'], spawnOptions);
         }
         if (options.logError) return { error: Object.assign(new Error(options.logError), { code: 'ENOENT' }) };
         return { status: options.logStatus ?? 0, stdout: options.log ?? 'setup\\nError: assertion expected true\\nteardown\\n', stderr: options.logStderr ?? 'log unavailable' };
@@ -846,6 +877,20 @@ function shepherdCli(options = {}, args = []) {
       if (frame.viewError) return { status: 1, stdout: 'not JSON', stderr: options.errorText ?? 'network failed' };
       return json({ ...open, ...(views++ % 2 ? frame.after ?? frame.before : frame.before) });
     };
+    childProcess.spawn = (bin, args, spawnOptions) => {
+      const result = response(bin, args, spawnOptions);
+      if (result instanceof childProcess.ChildProcess) return result;
+      const child = new EventEmitter();
+      if (spawnOptions.stdio !== 'inherit') {
+        child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      }
+      process.nextTick(() => {
+        if (result.error) child.emit('error', result.error);
+        child.stdout?.end(result.stdout ?? ''); child.stderr?.end(result.stderr ?? '');
+        child.emit('close', result.status ?? null, result.signal ?? null);
+      });
+      return child;
+    };
     syncBuiltinESMExports();
   `;
   const preloadPath = path.join(directory, 'preload.mjs');
@@ -861,8 +906,15 @@ function shepherdCli(options = {}, args = []) {
     const final = lines.at(-1);
     assert.equal(lines.filter((line) => line.startsWith('run-gh shepherd PR #7: ')).length, 1, result.stdout + result.stderr);
     assert.match(final, /^run-gh shepherd PR #7: /);
-    return { ...result, calls, final, lines };
+    const tree = recordedTree();
+    const settledBy = performance.now() + 300;
+    while (tree.some(({ pid }) => isRunning(pid)) && performance.now() < settledBy) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+    return { ...result, calls, final, lines, tree: tree.map((row) => ({ ...row, running: isRunning(row.pid) })) };
   } finally {
+    // Only fixture PIDs written at their creation are cleanup authority, never names.
+    for (const { pid } of recordedTree()) if (isRunning(pid)) process.kill(pid, 'SIGKILL');
     fs.rmSync(directory, { recursive: true, force: true });
   }
 }
@@ -948,13 +1000,24 @@ run('shepherd times out a hung log subprocess within the remaining deadline', ()
   assert.match(result.final, /TIMEOUT/);
   assert.ok(elapsed < 1200, `hung log took ${elapsed}ms`);
   const logCall = result.calls.find(({ args }) => args.includes('--log-failed'));
-  assert.ok(logCall.spawnOptions.timeout > 0 && logCall.spawnOptions.timeout <= 150);
+  assert.equal(logCall.spawnOptions.detached, process.platform !== 'win32');
 });
+for (const stage of ['validation', 'lookup', 'log']) {
+  run(`shepherd deadline stops the entire ${stage} tree, including a child ignoring SIGTERM`, () => {
+    const started = performance.now();
+    const result = shepherdCli({ hungTree: stage, polls: [{ checks: [actionCheck()] }] }, ['--timeout-sec', '0.5']);
+    assert.equal(result.status, 3, result.stdout + result.stderr);
+    assert.match(result.final, /TIMEOUT/);
+    assert.ok(performance.now() - started < 2000, 'tree cleanup exceeded its grace');
+    assert.deepEqual(result.tree.map(({ role }) => role), stage === 'validation' ? ['helper', 'gh', 'leaf'] : ['gh', 'leaf']);
+    assert.deepEqual(result.tree.filter(({ running }) => running), [], JSON.stringify(result.tree));
+  });
+}
 run('shepherd bounds reused merge-wait reads and polling by its deadline', () => {
   const result = shepherdCli({ polls: [{}] }, ['--timeout-sec', '0.15']);
   assert.equal(result.status, 3, result.final);
   for (const { spawnOptions } of result.calls) {
-    assert.ok(spawnOptions.timeout > 0 && spawnOptions.timeout <= 150, JSON.stringify(spawnOptions));
+    assert.equal(spawnOptions.detached, process.platform !== 'win32');
   }
   // One poll fits; the next must not launch after the deadline.
   assert.equal(result.calls.filter(({ args }) => args[1] === 'checks').length, 1);
