@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Check bindings and retirements; bound tests need a complete literal title and function body,
- * without disabling modifiers, skip/todo/fails options, non-literal options or conditional forms
+ * without disabling modifiers, disabling options (skip, fails and the to-do marker), non-literal options or conditional forms
  * on the test or any enclosing suite.
  * This does not establish execution: surrounding control flow (e.g. `if (false)`), runtime skips,
  * config include/exclude and name filters are out of scope.
