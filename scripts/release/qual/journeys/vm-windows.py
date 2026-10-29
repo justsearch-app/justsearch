@@ -126,7 +126,7 @@ def pins(args, phase):
             'predecessor': digest(args.predecessor) if args.predecessor else None,
             'mirror': {str(p.relative_to(args.mirror)): digest(p) for p in sorted(args.mirror.rglob('*')) if p.is_file()} if args.mirror else None,
             'phase': phase, 'session': args.session,
-            'setupSources': {name: digest(HERE / name) for name in ('windows-tools.ps1', 'windows-edge.ps1', 'windows-cache-tools.ps1', 'windows-quiet.ps1', 'corpus.py')},
+            'setupSources': {name: digest(HERE / name) for name in ('windows-tools.ps1', 'windows-edge.ps1', 'windows-association.py', 'windows-cache-tools.ps1', 'windows-quiet.ps1', 'corpus.py')},
             'base': json.loads((vm.ROOT / 'windows/base.json').read_text())}
 
 
@@ -205,6 +205,26 @@ def quiet_guest(mode, out):
         guest_ps('Unregister-ScheduledTask -TaskName ' + ps_value(task) + ' -Confirm:$false')
 
 
+def prepare_viewer(out, verify=False):
+    task = 'JustSearch-qual-viewer'
+    mode = 'verify' if verify else 'configure'
+    remote = 'C:/Qual/viewer-setup/' + mode + '.json'
+    arguments = 'C:/Qual/journeys/windows-association.py --evidence C:/Qual/viewer-setup' + (' --verify' if verify else '')
+    guest_ps('Remove-Item -LiteralPath ' + ps_value(remote) + ' -ErrorAction SilentlyContinue;' +
+        '$a=New-ScheduledTaskAction -Execute C:/Qual/Python/Scripts/python.exe -Argument ' + ps_value(arguments) + ';' +
+        '$p=New-ScheduledTaskPrincipal -UserId qual -LogonType Interactive -RunLevel Limited;' +
+        'Register-ScheduledTask -TaskName ' + ps_value(task) + ' -Action $a -Principal $p -Force | Out-Null;' +
+        'Start-ScheduledTask -TaskName ' + ps_value(task))
+    try:
+        wait_for(lambda: guest_ps('Test-Path ' + ps_value(remote)) == 'True',
+                 'Limited desktop default viewer ' + mode, seconds=300, interval=2, error=Infrastructure)
+        copy_out(remote, out / ('viewer-' + mode + '.json'))
+        if json.loads((out / ('viewer-' + mode + '.json')).read_text()).get('verified') is not True:
+            raise Infrastructure('Default viewer ' + mode + ' failed; see viewer-' + mode + '.json')
+    finally:
+        guest_ps('Unregister-ScheduledTask -TaskName ' + ps_value(task) + ' -Confirm:$false')
+
+
 def verify_crash_access(out):
     """Prove archive reads with the same limited token as the app journeys."""
     task = 'JustSearch-qual-crash-access'
@@ -271,6 +291,7 @@ def prepare_setup(args, out, source=None):
             guest_ps('& C:/Qual/Python/Scripts/python.exe C:/Qual/mirror-windows.py suspend; if($LASTEXITCODE){throw "Mirror snapshot suspension failed"}')
         # Generate corpus once; subsequent runs verify these exact cached bytes.
         guest_ps("if(!(Test-Path C:/Qual/corpus-sha256.json)){ $hashes=& C:/Qual/Python/Scripts/python.exe C:/Qual/journeys/corpus.py C:/Qual/corpus; if($LASTEXITCODE){throw 'Corpus generation failed'}; [IO.File]::WriteAllText('C:/Qual/corpus-sha256.json',($hashes -join [Environment]::NewLine))}")
+        prepare_viewer(out)
         quiet_guest('Apply', out)
         guest_ps('& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Qual/journeys/windows-edge.ps1; if($LASTEXITCODE){throw "Exact WebDriver setup failed"}', timeout=300)
         volumes.append(budget.finish()); budget.check(); budget = None
@@ -287,6 +308,7 @@ def prepare_setup(args, out, source=None):
         budget = WriteBudget(started, out); budget.thread.start()
         vm.wait_ssh('windows', timeout=600)
         quiet_guest('Verify', out)
+        prepare_viewer(out, verify=True)
         guest_ps('& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Qual/journeys/windows-edge.ps1 -VerifyOnly; if($LASTEXITCODE){throw "Exact WebDriver verification failed"}', timeout=60)
         copy_out('C:/Qual/edge/versions.json', out / 'webdriver-versions.json')
         verify_crash_access(out)

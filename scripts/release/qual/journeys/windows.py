@@ -1012,7 +1012,8 @@ def viewer_identity(rows, windows, fixture, expected_image, before):
         # matching substring, a title or a same-named executable elsewhere.
         if not any(ntpath.normcase(arg) == ntpath.normcase(fixture) for arg in process.get('argv', [])):
             continue
-        window = next((w for w in windows if w['pid'] == process['pid']), None)
+        window = next((w for w in windows if w['pid'] == process['pid']
+                       and w.get('automationId') == 'GraphicalPowerShellMainWindow'), None)
         if window:
             return dict(process, window=window)
 

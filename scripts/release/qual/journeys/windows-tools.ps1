@@ -66,35 +66,10 @@ if (!(Test-Path "$nodeDir/node.exe")) {
  & tar.exe -xf C:/Qual/downloads/node.zip -C C:/Qual
  if($LASTEXITCODE) {throw 'Node archive extraction failed'}
 }
-# Pin the real text viewer exactly as the Linux lane pins Mousepad as default.
-# Source/checksum: https://github.com/notepad-plus-plus/notepad-plus-plus/releases/tag/v8.9.8
-$viewer='C:/Qual/viewer/notepad++.exe'
-if (!(Test-Path $viewer)) {
- Download 'https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.8/npp.8.9.8.portable.x64.zip' C:/Qual/downloads/viewer.zip
- if((Get-FileHash C:/Qual/downloads/viewer.zip).Hash -ine 'b269383239464a945d17cfabfccf53935b83d80d907922310fdfd50d80274c66') {throw 'Viewer checksum mismatch'}
- New-Item -ItemType Directory -Force C:/Qual/viewer | Out-Null
- & tar.exe -xf C:/Qual/downloads/viewer.zip -C C:/Qual/viewer
- if($LASTEXITCODE) {throw 'Viewer archive extraction failed'}
-}
+# Use the installed OS editor; no separate viewer binary/download is needed.
+$viewer=Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell_ise.exe'
+if(!(Test-Path $viewer)){throw 'PowerShell ISE text editor is unavailable on this qualification image'}
 $viewImage=(Resolve-Path $viewer).Path
-$classes='HKCU:\Software\Classes'
-New-Item "$classes\.txt" -Force | Out-Null
-Set-Item "$classes\.txt" -Value 'JustSearchQualText'
-New-Item "$classes\JustSearchQualText\shell\open\command" -Force | Out-Null
-Set-Item "$classes\JustSearchQualText\shell\open\command" -Value ('"'+$viewImage+'" -multiInst -nosession -noUpdater "%1"')
-$choice='HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.txt\UserChoice'
-if(Test-Path $choice) {
- # UserChoice denies SetValue even to its owner. RegDeleteKeyEx needs DELETE
- # only, unlike the PowerShell/.NET recursive API's write-open. Keep the ACL.
- Add-Type -TypeDefinition @'
-using System;using System.Runtime.InteropServices;
-public class QualDeleteChoice {
- [DllImport("advapi32.dll",CharSet=CharSet.Unicode)] public static extern int RegDeleteKeyEx(IntPtr key,string subKey,uint view,uint reserved);
-}
-'@
- $code=[QualDeleteChoice]::RegDeleteKeyEx([IntPtr](-2147483647),'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.txt\UserChoice',0x100,0)
- if($code -notin @(0,2) -or (Test-Path $choice)) {throw "Disposable text association selection failed: $code"}
-}
 # Refresh the vendor driver for the exact installed runtime; cache by version.
 & (Join-Path $PSScriptRoot 'windows-edge.ps1')
 $edge=Get-Content C:/Qual/edge/versions.json -Raw | ConvertFrom-Json
@@ -114,3 +89,8 @@ if(Test-Path -LiteralPath $receiptPath) {
 }
 if((Resolve-Path $Driver).Path -ine 'C:\Qual\tauri-driver.exe') {Copy-Item -LiteralPath $Driver C:/Qual/tauri-driver.exe -Force}
 [IO.File]::WriteAllText('C:/Qual/tools.json',(@{node="$nodeDir/node.exe";driver='C:/Qual/tauri-driver.exe';nativeDriver='C:/Qual/edge/msedgedriver.exe';driverVersion='2.0.4';driverSha256=$driverHash;webview2=$webview;viewer=$viewImage} | ConvertTo-Json))
+
+if($hosted){
+ & $python (Join-Path $PSScriptRoot 'windows-association.py') --evidence C:/Qual/viewer-setup
+ if($LASTEXITCODE){throw 'Native default viewer setup failed; see C:/Qual/viewer-setup/configure.json'}
+}

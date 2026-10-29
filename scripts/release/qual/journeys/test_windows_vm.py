@@ -60,14 +60,14 @@ class WindowsVMTests(unittest.TestCase):
                  patch.object(wrapper.vm,'wait_ssh'),patch.object(wrapper,'WriteBudget') as budget, \
                  patch.object(wrapper,'stage_inputs'),patch.object(wrapper,'guest_ps',side_effect=guest), \
                  patch.object(wrapper,'copy_out',side_effect=copy),patch.object(wrapper,'quiet_guest',side_effect=quiet), \
-                 patch.object(wrapper,'verify_crash_access'),patch.object(wrapper.vm,'stop',side_effect=stop), \
+                 patch.object(wrapper,'verify_crash_access'),patch.object(wrapper,'prepare_viewer',side_effect=lambda out,verify=False:events.append('viewer-verify' if verify else 'viewer-configure')),patch.object(wrapper.vm,'stop',side_effect=stop), \
                  patch.object(wrapper.vm,'wait_host_memory'),patch.object(wrapper.vm,'locked',side_effect=lambda:contextlib.nullcontext(Mock())), \
                  patch.object(wrapper.vm,'ensure_free'),patch.object(wrapper.vm,'launch'), \
                  patch.object(wrapper.vm,'read_state',return_value=None),patch.object(wrapper,'pins',return_value={}):
                 budget.return_value.finish.side_effect=lambda:{'overlayInitialBytes':0}
                 budget.return_value.error=None
                 self.assertEqual(wrapper.prepare_setup(args,root/'out',root/'source'),0,(root/'out/summary.json').read_text())
-            self.assertEqual(events,['Apply','edge-cache','stop','Verify','edge-verify','stop'])
+            self.assertEqual(events,['viewer-configure','Apply','edge-cache','stop','Verify','viewer-verify','edge-verify','stop'])
             manifest=json.loads((root/'out/manifest.json').read_text())
             self.assertEqual(manifest['webview2'],'156.0.4314.50')
             self.assertEqual(manifest['edgeDriver']['msedgedriver'],manifest['webview2'])

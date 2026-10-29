@@ -249,7 +249,7 @@ class WindowsOperationalTests(unittest.TestCase):
         fixture=str(Path(corpus)/OPEN_FILE)
         receiver=dict(process(60,image),argv=[image,fixture])
         run=Mock(facts={});run.require.side_effect=lambda key:corpus if key=='corpus' else True
-        run.target.roots=[];run.native.windows.return_value=[{'pid':60,'handle':300}]
+        run.target.roots=[];run.native.windows.return_value=[{'pid':60,'handle':300,'automationId':'GraphicalPowerShellMainWindow'}]
         first={'element-6066-11e4-a52e-4f735466cecf':'unrelated-first'}
         exact={'element-6066-11e4-a52e-4f735466cecf':'fixture-second'}
         run.wd.element.return_value=first;run.wd.execute.return_value=exact;run.wd.text.return_value=OPEN_FILE
@@ -270,9 +270,9 @@ class WindowsOperationalTests(unittest.TestCase):
         image = r'C:\Qual\viewer\notepad++.exe'
         fixture = r'C:\corpus\JustSearch-journey-orchid-open.txt'
         viewer = dict(process(60, image), argv=[image, '-multiInst', fixture])
-        window = {'pid': 60, 'handle': 300}
+        window = {'pid': 60, 'handle': 300, 'automationId':'GraphicalPowerShellMainWindow'}
         self.assertEqual(windows.viewer_identity([viewer], [window], fixture, image, [])['window'], window)
-        for rows, win, before in [([viewer], [], []), ([viewer], [window], [viewer]),
+        for rows, win, before in [([viewer], [], []), ([viewer], [dict(window,automationId='')], []), ([viewer], [window], [viewer]),
             ([dict(viewer, argv=[image, fixture+'.other'])], [window], []),
             ([dict(viewer, exe=r'C:\other\notepad++.exe')], [window], [])]:
             self.assertIsNone(windows.viewer_identity(rows, win, fixture, image, before))
