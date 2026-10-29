@@ -115,3 +115,14 @@ The orchestrator generates execution evidence after committing this candidate; t
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-91c3ab-b-claude",
+  "verdict": "accept",
+  "digest": "sha256:08f1cc1c6b08376983fca248b7bf1c51d6ae09eea8b49c5815246d9a262cfcc7",
+  "note": "Claude verifier on 5dcc5db048: D scenarios R4,R4b,R4c,R4d,R4e,R5,R7 fail on b744db8744 by assertion and pass on candidate (JUnit, cargo, real Engine harness on Linux, conformance tauri+dev-runner); K R6,R8,R11-Linux pass on both; manual SIGKILL crash classified crashed and helper reconciled; mutations M1-M5b caught. Windows unverified locally; F3 real trigger unproven (synthetic conformance only)."
+}
+```
