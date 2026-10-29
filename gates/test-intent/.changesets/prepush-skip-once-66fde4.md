@@ -24,8 +24,8 @@ The acceptor (not the author) appends the acceptance record under the heading at
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "exclusions unchanged, only logging",
-          "location": "task t-20261029-66fde4 builder assignment"
+          "quote": "takeover all of them",
+          "location": "task t-20261029-66fde4 request"
         }
       ]
     }
