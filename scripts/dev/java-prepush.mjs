@@ -12,15 +12,18 @@ const INTEGRATION_MODULES = ['app-api', 'app-services', 'indexing', 'reranker', 
 export function selectIntegrationTasks({ changedPaths, settings, buildFiles }) {
   const tasks = (modules) => modules.map((module) => `:modules:${module}:integrationTest`);
   if (changedPaths.some((file) => /^(?:(?:settings|build)\.gradle(?:\.kts)?|gradle\.(?:properties|lockfile)|gradlew(?:\.bat)?)$/.test(file)
-      || file.startsWith('build-logic/') || file.startsWith('gradle/'))) {
+      || file.startsWith('build-logic/') || file.startsWith('gradle/')
+      // Inputs every module's tests read: shared catalogs and this run's own exclusion list.
+      || file.startsWith('SSOT/') || file === 'scripts/dev/prepush-excluded-tests.tsv')) {
     return tasks(INTEGRATION_MODULES);
   }
   const modules = parseSettings(settings).filter((module) => module.startsWith(':modules:'));
   const reached = new Set(modules.filter((module) => {
     const directory = `${module.slice(1).replaceAll(':', '/')}/`;
     // Any file in the module can change what its tests see (sources, build file, lockfile,
-    // properties, resources), except its Markdown documentation.
-    return changedPaths.some((file) => file.startsWith(directory) && !file.endsWith('.md'));
+    // properties, resources), except Markdown documentation outside its source sets.
+    return changedPaths.some((file) => file.startsWith(directory)
+      && (!file.endsWith('.md') || file.startsWith(`${directory}src/`)));
   }));
   if (reached.size === 0) return [];
   const dependents = new Map();

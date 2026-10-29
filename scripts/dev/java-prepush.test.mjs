@@ -141,15 +141,16 @@ try {
   assert.deepEqual(select('modules/system-tests/src/test/java/Test.java'), []);
   assert.deepEqual(select('modules/ui-web/src/index.ts', 'modules/shell/src/main.rs', 'docs/guide.md'), []);
   assert.deepEqual(select(), []);
-  assert.deepEqual(select('modules/ui/README.md', 'modules/core/docs/notes.md', 'modules/ui/src/main/java/README.md'), []);
+  assert.deepEqual(select('modules/ui/README.md', 'modules/core/docs/notes.md'), []);
   assert.deepEqual(select('modules/ui/gradle.lockfile'), [':modules:ui:integrationTest']);
   assert.deepEqual(select('modules/ui/gradle.properties'), [':modules:ui:integrationTest']);
   assert.deepEqual(select('modules/ui/config/extra.json'), [':modules:ui:integrationTest']);
+  assert.deepEqual(select('modules/ui/src/integrationTest/resources/fixture.md'), [':modules:ui:integrationTest']);
   assert.deepEqual(select('modules/core/src/main/java/Old.java', 'modules/runtime/src/main/java/New.java'), [
     ':modules:app-api:integrationTest', ':modules:app-services:integrationTest', ':modules:indexing:integrationTest',
   ]);
   const allTasks = ['app-api', 'app-services', 'indexing', 'reranker', 'ui'].map((module) => `:modules:${module}:integrationTest`);
-  for (const file of ['settings.gradle.kts', 'build.gradle.kts', 'gradle.properties', 'gradle.lockfile', 'gradlew', 'gradlew.bat', 'build-logic/src/main/kotlin/Plugin.kt', 'gradle/libs.versions.toml']) {
+  for (const file of ['settings.gradle.kts', 'build.gradle.kts', 'gradle.properties', 'gradle.lockfile', 'gradlew', 'gradlew.bat', 'build-logic/src/main/kotlin/Plugin.kt', 'gradle/libs.versions.toml', 'SSOT/catalogs/fields.v1.json', 'scripts/dev/prepush-excluded-tests.tsv']) {
     assert.deepEqual(select(file), allTasks, file);
   }
   assert.throws(() => selectIntegrationTasks({ settings, changedPaths: ['modules/core/src/main/java/Core.java'], buildFiles: {} }), /Missing module build file/);
