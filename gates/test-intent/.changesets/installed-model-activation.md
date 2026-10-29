@@ -264,3 +264,13 @@ See [the condition-by-condition coverage map](../evidence/installed-model-activa
   "note": "Code delta, unchanged assertions and refreshed evidence verified. Rejected because this candidate deletes the committed acceptance record from session codex-rel-act-acceptor-20261029-f7dec02a74, contrary to docs/reference/testing/test-intent.md: Records are appended, never deleted. Restore the old record unchanged, correct the above-heading prose to say it is retained as stale history, then obtain fresh independent acceptance on the resulting digest."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-rel-act-accept4-20261029-f645ea7da2",
+  "verdict": "accept",
+  "digest": "sha256:e3f2507d3aff4a87daeb54c92fd73cb46500f7866369d8e84dff0d324e41ef4f"
+}
+```
