@@ -14,6 +14,16 @@ $taskPaths=@('\Microsoft\Windows\WindowsUpdate\','\Microsoft\Windows\UpdateOrche
 $edgeTasks=@(Get-ScheduledTask | Where-Object {$_.TaskName -like 'MicrosoftEdgeUpdateTask*'})
 $exclusions=@('C:\Qual','C:\Users\qual\AppData\Local\JustSearch',
  'C:\Users\qual\AppData\Local\io.justsearch.shell','C:\Users\qual\AppData\Roaming\io.justsearch.shell')
+# Microsoft documents these policies for suppressing public Windows Update
+# connections. Use the documented single-space WSUS locations in this guest.
+# https://learn.microsoft.com/windows/privacy/manage-connections-from-windows-operating-system-components-to-microsoft-services
+$updateSources=@(
+ @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate','DoNotConnectToWindowsUpdateInternetLocations',1,'DWord'),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate','DisableWindowsUpdateAccess',1,'DWord'),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate','WUServer',' ','String'),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate','WUStatusServer',' ','String'),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate','UpdateServiceUrlAlternate',' ','String'),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU','UseWUServer',1,'DWord'))
 $errors=New-Object 'Collections.Generic.List[string]'
 if ($Mode -eq 'Apply') {
  # WER archives can carry High (NR,NX), which overrides an explicit read ACL
@@ -57,6 +67,16 @@ if ($Mode -eq 'Apply') {
   if(!(Test-Path $policy[0])) {New-Item $policy[0] -Force | Out-Null}
   New-ItemProperty $policy[0] -Name $policy[1] -Value $policy[2] -PropertyType DWord -Force | Out-Null
  }
+ foreach($policy in $updateSources) {
+  try {
+   if(!(Test-Path $policy[0])) {New-Item $policy[0] -Force | Out-Null}
+   New-ItemProperty $policy[0] -Name $policy[1] -Value $policy[2] -PropertyType $policy[3] -Force | Out-Null
+  } catch {$errors.Add("update source $($policy[1]): $($_.Exception.Message)")}
+ }
+ # Defender's default fallback includes public Microsoft Update/MMPC even when
+ # automatic Windows Update is disabled. Keep only the disabled internal source.
+ try {Set-MpPreference -SignatureFallbackOrder InternalDefinitionUpdateServer}
+ catch {$errors.Add("Defender update source: $($_.Exception.Message)")}
  & powercfg.exe /hibernate off
  if($LASTEXITCODE) {throw 'Disabling hibernation failed'}
  $computer=Get-CimInstance Win32_ComputerSystem
@@ -117,6 +137,16 @@ foreach($policy in @(
  $value=(Get-ItemProperty $policy[0] -ErrorAction SilentlyContinue).($policy[1])
  $rows.Add(@{setting=$policy[1];observed=$value;verified=($null -ne $value -and $value -eq $policy[2])})
 }
+foreach($policy in $updateSources) {
+ $value=(Get-ItemProperty $policy[0] -ErrorAction SilentlyContinue).($policy[1])
+ if($null -eq $value -or $value -cne $policy[2]) {
+  $exceptions.Add(@{setting=('update-source/'+$policy[1]);observed=$value;expected=$policy[2];reason='Update-source control refused or reverted; require unchanged download folder and no download/install events during every run'})
+ } else {$rows.Add(@{setting=('update-source/'+$policy[1]);observed=$value;verified=$true})}
+}
+$fallback=(Get-MpPreference).SignatureFallbackOrder
+if($fallback -cne 'InternalDefinitionUpdateServer') {
+ $exceptions.Add(@{setting='Defender/update-source';observed=$fallback;reason='Defender fallback control refused or reverted; require no download/install effects during every run'})
+} else {$rows.Add(@{setting='Defender/update-source';observed=$fallback;verified=$true})}
 $boot=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o')
 $applied=Get-Content C:/Qual/quiet-applied.json -Raw | ConvertFrom-Json
 $rebooted=$boot -ne $applied.boot

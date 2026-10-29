@@ -429,6 +429,14 @@ runtime components and semantic retrieval still have to pass. Windows J3 retains
 the actual activation click events and disabled control state through its own
 WebDriver session in `J3-activation-input.json`.
 
+Guest preparation also restricts Windows Update to the documented empty internal
+update locations and Defender to that internal source. These are
+[Microsoft's public-update connection controls](https://learn.microsoft.com/en-us/windows/privacy/manage-connections-from-windows-operating-system-components-to-microsoft-services)
+and [Defender update-source settings](https://learn.microsoft.com/en-us/defender-endpoint/manage-protection-updates-microsoft-defender-antivirus).
+Refused or reverted controls are recorded as exceptions. Each run still requires
+unchanged download-folder contents and no update download/install events; settings
+alone cannot certify the effect.
+
 Windows native-window discovery enumerates visible top-level HWNDs and reads
 each through UI Automation. UIA's desktop children omit owned dialogs, including
 the folder picker. Picker input still requires the exact installed image, PID
