@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-29T04:41:56.654Z",
+  "revision": "d6d4794d19a96d15dec320d094b06c069f9fc9e1",
+  "tree": "ae250b30404620c29dd0be39d1beb8773390a882",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/91t7gx47/tmp/test-intent-vitest-4-1793248888973.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 11157
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'folder' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 D12 unchanged 'folder' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'from' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 D12 unchanged 'from' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'to' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 D12 unchanged 'to' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'minimum' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 D12 unchanged 'minimum' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'maximum' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 D12 unchanged 'maximum' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "eaba2435fc7814b96cbba23ae7ee210ad08c10b4",
+    "revision": "eaba2435fc7814b96cbba23ae7ee210ad08c10b4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/91t7gx47/tmp/test-intent-vitest-4-1793248907896.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7905,
+        "output": "JSON report written to /home/elias/.cache/am/91t7gx47/tmp/test-intent-vitest-4-1793248907896.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'folder' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+        "classification": "assertion",
+        "detail": "F1 D12 unchanged 'folder' preserves exact API restrictions on blur and Enter and an edit commits only that bound:  AssertionError: folder blur keeps the exact spec including API input metadata: expected '{\"sizeFromBytes\":1025,\"sizeToBytes\":2…' to be '{\"pathPrefix\":\"/inside folder/ \",\"siz…' // Object.is equality\n    at /home/elias/.cache/am/91t7gx47/tmp/test-intent-before-rNFChT/modules/ui-web/src/shell-v0/views/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'from' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+        "classification": "assertion",
+        "detail": "F1 D12 unchanged 'from' preserves exact API restrictions on blur and Enter and an edit commits only that bound:  AssertionError: from blur keeps the exact spec including API input metadata: expected '{\"pathPrefix\":\"/inside folder/ \",\"siz…' to be '{\"pathPrefix\":\"/inside folder/ \",\"siz…' // Object.is equality\n    at /home/elias/.cache/am/91t7gx47/tmp/test-intent-before-rNFChT/modules/ui-web/src/shell-v0/views/se"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'to' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+        "classification": "assertion",
+        "detail": "F1 D12 unchanged 'to' preserves exact API restrictions on blur and Enter and an edit commits only that bound:  AssertionError: to blur keeps the exact spec including API input metadata: expected '{\"pathPrefix\":\"/inside folder/ \",\"siz…' to be '{\"pathPrefix\":\"/inside folder/ \",\"siz…' // Object.is equality\n    at /home/elias/.cache/am/91t7gx47/tmp/test-intent-before-rNFChT/modules/ui-web/src/shell-v0/views/sear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'minimum' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+        "classification": "assertion",
+        "detail": "F1 D12 unchanged 'minimum' preserves exact API restrictions on blur and Enter and an edit commits only that bound:  AssertionError: minimum blur keeps the exact spec including API input metadata: expected '{\"pathPrefix\":\"/inside folder/ \",\"mod…' to be '{\"pathPrefix\":\"/inside folder/ \",\"siz…' // Object.is equality\n    at /home/elias/.cache/am/91t7gx47/tmp/test-intent-before-rNFChT/modules/ui-web/src/shell-v0/views"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'maximum' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+        "classification": "assertion",
+        "detail": "F1 D12 unchanged 'maximum' preserves exact API restrictions on blur and Enter and an edit commits only that bound:  AssertionError: maximum blur keeps the exact spec including API input metadata: expected '{\"pathPrefix\":\"/inside folder/ \",\"mod…' to be '{\"pathPrefix\":\"/inside folder/ \",\"siz…' // Object.is equality\n    at /home/elias/.cache/am/91t7gx47/tmp/test-intent-before-rNFChT/modules/ui-web/src/shell-v0/views"
+      }
+    ]
+  },
+  "digest": "sha256:b202017c27cb8ceb005a867918e26121bb82c5a0897f63b3b3c1745e541c01ee"
+}

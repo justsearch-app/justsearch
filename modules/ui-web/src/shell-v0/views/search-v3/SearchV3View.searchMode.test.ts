@@ -15,6 +15,8 @@
  *    re-ranked and filtered.
  *  - **A search never steers.** The fake agent controller's `steer` is read back.
  */
+import { readFileSync } from 'node:fs';
+import { __seedForTest } from '../../../i18n/resourceCatalog.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { AgentSessionController } from '../../controllers/AgentSessionController.js';
 import { ReasoningController } from '../../controllers/ReasoningController.js';
@@ -93,6 +95,7 @@ import {
   __resetSearchFiltersForTest,
   getFacetSelections,
   getFilters,
+  setFilters,
   setFilterRange,
   toggleFacetValue,
 } from '../../state/searchFiltersState.js';
@@ -315,6 +318,8 @@ function chatUnavailable(): void {
 }
 
 beforeEach(() => {
+  __seedForTest(Object.fromEntries(readFileSync('../app-api/src/main/resources/messages/registry-surface.en.properties', 'utf8')
+    .split(/\r?\n/).filter(line => line.startsWith('search.')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])));
   sessionStorage.clear();
   localStorage.clear();
   __resetConversationListForTest();
@@ -352,6 +357,7 @@ afterEach(() => {
   __resetAiStateForTest();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -1375,4 +1381,264 @@ it('DS1 a known live unrestricted Ask still retries as Ask when the unrelated co
   expect(backend.streams).toHaveLength(2); expect(backend.streams[1]!.body.shapeId).toBe('core.rag-ask');
   expect((backend.streams[1]!.body.docIds as string[] | undefined) ?? []).toEqual([]); expect(ctrl.send).not.toHaveBeenCalled();
   restoreActiveConversation(original); await settle(el); expect((await fieldOf(el)).value).toBe('unrelated B');
+});
+
+
+/* WP2.3b: production view, controls, shared Search store and dispatch boundary. */
+async function filtersOf(el: Mounted): Promise<Mounted> {
+  const composer = await region(el, 'jf-sv3-composer');
+  const trigger = q<HTMLButtonElement>(composer, 'sv3-filters-trigger');
+  expect(trigger, 'F1 Filters entry exists in the production composer').not.toBeNull();
+  if (trigger!.getAttribute('aria-expanded') !== 'true') trigger!.click();
+  await composer.updateComplete;
+  const filters = composer.shadowRoot!.querySelector('jf-sv3-filters') as Mounted | null;
+  expect(filters, 'Filter controls are mounted').not.toBeNull();
+  await filters!.updateComplete;
+  return filters!;
+}
+async function filterEdit(el: Mounted, key: string, text: string, commit = 'Enter'): Promise<void> {
+  const filters = await filtersOf(el);
+  const input = filters.shadowRoot!.querySelector<HTMLInputElement>(`[data-filter-input=${key}]`)!;
+  input.value = text; input.dispatchEvent(new Event('input')); await filters.updateComplete;
+  if (commit === 'blur') input.dispatchEvent(new Event('blur'));
+  else input.dispatchEvent(new KeyboardEvent('keydown', { key: commit, bubbles: true, composed: true }));
+  await filters.updateComplete; await settle(el);
+}
+async function allRestrictions(el: Mounted): Promise<void> {
+  await filterEdit(el, 'folder', '/inside');
+  await filterEdit(el, 'from', '2026-03-29'); await filterEdit(el, 'to', '2026-03-29');
+  await filterEdit(el, 'minimum', '0'); await filterEdit(el, 'maximum', '2');
+}
+const wireRestrictions = (): Record<string, unknown> => ({ pathPrefix: '/inside',
+  modifiedAt: { fromMs: new Date(2026, 2, 29).getTime(), toMs: new Date(2026, 2, 30).getTime() - 1 }, sizeBytes: { fromBytes: 0, toBytes: 2048 } });
+
+it('F1 commits folder date and size controls and removes each restriction without losing the query', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el);
+  expect(backend.searches).toHaveLength(0); expect(ctrl.send).not.toHaveBeenCalled();
+  const filters = await filtersOf(el);
+  expect(filters.shadowRoot!.querySelectorAll('[data-filter]')).toHaveLength(3);
+  await searchFor(el, 'needle'); expect(backend.searches.at(-1)?.filters).toEqual(wireRestrictions());
+  await filterEdit(el, 'maximum', '3', 'blur');
+  expect(backend.searches.at(-1)?.filters).toMatchObject({ pathPrefix: '/inside', sizeBytes: { fromBytes: 0, toBytes: 3072 } });
+  for (const kind of ['folder', 'date', 'size']) {
+    filters.shadowRoot!.querySelector<HTMLButtonElement>(`[data-filter=${kind}]`)!.click(); await settle(el);
+    expect((await fieldOf(el)).value).toBe('needle');
+  }
+  expect(backend.searches.at(-1)?.filters).toBeUndefined();
+});
+
+it('F4b converts local DST calendar days and rounded binary units and keeps entered chip values', async () => {
+  vi.stubEnv('TZ', 'Europe/Berlin');
+  aiOnline(); const el = await mount(); await allRestrictions(el);
+  await filterEdit(el, 'minimum', '0.0005');
+  const filters = await filtersOf(el);
+  const select = filters.shadowRoot!.querySelector<HTMLSelectElement>('select')!;
+  select.value = 'MB'; select.dispatchEvent(new Event('change')); await settle(el);
+  await searchFor(el, 'needle');
+  expect(backend.searches.at(-1)?.filters).toEqual({ ...wireRestrictions(), sizeBytes: { fromBytes: 524, toBytes: 2048 } });
+  expect(filters.shadowRoot!.querySelector('[data-filter=size]')!.textContent).toContain('0.0005 MB');
+  // The explicit non-UTC precondition makes this portable to UTC-hosted CI.
+  expect((getFilters().modifiedToMs! - getFilters().modifiedFromMs! + 1) / 3600000).toBe(23);
+});
+
+it.each([
+  { key: 'folder', edited: '/another folder/', change: () => ({ pathPrefix: '/another folder/' }) },
+  { key: 'from', edited: '2026-03-28', change: () => ({ modifiedFromMs: new Date(2026, 2, 28).getTime() }) },
+  { key: 'to', edited: '2026-03-30', change: () => ({ modifiedToMs: new Date(2026, 2, 31).getTime() - 1 }) },
+  { key: 'minimum', edited: '0.0005', change: () => ({ sizeFromBytes: 1, sizeFromInput: { text: '0.0005', unit: 'KB' } }) },
+  { key: 'maximum', edited: '3.0005', change: () => ({ sizeToBytes: 3073, sizeToInput: { text: '3.0005', unit: 'KB' } }) },
+])('F1 D12 unchanged $key preserves exact API restrictions on blur and Enter and an edit commits only that bound', async ({ key, edited, change }) => {
+  vi.stubEnv('TZ', 'Europe/Berlin');
+  aiOnline(); const el = await mount();
+  const { createHostApi } = await import('../../plugin-api/HostApiImpl.js');
+  const api = createHostApi('filter-regression', 'CORE', { apiBase: 'http://127.0.0.1:9999', registerSurfacePort: vi.fn() });
+  setFilters({ pathPrefix: '/inside folder/ ', sizeFromBytes: 1025, sizeToBytes: 2051 });
+  api.search.setFilterRange(new Date(2026, 2, 29, 12, 34, 56, 789).getTime(), new Date(2026, 2, 29, 13, 34, 56, 789).getTime());
+  await searchFor(el, 'needle');
+  const filters = await filtersOf(el);
+  const input = filters.shadowRoot!.querySelector<HTMLInputElement>(`[data-filter-input=${key}]`)!;
+  const original = structuredClone(getFilters()), originalJson = JSON.stringify(original);
+  const searches = backend.searches.length, requests = fetchMock.mock.calls.length;
+  const opposites: Partial<Record<string, [string, string]>> = { from: ['to', '2026-03-30'], to: ['from', '2026-03-28'], minimum: ['maximum', '3'], maximum: ['minimum', '0'] };
+  const opposite = opposites[key];
+  const pending = opposite ? filters.shadowRoot!.querySelector<HTMLInputElement>(`[data-filter-input=${opposite[0]}]`)! : null;
+  const pendingOriginal = pending?.value;
+  if (pending) { pending.value = opposite![1]!; pending.dispatchEvent(new Event('input')); await filters.updateComplete; }
+  for (const action of ['blur', 'Enter']) {
+    input.focus();
+    if (action === 'blur') input.blur();
+    else {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+      input.blur();
+    }
+    await settle(el);
+    expect(JSON.stringify(getFilters()), `${key} ${action} keeps the exact spec including API input metadata`).toBe(originalJson);
+    expect(backend.searches, `${key} ${action} never reruns Search`).toHaveLength(searches);
+    expect(fetchMock, `${key} ${action} sends no request`).toHaveBeenCalledTimes(requests);
+    if (pending) expect(pending.value, 'an unfinished opposite bound stays a draft').toBe(opposite![1]);
+  }
+  if (pending) { pending.value = pendingOriginal!; pending.dispatchEvent(new Event('input')); await filters.updateComplete; }
+  await filterEdit(el, key, edited, 'blur');
+  expect(getFilters()).toEqual({ ...original, ...change() });
+  expect(backend.searches).toHaveLength(searches + 1);
+  expect(backend.searches.at(-1)?.filters).toEqual({ pathPrefix: key === 'folder' ? edited : original.pathPrefix,
+    modifiedAt: { fromMs: key === 'from' ? new Date(2026, 2, 28).getTime() : original.modifiedFromMs,
+      toMs: key === 'to' ? new Date(2026, 2, 31).getTime() - 1 : original.modifiedToMs },
+    sizeBytes: { fromBytes: key === 'minimum' ? 1 : original.sizeFromBytes, toBytes: key === 'maximum' ? 3073 : original.sizeToBytes } });
+  // Enter and the subsequent blur after this commit must also be no-ops.
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+  input.dispatchEvent(new Event('blur')); await settle(el);
+  expect(backend.searches).toHaveLength(searches + 1);
+});
+
+it('F5 keeps invalid text beside its error and applies no invalid or incomplete edit', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el); await searchFor(el, 'needle');
+  const before = backend.searches.length; const original = structuredClone(getFilters());
+  for (const [key, bad] of [['folder', 'relative/path'], ['minimum', '-1'], ['minimum', '9007199254740992'], ['maximum', '0.00001']]) {
+    await filterEdit(el, key!, bad!);
+    const filters = await filtersOf(el);
+    expect(filters.shadowRoot!.querySelector<HTMLInputElement>(`[data-filter-input=${key}]`)!.value).toBe(bad);
+    expect(filters.shadowRoot!.querySelector(`[data-filter-input=${key}]`)!.getAttribute('aria-invalid')).toBe('true');
+    expect(getFilters()).toEqual(original); expect(backend.searches).toHaveLength(before);
+  }
+});
+
+it('F7 empty Search names active restrictions and restricted Ask no-content never silently broadens', async () => {
+  aiOnline(); const el = await mount(); await filterEdit(el, 'folder', '/nonexistent'); await searchFor(el, 'needle');
+  const result = await results(el); expect(q(result!, 'sv3-results-empty')).not.toBeNull();
+  expect(q(result!, 'sv3-results-filters')!.textContent).toContain('/nonexistent');
+  await chooseTier(el, 'ask'); await askNow(el, 'needle');
+  expect(backend.streams[0]?.body.filters).toEqual({ pathPrefix: '/nonexistent' });
+  backend.streams[0]!.emit('error', { errorCode: 'NO_CONTENT', message: 'No content available.' }); backend.streams[0]!.end(); await settle(el);
+  expect(backend.streams).toHaveLength(1);
+  expect((await region(el, 'jf-sv3-main')).shadowRoot!.textContent).toContain('/nonexistent');
+  const filters = await filtersOf(el); q<HTMLButtonElement>(filters, 'sv3-filters-clear')!.click(); await settle(el); expect(getFilters()).toEqual({});
+});
+
+it('F8 same-query filter commits cancel stale rows counts facets and chosen-file preparation', async () => {
+  aiOnline(); backend.corpus.needle = [wireHit('old', '/outside/old.md')]; const el = await mount(); await filtersOf(el); await searchFor(el, 'needle');
+  await clickRow(el, 'old.md', { ctrlKey: true }); backend.holdSearches = true; await filterEdit(el, 'folder', '/first');
+  const old = backend.held.splice(0); backend.corpus.needle = [wireHit('new', '/new/new.md')];
+  await filterEdit(el, 'folder', '/new');
+  expect(await rows(el)).toHaveLength(0); expect(q((await results(el))!, 'sv3-results-ask')).toBeNull();
+  backend.held.splice(0).forEach(release => release()); await settle(el); old.forEach(release => release()); await settle(el);
+  expect(await rowTitles(el)).toEqual(['new.md']); expect((await results(el))!.shadowRoot!.textContent).not.toContain('/first');
+  expect(q((await results(el))!, 'sv3-results-ask')).toBeNull();
+});
+
+it('F9 plugin dates preserve folder and size and protected owners never issue filter reruns', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el); const before = backend.searches.length;
+  setFilterRange(0, undefined); await settle(el); expect(getFilters()).toMatchObject({ pathPrefix: '/inside', sizeFromBytes: 0, sizeToBytes: 2048 });
+  expect(backend.searches).toHaveLength(before);
+  const filters = await filtersOf(el); expect(filters.shadowRoot!.querySelector('[data-filter=date]')).toBeNull();
+  await searchFor(el, 'needle'); expect((backend.searches.at(-1)?.filters as Record<string, unknown>).modifiedAt).toBeUndefined();
+  setFilterRange(1, 1000); await settle(el);
+  await chooseTier(el, 'ask'); await askNow(el, 'held question');
+  const beforeProtected = backend.searches.length;
+  await filterEdit(el, 'folder', '/next'); await filterEdit(el, 'maximum', '4');
+  expect(backend.searches).toHaveLength(beforeProtected); expect(backend.streams).toHaveLength(1);
+  await answerLatest(el);
+  __feedForTest({ inference: { available: true } as never, status: { worker: { core: { indexedDocuments: 42 } }, conversationProtection: { state: 'locked' } } as unknown as StatusSnapshot });
+  await allRestrictions(el); expect(backend.searches).toHaveLength(beforeProtected); expect(backend.streams).toHaveLength(1);
+});
+
+it('F10 Ask captures at Send and follow-ups capture new controls while live Edit and Retry keep originals', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el); await chooseTier(el, 'ask');
+  await askNow(el, 'first question'); expect(backend.streams[0]?.body.filters).toEqual(wireRestrictions());
+  await filterEdit(el, 'folder', '/next'); await answerLatest(el, 'A fact from the first scope.');
+  await askNow(el, 'new follow-up'); expect(backend.streams[1]?.body.filters).toMatchObject({ pathPrefix: '/next' }); await answerLatest(el);
+  await filterEdit(el, 'folder', '/current');
+  const main = await region(el, 'jf-sv3-main'); const turn = main.shadowRoot!.querySelector('[data-testid=sv3-turn]')!;
+  await press(turn.querySelector('[data-testid=sv3-turn-edit]')); await settle(el);
+  expect(q(main, 'sv3-turn-edit-scope')!.textContent).toContain('/inside');
+  expect(q(main, 'sv3-turn-edit-scope')!.textContent).not.toContain('Searches all your files');
+  const editor = q<HTMLTextAreaElement>(main, 'sv3-turn-edit-input')!; editor.value = 'edited original'; editor.dispatchEvent(new Event('input')); await settle(el);
+  await press(q(main, 'sv3-turn-edit-send')); await settle(el);
+  expect(backend.streams.at(-1)?.body.filters).toEqual(wireRestrictions()); await answerLatest(el);
+  const latestTurn = main.shadowRoot!.querySelector('[data-testid=sv3-turn]')!;
+  await press(latestTurn.querySelector('[data-testid=sv3-turn-context-menu]')); await settle(el);
+  const menu = document.querySelector('jf-context-menu') as Mounted; await menu.updateComplete;
+  const retry = [...menu.shadowRoot!.querySelectorAll<HTMLButtonElement>('button.item')].find(b => b.textContent?.includes(BRANCH_MENU_RETRY))!;
+  expect(retry.textContent).toContain('/inside'); retry.click(); await settle(el);
+  expect(backend.streams.at(-1)?.body.filters).toEqual(wireRestrictions()); await answerLatest(el);
+});
+
+it('F11 prepared file Ask and non-retrieval modes explain restriction precedence', async () => {
+  aiOnline(); backend.corpus.needle = [wireHit('a', '/outside/a.md')]; const el = await mount(); await allRestrictions(el); await searchFor(el, 'needle');
+  const composer = await region(el, 'jf-sv3-composer');
+  const note = (): Element | null => q(composer, 'sv3-filter-note') ?? composer.shadowRoot!.querySelector('jf-sv3-filters')!.shadowRoot!.querySelector('[data-testid=sv3-filter-note]');
+  await clickRow(el, 'a.md', { ctrlKey: true }); await askAboutChosen(el);
+  expect(note()!.textContent).toContain('suspended');
+  await askNow(el, 'chosen file'); expect(backend.streams[0]?.body.docIds).toEqual(['/outside/a.md']); expect(backend.streams[0]?.body.filters).toBeUndefined(); await answerLatest(el);
+  await chooseTier(el, 'delegate'); expect(note()!.textContent).toContain('only to Search and Ask');
+});
+
+it('F12 navigation keeps session filters and both profile signals clear and cancel older generations', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el); el.remove();
+  const next = await mount(); await settle(next); expect(getFilters()).toMatchObject({ pathPrefix: '/inside', sizeFromBytes: 0 });
+  const { createProfile, setActiveProfileId, getActiveProfileId } = await import('../../state/UserStateDocument.js');
+  const original = getActiveProfileId(); createProfile('filter-other', 'Other');
+  backend.holdSearches = true; await searchFor(next, 'pending'); setActiveProfileId('filter-other'); setActiveProfileId(original); await settle(next);
+  expect(getFilters()).toEqual({}); backend.held.splice(0).forEach(release => release()); await settle(next); expect(await rows(next)).toHaveLength(0);
+  const { createProfileFromCurrent, activateProfile } = await import('../../substrates/profiles/index.js');
+  createProfileFromCurrent('filter-workspace', 'Filters workspace'); await allRestrictions(next); await activateProfile('filter-workspace'); await settle(next);
+  expect(getFilters()).toEqual({});
+});
+
+it('F16 controls chips notes and inline errors have accessible names and Escape returns focus', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el); await filterEdit(el, 'folder', 'relative');
+  const composer = await region(el, 'jf-sv3-composer'); const filters = await filtersOf(el);
+  for (const control of filters.shadowRoot!.querySelectorAll('input,select')) expect(control.getAttribute('aria-label')).toBeTruthy();
+  expect(filters.shadowRoot!.querySelector('[data-filter-input=folder]')!.getAttribute('aria-describedby')).toContain('folder-error');
+  expect(filters.shadowRoot!.querySelector('[role=alert]')!.textContent).toContain('absolute');
+  expect(filters.shadowRoot!.textContent).toContain('Earlier answers in this conversation are not changed');
+  filters.shadowRoot!.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true }));
+  await settle(el); expect(q(composer, 'sv3-filters-trigger')!.getAttribute('aria-expanded')).toBe('false');
+  expect(composer.shadowRoot!.activeElement).toBe(q(composer, 'sv3-filters-trigger'));
+});
+
+it('F18 restricted follow-up carries new restrictions while earlier answer remains in context', async () => {
+  aiOnline(); const el = await mount(); await filtersOf(el); await chooseTier(el, 'ask'); await askNow(el, 'outside question');
+  await answerLatest(el, 'Outside sentinel fact.'); await filterEdit(el, 'folder', '/inside'); await askNow(el, 'inside question');
+  expect(backend.streams.at(-1)?.body.filters).toEqual({ pathPrefix: '/inside' });
+  expect(backend.streams.at(-1)?.body.context).toEqual(expect.arrayContaining([expect.objectContaining({ role: 'assistant', content: 'Outside sentinel fact.' })]));
+  await answerLatest(el);
+});
+
+
+it('F5 Engine 400 errors appear next to Search and Ask controls with the entered text intact', async () => {
+  aiOnline(); const el = await mount(); await filterEdit(el, 'folder', '/inside');
+  const normal = fetchMock.getMockImplementation()! as (...args: unknown[]) => unknown;
+  fetchMock.mockImplementation(async (url: unknown, init: unknown) => String(url).includes('/api/knowledge/search') || String(url).includes('/api/chat/dispatch')
+    ? json({ errorCode: 'INVALID_REQUEST', error: 'pathPrefix: rejected by Engine' }, 400) : normal(url, init));
+  await searchFor(el, 'needle'); let filters = await filtersOf(el);
+  expect(filters.shadowRoot!.querySelector('#folder-error')!.textContent).toContain('pathPrefix: rejected by Engine');
+  expect(filters.shadowRoot!.querySelector<HTMLInputElement>('[data-filter-input=folder]')!.value).toBe('/inside');
+  await chooseTier(el, 'ask'); await askNow(el, 'needle'); filters = await filtersOf(el);
+  expect(filters.shadowRoot!.querySelector('#folder-error')!.textContent).toContain('pathPrefix: rejected by Engine');
+  expect(backend.streams).toHaveLength(0);
+});
+
+it('F10 pre-admission held Ask owns its Send snapshot before a later authored follow-up', async () => {
+  aiOnline(); const el = await mount(); setFilterRange(1, 1000); await chooseTier(el, 'ask');
+  const normal = fetchMock.getMockImplementation()! as (...args: unknown[]) => unknown; let release: (() => void) | undefined;
+  fetchMock.mockImplementation(async (url: unknown, init: unknown) => {
+    if (String(url).includes('/api/chat/dispatch')) await new Promise<void>(resolve => { release = resolve; });
+    return normal(url, init);
+  });
+  await type(el, 'held question'); await pressEnter(el); await settle(el);
+  setFilterRange(2000, 3000); release!(); await settle(el);
+  expect(backend.streams[0]?.body.filters).toEqual({ modifiedAt: { fromMs: 1, toMs: 1000 } });
+  await answerLatest(el); fetchMock.mockImplementation(normal);
+  await askNow(el, 'later question'); expect(backend.streams[1]?.body.filters).toEqual({ modifiedAt: { fromMs: 2000, toMs: 3000 } });
+  await answerLatest(el);
+});
+
+it('F8 plugin date commits supersede an identical query before older delayed responses finish', async () => {
+  aiOnline(); const el = await mount(); backend.corpus.needle = [wireHit('old', '/old.md')]; await searchFor(el, 'needle');
+  backend.holdSearches = true; const before = backend.searches.length; setFilterRange(1, 1000); await settle(el);
+  expect(backend.searches.length).toBeGreaterThan(before);
+  const older = backend.held.splice(0); backend.corpus.needle = [wireHit('new', '/new.md')]; setFilterRange(2000, 3000); await settle(el);
+  backend.held.splice(0).forEach(release => release()); await settle(el); older.forEach(release => release()); await settle(el);
+  expect(await rowTitles(el)).toEqual(['new.md']);
 });

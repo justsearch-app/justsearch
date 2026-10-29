@@ -15,6 +15,7 @@
  *
  * Side-effect registers <jf-sv3-main>.
  */
+import type { SearchFilterSpec } from '../../state/searchFiltersState.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { coverageHonesty, coverageNote, groundingCoverage } from '../../components/chat/evidenceProjection.js';
 import { JfElement } from '../../primitives/JfElement.js';
@@ -1345,6 +1346,7 @@ export class Sv3Main extends JfElement {
     conversationId: { attribute: false },
     apiBase: { attribute: false },
     turnScopes: { attribute: false },
+    turnFilters: { attribute: false },
     structuredNotes: { attribute: false },
     run: { attribute: false },
     liveEvidencePaths: { attribute: false },
@@ -1396,6 +1398,7 @@ export class Sv3Main extends JfElement {
    * an absent reloaded turn has unknown inputs, so Retry/Edit must refuse.
    */
   declare structuredNotes: ReadonlyMap<string, string>;
+  declare turnFilters: ReadonlyMap<string, SearchFilterSpec>;
   declare turnScopes: ReadonlyMap<string, Sv3AskScope | null>;
   /**
    * The ONE live agent run, or null. Rendered against `run.turnId` and no other turn, so the feed
@@ -1655,6 +1658,7 @@ export class Sv3Main extends JfElement {
     this.modelAnswerBusy = false;
     this.structuredNotes = new Map();
     this.turnScopes = new Map();
+    this.turnFilters = new Map();
     this.run = null;
     this.liveEvidencePaths = new Set();
     this.unconfirmedSteerNotes = new Map();
@@ -2240,7 +2244,7 @@ export class Sv3Main extends JfElement {
         }}
       ></textarea>
       <p class="ask-scope" data-testid="sv3-turn-edit-scope">
-        ${turn.kind === 'model' ? 'This answer does not search your files.' : sv3ExplainsRankingTrace(turn) ? 'Repeats Explain with its original ranking trace; after reload, start Explain from the result again.' : turn.shapeId === 'core.summarize' ? 'Repeats Summarize with its original input; after reload, choose the original files or passage before sending.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Original Structured inputs are unavailable. Prepare a new Structured task and review its schema and inputs.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id))}
+        ${turn.kind === 'model' ? 'This answer does not search your files.' : sv3ExplainsRankingTrace(turn) ? 'Repeats Explain with its original ranking trace; after reload, start Explain from the result again.' : turn.shapeId === 'core.summarize' ? 'Repeats Summarize with its original input; after reload, choose the original files or passage before sending.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Original Structured inputs are unavailable. Prepare a new Structured task and review its schema and inputs.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id), this.turnFilters?.get(turn.id))}
       </p>
       <div class="ask-edit-acts">
         <jf-control

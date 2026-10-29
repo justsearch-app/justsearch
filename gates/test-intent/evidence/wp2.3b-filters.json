@@ -1,0 +1,327 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-29T04:42:25.401Z",
+  "revision": "d6d4794d19a96d15dec320d094b06c069f9fc9e1",
+  "tree": "af841e8a9bc3aafcda8dcef67996014e7db8ac8b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/91t7gx47/tmp/test-intent-vitest-226-1793248924405.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8844
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 commits folder date and size controls and removes each restriction without losing the query",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F1 commits folder date and size controls and removes each restriction without losing the query",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F4b converts local DST calendar days and rounded binary units and keeps entered chip values",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F4b converts local DST calendar days and rounded binary units and keeps entered chip values",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F5 keeps invalid text beside its error and applies no invalid or incomplete edit",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F5 keeps invalid text beside its error and applies no invalid or incomplete edit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F7 empty Search names active restrictions and restricted Ask no-content never silently broadens",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F7 empty Search names active restrictions and restricted Ask no-content never silently broadens",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F8 same-query filter commits cancel stale rows counts facets and chosen-file preparation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F8 same-query filter commits cancel stale rows counts facets and chosen-file preparation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F9 plugin dates preserve folder and size and protected owners never issue filter reruns",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F9 plugin dates preserve folder and size and protected owners never issue filter reruns",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F10 Ask captures at Send and follow-ups capture new controls while live Edit and Retry keep originals",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F10 Ask captures at Send and follow-ups capture new controls while live Edit and Retry keep originals",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F11 prepared file Ask and non-retrieval modes explain restriction precedence",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F11 prepared file Ask and non-retrieval modes explain restriction precedence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F12 navigation keeps session filters and both profile signals clear and cancel older generations",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F12 navigation keeps session filters and both profile signals clear and cancel older generations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F16 controls chips notes and inline errors have accessible names and Escape returns focus",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F16 controls chips notes and inline errors have accessible names and Escape returns focus",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F18 restricted follow-up carries new restrictions while earlier answer remains in context",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F18 restricted follow-up carries new restrictions while earlier answer remains in context",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F5 Engine 400 errors appear next to Search and Ask controls with the entered text intact",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F5 Engine 400 errors appear next to Search and Ask controls with the entered text intact",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F10 pre-admission held Ask owns its Send snapshot before a later authored follow-up",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F10 pre-admission held Ask owns its Send snapshot before a later authored follow-up",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F8 plugin date commits supersede an identical query before older delayed responses finish",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:35d6558ec198cf6b2f0e4086457d46cfd4ac43ce5a5c50193d30ccea937738f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F8 plugin date commits supersede an identical query before older delayed responses finish",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "79e5bace52153d5876c78711c012324d29bde693",
+    "revision": "79e5bace52153d5876c78711c012324d29bde693",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/91t7gx47/tmp/test-intent-vitest-226-1793248938767.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5866,
+        "output": "JSON report written to /home/elias/.cache/am/91t7gx47/tmp/test-intent-vitest-226-1793248938767.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 commits folder date and size controls and removes each restriction without losing the query",
+        "classification": "assertion",
+        "detail": "F1 commits folder date and size controls and removes each restriction without losing the query:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at runNextTicks (node:internal/proc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F4b converts local DST calendar days and rounded binary units and keeps entered chip values",
+        "classification": "assertion",
+        "detail": "F4b converts local DST calendar days and rounded binary units and keeps entered chip values:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at filterEdit (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F5 keeps invalid text beside its error and applies no invalid or incomplete edit",
+        "classification": "assertion",
+        "detail": "F5 keeps invalid text beside its error and applies no invalid or incomplete edit:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at filterEdit (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F7 empty Search names active restrictions and restricted Ask no-content never silently broadens",
+        "classification": "assertion",
+        "detail": "F7 empty Search names active restrictions and restricted Ask no-content never silently broadens:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at filterEdit (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F8 same-query filter commits cancel stale rows counts facets and chosen-file preparation",
+        "classification": "assertion",
+        "detail": "F8 same-query filter commits cancel stale rows counts facets and chosen-file preparation:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at /home/elias/.cache/am/91t7gx47/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F9 plugin dates preserve folder and size and protected owners never issue filter reruns",
+        "classification": "assertion",
+        "detail": "F9 plugin dates preserve folder and size and protected owners never issue filter reruns:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at filterEdit (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F10 Ask captures at Send and follow-ups capture new controls while live Edit and Retry keep originals",
+        "classification": "assertion",
+        "detail": "F10 Ask captures at Send and follow-ups capture new controls while live Edit and Retry keep originals:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at filterEdit (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F11 prepared file Ask and non-retrieval modes explain restriction precedence",
+        "classification": "assertion",
+        "detail": "F11 prepared file Ask and non-retrieval modes explain restriction precedence:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at filterEdit (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F12 navigation keeps session filters and both profile signals clear and cancel older generations",
+        "classification": "assertion",
+        "detail": "F12 navigation keeps session filters and both profile signals clear and cancel older generations:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at filterEdit (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F16 controls chips notes and inline errors have accessible names and Escape returns focus",
+        "classification": "assertion",
+        "detail": "F16 controls chips notes and inline errors have accessible names and Escape returns focus:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at filterEdit (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F18 restricted follow-up carries new restrictions while earlier answer remains in context",
+        "classification": "assertion",
+        "detail": "F18 restricted follow-up carries new restrictions while earlier answer remains in context:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at /home/elias/.cache/am/91t7gx47/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F5 Engine 400 errors appear next to Search and Ask controls with the entered text intact",
+        "classification": "assertion",
+        "detail": "F5 Engine 400 errors appear next to Search and Ask controls with the entered text intact:  AssertionError: F1 Filters entry exists in the production composer: expected null not to be null\n    at filtersOf (/home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1391:77)\n    at filterEdit (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F10 pre-admission held Ask owns its Send snapshot before a later authored follow-up",
+        "classification": "assertion",
+        "detail": "F10 pre-admission held Ask owns its Send snapshot before a later authored follow-up:  AssertionError: expected undefined to deeply equal { modifiedAt: { fromMs: 1, …(1) } }\n    at /home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1631:44\n    at file:///home/elias/.cache/am/91t7gx47/tmp/test-intent-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F8 plugin date commits supersede an identical query before older delayed responses finish",
+        "classification": "assertion",
+        "detail": "F8 plugin date commits supersede an identical query before older delayed responses finish:  AssertionError: expected 1 to be greater than 1\n    at /home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1640:35\n    at file:///home/elias/.cache/am/91t7gx47/tmp/test-intent-before-KDT9KH/modules/ui-web/node_modul"
+      }
+    ]
+  },
+  "digest": "sha256:e2a954bb625a7c1fbe6ec7b29cea5581fcb089648c558ce94270f9c8951ff241"
+}
