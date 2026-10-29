@@ -93,6 +93,9 @@ function main(flags) {
     args.push(':modules:app-launcher:test', '--tests', '*UnreferencedCodeTest');
   }
   if (!slotAvailable) console.error('java-prepush: js-gradle-slot was not found on PATH; running the Gradle wrapper directly.');
+  const excludedTests = readFileSync(path.join(root, 'scripts/dev/prepush-excluded-tests.tsv'), 'utf8')
+    .split(/\r?\n/).filter((line) => line.startsWith('gradle\t')).map((line) => line.split('\t')[2]);
+  console.log(`Pre-push excludes: ${excludedTests.join(', ')}`);
   if (flags.includes('--dry-run')) {
     const quote = windows ? '"' : "'";
     const environment = windows ? 'set "JUSTSEARCH_PREPUSH=true" &&' : 'JUSTSEARCH_PREPUSH=true';
