@@ -73,7 +73,7 @@ the generative process exclusive GPU ownership from ONNX encoders.
 
 ### Transition Protocol
 
-When the user escalates to an Ask/agent turn in the unified "Search" window (tempdoc 687 — there is no separate Chat tab):
+When the user escalates to an Ask/agent turn in the Search window (`SearchV3View`, with Search, Ask, Structured and Delegate modes):
 1.  **Main:** Begins a mode transition via `ModeStateMachine` (validates not already transitioning, stores previous mode for rollback).
 2.  **Main:** Does not claim the GPU from ONNX encoders as part of the Online transition.
 3.  **Index half:** ONNX encoders may remain GPU-resident and continue query and background work while Chat is Online; VRAM capacity is shared.
@@ -582,7 +582,7 @@ Fallback chain in `matchCitations()`:
 
 ### Frontend rendering
 
-The RAG-citation event orchestration lives in `modules/ui-web/src/shell-v0/views/UnifiedChatView.ts` (`onRagCitationMatches` / `onRagCitationDelta`), consuming the streaming callbacks in `modules/ui-web/src/api/streams.ts` and feeding a resolved citation model (`shell-v0/components/chat/citationResolve.ts` / `citationTypes.ts`) to the presentational components under `shell-v0/components/chat/`. It handles both prongs:
+Search owns RAG-citation orchestration in `modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.ts`, with recorded evidence restored by `sv3-record.ts`. `SearchV3View.ts` feeds that evidence to `Sv3Main.ts` and the shared `shell-v0/components/chat/` components through `citationResolve.ts` / `citationTypes.ts`:
 
 - Cross-encoder scores **refine** the RAG citations — excerpts, offsets, and headings from the `meta` event are preserved; only the citation's `score` is updated.
 - LLM-generated `[N]` markers are reconciled against the resolved citations before render (prevents duplication).

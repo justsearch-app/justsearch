@@ -12,6 +12,7 @@ import { parseWireContract } from '../schemas';
 import {
   knowledgeSearchResponseSchema,
   type KnowledgeSearchResponse,
+  type Filters,
 } from '../generated/schema-types/knowledge-search-response';
 
 // Re-export the generated raw wire type so existing consumers (tests, callers) keep a
@@ -69,23 +70,9 @@ export interface ExcerptRegion {
   matchSpans: MatchSpan[];
 }
 
-export type SearchFilters = {
-  mime?: string[] | undefined;
-  mimeBase?: string[] | undefined;
-  fileKind?: string[] | undefined;
-  language?: string[] | undefined;
-  pathPrefix?: string | undefined;
-  modifiedAt?: { fromMs?: number | undefined; toMs?: number | undefined } | undefined;
-  includeChunks?: boolean | undefined;
-  entityPersons?: string[] | undefined;
-  entityOrganizations?: string[] | undefined;
-  entityLocations?: string[] | undefined;
-  // 362: Faceted metadata filters
-  metaSource?: string[] | undefined;
-  metaAuthor?: string[] | undefined;
-  metaCategory?: string[] | undefined;
-  metaPublishedAt?: { fromMs?: number | undefined; toMs?: number | undefined } | undefined;
-};
+// The request restrictions and appliedFilters echo share the generated Java filter record.
+export type SearchFilters = { [K in keyof Filters]?: Filters[K] | undefined };
+
 
 type FacetField = { field: string; size?: number | undefined };
 export type SearchFacets = { include: boolean; fields: FacetField[]; maxDocsScanned?: number | undefined };
@@ -106,7 +93,7 @@ export type PipelineConfig = {
 export type SearchOptions = {
   limit?: number | undefined;
   mode?: 'text' | 'vector' | 'hybrid' | undefined;
-  querySyntax?: 'simple' | 'lucene' | undefined;
+  querySyntax?: 'simple' | 'lucene' | 'search' | undefined;
   sort?: 'relevance' | 'modified_desc' | 'modified_asc' | 'size_desc' | 'size_asc' | 'path_asc' | 'path_desc' | undefined;
   cursor?: string | undefined;
   filters?: SearchFilters | undefined;

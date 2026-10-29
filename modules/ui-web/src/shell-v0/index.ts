@@ -58,11 +58,7 @@ import './renderers/resourceRegistryDefaults.js';
 // default landing surface, so first paint never flashes a loader.
 // (Tempdoc 565 §15: the standalone Workflow surface is retired — a workflow run is
 // now a MODE of the one window, so it is no longer a lazy route surface.)
-// Search Thread S5b — the standalone Search HUD surface (`jf-search-surface`, formerly the
-// default-landing EAGER import here) is retired; the retrieve tier folded into UnifiedChatView
-// (`core.unified-chat-surface`), which is ALREADY the eager default landing surface — imported
-// transitively via `./chrome/Shell.js` below (Shell.ts imports UnifiedChatView.js directly), so no
-// replacement eager import is needed here.
+// Search is the eager default landing surface, registered transitively by chrome/Shell.ts.
 // Tempdoc 560 §25/§26 — the core token-editor surface is retired; the ONE token editor ships as the
 // bundled first-party `token-editor` plugin (src/shell-v0/plugins/token-editor/, installed in main.jsx).
 // Slice 449 phase 10 — Lit chrome (jf-shell + jf-rail + jf-stage).

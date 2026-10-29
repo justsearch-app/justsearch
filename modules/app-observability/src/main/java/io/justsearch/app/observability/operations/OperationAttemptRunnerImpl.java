@@ -532,6 +532,14 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       OperationRecordHandle handle,
       io.justsearch.app.api.operations.RecordedInstallerGenerationPlan plan,
       io.justsearch.app.api.EngineWorkHandle work) {
+    return prepareInstallerGenerationProjection(handle, plan, work, null);
+  }
+
+  @Override
+  public SettingsCommitOwner.PreparedGenerationProjection prepareInstallerGenerationProjection(
+      OperationRecordHandle handle,
+      io.justsearch.app.api.operations.RecordedInstallerGenerationPlan plan,
+      io.justsearch.app.api.EngineWorkHandle work, SettingsCommitOwner.GenerationEncoders encoders) {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(work, "work");
     if (settingsOwner == null || !(handle instanceof OperationAttemptRunnerImpl.Control control)
@@ -564,7 +572,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       io.justsearch.app.api.UiSettings candidate = tools.jackson.databind.json.JsonMapper.builder().build()
           .readValue(plan.candidateSettings().canonicalJson(), io.justsearch.app.api.UiSettings.class);
       prepared = settingsOwner.prepareInstallerGenerationProjection(
-          reservation, candidate, control.settingsControl, plan);
+          reservation, candidate, control.settingsControl, plan, encoders);
       observeBulkBoundary(handle, BulkBoundary.INSTALLER_BEFORE_MARKER);
       if (!store.armInstallerGenerationSettingsRevision(row.id(), expectedRevision)) {
         throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);

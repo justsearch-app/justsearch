@@ -506,6 +506,8 @@ public final class FilterNormalizationService {
         .pathPrefix(original.pathPrefix())
         .includeChunks(original.includeChunks())
         .modifiedAt(original.modifiedAt())
+        .sizeBytes(original.sizeBytes())
+        .collection(original.collection())
         .entityPersons(original.entityPersons())
         .entityOrganizations(original.entityOrganizations())
         .entityLocations(original.entityLocations())

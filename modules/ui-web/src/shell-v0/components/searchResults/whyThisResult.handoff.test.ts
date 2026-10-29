@@ -3,9 +3,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { render } from 'lit';
 import { renderWhyDisclosure, type WhyHit } from './whyThisResult.js';
-import { takePendingForceShape, takePendingSelection } from '../../utils/compose.js';
+import { takePendingSelection } from '../../utils/compose.js';
 vi.mock('../../state/aiStateStore.js', () => ({ getAiState: () => ({ capabilities: { chat: true } }) }));
-afterEach(() => { document.body.replaceChildren(); takePendingForceShape(); takePendingSelection(); });
+afterEach(() => { document.body.replaceChildren(); takePendingSelection(); });
 const trace: WhyHit['trace'] = [{ id: 'sparse-retrieval', rank: 2, score: 3.5 }, { id: 'cross-encoder', rank: 1, score: 0.9 }];
 function explain(id?: string, path?: string): { query: string } {
   const hit = { id, path, title: 'orchard.md', trace };

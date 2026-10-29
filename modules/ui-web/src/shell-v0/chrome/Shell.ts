@@ -325,9 +325,16 @@ import {
 import '../components/chat/ChatShapeMount.js';
 import '../views/NavigateView.js';
 import '../views/SummarizeView.js';
-// Tempdoc 561 surface tier: AskView/FreeChatView/ExtractView retired — the one window
-// (UnifiedChatView) is the view for every interaction shape (rag-ask/free-chat/extract/agent-run).
-import '../views/UnifiedChatView.js';
+// Search is the eager landing window and registers the supported interaction-shape factories.
+import '../views/search-v3/SearchV3View.js';
+// Public vocabulary formerly registered only through the retired window.
+import '../components/RouteChip.js';
+import '../components/ScopeChip.js';
+import '../components/chat/ConversationHistory.js';
+import '../components/chat/HandoffCard.js';
+import '../components/chat/AgentAuthorityPanel.js';
+import '../components/AutonomyDial.js';
+import { canonicalComponentTag } from '../renderers/componentIdentity.js';
 // Lazy route-surface loaders — the other navigable surfaces are imported on
 // first navigation (renderOneSurface, below) instead of eagerly, keeping them
 // out of the eager app entry chunk (ui-bundle app_main budget).
@@ -1446,15 +1453,14 @@ export class Shell extends JfElement {
     });
     // Search Thread S6 — the inspectorState subscription (the Shell-level `data-inspector-open` grid
     // column + `<jf-inspector-pane>` mount) retired; `UnifiedChatView` now subscribes directly and
-    // renders `<jf-document-pane>` in its own conversation-zone column.
+    // Search now owns its `<jf-document-pane>` directly.
     // Slice 471 — userConfig subscribe drives both Stage's override
     // dispatch + the ProvenanceBadge visibility.
     // Slice 472 — also re-filter rail when surfaceVisibility /
     // surfaceOrder change.
     // 687 R5b — narrow reading mount inputs (the wide-layout decision + the shared inspector
-    // selection). 798 round 8 — that decision is the reading SURFACE's measured width, not the raw
-    // viewport, and it is the same one UnifiedChatView's grid mount reads; the two must stay exact
-    // complements or the pane renders twice, or nowhere.
+    // selection). The shared viewport authority remains after the old host's width reporter retires.
+    // Search owns its own reader; this fallback serves other surfaces at narrow widths.
     this.narrowReadingUnsubs = [
       subscribeWide(() => {
         this.wideForReading = isWideLayout();
@@ -3314,8 +3320,8 @@ export class Stage extends JfElement {
     // On first navigation the custom element isn't defined yet: kick off the
     // dynamic import, show a loading state, and re-render once the element
     // upgrades (whenDefined). See ../views/lazySurfaceRegistry.ts. The default
-    // landing surface (jf-unified-chat-view) is eager, so it never hits this path.
-    const mountTag = surface.mountTag;
+    // landing surface (jf-sv3-window) is eager, so it never hits this path.
+    const mountTag = canonicalComponentTag(surface.mountTag);
     if (isLazySurface(mountTag) && !customElements.get(mountTag)) {
       void ensureSurfaceLoaded(mountTag);
       void customElements.whenDefined(mountTag).then(() => this.requestUpdate());
@@ -3389,7 +3395,7 @@ export class Stage extends JfElement {
     //   3. customElements.get() membership-checks the tag (HTML
     //      spec PCEN regex ensures only valid names return truthy).
     //   4. unsafeStatic dispatches the validated tag.
-    const tag = surface.mountTag;
+    const tag = canonicalComponentTag(surface.mountTag);
     if (!customElements.get(tag)) {
       return html`<div class="empty">Surface element &lt;${tag}&gt; not registered.</div>`;
     }

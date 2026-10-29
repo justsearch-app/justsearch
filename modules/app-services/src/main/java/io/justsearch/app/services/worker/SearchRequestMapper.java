@@ -28,6 +28,7 @@ final class SearchRequestMapper {
    * {@code filters != null}.
    */
   static void applyFilters(SearchRequest.Builder b, KnowledgeSearchRequest.Filters filters) {
+    boolean strict = b.getQuerySyntax() == io.justsearch.ipc.SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SEARCH;
     SearchFilters.Builder fb = SearchFilters.newBuilder();
     for (String v : filters.mime()) {
       if (v != null && !v.isBlank()) fb.addMime(v);
@@ -59,6 +60,12 @@ final class SearchRequestMapper {
         fb.setModifiedAt(TimeRangeMs.newBuilder().setFromMs(fromMs).setToMs(toMs).build());
       }
     }
+    if (filters.sizeBytes() != null) {
+      var size = io.justsearch.ipc.ByteRange.newBuilder();
+      if (filters.sizeBytes().fromBytes() != null) size.setFromBytes(filters.sizeBytes().fromBytes());
+      if (filters.sizeBytes().toBytes() != null) size.setToBytes(filters.sizeBytes().toBytes());
+      fb.setSizeBytes(size);
+    }
     // Entity filters
     for (String v : filters.entityPersons()) {
       if (v != null && !v.isBlank()) fb.addEntityPersons(v);
@@ -71,13 +78,13 @@ final class SearchRequestMapper {
     }
     // 366: lowercase to match index-time normalization in IndexingDocumentOps
     for (String v : filters.metaSource()) {
-      if (v != null && !v.isBlank()) fb.addMetaSource(v.toLowerCase(Locale.ROOT));
+      if (v != null && !v.isBlank()) fb.addMetaSource(strict ? v : v.toLowerCase(Locale.ROOT));
     }
     for (String v : filters.metaAuthor()) {
-      if (v != null && !v.isBlank()) fb.addMetaAuthor(v.toLowerCase(Locale.ROOT));
+      if (v != null && !v.isBlank()) fb.addMetaAuthor(strict ? v : v.toLowerCase(Locale.ROOT));
     }
     for (String v : filters.metaCategory()) {
-      if (v != null && !v.isBlank()) fb.addMetaCategory(v.toLowerCase(Locale.ROOT));
+      if (v != null && !v.isBlank()) fb.addMetaCategory(strict ? v : v.toLowerCase(Locale.ROOT));
     }
     KnowledgeSearchRequest.TimeRangeMs metaPub = filters.metaPublishedAt();
     if (metaPub != null) {
@@ -91,8 +98,8 @@ final class SearchRequestMapper {
     boolean isWindows = io.justsearch.configuration.PlatformPaths.isWindows();
     for (String v : filters.docIds()) {
       if (v != null && !v.isBlank()) {
-        String normalized = v.replace('/', java.io.File.separatorChar);
-        if (isWindows) normalized = normalized.toLowerCase(Locale.ROOT);
+        String normalized = strict ? v : v.replace('/', java.io.File.separatorChar);
+        if (!strict && isWindows) normalized = normalized.toLowerCase(Locale.ROOT);
         fb.addDocIds(normalized);
       }
     }

@@ -142,7 +142,7 @@ public final class SearchInputCapture {
             && !queryString.isBlank()
             && request.getCursor().isBlank()
             && request.getQuerySyntax()
-                != io.justsearch.ipc.SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE
+                == io.justsearch.ipc.SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE
             && ProtoConverters.toRuntimeSort(request.getSort())
                 == LuceneRuntimeTypes.RuntimeSearchSort.RELEVANCE;
     boolean hasChunkDocs = false;
@@ -163,8 +163,15 @@ public final class SearchInputCapture {
 
     // 4. Filter expansion (entity normalization).
     var filtersMsg = request.hasFilters() ? request.getFilters() : null;
-    LuceneRuntimeTypes.RuntimeSearchFilters runtimeFilters =
-        expandEntityFilters(ProtoConverters.toRuntimeFilters(filtersMsg), clusterSnapshot);
+    boolean strictSearch = request.getQuerySyntax()
+        == io.justsearch.ipc.SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SEARCH;
+    LuceneRuntimeTypes.RuntimeSearchFilters runtimeFilters = ProtoConverters.toRuntimeFilters(filtersMsg);
+    if (strictSearch && runtimeFilters != null && filtersMsg != null) {
+      runtimeFilters = runtimeFilters.withMetaSource(filtersMsg.getMetaSourceList())
+          .withMetaAuthor(filtersMsg.getMetaAuthorList()).withMetaCategory(filtersMsg.getMetaCategoryList());
+    } else if (!strictSearch) {
+      runtimeFilters = expandEntityFilters(runtimeFilters, clusterSnapshot);
+    }
     if (runtimeFilters == null) {
       // Build empty filters when none supplied so downstream code sees a non-null value.
       runtimeFilters = LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder().build();
@@ -581,24 +588,8 @@ public final class SearchInputCapture {
       return filters;
     }
 
-    return LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder()
-        .mime(filters.mime())
-        .language(filters.language())
-        .fileKind(filters.fileKind())
-        .mimeBase(filters.mimeBase())
-        .pathPrefix(filters.pathPrefix())
-        .modifiedFromMs(filters.modifiedFromMs())
-        .modifiedToMs(filters.modifiedToMs())
-        .includeChunks(filters.includeChunks())
-        .entityPersons(persons)
-        .entityOrganizations(orgs)
-        .entityLocations(locs)
-        .metaSource(filters.metaSource())
-        .metaAuthor(filters.metaAuthor())
-        .metaCategory(filters.metaCategory())
-        .metaPublishedFromMs(filters.metaPublishedFromMs())
-        .metaPublishedToMs(filters.metaPublishedToMs())
-        .build();
+    return filters.withEntityPersons(persons)
+        .withEntityOrganizations(orgs).withEntityLocations(locs);
   }
 
   // visible for testing

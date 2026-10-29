@@ -590,6 +590,15 @@ public final class DocumentFieldOps {
    * <p>Does NOT call {@code ensureStarted()} â€” caller (facade) is responsible for that guard.
    */
   public boolean isUnmodified(String docId, long currentLastModified) {
+    return isUnmodified(docId, currentLastModified, null);
+  }
+
+  /** Certifies the source stamp and complete chunks; missing stored size requires repair. */
+  public boolean isUnmodified(String docId, long currentLastModified, long currentSizeBytes) {
+    return isUnmodified(docId, currentLastModified, Long.valueOf(currentSizeBytes));
+  }
+
+  private boolean isUnmodified(String docId, long currentLastModified, Long currentSizeBytes) {
     // A complete stale reader is a false positive after committed deletion/replacement. Commit
     // prepares the reader; retry if another commit overtakes this admission's reader lease.
     try {
@@ -611,6 +620,11 @@ public final class DocumentFieldOps {
                 return false;
               }
               if (modifiedAt != currentLastModified) return false;
+              if (currentSizeBytes != null) {
+                long sizeBytes = readPathOps.readLongDocValueOrStoredLong(
+                    searcher, docNum, SchemaFields.SIZE_BYTES);
+                if (sizeBytes < 0 || sizeBytes != currentSizeBytes) return false;
+              }
               var assessment = session.chunkCompleteness.assess(searcher, docNum, docId);
               boolean unchanged = assessment.complete();
               if (unchanged && assessment.backfill() != null) {

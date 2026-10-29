@@ -1,0 +1,243 @@
+--- scripts/governance/gates/test-intent/run-evidence.mjs
++++ tmp/wp24a-runner/run-evidence.mjs
+@@ -14,7 +14,7 @@
+  * hash, the exact commands, the environment, a content digest of every named check's file, and
+  * executed versus skipped per check.
+  *
+- * `--before <ref>`: the fail-before run for repaired behaviour. A detached worktree of <ref> gets
++ * `--before <ref>`: the fail-before run for repaired behaviour. A retained TMPDIR shared clone of <ref> gets
+  * the candidate's check files (for a Rust production file, only its #[cfg(test)] items are
+  * transplanted) plus any `--overlay` paths, the same commands run there, and each check's failure is
+  * classified: `assertion` (the only one that shows the old behaviour is wrong), `exception`,
+@@ -33,8 +33,8 @@
+ import path from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ 
+-import { normalizeText } from './changeset.mjs';
+-import { EVIDENCE_PRODUCER, EVIDENCE_SCHEMA, checkFile, checkName, contentDigest, evidenceSelfDigest } from './evidence.mjs';
++import { normalizeText } from '../../scripts/governance/gates/test-intent/changeset.mjs';
++import { EVIDENCE_PRODUCER, EVIDENCE_SCHEMA, checkFile, checkName, contentDigest, evidenceSelfDigest } from '../../scripts/governance/gates/test-intent/evidence.mjs';
+ import {
+   classifyFailBefore,
+   gradleTarget,
+@@ -45,63 +45,25 @@
+   selectJUnitCases,
+   selectVitestCases,
+   summarize,
+-} from './evidence-runners.mjs';
+-import { extractTestItems, testModuleFiles } from './rust-tests.mjs';
++} from '../../scripts/governance/gates/test-intent/evidence-runners.mjs';
++import { extractTestItems, testModuleFiles } from '../../scripts/governance/gates/test-intent/rust-tests.mjs';
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+-const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..');
++const REPO_ROOT = process.cwd();
+ const IS_WIN = process.platform === 'win32';
+ 
+ function sh(command, cwd) {
+   const started = Date.now();
++  console.error(`${new Date().toISOString()}: starting ${command} in ${cwd}`);
+   // Native test extraction must be private to this invocation and checkout. Sharing the default
+   // path with another Gradle run silently skips app-services' native checks on Windows.
+-  const env = { ...process.env };
+-  if (/gradlew/.test(command)) {
+-    // Isolate Gradle tests and their children, including historical builds without the convention.
+-    // Retain Gradle's cache location before replacing HOME/USERPROFILE.
+-    env.GRADLE_USER_HOME ||= path.join(os.homedir(), '.gradle');
+-    const profile = path.join(cwd, 'build', 'test-evidence-profile');
+-    const home = path.join(profile, 'home');
+-    const paths = {
+-      HOME: home, USERPROFILE: home,
+-      APPDATA: path.join(home, 'AppData', 'Roaming'), LOCALAPPDATA: path.join(home, 'AppData', 'Local'),
+-      XDG_CONFIG_HOME: path.join(home, '.config'), XDG_DATA_HOME: path.join(home, '.local', 'share'),
+-      XDG_CACHE_HOME: path.join(home, '.cache'), XDG_STATE_HOME: path.join(home, '.local', 'state'),
+-    };
+-    for (const [key, directory] of Object.entries(paths)) {
+-      fs.mkdirSync(directory, { recursive: true });
+-      env[key] = directory;
+-    }
+-    delete env.JUSTSEARCH_HOME;
+-    delete env.JUSTSEARCH_DATA_DIR;
+-    // JVM properties are not inherited by Gradle test workers. An init script also protects
+-    // --before checkouts, whose Test tasks may predate the shared isolation convention.
+-    const initScript = 'build/test-evidence-profile.init.gradle';
+-    fs.writeFileSync(path.join(cwd, initScript), `
+-allprojects {
+-  tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+-    def profileDirectory = layout.buildDirectory.dir("test-profile/" + name)
+-    doFirst {
+-      def profile = profileDirectory.get().asFile
+-      def home = new File(profile, "home")
+-      def paths = [HOME: home, USERPROFILE: home,
+-        APPDATA: new File(home, "AppData/Roaming"), LOCALAPPDATA: new File(home, "AppData/Local"),
+-        XDG_CONFIG_HOME: new File(home, ".config"), XDG_DATA_HOME: new File(home, ".local/share"),
+-        XDG_CACHE_HOME: new File(home, ".cache"), XDG_STATE_HOME: new File(home, ".local/state")]
+-      paths.values().each { it.mkdirs() }
+-      systemProperty "user.home", home.absolutePath
+-      systemProperties.remove("justsearch.data.dir")
+-      systemProperties.remove("justsearch.home")
+-      environment.remove("JUSTSEARCH_HOME")
+-      environment.remove("JUSTSEARCH_DATA_DIR")
+-      paths.each { key, directory -> environment key, directory.absolutePath }
+-    }
+-  }
+-}
+-`, 'utf8');
+-    command += ` --init-script ${initScript}`;
+-  }
++  const env = { ...process.env, CUDA_VISIBLE_DEVICES: '-1' };
++  for (const key of Object.keys(env)) {
++    if (key.startsWith('JUSTSEARCH_') || ['JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', 'JAVA_OPTS', '_JAVA_OPTIONS'].includes(key)) delete env[key];
++  }
++  delete env.DISPLAY;
++  delete env.WAYLAND_DISPLAY;
++  // Both trees already isolate Test tasks in JvmBaseConventionsPlugin. No init script.
+   if (/gradlew/.test(command) && env.LIGHTGBM_NATIVE_LIB_PATH) {
+     // Resolve the named directory itself (it may be a junction); links inside it are not followed.
+     const nativeSource = fs.realpathSync(env.LIGHTGBM_NATIVE_LIB_PATH);
+@@ -114,13 +76,32 @@
+       filter: (source) => !fs.lstatSync(source).isSymbolicLink(),
+     });
+   }
+-  const res = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
++  let res;
++  const attempts = [];
++  let busySince;
++  let readOnlySince;
++  for (;;) {
++    res = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
++    const output = `${res.stdout ?? ''}\n${res.stderr ?? ''}`;
++    const readOnly = /Read-only file system/.test(output) && /fileHashes(?:\/|\\).*fileHashes.lock/.test(output);
++    if (res.status !== 75 && !readOnly) break;
++    const now = Date.now();
++    if (res.status === 75) busySince ??= now;
++    if (readOnly) readOnlySince ??= now;
++    if ((busySince && now - busySince >= 3 * 60 * 60 * 1000)
++        || (readOnlySince && now - readOnlySince >= 60 * 60 * 1000)) break;
++    attempts.push({ exitCode: res.status, output, at: new Date().toISOString() });
++    console.error(`${new Date().toISOString()}: Gradle ${readOnly ? 'read-only cache hazard' : 'slot exit 75'}; retrying in ten minutes`);
++    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10 * 60 * 1000);
++  }
++  console.error(`${new Date().toISOString()}: command exit ${res.status}`);
+   const signal = res.signal ?? (IS_WIN && (res.status >>> 0) === 0xC000013A ? 'STATUS_CONTROL_C_EXIT' : null);
+   return {
+     command,
+     cwd: path.relative(REPO_ROOT, cwd).replaceAll('\\', '/') || '.',
+     exitCode: res.status ?? -1,
+     durationMs: Date.now() - started,
++    ...(attempts.length ? { retries: attempts } : {}),
+     output: [res.stdout ?? '', res.stderr ?? '',
+       ...(signal ? [`command interrupted: ${signal}`] : []),
+       ...(res.error ? [res.error.message] : []),
+@@ -184,7 +165,7 @@
+   for (const group of gradleGroups.values()) {
+     for (const { t } of group) fs.rmSync(path.join(root, t.resultFile), { force: true });
+     const filters = [...new Set(group.map(({ t }) => (t.method ? `${t.fqcn}.${t.method}` : t.fqcn)))];
+-    const wrapper = IS_WIN ? '.\\gradlew.bat' : './gradlew';
++    const wrapper = IS_WIN ? '.\\gradlew.bat' : 'env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew';
+     const { project, task } = group[0].t;
+     const run = sh(`${wrapper} ${project}:${task} ${filters.map((f) => `--tests ${JSON.stringify(f)}`).join(' ')} --rerun -PskipWebBuild=true --console=plain`, root);
+     runs.push(run);
+@@ -198,7 +179,7 @@
+     const out = path.join(os.tmpdir(), `test-intent-vitest-${process.pid}-${Date.now()}.json`);
+     const files = [...new Set(ids.map((id) => checkFile(id).replace(/^modules\/ui-web\//, '')))];
+     const config = kind === 'lockdown' ? ' --config vitest.config.lockdown.ts' : '';
+-    const run = sh(`npx vitest run ${files.map((f) => JSON.stringify(f)).join(' ')}${config} --reporter=json --outputFile=${JSON.stringify(out)}`, path.join(root, 'modules', 'ui-web'));
++    const run = sh(`npx vitest run ${files.map((f) => JSON.stringify(f)).join(' ')}${config} --configLoader runner --maxWorkers=2 --reporter=json --outputFile=${JSON.stringify(out)}`, path.join(root, 'modules', 'ui-web'));
+     runs.push(run);
+     const parsed = fs.existsSync(out) ? parseVitestJson(fs.readFileSync(out, 'utf8')) : [];
+     fs.rmSync(out, { force: true });
+@@ -252,14 +233,11 @@
+   return rustTestFileCache;
+ }
+ 
+-function prepareNodeModules(worktree, copyNodeModules = false) {
+-  const src = path.join(REPO_ROOT, 'modules', 'ui-web', 'node_modules');
++function prepareNodeModules(worktree) {
+   const dst = path.join(worktree, 'modules', 'ui-web', 'node_modules');
+-  if (!fs.existsSync(src) || fs.existsSync(dst)) return;
+-  // Node 24's native directory copier recreates POSIX symlinks even with dereference enabled.
+-  // An all-pass filter selects its stat-based copier, which follows each dependency link.
+-  if (copyNodeModules) fs.cpSync(src, dst, { recursive: true, dereference: true, filter: () => true });
+-  else fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
++  if (!fs.existsSync(dst) || fs.lstatSync(dst).isSymbolicLink()) {
++    throw new Error('before shared clone requires its own plain npm ci');
++  }
+ }
+ 
+ /** Detach links without visiting their targets, including dangling links and linked ancestors. */
+@@ -274,19 +252,7 @@
+ }
+ 
+ function removeBeforeWorktree(worktree, created) {
+-  // An invalid ref never creates/registers a worktree. Remove only our still-empty, real
+-  // reservation, non-recursively; anything populated still goes through guarded Git removal.
+-  if (!created && fs.lstatSync(worktree, { throwIfNoEntry: false })?.isDirectory()
+-      && fs.readdirSync(worktree).length === 0) {
+-    fs.rmdirSync(worktree);
+-    return;
+-  }
+-  // Git for Windows can traverse junctions during recursive removal. Detach every link first,
+-  // not only the node_modules link we created: a check or partial checkout can leave others.
+-  // An unreadable directory or failed unlink aborts removal, leaving the tree for inspection.
+-  unlinkWorktreeLinks(worktree);
+-  const removed = spawnSync('git', ['-c', 'core.longpaths=true', 'worktree', 'remove', '--force', worktree], { cwd: REPO_ROOT });
+-  if (removed.status !== 0) throw new Error(`before-state cleanup failed (${worktree}): ${removed.error?.message ?? removed.stderr}`);
++  // Shared clones are owned temporary evidence; retain them until the session ends.
+ }
+ 
+ function parseArgs(argv) {
+@@ -346,13 +312,20 @@
+   let failBefore = null;
+   let cleanupError;
+   if (args.before) {
+-    const wt = fs.mkdtempSync(path.join(args.beforeRoot ?? os.tmpdir(), 'test-intent-before-'));
++    const wt = path.join(args.beforeRoot ?? os.tmpdir(), 'before');
+     let beforeError;
+     let created = false;
+     try {
+-      // Git accepts the reserved empty directory. Keep creation inside the cleanup scope so a
+-      // failed checkout cannot leave links behind without even attempting to detach them.
+-      gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
++      // Use an owned shared clone, retaining its separate build folder for inspection.
++      // Never register worktrees or write checkout metadata into the candidate repository.
++      if (!fs.existsSync(path.join(wt, '.git'))) {
++        gitOut(['clone', '--quiet', '--shared', '--no-checkout', REPO_ROOT, wt], REPO_ROOT);
++        gitOut(['checkout', '--quiet', '--detach', args.before], wt);
++      }
++      if (gitOut(['rev-parse', 'HEAD'], wt) !== gitOut(['rev-parse', `${args.before}^{commit}`], REPO_ROOT)
++          || gitOut(['diff', '--name-only', '--', 'modules/*/src/main', 'build-logic', '*.gradle*'], wt)) {
++        throw new Error('before clone must retain exact baseline production and build sources');
++      }
+       created = true;
+       // Explicit compatibility scaffolding for checks using newly added interfaces. Its bytes are
+       // part of the evidence; repaired behavior must remain absent from this before-state patch.
+@@ -370,7 +343,7 @@
+         revision: gitOut(['rev-parse', `${args.before}^{commit}`], REPO_ROOT),
+         overlays: args.overlays,
+         patches,
+-        runs: fb.runs.map(({ output, ...r }) => ({ ...r, cwd: '<before-worktree>', ...(r.exitCode !== 0 ? { output } : {}) })),
++        runs: fb.runs.map(({ output, ...r }) => ({ ...r, cwd: '<before-shared-clone>', ...(r.exitCode !== 0 ? { output } : {}) })),
+         checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
+       };
+     } catch (e) {
+@@ -390,11 +363,18 @@
+ 
+   const evidence = {
+     schema: EVIDENCE_SCHEMA,
+-    producer: { script: EVIDENCE_PRODUCER, scriptDigest: contentDigest(scriptText) },
++    producer: {
++      script: EVIDENCE_PRODUCER, scriptDigest: contentDigest(scriptText),
++      adapterPatch: 'gates/test-intent/evidence/wp24a-syntax/runner-machine-rules.patch',
++      adaptation: 'Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, vitest with two workers, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources.'
++    },
+     createdAt: new Date().toISOString(),
+     revision: gitOut(['rev-parse', 'HEAD'], REPO_ROOT),
+     tree: workingTreeHash(REPO_ROOT),
+     environment: {
++      cudaVisibleDevices: process.env.CUDA_VISIBLE_DEVICES,
++      displayUnset: !('DISPLAY' in process.env),
++      waylandDisplayUnset: !('WAYLAND_DISPLAY' in process.env),
+       platform: process.platform,
+       arch: process.arch,
+       osRelease: os.release(),

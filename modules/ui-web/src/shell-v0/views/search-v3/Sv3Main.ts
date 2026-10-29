@@ -15,6 +15,7 @@
  *
  * Side-effect registers <jf-sv3-main>.
  */
+import type { SearchFilterSpec } from '../../state/searchFiltersState.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { coverageHonesty, coverageNote, groundingCoverage } from '../../components/chat/evidenceProjection.js';
 import { JfElement } from '../../primitives/JfElement.js';
@@ -817,6 +818,8 @@ export class Sv3Main extends JfElement {
          margin (the F8 pane lesson), which is why the shared component's 0.5rem is neutralised from
          here rather than edited inside an authority three windows render through. */
       .sv3-citations {
+        /* Sources metadata must remain readable on the hovered card's secondary wash. */
+        --text-secondary: color-mix(in srgb, var(--secondary-label) 90%, var(--foreground));
         display: block;
         margin: var(--space-2) 0 0;
         overflow-wrap: anywhere;
@@ -1343,6 +1346,7 @@ export class Sv3Main extends JfElement {
     conversationId: { attribute: false },
     apiBase: { attribute: false },
     turnScopes: { attribute: false },
+    turnFilters: { attribute: false },
     structuredNotes: { attribute: false },
     run: { attribute: false },
     liveEvidencePaths: { attribute: false },
@@ -1394,6 +1398,7 @@ export class Sv3Main extends JfElement {
    * an absent reloaded turn has unknown inputs, so Retry/Edit must refuse.
    */
   declare structuredNotes: ReadonlyMap<string, string>;
+  declare turnFilters: ReadonlyMap<string, SearchFilterSpec>;
   declare turnScopes: ReadonlyMap<string, Sv3AskScope | null>;
   /**
    * The ONE live agent run, or null. Rendered against `run.turnId` and no other turn, so the feed
@@ -1653,6 +1658,7 @@ export class Sv3Main extends JfElement {
     this.modelAnswerBusy = false;
     this.structuredNotes = new Map();
     this.turnScopes = new Map();
+    this.turnFilters = new Map();
     this.run = null;
     this.liveEvidencePaths = new Set();
     this.unconfirmedSteerNotes = new Map();
@@ -2058,7 +2064,7 @@ export class Sv3Main extends JfElement {
           : html`
               ${this.rewriteNote(turn)}${this.reasoningBlocks(turn, streaming)}
               <div class="answer" data-testid="sv3-turn-answer" data-item-id=${`${turn.id}:a`}>
-                ${empty && turn.kind === 'model' && turn.status !== 'complete' ? nothing : empty && !streaming
+                ${empty && (turn.kind === 'model' || turn.shapeId === 'core.extract') && turn.status !== 'complete' ? nothing : empty && !streaming
                   ? html`<span class="answer-empty" data-testid="sv3-turn-answer-empty"
                       >${TURN_EMPTY_ANSWER}</span
                     >`
@@ -2238,7 +2244,7 @@ export class Sv3Main extends JfElement {
         }}
       ></textarea>
       <p class="ask-scope" data-testid="sv3-turn-edit-scope">
-        ${turn.kind === 'model' ? 'This answer does not search your files.' : sv3ExplainsRankingTrace(turn) ? 'Repeats Explain with its original ranking trace; after reload, start Explain from the result again.' : turn.shapeId === 'core.summarize' ? 'Repeats Summarize with its original input; after reload, choose the original files or passage before sending.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Original Structured inputs are unavailable. Prepare a new Structured task and review its schema and inputs.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id))}
+        ${turn.kind === 'model' ? 'This answer does not search your files.' : sv3ExplainsRankingTrace(turn) ? 'Repeats Explain with its original ranking trace; after reload, start Explain from the result again.' : turn.shapeId === 'core.summarize' ? 'Repeats Summarize with its original input; after reload, choose the original files or passage before sending.' : turn.shapeId === 'core.extract' ? this.structuredNotes.get(turn.id) ?? 'Original Structured inputs are unavailable. Prepare a new Structured task and review its schema and inputs.' : sv3ResendScopeNote(this.turnScopes?.get(turn.id), this.turnFilters?.get(turn.id))}
       </p>
       <div class="ask-edit-acts">
         <jf-control
@@ -3201,9 +3207,11 @@ export class Sv3Main extends JfElement {
       >`;
     }
     const broken = turn.status === 'failed' || turn.status === 'refused';
-    const fallback = retrievalFallbackPhrase(
-      turn.evidence?.retrievalModeReason ?? '', turn.evidence?.retrievalModeCause ?? '',
-    );
+    const fallback = turn.evidence?.retrievalMode === 'FULLTEXT_FALLBACK'
+      ? 'Full-document retrieval — document too small for chunking'
+      : retrievalFallbackPhrase(
+        turn.evidence?.retrievalModeReason ?? '', turn.evidence?.retrievalModeCause ?? '',
+      );
     if (turn.kind === 'agent') {
       return html`<span
         class="tail-note"

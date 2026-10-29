@@ -21,7 +21,10 @@
   "demandClassesNote": "Annotates WHY a channel holds the mechanism `class` it does (Design §D2's literal ask: declare each channel's demand class, not just its mechanism). Optional per channel — only present where the demand reasoning isn't self-evident from the class alone. Documentation-only: the gate validates the enum if present but does not derive placement from it (that judgment call — e.g. tempdoc 662's design-alignment review §Gap-1 on indexing-jobs — stays in the tempdoc's prose, not mechanized here, per AHA scope discipline).",
   "scan": {
     "root": "modules/ui-web/src",
-    "excludeSuffixes": [".test.ts", ".test.tsx"],
+    "excludeSuffixes": [
+      ".test.ts",
+      ".test.tsx"
+    ],
     "excludeFiles": [
       "modules/ui-web/src/shell-v0/streaming/FetchEventSource.ts",
       "modules/ui-web/src/shell-v0/streaming/EnvelopeStream.ts",
@@ -30,13 +33,41 @@
     ],
     "excludeFilesNote": "The 4 substrate files IMPLEMENT the transport/openers; they do not own independent channels. FetchEventSource replaces the native EventSource transport used by EnvelopeStream and CapabilitiesHandshake. Connections remain classified at their existing CALL SITES (always-on Shell, lazy surfaces, fallback clients, dormant handshake), with the same owners and budget. Exclude the mechanism itself, as for EnvelopeStream, EnvelopeStreamPool and MultiplexedStream; scan new FetchEventSource call sites with fetch-event-source.",
     "openers": [
-      { "id": "fetch-event-source", "pattern": "new FetchEventSource\\b", "transport": "fetch-stream" },
-      { "id": "envelope-stream-direct", "pattern": "new EnvelopeStream\\b", "transport": "sse" },
-      { "id": "envelope-stream-pool", "pattern": "\\bsubscribePooled\\b", "transport": "sse" },
-      { "id": "multiplexed-stream", "pattern": "new MultiplexedStream\\b", "transport": "sse-multiplexed" },
-      { "id": "fetch-stream-shape", "pattern": "\\bconsumeShapeStream\\b", "transport": "fetch-stream" },
-      { "id": "fetch-stream-host-ai", "pattern": "\\bpumpHostAiStream\\b", "transport": "fetch-stream" },
-      { "id": "fetch-stream-body-reader", "pattern": "\\.body\\??\\.getReader\\(\\)", "transport": "fetch-stream" }
+      {
+        "id": "fetch-event-source",
+        "pattern": "new FetchEventSource\\b",
+        "transport": "fetch-stream"
+      },
+      {
+        "id": "envelope-stream-direct",
+        "pattern": "new EnvelopeStream\\b",
+        "transport": "sse"
+      },
+      {
+        "id": "envelope-stream-pool",
+        "pattern": "\\bsubscribePooled\\b",
+        "transport": "sse"
+      },
+      {
+        "id": "multiplexed-stream",
+        "pattern": "new MultiplexedStream\\b",
+        "transport": "sse-multiplexed"
+      },
+      {
+        "id": "fetch-stream-shape",
+        "pattern": "\\bconsumeShapeStream\\b",
+        "transport": "fetch-stream"
+      },
+      {
+        "id": "fetch-stream-host-ai",
+        "pattern": "\\bpumpHostAiStream\\b",
+        "transport": "fetch-stream"
+      },
+      {
+        "id": "fetch-stream-body-reader",
+        "pattern": "\\.body\\??\\.getReader\\(\\)",
+        "transport": "fetch-stream"
+      }
     ],
     "openersPatternNote": "Patterns match the bare call/constructor identifier, not the full call expression with its generic type argument — TypeScript generics (`subscribePooled<StrategyState<TabularData<X>>>(`) defeat naive balanced-bracket regex matching. A conservative over-detection bias (matching a bare identifier, e.g. a type-only import) is the safer failure direction for a budget gate than under-detection.",
     "openersNote": "Honest limit (mirrors check-declared-surfaces.mjs / execution-surfaces.v1.json §5): import/grep-visible coverage only. A re-modeled opener (a renamed helper, a hand-rolled fetch-stream loop not matching these patterns) is import-invisible and slips past this gate — early-warning register, the accepted norm for every presentation/connection gate in this codebase. `multiplex.subscribe(...)` calls (the 4 migrated consumers' demux registrations) are deliberately NOT a scanned pattern — they register a LOGICAL stream on an ALREADY-open physical connection; they open no new socket, so they are out of scope for a connection-budget register by construction, not an oversight."
@@ -113,7 +144,7 @@
       "file": "modules/ui-web/src/api/streams.ts",
       "openerId": "fetch-stream-shape",
       "class": "transient",
-      "note": "consumeShapeStream — the chat/agent/summarize generation POST response-body stream (UnifiedChatView, SummarizeView, AgentSessionController, and other shape consumers). One in flight per active generation; this is the entry the budget's headroom reserves a slot for (Investigation §C/§F)."
+      "note": "consumeShapeStream — the chat/agent/summarize generation POST response-body stream (Search, SummarizeView, AgentSessionController, and other shape consumers). One in flight per active generation; this is the entry the budget's headroom reserves a slot for (Investigation §C/§F)."
     },
     {
       "file": "modules/ui-web/src/api/streams.ts",
@@ -170,16 +201,10 @@
       "note": "Plugin-host AI stream consumer — open only while the Summarize view is mounted and a plugin-driven generation is in flight."
     },
     {
-      "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
-      "openerId": "fetch-stream-shape",
-      "class": "lazy",
-      "note": "consumeShapeStream-driven chat generation — open only while the chat view is mounted and a generation is in flight."
-    },
-    {
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.ts",
       "openerId": "fetch-stream-shape",
       "class": "lazy",
-      "note": "Tempdoc 822 Phase F1 — the Search v3 window's ONE ask issuance site delegates to consumeShapeStream (core.rag-ask). Same demand shape as the UnifiedChatView row: open only while the (dev-gated, hidden-deeplink) Search v3 window is mounted and a turn is streaming, closed at the terminal event or at the reader's Stop (the window aborts on unmount and on New session, so an unwatched stream cannot outlive its window). Tempdoc 851 (owner decision 2026-08-19) retired the Search v2 row with its window, so the two remaining windows are siblings until the v3 promotion retires one more."
+      "note": "Tempdoc 822 Phase F1 — the Search window's ONE ask issuance site delegates to consumeShapeStream (core.rag-ask). Open only while the main Search window is mounted and a turn is streaming, closed at the terminal event or at the reader's Stop (the window aborts on unmount and on New session, so an unwatched stream cannot outlive its window). SA15 retired the old chat opener; the shared shape-stream transport and Search opener remain."
     }
   ]
 }

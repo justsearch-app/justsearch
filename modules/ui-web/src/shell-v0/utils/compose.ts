@@ -1,25 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-/**
- * compose — universal dispatch helper per tempdoc 526 §4.5 + §12.4.
- *
- * Replaces the slice 510 / slice 514 `askAi` helper and dissolves the
- * askAi-vs-direct-route fork (§6) by carrying a typed
- * {@link ComposeOperation} + an optional {@link SelectionPayload}, then
- * resolving the target shape through a single (operation, kind) → ShapeId
- * table — instead of letting {@code UnifiedChatView}'s {@code
- * affordanceToShape} pick.
- *
- * The helper dispatches a {@code navigate-with-context} event with the
- * resolved {@code forceShapeId}; UnifiedChatView prefers that shape over its
- * own affordance derivation. The pending selection is parked in a one-shot
- * register so UnifiedChatView's next dispatch forwards {@code body.selection}.
- *
- * compose() gates on AI capability and returns {@code false} when AI is
- * unavailable (mirrors the legacy askAi contract).
- */
-
+/** Prepare Search through the shared navigation and selection transport; never send on arrival. */
 import { getAiState } from '../state/aiStateStore.js';
-import { type Affordance } from '../state/unifiedChatState.js';
+export type Affordance = 'none' | 'retrieve' | 'documents' | 'extract' | 'agent';
 import type { SelectionPayload } from '../../api/types/selection.js';
 
 /**
@@ -50,7 +32,7 @@ export interface ComposeArgs {
   /**
    * Optional affordance hint. Defaults from operation + docIds. The resolved
    * shape (see {@link resolveShape}) is always preferred; affordance is
-   * carried only so UnifiedChatView's UI bits that still read it (chip,
+   * carried only so Search's UI bits that still read it (chip,
    * input placeholder) keep behaving as before.
    */
   readonly affordance?: Affordance;
@@ -59,18 +41,10 @@ export interface ComposeArgs {
 }
 
 /**
- * Pending-selection register — UnifiedChatView's next /api/chat/dispatch
+ * Pending-selection register — Search's next /api/chat/dispatch
  * picks this up and forwards it as body.selection. One-shot.
  */
 let pendingSelection: SelectionPayload | null = null;
-
-/**
- * Forced-shape register — compose() resolves a shapeId from the (operation,
- * kind) table and parks it here. UnifiedChatView's next dispatch prefers it
- * over the legacy {@code affordanceToShape} derivation, dissolving the
- * askAi-vs-direct-route fork named in tempdoc 526 §6. One-shot.
- */
-let pendingForceShapeId: string | null = null;
 
 export function setPendingSelection(s: SelectionPayload | null): void {
   pendingSelection = s;
@@ -80,40 +54,6 @@ export function takePendingSelection(): SelectionPayload | null {
   const s = pendingSelection;
   pendingSelection = null;
   return s;
-}
-
-export function setPendingForceShape(shapeId: string | null): void {
-  pendingForceShapeId = shapeId;
-}
-
-export function takePendingForceShape(): string | null {
-  const s = pendingForceShapeId;
-  pendingForceShapeId = null;
-  return s;
-}
-
-/**
- * Auto-run register — 548 §4.5. Set by the IntentRouter when it lowers an
- * `answer` verb to a chat-surface activation. UnifiedChatView drains it on
- * connect and, once the AI is chat-capable, fires `send()` once with the
- * prefilled prompt — giving the `answer` verb the same "navigate-and-run"
- * symmetry the `query` verb already has against the search surface
- * (SearchSurface's restoreSearch executes the fetch). One-shot.
- *
- * compose()/askAi paths deliberately leave this unset: those prefill the
- * composer and wait for the user to press Send. Only the agent-emitted
- * `answer` verb declares "run it now."
- */
-let pendingAutoRun = false;
-
-export function setPendingAutoRun(v: boolean): void {
-  pendingAutoRun = v;
-}
-
-export function takePendingAutoRun(): boolean {
-  const v = pendingAutoRun;
-  pendingAutoRun = false;
-  return v;
 }
 
 /**
@@ -158,44 +98,6 @@ export function resolveShape(
   }
 }
 
-/**
- * The ONE shape computation the chat window's mode chip, streaming header, and `send()` share.
- *
- * <p>The chip used to call {@link resolveShape} with the selection kind hardcoded to `'none'`
- * while `send()` passed the live kind — one resolver, two argument sets, so the label could
- * name a shape that was never dispatched. Both call this instead.
- *
- * `'agent'` is the action-plane MODE, not an answer-plane shape, so it resolves as if no
- * affordance were chosen (the agent path hosts its own view rather than dispatching a shape).
- */
-export function resolveDispatchShape(
-  affordance: Affordance,
-  selectionKind: SelectionPayload['kind'] | 'none',
-): string {
-  return resolveShape('core.ask', selectionKind, affordance === 'agent' ? 'none' : affordance);
-}
-
-/**
- * Narrow the live selection store's kind to the wire kinds {@link resolveShape} understands.
- * The FE-only item kinds (search-hit / browse-node / plugin-item) all ride the wire as `'item'`;
- * anything else resolves as if nothing were selected. Lifted verbatim from `UnifiedChatView.send()`
- * so the chip and the dispatch cannot normalize the same selection differently.
- */
-export function wireSelectionKind(kind: string | undefined): SelectionPayload['kind'] | 'none' {
-  switch (kind) {
-    case 'text-range':
-    case 'citation':
-    case 'result-set':
-      return kind;
-    case 'search-hit':
-    case 'browse-node':
-    case 'plugin-item':
-      return 'item';
-    default:
-      return 'none';
-  }
-}
-
 /** Mirror the legacy askAi return contract: false when AI is offline. */
 export function compose(args: ComposeArgs): boolean {
   const ai = getAiState();
@@ -209,14 +111,9 @@ export function compose(args: ComposeArgs): boolean {
   setPendingSelection(args.selection ?? (docIds.length > 0
     ? { kind: 'result-set', items: docIds.map(id => ({ id, kind: 'doc' as const })) }
     : null));
-  setPendingAutoRun(false);
   const kind: SelectionPayload['kind'] | 'none' = args.selection?.kind ?? 'none';
   const forceShapeId =
     args.targetShape ?? resolveShape(args.operation, kind, affordance);
-  // Park forceShapeId in the one-shot register; UnifiedChatView.send() drains
-  // it on the next /api/chat/dispatch, dissolving the askAi-vs-direct-route
-  // fork (§6) by routing through the resolver instead of affordanceToShape.
-  setPendingForceShape(forceShapeId);
   const detail = {
     target: 'core.search-v3-surface',
     state: { query, affordance, ...(args.docIds !== undefined ? { docIds } : {}), forceShapeId },
@@ -248,9 +145,7 @@ let searchV3Handoff: { state: Record<string, unknown>; selection: SelectionPaylo
 
 export function parkSearchV3Handoff(state: Record<string, unknown>, origin: 'fresh' | 'restore' = 'fresh'): void {
   const selection = takePendingSelection();
-  takePendingForceShape();
   searchV3Handoff = { state, selection: typeof state.forceShapeId === 'string' ? selection : null, origin };
-  takePendingAutoRun(); // Search v3 always waits for a person's send, including answer links.
   window.dispatchEvent(new Event('sv3-handoff'));
 }
 

@@ -315,6 +315,14 @@ public final class ChatController {
       return;
     }
     if (StoreIdRequest.rejectBody(ctx, parsedBody)) return;
+    if ("core.rag-ask".equals(shapeId.value())) {
+      try {
+        io.justsearch.app.api.knowledge.SearchRestrictions.fromJson(ctx.body());
+      } catch (IllegalArgumentException invalid) {
+        ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, invalid.getMessage()));
+        return;
+      }
+    }
     if (engine.wouldDiscardWhileLocked(shapeId, parsedBody)) {
       LOG.info("Refusing dispatch of shape {}: conversation store is locked", shapeId.value());
       Map<String, Object> locked =

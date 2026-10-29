@@ -23,7 +23,8 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -201,6 +202,18 @@ final class SyncDirectoryOps {
   }
 
   /**
+   * A walk member {@link #discoverCandidateDifference} could not read: the walk an ordinary sync
+   * makes keeps going past it and reports delete detection unverified.
+   */
+  static final class UnreadableWalkMemberException extends IOException {
+    private static final long serialVersionUID = 1L;
+
+    UnreadableWalkMemberException(String message, IOException cause) {
+      super(message, cause);
+    }
+  }
+
+  /**
    * Discovers a root difference for candidate-scoped admission.
    *
    * <p>Unlike ordinary maintenance sync, every incomplete observation throws. The caller cannot
@@ -232,8 +245,8 @@ final class SyncDirectoryOps {
     try {
       identityLease.requireCurrent();
       var budget = new PathBudget(pathCharCap);
-      Set<String> indexedPaths = getIndexedPathsUnderPrefixStrict(root.toString(), budget, cancelled, scope);
-      indexedPaths.removeIf(scope::excludes);
+      Map<String, IndexedFileStamp> indexedFiles = getIndexedPathsUnderPrefixStrict(root.toString(), budget, cancelled, scope);
+      indexedFiles.keySet().removeIf(scope::excludes);
       Set<String> seenDiskPaths = new HashSet<>();
       List<Path> eligibleFiles = new ArrayList<>();
       Files.walkFileTree(
@@ -247,7 +260,8 @@ final class SyncDirectoryOps {
               if (!dir.equals(root) && nativePolicy != null
                   && nativePolicy.excludesDirectory(dir, root, collection)) return FileVisitResult.SKIP_SUBTREE;
               if (!Files.isReadable(dir)) {
-                throw new IOException("Reconciliation directory is unreadable: " + dir);
+                throw new UnreadableWalkMemberException(
+                    "Reconciliation directory is unreadable: " + dir, null);
               }
               if (!dir.equals(root)) {
                 String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
@@ -277,14 +291,18 @@ final class SyncDirectoryOps {
                 return FileVisitResult.CONTINUE;
               }
               if (!Files.isReadable(file)) {
-                throw new IOException("Reconciliation file is unreadable: " + file);
+                throw new UnreadableWalkMemberException(
+                    "Reconciliation file is unreadable: " + file, null);
               }
               if ((nativePolicy == null ? !IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
                       : nativePolicy.allows(file, root, collection)) && !isCloudPlaceholder(file)) {
                 // Conservatively account for the Path's spelling and component storage as well
                 // as the separately retained normalized disk key.
                 budget.retain(2L * file.toString().length());
-                eligibleFiles.add(file.toAbsolutePath().normalize());
+                IndexedFileStamp indexed = indexedFiles.get(normalized);
+                if (force || indexed == null || !indexed.matches(attrs)) {
+                  eligibleFiles.add(file.toAbsolutePath().normalize());
+                }
               }
               return FileVisitResult.CONTINUE;
             }
@@ -298,7 +316,8 @@ final class SyncDirectoryOps {
               if (!file.equals(root) && nativePolicy != null
                   && nativePolicy.excludesDirectory(file, root, collection)
                   && Files.isDirectory(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return FileVisitResult.CONTINUE;
-              throw new IOException("Reconciliation walk could not read: " + file, failure);
+              throw new UnreadableWalkMemberException(
+                  "Reconciliation walk could not read: " + file, failure);
             }
 
             @Override
@@ -315,14 +334,14 @@ final class SyncDirectoryOps {
       List<Path> additions = new ArrayList<>();
       for (Path file : eligibleFiles) {
         checkCancelled(cancelled);
-        if (force || !indexedPaths.contains(PathNormalizer.normalizeKey(file))) additions.add(file);
+        additions.add(file);
       }
       additions.sort(
           (first, second) -> {
             checkCancelledUnchecked(cancelled);
             return PathNormalizer.normalizeKey(first).compareTo(PathNormalizer.normalizeKey(second));
           });
-      List<String> deletions = confirmedAbsentPaths(indexedPaths, cancelled);
+      List<String> deletions = confirmedAbsentPaths(indexedFiles.keySet(), cancelled);
       checkCancelled(cancelled);
       identityLease.requireCurrent();
       RootDifference difference =
@@ -376,6 +395,11 @@ final class SyncDirectoryOps {
    * size or time is {@code -1}.
    */
   record IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs) {
+    boolean matches(BasicFileAttributes attrs) {
+      return sizeBytes >= 0 && modifiedAtMs >= 0 && attrs.isRegularFile()
+          && attrs.size() == sizeBytes && attrs.lastModifiedTime().toMillis() == modifiedAtMs;
+    }
+
     /** Whether the file exists at its path now, unlinked, with the indexed size and time. */
     boolean matchesDisk() {
       if (sizeBytes < 0 || modifiedAtMs < 0) {
@@ -384,9 +408,7 @@ final class SyncDirectoryOps {
       try {
         BasicFileAttributes attrs = Files.readAttributes(
             path, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
-        return attrs.isRegularFile()
-            && attrs.size() == sizeBytes
-            && attrs.lastModifiedTime().toMillis() == modifiedAtMs;
+        return matches(attrs);
       } catch (IOException | SecurityException notThere) {
         return false;
       }
@@ -454,11 +476,11 @@ final class SyncDirectoryOps {
     }
   }
 
-  private Set<String> getIndexedPathsUnderPrefixStrict(
+  private Map<String, IndexedFileStamp> getIndexedPathsUnderPrefixStrict(
       String prefix, PathBudget budget,
       java.util.function.BooleanSupplier cancelled, PathPrefixScope scope) throws IOException {
     if (readPathOps == null) throw new IOException("Serving index read path is unavailable");
-    Set<String> paths = new LinkedHashSet<>();
+    Map<String, IndexedFileStamp> paths = new java.util.LinkedHashMap<>();
     Set<String> cursors = new HashSet<>();
     try {
       String normalizedPrefix = PathNormalizer.normalizePathPrefix(prefix);
@@ -478,7 +500,8 @@ final class SyncDirectoryOps {
       do {
         checkCancelled(cancelled);
         var result = readPathOps.search(scopedQuery, 256,
-            Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID),
+            Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID,
+                SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT),
             LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, cursor);
         if (result == null) throw new IOException("Serving index path scan returned no result");
         if (result.totalHits() > pathScanCap) {
@@ -500,7 +523,11 @@ final class SyncDirectoryOps {
           if (!canonical.equals(storedPath)) {
             throw new IOException("Serving file document path metadata does not match its id");
           }
-          if (paths.add(canonical)) budget.retain(canonical.length());
+          if (paths.put(canonical, new IndexedFileStamp(Path.of(canonical),
+              longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
+              longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)))) == null) {
+            budget.retain(canonical.length());
+          }
           requireBelowCap(paths.size(), "index");
         }
         cursor = result.nextCursor();
@@ -648,7 +675,7 @@ final class SyncDirectoryOps {
     if(root==null)return syncDirectoryErrorResponse("ROOT enumeration unavailable");
     try {
       requireRetirementPolicy(root, cancelled);
-      var result=walkAndEnqueueMissingFiles(root,true,Set.of(),
+      var result=walkAndEnqueueMissingFiles(root,true,Map.of(),
           io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(original.payload()).provenance(),
           cancelled,collection,automatic?AdmissionMode.UPGRADE_RECOVERY:AdmissionMode.RETIREMENT_REPLAY,
           recoveryAdmission,original);
@@ -720,7 +747,7 @@ final class SyncDirectoryOps {
       // set (can be large). We enqueue all disk files and rely on IndexingLoop's "unchanged"
       // fast-path.
       if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
-      Set<String> indexedPaths = indexedPathsForSync(rootPath, force, cancelled, scope);
+      Map<String, IndexedFileStamp> indexedPaths = indexedPathsForSync(rootPath, force, cancelled, scope);
       if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
       SyncDirectoryResponse scanSkip =
           handleSyncIndexedPathsScanSkipIfNeeded(rootPath, force, indexedPaths, filesDeleted);
@@ -790,7 +817,7 @@ final class SyncDirectoryOps {
   }
 
   private SyncDirectoryResponse handleSyncIndexedPathsScanSkipIfNeeded(
-      String rootPath, boolean force, Set<String> indexedPaths, int filesDeleted) {
+      String rootPath, boolean force, Map<String, IndexedFileStamp> indexedPaths, int filesDeleted) {
     if (force || indexedPaths != null) {
       return null;
     }
@@ -856,7 +883,7 @@ final class SyncDirectoryOps {
         pruneWriterFence);
   }
 
-  private Set<String> indexedPathsForSync(String rootPath, boolean force,
+  private Map<String, IndexedFileStamp> indexedPathsForSync(String rootPath, boolean force,
       java.util.function.BooleanSupplier cancelled, PathPrefixScope scope) {
     if (force) {
       return null;
@@ -870,7 +897,7 @@ final class SyncDirectoryOps {
 
   @SuppressWarnings("PMD.CognitiveComplexity")
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
-      Path root, boolean force, Set<String> indexedPaths,
+      Path root, boolean force, Map<String, IndexedFileStamp> indexedPaths,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
       String collection, AdmissionMode admissionMode,
       java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
@@ -881,7 +908,7 @@ final class SyncDirectoryOps {
       int[] counters = {0}; // [0]=fileCount (for throttle)
       boolean[] walkInterrupted = {false};
       boolean[] walkIncomplete = {false};
-      final Set<String> indexedPathsFinal = indexedPaths;
+      final Map<String, IndexedFileStamp> indexedPathsFinal = indexedPaths;
 
       Files.walkFileTree(
           root,
@@ -947,8 +974,11 @@ final class SyncDirectoryOps {
 
               String normalizedPath =
                   PathNormalizer.normalizePath(file.toAbsolutePath().toString());
-              if (force
-                  || (indexedPathsFinal != null && !indexedPathsFinal.contains(normalizedPath))) {
+              IndexedFileStamp indexed = indexedPathsFinal == null ? null : indexedPathsFinal.get(normalizedPath);
+              // Retirement replay retains its separate ownership and current-byte proof.
+              if (force || indexed == null
+                  || ((admissionMode == AdmissionMode.DEFAULT || admissionMode == AdmissionMode.MAINTENANCE)
+                      && !indexed.matches(attrs))) {
                 // 813 Slice B: the walk already holds the size — no extra stat.
                 if (stopped()) return FileVisitResult.TERMINATE;
                 spool.add(file, attrs.size());
@@ -991,7 +1021,7 @@ final class SyncDirectoryOps {
             if (originalRoot != null) {
               var queue=(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue)jobQueue;
               boolean replay = admissionMode==AdmissionMode.RETIREMENT_REPLAY || admissionMode==AdmissionMode.UPGRADE_RECOVERY;
-              var completedRows = new java.util.HashMap<String,java.util.Map<String,String>>();
+              var completedRows = new HashMap<String,Map<String,String>>();
               var changedPaths = new ArrayList<String>();
               var corrections = new ArrayList<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.RetirementSourceObservation>();
               var rootFiles=replay?queue.retirementRootFiles():null;
@@ -1131,9 +1161,9 @@ final class SyncDirectoryOps {
    * field-based filtering (is_chunk != true) to exclude chunk documents rather than string
    * matching on doc_id, which can misclassify legitimate paths.
    */
-  private Set<String> getIndexedPathsUnderPrefix(String prefix,
+  private Map<String, IndexedFileStamp> getIndexedPathsUnderPrefix(String prefix,
       java.util.function.BooleanSupplier cancelled, PathPrefixScope scope) {
-    Set<String> paths = new HashSet<>();
+    Map<String, IndexedFileStamp> paths = new HashMap<>();
     if (readPathOps == null) {
       return paths;
     }
@@ -1164,7 +1194,7 @@ final class SyncDirectoryOps {
             readPathOps.search(
                 scopedQuery,
                 batchSize,
-                Set.of(SchemaFields.DOC_ID),
+                Set.of(SchemaFields.DOC_ID, SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT),
                 LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC,
                 cursor);
 
@@ -1172,7 +1202,9 @@ final class SyncDirectoryOps {
           if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) return null;
           String path = hit.docId();
           if (path != null) {
-            if (paths.add(path)) pathChars += path.length();
+            if (paths.put(path, new IndexedFileStamp(Path.of(path),
+                longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
+                longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)))) == null) pathChars += path.length();
             if (paths.size() >= MAX_INDEXED_PATHS_FOR_MISSING_SCAN
                 || pathChars >= MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN) {
               return null;

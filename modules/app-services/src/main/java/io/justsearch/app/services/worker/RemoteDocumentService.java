@@ -467,14 +467,7 @@ public final class RemoteDocumentService implements DocumentService {
                   answerDeadline,
                   () -> preSearchForDocIds(params, params.topK() * 2, engineContext, client));
           if (!preSearch.docIds().isEmpty()) {
-            effectiveParams = new io.justsearch.app.api.RetrieveContextParams(
-                params.question(), preSearch.docIds(), params.topK(), params.maxContextTokens(),
-                params.entityPersons(), params.entityOrganizations(), params.entityLocations(),
-                params.modifiedAt(), params.freshnessEnabled(), params.pathPrefix(),
-                params.fileKind(), params.autoEntityExtract(), params.contextFormat(),
-                params.metaSource(), params.metaAuthor(), params.metaCategory(),
-                params.metaPublishedAt(), params.returnFullDocuments(),
-                params.excludedSourceIds(), params.collection());
+            effectiveParams = params.withDocIds(preSearch.docIds());
           }
           logRichRetrieval(effectiveParams);
           var retrieval = effectiveParams;
@@ -495,6 +488,10 @@ public final class RemoteDocumentService implements DocumentService {
         EngineRefusals.rethrow(e);
         if (params.docIds().isEmpty()) EngineRequestEnds.rethrow(e);
         else EngineRequestEnds.rethrowCancellation(e);
+        if (params.hasRestrictions() || (e instanceof KnowledgeClientException port
+            && port.status() == KnowledgeClientException.Status.RESOURCE_EXHAUSTED)) {
+          throw new java.util.concurrent.CompletionException(e);
+        }
         log.error("Failed to retrieve context from the index half (rich params), falling back", e);
         recordRagFallback();
         return retrieveContextFallback(effectiveParams.docIds(), engineContext, client);
@@ -584,7 +581,8 @@ public final class RemoteDocumentService implements DocumentService {
           // and discovered zero parents.
           || !params.collection().isEmpty();
 
-      if (hasFilters || params.modifiedAt().isSet() || params.metaPublishedAt().isSet()) {
+      if (hasFilters || params.modifiedAt().isSet() || params.metaPublishedAt().isSet()
+          || params.sizeBytes() != null) {
         var filtersBuilder = io.justsearch.ipc.SearchFilters.newBuilder();
         if (!params.collection().isEmpty()) {
           filtersBuilder.addAllCollection(params.collection());
@@ -609,6 +607,12 @@ public final class RemoteDocumentService implements DocumentService {
               .setFromMs(params.modifiedAt().fromMs())
               .setToMs(params.modifiedAt().toMs())
               .build());
+        }
+        if (params.sizeBytes() != null) {
+          var size = io.justsearch.ipc.ByteRange.newBuilder();
+          if (params.sizeBytes().fromBytes() != null) size.setFromBytes(params.sizeBytes().fromBytes());
+          if (params.sizeBytes().toBytes() != null) size.setToBytes(params.sizeBytes().toBytes());
+          filtersBuilder.setSizeBytes(size);
         }
         if (!params.metaSource().isEmpty()) {
           filtersBuilder.addAllMetaSource(params.metaSource());
@@ -646,6 +650,9 @@ public final class RemoteDocumentService implements DocumentService {
     } catch (Exception e) {
       EngineRefusals.rethrow(e);
       EngineRequestEnds.rethrow(e);
+      if (params.hasRestrictions()) {
+        throw new java.util.concurrent.CompletionException(e);
+      }
       log.warn("Pre-search for open retrieval failed", e);
       return PreSearch.NONE;
     }

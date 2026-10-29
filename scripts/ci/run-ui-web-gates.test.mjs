@@ -21,6 +21,12 @@ function run(label, fn) {
   try { fn(); passed += 1; } catch (e) { failures.push(`${label}: ${e.message}`); }
 }
 
+run('SA15 retires exactly the old composition guard (floor 28 → 27)', () => {
+  assert.equal(EXPECTED_MIN, 27);
+  const commands = parseUiWebGateCommands(register).map(c => c[1]);
+  assert.ok(!commands.includes('scripts/ci/check-composition-surfaces.mjs'));
+});
+
 run('real register parses to at least the floor', () => {
   const cmds = parseUiWebGateCommands(register);
   assert.ok(cmds.length >= EXPECTED_MIN, `parsed ${cmds.length} < floor ${EXPECTED_MIN}`);

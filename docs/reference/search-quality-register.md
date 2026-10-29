@@ -1604,7 +1604,7 @@ above)*
   rule), weak ⇒ `--text-secondary`, ungrounded ⇒ `--accent-warning`
   (`MarkdownBlock.ts:342-350`); the ref chip mirrors it with the warning role's text member,
   `.cite-ref.cite-ungrounded` ⇒ `--text-warning` (:601-602), so mark and underline agree. The
-  second consumer, the Search v3 window, bridges both tokens to `--warning-foreground`
+  second consumer, the Search window, bridges both tokens to `--warning-foreground`
   (`modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.ts:289-290`, and per-scope at :386, :404,
   :434, :438), so the two windows render one tier vocabulary rather than two palettes.
 - **Presentation consequence (tempdoc-recorded, not code-derivable):** the per-sentence underline

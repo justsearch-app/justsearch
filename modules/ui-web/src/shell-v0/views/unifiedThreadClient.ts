@@ -28,7 +28,7 @@ const KNOWN_EVENT_KINDS = [
 ] as const;
 
 /** Tempdoc 561 P-A/P-A2 — the typed loop object summary (state + Turn/Iteration counts + budget). */
-export interface ThreadLifecycle {
+interface ThreadLifecycle {
   readonly sessionId: string;
   readonly state: string;
   readonly actor: string;

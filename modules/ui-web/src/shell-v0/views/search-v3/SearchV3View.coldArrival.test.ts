@@ -23,7 +23,7 @@ import { resolveSurface } from '../../router/catalogResolver.js';
 import { __seedForTest as seedSurfaces, __resetForTest as resetSurfaces } from '../../../api/registry/SurfaceCatalogClient.js';
 import type { Surface } from '../../../api/types/surface.js';
 import { deactivateProjection } from '../../router/URLProjector.js';
-import { takeSearchV3Handoff, takePendingForceShape, takePendingSelection, takePendingAutoRun } from '../../utils/compose.js';
+import { takeSearchV3Handoff, takePendingSelection, } from '../../utils/compose.js';
 
 type ElementView = HTMLElement & { updateComplete: Promise<unknown> };
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -69,8 +69,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   deactivateProjection();
-  takeSearchV3Handoff(); takePendingSelection(); takePendingForceShape(); takePendingAutoRun();
-  document.body.replaceChildren();
+  takeSearchV3Handoff(); takePendingSelection(); document.body.replaceChildren();
   // Disconnect closes the window's subscriptions and stream; settle its outstanding promises.
   await new Promise<void>(resolve => setTimeout(resolve, 0));
   resetSearchState(); __resetAiStateForTest(); __resetAgentSessionStore();

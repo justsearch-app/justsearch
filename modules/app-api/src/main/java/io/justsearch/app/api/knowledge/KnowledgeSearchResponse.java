@@ -162,6 +162,7 @@ public record KnowledgeSearchResponse(
           || (f.pathPrefix() != null && !f.pathPrefix().isBlank())
           || Boolean.TRUE.equals(f.includeChunks())
           || f.modifiedAt() != null
+          || f.sizeBytes() != null
           || !f.entityPersons().isEmpty()
           || !f.entityOrganizations().isEmpty()
           || !f.entityLocations().isEmpty()
