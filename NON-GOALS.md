@@ -8,7 +8,7 @@ they're not judgments about other tools.
 
 Everything runs on your machine. Cloud processing would add running costs and privacy obligations this
 project cannot carry, so it is out of scope by design: no cloud inference, no hosted services, no telemetry.
-An outside AI client you connect through MCP is your own choice. The existing update checks, Install AI downloads, and optional tracing are
+The local core will not require an account. An outside AI client you connect through MCP is your own choice. The existing update checks, Install AI downloads, and optional tracing are
 described below.
 
 - **No telemetry, analytics, or phone-home.** The product does not report usage anywhere. A PR that adds outbound
