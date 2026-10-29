@@ -123,6 +123,9 @@ node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:test
 node scripts/lib/tool-invoker.cjs gradle build
 ```
 
+Tests tagged `evidence`/`experiment` and `stress` opt in with `-PincludeExperiment=true` and `-PincludeStress=true`.
+Real-drive integration tests are excluded from ordinary runs; `-PincludeRealDrives=true` enables them and mounts disposable loop images in the desktop session.
+
 ### Code Style
 
 Code style is enforced automatically:

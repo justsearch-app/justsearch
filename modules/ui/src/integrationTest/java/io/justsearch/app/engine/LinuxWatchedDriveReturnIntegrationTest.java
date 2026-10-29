@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Real Engine, search, queue and physical Linux watchers on disposable udisks loop filesystems. */
+@org.junit.jupiter.api.Tag("real-drives")
 final class LinuxWatchedDriveReturnIntegrationTest {
   @TempDir(cleanup = org.junit.jupiter.api.io.CleanupMode.ON_SUCCESS) Path directory;
   private static final EngineContext CONTEXT = EngineProvenance.internal(
@@ -33,7 +34,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
   @Timeout(300)
   void realUnmountReturnsWithHealthyWatcherReceiptsAndOfflineChanges(boolean changedDevice)
       throws Exception {
-    try (var volume = LinuxLoopVolume.create(directory.resolve("loop")); var f = fixture()) {
+    try (var volume = LinuxLoopVolume.create(directory.resolve("loop")); var f = descriptorFixture()) {
       Path mount = volume.mounted();
       Path root = Files.createDirectory(mount.resolve("documents"));
       Path gone = Files.writeString(root.resolve("gone.txt"), "mountgone old document");
@@ -121,6 +122,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
         volume.releaseDecoy();
         awaitRecoverySettled(f, root);
         awaitIndexingIdle(f);
+        awaitTelemetryStoreOpen();
         long descriptors = descriptorCount();
         var initialTargets = descriptorTargets();
         long watcherThreads = watcherThreadCount();
@@ -845,6 +847,23 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     while (((java.util.Set<?>) invoke(registry, "recoveryRoots", new Class<?>[0])).contains(root)
         && System.nanoTime() < until) Thread.sleep(25);
     assertFalse(((java.util.Set<?>) invoke(registry, "recoveryRoots", new Class<?>[0])).contains(root));
+  }
+
+  private Fixture descriptorFixture() throws Exception {
+    String key = "justsearch.telemetry.flushMs";
+    String previous = System.setProperty(key, "1000");
+    try { return fixture(); }
+    finally {
+      if (previous == null) System.clearProperty(key);
+      else System.setProperty(key, previous);
+    }
+  }
+
+  private void awaitTelemetryStoreOpen() throws Exception {
+    String store = directory.resolve("data/telemetry/metrics.rrd").toString();
+    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (!descriptorTargets().containsKey(store) && System.nanoTime() < until) Thread.sleep(25);
+    assertTrue(descriptorTargets().containsKey(store), "telemetry's retained store is open before the descriptor baseline");
   }
 
   private static long descriptorCount() throws Exception {

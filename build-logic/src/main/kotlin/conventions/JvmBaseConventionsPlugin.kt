@@ -100,6 +100,7 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
       javaExt.toolchain.languageVersion.set(org.gradle.jvm.toolchain.JavaLanguageVersion.of(25))
 
       val includeExperiment = project.findProperty("includeExperiment")?.toString()?.toBoolean() ?: false
+      val includeRealDrives = project.findProperty("includeRealDrives")?.toString()?.toBoolean() ?: false
       val includeStress = project.findProperty("includeStress")?.toString()?.toBoolean() ?: false
       // Windows-native CI also selects formerly Windows-only classes with portable OS branches.
       // "cross-platform" keeps those classes in that lane and in the default Linux test tasks;
@@ -156,7 +157,13 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
                 logger.lifecycle("SKIP $reason: $identifier")
               }
         }
+        if (!includeRealDrives) {
+          doFirst {
+            logger.lifecycle("SKIP real-drives tests ($path): opt in with -PincludeRealDrives=true")
+          }
+        }
         useJUnitPlatform {
+          if (!includeRealDrives) excludeTags("real-drives")
           if (windowsOnly) {
             includeTags("windows", "cross-platform")
           } else {
