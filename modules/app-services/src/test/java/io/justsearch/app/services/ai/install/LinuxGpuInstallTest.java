@@ -192,6 +192,23 @@ class LinuxGpuInstallTest {
     }
   }
 
+  @Test void oldDriverWithoutVramStillReportsDetectedGpuAndDriverAdvice() throws Exception {
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, home.resolve("settings.json"));
+    var effective = new GpuCapabilities.Effective(true, "fixture", GpuCapabilities.Confidence.HIGH,
+        "569.0", 569, 0, 1, null, null, null,
+        new GpuCapabilities.Cuda(true, "fixture", GpuCapabilities.Confidence.HIGH));
+    try (var ignored = mockConstruction(GpuCapabilityResolver.class,
+        (mock, context) -> when(mock.snapshot()).thenReturn(new GpuCapabilities(null, null, effective)))) {
+      var hardware = new AiInstallService(null, settings, null, null, home).detectHardwareProfile();
+      assertTrue(hardware.gpuDetected(), "An old driver must not erase the detected device");
+      assertFalse(hardware.cudaFunctional());
+      var registry = ModelRegistryLoader.loadFromClasspath("ai/linux-gpu-registry.fixture.json");
+      var plan = InstallPlanner.plan(registry, hardware, home.resolve("models"));
+      assertTrue(plan.skipped().stream().filter(p -> "chat".equals(p.packageId()))
+          .allMatch(p -> p.reason().contains("570 or newer")));
+    }
+  }
+
   @Test void existingInstallContractAndActivationSettingsRoundTripWithoutMigration() throws Exception {
     var installed = new InstallContract(2, 1700000000000L, HardwareProfile.gpuFull(12_000_000_000L),
         DownloadProfile.GPU_FULL, Map.of("cuda-runtime", new InstallContract.InstalledModel(

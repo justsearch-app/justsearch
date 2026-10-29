@@ -38,7 +38,11 @@ public final class InstallPlanner {
 
   /** Hardware the target's shipped or downloadable runtime can actually support. */
   public static HardwareProfile hardwareForPlan(ModelRegistry registry, HardwareProfile detected) {
-    var target = io.justsearch.configuration.NativeTargets.current();
+    var supported = io.justsearch.configuration.NativeTargets.currentIfSupported();
+    if (supported.isEmpty()) {
+      return new HardwareProfile(detected.gpuDetected(), false, detected.vramBytes());
+    }
+    var target = supported.orElseThrow();
     // Windows' bundled runtime and CUDA supplement keep their existing selection. On Linux the
     // ORT provider alone cannot run: its CUDA/cuDNN dependencies need a target-specific pack.
     boolean cudaSupplied = target.hasCpuBaselineRuntime()
@@ -284,8 +288,7 @@ public final class InstallPlanner {
                 SkipCause.HARDWARE,
                 excludedProfile.usesCuda()
                     ? "GPU acceleration is disabled by administrator policy"
-                    : String.format(
-                        "%s requires a CUDA-capable GPU (none detected on this system).", pkg.label())));
+                    : unavailableCudaReason(pkg, hardware)));
         continue;
       }
 
@@ -306,12 +309,7 @@ public final class InstallPlanner {
                   "Insufficient VRAM for %s (%d MB available, %d MB required)",
                   pkg.label(), haveMb, minMb);
         } else if (explanationHardware.gpuDetected()) {
-          reason =
-              String.format(
-                  "%s requires a CUDA-capable GPU. An NVIDIA GPU was detected but the CUDA"
-                      + " runtime is not available — install the CUDA toolkit, or use this app"
-                      + " without chat features.",
-                  pkg.label());
+          reason = unavailableCudaReason(pkg, explanationHardware);
         } else {
           reason =
               String.format(
@@ -533,8 +531,21 @@ public final class InstallPlanner {
         && platformExclusion(pkg, registry) == null;
   }
 
+  private static String unavailableCudaReason(ModelPackage pkg, HardwareProfile hardware) {
+    if (hardware.gpuDetected()) {
+      if (io.justsearch.configuration.PlatformPaths.isLinux()) {
+        return pkg.label() + " requires a supported NVIDIA GPU with driver 570 or newer. "
+            + "An NVIDIA GPU was detected, but usable CUDA support could not be confirmed.";
+      }
+      return pkg.label() + " requires a CUDA-capable GPU. An NVIDIA GPU was detected but the CUDA"
+          + " runtime is not available — install the CUDA toolkit, or use this app without chat features.";
+    }
+    return pkg.label() + " requires a CUDA-capable GPU (none detected on this system).";
+  }
+
   private static String platformExclusion(ModelPackage pkg, ModelRegistry registry) {
-    String target = io.justsearch.configuration.NativeTargets.current().targetId();
+    String target = io.justsearch.configuration.NativeTargets.currentIfSupported()
+        .map(io.justsearch.configuration.NativeTargets::targetId).orElse("unsupported platform");
     if (pkg.nativeTarget() != null && !pkg.nativeTarget().equals(target)) {
       return "Runtime artifacts target " + pkg.nativeTarget()
           + "; configure an external runtime for " + target + ".";

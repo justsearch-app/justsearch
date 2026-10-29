@@ -177,7 +177,10 @@ public final class OrtCudaHelper {
         Path home = store.get().paths().dataDir();
         if (home != null) {
           Path pack = home.resolve("native-bin/llama-server/variants/cuda12");
-          if (Files.isDirectory(pack)) return pack;
+          if (Files.isDirectory(pack) && !cudaDependencyDllOrder().isEmpty()
+              && cudaDependencyDllOrder().stream().allMatch(name -> Files.isRegularFile(pack.resolve(name)))) {
+            return pack;
+          }
         }
       }
       log.info("ORT native path: no env/sysprop configured, using default: {}", defaultPath);

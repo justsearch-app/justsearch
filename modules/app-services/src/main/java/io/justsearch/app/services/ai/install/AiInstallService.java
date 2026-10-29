@@ -2064,12 +2064,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // separate GpuCapabilitiesService call for VRAM — so both axes come from one resolver and the
     // raw probes are no longer reached directly (the bypass GpuProbeAccessTest now forecloses).
     boolean cudaFunctional = false;
+    boolean deviceDetected = false;
     long vramBytes = -1;
     try {
       io.justsearch.gpu.GpuCapabilities.Effective effective =
           new io.justsearch.app.services.gpu.GpuCapabilityResolver().snapshot().effective();
+      deviceDetected = effective.deviceCount() != null && effective.deviceCount() > 0;
       if (effective.cuda() != null && Boolean.TRUE.equals(effective.cuda().functional())) {
-        cudaFunctional = NativeTargets.current().hasCpuBaselineRuntime()
+        cudaFunctional = NativeTargets.currentIfSupported().map(NativeTargets::hasCpuBaselineRuntime).orElse(false)
             || (effective.driverVersionMajor() != null && effective.driverVersionMajor() >= 570);
       }
       if (effective.totalVramBytes() != null && effective.totalVramBytes() > 0) {
@@ -2078,7 +2080,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     } catch (Throwable t) {
       log.debug("GPU capability resolve failed (best-effort): {}", t.getMessage());
     }
-    boolean gpuDetected = vramBytes > 0 || cudaFunctional;
+    boolean gpuDetected = deviceDetected || vramBytes > 0 || cudaFunctional;
     return new HardwareProfile(gpuDetected, cudaFunctional, vramBytes);
   }
 

@@ -134,7 +134,15 @@ class OrtCudaHelperTest {
       Path fallback = Files.createDirectories(tmp.resolve("model"));
       org.junit.jupiter.api.Assertions.assertEquals(fallback, OrtCudaHelper.resolveOrtNativePath(fallback));
       Path pack = Files.createDirectories(tmp.resolve("native-bin/llama-server/variants/cuda12"));
+      // W6b precondition: a newly created or partial extraction is not an ORT pack.
+      org.junit.jupiter.api.Assertions.assertEquals(fallback, OrtCudaHelper.resolveOrtNativePath(fallback));
+      for (String name : OrtCudaHelper.cudaDependencyDllOrder()) touch(pack.resolve(name));
       org.junit.jupiter.api.Assertions.assertEquals(pack, OrtCudaHelper.resolveOrtNativePath(fallback));
+      for (String name : OrtCudaHelper.cudaDependencyDllOrder()) {
+        Files.delete(pack.resolve(name));
+        org.junit.jupiter.api.Assertions.assertEquals(fallback, OrtCudaHelper.resolveOrtNativePath(fallback), name);
+        touch(pack.resolve(name));
+      }
       org.junit.jupiter.api.Assertions.assertNull(boot.paths().ortNativePath());
       Path operator = Files.createDirectories(tmp.resolve("operator"));
       var explicit = io.justsearch.configuration.resolved.ResolvedConfig.builder()
