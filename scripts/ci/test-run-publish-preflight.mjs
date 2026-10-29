@@ -11,12 +11,10 @@ import { loadPublicCiLocalRepro, validatePublicCiLocalRepro } from './lib/public
 
 const repositoryManifest = loadPublicCiLocalRepro();
 const publicClaims = repositoryManifest.contexts.find((entry) => entry.check === 'Public claims');
-for (const command of [
-  'node scripts/ci/test-check-runtime-manifest-closure.mjs',
-  'node scripts/ci/check-runtime-manifest-closure.mjs',
-]) {
-  assert.ok(publicClaims.commands.includes(command), `Public claims must reproduce ${command}`);
-}
+assert.ok(publicClaims.commands.includes('node scripts/ci/test-check-runtime-manifest-closure.mjs'),
+  'Public claims must reproduce the blocking runtime manifest closure self-test');
+assert.ok(!publicClaims.commands.includes('node scripts/ci/check-runtime-manifest-closure.mjs'),
+  'the advisory runtime manifest closure guard must not block local publication preflight');
 const lifecycle = repositoryManifest.contexts.filter((entry) => entry.check === 'Engine lifecycle tests (model-free)');
 assert.equal(lifecycle.length, 1, 'the required lifecycle check needs exactly one reproduction entry');
 assert.equal(lifecycle[0].mode, 'local-subset');

@@ -18,7 +18,9 @@
  *      / ".json" / ".lock" path components in source) and flags any that
  *      aren't on the allowlist.
  *
- * Exit non-zero on any violation. Runs as a blocking Public claims CI step.
+ * Exit non-zero on findings. The Public claims CI step is advisory: these
+ * literal-path regexes also match comments and bases other than dataDir.
+ * Zero real violations found so far; the fixture self-test remains blocking.
  *
  * Allowlist additions must include a `tempdoc-ref:` comment justifying
  * the new sibling file (e.g., "supersedes manifest field X" or "different
@@ -251,7 +253,7 @@ function matchesGlob(filePath, glob) {
   const reStr =
     '^' +
     glob
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/[.+^$()|[\]\\]/g, '\\$&')
       .replace(/\{([^}]+)\}/g, (_, opts) => `(?:${opts.split(',').join('|')})`)
       .replace(/\*\*/g, '.*')
       .replace(/(?<!\.)\*/g, '[^/]*') +
