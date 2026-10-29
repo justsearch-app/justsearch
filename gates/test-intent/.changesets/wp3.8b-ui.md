@@ -1,0 +1,68 @@
+---
+schema: test-intent.v1
+task: t-20261019-bd718f
+author-role: builder
+author-session: wp3.8b-ui-builder-j22dnc4z
+---
+
+# WP3.8b UI test intent
+
+Agent-adopted under the design delegation below, never owner-agreed. Execution details and
+per-check before failures are in `gates/test-intent/evidence/wp3.8b-ui/README.md` and the runner receipt.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Settings edits and refusals, preparation consent/conflict, disabled-hours retention, unknown-power option availability, pending/load/read-only states, confirmed ordered hold explanations, rule destinations and one-arrival focus navigation, manual-only Resume with remaining rules. Each named check passes after and fails by assertion on 1a4ec4a551db33f3dc2cb536b5eb437875ef86dd; no compile/environment failure is claimed as evidence.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "WP3.8b UI for the settled revision 3 indexing-hours and pause-on-battery design",
+          "choice": "D1/D4 complete-pair rule edits, retained refused drafts; D5 ordered policy reasons, rule navigation and residual holds after Resume; D6 unknown-power preference availability; S38.7 native keyboard/time controls, focus and announced errors.",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp3.8b-ui/rules.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#Shell \u2014 settings window close semantics (tempdoc 855 \u00a711.1 D3/D4) WP3.8b routes hours to Settings once without replay on Back and Forward",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#Shell \u2014 settings window close semantics (tempdoc 855 \u00a711.1 D3/D4) WP3.8b routes battery to Settings once without replay on Back and Forward",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.1 S38.7 loads labelled days and native locale times and saves both rules retaining disabled hours",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 announces equal endpoints and retains the refused draft",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 announces missing time and retains the refused draft",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 refuses enabled hours without days and accepts the retained empty set when off",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 retains the draft and announces Engine 400 without stale replay",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 retains the draft and announces Engine 409 without stale replay",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 retains the draft and announces Engine 200 without stale replay",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 waits for saved rules before editing or applying deferred rule focus",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 keeps read-only rules readable without issuing a save",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 preserves Save focus while pending and sends one unchanged rule pair",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor D4 preserves both rules through approval and uses the approved preparation key",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor D4 changing battery preserves an absent schedule until the hours are edited",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor D6 keeps battery available with unknown power and explains the rule",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 focuses hours in the indexing category",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 focuses battery in the indexing category",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSING schedule names the rule with an empty queue and offers its Settings action",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSED schedule names the rule with an empty queue and offers its Settings action",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSING on_battery names the rule with an empty queue and offers its Settings action",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSED on_battery names the rule with an empty queue and offers its Settings action",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 orders combined reasons and restricts recovery actions",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 names every folder rule without Waiting for Resume and preserves failure evidence",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions S38.5 Resume clears manual only and announces both remaining rules after confirmed status",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions S38.5 waits for manual-pause removal before announcing it cleared",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 does not invoke a focused Resume when manual pause clears leaving hours",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 jf-library-surface names schedule holds for queued work",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 jf-task-list names schedule holds for queued work"
+      ],
+      "repaired": true
+    }
+  ]
+}
+```

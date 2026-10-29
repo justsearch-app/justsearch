@@ -62,8 +62,11 @@ export class SettingsWindow extends JfElement {
   // idle mounting only shifts WHEN the (still boot-synchronous, non-open) mount happens.
   private shouldMount = false;
   private recoveryFocusRequested = false;
+  private indexingRuleFocus: 'hours' | 'battery' | null = null;
   private readonly cancelRecoveryOnUserActivity = (): void => {
     this.recoveryFocusRequested = false;
+    this.indexingRuleFocus = null;
+    (this.mounted as SettingsSurface | null)?.cancelIndexingRuleFocus?.();
     (this.mounted as SettingsSurface | null)?.cancelSettingsRecoveryFocus?.();
   };
   private idleHandle: number | null = null;
@@ -203,16 +206,32 @@ export class SettingsWindow extends JfElement {
       this.modal.open();
     } else if (changed.has('open')) {
       this.recoveryFocusRequested = false;
+      this.indexingRuleFocus = null;
+      (this.mounted as SettingsSurface | null)?.cancelIndexingRuleFocus?.();
       (this.mounted as SettingsSurface | null)?.cancelSettingsRecoveryFocus?.();
       const skipFocusRestore = this.pendingCloseSkipsFocusRestore;
       this.pendingCloseSkipsFocusRestore = false;
       this.modal.close({ skipFocusRestore });
+    }
+    if (this.open && this.indexingRuleFocus && this.mounted) {
+      const control = this.indexingRuleFocus;
+      this.indexingRuleFocus = null;
+      void (this.mounted as SettingsSurface).focusIndexingRule(control);
     }
     if (this.open && this.recoveryFocusRequested && this.mounted) {
       this.recoveryFocusRequested = false;
       const surface = this.mounted as SettingsSurface;
       void surface.focusSettingsRecovery();
     }
+  }
+
+  focusIndexingRule(control: 'hours' | 'battery'): void {
+    if (this.open && this.mounted && this.shadowRoot?.querySelector('dialog')?.open) {
+      void (this.mounted as SettingsSurface).focusIndexingRule(control);
+      return;
+    }
+    this.indexingRuleFocus = control;
+    this.requestUpdate();
   }
 
   /** Move focus to the existing recovery destination after the Settings window has rendered. */

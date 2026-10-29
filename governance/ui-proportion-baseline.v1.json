@@ -1539,6 +1539,77 @@
         "[data-testid=\"sv3-recents\"]",
         "jf-sv3-composer"
       ]
+    },
+    {
+      "uiShotStep": "settings-indexing-dark",
+      "requiredSelectors": [
+        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
+        "[data-testid=\"settings-indexing\"] #indexing-hours"
+      ],
+      "elements": [
+        {
+          "selector": "dialog[aria-label=\"Settings\"][open]",
+          "maxWidthPx": 1200,
+          "maxHeightPx": 900
+        }
+      ]
+    },
+    {
+      "uiShotStep": "settings-indexing-light",
+      "requiredSelectors": [
+        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
+        "[data-testid=\"settings-indexing\"] #indexing-hours"
+      ],
+      "elements": [
+        {
+          "selector": "dialog[aria-label=\"Settings\"][open]",
+          "maxWidthPx": 1200,
+          "maxHeightPx": 900
+        }
+      ]
+    },
+    {
+      "uiShotStep": "settings-indexing-forced",
+      "requiredSelectors": [
+        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
+        "[data-testid=\"settings-indexing\"] #indexing-hours"
+      ],
+      "elements": [
+        {
+          "selector": "dialog[aria-label=\"Settings\"][open]",
+          "maxWidthPx": 1200,
+          "maxHeightPx": 900
+        }
+      ]
+    },
+    {
+      "uiShotStep": "settings-indexing-minimum",
+      "requiredSelectors": [
+        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
+        "[data-testid=\"settings-indexing\"] #indexing-hours"
+      ],
+      "elements": [
+        {
+          "selector": "dialog[aria-label=\"Settings\"][open]",
+          "maxWidthPx": 1200,
+          "maxHeightPx": 900
+        }
+      ]
+    },
+    {
+      "uiShotStep": "library-indexing-held",
+      "requiredSelectors": [
+        "[data-testid=\"library-indexing-pause\"] jf-indexing-controls"
+      ],
+      "forbiddenVisibleText": [
+        "Work is waiting for Resume."
+      ],
+      "elements": [
+        {
+          "selector": "[data-testid=\"library-indexing-pause\"] jf-indexing-controls",
+          "maxHeightPx": 120
+        }
+      ]
     }
   ]
 }

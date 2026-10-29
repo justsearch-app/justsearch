@@ -46,9 +46,15 @@ with or without the AI models. All inference runs locally on your machine.
 
 ## Indexing restrictions
 
+In Settings → Indexing, choose the days, start and end times, then turn on Use indexing hours and
+Save indexing rules. Turning hours off keeps the configured days and times. The time fields follow
+your platform's clock format. Pause indexing on battery is available even when the power source is
+unknown; it applies only while this computer is known to run on battery.
+
 Manual Pause keeps indexed files searchable. Resume clears the manual pause; saved indexing hours
 and the pause-on-battery preference still apply. Outside the saved hours, processing waits for the
-schedule. On a known battery reading, it waits for AC power or a change to the battery preference.
+schedule. Change hours opens the hours control; Change battery setting opens the battery preference.
+On a known battery reading, it waits for AC power or a change to the battery preference.
 An unknown power reading adds no battery hold. The battery preference is off by default and stays saved
 even when no battery is detected.
 

@@ -129,8 +129,11 @@
   "shell-v0/views/SettingsSurface.ts": [
     "settings", "settings-light",
     "search-results-light", "search-results-compact", "search-results-rich",
-    "search-simple-mode", "search-advanced-mode", "settings-forced-colors"
+    "search-simple-mode", "search-advanced-mode", "settings-forced-colors",
+    "settings-indexing-dark", "settings-indexing-light", "settings-indexing-forced", "settings-indexing-minimum"
   ],
+  "shell-v0/components/IndexingControls.ts": ["settings-indexing-dark", "library-indexing-held"],
+  "shell-v0/state/indexingProgress.ts": ["settings-indexing-dark", "library-indexing-held"],
   "shell-v0/components/AppUpdateBanner.ts": [
     "settings", "settings-light"
   ],

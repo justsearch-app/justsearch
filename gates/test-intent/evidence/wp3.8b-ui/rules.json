@@ -1,0 +1,607 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:4109ccd34d91d94b765b021d958300430a9a427fab63c2f92d088ae92b287024"
+  },
+  "createdAt": "2026-10-29T06:24:19.585Z",
+  "revision": "1a4ec4a551db33f3dc2cb536b5eb437875ef86dd",
+  "tree": "99f5ce8975d72b6122d9c0bd869516be29aab0c4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" --configLoader runner --maxWorkers=2 --reporter=json --outputFile=\"/home/elias/.cache/am/j22dnc4z/tmp/test-intent-vitest-48-1793255043138.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6684
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) WP3.8b routes hours to Settings once without replay on Back and Forward",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ba55a1cb6b01b31f1983660931499f709faf68309f4f7918ece404171ca9008c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) WP3.8b routes hours to Settings once without replay on Back and Forward",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) WP3.8b routes battery to Settings once without replay on Back and Forward",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ba55a1cb6b01b31f1983660931499f709faf68309f4f7918ece404171ca9008c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) WP3.8b routes battery to Settings once without replay on Back and Forward",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.1 S38.7 loads labelled days and native locale times and saves both rules retaining disabled hours",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.1 S38.7 loads labelled days and native locale times and saves both rules retaining disabled hours",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 announces equal endpoints and retains the refused draft",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.2 announces equal endpoints and retains the refused draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 announces missing time and retains the refused draft",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.2 announces missing time and retains the refused draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 refuses enabled hours without days and accepts the retained empty set when off",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.2 refuses enabled hours without days and accepts the retained empty set when off",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 retains the draft and announces Engine 400 without stale replay",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 400 without stale replay",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 retains the draft and announces Engine 409 without stale replay",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 409 without stale replay",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 retains the draft and announces Engine 200 without stale replay",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 200 without stale replay",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 waits for saved rules before editing or applying deferred rule focus",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.7 waits for saved rules before editing or applying deferred rule focus",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 keeps read-only rules readable without issuing a save",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.7 keeps read-only rules readable without issuing a save",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 preserves Save focus while pending and sends one unchanged rule pair",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.7 preserves Save focus while pending and sends one unchanged rule pair",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor D4 preserves both rules through approval and uses the approved preparation key",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor D4 preserves both rules through approval and uses the approved preparation key",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor D4 changing battery preserves an absent schedule until the hours are edited",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor D4 changing battery preserves an absent schedule until the hours are edited",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor D6 keeps battery available with unknown power and explains the rule",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor D6 keeps battery available with unknown power and explains the rule",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 focuses hours in the indexing category",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.7 focuses hours in the indexing category",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 focuses battery in the indexing category",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.7 focuses battery in the indexing category",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSING schedule names the rule with an empty queue and offers its Settings action",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSING schedule names the rule with an empty queue and offers its Settings action",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSED schedule names the rule with an empty queue and offers its Settings action",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSED schedule names the rule with an empty queue and offers its Settings action",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSING on_battery names the rule with an empty queue and offers its Settings action",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSING on_battery names the rule with an empty queue and offers its Settings action",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSED on_battery names the rule with an empty queue and offers its Settings action",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSED on_battery names the rule with an empty queue and offers its Settings action",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 orders combined reasons and restricts recovery actions",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions D5 orders combined reasons and restricts recovery actions",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 names every folder rule without Waiting for Resume and preserves failure evidence",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions D5 names every folder rule without Waiting for Resume and preserves failure evidence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions S38.5 Resume clears manual only and announces both remaining rules after confirmed status",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions S38.5 Resume clears manual only and announces both remaining rules after confirmed status",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions S38.5 waits for manual-pause removal before announcing it cleared",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions S38.5 waits for manual-pause removal before announcing it cleared",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 does not invoke a focused Resume when manual pause clears leaving hours",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions D5 does not invoke a focused Resume when manual pause clears leaving hours",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 jf-library-surface names schedule holds for queued work",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions D5 jf-library-surface names schedule holds for queued work",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 jf-task-list names schedule holds for queued work",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49a51b3c8501a1a22d28ba3105ed3611ae1e1f8259759a96f45e8ba929f913ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b policy status and actions D5 jf-task-list names schedule holds for queued work",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1a4ec4a551db33f3dc2cb536b5eb437875ef86dd",
+    "revision": "1a4ec4a551db33f3dc2cb536b5eb437875ef86dd",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" --configLoader runner --maxWorkers=2 --reporter=json --outputFile=\"/home/elias/.cache/am/j22dnc4z/tmp/test-intent-vitest-48-1793255053373.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6206,
+        "output": "JSON report written to /home/elias/.cache/am/j22dnc4z/tmp/test-intent-vitest-48-1793255053373.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) WP3.8b routes hours to Settings once without replay on Back and Forward",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) WP3.8b routes hours to Settings once without replay on Back and Forward:  AssertionError: rule focus destination exists: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:922:94\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) WP3.8b routes battery to Settings once without replay on Back and Forward",
+        "classification": "assertion",
+        "detail": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) WP3.8b routes battery to Settings once without replay on Back and Forward:  AssertionError: rule focus destination exists: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:922:94\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.1 S38.7 loads labelled days and native locale times and saves both rules retaining disabled hours",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.1 S38.7 loads labelled days and native locale times and saves both rules retaining disabled hours:  AssertionError: expected [] to deeply equal [ 'Monday', 'Tuesday', …(5) ]\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:75:106\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 announces equal endpoints and retains the refused draft",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.2 announces equal endpoints and retains the refused draft:  AssertionError: control input[type=time] is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at edit (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-befo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 announces missing time and retains the refused draft",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.2 announces missing time and retains the refused draft:  AssertionError: control input[type=time] is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at edit (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-befo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 refuses enabled hours without days and accepts the retained empty set when off",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.2 refuses enabled hours without days and accepts the retained empty set when off:  AssertionError: control .indexing-days label:nth-child(1) input is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at edit (/home/elias/.cache/am/j22dnc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 retains the draft and announces Engine 400 without stale replay",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.2 retains the draft and announces Engine 400 without stale replay:  AssertionError: control input[type=time] is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at edit (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-befo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 retains the draft and announces Engine 409 without stale replay",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.2 retains the draft and announces Engine 409 without stale replay:  AssertionError: control input[type=time] is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at edit (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-befo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.2 retains the draft and announces Engine 200 without stale replay",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.2 retains the draft and announces Engine 200 without stale replay:  AssertionError: control input[type=time] is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at edit (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-befo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 waits for saved rules before editing or applying deferred rule focus",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.7 waits for saved rules before editing or applying deferred rule focus:  AssertionError: control #indexing-hours is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 keeps read-only rules readable without issuing a save",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.7 keeps read-only rules readable without issuing a save:  AssertionError: control #indexing-hours is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 preserves Save focus while pending and sends one unchanged rule pair",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.7 preserves Save focus while pending and sends one unchanged rule pair:  AssertionError: action Save indexing rules is mounted: expected undefined to be defined\n    at action (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:57:47)\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor D4 preserves both rules through approval and uses the approved preparation key",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor D4 preserves both rules through approval and uses the approved preparation key:  AssertionError: rules form is mounted: expected null not to be null\n    at save (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:48:45)\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor D4 changing battery preserves an absent schedule until the hours are edited",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor D4 changing battery preserves an absent schedule until the hours are edited:  AssertionError: control #indexing-battery is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at edit (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor D6 keeps battery available with unknown power and explains the rule",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor D6 keeps battery available with unknown power and explains the rule:  AssertionError: control #indexing-battery is mounted: expected null not to be null\n    at input (/home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:39:56)\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gv"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 focuses hours in the indexing category",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.7 focuses hours in the indexing category:  AssertionError: indexing focus route exists: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:176:72\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/test-intent"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b rules editor S38.7 focuses battery in the indexing category",
+        "classification": "assertion",
+        "detail": "WP3.8b rules editor S38.7 focuses battery in the indexing category:  AssertionError: indexing focus route exists: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:176:72\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSING schedule names the rule with an empty queue and offers its Settings action",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions D5 PAUSING schedule names the rule with an empty queue and offers its Settings action:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Outside indexing hours.'\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:187:42\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSED schedule names the rule with an empty queue and offers its Settings action",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions D5 PAUSED schedule names the rule with an empty queue and offers its Settings action:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Outside indexing hours.'\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:187:42\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSING on_battery names the rule with an empty queue and offers its Settings action",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions D5 PAUSING on_battery names the rule with an empty queue and offers its Settings action:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Paused while this computer is running…'\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:187:42\n    at file:///home/elias/.cache/am"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 PAUSED on_battery names the rule with an empty queue and offers its Settings action",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions D5 PAUSED on_battery names the rule with an empty queue and offers its Settings action:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Paused while this computer is running…'\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:187:42\n    at file:///home/elias/.cache/am"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 orders combined reasons and restricts recovery actions",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions D5 orders combined reasons and restricts recovery actions:  AssertionError: expected -1 to be less than -1\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:200:47\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 names every folder rule without Waiting for Resume and preserves failure evidence",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions D5 names every folder rule without Waiting for Resume and preserves failure evidence:  AssertionError: expected 'default · Waiting for Resume · 3 rema…' not to contain 'Waiting for Resume'\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:209:32\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/te"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions S38.5 Resume clears manual only and announces both remaining rules after confirmed status",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions S38.5 Resume clears manual only and announces both remaining rules after confirmed status:  AssertionError: expected '\\n      \\n      Resume indexing\\n    …' to contain 'Change hours'\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:216:39\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/test-intent-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions S38.5 waits for manual-pause removal before announcing it cleared",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions S38.5 waits for manual-pause removal before announcing it cleared:  AssertionError: expected '' to contain 'Waiting for status'\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:227:71\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/nod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 does not invoke a focused Resume when manual pause clears leaving hours",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions D5 does not invoke a focused Resume when manual pause clears leaving hours:  AssertionError: expected 'false' to be 'true' // Object.is equality\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:235:100\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 jf-library-surface names schedule holds for queued work",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions D5 jf-library-surface names schedule holds for queued work:  AssertionError: expected '\\n      \\n        \\n      \\n      \\n …' to contain 'Outside indexing hours'\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:241:94\n    at runNextTicks (node:internal/process/task_que"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts#WP3.8b policy status and actions D5 jf-task-list names schedule holds for queued work",
+        "classification": "assertion",
+        "detail": "WP3.8b policy status and actions D5 jf-task-list names schedule holds for queued work:  AssertionError: expected '\\n      \\n        \\n          Indexin…' to contain 'Outside indexing hours'\n    at /home/elias/.cache/am/j22dnc4z/tmp/test-intent-before-Gvc9iD/modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts:241:94\n    at file:///home/elias/.cache/am/j22dnc4z/tmp/te"
+      }
+    ]
+  },
+  "digest": "sha256:28a719707ee350797d7203508ad93b70a3cc98a1c1bb5a6f34966e9d997b9245"
+}

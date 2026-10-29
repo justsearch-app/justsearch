@@ -945,6 +945,7 @@ export class LibrarySurface extends JfElement {
         retryWaiting: this.retryWaiting,
         indexingPaused: this.indexProgress.pause?.state === 'paused',
         indexingPauseReason: this.indexProgress.pause?.reason,
+        indexingPauseReasons: this.indexProgress.pause?.reasons,
         // Tempdoc 914 D3 — keeps the failed chip (and its drill-down) reachable across a retry
         // re-queue window, when the wire row reports the failures as in-flight instead.
         lastKnownFailed: this.lastKnownFailed[pathHash],
@@ -1782,6 +1783,7 @@ export class LibrarySurface extends JfElement {
         retryWaiting: this.retryWaiting,
         indexingPaused: this.indexProgress.pause?.state === 'paused',
         indexingPauseReason: this.indexProgress.pause?.reason,
+        indexingPauseReasons: this.indexProgress.pause?.reasons,
       // Tempdoc 914 D3 — see the declared-renderer projection above: same memory, same reason.
       lastKnownFailed: this.lastKnownFailed[pathHash],
     });

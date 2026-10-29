@@ -23,9 +23,20 @@ class IndexingControls extends SignalWatcher(JfElement) {
 
   // Retain the last observed action through uncertain polls and while it has focus.
   // This is control identity, never a claim that indexing is paused or running.
-  private action: 'pause' | 'resume' | 'settings' | null = null;
+  private action: 'pause' | 'resume' | 'settings' | 'hours' | 'battery' | null = null;
   private awaitingStatus = false;
   private focused = false;
+  private requestedResume = false;
+
+  private get reasons(): readonly string[] {
+    const pause = this.progress.pause;
+    return pause?.reasons?.length ? pause.reasons : pause ? [pause.reason] : [];
+  }
+
+  private get remainingRules(): string {
+    return [this.reasons.includes('schedule') ? 'indexing hours' : '',
+      this.reasons.includes('on_battery') ? 'battery power' : ''].filter(Boolean).join(' and ');
+  }
 
   constructor() {
     super();
@@ -62,10 +73,15 @@ class IndexingControls extends SignalWatcher(JfElement) {
       this.action = 'settings';
     } else if (!this.focused && !this.pending && this.progress.activity.confirmed) {
       this.action = this.progress.pause?.reason === 'settings_recovery' ? 'settings'
-        : this.progress.pause ? 'resume' : this.allowPause ? 'pause' : null;
+        : this.reasons.includes('user_paused') ? 'resume'
+          : this.reasons.includes('schedule') ? 'hours' : this.reasons.includes('on_battery') ? 'battery'
+            : this.progress.pause ? null : this.allowPause ? 'pause' : null;
     }
-    if (changed.has('progress') && !this.pending && this.awaitingStatus && this.progress.activity.confirmed) {
-      this.message = '';
+    if (!this.pending && this.awaitingStatus && this.progress.activity.confirmed
+      && (changed.has('progress') || (this.requestedResume && !this.reasons.includes('user_paused')))) {
+      if (this.requestedResume && this.reasons.includes('user_paused')) return;
+      this.message = this.action !== 'resume' && this.requestedResume && this.remainingRules
+        ? `Manual pause cleared. Indexing is still held by ${this.remainingRules}.` : '';
       this.awaitingStatus = false;
     }
   }
@@ -77,6 +93,9 @@ class IndexingControls extends SignalWatcher(JfElement) {
     if (this.action === 'resume' && this.progress.pause?.reason === 'settings_recovery') {
       return 'Settings recovery requires confirmation of the reset in Settings.';
     }
+    if (this.action === 'resume' && !this.reasons.includes('user_paused')) {
+      return `Manual pause is cleared.${this.remainingRules ? ` Indexing is still held by ${this.remainingRules}.` : ''}`;
+    }
     if (this.action === 'pause' && this.progress.pause) return 'Indexing is already on hold.';
     return '';
   }
@@ -85,6 +104,10 @@ class IndexingControls extends SignalWatcher(JfElement) {
     if (this.unavailableReason || !this.action) return;
     if (this.action === 'settings') {
       requestSurfaceNavigation('core.settings-surface', { focusSettingsRecovery: true });
+      return;
+    }
+    if (this.action === 'hours' || this.action === 'battery') {
+      this.changeRule(this.action);
       return;
     }
     const resume = this.action === 'resume';
@@ -97,6 +120,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
         resume ? 'core.indexing-resume' : 'core.indexing-pause', { args },
         { requestConsent: requestAuthorization },
       );
+      this.requestedResume = resume;
       this.awaitingStatus = true;
       this.message = 'Waiting for status to confirm the request.';
     } catch (error: unknown) {
@@ -104,6 +128,10 @@ class IndexingControls extends SignalWatcher(JfElement) {
     } finally {
       this.pending = false;
     }
+  }
+
+  private changeRule(control: 'hours' | 'battery'): void {
+    requestSurfaceNavigation('core.settings-surface', { focusIndexingRule: control });
   }
 
   override render() {
@@ -124,7 +152,11 @@ class IndexingControls extends SignalWatcher(JfElement) {
           <option value="3600000">1 hour</option>
         </select></label>` : nothing}
       <button type="button" aria-disabled=${unavailable ? 'true' : 'false'} aria-describedby="control-state"
-        @click=${() => void this.invoke()}>${this.action === 'settings' ? 'Open Settings at Reset to defaults' : resume ? 'Resume indexing' : 'Pause indexing'}</button>
+        @click=${() => void this.invoke()}>${this.action === 'settings' ? 'Open Settings at Reset to defaults' : this.action === 'hours' ? 'Change hours' : this.action === 'battery' ? 'Change battery setting' : resume ? 'Resume indexing' : 'Pause indexing'}</button>
+      ${this.action !== 'settings' && this.action !== 'hours' && this.reasons.includes('schedule')
+        ? html`<button type="button" @click=${() => this.changeRule('hours')}>Change hours</button>` : nothing}
+      ${this.action !== 'settings' && this.action !== 'battery' && this.reasons.includes('on_battery')
+        ? html`<button type="button" @click=${() => this.changeRule('battery')}>Change battery setting</button>` : nothing}
     </div>
     <p id="control-state" role="status">${[unavailable, this.message].filter(Boolean).join(' ')}</p>`;
   }
