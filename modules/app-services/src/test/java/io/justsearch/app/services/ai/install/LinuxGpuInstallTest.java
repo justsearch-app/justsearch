@@ -194,18 +194,24 @@ class LinuxGpuInstallTest {
 
   @Test void oldDriverWithoutVramStillReportsDetectedGpuAndDriverAdvice() throws Exception {
     var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, home.resolve("settings.json"));
-    var effective = new GpuCapabilities.Effective(true, "fixture", GpuCapabilities.Confidence.HIGH,
-        "569.0", 569, 0, 1, null, null, null,
-        new GpuCapabilities.Cuda(true, "fixture", GpuCapabilities.Confidence.HIGH));
-    try (var ignored = mockConstruction(GpuCapabilityResolver.class,
-        (mock, context) -> when(mock.snapshot()).thenReturn(new GpuCapabilities(null, null, effective)))) {
-      var hardware = new AiInstallService(null, settings, null, null, home).detectHardwareProfile();
-      assertTrue(hardware.gpuDetected(), "An old driver must not erase the detected device");
-      assertFalse(hardware.cudaFunctional());
-      var registry = ModelRegistryLoader.loadFromClasspath("ai/linux-gpu-registry.fixture.json");
-      var plan = InstallPlanner.plan(registry, hardware, home.resolve("models"));
-      assertTrue(plan.skipped().stream().filter(p -> "chat".equals(p.packageId()))
-          .allMatch(p -> p.reason().contains("570 or newer")));
+    record Presence(boolean available, Integer count, boolean driverFunctional, boolean detected) {}
+    for (var presence : List.of(new Presence(true, null, false, true),
+        new Presence(false, 1, false, true), new Presence(false, null, true, true),
+        new Presence(false, null, false, false))) {
+      var effective = new GpuCapabilities.Effective(presence.available(), "fixture", GpuCapabilities.Confidence.HIGH,
+          "569.0", 569, 0, presence.count(), null, null, null,
+          new GpuCapabilities.Cuda(presence.driverFunctional(), "fixture", GpuCapabilities.Confidence.HIGH));
+      try (var ignored = mockConstruction(GpuCapabilityResolver.class,
+          (mock, context) -> when(mock.snapshot()).thenReturn(new GpuCapabilities(null, null, effective)))) {
+        var hardware = new AiInstallService(null, settings, null, null, home).detectHardwareProfile();
+        assertEquals(presence.detected(), hardware.gpuDetected(),
+            "Driver gating must preserve independently observed device presence: " + presence);
+        assertFalse(hardware.cudaFunctional());
+        var registry = ModelRegistryLoader.loadFromClasspath("ai/linux-gpu-registry.fixture.json");
+        var plan = InstallPlanner.plan(registry, hardware, home.resolve("models"));
+        var chat = plan.skipped().stream().filter(p -> "chat".equals(p.packageId())).findFirst().orElseThrow();
+        assertTrue(chat.reason().contains(presence.detected() ? "570 or newer" : "none detected"), chat.reason());
+      }
     }
   }
 

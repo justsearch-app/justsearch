@@ -154,6 +154,9 @@ def build(args):
     # NVIDIA's archives use lib/; CMake/nvcc also look for lib64/.
     if not (toolkit / "lib64").exists():
         (toolkit / "lib64").symlink_to("lib", target_is_directory=True)
+    # Executables resolve the CUDA backend's private DT_NEEDED dependencies by
+    # SONAME. NVIDIA ships the driver link stub under its unversioned name only.
+    (toolkit / "lib/stubs/libcuda.so.1").symlink_to("libcuda.so")
     env = {k: v for k, v in os.environ.items() if not k.startswith("LD_")
            and k not in ("CUDA_HOME", "CUDA_PATH", "LIBRARY_PATH", "CPATH", "CPLUS_INCLUDE_PATH")}
     env.update(CUDACXX=str(toolkit / "bin/nvcc"), CUDA_HOME=str(toolkit),
@@ -173,6 +176,8 @@ def build(args):
                  "-DCMAKE_CUDA_HOST_COMPILER=g++-13", "-DCUDAToolkit_ROOT=" + str(toolkit),
                  "-DCMAKE_CUDA_ARCHITECTURES=" + ARCHITECTURES,
                  "-DCMAKE_BUILD_RPATH_USE_ORIGIN=ON", "-DCMAKE_INSTALL_RPATH=$ORIGIN",
+                 "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link," + str(toolkit / "lib")
+                 + ":" + str(toolkit / "lib/stubs"),
                  "-DCMAKE_C_FLAGS=-ffile-prefix-map=" + str(work) + "=/build",
                  "-DCMAKE_CXX_FLAGS=-ffile-prefix-map=" + str(work) + "=/build",
                  "-DCMAKE_CUDA_FLAGS=-Xcompiler=-ffile-prefix-map=" + str(work) + "=/build"]

@@ -2069,8 +2069,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     try {
       io.justsearch.gpu.GpuCapabilities.Effective effective =
           new io.justsearch.app.services.gpu.GpuCapabilityResolver().snapshot().effective();
-      deviceDetected = effective.deviceCount() != null && effective.deviceCount() > 0;
+      deviceDetected = effective.cudaAvailable()
+          || (effective.deviceCount() != null && effective.deviceCount() > 0);
       if (effective.cuda() != null && Boolean.TRUE.equals(effective.cuda().functional())) {
+        deviceDetected = true;
         cudaFunctional = NativeTargets.currentIfSupported().map(NativeTargets::hasCpuBaselineRuntime).orElse(false)
             || (effective.driverVersionMajor() != null && effective.driverVersionMajor() >= 570);
       }
