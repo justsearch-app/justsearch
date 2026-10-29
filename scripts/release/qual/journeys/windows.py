@@ -1063,8 +1063,10 @@ def search_open(run):
     run.wd.click('button[aria-label="Mode: Search"]')
     run.wd.click('button[data-tier="search"]')
     run.wd.keys('textarea[data-testid="sv3-composer-input"]', QUERY + '\ue007')
-    wait_for(lambda: OPEN_FILE in run.wd.text(), 'Fixture visible in search UI', seconds=45, error=ProductFailure)
-    hit = run.wd.element('[data-testid="search-result-row"]', seconds=5)
+    hit = wait_for(lambda: run.wd.execute("""
+return all(document,'[data-testid="search-result-row"]').find(e =>
+ (e.getAttribute('data-addressable-id') || '').toLowerCase() === arguments[0].toLowerCase()) || null;
+""", [fixture]), 'Exact fixture row in search DOM', seconds=45, error=ProductFailure)
     run.wd.call(f'/session/{run.wd.session}/actions', {'actions': [{'type': 'pointer', 'id': 'result-menu',
         'parameters': {'pointerType': 'mouse'}, 'actions': [
             {'type': 'pointerMove', 'duration': 0, 'origin': hit, 'x': 0, 'y': 0},

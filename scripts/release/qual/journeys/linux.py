@@ -161,11 +161,20 @@ def add_folder(run):
     return roots
 
 
+def fixture_present(run, value, filename=OPEN_FILE):
+    # Windows Engine IDs/filenames use canonical lowercase paths. Linux keeps
+    # its case-sensitive comparison; all callers still inspect app evidence.
+    observed = json.dumps(value)
+    if getattr(run, 'platform', None) == 'windows':
+        observed, filename = observed.casefold(), filename.casefold()
+    return filename in observed
+
+
 def search_api(run, query=QUERY, filename=OPEN_FILE):
     def probe():
         result = run.api('/api/knowledge/search', {'query': query, 'mode': 'text', 'limit': 20})
         run.evidence('search-last', result)
-        return result if filename in json.dumps(result.get('results', [])) else None
+        return result if fixture_present(run, result.get('results', []), filename) else None
     return wait_for(probe, 'Indexed fixture returned: ' + filename, seconds=240)
 
 
@@ -377,7 +386,7 @@ def semantic_search(run):
         trace = result.get('searchTrace', {})
         degradation = trace.get('degradation', {})
         stages = trace.get('stages', [])
-        return result if OPEN_FILE in json.dumps(result.get('results', [])) and trace.get('effectiveMode') == 'VECTOR' and not degradation.get('hybridFallback') and not degradation.get('vectorBlocked') and any(
+        return result if fixture_present(run, result.get('results', [])) and trace.get('effectiveMode') == 'VECTOR' and not degradation.get('hybridFallback') and not degradation.get('vectorBlocked') and any(
             s.get('id') == 'dense-retrieval' and s.get('status') == 'executed' for s in stages) and any(
             s.get('id') == 'cross-encoder' and s.get('status') == 'executed' for s in stages) and not any(
             s.get('id') == 'sparse-retrieval' and s.get('status') == 'executed' for s in stages) else None
@@ -446,7 +455,7 @@ def assert_state(run):
     assert after['savedFiles']['savedViews'], 'No persisted authored bookmark was observed'
     assert before['settings'].get('ui') == after['settings'].get('ui'), 'Persisted UI settings changed'
     assert json.dumps(run.require('corpus')) in json.dumps(after['roots']), 'Watched folder disappeared'
-    assert OPEN_FILE in json.dumps(after['search']['results']), 'Indexed fixture disappeared'
+    assert fixture_present(run, after['search']['results']), 'Indexed fixture disappeared'
     return after
 
 
@@ -970,7 +979,7 @@ def mcp(run):
         observations[name] = parsed
         assert not parsed.get('isError'), 'MCP tool returned isError: ' + json.dumps(parsed)
     assert 'justsearch_search' in json.dumps(observations['list']), 'tools/list omits search'
-    assert OPEN_FILE in json.dumps(observations['search']), 'MCP search did not return fixture'
+    assert fixture_present(run, observations['search']), 'MCP search did not return fixture'
     return {'manifest': manifest, 'inspector': '0.21.1', 'node': node, 'observations': observations}
 
 

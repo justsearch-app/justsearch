@@ -230,6 +230,42 @@ class WindowsOperationalTests(unittest.TestCase):
             button.CurrentIsEnabled=True;button.CurrentProcessId=99
             with self.assertRaisesRegex(Infrastructure,'process identity'):native.buttons(window,1)
 
+    def test_search_accepts_windows_canonical_case_and_preserves_linux_case(self):
+        import linux
+        from corpus import OPEN_FILE
+        for platform,name,accepted in [('windows',OPEN_FILE.lower(),True),('linux',OPEN_FILE,True),
+                                       ('linux',OPEN_FILE.lower(),False),('windows','other.txt',False)]:
+            result={'results':[{'id':name,'fields':{'filename':name}}]}
+            run=Mock(platform=platform);run.api.return_value=result
+            with patch.object(linux,'wait_for',once):
+                if accepted:self.assertEqual(linux.search_api(run),result)
+                else:
+                    with self.assertRaises(AssertionError):linux.search_api(run)
+
+    def test_open_uses_the_exact_fixture_dom_id_instead_of_the_first_ranked_row(self):
+        import linux
+        from corpus import OPEN_FILE
+        corpus=r'C:\corpus';image=r'C:\Qual\viewer\notepad++.exe'
+        fixture=str(Path(corpus)/OPEN_FILE)
+        receiver=dict(process(60,image),argv=[image,fixture])
+        run=Mock(facts={});run.require.side_effect=lambda key:corpus if key=='corpus' else True
+        run.target.roots=[];run.native.windows.return_value=[{'pid':60,'handle':300}]
+        first={'element-6066-11e4-a52e-4f735466cecf':'unrelated-first'}
+        exact={'element-6066-11e4-a52e-4f735466cecf':'fixture-second'}
+        run.wd.element.return_value=first;run.wd.execute.return_value=exact;run.wd.text.return_value=OPEN_FILE
+        tools=Mock();tools.read_text.return_value=json.dumps({'viewer':image})
+        path=lambda p:tools if str(p)=='C:/Qual/tools.json' else Path(p)
+        with patch.object(windows,'Path',side_effect=path),patch.object(linux,'search_api',return_value={'results':[OPEN_FILE.lower()]}), \
+             patch.object(windows,'default_viewer',return_value={'executable':image}), \
+             patch.object(windows,'ps_json',side_effect=[[],[receiver]]),patch.object(windows,'wait_for',once):
+            windows.search_open(run)
+        run.wd.element.assert_not_called()
+        self.assertIn('data-addressable-id',run.wd.execute.call_args.args[0])
+        self.assertEqual(run.wd.execute.call_args.args[1],[fixture])
+        actions=run.wd.call.call_args.args[1]['actions'][0]['actions']
+        self.assertEqual(actions[0]['origin'],exact)
+        self.assertTrue(run.facts['search'])
+
     def test_default_viewer_needs_exact_argv_path_image_new_lifetime_and_window(self):
         image = r'C:\Qual\viewer\notepad++.exe'
         fixture = r'C:\corpus\JustSearch-journey-orchid-open.txt'
