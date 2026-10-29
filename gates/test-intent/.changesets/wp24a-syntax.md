@@ -305,9 +305,86 @@ Agent choices under the quoted design delegation, never owner-agreed words. Buil
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 restored quoted Search draft keeps its text and requires the existing review before Search"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "X3: document authors and mail senders reach author phrase search through normal extraction-to-index ingestion.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X3 normal ingestion preserves Tika creator/sender through structured policy extraction, sandbox routing, document production and the author index field for DOCX, ODT, PDF, EML and MSG. Markdown front matter retains its existing meta_author facet mapping.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/authors-java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#docxAuthorReachesIndex",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#odtAuthorReachesIndex",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#pdfAuthorReachesIndex",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#emlSenderReachesIndex",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#msgSenderReachesIndex"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "X3 preservation: Markdown YAML author stays in the meta_author facet; this repair does not promote it into the author text field.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X3 normal ingestion preserves Tika creator/sender through structured policy extraction, sandbox routing, document production and the author index field for DOCX, ODT, PDF, EML and MSG. Markdown front matter retains its existing meta_author facet mapping.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/authors-java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#markdownAuthorRemainsFrontmatterFacet"
+      ],
+      "repaired": false
     }
   ]
 }
 ```
 
 ## Acceptance records
+
+### WP2.4a author ingestion repair selectors
+
+Agent-adopted under the same design delegation above (delegated-choice), never owner-agreed.
+Do not run the evidence launcher during the builder repair. Exact launcher arguments for the
+orchestrator after committing the candidate:
+
+```text
+--before 0417bfd91363488ea2d639888f5767c069c2fe39
+--out gates/test-intent/evidence/wp24a-syntax/authors-java.json
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#docxAuthorReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#odtAuthorReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#pdfAuthorReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#emlSenderReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#msgSenderReachesIndex
+--check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#markdownAuthorRemainsFrontmatterFacet
+--overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.docx
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.odt
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.pdf
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.eml
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.msg
+--overlay modules/worker-services/src/test/resources/fixtures/authors/authored.md
+```
+
+Builder logs, before/after JUnit XML, installed-Engine HTTP requests/responses and process
+cleanup are recorded in `tmp/verify/wp2.4a-author-report.md` and its linked evidence directory.
+The `authors-java.json` evidence path is reserved for the orchestrator's launcher run, not claimed
+as generated evidence by this builder.

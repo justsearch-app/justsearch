@@ -13,6 +13,7 @@ Plain uppercase `OR`, `AND` and `NOT` retain their existing behavior. `AND` favo
 - `"budget review"` requires that exact phrase within one field: text, title or author. Words split across fields do not form a phrase.
 - `foo -bar` matches foo but excludes any document containing bar in text, title or author. `foo -"red pen"` excludes the phrase rather than separate occurrences of red and pen.
 - `title:budget` requires budget in the title. `author:"Ada Lovelace"` requires that phrase in the author. These two field names are lowercase.
+- `author:` reads the author recorded in the file: Word, OpenDocument and PDF documents, and the sender of an email. A Markdown front-matter author is not searched by `author:`. Files indexed by an earlier version gain their author the next time they change.
 - Required phrases and field clauses all have to match; they may match different fields. In `foo "budget review"`, the phrase is required and foo helps ranking. With no required clause, at least one unqualified word must match. Exclusions always apply across all three fields.
 
 Quotes deliberately choose strict retrieval. A pasted quoted title becomes a phrase search. Existing saved URLs and restored Search drafts keep their original text and recovery guards; quotes, exclusions and field clauses in them now have this advanced meaning.
