@@ -58,7 +58,7 @@ test('--copy-node-modules creates independent ordinary files including linked de
   }
 });
 
-test('vitest checks run in a --copy-node-modules before-worktree', () => {
+test('vitest checks run in a --copy-node-modules before-worktree', (t) => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-vitest-copy-'));
   // A shell-special checkout path must reach Vitest unexpanded.
   const root = path.join(scratch, 'candidate$HOME');
@@ -76,7 +76,12 @@ const out = process.argv.find((a) => a.startsWith('--outputFile=')).slice('--out
 fs.writeFileSync(out, JSON.stringify({ testResults: [{ name: 'src/probe.test.ts', status: 'passed',
   assertionResults: [{ title: 'probe', fullName: 'probe', status: 'passed' }] }] }));
 `);
-    fs.symlinkSync(path.join('..', 'vitest', 'vitest.mjs'), path.join(modules, '.bin', 'vitest'));
+    try {
+      fs.symlinkSync(path.join('..', 'vitest', 'vitest.mjs'), path.join(modules, '.bin', 'vitest'));
+    } catch (e) {
+      if (process.platform === 'win32' && e.code === 'EPERM') return t.skip('file symlink privilege is unavailable');
+      throw e;
+    }
     fs.mkdirSync(path.join(worktree, 'modules', 'ui-web'), { recursive: true });
     const result = vm.runInNewContext(`${functions}
       prepareNodeModules(worktree, true);
