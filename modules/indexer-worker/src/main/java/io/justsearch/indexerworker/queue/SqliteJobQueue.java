@@ -120,6 +120,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               && SwitchBufferUpsert.decode(later.payload()).collection() != null)) continue;
           var owner = IngestCollectionPolicy.owningRoot(Path.of(file.path()), frozen);
           if (owner == null) owner = IngestCollectionPolicy.owningRoot(Path.of(file.path()), declared);
+          // Unknown ownership alone does not prove removal. A later scoped deletion is
+          // production Remove's durable evidence; never turn an unrelated NULL admission into DELETE.
+          boolean removed = owner == null && receipts.stream().anyMatch(later ->
+              later.acceptedOrder() > op.acceptedOrder()
+                  && (later.generation().isBlank() || generation.equals(later.generation()))
+                  && "DELETE_PREFIX".equals(later.op())
+                  && PathPrefixScope.decode(later.payload()).contains(file.path()));
+          if (owner == null && !removed) continue;
           String label = owner == null ? null : owner.collection();
           // A later reserved admission retains its search exclusions and receipt authority.
           var current = watcherRowLocked(file.path());
@@ -137,12 +145,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             update.setString(3, UUID.randomUUID().toString()); update.setString(4, op.generation());
             update.setString(5, op.key()); update.setString(6, op.revision());
             if (update.executeUpdate() != 1) throw new SQLException("Legacy receipt changed during recovery");
-          }
-          if (owner == null && current != null && current.get("collection") == null
-              && Objects.equals(file.unitRevision(), current.get("unit_revision"))) {
-            try (var delete = connection.prepareStatement("DELETE FROM jobs WHERE path=? AND collection IS NULL")) {
-              delete.setString(1, file.path()); delete.executeUpdate();
-            }
           }
         }
         for (var entry : owners.entrySet()) {
@@ -2540,6 +2542,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       return 0;
     }
 
+    var declared = !exactCollection && unitRevision == null && (collection == null || collection.isBlank())
+        ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
     lockTimed();
     try {
       ensureOpen();
@@ -2569,7 +2573,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       int count = inTransaction(
           () -> enqueueEntriesInTransaction(
-              entries, col, scan, now, exactCollection, unitRevision, preserveRetryWaits));
+              entries, col, scan, now, exactCollection, unitRevision, preserveRetryWaits, declared));
 
       meters.recordEnqueued(count);
       log.debug("Enqueued {} jobs (collection={}, scanId={})", count, col, scan);
@@ -2796,6 +2800,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       boolean maintenance, java.util.function.BooleanSupplier cancelled) {
     if (entries.isEmpty()) return 0;
     if (!hasSufficientDiskSpace()) throw new IllegalStateException("Insufficient sync disk space");
+    var declared = collection == null || collection.isBlank()
+        ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
     lockTimed();
     try {
       ensureOpen();
@@ -2824,7 +2830,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             }
           }
           if (enqueueEntriesInTransaction(List.of(admitted), collection, null,
-              System.currentTimeMillis(), false, null) != 1) {
+              System.currentTimeMillis(), false, null, false, declared) != 1) {
             throw new SQLException("Retirement sync admission incomplete");
           }
           if (exact) bufferAdmittedFile(generation, admitted);
@@ -3046,12 +3052,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
       boolean exactCollection, String unitRevision) throws SQLException {
     return enqueueEntriesInTransaction(
-        entries, collection, scanId, now, exactCollection, unitRevision, false);
+        entries, collection, scanId, now, exactCollection, unitRevision, false,
+        !exactCollection && unitRevision == null && (collection == null || collection.isBlank())
+            ? declaredCollectionRoots.get() : List.of());
   }
 
   private int enqueueEntriesInTransaction(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
-      boolean exactCollection, String unitRevision, boolean preserveRetryWaits)
+      boolean exactCollection, String unitRevision, boolean preserveRetryWaits,
+      List<IngestCollectionPolicy.RootBinding> declared)
       throws SQLException {
     String sql = """
         INSERT INTO jobs
@@ -3090,7 +3099,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         boolean exact = exactCollection;
         if (!exact && unitRevision == null && membership.epoch() == null
             && (collection == null || collection.isBlank())) {
-          var owner = IngestCollectionPolicy.owningRoot(entry.path(), declaredCollectionRoots.get());
+          var owner = IngestCollectionPolicy.owningRoot(entry.path(), declared);
           if (owner != null) {
             effectiveCollection = owner.collection() == null || owner.collection().isBlank() ? null : owner.collection();
             exact = true;
@@ -3177,8 +3186,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       return 0;
     }
 
+    List<IngestCollectionPolicy.RootBinding> declared;
     List<JobQueue.EnqueueEntry> witnessedEntries = new ArrayList<>(entries.size());
     try {
+      declared = !enumeration && (collection == null || collection.isBlank())
+          ? declaredCollectionRoots.get() : List.of();
       for (JobQueue.EnqueueEntry entry : entries) {
         String hash = entry.plannedSourceSha256() == null
             ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
@@ -3190,7 +3202,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             entry.path(), entry.sizeBytes(), provenance, hash, entry.ingestionRoot()));
       }
     } catch (IOException | RuntimeException unreadable) {
-      log.warn("Refusing candidate file admission without exact source bytes", unreadable);
+      log.warn("Refusing candidate file admission without source or declaration evidence", unreadable);
       return 0;
     }
 
@@ -3214,7 +3226,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         int accepted = enqueueEntriesInTransaction(
-            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), enumeration, null);
+            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), enumeration, null, false, declared);
         if (accepted != admitted.size()) {
           throw new SQLException("Atomic file batch did not accept every entry");
         }

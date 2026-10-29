@@ -51,9 +51,20 @@ final class SyncDirectoryOps {
     declaredCollectionRoots = roots;
   }
 
-  private boolean collectionMatches(IndexedFileStamp indexed, Path file, String collection) {
+  /** A walk reads declarations only if an unchanged, non-reserved file needs comparison. */
+  private final class CollectionSnapshot {
+    private List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> roots;
+
+    private List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> roots() {
+      if (roots == null) roots = declaredCollectionRoots.get();
+      return roots;
+    }
+  }
+
+  private static boolean collectionMatches(IndexedFileStamp indexed, Path file, String collection,
+      CollectionSnapshot declared) {
     if (io.justsearch.app.api.knowledge.IngestCollectionPolicy.isReserved(indexed.collection())) return true;
-    var owner = io.justsearch.app.api.knowledge.IngestCollectionPolicy.owningRoot(file, declaredCollectionRoots.get());
+    var owner = io.justsearch.app.api.knowledge.IngestCollectionPolicy.owningRoot(file, declared.roots());
     if (owner == null) return true;
     String expected = collection == null || collection.isBlank() ? owner.collection() : collection;
     return java.util.Objects.equals(normalizeCollection(expected), normalizeCollection(indexed.collection()));
@@ -263,6 +274,7 @@ final class SyncDirectoryOps {
     try {
       identityLease.requireCurrent();
       var budget = new PathBudget(pathCharCap);
+      var declared = new CollectionSnapshot();
       Map<String, IndexedFileStamp> indexedFiles = getIndexedPathsUnderPrefixStrict(root.toString(), budget, cancelled, scope);
       indexedFiles.keySet().removeIf(scope::excludes);
       Set<String> seenDiskPaths = new HashSet<>();
@@ -318,7 +330,7 @@ final class SyncDirectoryOps {
                 // as the separately retained normalized disk key.
                 budget.retain(2L * file.toString().length());
                 IndexedFileStamp indexed = indexedFiles.get(normalized);
-                if (force || indexed == null || !indexed.matches(attrs) || !collectionMatches(indexed, file, collection)) {
+                if (force || indexed == null || !indexed.matches(attrs) || !collectionMatches(indexed, file, collection, declared)) {
                   eligibleFiles.add(file.toAbsolutePath().normalize());
                 }
               }
@@ -930,6 +942,7 @@ final class SyncDirectoryOps {
       boolean[] walkInterrupted = {false};
       boolean[] walkIncomplete = {false};
       final Map<String, IndexedFileStamp> indexedPathsFinal = indexedPaths;
+      var declared = new CollectionSnapshot();
 
       Files.walkFileTree(
           root,
@@ -999,7 +1012,7 @@ final class SyncDirectoryOps {
               // Retirement replay retains its separate ownership and current-byte proof.
               if (force || indexed == null
                   || ((admissionMode == AdmissionMode.DEFAULT || admissionMode == AdmissionMode.MAINTENANCE)
-                      && (!indexed.matches(attrs) || !collectionMatches(indexed, file, collection)))) {
+                      && (!indexed.matches(attrs) || !collectionMatches(indexed, file, collection, declared)))) {
                 // 813 Slice B: the walk already holds the size — no extra stat.
                 if (stopped()) return FileVisitResult.TERMINATE;
                 spool.add(file, attrs.size());

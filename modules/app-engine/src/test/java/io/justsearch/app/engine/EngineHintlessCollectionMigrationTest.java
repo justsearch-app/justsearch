@@ -114,6 +114,10 @@ final class EngineHintlessCollectionMigrationTest {
   @ValueSource(booleans = {false, true})
   void legacyNullJobAndReceiptCannotSurviveCollectionDeletionAfterRestart(boolean removeDeclaration, @TempDir Path data)
       throws Exception {
+    if (removeDeclaration) {
+      removedDeclarationRecovery(data);
+      return;
+    }
     Path parent = Files.createDirectories(data.resolve("parent"));
     Path child = Files.createDirectories(parent.resolve("child"));
     // Record physical root identity through the real add-root route, then stop our Engine.
@@ -121,10 +125,6 @@ final class EngineHintlessCollectionMigrationTest {
       engine.addRootAsThePerson(parent);
       engine.addRootAsThePerson(child);
       declarations(data, parent, child);
-    }
-    if (removeDeclaration) {
-      new ObjectMapper().writeValue(data.resolve("watched_roots.json").toFile(),
-          Map.of("schemaVersion", 1, "roots", List.of()));
     }
     Path file = Files.writeString(child.resolve("legacy.txt"), EngineTestHarness.chunkedContent("legacychildmarker"));
     var manager = new IndexGenerationManager(data.resolve("index"));
@@ -167,6 +167,146 @@ final class EngineHintlessCollectionMigrationTest {
         assertEquals(0, view.searchRuntime().indexCountOps().countByIdAndChunksStrict(key(file)));
       }
     } finally {
+      switching.release();
+    }
+  }
+
+  private static void removedDeclarationRecovery(Path data) throws Exception {
+    Path parent = Files.createDirectories(data.resolve("parent"));
+    Path child = Files.createDirectories(parent.resolve("child"));
+    Path file = Files.writeString(child.resolve("legacy.txt"), EngineTestHarness.chunkedContent("legacychildmarker"));
+    declarations(data, parent, child);
+    var opening = new MigrationTransitionBarrier.Controlled("migration-before-live-green-open");
+    var switching = new MigrationTransitionBarrier.Controlled("migration-before-switching");
+    var activated = new CountDownLatch(1);
+    try (var engine = EngineTestHarness.startWithPersistedRoots(data, transition -> {
+      if ("migration-after-live-activation".equals(transition.point())) activated.countDown();
+      opening.await(transition);
+      switching.await(transition);
+    })) {
+      engine.addRootAsThePerson(parent);
+      engine.addRootAsThePerson(child);
+      assertEquals(1, engine.client().submitBatch(List.of(file), false, "C",
+          TestEngineContexts.FOREGROUND).getAcceptedCount());
+      assertTrue(engine.awaitIngestChunks(key(file), "legacychildmarker", false, 120_000));
+      String blue = engine.status().getMigration().getActiveGenerationId();
+      assertTrue(engine.client().startMigration("legacy_collection", TestEngineContexts.FOREGROUND).accepted());
+      assertTrue(opening.awaitReached(120, TimeUnit.SECONDS));
+      assertTrue(engine.client().pauseMigration("legacy_collection", TestEngineContexts.FOREGROUND));
+      opening.release();
+      assertTrue(engine.awaitLiveGreen(60_000));
+      String green = engine.status().getMigration().getBuildingGenerationId();
+      try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
+        queue.open();
+        // Plant the old-version NULL owner even if Blue's earlier row still carries C.
+        assertEquals(1, queue.enqueueEntriesWithExactCollection(List.of(JobQueue.EnqueueEntry.stat(file)), null));
+        assertTrue(queue.enqueueAndBufferFileForGeneration(green, JobQueue.EnqueueEntry.stat(file), null));
+        assertNull(queue.listSwitchBufferOpsStrict().stream().filter(op -> "UPSERT".equals(op.op()))
+            .map(op -> io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload()))
+            .filter(upsert -> key(file).equals(upsert.path())).findFirst().orElseThrow().collection());
+      }
+      // Remove the ancestor first: its scoped deletion preserves the independently declared child.
+      // Removing the child then records its own deletion, as production does, before restart.
+      assertTrue(engine.client().removeWatchedPath(parent, TestEngineContexts.FOREGROUND) >= 0);
+      assertTrue(engine.client().removeWatchedPath(child, TestEngineContexts.FOREGROUND) >= 0);
+      assertTrue(io.justsearch.configuration.persistence.WatchedRootsFormat.declaredPaths(data).isEmpty(),
+          "production Remove must retire both declarations");
+      try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
+        queue.open();
+        assertTrue(queue.listSwitchBufferOpsStrict().stream().anyMatch(op -> "DELETE_PREFIX".equals(op.op())
+            && io.justsearch.adapters.lucene.runtime.PathPrefixScope.decode(op.payload()).contains(key(file))),
+            "production Remove must record a scoped deletion covering the legacy file");
+      }
+      assertTrue(engine.client().deleteDocsByCollection("C", TestEngineContexts.FOREGROUND) >= 0);
+      engine.restart();
+      assertTrue(engine.client().resumeMigration(TestEngineContexts.FOREGROUND));
+      assertTrue(switching.awaitReached(180, TimeUnit.SECONDS));
+      try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
+        queue.open();
+        assertTrue(queue.listSwitchBufferOpsStrict().stream()
+            .filter(op -> "UPSERT".equals(op.op()))
+            .map(op -> io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload()))
+            .noneMatch(upsert -> key(file).equals(upsert.path()) && upsert.collection() == null),
+            "the legacy NULL receipt must resolve to C or removal before ordered deletion replay");
+      }
+      switching.release();
+      assertTrue(activated.await(180, TimeUnit.SECONDS), "live cutover must publish Green");
+      assertNotEquals(blue, engine.status().getMigration().getActiveGenerationId());
+      try (var view = engine.captureServingView()) {
+        assertEquals(0, view.searchRuntime().indexCountOps().countByIdAndChunksStrict(key(file)),
+            "the older NULL admission belongs to C and is removed by its later deletion");
+      }
+      engine.restart();
+      try (var view = engine.captureServingView()) {
+        assertEquals(0, view.searchRuntime().indexCountOps().countByIdAndChunksStrict(key(file)));
+      }
+    } finally {
+      opening.release();
+      switching.release();
+    }
+  }
+
+  @Test
+  void outsideAdmissionKeepsNullJobReceiptAndDocumentAcrossMigrationRestart(@TempDir Path data) throws Exception {
+    Path declared = Files.createDirectories(data.resolve("declared"));
+    Path file = data.resolve("outside.txt");
+    var opening = new MigrationTransitionBarrier.Controlled("migration-before-live-green-open");
+    var switching = new MigrationTransitionBarrier.Controlled("migration-before-switching");
+    var activated = new CountDownLatch(1);
+    try (var engine = EngineTestHarness.start(data, transition -> {
+      if ("migration-after-live-activation".equals(transition.point())) activated.countDown();
+      opening.await(transition);
+      switching.await(transition);
+    })) {
+      engine.addRootAsThePerson(declared);
+      new ObjectMapper().writeValue(data.resolve("watched_roots.json").toFile(), Map.of(
+          "schemaVersion", 1, "roots", List.of(Map.of("path", declared.toString(), "collection", "C"))));
+      String blue = engine.status().getMigration().getActiveGenerationId();
+      assertTrue(engine.client().startMigration("outside_collection", TestEngineContexts.FOREGROUND).accepted());
+      assertTrue(opening.awaitReached(120, TimeUnit.SECONDS));
+      assertTrue(engine.client().pauseMigration("outside_collection", TestEngineContexts.FOREGROUND));
+      opening.release();
+      assertTrue(engine.awaitLiveGreen(60_000));
+      Files.writeString(file, EngineTestHarness.chunkedContent("outsidesurvivormarker"));
+      assertEquals(1, engine.client().submitBatch(List.of(file), TestEngineContexts.FOREGROUND).getAcceptedCount());
+      assertTrue(engine.awaitIngestChunks(key(file), "outsidesurvivormarker", true, 120_000));
+      engine.restart();
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + data.resolve("jobs.db"));
+          var query = connection.prepareStatement("SELECT collection FROM jobs WHERE path=?")) {
+        query.setString(1, key(file));
+        try (var rows = query.executeQuery()) {
+          assertTrue(rows.next(), "restart must keep the out-of-root job");
+          assertNull(rows.getString(1));
+        }
+      }
+      try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
+        queue.open();
+        assertTrue(queue.listSwitchBufferOpsStrict().stream()
+            .filter(op -> "UPSERT".equals(op.op()))
+            .map(op -> io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload()))
+            .anyMatch(upsert -> key(file).equals(upsert.path()) && upsert.collection() == null),
+            "restart must retain an out-of-root NULL admission as an UPSERT");
+      }
+      assertTrue(engine.client().resumeMigration(TestEngineContexts.FOREGROUND));
+      assertTrue(switching.awaitReached(180, TimeUnit.SECONDS));
+      switching.release();
+      assertTrue(activated.await(180, TimeUnit.SECONDS), "live cutover must publish Green");
+      assertNotEquals(blue, engine.status().getMigration().getActiveGenerationId());
+      try (var view = engine.captureServingView()) {
+        assertEquals(1, view.searchRuntime().readPathOps().search(
+            new TermQuery(new Term(SchemaFields.DOC_ID, key(file))), 1, Set.of(), null, null).totalHits(),
+            "the out-of-root parent must survive replay and cutover");
+        assertLabels(view.searchRuntime(), file, null);
+      }
+      engine.restart();
+      try (var view = engine.captureServingView()) {
+        assertEquals(1, view.searchRuntime().readPathOps().search(
+            new TermQuery(new Term(SchemaFields.DOC_ID, key(file))), 1, Set.of(), null, null).totalHits(),
+            "the out-of-root parent must survive replay and cutover");
+        assertLabels(view.searchRuntime(), file, null);
+      }
+    } finally {
+      opening.release();
       switching.release();
     }
   }

@@ -67,6 +67,7 @@ final class EngineTestHarness implements AutoCloseable {
   private final Path indexBase;
   private final Map<String, String> extraConfig;
   private final MigrationTransitionBarrier.Hook migrationHook;
+  private boolean persistedRoots;
 
   private EngineRoot root;
   private KnowledgeClient client;
@@ -95,6 +96,16 @@ final class EngineTestHarness implements AutoCloseable {
   static EngineTestHarness start(Path dataDir, MigrationTransitionBarrier.Hook migrationHook)
       throws Exception {
     return start(dataDir, dataDir.resolve("index"), Map.of(), migrationHook);
+  }
+
+  /** Exercise durable Head root removal as well as the real Worker and queue. */
+  static EngineTestHarness startWithPersistedRoots(
+      Path dataDir, MigrationTransitionBarrier.Hook migrationHook) throws Exception {
+    var harness = new EngineTestHarness(dataDir, dataDir.resolve("index"), Map.of(),
+        java.util.Objects.requireNonNull(migrationHook, "migrationHook"));
+    harness.persistedRoots = true;
+    harness.open();
+    return harness;
   }
 
   /** As {@link #start(Path)}, with extra resolved-config defaults (recovery policy, pacing, …). */
@@ -217,10 +228,21 @@ final class EngineTestHarness implements AutoCloseable {
                     startupConfiguration));
           }
         };
-    root = new EngineRoot(
-        org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
-        org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
-        hooked, DEADLINE_MS, BATCH_SIZE);
+    if (persistedRoots) {
+      root = new EngineRoot(
+          org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+          org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+          hooked, DEADLINE_MS, BATCH_SIZE,
+          exitCode -> { throw new IllegalStateException("Unexpected terminal writer exit " + exitCode); },
+          () -> org.slf4j.LoggerFactory.getLogger(EngineTestHarness.class)
+              .warn("Migration requires the embedded Engine owner to restart it"),
+          io.justsearch.app.services.bootstrap.OperationAuthority.load(dataDir));
+    } else {
+      root = new EngineRoot(
+          org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+          org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+          hooked, DEADLINE_MS, BATCH_SIZE);
+    }
     client = root.start(gauge, IpcTelemetry.noop());
   }
 
