@@ -121,7 +121,7 @@ An X button appears inside the search input when the query is non-empty. Clickin
 - Each history entry can be removed individually (X button on hover)
 - The dropdown closes on Escape, blur (200 ms delay), or when the user starts typing
 - Selecting a history entry populates the input and triggers search
-- The history dropdown supports full keyboard navigation: Arrow Up/Down to highlight entries, Enter to select, Escape to dismiss. ARIA attributes (`role="listbox"` on the container, `role="option"` and `aria-selected` on entries) provide screen reader support.
+- The history dropdown supports full keyboard navigation: Arrow Up/Down to highlight entries, Enter to select, Escape to dismiss. It exposes ARIA attributes (`role="listbox"` on the container, `role="option"` and `aria-selected` on entries); screen-reader behavior is unverified until a run is recorded in the [screen-reader checklist](../how-to/screen-reader-checklist.md).
 
 ### Loading Indicator
 - An animated pulsing teal dot appears inside the command bar (Zone A) during active searches
