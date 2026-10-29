@@ -137,7 +137,11 @@ product pass: shell banners, notification-center text and foreign windows can
 cover app pixels even when its compositor PID and geometry are stable. Shell
 modal/banner guards, repeated OCR before-reads and unique OCR tokens are removed.
 Apport still records crashes; only bounded diagnostic fields are transferred.
-CoreDump bytes are skipped while scanning, so later diagnostic fields are retained.
+Crashes collected before installation are retained separately under `before-install/`.
+The hosted workflow installs systemd-coredump and attributes its JSON entries after
+the run, using the same crash rules and recorded app processes. Product crashes
+fail the lane; unknown crashes require owner validation; collection errors fail as
+infrastructure. CoreDump bytes are skipped while scanning, so later diagnostic fields are retained.
 Installed package paths are read and every report is attributed
 before reports move aside, so a lookup failure leaves reports available for retry.
 A report naming Package: just-search, an installed package executable, a bundled
@@ -240,8 +244,8 @@ harness interaction with desktop dialogs, but only DOM, production app/Engine
 APIs, exact installed process identity or mapped compositor window identity can
 supply pass evidence. Picker and PolicyKit text alone cannot certify an app result.
 Startup and updater relaunch also use process/window identity and Engine readiness.
-Before rail navigation the harness closes any restored Settings window; failure
-to close it is infrastructure. Launch observation excludes pre-launch identities,
+Before rail navigation the harness closes any restored Settings window; a delivered
+Close Settings action that leaves the window open is a product failure. Launch observation excludes pre-launch identities,
 and stopping waits for each recorded process identity to exit.
 Interaction observations retain elapsed time, indexing and worker state without
 adding an indexing-idle prerequisite.

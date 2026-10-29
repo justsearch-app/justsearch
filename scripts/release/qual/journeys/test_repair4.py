@@ -168,6 +168,7 @@ class Repair4Tests(unittest.TestCase):
             run.target.json.return_value = {'pid': 77, 'executableMatches': True, 'jarMatches': True, field: False}
             with patch.object(linux, 'installed_version', return_value='0.3.1'), \
                  patch.object(linux, 'open_update_offer'), patch.object(linux, 'assert_state'), \
+                 patch.object(linux, 'update_elevation', return_value=[{'pid':98,'ticks':'456'}]), \
                  patch.object(linux, 'wait_for', immediate), self.assertRaisesRegex(AssertionError, 'Running Engine'):
                 linux.update_success(run)
 
@@ -179,6 +180,7 @@ class Repair4Tests(unittest.TestCase):
             stdout='/opt/app/runtime/bin/java\n/opt/app/ui-headless.jar' if args[0] == 'dpkg-query' else '')
         with patch.object(linux, 'installed_version', return_value='0.3.1'), \
              patch.object(linux, 'open_update_offer'), patch.object(linux, 'assert_state'), \
+                 patch.object(linux, 'update_elevation', return_value=[{'pid':98,'ticks':'456'}]), \
              patch.object(linux, 'wait_for', immediate):
             self.assertEqual(linux.update_success(run)['installedVersion'], '0.3.1')
 

@@ -40,7 +40,10 @@ def apt(run, *args):
 
 
 def installed_version(run):
-    return run.target.run(['dpkg-query', '-W', '-f=${Version}', 'just-search']).stdout.strip()
+    result = run.target.run(['dpkg-query', '-W', '-f=${db:Status-Abbrev}${Version}', 'just-search'], check=False)
+    if result.returncode not in (0, 1):
+        raise Infrastructure('Installed package status query failed')
+    return result.stdout[3:].strip() if result.returncode == 0 and result.stdout.startswith('ii ') else None
 
 
 def require_candidate(run):
@@ -220,7 +223,7 @@ def search_open(run):
         'parameters': {'pointerType': 'mouse'}, 'actions': [
             {'type': 'pointerMove', 'duration': 0, 'origin': {'element-6066-11e4-a52e-4f735466cecf': hit_key}, 'x': 0, 'y': 0},
             {'type': 'pointerDown', 'button': 2}, {'type': 'pointerUp', 'button': 2}]}]})
-    run.wd.click('button,[role="menuitem"]', 'Open file')
+    run.wd.click('button,[role="menuitem"]', 'Open file', error=ProductFailure)
     # Receiving-viewer evidence, not an IPC response or process-spawn assertion.
     viewer = wait_for(lambda: receiving_viewer(run),
                       'Receiving viewer opened exact fixture (cmdline or fd)', seconds=30)
@@ -558,12 +561,15 @@ for p in Path('/proc').glob('[0-9]*'):
  try:
   argv=(p/'cmdline').read_bytes().decode().strip('\\0').split('\\0')
   if not argv or Path(argv[0]).name != 'pkexec' or str((p/'exe').resolve()) != '/usr/bin/pkexec':continue
-  if argv[1:8] != ['env','DEBIAN_FRONTEND=noninteractive','apt-get','install','-y','-o','DPkg::Lock::Timeout=300'] or len(argv)!=9:continue
   stat=(p/'stat').read_text().split(') ',1)[1].split()
   if marker not in (p/'environ').read_bytes().split(b'\\0') and int(stat[1]) not in a['shellPids']:continue
-  artifact=Path(argv[-1])
-  if hashlib.file_digest(artifact.open('rb'),'sha256').hexdigest() != a['sha256']:continue
-  rows.append({'pid':int(p.name),'ticks':stat[19],'exe':str((p/'exe').resolve()),'argv':argv})
+  valid=argv[1:8] == ['env','DEBIAN_FRONTEND=noninteractive','apt-get','install','-y','-o','DPkg::Lock::Timeout=300'] and len(argv)==9
+  checksum=None
+  if valid:
+   try:
+    with Path(argv[-1]).open('rb') as artifact:checksum=hashlib.file_digest(artifact,'sha256').hexdigest()
+   except OSError:pass
+  rows.append({'pid':int(p.name),'ticks':stat[19],'exe':str((p/'exe').resolve()),'argv':argv,'sha256':checksum})
  except (FileNotFoundError,ProcessLookupError):pass
 print(json.dumps(rows))
 """
@@ -571,19 +577,26 @@ print(json.dumps(rows))
         'runId': run.run_id, 'sha256': run.require('assets')[run.args.package],
         'shellPids': [p['pid'] for p in run.target.owned() if p['exe'] == run.binary]})],
         input=run.target.vm.config()['password'] + '\n')
-    return json.loads(result.stdout)
+    rows = json.loads(result.stdout)
+    for row in rows:
+        argv = row['argv']
+        if argv[1:8] != ['env', 'DEBIAN_FRONTEND=noninteractive', 'apt-get', 'install', '-y', '-o', 'DPkg::Lock::Timeout=300'] or len(argv) != 9:
+            raise ProductFailure('Run-owned pkexec has unexpected installer arguments')
+        if row.get('sha256') != run.require('assets')[run.args.package]:
+            raise ProductFailure('Run-owned pkexec candidate artifact checksum differs or is unreadable')
+    return rows
 
 
 def cancel_update(run):
     run.require('updateOffered')
     old_version = installed_version(run)
     run.wd.click('button[aria-label="Install update"]')
+    elevation = wait_for(lambda: update_elevation(run), 'Run-owned candidate pkexec install awaiting authorization',
+                         seconds=30, error=ProductFailure)
+    run.evidence('J5-cancel-elevation-before', elevation)
     prompt = wait_for(lambda: (v if 'authenticat' in v.lower() or 'password' in v.lower() else None)
                       if (v := run.native.screen_text('J5-polkit-cancel-prompt', psm=6)) else None,
                       'PolicyKit prompt', seconds=180, error=Infrastructure)
-    elevation = wait_for(lambda: update_elevation(run), 'Run-owned candidate pkexec install awaiting authorization',
-                         seconds=30, error=Infrastructure)
-    run.evidence('J5-cancel-elevation-before', elevation)
     run.native.key('escape')
     wait_for(lambda: not run.target.alive(elevation), 'Cancelled elevation process exited', seconds=30)
     run.evidence('J5-cancel-elevation-after', {'remaining': run.target.alive(elevation)})
@@ -608,6 +621,9 @@ def update_success(run):
     wait_for(lambda: (v if 'authenticat' in v.lower() or 'password' in v.lower() else None)
              if (v := run.native.screen_text('J5-polkit-accept-prompt', psm=6)) else None,
              'PolicyKit prompt', seconds=180, error=Infrastructure)
+    elevation = wait_for(lambda: update_elevation(run), 'Run-owned candidate pkexec install awaiting authorization',
+                         seconds=30, error=ProductFailure)
+    run.evidence('J5-success-elevation-before', elevation)
     run.native.type(run.target.vm.config()['password'])
     run.native.key('enter')
     expected = run.require('initialVersion')
@@ -691,6 +707,9 @@ with open('/var/lib/dpkg/lock-frontend','a') as lock:
         wait_for(lambda: (v if 'authenticat' in v.lower() or 'password' in v.lower() else None)
                  if (v := run.native.screen_text('J5-lock-polkit', psm=6)) else None,
                  'PolicyKit lock-test prompt', seconds=180, error=Infrastructure)
+        elevation = wait_for(lambda: update_elevation(run), 'Run-owned candidate pkexec install awaiting authorization',
+                             seconds=30, error=ProductFailure)
+        run.evidence('J5-lock-elevation-before', elevation)
         run.native.type(run.target.vm.config()['password'])
         run.native.key('enter')
         # The packaged updater specifies DPkg::Lock::Timeout=300. Do not shorten
@@ -735,7 +754,12 @@ def remove_reinstall(run):
 def desktop_entry(run):
     require_candidate(run)
     run.require('ready')
-    entry = run.target.run(['cat', '/usr/share/applications/JustSearch.desktop']).stdout
+    result = run.target.run(['cat', '/usr/share/applications/JustSearch.desktop'], check=False)
+    if result.returncode:
+        if 'No such file or directory' in result.stderr:
+            raise ProductFailure('Installed package is missing JustSearch.desktop')
+        raise Infrastructure('Cannot read installed desktop entry: ' + result.stderr)
+    entry = result.stdout
     assert 'MimeType=x-scheme-handler/justsearch;' in entry, 'Desktop entry lacks the deep-link handler'
     handler = run.target.run(['xdg-mime', 'query', 'default', 'x-scheme-handler/justsearch']).stdout.strip()
     assert handler == 'JustSearch.desktop', 'OS has not registered the installed deep-link handler'

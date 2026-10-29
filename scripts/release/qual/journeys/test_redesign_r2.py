@@ -38,14 +38,16 @@ class UpdateTests(unittest.TestCase):
         run = self.cancellation()
         with patch.object(linux, 'installed_version', return_value='old'), \
              patch.object(linux, 'open_update_offer'), patch.object(linux, 'assert_state'), \
-             patch.object(linux, 'wait_for', immediate), self.assertRaises(runner.Infrastructure):
+             patch.object(linux, 'wait_for', immediate), self.assertRaises(runner.ProductFailure):
             linux.cancel_update(run)
         run.native.key.assert_not_called()
         self.assertNotIn('updateCancelled', run.facts)
 
     def test_cancel_requires_exact_elevation_identity_to_exit(self):
         run = self.cancellation()
-        elevation = {'pid': 98, 'ticks': '456', 'exe': '/usr/bin/pkexec'}
+        elevation = {'pid': 98, 'ticks': '456', 'exe': '/usr/bin/pkexec',
+                     'argv': ['pkexec','env','DEBIAN_FRONTEND=noninteractive','apt-get','install','-y','-o','DPkg::Lock::Timeout=300','/tmp/candidate.deb'],
+                     'sha256': 'abc'}
         run.target.run.return_value.stdout = json.dumps([elevation])
         run.target.alive.return_value = [elevation]
         with patch.object(linux, 'installed_version', return_value='old'), \
@@ -56,7 +58,9 @@ class UpdateTests(unittest.TestCase):
 
     def test_cancel_records_elevation_and_unchanged_version(self):
         run = self.cancellation()
-        elevation = {'pid': 98, 'ticks': '456', 'exe': '/usr/bin/pkexec'}
+        elevation = {'pid': 98, 'ticks': '456', 'exe': '/usr/bin/pkexec',
+                     'argv': ['pkexec','env','DEBIAN_FRONTEND=noninteractive','apt-get','install','-y','-o','DPkg::Lock::Timeout=300','/tmp/candidate.deb'],
+                     'sha256': 'abc'}
         run.target.run.return_value.stdout = json.dumps([elevation])
         with patch.object(linux, 'installed_version', return_value='old'), \
              patch.object(linux, 'open_update_offer'), patch.object(linux, 'assert_state'), \
@@ -87,7 +91,7 @@ class UpdateTests(unittest.TestCase):
                 run.target.run.side_effect=execute
                 with patch.object(linux,'installed_version',return_value='old'), \
                      patch.object(linux,'open_update_offer'),patch.object(linux,'assert_state'), \
-                     patch.object(linux,'wait_for',immediate),self.assertRaises(runner.Infrastructure):
+                     patch.object(linux,'wait_for',immediate),self.assertRaises(runner.ProductFailure):
                     linux.cancel_update(run)
                 run.native.key.assert_not_called()
 
@@ -100,7 +104,8 @@ class UpdateTests(unittest.TestCase):
             run.target.alive.return_value = [dict(old,exe=run.binary) if old == SHELL else old]
             with self.subTest(old=old), patch.object(linux, 'installed_version', return_value='0.3.1'), \
                  patch.object(linux, 'open_update_offer'), patch.object(linux, 'assert_state'), \
-                 patch.object(linux, 'candidate_engine', create=True, return_value={'candidate':True}), \
+                 patch.object(linux, 'candidate_engine', return_value={'candidate':True}), \
+                 patch.object(linux, 'update_elevation', return_value=[{'pid':98,'ticks':'456'}]), \
                  patch.object(linux, 'wait_for', immediate), self.assertRaisesRegex(AssertionError, 'Pre-update shell and Engine exited'):
                 linux.update_success(run)
             recorded = next((c.args[1] for c in run.evidence.call_args_list if c.args[0] == 'J5-pre-update-processes'), [])
@@ -111,7 +116,7 @@ class UpdateTests(unittest.TestCase):
         run.target.owned.side_effect=[[dict(SHELL,exe=run.binary)],[dict(SHELL,pid=88,ticks='333',exe=run.binary)]]
         with patch.object(linux,'installed_version',return_value='0.3.1'), \
              patch.object(linux,'open_update_offer'),patch.object(linux,'assert_state'), \
-             patch.object(linux,'candidate_engine',create=True,return_value={'candidate':True}), \
+             patch.object(linux,'candidate_engine',return_value={'candidate':True}), \
              patch.object(linux,'wait_for',immediate),self.assertRaisesRegex(AssertionError,'Pre-update Engine identity unavailable'):
             linux.update_success(run)
 
@@ -151,7 +156,7 @@ class ClassificationTests(unittest.TestCase):
              patch.object(linux,'wait_for',immediate):linux.search_open(run)
         run.desktop_spawn.assert_not_called()
 
-    def test_j4_restored_settings_close_failure_is_infrastructure(self):
+    def test_j4_restored_settings_close_failure_is_product(self):
         run=test_redesign.BookmarkTests().restart_run()
         def dom(script,args=None):
             if 'localStorage' in script:return [test_redesign.BookmarkTests.bookmark]
@@ -162,7 +167,7 @@ class ClassificationTests(unittest.TestCase):
         run.close_settings.side_effect=lambda: runner.Run.close_settings(run)
         with patch.object(linux,'assert_state',return_value={}), \
              patch.object(linux,'wait_for',immediate),patch.object(runner,'wait_for',immediate), \
-             self.assertRaises(runner.Infrastructure):linux.restart(run)
+             self.assertRaises(runner.ProductFailure):linux.restart(run)
 
     def test_packaged_shell_never_mounts_is_product(self):
         run = Mock(binary=BINARY, work='/tmp/isolated', facts={})
@@ -223,11 +228,11 @@ class ClassificationTests(unittest.TestCase):
                 self.assertLess(next(i for i,c in enumerate(calls) if c[0]=='click'),
                                 next(i for i,c in enumerate(calls) if c[0]=='element'))
 
-    def test_restored_settings_stuck_is_infrastructure(self):
+    def test_restored_settings_stuck_is_product(self):
         with tempfile.TemporaryDirectory() as temp:
             run=runner.Run(NS(evidence=temp+'/run',vm=None),DEFINITION)
             run.facts['ui']=True;run.wd=Mock();run.wd.execute.return_value=True
-            with patch.object(runner,'wait_for',immediate),self.assertRaises(runner.Infrastructure):run.nav('Search')
+            with patch.object(runner,'wait_for',immediate),self.assertRaises(runner.ProductFailure):run.nav('Search')
             run.wd.element.assert_not_called()
 
 

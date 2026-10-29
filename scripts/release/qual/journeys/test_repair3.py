@@ -70,7 +70,7 @@ class Repair3Tests(unittest.TestCase):
             target = Mock()
             target.run.side_effect = lambda args, **kw: Mock(stdout='false\n' if args[-1] == 'show-banners' else 'true\n')
             with patch.object(wrapper, 'Target', return_value=target), patch.object(wrapper, 'Native') as native, \
-                 patch.object(wrapper, 'crash_evidence', create=True), patch.object(wrapper.vm, 'guest_root') as root, \
+                 patch.object(wrapper, 'crash_evidence'), patch.object(wrapper.vm, 'guest_root') as root, \
                  patch.object(wrapper.vm, 'QMP'), patch.object(wrapper, 'wait_for', return_value=True), \
                  patch('screen.key'):
                 wrapper.prepare_desktop(SimpleNamespace(session='wayland'), Path(temp))

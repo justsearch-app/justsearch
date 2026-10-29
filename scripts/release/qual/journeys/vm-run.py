@@ -20,7 +20,7 @@ import time
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import vm
-from runner import Native, Target, digest, verify_assets, preparation_failure, summarize, full_selection, wait_for, Infrastructure, report_exit_code
+from runner import Native, Target, digest, verify_assets, preparation_failure, summarize, full_selection, wait_for, Infrastructure, report_exit_code, attribute_crashes
 from writes import COUNTERS
 
 
@@ -167,7 +167,8 @@ def provision(args, out):
                       'systemctl restart gdm3')
 
 
-def crash_evidence(out):
+def crash_evidence(out, *, before_install=False):
+    out.mkdir(parents=True, exist_ok=True)
     # Keep reports even when the disposable desktop's notification is disabled.
     result = vm.ssh('ubuntu', "find /var/crash -maxdepth 1 -name '*.crash' -printf '%f\\n'",
                     capture_output=True, text=True, check=True, timeout=30)
@@ -229,9 +230,13 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
         if installed.returncode not in (0, 1):
             raise Infrastructure('Installed package paths unavailable for crash attribution; reports retained in place')
         paths = set(installed.stdout.splitlines()) if installed.returncode == 0 else set()
-        process_record = out / 'run/app-processes.json'
+        process_record = out / ('evidence' if (out / 'evidence').is_dir() else 'run') / 'app-processes.json'
         processes = json.loads(process_record.read_text()) if process_record.exists() else []
-        attribute_crashes(fields, paths, processes)
+        if before_install:
+            for row in fields:
+                row['attribution'] = 'before-install'
+        else:
+            attribute_crashes(fields, paths, processes)
         record = out / 'guest-crashes.json'
         previous = json.loads(record.read_text()) if record.exists() else []
         record.write_text(json.dumps(previous + fields, indent=2) + '\n')
@@ -241,28 +246,6 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
         product = [r for r in fields if r['attribution'] == 'product']
         if product:
             raise AssertionError('Product crash in guest: ' + json.dumps(product))
-
-
-def attribute_crashes(reports, installed_paths, processes):
-    # A crashed helper can disappear from /proc before final collection. Keep
-    # observed app ancestry and use Apport's process/parent IDs as well as paths.
-    app_pids = {p['pid'] for p in processes}
-    for _ in range(len(reports) + 1):
-        previous_pids = set(app_pids)
-        for report in reports:
-            fields = report['fields']
-            exe = fields.get('ExecutablePath', '').removesuffix(' (deleted)')
-            status = dict(line.split(':', 1) for line in fields.get('ProcStatus', '').splitlines() if ':' in line)
-            report['attribution'] = ('product' if fields.get('Package', '').split()[:1] == ['just-search']
-                or exe in installed_paths
-                or Path(exe).name in ('WebKitWebProcess', 'WebKitNetworkProcess')
-                or (exe.endswith('/runtime/bin/java') and any(p.endswith('/runtime/bin/java') for p in installed_paths))
-                or any(status.get(key, '').strip() in {str(pid) for pid in app_pids} for key in ('Pid', 'PPid'))
-                else 'unattributed')
-            if report['attribution'] == 'product' and status.get('Pid', '').strip().isdigit():
-                app_pids.add(int(status['Pid'].strip()))
-        if app_pids == previous_pids:
-            break
 
 
 def record_unattributed_crashes(report, out):
@@ -292,7 +275,7 @@ def prepare_desktop(args, out):
                     raise
                 time.sleep(2)
     ready()
-    crash_evidence(out)
+    crash_evidence(out / 'before-install', before_install=True)
     # Ubuntu's release-upgrade checker can crash before qualification starts.
     # Disable only desktop notifications; apport still writes crash reports.
     notify = ['gsettings', 'get', 'com.ubuntu.update-notifier', 'show-apport-crashes']

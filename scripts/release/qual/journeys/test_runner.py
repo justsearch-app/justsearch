@@ -182,7 +182,7 @@ class RunnerTests(unittest.TestCase):
         run.native.screen_text.return_value = 'File Edit Document ' + linux.OPEN_FILE
         viewer = {'pid': 123, 'ticks': '456', 'exe': '/usr/bin/mousepad'}
         with patch.object(linux, 'search_api', return_value={}), \
-             patch.object(linux, 'receiving_viewer', create=True, return_value=viewer):
+             patch.object(linux, 'receiving_viewer', return_value=viewer):
             linux.search_open(run)
         run.target.stop.assert_called_once_with([viewer])
         self.assertNotIn('alt+f4', [c.args[0] for c in run.native.key.call_args_list])

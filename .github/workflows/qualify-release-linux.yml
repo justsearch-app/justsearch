@@ -24,6 +24,8 @@ jobs:
       OPENBLAS_NUM_THREADS: '8'
       RAYON_NUM_THREADS: '8'
     steps:
+      - name: Require a disposable GitHub-hosted runner
+        run: '[[ $RUNNER_ENVIRONMENT == github-hosted ]]'
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -59,7 +61,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y webkit2gtk-driver xvfb openbox xdotool scrot \
-            mousepad python3-pil fonts-dejavu-core tesseract-ocr dbus-x11
+            mousepad python3-pil fonts-dejavu-core tesseract-ocr dbus-x11 systemd-coredump
           python3 - <<'PY'
           import re, subprocess
           # Hosted images carry development JDKs. Remove those packages from this
@@ -77,23 +79,30 @@ jobs:
           set -euo pipefail
           mapfile -t packages < <(find "$RUNNER_TEMP/release-assets" -maxdepth 1 -name '*.deb' -printf '%f\n')
           [[ ${#packages[@]} == 1 ]]
+          crash_since=$(date --iso-8601=seconds)
           set +e
           xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
             python3 scripts/release/qual/journeys/hosted.py \
               --assets "$RUNNER_TEMP/release-assets" --package "${packages[0]}" \
               --registry "$RUNNER_TEMP/server.json" --evidence "$RUNNER_TEMP/journey-evidence"
           result=$?
-          set -e
-          python3 - <<'PY_SUMMARY'
-          import json, os
+          python3 - "$crash_since" "$result" <<'PY_SUMMARY'
+          import json, os, sys
           from pathlib import Path
+          sys.path.insert(0, 'scripts/release/qual/journeys')
+          from runner import collect_hosted_crashes
+          out = Path(os.environ['RUNNER_TEMP']) / 'journey-evidence'
+          crash_result = collect_hosted_crashes(out, sys.argv[1])
           summary = Path(os.environ['RUNNER_TEMP']) / 'journey-evidence/summary.json'
           status = json.loads(summary.read_text())['status'] if summary.exists() else 'summary unavailable'
           message = f'Linux release journeys: {status}'
           print(message)
           with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as stream:
               stream.write(message + '\n')
+          sys.exit(int(sys.argv[2]) if int(sys.argv[2]) not in (0, 2) else crash_result)
           PY_SUMMARY
+          result=$?
+          set -e
           exit "$result"
       - name: Record unavailable journeys when preparation failed
         if: always()

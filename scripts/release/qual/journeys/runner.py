@@ -52,6 +52,99 @@ def classify(exc):
     return 'failed-product' if isinstance(exc, AssertionError) else 'failed-infrastructure'
 
 
+def attribute_crashes(reports, installed_paths, processes):
+    # Process identities include start ticks: a reused PID is not the observed app.
+    # Apport can retain a child/parent relationship after the helper has exited.
+    identities = {(str(p['pid']), str(p['ticks'])) for p in processes}
+    ancestry = set(identities)
+    for _ in range(len(reports) + 1):
+        previous = set(ancestry)
+        for report in reports:
+            fields = report['fields']
+            exe = fields.get('ExecutablePath', '').removesuffix(' (deleted)')
+            status = dict(line.split(':', 1) for line in fields.get('ProcStatus', '').splitlines() if ':' in line)
+            pid, parent = (status.get(key, '').strip() for key in ('Pid', 'PPid'))
+            ticks = None
+            stat = fields.get('ProcStat', '')
+            if stat:
+                try:
+                    stat_pid, rest = stat.split(' (', 1)
+                    values = rest.rsplit(') ', 1)[1].split()
+                    if pid and pid != stat_pid:
+                        raise ValueError('Crash PID differs between ProcStatus and ProcStat')
+                    pid, parent, ticks = stat_pid, values[1], str(int(values[19]))
+                except (ValueError, IndexError) as exc:
+                    raise Infrastructure('Malformed crash process identity') from exc
+            # Parent start ticks must precede the crashed child when available.
+            descendant = any(parent == observed_pid and (ticks is None or int(start) <= int(ticks))
+                             for observed_pid, start in ancestry)
+            same_process = ticks is not None and (pid, ticks) in identities
+            report['attribution'] = ('product' if fields.get('Package', '').split()[:1] == ['just-search']
+                or exe in installed_paths
+                or Path(exe).name in ('WebKitWebProcess', 'WebKitNetworkProcess')
+                or (exe.endswith('/runtime/bin/java') and any(p.endswith('/runtime/bin/java') for p in installed_paths))
+                or same_process or descendant else 'unattributed')
+            if report['attribution'] == 'product' and pid.isdigit():
+                # Without ProcStat, propagate only the report's parent start lower
+                # bound; direct PID matches still always need an exact start tick.
+                starts = [int(start) for observed_pid, start in ancestry if observed_pid == parent]
+                if ticks is not None:
+                    identities.add((pid, ticks))
+                    ancestry.add((pid, ticks))
+                elif starts:
+                    ancestry.add((pid, str(min(starts))))
+        if ancestry == previous:
+            break
+
+
+def collect_hosted_crashes(out, since):
+    """Fold systemd-coredump observations into the completed hosted report."""
+    out = Path(out)
+    report = json.loads((out / 'summary.json').read_text())
+    try:
+        result = subprocess.run(['sudo', '-n', 'coredumpctl', '--json=short', '--no-pager',
+                                 '--since', since, 'list'], capture_output=True, text=True)
+        (out / 'coredumpctl.stderr.txt').write_text(result.stderr)
+        # coredumpctl returns 1 for an empty journal, as well as for real errors.
+        if result.returncode and not (result.returncode == 1
+                and result.stderr.strip() == 'No coredumps found.'
+                and result.stdout.strip() in ('', '[]')):
+            raise Infrastructure('coredumpctl collection failed: ' + result.stderr)
+        entries = json.loads(result.stdout) if result.stdout.strip() else []
+        if not isinstance(entries, list):
+            raise Infrastructure('coredumpctl did not return a JSON array')
+        (out / 'coredumps.json').write_text(json.dumps(entries, indent=2) + '\n')
+        paths = subprocess.run(['dpkg-query', '-L', 'just-search'], capture_output=True, text=True)
+        if paths.returncode not in (0, 1):
+            raise Infrastructure('Installed package paths unavailable for crash attribution')
+        process_record = out / 'app-processes.json'
+        processes = json.loads(process_record.read_text()) if process_record.exists() else []
+        crashes = []
+        for entry in entries:
+            # coredumpctl's JSON list uses lowercase summary keys. Accept journal
+            # fields too, when diagnostics supply the fuller process identity.
+            fields = {key: str(entry.get(journal, entry.get(short, ''))) for key, journal, short in (
+                ('ExecutablePath', 'COREDUMP_EXE', 'exe'), ('Signal', 'COREDUMP_SIGNAL', 'sig'),
+                ('Package', 'COREDUMP_PACKAGE_NAME', 'package'), ('Date', 'COREDUMP_TIMESTAMP', 'time'),
+                ('ProcStatus', 'COREDUMP_PROC_STATUS', 'status'), ('ProcStat', 'COREDUMP_PROC_STAT', 'stat'))}
+            crashes.append({'fields': fields})
+        attribute_crashes(crashes, set(paths.stdout.splitlines()) if paths.returncode == 0 else set(), processes)
+        (out / 'hosted-crashes.json').write_text(json.dumps(crashes, indent=2) + '\n')
+        for attribution, status in (('product', 'failed-product'), ('unattributed', 'owner-validation')):
+            found = [c for c in crashes if c['attribution'] == attribution]
+            if found:
+                report['journeys'].append({'id': 'hosted-crashes', 'checks': [{
+                    'name': attribution, 'status': status, 'reason': json.dumps(found),
+                    'evidence': ['coredumps.json', 'hosted-crashes.json', 'app-processes.json']}]})
+    except Exception as exc:
+        report['journeys'].append({'id': 'hosted-crashes', 'checks': [{
+            'name': 'collection', 'status': 'failed-infrastructure', 'reason': str(exc),
+            'evidence': ['coredumpctl.stderr.txt']}]})
+    report.update(summarize(report['journeys'], report.get('fullSelection', False)))
+    (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
+    return report_exit_code(report)
+
+
 def require_disposable_host():
     marker = Path('/run/justsearch-qualification-guest')
     if (os.environ.get('GITHUB_ACTIONS') == 'true'
@@ -362,16 +455,16 @@ class WebDriver:
             raise Unavailable('No attached WebDriver session')
         return self.call(f'/session/{self.session}/execute/sync', {'script': DEEP_QUERY + script, 'args': args or []})
 
-    def element(self, selector, text=None, seconds=30):
+    def element(self, selector, text=None, seconds=30, *, error=Infrastructure):
         return wait_for(lambda: self.execute("""
 return all(document,arguments[0]).find(e => {
  const r=e.getBoundingClientRect();
  return r.width>0 && r.height>0 && (!arguments[1] || (e.innerText || e.textContent || '').trim()===arguments[1]);
 }) || null;
-""", [selector, text]), f'Visible {selector} {text or ""}', seconds, error=Infrastructure)
+""", [selector, text]), f'Visible {selector} {text or ""}', seconds, error=error)
 
-    def click(self, selector, text=None):
-        element = self.element(selector, text)
+    def click(self, selector, text=None, *, error=Infrastructure):
+        element = self.element(selector, text, error=error)
         point = self.execute("arguments[0].scrollIntoView({block:'center',inline:'nearest'});const r=arguments[0].getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)}", [element])
         # Resolve the viewport point explicitly: WebKitGTK's element-origin
         # hit test can report an ancestor shadow host for nested components.
@@ -680,7 +773,7 @@ except TimeoutError as exc:
         if self.wd.execute(script):
             self.wd.click('button[aria-label="Close Settings"]')
             wait_for(lambda: not self.wd.execute(script), 'Restored Settings closed before navigation',
-                     seconds=30, error=Infrastructure)
+                     seconds=30, error=ProductFailure)
 
     def nav(self, surface):
         self.require('ui')
