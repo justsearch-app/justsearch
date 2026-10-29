@@ -13,6 +13,7 @@ import io.justsearch.app.api.registry.OperationInvocationResponse;
 import io.justsearch.app.api.status.MigrationSource;
 import java.time.Clock;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -193,13 +194,19 @@ public final class OperationsController {
 
     OperationInvocationRequest request;
     try {
+      if ("core.set-indexing-rules".equals(idValue)) {
+        // The ordinary request DTO loses duplicate keys; validate this strict rule ingress first.
+        MAPPER.reader().with(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+            .with(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(ctx.body());
+      }
       request = parseRequest(ctx, inputForm);
     } catch (Exception e) {
-      writeError(
-          ctx,
-          400,
-          "Invalid invocation request body: " + e.getMessage(),
-          "BAD_REQUEST");
+      String message = "Invalid invocation request body: " + e.getMessage();
+      if ("core.set-indexing-rules".equals(idValue)) {
+        String field = message.contains("pauseOnBattery") ? "pauseOnBattery" : "schedule";
+        writeResponse(ctx, 400, new OperationInvocationResponse(false, message, null, Map.of(),
+            "BAD_REQUEST", "BAD_REQUEST", Map.of("field", field), false));
+      } else writeError(ctx, 400, message, "BAD_REQUEST");
       return;
     }
 
@@ -269,7 +276,10 @@ public final class OperationsController {
       return;
     }
 
-    writeResponse(ctx, result.success() ? acceptedStatus : 200, OperationInvocationResponse.fromResult(result));
+    int status = "core.set-indexing-rules".equals(idValue)
+        && result.errorCode().filter("BAD_REQUEST"::equals).isPresent() ? 400
+        : result.success() ? acceptedStatus : 200;
+    writeResponse(ctx, status, OperationInvocationResponse.fromResult(result));
   }
 
   /**
@@ -499,7 +509,7 @@ public final class OperationsController {
       io.justsearch.agent.api.registry.ConfirmationRequiredException e,
       String argumentsJson,
       InvocationProvenance provenance, String operationKey, boolean undo) {
-    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+    Map<String, Object> body = new java.util.LinkedHashMap<>();
     body.put("success", false);
     body.put("errorClass", io.justsearch.app.api.ApiErrorCode.CONFIRMATION_REQUIRED.name());
     body.put("message", e.getMessage());

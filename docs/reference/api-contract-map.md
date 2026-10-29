@@ -1581,3 +1581,33 @@ Three typed exception classes replace fragile message-sniffing patterns:
 
 - Search + RAG reason codes: `docs/reference/contracts/search-and-rag-reason-codes.md`
 - Lifecycle reason codes: `io.justsearch.app.api.lifecycle.LifecycleReasonCode` (validated by `LifecycleContractTest`)
+
+## Indexing pause and rules
+
+UI-only operations use `POST /api/operations/{id}/invoke` with the standard `{args, idempotencyKey}`
+envelope and accepted settings witness/key/replay transaction. They are unavailable to MCP/agent
+executors. Generic Settings exposes `indexingPause` read-only.
+
+- `core.indexing-pause`: `{untilEpochMs?: integer|null}`; nonnegative epoch milliseconds, absent/null
+  means indefinite. Preserves the rules.
+- `core.indexing-resume`: `{}`; clears manual intent and its deadline, preserving the rules.
+- `core.set-indexing-rules`: both `{schedule, pauseOnBattery}` required. `schedule:null` removes
+  hours; otherwise `{enabled:boolean, days:integer[], startMinute:integer, endMinute:integer}`
+  with no unknown or duplicate members, unique ISO weekdays 1–7, minutes 0–1439, unequal endpoints,
+  and at least one day when enabled. Disabled schedules still validate and retain their hours.
+  Types are strict. Both rules replace atomically; invalid requests return HTTP 400 with field
+  information and preserve the policy. Manual pause, deadline and recovery reason are preserved.
+
+`operating.indexing.reasons` is ordered settings recovery, manual (`user_paused`), `schedule`,
+`on_battery`, then automatic bulk-work reasons. The primary lifecycle codes are
+`indexing.pausing_schedule` / `indexing.paused_schedule` and
+`indexing.pausing_on_battery` / `indexing.paused_on_battery`. PAUSING waits for admitted leases to
+finish publication; PAUSED is quiet even with an empty queue. Rules do not inherit expired manual
+deadlines. MCP status carries the complete policy reasons and names the rule holding queued work.
+Only known BATTERY holds when enabled, independently of energy-saver intent; AC and UNKNOWN do not.
+Start-inclusive/end-exclusive hours use current local weekday/minute, including overnight Sunday
+wrap. Each admission, status snapshot and waiter recheck evaluates again without a cached transition.
+
+Recovery also distinguishes draining from quiet with
+`indexing.pausing_settings_recovery_check_exclusions` /
+`indexing.paused_settings_recovery_check_exclusions`; its primary reason stays `settings_recovery`.

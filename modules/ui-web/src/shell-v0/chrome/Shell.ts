@@ -1557,9 +1557,10 @@ export class Shell extends JfElement {
     let navigationHandled = false;
     const persistentAddress = (address: ShellAddressNavigation): ShellAddressNavigation => {
       if (address.target !== SETTINGS_SURFACE_ID || !address.state ||
-          !('focusSettingsRecovery' in address.state)) return address;
+          (!('focusSettingsRecovery' in address.state) && !('focusIndexingRule' in address.state))) return address;
       const state = { ...address.state };
       delete state.focusSettingsRecovery;
+      delete state.focusIndexingRule;
       return { ...address, state };
     };
     const navigationHandler = createNavigationHandler({
@@ -1636,11 +1637,14 @@ export class Shell extends JfElement {
         if (state?.focusSettingsRecovery === true || state?.focusSettingsRecovery === 'true') {
           win.focusSettingsRecovery();
         }
+        if (state?.focusIndexingRule === 'hours' || state?.focusIndexingRule === 'battery') {
+          win.focusIndexingRule(state.focusIndexingRule);
+        }
         // The focus request belongs to this arrival only. Keep the destination in history,
         // but hand focus off to Settings' cancellable pending intent instead of replaying it.
         const current = parseUrl(window.location.hash.slice(1));
         if (current?.kind === 'navigate' && current.target === SETTINGS_SURFACE_ID &&
-            current.state && 'focusSettingsRecovery' in current.state) {
+            current.state && ('focusSettingsRecovery' in current.state || 'focusIndexingRule' in current.state)) {
           window.history.replaceState(window.history.state, '', `#${canonicalize(persistentAddress(current))}`);
         }
       },

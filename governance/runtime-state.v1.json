@@ -146,6 +146,14 @@
       "note": "WP3.6 pause engine: the core.pause-indexing / core.resume-indexing intent-write handlers prepare the persisted indexing-pause intent through RuntimeSpecStore's settings commit owner and validate it with RuntimeIntentPreparation, so a pause or resume never forwards a runtime change. Consumes the authority; does not re-model it."
     },
     {
+      "id": "indexing-rules-handler-consumer",
+      "kind": "consumer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/IndexingRulesHandler.java",
+      "guard": "test:IndexingRulesIntentTest",
+      "note": "WP3.8a: UI-only whole-rule-pair intent uses RuntimeSpecStore and its existing witnessed settings commit owner; preserves manual policy and does not model AI runtime state."
+    },
+    {
       "id": "switch-inference-mode-alias-consumer",
       "kind": "consumer",
       "lang": "java",

@@ -126,11 +126,34 @@
         "indexingPause" : {
           "type" : "object",
           "properties" : {
+            "pauseOnBattery" : {
+              "type" : "boolean"
+            },
             "paused" : {
               "type" : "boolean"
             },
             "reason" : {
               "type" : [ "string", "null" ]
+            },
+            "schedule" : {
+              "type" : "object",
+              "properties" : {
+                "days" : {
+                  "type" : [ "array", "null" ],
+                  "items" : {
+                    "type" : "integer"
+                  }
+                },
+                "enabled" : {
+                  "type" : "boolean"
+                },
+                "endMinute" : {
+                  "type" : "integer"
+                },
+                "startMinute" : {
+                  "type" : "integer"
+                }
+              }
             },
             "untilEpochMs" : {
               "type" : [ "integer", "null" ]

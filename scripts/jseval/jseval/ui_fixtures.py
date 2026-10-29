@@ -631,6 +631,12 @@ def _status_body(variant: str) -> str:
     Degraded variants have a real warning code, indexed content, and authoritative READY
     chat operation; only those variants claim that a human Ask or Delegate is available.
     """
+    if variant == "indexing-rules":
+        d = json.loads(_status_body("indexing"))
+        d["operating"]["indexing"].update({"state": "PAUSED", "reasons": ["schedule", "on_battery"],
+            "reasonCode": "indexing.paused_schedule", "untilEpochMs": None, "waitingForResume": True})
+        d["worker"]["migration"]["processingJobsCount"] = 0
+        return json.dumps(d)
     if variant == "semantic-paused":
         # D1-14: an in-place model-change build serves keyword results while
         # the dense leg is rebuilding. The reason code, not the migration
@@ -743,6 +749,11 @@ def _inference_body(variant: str) -> str:
 
 def _settings_body(variant: str) -> str:
     """Compact disclosure unless this fixture explicitly promises Detailed."""
+    if variant == "indexing-rules":
+        d = json.loads(_BODY_SETTINGS)
+        d["ui"]["indexingPause"] = {"paused": False, "pauseOnBattery": True,
+            "schedule": {"enabled": True, "days": [1, 2, 3, 4, 5], "startMinute": 540, "endMinute": 1020}}
+        return json.dumps(d)
     if variant in ("degraded", "agent-run", "agent-budget", "no-evidence"):
         d = json.loads(_BODY_SETTINGS)
         d["ui"]["mode"] = "simple"

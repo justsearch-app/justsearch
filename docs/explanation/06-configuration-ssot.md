@@ -208,7 +208,13 @@ The optional `indexingPause` object in `ui/settings.json` records `paused`, `unt
 `core.indexing-pause` and `core.indexing-resume` operations use the accepted settings transaction,
 including its witness, conflict detection and keyed retry. The policy is applied before the indexing
 loop activates, and an expired deadline resumes on the next wall-clock read, including after sleep.
-Reset clears the pause. Corrupt-settings recovery starts paused so exclusions can be checked.
+Reset clears the pause and rules. Corrupt-settings recovery starts paused so exclusions can be checked.
+The optional `schedule` (`enabled`, unique ISO weekday `days` 1–7, `startMinute` and `endMinute`
+0–1439) and `pauseOnBattery` (absent means false) are part of the same policy. Disabled hours stay
+configured. `core.set-indexing-rules` atomically replaces both rules and preserves manual fields;
+Pause and Resume preserve the rules. Generic Settings keeps `indexingPause` read-only. Strict rule
+validation happens before token coercion or duplicate-key loss; malformed saved rules use the
+existing quarantine/recovery path. The envelope remains schema version 6.
 Older settings without the object load normally; an older app may discard it when saving.
 
 `operating.indexing` reports `PAUSING` until extraction, enrichment, picture reading and GPL have

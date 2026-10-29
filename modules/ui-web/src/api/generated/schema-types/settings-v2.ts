@@ -49,8 +49,15 @@ export interface SettingsV2 {
     hasSeenTrustLoopNudge?: boolean | null;
     highContrast?: boolean | null;
     indexingPause?: {
+      pauseOnBattery?: boolean;
       paused?: boolean;
       reason?: string | null;
+      schedule?: {
+        days?: number[] | null;
+        enabled?: boolean;
+        endMinute?: number;
+        startMinute?: number;
+      };
       untilEpochMs?: number | null;
     };
     inspectorWidth?: number | null;
@@ -103,8 +110,15 @@ export const settingsV2Schema = z.strictObject({
     "hasSeenTrustLoopNudge": z.boolean().nullable().optional(),
     "highContrast": z.boolean().nullable().optional(),
     "indexingPause": z.strictObject({
+      "pauseOnBattery": z.boolean().optional(),
       "paused": z.boolean().optional(),
       "reason": z.string().nullable().optional(),
+      "schedule": z.strictObject({
+        "days": z.array(z.number().int()).nullable().optional(),
+        "enabled": z.boolean().optional(),
+        "endMinute": z.number().int().optional(),
+        "startMinute": z.number().int().optional(),
+      }).optional(),
       "untilEpochMs": z.number().int().nullable().optional(),
     }).optional(),
     "inspectorWidth": z.number().int().nullable().optional(),
