@@ -1290,7 +1290,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     if (NativeTargets.current().hasCpuBaselineRuntime()
         || planIncludesChatRuntimeConsumer(plan, registry)) {
       updateState("running", "restore_runtime", "Restoring AI runtime...");
-      boolean bundledRuntimePresent = RuntimeRestoreUtil.ensureRuntimePresent(homeDir);
+      // A Linux pack supplies both first installation and repair of a deleted executable.
+      // Probing a stale saved path first would throw before acquisition could restore it.
+      boolean runtimeFromPlan = !NativeTargets.current().hasCpuBaselineRuntime()
+          && planSuppliesRuntime(plan, registry);
+      boolean bundledRuntimePresent = !runtimeFromPlan && RuntimeRestoreUtil.ensureRuntimePresent(homeDir);
       if (!runtimePreconditionMet(bundledRuntimePresent, plan, registry)) {
         fail(
             "RUNTIME_MISSING",
@@ -1396,10 +1400,12 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * selector than a tier mapping could be, because it is disk truth rather than plan truth.
    * {@code applySettings} falls out unless the chat GGUF is a regular file; {@code applyOrtNativePath}
    * unless the cuda12 dir holds every CUDA runtime DLL; and {@code applyCudaServerExe} unless the
-   * cuda12 llama-server binary exists. The ONNX settings step is deliberately a no-op during
+   * cuda12 llama-server binary and, on Linux, the selected chat model exist. The ONNX settings
+   * step is deliberately a no-op during
    * acquisition because those generation-bound paths belong to the separately approved recorded
-   * activation. So the core stage applies the ORT native path (its RUNTIME tier just delivered the
-   * DLLs) and silently does not apply the chat settings, while the chat stage applies them.
+   * activation. On Windows the core stage applies the ORT native path once its runtime DLLs
+   * arrive. Linux sessions discover the installed pack directly without changing process sources.
+   * Chat settings wait until the chat stage has delivered the model.
    * Re-running an already-applied step is a no-op by construction:
    * {@code setSysPropIfBlank} is first-writer-wins, and the settings writes are the same absolute
    * paths.
@@ -2063,7 +2069,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       io.justsearch.gpu.GpuCapabilities.Effective effective =
           new io.justsearch.app.services.gpu.GpuCapabilityResolver().snapshot().effective();
       if (effective.cuda() != null && Boolean.TRUE.equals(effective.cuda().functional())) {
-        cudaFunctional = true;
+        cudaFunctional = NativeTargets.current().hasCpuBaselineRuntime()
+            || (effective.driverVersionMajor() != null && effective.driverVersionMajor() >= 570);
       }
       if (effective.totalVramBytes() != null && effective.totalVramBytes() > 0) {
         vramBytes = effective.totalVramBytes();
@@ -2324,7 +2331,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    *     override was respected
    */
   private boolean applyCudaServerExe() {
-    if (!PlatformPaths.isWindows() || !gpuAccelerationAllowed()) return false;
+    if (!NativeTargets.current().supportsRuntimePacks() || !gpuAccelerationAllowed()) return false;
     Path cuda12Exe =
         homeDir
             .resolve("native-bin/llama-server/variants/cuda12")
@@ -2350,6 +2357,16 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     String absPath = cuda12Exe.toAbsolutePath().toString();
     UiSettings candidate = snapshot.settings();
     candidate.setServerExecutablePath(absPath);
+    // Linux acquires the executable in CORE, before CHAT acquires its model. A settings
+    // commit prepares the real generative owner, which must refuse that incomplete pair.
+    // Leave the run-scoped latch unset so a later stage retries once the model is present.
+    // Windows retains its bundled-runtime selection sequence.
+    if (PlatformPaths.isLinux()
+        && !Files.isRegularFile(io.justsearch.app.inference.InferenceConfig.forPlanning(
+            ConfigStoreRebuilder.prepare(candidate), homeDir).modelPath())) {
+      log.debug("Deferring downloaded llama-server selection until the chat model is present");
+      return false;
+    }
     commitSettings(candidate, snapshot.witness(), "ai-install-server-selection");
     log.info("alpha.15: server.exe set to cuda12 variant: {}", absPath);
     return true;
@@ -2371,7 +2388,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     var result = io.justsearch.app.api.settings.SettingsCandidateContext.NONE.equals(candidateContext)
         ? settingsService.applyInternal(candidate, witness, context)
         : settingsService.applyInternal(candidate, witness, context, candidateContext);
-    if (!result.response().success()) throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
+    if (!result.response().success()) {
+      log.warn("AI install settings refused: producer={}, code={}, details={}",
+          producer, result.response().errorCode().orElse(null), result.response().errorDetails());
+      throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
+    }
     if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
       throw new IllegalStateException("Settings commitment is unresolved");
     }
@@ -2412,6 +2433,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    */
   private boolean applyOrtNativePath() {
     if (!gpuAccelerationAllowed()) return false;
+    // Linux sessions resolve the downloaded pack directly. Mutating a restart-required
+    // process source here would fence every later settings/activation commit in this run.
+    if (PlatformPaths.isLinux()) return false;
     Path cuda12Dir = homeDir.resolve("native-bin/llama-server/variants/cuda12");
     return writeOrtNativePathSysprop(cuda12Dir);
   }

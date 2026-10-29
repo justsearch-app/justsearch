@@ -59,16 +59,41 @@ public final class ModelRegistryLoader {
       throw new IllegalStateException(
           "Unsupported registry schema version: " + raw.schemaVersion + " (expected 2)");
     }
+    // Native replacements have distinct identities. Resolve them before dependency lookup,
+    // so Windows keeps precisely its existing packages and persisted package ids stay stable.
+    var replacements = new java.util.HashMap<String, String>();
+    var ids = new java.util.HashSet<String>();
+    if (raw.packages != null) {
+      for (RawPackage pkg : raw.packages) {
+        if (!ids.add(pkg.id)) throw new IllegalStateException("Duplicate package id: " + pkg.id);
+        if (pkg.nativeTarget != null) io.justsearch.configuration.NativeTargets.forTarget(pkg.nativeTarget);
+        if (pkg.replaces != null && (pkg.replaces.equals(pkg.id) || pkg.nativeTarget == null
+            || CapabilityTier.fromId(pkg.tier) != CapabilityTier.RUNTIME)) {
+          throw new IllegalStateException("Invalid native runtime replacement: " + pkg.id);
+        }
+        if (pkg.replaces != null
+            && io.justsearch.configuration.NativeTargets.current().targetId().equals(pkg.nativeTarget)) {
+          if (replacements.put(pkg.replaces, pkg.id) != null) {
+            throw new IllegalStateException("Duplicate native replacement: " + pkg.replaces);
+          }
+        }
+      }
+    }
+    for (String replaced : replacements.keySet()) {
+      if (!ids.contains(replaced)) throw new IllegalStateException("Missing replaced package: " + replaced);
+    }
     List<ModelPackage> packages = new ArrayList<>();
     if (raw.packages != null) {
       for (RawPackage rp : raw.packages) {
-        packages.add(convertPackage(rp));
+        if (replacements.containsKey(rp.id)
+            || (rp.replaces != null && !replacements.containsValue(rp.id))) continue;
+        packages.add(convertPackage(rp, replacements));
       }
     }
     return new ModelRegistry(raw.schemaVersion, raw.purpose, packages);
   }
 
-  private static ModelPackage convertPackage(RawPackage rp) {
+  private static ModelPackage convertPackage(RawPackage rp, java.util.Map<String, String> replacements) {
     List<ModelVariant> variants = new ArrayList<>();
     if (rp.variants != null) {
       for (RawVariant rv : rp.variants) {
@@ -120,7 +145,7 @@ public final class ModelRegistryLoader {
     // dependsOn: optional, absent ⇒ no declared dependency. Deliberately NOT fail-closed the other
     // way (inventing an edge nobody declared would skip packages the registry wants installed); the
     // H1 invariant it makes checkable is asserted against the shipped registry, not defaulted in.
-    List<String> dependsOn = rp.dependsOn == null ? List.of() : List.copyOf(rp.dependsOn);
+    List<String> dependsOn = rp.dependsOn == null ? List.of() : rp.dependsOn.stream().map(id -> replacements.getOrDefault(id, id)).toList();
     return new ModelPackage(
         rp.id,
         rp.label,
@@ -160,7 +185,8 @@ public final class ModelRegistryLoader {
       Boolean devOnly,
       String necessity,
       List<String> dependsOn,
-      String nativeTarget) {}
+      String nativeTarget,
+      String replaces) {}
 
   private record RawVariant(
       String filename,

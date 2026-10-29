@@ -73,4 +73,24 @@ class HeadlessAppServerAutoSelectionTest {
       io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(previous);
     }
   }
+  @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void linuxRestartFindsDownloadedRuntimeAndRespectsOperatorSelection() throws Exception {
+    String previous = System.getProperty("justsearch.data.dir");
+    try {
+      System.setProperty("justsearch.data.dir", directory.toString());
+      Path exe = directory.resolve("native-bin/llama-server/variants/cuda12/llama-server");
+      Files.createDirectories(exe.getParent());
+      Files.writeString(exe, "#!/bin/sh\nexit 0\n");
+      assertTrue(exe.toFile().setExecutable(true, true));
+      var builder = ResolvedConfig.builder().putDefault("justsearch.gpu.layers", "99");
+      assertEquals(exe, HeadlessApp.maybeAutoSelectCuda12Variant(new UiSettings(), new ConfigStore(builder.build())));
+      builder.put("justsearch.server.exe", 400, "env_var", "JUSTSEARCH_SERVER_EXE", "/operator/server");
+      assertNull(HeadlessApp.maybeAutoSelectCuda12Variant(new UiSettings(), new ConfigStore(builder.build())));
+    } finally {
+      if (previous == null) System.clearProperty("justsearch.data.dir");
+      else System.setProperty("justsearch.data.dir", previous);
+    }
+  }
+
 }

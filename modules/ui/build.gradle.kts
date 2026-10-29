@@ -157,6 +157,10 @@ tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUni
 }
 
 tasks.withType<Test>().configureEach {
+  inputs.property("linuxGpuPackDir", providers.environmentVariable("JUSTSEARCH_LINUX_GPU_PACK_DIR").orElse(""))
+  providers.environmentVariable("JUSTSEARCH_LINUX_GPU_PACK_DIR").orNull?.let {
+    inputs.dir(it)
+  }
   systemProperty("prism.allowhidpi", "false")
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   // Tempdoc 771 item (b): forward the entity-carriage metric's corpus input to the test JVM. Unset

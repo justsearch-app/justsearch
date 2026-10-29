@@ -43,6 +43,8 @@ class RuntimeLinuxDeactivationTest {
       try (var fixture = new RuntimeIntentTestFixture(root.resolve("intent"), settings, config);
           var owner = new RuntimeActivationService(executors, OnlineAiService.unavailable(), settings,
               null, null, null, null, null, null, new SettingsServiceImpl(settings, fixture.runner()))) {
+        assertTrue(owner.getStatus().installedVariants().stream()
+            .anyMatch(v -> v.variantId().equals("default") && v.exePath().equals(exe.toString())));
         var terminal = owner.startDeactivate().completion().toCompletableFuture().get(5, TimeUnit.SECONDS);
         assertEquals("completed", terminal.state, terminal.errorCode + ": " + terminal.message);
         assertTrue(terminal.message.contains("unavailable"), terminal.message);
