@@ -327,11 +327,6 @@ UIA = r"""
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
-# Managed UIA does not register its Win32 proxies in this PowerShell host.
-# Without them standard Edit/Button controls are opaque Panes with no patterns.
-$proxyPath=Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'WPF/UIAutomationClientsideProviders.dll'
-$proxies=[Reflection.Assembly]::LoadFrom($proxyPath)
-[System.Windows.Automation.ClientSettings]::RegisterClientSideProviderAssembly($proxies.GetName())
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -441,7 +436,7 @@ if ([QualWindow]::GetForegroundWindow().ToInt64() -ne $a.window.handle) {throw '
                 if process:
                     return dict(window, process=process)
         window = wait_for(picker, 'System folder picker belonging to the installed app', seconds=30, error=ProductFailure)
-        # Operate the real common-item dialog using its UIA Value/Invoke patterns.
+        # Identify and focus the real common-item dialog through UI Automation.
         payload = base64.b64encode(json.dumps({'window': window, 'folder': folder,
             'diagnostics':str(self.evidence / 'J2-picker-controls.json')}).encode()).decode()
         result = ps_json(UIA + r"""
@@ -456,13 +451,18 @@ $controls=@($entries | ForEach-Object {@{name=$_.Current.Name;automationId=$_.Cu
 $edit=@($entries | Where-Object {$_.Current.AutomationId -eq '1152' -and $_.Current.ClassName -eq 'Edit'})
 $button=@($entries | Where-Object {$_.Current.AutomationId -eq '1' -and $_.Current.ClassName -eq 'Button'})
 if ($edit.Count -ne 1 -or $button.Count -ne 1) {throw 'Unique native folder picker controls unavailable; see J2-picker-controls.json'}
-$value=$edit[0].GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-$value.SetValue($a.folder)
-$observed=$value.Current.Value
-if ($observed -cne $a.folder) {throw 'Folder picker did not accept the requested path'}
-$button[0].GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-@{handle=$a.window.handle;pid=$a.window.pid;value=$observed;invoked=$true}
+$edit[0].SetFocus()
+$focus=[System.Windows.Automation.AutomationElement]::FocusedElement
+if($focus.Current.NativeWindowHandle -ne $edit[0].Current.NativeWindowHandle) {throw 'Native folder field did not receive UIA focus'}
+@{handle=$a.window.handle;pid=$a.window.pid;editHandle=$edit[0].Current.NativeWindowHandle;focused=$true;requestedPath=$a.folder}
 """)
+        # Win32 controls in this guest expose UIA identity/focus but no Value or
+        # Invoke patterns. Deliver real keyboard input only after the UIA field
+        # and exact dialog process/window have been identified.
+        keys = ''.join('{'+c+'}' if c in '+^%~()[]{}' else c for c in folder)
+        self.send(window, '^a' + keys)
+        self.send(window, '{ENTER}')
+        result['keyboardSubmitted'] = True
         self.shot('J2-folder-picker-submitted')
         return result
 
