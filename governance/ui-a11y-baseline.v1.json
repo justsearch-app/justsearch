@@ -265,6 +265,156 @@
       "surface": "search",
       "uiShotStep": "chat-structured-light",
       "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-normal-dark",
+      "uiShotStep": "sv3-recents-hero-normal-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-normal-light",
+      "uiShotStep": "sv3-recents-hero-normal-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-normal-forced",
+      "uiShotStep": "sv3-recents-hero-normal-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-narrow-dark",
+      "uiShotStep": "sv3-recents-hero-narrow-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-narrow-light",
+      "uiShotStep": "sv3-recents-hero-narrow-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-narrow-forced",
+      "uiShotStep": "sv3-recents-hero-narrow-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-normal-dark",
+      "uiShotStep": "sv3-recents-docked-normal-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-normal-light",
+      "uiShotStep": "sv3-recents-docked-normal-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-normal-forced",
+      "uiShotStep": "sv3-recents-docked-normal-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-narrow-dark",
+      "uiShotStep": "sv3-recents-docked-narrow-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-narrow-light",
+      "uiShotStep": "sv3-recents-docked-narrow-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-narrow-forced",
+      "uiShotStep": "sv3-recents-docked-narrow-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-1280x720-dark",
+      "uiShotStep": "sv3-recents-hero-1280x720-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-1280x720-light",
+      "uiShotStep": "sv3-recents-hero-1280x720-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-1280x720-forced",
+      "uiShotStep": "sv3-recents-hero-1280x720-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-760x720-dark",
+      "uiShotStep": "sv3-recents-hero-760x720-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-760x720-light",
+      "uiShotStep": "sv3-recents-hero-760x720-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-760x720-forced",
+      "uiShotStep": "sv3-recents-hero-760x720-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-600x400-dark",
+      "uiShotStep": "sv3-recents-hero-600x400-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-600x400-light",
+      "uiShotStep": "sv3-recents-hero-600x400-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-hero-600x400-forced",
+      "uiShotStep": "sv3-recents-hero-600x400-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-1280x720-dark",
+      "uiShotStep": "sv3-recents-docked-1280x720-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-1280x720-light",
+      "uiShotStep": "sv3-recents-docked-1280x720-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-1280x720-forced",
+      "uiShotStep": "sv3-recents-docked-1280x720-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-760x720-dark",
+      "uiShotStep": "sv3-recents-docked-760x720-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-760x720-light",
+      "uiShotStep": "sv3-recents-docked-760x720-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-760x720-forced",
+      "uiShotStep": "sv3-recents-docked-760x720-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-600x400-dark",
+      "uiShotStep": "sv3-recents-docked-600x400-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-600x400-light",
+      "uiShotStep": "sv3-recents-docked-600x400-light",
+      "knownRules": []
+    },
+    {
+      "surface": "sv3-recents-docked-600x400-forced",
+      "uiShotStep": "sv3-recents-docked-600x400-forced",
+      "knownRules": []
     }
   ]
 }
