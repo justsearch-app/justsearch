@@ -169,25 +169,47 @@ class WindowsOperationalTests(unittest.TestCase):
             native.key('escape')
             send.assert_called_once_with(owned, '{ESC}')
 
-    def test_picker_keys_follow_uia_focus_and_refuse_an_unowned_dialog(self):
+    def test_native_com_picker_uses_exact_value_and_refuses_unowned_or_unaccepted_input(self):
         with tempfile.TemporaryDirectory() as temp:
             target=Mock(app_binary=r'C:\app\JustSearch.exe')
-            target.owned.return_value=[process()]
+            target.owned.return_value=[process()];target.alive.return_value=[process()]
             native=windows.Native(target,Path(temp))
             window={'pid':50,'handle':200,'class':'#32770'}
+            client=Mock();module=Mock()
+            client.ElementFromHandle.return_value=Mock(CurrentProcessId=50,CurrentNativeWindowHandle=200,CurrentClassName='#32770')
+            edit=Mock(CurrentName='',CurrentAutomationId='1152',CurrentClassName='Edit',CurrentControlType=50033,
+                      CurrentNativeWindowHandle=201,CurrentProcessId=50,CurrentIsEnabled=True)
+            button=Mock(CurrentName='Select Folder',CurrentAutomationId='1',CurrentClassName='Button',CurrentControlType=50033,
+                        CurrentNativeWindowHandle=202,CurrentProcessId=50,CurrentIsEnabled=True)
             folder=r'C:\folder+name{one}'
+            value=edit.GetCurrentPattern.return_value.QueryInterface.return_value;value.CurrentValue=folder
+            invoke=button.GetCurrentPattern.return_value.QueryInterface.return_value
             with patch.object(native,'windows',return_value=[dict(window,pid=99),window]), \
-                 patch.object(windows,'wait_for',once),patch.object(windows,'ps_json',return_value={'focused':True}) as focus, \
-                 patch.object(native,'send') as send,patch.object(native,'shot'):
+                 patch.object(windows,'wait_for',once),patch.object(native,'automation',return_value=(client,module)), \
+                 patch.object(native,'descendants',return_value=[edit,button]),patch.object(native,'shot'):
                 result=native.select_folder(folder)
-            self.assertTrue(result['keyboardSubmitted'])
-            self.assertIn('SetFocus()',focus.call_args.args[0])
-            self.assertEqual([c.args[1] for c in send.call_args_list],[r'^aC:\folder{+}name{{}one{}}','{ENTER}'])
-            self.assertTrue(all(c.args[0]['process']==process() for c in send.call_args_list))
+                self.assertTrue(result['invoked']);self.assertEqual(result['value'],folder)
+                value.SetValue.assert_called_once_with(folder);invoke.Invoke.assert_called_once()
+                self.assertGreaterEqual(client.ElementFromHandle.call_count,2)
+                invoke.Invoke.reset_mock();value.CurrentValue='wrong path'
+                with self.assertRaisesRegex(Infrastructure,'did not accept'):native.select_folder(folder)
+                invoke.Invoke.assert_not_called()
             with patch.object(native,'windows',return_value=[dict(window,pid=99)]), \
-                 patch.object(windows,'wait_for',once),patch.object(windows,'ps_json') as focus,patch.object(native,'send') as send:
+                 patch.object(windows,'wait_for',once),patch.object(native,'automation') as automation:
                 with self.assertRaises(ProductFailure):native.select_folder(folder)
-            focus.assert_not_called();send.assert_not_called()
+            automation.assert_not_called()
+
+    def test_native_com_element_refuses_stale_process_and_reused_window(self):
+        native=windows.Native(Mock(),Path('unused'))
+        window={'pid':50,'handle':200,'class':'#32770','process':process()}
+        with patch.object(native,'automation') as automation:
+            native.target.alive.return_value=[]
+            with self.assertRaisesRegex(Infrastructure,'process identity'):native.element(window)
+            automation.assert_not_called()
+            native.target.alive.return_value=[process()]
+            client=Mock();automation.return_value=(client,Mock())
+            client.ElementFromHandle.return_value=Mock(CurrentProcessId=99,CurrentNativeWindowHandle=200,CurrentClassName='#32770')
+            with self.assertRaisesRegex(Infrastructure,'window identity'):native.element(window)
 
     def test_default_viewer_needs_exact_argv_path_image_new_lifetime_and_window(self):
         image = r'C:\Qual\viewer\notepad++.exe'

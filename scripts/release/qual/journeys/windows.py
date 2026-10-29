@@ -354,6 +354,34 @@ $all = [System.Windows.Automation.Condition]::TrueCondition
 class Native:
     def __init__(self, target, evidence):
         self.target, self.evidence = target, evidence
+        self._automation = None
+
+    def automation(self):
+        if self._automation is None:
+            # Use the native COM client. The legacy managed UIA provider reports
+            # standard Win32 controls as opaque panes in this Windows guest.
+            sys.coinit_flags = 0
+            import comtypes.client
+            module = comtypes.client.GetModule(str(Path(os.environ['WINDIR']) / 'System32/UIAutomationCore.dll'))
+            client = comtypes.client.CreateObject(module.CUIAutomation, interface=module.IUIAutomation)
+            self._automation = client, module
+        return self._automation
+
+    def element(self, window):
+        process = window['process']
+        if not self.target.alive([process]):
+            raise Infrastructure('Native UIA target process identity changed')
+        client, _ = self.automation()
+        element = client.ElementFromHandle(window['handle'])
+        if (element.CurrentProcessId != process['pid'] or element.CurrentNativeWindowHandle != window['handle']
+                or element.CurrentClassName != window['class']):
+            raise Infrastructure('Native UIA target window identity changed')
+        return element
+
+    def descendants(self, window):
+        client, module = self.automation()
+        elements = self.element(window).FindAll(module.TreeScope_Descendants, client.CreateTrueCondition())
+        return [elements.GetElement(i) for i in range(elements.Length)]
 
     def windows(self):
         rows = ps_json(UIA + r"""
@@ -436,33 +464,31 @@ if ([QualWindow]::GetForegroundWindow().ToInt64() -ne $a.window.handle) {throw '
                 if process:
                     return dict(window, process=process)
         window = wait_for(picker, 'System folder picker belonging to the installed app', seconds=30, error=ProductFailure)
-        # Identify and focus the real common-item dialog through UI Automation.
-        payload = base64.b64encode(json.dumps({'window': window, 'folder': folder,
-            'diagnostics':str(self.evidence / 'J2-picker-controls.json')}).encode()).decode()
-        result = ps_json(UIA + r"""
-$a=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('""" + payload + r"""')) | ConvertFrom-Json
-$p=Get-CimInstance Win32_Process -Filter "ProcessId=$($a.window.process.pid)"
-if (!$p -or ([Diagnostics.Process]::GetProcessById($p.ProcessId)).StartTime.ToUniversalTime().ToString('o') -cne $a.window.process.created -or $p.ExecutablePath -ine $a.window.process.exe) {throw 'Folder picker process identity changed'}
-$w=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$a.window.handle)
-if ($w.Current.ProcessId -ne $a.window.pid -or $w.Current.ClassName -ne '#32770') {throw 'Folder picker identity changed'}
-$entries=@($w.FindAll($descendants,$all))
-$controls=@($entries | ForEach-Object {@{name=$_.Current.Name;automationId=$_.Current.AutomationId;type=$_.Current.ControlType.ProgrammaticName;class=$_.Current.ClassName;handle=$_.Current.NativeWindowHandle;patterns=@($_.GetSupportedPatterns() | ForEach-Object {$_.ProgrammaticName})}})
-[IO.File]::WriteAllText($a.diagnostics,($controls | ConvertTo-Json -Depth 5))
-$edit=@($entries | Where-Object {$_.Current.AutomationId -eq '1152' -and $_.Current.ClassName -eq 'Edit'})
-$button=@($entries | Where-Object {$_.Current.AutomationId -eq '1' -and $_.Current.ClassName -eq 'Button'})
-if ($edit.Count -ne 1 -or $button.Count -ne 1) {throw 'Unique native folder picker controls unavailable; see J2-picker-controls.json'}
-$edit[0].SetFocus()
-$focus=[System.Windows.Automation.AutomationElement]::FocusedElement
-if($focus.Current.NativeWindowHandle -ne $edit[0].Current.NativeWindowHandle) {throw 'Native folder field did not receive UIA focus'}
-@{handle=$a.window.handle;pid=$a.window.pid;editHandle=$edit[0].Current.NativeWindowHandle;focused=$true;requestedPath=$a.folder}
-""")
-        # Win32 controls in this guest expose UIA identity/focus but no Value or
-        # Invoke patterns. Deliver real keyboard input only after the UIA field
-        # and exact dialog process/window have been identified.
-        keys = ''.join('{'+c+'}' if c in '+^%~()[]{}' else c for c in folder)
-        self.send(window, '^a' + keys)
-        self.send(window, '{ENTER}')
-        result['keyboardSubmitted'] = True
+        client, module = self.automation()
+        controls = self.descendants(window)
+        (self.evidence / 'J2-picker-controls.json').write_text(json.dumps([
+            {'name': e.CurrentName, 'automationId': e.CurrentAutomationId, 'class': e.CurrentClassName,
+             'type': e.CurrentControlType, 'handle': e.CurrentNativeWindowHandle,
+             'valuePattern': bool(e.GetCurrentPropertyValue(module.UIA_IsValuePatternAvailablePropertyId)),
+             'invokePattern': bool(e.GetCurrentPropertyValue(module.UIA_IsInvokePatternAvailablePropertyId))}
+            for e in controls], indent=2))
+        edits = [e for e in controls if e.CurrentAutomationId == '1152' and e.CurrentClassName == 'Edit']
+        buttons = [e for e in controls if e.CurrentAutomationId == '1' and e.CurrentClassName == 'Button']
+        if len(edits) != 1 or len(buttons) != 1:
+            raise Infrastructure('Unique native picker controls unavailable; see J2-picker-controls.json')
+        edit, button = edits[0], buttons[0]
+        if any(e.CurrentProcessId != window['process']['pid'] or not e.CurrentIsEnabled for e in (edit, button)):
+            raise Infrastructure('Native picker control owner/enabled state differs')
+        value = edit.GetCurrentPattern(module.UIA_ValuePatternId).QueryInterface(module.IUIAutomationValuePattern)
+        self.element(window) # Revalidate lifetime/window immediately before input.
+        value.SetValue(folder)
+        if value.CurrentValue != folder:
+            raise Infrastructure('Native picker did not accept the requested path')
+        invoke = button.GetCurrentPattern(module.UIA_InvokePatternId).QueryInterface(module.IUIAutomationInvokePattern)
+        self.element(window)
+        invoke.Invoke()
+        result = {'handle':window['handle'], 'pid':window['pid'], 'value':folder, 'invoked':True,
+                  'interface':'IUIAutomation', 'editHandle':edit.CurrentNativeWindowHandle}
         self.shot('J2-folder-picker-submitted')
         return result
 

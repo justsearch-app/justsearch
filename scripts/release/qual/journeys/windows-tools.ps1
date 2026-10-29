@@ -30,7 +30,7 @@ if (!(Test-Path $python)) {
  & $base -m venv C:/Qual/Python
  if($LASTEXITCODE) {throw 'Qualification Python venv failed'}
 }
-& $python -m pip install --disable-pip-version-check Pillow==11.3.0
+& $python -m pip install --disable-pip-version-check Pillow==11.3.0 comtypes==1.4.13
 if($LASTEXITCODE) {throw 'Qualification Pillow install failed'}
 if ($hosted) {
  # The hosted machine belongs to this job. Remove its known developer JDKs,

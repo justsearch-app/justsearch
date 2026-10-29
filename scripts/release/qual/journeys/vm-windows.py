@@ -264,6 +264,7 @@ def prepare_setup(args, out, source=None):
         stage_inputs(args, out, source)
         guest_ps('& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Qual/journeys/windows-cache-tools.ps1; if($LASTEXITCODE){throw "Qualification client cache failed"}', timeout=600)
         copy_out('C:/Qual/inspector-cache.json', out / 'inspector-cache.json')
+        copy_out('C:/Qual/uia-client.json', out / 'uia-client.json')
         if args.mirror:
             if guest_ps('Test-Path C:/Qual/mirror/server.json') != 'True':
                 vm.mirror('windows', str(args.mirror))
