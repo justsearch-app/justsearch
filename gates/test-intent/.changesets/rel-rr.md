@@ -119,3 +119,14 @@ It comes from the shared clone at e9d569f1b0 with only the candidate test file o
 ## Acceptance records
 
 Independent verification pending.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-rel-rr-verifier-20261029",
+  "verdict": "accept",
+  "digest": "sha256:ef81ec88851f742a385689323abe91eb0eebf0e95740548c2a165d1c293ba8ef",
+  "note": "Accepted: six CPU readiness cases fail before and pass after; eight preservation cases pass both. Independent full worker suites and CPU dev-stack API/UI/reload checks confirm the intended status correction. The runner patch reproduces the recorded evidence producer digest."
+}
+```
