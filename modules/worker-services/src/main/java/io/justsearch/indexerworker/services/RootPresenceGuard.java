@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The prune-side authority for "this root still vouches for absence" (task t-20261013-ef3c41).
+ * The prune-side authority for "this root still vouches for absence" (#758).
  *
  * <p>A file reported "not found" is evidence of deletion only while the root that holds it is the
  * same, present, listable directory. This guard captures the root's native identity (volume serial

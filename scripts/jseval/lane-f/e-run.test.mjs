@@ -296,7 +296,7 @@ test('wire failures, actual idle refusals, and reason-coded scripted ceilings ar
   projectLoad(r, windowLoad(), [{ status: 429, code: 'ADMISSION_ENGINE_LIMIT', retrySafe: true, retryAfter: '1' }], values);
   assert.equal(r.clauses['scripted-rejections'], false);
 });
-// Task t-20261005-b6d536, FP11: full inference threads and queue answer 429
+// #759: full inference threads and queue answer 429
 // ADMISSION_INFERENCE_BUSY mid-request, which is a legal refusal only without a safe-replay promise.
 test('an inference-busy 429 is a legal wire refusal only when it never promises a safe replay', () => {
   const r = record('main'); r.workload = 'agent-idle'; r.gaps = {};
