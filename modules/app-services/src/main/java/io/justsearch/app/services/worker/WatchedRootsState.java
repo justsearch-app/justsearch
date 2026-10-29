@@ -255,7 +255,7 @@ public final class WatchedRootsState {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 5 (S8): the Worker refused a sync of this root with the
+   * #758: the Worker refused a sync of this root with the
    * root-level {@code reason} (the folder at its path is not the volume it was first seen on).
    * The root reads unavailable at once; its last-indexed time is kept. Returns whether the state
    * changed.

@@ -58,11 +58,11 @@ final class RootLifecycleOps {
     static final String ROOT_MISSING_REASON = "ROOT_NOT_DIRECTORY";
 
     /**
-     * Task t-20261013-ef3c41, round 8 (refined decision 2): the unavailable reason of a root whose
+     * #758: the unavailable reason of a root whose
      * drive the Worker could not confirm after an upgrade; the same text the Worker answers with
      * ({@code WorkerIngestService.ROOT_UNCONFIRMED_AFTER_UPGRADE}). Shown verbatim. No module both
      * sides use holds the root reason codes, so the text is kept in both; a change to one must be
-     * made to the other (round 8b, decision 7).
+     * made to the other.
      */
     static final String ROOT_UNCONFIRMED_REASON = ROOT_MISSING_REASON + ": drive not confirmed after upgrade";
 
@@ -128,7 +128,7 @@ final class RootLifecycleOps {
         }
 
         /**
-         * Task t-20261013-ef3c41, round 8: the watch registration of the person's add, carrying the
+         * #758: the watch registration of the person's add, carrying the
          * add marker that alone records the root's volume on the Worker.
          */
         default void watchAdded(String rootPath, String collection, EngineContext engineContext,
@@ -167,7 +167,7 @@ final class RootLifecycleOps {
                 java.util.function.Consumer<ScanRootProgress> progressConsumer, EngineContext engineContext);
 
         /**
-         * Task t-20261013-ef3c41, round 8: the walk of the person's add, carrying the add marker
+         * #758: the walk of the person's add, carrying the add marker
          * that alone records the root's volume on the Worker.
          */
         default ScanRootProgress scanAdded(
@@ -254,7 +254,7 @@ final class RootLifecycleOps {
     }
 
     /**
-     * Task t-20261013-ef3c41 (S8): a folder that exists but cannot be listed (access denied, a share
+     * #758: a folder that exists but cannot be listed (access denied, a share
      * that answers metadata but not enumeration) is just as unavailable to indexing as a missing
      * one, and its documents are kept; it shows the same single root-level "unavailable" state
      * instead of reading as indexed while its files fail one by one.
@@ -337,7 +337,7 @@ final class RootLifecycleOps {
         try {
             java.util.function.Consumer<ScanRootProgress> progressConsumer =
                     progress -> admittedTotal[0] = progress.getFilesAdmitted();
-            // Task t-20261013-ef3c41, round 8: only the person's add carries the add marker.
+            // #758: only the person's add carries the add marker.
             ScanRootProgress terminal = rootAdded
                     ? scanRootFn.scanAdded(normalized.toString(), collection, mode, excludeGlobs,
                             progressConsumer, engineContext)
@@ -662,7 +662,7 @@ final class RootLifecycleOps {
      * Clears all watched roots — stops watchers, clears state, persists empty. Used by profiling
      * reset, after the Worker's deleteAll emptied the index.
      *
-     * <p>Task t-20261013-ef3c41, round 8: a reset that removes roots removes each one exactly as
+     * <p>#758: a reset that removes roots removes each one exactly as
      * the person's removal does, so the Worker drops its volume record, its pending upgrade
      * seeding, its held watch and watcher state, and any deferred boot state of the root. Each
      * declaration is removed independently; the Worker then clears any worker-only roots.

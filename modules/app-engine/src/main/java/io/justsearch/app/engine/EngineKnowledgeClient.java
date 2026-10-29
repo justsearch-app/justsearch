@@ -1341,8 +1341,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   /**
    * One accepted child on the existing bounded walker; completion means both owned tasks exited.
    * The request was just made by a person or an agent: an explicit ingest is a deliberate add, so
-   * it carries the add marker and records its folder's volume (task t-20261013-ef3c41, round 8b,
-   * decision 1).
+   * it carries the add marker and records its folder's volume (#758).
    */
   CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation) {
@@ -1477,7 +1476,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
                   ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
           if (!root.singleFile()) {
-            // Task t-20261013-ef3c41, round 6 (S8): the reindex walk records a root-level refusal
+            // #758: the reindex walk records a root-level refusal
             // as the root's state at once, as the boot walk does, instead of leaving it to read
             // indexed until the periodic sync asks.
             roots.recordRecordedWalk(root.path(),

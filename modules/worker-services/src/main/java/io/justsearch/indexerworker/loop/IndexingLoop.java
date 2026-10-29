@@ -416,7 +416,7 @@ public class IndexingLoop implements Closeable {
     if (commitOps != null) {
       commitOps.setCommitCompletedListener(embeddingLifecycle::refreshStoredFingerprintAfterCommit);
     }
-    // Task t-20261013-ef3c41: lets an unreadable source be reported as "indexed, source
+    // #758: lets an unreadable source be reported as "indexed, source
     // unreadable". Read-only; never part of a deletion decision.
     if (documentFieldOps != null) {
       ingestionAuthority.useIndexedSourceProbe(
@@ -1185,7 +1185,7 @@ public class IndexingLoop implements Closeable {
    * removed from IndexingLoop's surface.
    */
   /**
-   * Task t-20261013-ef3c41, round 4: every deletion decision this loop makes (admission, freshness,
+   * #758: every deletion decision this loop makes (admission, freshness,
    * re-hash, pre-write) asks {@code check} whether the source's root still vouches for absence.
    */
   /** Bind watched-root policy scope for already queued work. */

@@ -197,13 +197,13 @@ public final class PruneOps {
   /**
    * Prunes documents under {@code pathPrefix} whose backing files are confirmed absent.
    *
-   * <p>"Confirmed absent" (task t-20261013-ef3c41): the path is reported not found, the nearest
+   * <p>"Confirmed absent" (#758): the path is reported not found, the nearest
    * folder above it that exists can be listed ({@link PathPresence#absentBeneathListableFolder}),
    * and the root was present, the same root, before and after that observation. Absent candidates
    * are collected per batch and only removed after {@link PresenceGuard#rootCurrent()} passes
    * immediately before they are applied, so a drive unplugged or a share dropped mid-batch removes
    * nothing. A document whose presence cannot be established ({@link PathPresence#UNKNOWN}) is
-   * kept and the rest are still judged (round 4: one unreadable subfolder must not stop the
+   * kept and the rest are still judged (one unreadable subfolder must not stop the
    * genuine deletions beside it); the run then ends {@link Completion#INCOMPLETE} with the count of
    * kept documents. The first such document of a batch re-checks the root at once: a root that no
    * longer vouches ends the run there, discarding that batch's candidates. A batch in which every

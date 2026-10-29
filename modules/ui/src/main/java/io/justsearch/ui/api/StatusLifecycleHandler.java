@@ -1807,8 +1807,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // additionally says the Worker has stopped trying to fix it by itself, which is the more
     // actionable of the two.
     if ("BLOCKED_REBUILD_BRAKE".equals(compat.indexSchemaCompatState())) {
-      // Task t-20261013-ef3c41: the Worker names WHY the brake holds in reindexRequiredReason. A
-      // lost state record (round 3) is an unreadable brake whose detail says the record was gone.
+      // #758: the Worker names WHY the brake holds in reindexRequiredReason. A
+      // lost state record is an unreadable brake whose detail says the record was gone.
       String why = compat.reindexRequiredReason();
       return "rebuild_brake_unreadable".equals(why) || "rebuild_brake_state_lost".equals(why)
           ? LifecycleReasonCode.INDEX_REBUILD_BRAKE_UNREADABLE.code()
@@ -2067,7 +2067,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         // documents with no chunks is genuinely pending work (keep NOT_READY), and chunks without
         // parents is an inconsistency we must not hide. Mirrors VISUAL_TEXT_EXTRACTION below, which
         // already reports READY when its needed-count is zero.
-        // Task t-20261013-ef3c41: an index the Worker could not count is not an empty one, so the
+        // #758: an index the Worker could not count is not an empty one, so the
         // exemption needs a document count that was actually read as 0.
         if (workerView.enrichment().chunk().chunkDocCount() == 0
             && workerView.core().indexedDocuments() == 0

@@ -187,7 +187,7 @@ public final class JobBatchExtractor {
   }
 
   /**
-   * Whether the index is known to hold no documents. Task t-20261013-ef3c41: {@code docCount()}
+   * Whether the index is known to hold no documents. #758: {@code docCount()}
    * answers 0 when the reader cannot be read, which made an unreadable index "empty" and skipped
    * the unchanged-file check for the whole batch — every file re-extracted and rewritten. Only a
    * count that was actually read as 0 makes the index empty; an unreadable one keeps the check.

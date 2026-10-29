@@ -24,8 +24,8 @@ final class WorkerIngestionAuthority {
   }
 
   /**
-   * The root-identity check every admission and deletion decision here asks (task
-   * t-20261013-ef3c41, rounds 4 and 5). Until the Worker's service wires its persistent one in, an
+   * The root-identity check every admission and deletion decision here asks (#758). Until the
+   * Worker's service wires its persistent one in, an
    * in-memory one remembers the volume of each root this authority has admitted a source under.
    */
   private volatile SourcePresence.RootCheck rootCheck =
@@ -80,7 +80,7 @@ final class WorkerIngestionAuthority {
               "Skipped by ingestion or user exclusion policy"));
     }
 
-    // Task t-20261013-ef3c41: "cannot read it" is never "it is gone". The snapshot is taken first
+    // #758: "cannot read it" is never "it is gone". The snapshot is taken first
     // (no links followed); a failure is classified, and only a confirmed absence — not found while
     // the root that holds it is present — retires the source and its indexed content.
     FileFreshnessSnapshot freshness;
@@ -123,7 +123,7 @@ final class WorkerIngestionAuthority {
         return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
             sourceUnreadable(filePath, null));
       }
-      // Task t-20261013-ef3c41 (S9): a file replaced by a folder or a link (dangling or not) is no
+      // #758: a file replaced by a folder or a link (dangling or not) is no
       // longer the indexed source. Its old text is retired instead of staying searchable forever;
       // the walks never follow links, so nothing is indexed in its place.
       return SourceAdmission.terminal(

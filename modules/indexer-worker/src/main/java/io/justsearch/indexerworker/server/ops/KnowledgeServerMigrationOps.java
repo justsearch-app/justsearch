@@ -1986,7 +1986,7 @@ public final class KnowledgeServerMigrationOps {
         case "PRUNE_PREFIX" -> {
           if (context.ingestLifecycle() != null && !payload.isBlank()) {
             try {
-              // Task t-20261013-ef3c41: replay prunes only confirmed absences. The root holding the
+              // #803: replay prunes only confirmed absences. The root holding the
               // prefix must be present, listable, the folder a watch registered and on the volume
               // recorded for it, re-checked every batch; each batch is applied inside the live
               // Worker's file-mutation fence. A prune that could not finish stays unapplied and is
