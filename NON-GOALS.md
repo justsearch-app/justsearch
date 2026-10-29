@@ -16,7 +16,7 @@ described below.
 - **No telemetry, analytics, or phone-home.** The product does not report usage anywhere. A PR that adds outbound
   reporting will be declined.
   Desktop builds with an embedded release URL check for updates by default about 30 seconds after the desktop chrome mounts,
-  including CI-built branch candidates and pre-releases. They fetch `release.v1.json`, `release.v1.json.sig`, and
+  including CI-built branch candidates and pre-releases. They fetch `release.v2.json`, `release.v2.json.sig`, and
   `latest.json` from GitHub (following redirects to download/CDN hosts); these checks send no document
   content, queries or usage reports. The contacted hosts see the request IP and time. Installer bytes
   are downloaded only when you request installation. Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before

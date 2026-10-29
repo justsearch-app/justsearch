@@ -230,7 +230,7 @@ Indexing, retrieval, and built-in AI inference run locally. Network activity has
   hardware also gets a CUDA build of `llama-server` when downloads and GPU acceleration are permitted by policy, selected automatically unless you chose your own executable.
 - **The desktop app checks for updates by default**, about 30 seconds after the desktop chrome mounts when a release URL is
   embedded. CI-built installers embed the repository's configured URL, including branch candidates and pre-releases.
-  Discovery fetches `release.v1.json`, `release.v1.json.sig` and `latest.json` from GitHub, following download/CDN redirects;
+  Discovery fetches `release.v2.json`, `release.v2.json.sig` and `latest.json` from GitHub, following download/CDN redirects;
   installation rechecks `latest.json` and downloads installer bytes only on request. Contacted hosts see
   your IP address and request time; these requests send no document content or queries.
   Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process to suppress automatic
