@@ -120,3 +120,14 @@ collection field and are handled by their existing replay authority.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-b68264-codex-r2",
+  "verdict": "accept",
+  "digest": "sha256:c3b1721e23d22bb2548ff7807fdda84375f3ca2a4d5ab823436197b39e07d933",
+  "note": "Collection checks pass after merge; activation stall and final index/queue state match baseline; all full-suite failures reproduce before."
+}
+```
