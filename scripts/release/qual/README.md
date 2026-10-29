@@ -167,7 +167,7 @@ A successful preparation intentionally leaves the VM running for its owner;
 use `vm.py stop` with the same token when finished. Keep qualification-only
 visible checks brief while the owner uses the desktop.
 
-HTTPS update mirror (Ubuntu)
+HTTPS update mirror (Ubuntu and Windows)
 ----------------------------
 
 Lay out a folder as a URL tree, for example:
@@ -285,3 +285,15 @@ reconciliation. Test pins and test signing keys were used, with no sandbox/HTTP
 test switch. The harness branch contains no updater product changes. Evidence,
 including exact commands, initial probe failures and corrected checks:
 `/home/elias/dev/justsearch-qual/evidence/w5/acceptance.json`.
+
+Windows journey qualification uses [journeys/vm-windows.py](journeys/README.md#windows-journeys).
+Its guest tooling and interactive task keep developer build tools out of the
+clean install. After that wrapper has provisioned Python and copied the adapter,
+`vm.py mirror windows /path/to/mirror` uses the same HTTPS URL-tree layout as
+Ubuntu. `mirror-windows.py` imports a two-day test CA into the **guest's** machine
+root store, saves exact hosts bytes, maps github.com to guest loopback and runs
+a recorded interactive HTTPS task. `--untrusted` omits trust; `--remove` stops
+only that server's PID/creation/image identity, removes its CA and restores the
+hosts bytes. Concurrent hosts edits cause refusal instead of being overwritten.
+No host trust store or base image is changed. Windows mirror setup is elevated
+inside the disposable guest; the app journeys run with a limited user token.

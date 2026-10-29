@@ -40,6 +40,9 @@ def apt(run, *args):
 
 
 def installed_version(run):
+    if getattr(run, 'platform', None) == 'windows':
+        entry = run.installed_version()
+        return entry['version'] if entry else None
     result = run.target.run(['dpkg-query', '-W', '-f=${db:Status-Abbrev}${Version}', 'just-search'], check=False)
     if result.returncode not in (0, 1):
         raise Infrastructure('Installed package status query failed')
@@ -273,7 +276,10 @@ def install_ai(run):
     run.evidence('J3-downloaded', status)
     memory_samples = []
     def sample_memory():
-        sample = run.target.json("""
+        if getattr(run, 'platform', None) == 'windows':
+            sample = run.memory_sample()
+        else:
+            sample = run.target.json("""
 import json,time
 from pathlib import Path
 m={k:int(v.split()[0]) for k,v in (line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines()) if k in ('MemTotal','MemAvailable','SwapTotal','SwapFree')}
@@ -379,6 +385,8 @@ def semantic_search(run):
 
 
 def snapshot(run):
+    if getattr(run, 'platform', None) == 'windows':
+        return run.state_snapshot()
     settings = run.api('/api/settings/v2')
     roots = run.api('/api/indexing/roots')
     # Observe owned authored/settings/model files; never modify saved state to
@@ -437,7 +445,7 @@ def assert_state(run):
     assert before['savedFiles'] == after['savedFiles'], 'Settings, authored records or model bytes changed'
     assert after['savedFiles']['savedViews'], 'No persisted authored bookmark was observed'
     assert before['settings'].get('ui') == after['settings'].get('ui'), 'Persisted UI settings changed'
-    assert run.require('corpus') in json.dumps(after['roots']), 'Watched folder disappeared'
+    assert json.dumps(run.require('corpus')) in json.dumps(after['roots']), 'Watched folder disappeared'
     assert OPEN_FILE in json.dumps(after['search']['results']), 'Indexed fixture disappeared'
     return after
 

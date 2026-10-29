@@ -114,6 +114,7 @@ class RunnerTests(unittest.TestCase):
             'S22': 'Journeys run on clean installs without a developer JDK, models or inherited runtime paths; a missing download, skipped or unavailable check is reported as such, never as a pass',
         }
         definition = json.loads(Path(__file__).with_name('journeys.json').read_text())
+        expected['S-Windows-update'] = 'Windows in-app update via descriptor v2 from a VM-local mirror: success relaunches the new version with data kept; a cancelled elevation or failed install resumes the old version and re-offers'
         self.assertEqual(definition['scenarios'], expected)
 
     def test_preparation_failure_retains_unavailable_checks(self):

@@ -1,4 +1,4 @@
-# Linux release journeys
+# Release journeys
 
 Implementation status: experimental. Full Linux acceptance has not passed.
 The runner and native adapters need further qualification before this can serve
@@ -6,7 +6,7 @@ as a release gate; an unavailable check never certifies a release.
 
 `journeys.json` is the journey definition and applicability matrix. `runner.py`
 executes it against an **installed** package. `linux.py` implements J1–J8;
-the Windows, GPU and J9 lanes remain explicitly unavailable in the definition.
+`windows.py` implements Windows as described below; GPU and J9 remain outside this assignment.
 The scenario wording is copied verbatim into every summary and checked by tests.
 This suite changes no product code and enables no application test-build feature.
 
@@ -308,7 +308,7 @@ check fails); it cannot qualify the full release. Empty reports cannot pass.
 check outcomes. JSON observations redact credentials. Logs, source/corpus
 hashes, screenshots and exception traces remain alongside it. The VM wrapper
 also retains provisioning logs and hosted evidence as `evidence.tar`. A green
-Linux lane does not qualify the unavailable Windows, GPU or J9 work.
+Linux lane does not qualify Windows, GPU or J9 work.
 
 ```sh
 python3 -m unittest discover -s scripts/release/qual/journeys -p 'test_*.py' -v
@@ -320,3 +320,153 @@ the shared VM data, a display, running app,
 network service or installed package. The compositor query unit tests evaluate
 JavaScript with the existing Node tool. Before-state tests belong in a shared
 clone under `$TMPDIR`; do not stash or revert the worktree for a baseline check.
+
+## Windows journeys
+
+The Windows implementation is experimental. Fixture tests and tooling probes do
+not qualify an installed app. `windows.py` is a platform adapter used by the same
+`runner.py`, result classification, crash rules and exit codes as Linux.
+`qualify-release-windows.yml` is an advisory, read-only `workflow_dispatch` lane
+for an existing draft. It verifies the NSIS/MCPB hashes before use and reads
+`server.json` from the draft tag. No signing secret, release creation or publication
+is involved. Its first step rejects a non-GitHub-hosted runner.
+
+The guest/hosted tooling script is `windows-tools.ps1`. It requires a disposable
+runner or the VM marker and runs elevated during provisioning. It installs Python
+3.13.7, Pillow 11.3.0, Node 22.20.0 and a pinned, checksummed Notepad++ 8.9.8 portable
+viewer, then makes that viewer this disposable user's `.txt` default. It downloads
+Microsoft's signed msedgedriver for the installed WebView2 version. Supply a
+separately built **tauri-driver 2.0.4 Windows binary** and an adjacent
+`tauri-driver.exe.json` receipt containing `version: "2.0.4"` and the binary
+`sha256`. The producer records this after `cargo install tauri-driver --version
+2.0.4 --locked`; the hosted provisioner reads Cargo's installation metadata.
+The tool has no `--version` switch. Its receipt and bytes are checked before use. A WebView2/driver mismatch
+is infrastructure. The app's child environment drops developer JVM/model/CUDA
+variables and JDK PATH entries; hosted provisioning also removes its known JDK
+installations. A remaining `javac` refuses clean-install qualification. Developer
+build tooling stays on a separate build overlay, never the clean journey overlay.
+
+```sh
+export QUAL_OWNER=w4b
+python3 scripts/release/qual/vm.py status
+windows_inputs=( \
+  --assets /path/to/windows-assets --package JustSearch_0.3.2_x64-setup.exe \
+  --registry /path/to/candidate/server.json \
+  --driver /path/to/windows/tauri-driver.exe \
+  --predecessor /path/to/parent/JustSearch_0.3.1_x64-setup.exe \
+  --mirror /path/to/signed-test-mirror )
+# Once: tools, matching driver, corpus and immutable release/mirror staging.
+python3 scripts/release/qual/journeys/vm-windows.py "${windows_inputs[@]}" \
+  --mode prepare --evidence /path/to/windows-tools-snapshot
+# Development: work on one journey, from a thin overlay of that snapshot.
+python3 scripts/release/qual/journeys/vm-windows.py "${windows_inputs[@]}" \
+  --setup-snapshot /path/to/windows-tools-snapshot \
+  --journeys J1 --evidence /path/to/new-j1-evidence
+```
+
+Preparation applies `windows-quiet.ps1` as SYSTEM only in the owned guest. It
+disables Windows Update, SysMain, Windows Search, diagnostics/telemetry upload,
+Delivery Optimisation and their scheduled work, scheduled optimisation and
+Defender real-time/scheduled scans. If Defender refuses, all test and app data
+folders must be excluded instead; the actual mode is recorded. Hibernation is
+off and the page file is fixed at 512 MiB. A full shutdown/reboot precedes
+verification of each observed service, task, policy, exclusion and page-file
+allocation in `quiet-verify.json`. An unverified setting refuses snapshot
+sealing and all journeys. WER remains enabled; the limited app task receives
+read access to existing machine crash reports during SYSTEM provisioning.
+
+The wrapper owns one headless, eight-thread Windows VM at a time and honors the
+harness's 14 GiB host-memory threshold. It runs the adapter through a **limited,
+interactive scheduled task**, rather than SSH's session zero. The host performs approved NSIS `/S` operations
+in the existing harness's highest interactive context, checking exact package
+paths/checksums and retaining PID, creation/exit time and native exit code. App
+and WebDriver stay limited. The bundled VC++ prerequisite otherwise waits for
+elevation on a clean OS; its standard-token consent UI is not certified by this
+installer context. The hosted equivalent uses the hosted runner's elevated caller
+context. It stops only its
+recorded guest on every outcome. Candidate J1–J3 and predecessor J1–J4 each run
+fresh, with real production AI downloads. A clean shutdown seals each setup by
+renaming its disk/firmware into a snapshot. Remaining journeys use thin child
+overlays; no model cache or candidate data is moved into the predecessor.
+
+Use `--session hosted` without predecessor/mirror arguments for a local hosted
+equivalent in a fresh Windows VM. This executes `windows-hosted.py`, the same
+entry point as Actions. Prepare its tools snapshot with that same session first.
+To continue from an installed checkpoint, supply `--mode rerun --snapshot
+/path/to/new-j1-evidence/selected/snapshot --journeys J2`. Each development
+rerun selects one journey, restores its prerequisite checkpoint and seals the
+resulting stopped state for the next journey. J1 starts fresh from the tools
+snapshot. Snapshot pins include packages, registry, driver, mirror contents,
+provisioning sources and OS base. Tools, corpus, packages and mirror bytes are
+never recopied or reinstalled on a rerun; only changed harness source is staged.
+Explicit subsets and development reruns remain incomplete and cannot qualify
+a release. Omit `--journeys` only for final full-suite evidence. Keep backing
+snapshots in place; unused child overlays are deleted after evidence collection.
+
+J1 checks shipped per-user NSIS completion, installed version/image, bundled JVM,
+UI Automation window identity and Engine readiness. Normal first-run text needs
+owner validation with a screenshot. Later DOM checks belong only to the harness's
+own WebDriver session. J2 drives the real system picker with UIA Value/Invoke
+patterns, then requires the returned path in the app DOM and watched-folder API.
+Open-file evidence requires the OS default viewer's exact image, a new PID and
+creation time, the exact fixture argument, and its UIA window. Titles and OCR
+cannot pass any check. J3 and J4 reuse the Linux DOM/API AI and authored-state
+contracts; Windows bookmarks are read through Web Storage, never guessed from a
+WebView database. J6 hashes actual downloaded models/settings across reinstall
+and uninstall/reinstall. It uses the preservation method of
+`update-preserves-models-test.ps1`; that script's Actions-only guard is preserved.
+J8 uses the release bridge and pinned MCP Inspector over stdio on Windows too.
+J7 remains Linux-only; Windows GPU is explicitly skipped by owner decision.
+
+J5 uses the production HTTPS URL, descriptor v2, generated test trust pins and a
+VM-local mirror. The shipped installer is `currentUser` and requests no UAC;
+the cancellation leg declines the **actual witnessed NSIS installer**. It must
+resume the old Engine and re-offer without a harness restart. Success requires
+identified NSIS actions, automatic candidate relaunch, retirement of both old
+shell and Engine identities, and retained data. A later harness-owned WebDriver
+restart observes persisted Web Storage; it does not certify the preceding
+relaunch's pixels. The updater source checks descriptor/artifact signatures and
+does not require Authenticode or the production signing key. Runtime acceptance
+of unsigned locally built NSIS bytes still requires a real run. SmartScreen or
+Mark-of-the-Web blocking is an environment finding, never a product pass/failure.
+W8 must repeat qualification on the immutable draft NSIS/MCPB/registry bytes and
+provide a compatible predecessor and authenticated mirror/feed for those pins.
+
+Build local NSIS packages **inside a separate Windows build overlay** using the
+existing `scripts/ci/build-installer-windows.ps1` producer. That wrapper calls
+`package-installer-win.ps1` and applies `packaging/signed-mirrors.v1.json`; bypassing
+it can compare unsigned upstream Tesseract against the signed per-file manifest.
+Provision MSVC, Rust, Node, JDK 25 and 7-Zip there. Build the predecessor from the
+candidate parent's shared clone under `$TMPDIR`, in its own build folder, with
+identical generated test pins and a lower test version. Do not enable
+`JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE`. The existing Gradle hook may use
+`--no-daemon` inside this disposable guest; host Gradle remains exclusively
+`js-gradle-slot ./gradlew` and must not stop shared daemons.
+
+Crash evidence includes readable Application event records, WER reports, local
+dump records and newly written `hs_err_pid*.log` files. Elevated provisioning arms
+HKLM WER LocalDumps; configuration is recorded before the app starts. Process
+observations retain image, PID, creation time and parent creation time. Windows
+CIM creation dates lose precision, so process creation times come from the held
+Windows process handle/.NET process object instead. Installed-image, observed app
+tree, its WebView2 children or bundled JVM crashes fail as product. Unknown crashes
+require owner validation with their original crash records. Old crashes are
+recorded separately. The hosted lane always adds the crash-coverage owner-validation
+row until collection is proven armed and finished in that same run; an empty
+journal cannot produce exit 0. Crash records are bounded; truncation is explicit.
+
+Every journey records physical-disk raw-counter deltas without `_Total` double
+counting. Each overlay summary records `guestWrittenBytes`, QEMU's actual
+`/proc/<pid>/io` `write_bytes` as `hostQemuWrittenBytes`, and allocated qcow2
+growth as `overlayGrowthBytes`. Guest and QEMU counters end before shutdown;
+overlay allocation is measured after shutdown. A background watcher also covers
+blocking guest commands. Exceeding **15 GB** in any measured write/growth counter
+stops only this owned VM and fails the run; report it before another run.
+Preparation retains separate counters for both boots. Windows swap bytes are
+explicitly unavailable rather than zero. Allocation growth is not an I/O counter.
+
+```sh
+python3 -m unittest discover -s scripts/release/qual/journeys -p 'test_*.py'
+# Inside Windows: only platform-neutral Windows fixtures, without host VM modules.
+python -m unittest discover -s scripts/release/qual/journeys -p test_windows.py
+```

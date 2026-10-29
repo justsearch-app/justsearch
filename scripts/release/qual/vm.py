@@ -685,10 +685,11 @@ def prepare_owner(os_name, package=None, corpus=None):
 
 def mirror(os_name, folder=None, remove=False, untrusted=False):
     require_owner(os_name)
-    if os_name != 'ubuntu':
-        raise ValueError('The update mirror currently supports Ubuntu only')
     if remove:
-        guest_root(os_name, 'python3 /home/qual/qual-mirror-guest.py remove')
+        if os_name == 'windows':
+            ssh(os_name, 'C:/Qual/Python/Scripts/python.exe C:/Qual/mirror-windows.py remove', check=True)
+        else:
+            guest_root(os_name, 'python3 /home/qual/qual-mirror-guest.py remove')
         return
     if not folder:
         raise ValueError('mirror requires a folder, or --remove')
@@ -696,20 +697,28 @@ def mirror(os_name, folder=None, remove=False, untrusted=False):
         temp = Path(temp)
         archive_folder(folder, temp / 'files.tar.gz')
         run('openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2',
-            '-subj', '/CN=JustSearch qualification test CA', '-keyout', temp / 'ca.key', '-out', temp / 'ca.crt',
+            '-subj', '/CN=JustSearch qualification test CA',
+            '-addext', 'basicConstraints=critical,CA:TRUE', '-addext', 'keyUsage=critical,keyCertSign,cRLSign', '-keyout', temp / 'ca.key', '-out', temp / 'ca.crt',
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         run('openssl', 'req', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=github.com',
             '-keyout', temp / 'server.key', '-out', temp / 'server.csr',
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        (temp / 'ext.cnf').write_text('subjectAltName=DNS:github.com\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n')
+        (temp / 'ext.cnf').write_text('subjectAltName=DNS:github.com\nbasicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n')
         run('openssl', 'x509', '-req', '-days', '2', '-in', temp / 'server.csr', '-CA', temp / 'ca.crt',
             '-CAkey', temp / 'ca.key', '-CAcreateserial', '-extfile', temp / 'ext.cnf', '-out', temp / 'server.crt',
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        copy_in(os_name, HERE / 'mirror-guest.py', '/home/qual/qual-mirror-guest.py')
-        ssh(os_name, 'mkdir -p /home/qual/qual-mirror-input && chmod 700 /home/qual/qual-mirror-input', check=True)
-        for name in ('ca.crt', 'server.crt', 'server.key', 'files.tar.gz'):
-            copy_in(os_name, temp / name, '/home/qual/qual-mirror-input/' + name)
-        guest_root(os_name, 'python3 /home/qual/qual-mirror-guest.py setup' + (' --untrusted' if untrusted else ''))
+        if os_name == 'windows':
+            ssh(os_name, powershell('New-Item -ItemType Directory -Force C:/Qual/mirror-input | Out-Null'), check=True)
+            copy_in(os_name, HERE / 'mirror-windows.py', 'C:/Qual/mirror-windows.py')
+            for name in ('ca.crt', 'server.crt', 'server.key', 'files.tar.gz'):
+                copy_in(os_name, temp / name, 'C:/Qual/mirror-input/' + name)
+            ssh(os_name, 'C:/Qual/Python/Scripts/python.exe C:/Qual/mirror-windows.py setup' + (' --untrusted' if untrusted else ''), check=True)
+        else:
+            copy_in(os_name, HERE / 'mirror-guest.py', '/home/qual/qual-mirror-guest.py')
+            ssh(os_name, 'mkdir -p /home/qual/qual-mirror-input && chmod 700 /home/qual/qual-mirror-input', check=True)
+            for name in ('ca.crt', 'server.crt', 'server.key', 'files.tar.gz'):
+                copy_in(os_name, temp / name, '/home/qual/qual-mirror-input/' + name)
+            guest_root(os_name, 'python3 /home/qual/qual-mirror-guest.py setup' + (' --untrusted' if untrusted else ''))
         print('HTTPS mirror ready at https://github.com/ (CA ' + ('untrusted' if untrusted else 'in system trust store') + ')')
 
 

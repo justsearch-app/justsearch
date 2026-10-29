@@ -1,0 +1,116 @@
+name: Qualify draft release (Windows journeys)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing draft release tag (for example v0.3.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qualify-windows-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  journeys:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      OMP_NUM_THREADS: '8'
+      OPENBLAS_NUM_THREADS: '8'
+      RAYON_NUM_THREADS: '8'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Require a disposable GitHub-hosted runner
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -cne 'github-hosted') { throw 'Refusing a non-hosted runner' }
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.7'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.20.0'
+      - name: Fetch and verify exact draft bytes and tagged registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if ($env:RELEASE_TAG -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') { throw 'Invalid release tag' }
+          $assets=Join-Path $env:RUNNER_TEMP release-assets
+          New-Item -ItemType Directory -Path $assets | Out-Null
+          $draft=& gh release view $env:RELEASE_TAG --json isDraft,tagName,targetCommitish
+          if ($LASTEXITCODE) { throw 'Draft lookup failed' }
+          $draft | Set-Content (Join-Path $env:RUNNER_TEMP draft.json)
+          if (($draft | ConvertFrom-Json).isDraft -ne $true) { throw 'An existing draft release is required' }
+          & gh release download $env:RELEASE_TAG --dir $assets --pattern '*-setup.exe' --pattern justsearch-mcp.mcpb --pattern SHA256SUMS
+          if ($LASTEXITCODE) { throw 'Draft download failed' }
+          $content=& gh api "repos/$env:GITHUB_REPOSITORY/contents/packaging/mcpb/server.json?ref=$env:RELEASE_TAG" --jq .content
+          if ($LASTEXITCODE) { throw 'Tagged registry fetch failed' }
+          [IO.File]::WriteAllBytes((Join-Path $env:RUNNER_TEMP server.json),[Convert]::FromBase64String(($content -join '')))
+          @'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/release/qual/journeys')
+          from runner import verify_assets
+          root=Path(os.environ['RUNNER_TEMP'])/'release-assets'
+          packages=list(root.glob('*-setup.exe'))
+          assert len(packages)==1, 'Expected exactly one Windows NSIS draft asset'
+          verify_assets(root,[packages[0].name,'justsearch-mcp.mcpb'])
+          '@ | python -
+          if ($LASTEXITCODE) { throw 'SHA256SUMS verification failed' }
+      - name: Provision qualification tools
+        run: |
+          cargo install tauri-driver --version 2.0.4 --locked
+          if ($LASTEXITCODE) { throw 'Pinned tauri-driver install failed' }
+          ./scripts/release/qual/journeys/windows-tools.ps1 -Driver "$env:USERPROFILE/.cargo/bin/tauri-driver.exe"
+          if ($LASTEXITCODE) { throw 'Windows tool provisioning failed' }
+          python -m unittest discover -s scripts/release/qual/journeys -p 'test_windows.py'
+          if ($LASTEXITCODE) { throw 'Journey fixture tests failed' }
+      - name: Run shared Windows journeys
+        run: |
+          $assets=Join-Path $env:RUNNER_TEMP release-assets
+          $packages=@(Get-ChildItem $assets -Filter '*-setup.exe')
+          if ($packages.Count -ne 1) { throw 'Expected one NSIS package' }
+          & C:/Qual/Python/Scripts/python.exe scripts/release/qual/journeys/windows-hosted.py `
+            --assets $assets --package $packages[0].Name `
+            --registry (Join-Path $env:RUNNER_TEMP server.json) `
+            --evidence (Join-Path $env:RUNNER_TEMP journey-evidence)
+          $result=$LASTEXITCODE
+          $summary=Get-Content (Join-Path $env:RUNNER_TEMP journey-evidence/summary.json) -Raw | ConvertFrom-Json
+          "Windows release journeys: $($summary.status)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          # Unproven hosted crash coverage caps success at pending validation (2).
+          exit $result
+      - name: Record unavailable journeys if preparation failed
+        if: always()
+        run: |
+          @'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0,'scripts/release/qual/journeys')
+          from runner import preparation_failure
+          out=Path(os.environ['RUNNER_TEMP'])/'journey-evidence'
+          out.mkdir(exist_ok=True)
+          if not (out/'summary.json').exists():
+              report=preparation_failure('hosted-windows','Workflow preparation failed; see job logs')
+              (out/'summary.json').write_text(json.dumps(report,indent=2)+'\n')
+          '@ | python -
+          if ($LASTEXITCODE) { throw 'Preparation failure summary failed' }
+      - name: Upload observations on every outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-journeys-${{ inputs.tag }}
+          path: |
+            ${{ runner.temp }}/journey-evidence/
+            ${{ runner.temp }}/draft.json
+          if-no-files-found: error
+          retention-days: 30
