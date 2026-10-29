@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:e04ef55557c07f708fed9e4724262b42ee8cbba572cd1f8b9dc51d80de7c24d0"
+  },
+  "createdAt": "2026-10-29T15:56:00.709Z",
+  "revision": "330fe55bc3249aac564594c4ece172e516bc3ddf",
+  "tree": "aa6225b5a1d9976f6f2e7d3ae941c279ed7e6973",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run --configLoader runner --maxWorkers=2 \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/12umz2gu/tmp/test-intent-vitest-6-1793289339935.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5242
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts#CommandPaletteProjection (§21.C) WP3.8b opens indexing rules in Settings instead of invoking the operation without arguments",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec9170f76bb416bb85b815078b03b483e03362f4dcd906ab210d74ba786e4768",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CommandPaletteProjection (§21.C) WP3.8b opens indexing rules in Settings instead of invoking the operation without arguments",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "330fe55bc3",
+    "revision": "330fe55bc3249aac564594c4ece172e516bc3ddf",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run --configLoader runner --maxWorkers=2 \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/12umz2gu/tmp/test-intent-vitest-6-1793289354588.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4971,
+        "output": "JSON report written to /home/elias/.cache/am/12umz2gu/tmp/test-intent-vitest-6-1793289354588.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts#CommandPaletteProjection (§21.C) WP3.8b opens indexing rules in Settings instead of invoking the operation without arguments",
+        "classification": "assertion",
+        "detail": "CommandPaletteProjection (§21.C) WP3.8b opens indexing rules in Settings instead of invoking the operation without arguments:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      CustomEvent {\n        \"AT_TARGET\": 2,\n        \"BUBBLING_PHASE\": 3,\n        \"CAPTURING_PHASE\": 1,\n        \"NONE\": 0,\n        Symbol(composed): false,"
+      }
+    ]
+  },
+  "digest": "sha256:dbd1aad896025adb6433dceab701d0c1c9fa664d45d74fd416705f757ab061ec"
+}

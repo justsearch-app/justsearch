@@ -15,6 +15,28 @@ per-check before failures are in `gates/test-intent/evidence/wp3.8b-ui/README.md
   "entries": [
     {
       "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The indexing-rules palette result opens Settings with focusIndexingRule=hours, labelled Change indexing rules, without dispatching core.set-indexing-rules. The raw operation is absent even for an empty palette query; invoking its old command ID cannot dispatch it. This repairs an existing zero-argument invocation defect.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "WP3.8b UI for the settled revision 3 indexing-hours and pause-on-battery design",
+          "choice": "D4 keeps the complete-pair rules write in Settings; reuse the existing input-requiring operation exclusion and navigation-only palette entry, routing through the existing hours focus request.",
+          "label": "agent choice; agent-adopted (delegated-choice)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp3.8b-ui/palette.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts#CommandPaletteProjection (§21.C) WP3.8b opens indexing rules in Settings instead of invoking the operation without arguments"
+      ]
+    },
+    {
+      "items": [
         "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
         "modules/ui-web/src/shell-v0/chrome/Shell.test.ts"
       ],
@@ -66,6 +88,17 @@ per-check before failures are in `gates/test-intent/evidence/wp3.8b-ui/README.md
   ]
 }
 ```
+
+## Palette regression evidence
+
+Class `New`, repaired behaviour: a new oracle for the existing D4 contract, not a claim that
+palette execution was previously allowed. Under `TZ=UTC`, the named check fails by assertion
+on 330fe55bc3 because the selected entry emits `jf-invoke-operation`; it passes with this repair.
+`palette.json` was written by the evidence runner in a temporary shared clone. That temporary
+copy uses shared clones and `npm ci` instead of worktrees and linked/copied dependencies, and
+runs Vitest with `--configLoader runner --maxWorkers=2`; its actual script digest is recorded.
+The adaptation and raw output are retained in `tmp/verify/wp3.8-palette/`. No repository runner
+was changed. The earlier acceptance below has not been renewed by this builder.
 
 ## Acceptance records
 
