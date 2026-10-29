@@ -456,6 +456,14 @@ and uninstall/reinstall. It uses the preservation method of
 J8 uses the release bridge and pinned MCP Inspector over stdio on Windows too.
 J7 remains Linux-only; Windows GPU is explicitly skipped by owner decision.
 
+For Windows CPU J3, the product deliberately reports `installedFully=false`
+when chat and CUDA are hardware-skipped. That status is accepted only with
+completed activation, no repair needed, retrieval-core acquisition ready, all
+five downloadable model packages installed without errors, and exactly those
+two hardware skips. The semantic query, executed retrieval stages, chat
+unavailability and all four active runtime components remain required. Linux's
+existing completion checks are unchanged.
+
 J5 uses the production HTTPS URL, descriptor v2, generated test trust pins and a
 VM-local mirror. The shipped installer is `currentUser` and requests no UAC;
 the cancellation leg declines the **actual witnessed NSIS installer**. It must

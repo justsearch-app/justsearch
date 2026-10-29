@@ -246,6 +246,27 @@ def search_open(run):
     return {'search': result, 'receivingViewerProcess': viewer}
 
 
+def cpu_install_ready(run, status):
+    if status.get('installedFully') is True:
+        return True
+    if getattr(run, 'platform', None) != 'windows':
+        return False
+    # Windows AiInstallStatus intentionally calls CPU chat/CUDA hardware skips
+    # "installed with limitations". Require the complete positive package and
+    # acquisition evidence instead of waiting for that flag to become true.
+    packages = status.get('packages', [])
+    required = {'embedding', 'splade', 'reranker', 'ner', 'citation-scorer'}
+    excluded = {'chat', 'cuda-runtime'}
+    return (status.get('state') == 'completed' and status.get('phase') == 'done'
+            and status.get('repairNeeded') is False
+            and 'retrieval-core' in status.get('readyCapabilities', [])
+            and {p.get('packageId') for p in packages} == required | excluded
+            and len(packages) == len(required | excluded)
+            and all(not p.get('error') and (
+                p.get('state') == 'installed' if p.get('packageId') in required else
+                p.get('state') == 'skipped' and p.get('skipCause') == 'hardware') for p in packages))
+
+
 def install_ai(run):
     run.require('ui')
     run.require('folder')
@@ -318,7 +339,7 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
             if operation.get('state') in ('failed', 'cancelled'):
                 raise ProductFailure('Model activation failed: ' + json.dumps(operation))
         features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
-        return {'install': install, 'runtime': runtime} if install.get('installedFully') is True and all(
+        return {'install': install, 'runtime': runtime} if cpu_install_ready(run, install) and all(
             features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
     active = wait_for(activated, 'Downloaded default CPU search encoders activated', seconds=900, interval=5)
     status = active['install']
