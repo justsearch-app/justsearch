@@ -18,9 +18,9 @@ export function selectIntegrationTasks({ changedPaths, settings, buildFiles }) {
   const modules = parseSettings(settings).filter((module) => module.startsWith(':modules:'));
   const reached = new Set(modules.filter((module) => {
     const directory = `${module.slice(1).replaceAll(':', '/')}/`;
-    // Only sources, the module's build file and its dependency lockfile change what its tests see.
-    return changedPaths.some((file) => file.startsWith(`${directory}src/`)
-      || file === `${directory}build.gradle.kts` || file === `${directory}gradle.lockfile`);
+    // Any file in the module can change what its tests see (sources, build file, lockfile,
+    // properties, resources), except its Markdown documentation.
+    return changedPaths.some((file) => file.startsWith(directory) && !file.endsWith('.md'));
   }));
   if (reached.size === 0) return [];
   const dependents = new Map();
