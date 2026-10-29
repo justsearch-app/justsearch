@@ -165,6 +165,7 @@ final class SearchPipelinePresets {
     }
     String s = querySyntax.trim().toLowerCase(Locale.ROOT);
     return switch (s) {
+      case "search" -> SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SEARCH;
       case "lucene", "advanced" -> SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE;
       default -> SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE;
     };

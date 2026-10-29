@@ -40,6 +40,16 @@ public final class NoVolumeIdentityExtension implements BeforeEachCallback, Afte
     RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(Boolean.getBoolean(PROPERTY));
   }
 
+  /** As {@link #installVolumeLookupIfAbsent}, with {@code folder} on another volume while {@code away}. */
+  public static void installVolumeLookupWithFolderAway(Path folder, java.util.function.BooleanSupplier away)
+      throws IOException {
+    Path real = folder.toRealPath();
+    String other = PRESENT_VOLUME.replace(":739", ":740");
+    RootIdentity.VOLUME_IDENTITY_LOOKUP = path ->
+        path.startsWith(real) && away.getAsBoolean() ? other : PRESENT_VOLUME;
+    RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(Boolean.getBoolean(PROPERTY));
+  }
+
   /** Inject both lookup results without relying on the host's /dev/disk/by-uuid. */
   public static AutoCloseable withVolumeIdentity(boolean available) {
     var previous = RootIdentity.VOLUME_IDENTITY_LOOKUP;

@@ -8,37 +8,40 @@
     "labelAuthority": "modules/ui-web/src/shell-v0/display/toolLabeling.ts",
     "mountSites": [
       "modules/ui-web/src/shell-v0/components/chat/ToolCallCard.ts",
-      "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
       "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.ts"
     ]
   },
   "runProjection": {
-    "rationale": "ONE ordered run projection — the record (projectUnifiedThread) and the live SSE run (projectLiveAgentActivity) project into the SAME UnifiedTurnItem contract, merged and rendered through one item renderer (§12.3.A). No second run-assembly structure.",
+    "rationale": "The canonical saved thread is projected once by projectUnifiedThread, then consumed by Search sv3-record. The live Search feed uses sv3-run over the shared AgentSessionController. The retired old-host merge and live projector are removed.",
     "module": "modules/ui-web/src/shell-v0/views/unifiedThreadProjection.ts",
-    "projectionSymbols": ["projectUnifiedThread", "projectLiveAgentActivity"],
+    "projectionSymbols": [
+      "projectUnifiedThread"
+    ],
     "renderSites": [
       "modules/ui-web/src/shell-v0/views/unifiedThreadProjection.ts",
-      "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
       "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.ts"
     ]
   },
   "runSegments": {
-    "rationale": "Tempdoc 565 §26.A — ONE run-segmentation authority. The run's STRUCTURE (workflow node grouping; background-run provenance) is computed ONCE by `assignRunSegments` in the run-projection module, stamped onto the typed `RunSegmentRef` field of `UnifiedTurnItem`, and read by the body (segment → collapsible group) + the spine (segment start → boundary landmark). Before §26 the node structure was dropped into the untyped `attributes` escape hatch and no-op'd (§25.1, the §15.C flatten). A SECOND segmentation pass (another file computing `assignRunSegments`, or re-deriving node grouping) is the §26 leaf-fork — caught here import-visibly. Honest scope (§12.10): a hand-rolled re-segmentation that imports nothing still slips; the typed `RunSegmentRef` seam (only `assignRunSegments` stamps it) is the stronger guard, per §15.D.1 'prefer the seam over the grep gate'.",
+    "rationale": "RunSegmentRef is minted only by assignRunSegments in the canonical saved-record projection. Keep the typed grouping contract and its single authority.",
     "authority": "modules/ui-web/src/shell-v0/views/unifiedThreadProjection.ts",
-    "segmentSymbols": ["assignRunSegments"],
+    "segmentSymbols": [
+      "assignRunSegments"
+    ],
     "consumerSites": [
       "modules/ui-web/src/shell-v0/views/unifiedThreadProjection.ts"
     ]
   },
   "answerRenderer": {
-    "rationale": "Tempdoc 565 §15.B — ONE answer-text renderer + ONE inline-citation weave. Every mode (agent / RAG / chat / extract / navigate / summarize) renders the answer through `jf-markdown-block` (markdown or `plain` format); the per-sentence `[n]` weave + grounding coloring lives once in its private `decorateCitations`. The RAG flat-text fork (`StreamingTextBlock` + its `cite-ref-click` event) was retired. The claim→`Citation` mapping (the one resolver every RAG site shares) lives in `citationResolve.claimsToCitations`. A SECOND answer-text block tag or a SECOND `claimsToCitations` owner is the §15.A/§15.B leaf-fork class — caught here (same import-visible ceiling as the other two authorities, §12.10).",
+    "rationale": "The shared MarkdownBlock renders prose and citations through the one weave authority. Search Structured accepted JSON uses its dedicated pre element; it never treats rejected chunks as an answer.",
     "primitive": "modules/ui-web/src/shell-v0/components/chat/MarkdownBlock.ts",
     "primitiveTag": "jf-markdown-block",
     "weaveAuthority": "modules/ui-web/src/shell-v0/components/chat/citationResolve.ts",
-    "weaveSymbols": ["claimsToCitations"],
+    "weaveSymbols": [
+      "claimsToCitations"
+    ],
     "mountSites": [
       "modules/ui-web/src/shell-v0/components/chat/MarkdownBlock.ts",
-      "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
       "modules/ui-web/src/shell-v0/views/NavigateView.ts",
       "modules/ui-web/src/shell-v0/views/SummarizeView.ts",
       "modules/ui-web/src/shell-v0/components/chat/ReasoningBlock.ts",
@@ -46,7 +49,6 @@
     ],
     "weaveSites": [
       "modules/ui-web/src/shell-v0/components/chat/citationResolve.ts",
-      "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
       "modules/ui-web/src/shell-v0/views/SummarizeView.ts",
       "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.ts",
       "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.ts"
@@ -58,25 +60,51 @@
   "groundingSemantics": {
     "rationale": "Tempdoc 565 §15.A/§15.D.1/§6 — ONE grounding-semantics authority. The score→tier→grounding-class/label mapping (the answer↔source similarity classification) lives ONLY in evidenceProjection.ts; the tier is a BRANDED GroundingTier (§15.D.1 typed seam) only `evidenceTier` can mint, and the grounding presentations (`groundingClass`/`groundingLabel`) + the grouping/CSS vocabulary (`tierGroup`/`tierClass`) derive from it. Before §15 this mapping was forked across FOUR sites with TWO threshold sets (MarkdownBlock/StreamingTextBlock `groundingStatus` 0.5/0.2; CitationHoverCard `scoreLabel` 0.5/0.2; this file 0.7/0.3) so one similarity classified DIFFERENTLY per surface. This realizes the §6 'evidence-surface gate' SCORER facet via two checks: (i) only registered consumer sites import the tier-classification symbols (a new importer = a new grounding classifier, forces review); (ii) NO file but the authority re-derives a grounding class from a numeric threshold (a `score >= 0.X ? 'grounded'` shape — the import-INVISIBLE fork the seam alone can't catch). Honest scope (§12.10): import-visible + literal-visible; a fully-obfuscated re-derivation (no recognizable threshold literal, no import) still slips — the same ceiling as the other run-renderer checks.",
     "authority": "modules/ui-web/src/shell-v0/components/chat/evidenceProjection.ts",
-    "authoritySymbols": ["evidenceTier", "groundingClass", "groundingLabel", "tierGroup", "tierClass", "answerFrame", "declaredGroundingClass", "groundingDegraded"],
+    "authoritySymbols": [
+      "evidenceTier",
+      "groundingClass",
+      "groundingLabel",
+      "tierGroup",
+      "tierClass",
+      "answerFrame",
+      "declaredGroundingClass",
+      "groundingDegraded"
+    ],
     "consumerSites": [
       "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.ts",
       "modules/ui-web/src/shell-v0/components/chat/MarkdownBlock.ts",
       "modules/ui-web/src/shell-v0/components/chat/CitationHoverCard.ts",
-      "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
       "modules/ui-web/src/shell-v0/views/search-v3/sv3-honesty.ts"
     ],
     "consumerNotes": {
-      "modules/ui-web/src/shell-v0/views/search-v3/sv3-honesty.ts": "Tempdoc 822 Phase F7 (inventory C1) — the Search v3 window's answer-frame line. It is a CALLER of the authority, not a second classifier: it supplies (shapeId x sourceCount x coverage x chunk-precision x settled) and renders `answerFrameLabel`'s wording verbatim, deriving no tier and comparing no similarity against a threshold of its own. Registered here rather than importing the symbols from the view, so the window has exactly ONE site that touches the grounding authority. Phase F11 SPLITS the presentation of that wording without re-wording it: `splitSv3FrameLabel` cuts the authority's own '<verdict> - <elaboration>' string at its em dash so the verdict can rest and the elaboration extend (L14), both halves are the authority's own substrings, the whole string survives verbatim in the accessible name and the `title`, and a label the authority ever words WITHOUT the separator rests entirely (the fail-safe is more text, never less). No second label table is authored here."
+      "modules/ui-web/src/shell-v0/views/search-v3/sv3-honesty.ts": "Tempdoc 822 Phase F7 (inventory C1) — the Search window's answer-frame line. It is a CALLER of the authority, not a second classifier: it supplies (shapeId x sourceCount x coverage x chunk-precision x settled) and renders `answerFrameLabel`'s wording verbatim, deriving no tier and comparing no similarity against a threshold of its own. Registered here rather than importing the symbols from the view, so the window has exactly ONE site that touches the grounding authority. Phase F11 SPLITS the presentation of that wording without re-wording it: `splitSv3FrameLabel` cuts the authority's own '<verdict> - <elaboration>' string at its em dash so the verdict can rest and the elaboration extend (L14), both halves are the authority's own substrings, the whole string survives verbatim in the accessible name and the `title`, and a label the authority ever words WITHOUT the separator rests entirely (the fail-safe is more text, never less). No second label table is authored here."
     },
-    "groundingOutputVocab": ["grounded", "ungrounded", "partially-grounded", "transform", "strong", "moderate", "high", "medium", "low"]
+    "groundingOutputVocab": [
+      "grounded",
+      "ungrounded",
+      "partially-grounded",
+      "transform",
+      "strong",
+      "moderate",
+      "high",
+      "medium",
+      "low"
+    ]
   },
   "stepPresentation": {
     "rationale": "Tempdoc 565 §17 — ONE run-step presentation authority. A run step's { tone, glyph, label, prominence, liveness } is projected ONCE by `runStepPresentation.stepPresentation` (a BRANDED StepPresentation) and rendered by the ONE `<jf-run-node>` primitive; the status→tone and status→glyph facets are SIBLINGS living ONLY in `statusTone.ts`. Before §17 the tone was projected (statusTone) but the glyph/label/prominence/bundle were hand-authored at ≥5 step-render sites (renderRunSpine / renderTraceNode / ToolCallCard / RetrospectivePanel) — tempdoc 559's 'kernel half-applied to presentation' at the run-step element (the identical `statusAccent(status)` line was byte-copied at renderRunSpine:1511 / renderTraceNode:2026). Three checks: (i) only registered toneSites import the status authority symbols — a NEW importer is a second status classifier, forces review; (ii) only registered nodeSites mount `<jf-run-node>`; (iii) NO file but the run-node primitive hand-rolls a status GLYPH char (✓/✕/⊘) as a ternary branch — the import-INVISIBLE glyph fork the import-scope can't catch. Honest scope (§12.10): import + tag + glyph-literal visible; a fully-obfuscated status presentation still slips — the same ceiling as the other run-renderer checks.",
     "projector": "modules/ui-web/src/shell-v0/views/runStepPresentation.ts",
     "primitive": "modules/ui-web/src/shell-v0/components/chat/RunNode.ts",
     "primitiveTag": "jf-run-node",
-    "toneSymbols": ["statusToTone", "statusGlyph", "glyphChar", "statusAccent", "toneAccent", "outcomeToTone", "presentedToolStatus"],
+    "toneSymbols": [
+      "statusToTone",
+      "statusGlyph",
+      "glyphChar",
+      "statusAccent",
+      "toneAccent",
+      "outcomeToTone",
+      "presentedToolStatus"
+    ],
     "toneSites": [
       "modules/ui-web/src/shell-v0/utils/statusTone.ts",
       "modules/ui-web/src/shell-v0/views/runStepPresentation.ts",
@@ -90,35 +118,56 @@
       "modules/ui-web/src/shell-v0/components/FilterChip.ts"
     ],
     "nodeSites": [
-      "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
       "modules/ui-web/src/shell-v0/components/chat/ToolCallCard.ts"
     ],
-    "glyphChars": ["✓", "✕", "⊘", "⊗", "✗"]
+    "glyphChars": [
+      "✓",
+      "✕",
+      "⊘",
+      "⊗",
+      "✗"
+    ]
   },
   "toolLineage": {
     "rationale": "Tempdoc 577 §2.14 Root III (#18) — ONE tool-output text-provenance authority. A tool result's lineage (corpus-quoted vs runtime vs agent-authored) is STAMPED authoritatively by the backend (OutputLineage) into structuredData.lineage and projected ONCE by `toolOutputLineage` / framed by `lineageFrameLabel`; the FE never re-derives the classification from the output text. This is the display half of prompt-injection safety — the answer-frame's mirror for tool spans: a corpus-quoted excerpt is framed as quoted so citation/instruction-shaped text inside it cannot read as the agent's own claim. A SECOND file importing the lineage symbols (a second framing classifier) forces review. Honest scope (§12.10): import-visible only; a hand-rolled re-derivation off structuredData.lineage that imports nothing still slips — register + discipline, same ceiling as groundingSemantics.",
     "authority": "modules/ui-web/src/shell-v0/components/chat/toolOutputLineage.ts",
-    "authoritySymbols": ["toolOutputLineage", "lineageFrameLabel"],
+    "authoritySymbols": [
+      "toolOutputLineage",
+      "lineageFrameLabel"
+    ],
     "consumerSites": [
       "modules/ui-web/src/shell-v0/components/chat/ToolCallCard.ts"
     ],
-    "lineageVocab": ["corpus-quoted", "runtime", "agent-authored"]
+    "lineageVocab": [
+      "corpus-quoted",
+      "runtime",
+      "agent-authored"
+    ]
   },
   "searchResultRendering": {
-    "rationale": "Tempdoc 577 Goal 3 §3.9a — ONE search-result evidence rendering shared by the standalone SearchSurface and the unified window's retrieve tier (UnifiedChatView). The per-hit 'Why this result?' disclosure (chips from the per-hit trace + the 'Explain in words' → core.summarize action) lives once in whyThisResult.ts; the facet-chip render (projected from the response's emitted counts + selections) lives once in facetChips.ts. Tempdoc 602 R3 — the per-hit path/snippet PRESENTATION (middle-ellipsis path + query-term `<mark>` highlight) lives once in resultRowPresentation.ts (sibling of 597 R-1's matchCountLabel.ts); before R3 the retrieve tier showed the raw path with no highlighting while the Search surface formatted + highlighted, so the SAME result rendered two ways. Before §3.9a the in-window tier was a leaner FORK that lacked both; folding them into the one window risked re-implementing the same chips a second time. A THIRD file importing these render symbols (a new fork of the why/facet/highlight render) is caught here — register a consumer only with review. Honest scope (§12.10): import-visible only; a hand-rolled re-implementation that imports nothing still slips — register + discipline, the same ceiling as groundingSemantics / toolLineage.",
+    "rationale": "ResultsCard is the shared Search result renderer. Why, facets and highlights derive from their registered authorities; the retired host no longer has a parallel result renderer.",
     "authoritySites": [
       "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.ts",
       "modules/ui-web/src/shell-v0/components/searchResults/facetChips.ts",
       "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.ts"
     ],
-    "authoritySymbols": ["renderWhyDisclosure", "renderFacetChips", "traceChipsFor", "tracePartsFor", "highlightTerms"],
+    "authoritySymbols": [
+      "renderWhyDisclosure",
+      "renderFacetChips",
+      "traceChipsFor",
+      "tracePartsFor",
+      "highlightTerms"
+    ],
     "consumerSites": [
-      "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
       "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.ts"
     ]
   },
   "scan": {
     "feRoot": "modules/ui-web/src/shell-v0",
-    "excludeSuffixes": [".test.ts", ".test.tsx", ".spec.ts"]
+    "excludeSuffixes": [
+      ".test.ts",
+      ".test.tsx",
+      ".spec.ts"
+    ]
   }
 }

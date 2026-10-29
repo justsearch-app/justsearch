@@ -87,7 +87,7 @@ describe('searchState (slice 463)', () => {
     await vi.advanceTimersByTimeAsync(250);
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     // 577 Phase 5: the keystroke path issues the QUICK pass first.
-    expect(body).toEqual({ query: 'test', limit: 50, mode: 'text', pipeline: QUICK_PIPELINE });
+    expect(body).toEqual({ query: 'test', querySyntax: 'search', limit: 50, mode: 'text', pipeline: QUICK_PIPELINE });
     expect(body.filters).toBeUndefined();
     resetSearchState();
     vi.unstubAllGlobals();
@@ -297,12 +297,14 @@ describe('searchState (slice 463)', () => {
     // excerpts + the facet-count request (Move E).
     expect(buildSearchIntent('q', {}, 'quick')).toEqual({
       query: 'q',
+      querySyntax: 'search',
       limit: 50,
       mode: 'text',
       pipeline: QUICK_PIPELINE,
     });
     expect(buildSearchIntent('q', {}, 'refined')).toEqual({
       query: 'q',
+      querySyntax: 'search',
       limit: 50,
       includeExcerpts: true,
       facets: {

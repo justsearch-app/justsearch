@@ -7,7 +7,7 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { createIntentRouter } from './intentRouter.js';
-import { takePendingForceShape, takePendingAutoRun } from '../utils/compose.js';
+
 import type { NavigationHandler } from './navigationHandler.js';
 import type { InvocationHandler } from './invocationHandler.js';
 import type { Intent } from './types.js';
@@ -291,12 +291,10 @@ describe('IntentRouter — Query intents (548 S4-A)', () => {
 describe('IntentRouter — Answer intents (548 §4.5)', () => {
   beforeEach(() => {
     // Drain the compose one-shots so each assertion sees only this test's writes.
-    takePendingForceShape();
-    takePendingAutoRun();
   });
 
   it('parks the answer shape without an automatic send', async () => {
-    const { handler: navHandler } = makeNavHandler();
+    const { handler: navHandler, spy: navSpy } = makeNavHandler();
     const router = makeRouter({ navigationHandler: navHandler });
 
     await router.dispatch({
@@ -304,9 +302,9 @@ describe('IntentRouter — Answer intents (548 §4.5)', () => {
       transport: 'LLM_EMISSION',
     });
 
-    // The named shape is prepared; Search always waits for Send.
-    expect(takePendingForceShape()).toBe('core.summarize');
-    expect(takePendingAutoRun()).toBe(false);
+    // Shape, prompt and scope travel in navigation state, without any dispatch.
+    expect(navSpy).toHaveBeenCalledExactlyOnceWith({ kind: 'navigate', target: 'core.search-v3-surface',
+      state: { query: 'what is rust', forceShapeId: 'core.summarize' } }, expect.anything());
   });
 
   it('does NOT park the auto-run flag when the chat surface is unresolved', async () => {
@@ -319,8 +317,6 @@ describe('IntentRouter — Answer intents (548 §4.5)', () => {
     // No navigation fired, and crucially no stale one-shot is left parked to
     // hijack the next genuine chat activation.
     expect(navSpy).not.toHaveBeenCalled();
-    expect(takePendingForceShape()).toBeNull();
-    expect(takePendingAutoRun()).toBe(false);
   });
 
   it('lowers an answer to a chat-surface activation carrying the prompt in state', async () => {
@@ -367,7 +363,6 @@ describe('IntentRouter — Answer intents (548 §4.5)', () => {
       shape: 'core.extract', state: { docIds: ['chosen.md'], forceShapeId: 'core.agent-run', query: 'stale' } } });
     expect(navSpy.mock.calls[0]![0]).toEqual({ kind: 'navigate', target: 'core.search-v3-surface',
       state: { docIds: ['chosen.md'], forceShapeId: 'core.extract', query: 'Extract chosen' } });
-    expect(takePendingAutoRun()).toBe(false);
   });
 
   it('does NOT call the handler when the chat surface is unresolved', async () => {

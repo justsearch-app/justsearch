@@ -1221,3 +1221,20 @@ describe('a decision made once is RE-APPLIED, not re-asked (859 §D P3)', () => 
     );
   });
 });
+
+it('S2 live bulk-reindex refusal is expanded and self-contained exactly once in Search', async () => {
+  aiOnline(); const el = await mount(); await type(el, 'rebuild'); await press(el, { ctrlKey: true });
+  const output = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild. (Code: BULK_GENERATION_REFUSED)';
+  const real = new RealAgentSessionController('', () => {});
+  try {
+    real.onToolCallProposed({ callId: 'call', toolName: 'core_bulk_reindex', arguments: '{}', risk: 'LOW' });
+    real.onToolExecStarted({ callId: 'call', toolName: 'core_bulk_reindex' });
+    real.onToolExecCompleted({ callId: 'call', success: false, output, errorCode: 'BULK_GENERATION_REFUSED' });
+    ctrl.conversation = [...real.conversation]; ctrl.toolCalls = { ...real.toolCalls };
+    ctrl.runInFlight = true; ctrl.isStreaming = true; agentListener?.(); await settle(el);
+    const card = (await region(el, 'jf-sv3-main')).shadowRoot!.querySelector('jf-tool-call-card') as Mounted & { expanded: boolean };
+    expect(card).not.toBeNull(); await card.updateComplete;
+    expect(card.expanded).toBe(true); expect(card.shadowRoot!.querySelector('.tool-output')?.textContent).toBe(output);
+    expect(card.shadowRoot!.textContent!.split('Code: BULK_GENERATION_REFUSED')).toHaveLength(2);
+  } finally { real.destroy(); }
+});

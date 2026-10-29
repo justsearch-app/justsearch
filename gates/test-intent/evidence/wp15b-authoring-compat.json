@@ -1,0 +1,122 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-28T17:09:35.417Z",
+  "revision": "edf31674779d432098809d29f711951d64110cf1",
+  "tree": "292a524288f4827ebeac8fbda737cb2bfb7ed03b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.compatibilityRegistration.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2915494-1793207372668.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2748
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.compatibilityRegistration.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.compatibilityRegistration.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:713663e14e1f79c20ee95304dff6a4cceb7c44ba20ed264c7fde7b2f5e8cd8dc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA15 cold production registration and authoring compatibility registers Search eagerly without defining the retired root",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility registers jf-route-chip before Settings loads, and a plugin factory constructs it",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility registers jf-scope-chip before Settings loads, and a plugin factory constructs it",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility registers jf-conversation-history before Settings loads, and a plugin factory constructs it",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility registers jf-handoff-card before Settings loads, and a plugin factory constructs it",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility registers jf-agent-authority-panel before Settings loads, and a plugin factory constructs it",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility registers jf-autonomy-dial before Settings loads, and a plugin factory constructs it",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility keeps jf-unified-chat-view admitted through generated vocabulary, schema and runtime",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility keeps jf-selection-actions-menu admitted through generated vocabulary, schema and runtime",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility keeps jf-route-chip admitted through generated vocabulary, schema and runtime",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility keeps jf-scope-chip admitted through generated vocabulary, schema and runtime",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility keeps jf-conversation-history admitted through generated vocabulary, schema and runtime",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility keeps jf-handoff-card admitted through generated vocabulary, schema and runtime",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility keeps jf-agent-authority-panel admitted through generated vocabulary, schema and runtime",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility keeps jf-autonomy-dial admitted through generated vocabulary, schema and runtime",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility canonicalizes a plugin surface at construction while retaining identity, provenance and brand",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility canonicalizes an owned shape factory without permitting a different owner to replace it",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility canonicalizes both ranked and override renderer dispatch results",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility canonicalizes hints through the production XUiRendererControl",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 cold production registration and authoring compatibility canonicalizes the factory-absent Stage fallback",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b8b62a132d38097910f8fdd9e1d8eae7f6de6efcea3ae8514b78526e0130b2f6"
+}

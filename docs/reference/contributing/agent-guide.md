@@ -602,9 +602,8 @@ Four `gh` CLI quirks (tempdoc 695, 930) worth knowing at merge/wait time:
   which reverts that PR on push. Re-fetch immediately before every comparison
   and verify `git log -1 --format=%P` after any soft reset.
 
-`node scripts/dev/run-gh.mjs enqueue N` validates the squash preview and managed review
-record, then enables squash auto-merge bound to the validated head, title and body. A new push
-requires a new enqueue. After enqueue, run its printed command in the background:
+Follow [ADR-0053 § Decision](../../decisions/0053-one-pr-ci-run-and-squash-auto-merge.md#decision) for validated squash enqueueing.
+After enqueue, run its printed command in the background:
 `node scripts/dev/run-gh.mjs merge-wait N --head <validated-head-sha> --timeout-sec 5400`
 (include `--repo owner/repo` if enqueue used it). The 40-hex `--head` binds observation to
 the enqueued head; omitting it watches the first poll's head. The observer polls every
@@ -618,22 +617,9 @@ Exit 0 means merged. Exit 1 means follow-up
 work on the same task; the message says what needs attention and when to enqueue again.
 Exit 3 means inspect the PR, then start observing again; enqueue again only if the message
 says to. Exit 2 means retry once, then investigate if it fails again.
-The PR runs the union of lanes that consume its changed files; all
-required names report, including intentional skips. Unknown inputs run every lane. Strict stays
-off, so an older green base needs no update push. There is no merge queue.
-`Measured axe` is required: serious and critical accessibility violations block merges.
-It runs for frontend inputs on PRs and always on main pushes and dispatch; unselected PRs
-report skipped, as the required `jseval Python suite` does.
 
-After merging, run `node scripts/dev/run-gh.mjs run-wait-sha <merge commit>`. Main runs the full
-suite, including both integration tiers (system-tests and module), Windows stop-census, supervisor
-conformance and Measured axe. The module tier runs app-api, app-services, indexing, reranker and ui
-integration tests on Linux. Both integration tiers run only on main pushes and manual dispatch;
-neither is a required PR check.
-Its running CI is never cancelled; only the newest pending commit runs, and the wait command
-follows a newer run that covers the requested commit. If main fails in your change's area, open
-a fix or revert PR at once through the normal path. Report a failure in a test listed in
-`scripts/ci/pr-flakes.tsv`; do not revert for that listed flake.
+For CI selection, publication and post-merge verification, follow [ADR-0053 § Decision](../../decisions/0053-one-pr-ci-run-and-squash-auto-merge.md#decision)
+and its [Measured axe amendment](../../decisions/0053-one-pr-ci-run-and-squash-auto-merge.md#amendment-2026-10-24-measured-axe-becomes-required).
 
 Validate the local reproduction inventory with `node scripts/ci/run-publish-preflight.mjs --check`
 before pushing. Confirm the merge with `node scripts/dev/run-gh.mjs merge-wait N` before cleanup.

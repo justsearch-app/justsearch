@@ -41,16 +41,10 @@ import {
   subscribeAgentChat,
 } from '../state/agentChatState.js';
 import {
-  serializeUnifiedChat,
-  restoreUnifiedChat,
-  subscribeUnifiedChat,
-} from '../state/unifiedChatState.js';
-import {
   getConversationListState,
   restoreActiveConversation,
   subscribeConversationList,
 } from '../state/conversationListStore.js';
-import * as selectionStateMod from '../state/selectionState.js';
 import { projectAsNavigation } from './URLProjector.js';
 import { registerStore, type StoreAdapter } from './storeRegistry.js';
 import {
@@ -85,7 +79,6 @@ export function registerCoreStores(): void {
   registerStore(buildSearchFiltersAdapter());
   registerStore(buildAskChatAdapter());
   registerStore(buildAgentChatAdapter());
-  registerStore(buildUnifiedChatAdapter());
   registerStore(buildSv3ConversationAdapter());
   registerFrontendSurfaceSchemas();
 }
@@ -259,67 +252,6 @@ function buildAskChatAdapter(): StoreAdapter {
         const out: StateSnapshot = {};
         if (s.query) out.query = s.query;
         if (s.docIds.length > 0) out.docIds = s.docIds;
-        listener(out);
-      });
-    },
-  };
-}
-
-function buildUnifiedChatAdapter(): StoreAdapter {
-  return {
-    storeId: 'unified-chat',
-    serialize(): StateSnapshot {
-      // Tempdoc 526 §14.5 T7 — selectionState.result-set is the source of
-      // truth for docIds. We pull from selectionState here so existing
-      // surface state-schema bindings (`{storeId: 'unified-chat',
-      // storeKey: 'docIds'}`) keep persisting the right data to the URL
-      // without requiring a server-side surface catalog change.
-      const s = serializeUnifiedChat();
-      const out: StateSnapshot = {};
-      if (s.query) out.query = s.query;
-      if (s.affordance) out.affordance = s.affordance;
-      const cur = selectionStateMod.getSelection().items[0];
-      if (cur && cur.kind === 'result-set' && cur.items.length > 0) {
-        out.docIds = cur.items.map((r) => r.id);
-      }
-      return out;
-    },
-    restore(snapshot: StateSnapshot): void {
-      restoreUnifiedChat({
-        query: snapshot.query as string | string[] | undefined,
-        affordance: snapshot.affordance as string | string[] | undefined,
-      });
-      // Tempdoc 526 §14.5 T7 — bridge ?docIds= → selectionState.result-set.
-      // The legacy URL key persists for one release; the destination is the
-      // substrate, not the legacy store.
-      const raw = snapshot.docIds;
-      const ids =
-        typeof raw === 'string' ? [raw] : Array.isArray(raw) ? (raw as string[]) : [];
-      if (ids.length > 0) {
-        selectionStateMod.setSingleSelection(
-          {
-            kind: 'result-set',
-            items: ids.map((id) => ({ id, kind: 'doc' as const })),
-            capabilities: selectionStateMod.DEFAULT_CAPABILITIES_BY_KIND['result-set'],
-          },
-          'core.url-restore',
-        );
-      }
-    },
-    subscribe(listener: (s: StateSnapshot) => void): () => void {
-      // Tempdoc 526 §16 F9 — single subscription path. The legacy listener
-      // reads the selection state synchronously on each emit. Selection-only
-      // changes (e.g., F9 menu picks) don't re-emit a URL snapshot: that's
-      // correct because URL state for selection rides through the same
-      // legacy `docIds` URL key.
-      return subscribeUnifiedChat((s) => {
-        const out: StateSnapshot = {};
-        if (s.query) out.query = s.query;
-        if (s.affordance !== 'none') out.affordance = s.affordance;
-        const cur = selectionStateMod.getSelection().items[0];
-        if (cur && cur.kind === 'result-set' && cur.items.length > 0) {
-          out.docIds = cur.items.map((r) => r.id);
-        }
         listener(out);
       });
     },

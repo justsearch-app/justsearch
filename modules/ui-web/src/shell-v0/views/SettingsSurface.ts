@@ -1481,8 +1481,8 @@ export class SettingsSurface extends JfElement {
         <h3>${icon({ name: 'layers', size: 12 })} Interface</h3>
         ${this.renderSettingRow(
           'Mode',
-          'Detailed mode shows technical detail and unlocks AI runtime configuration, GPU controls, ' +
-            'Lucene search syntax, and library management tools.',
+          'Detailed mode shows technical detail and unlocks AI runtime configuration, GPU controls ' +
+            'and library management tools. Search mode supports quotes, -exclusions, title: and author: in both views.',
           html`
             <jf-option-button-group
               .options=${options}

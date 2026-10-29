@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { compareUnifiedTurnItems, projectLiveAgentActivity, projectUnifiedThread, type ThreadEvent } from './unifiedThreadProjection.js';
+import { projectUnifiedThread, type ThreadEvent } from './unifiedThreadProjection.js';
 import { projectSv3RecordTurns } from './search-v3/sv3-record.js';
 
 const at = '2026-10-23T02:04:45.355494108Z';
@@ -77,10 +77,16 @@ describe('canonical record occurrence order (WU4/WU5/WU7/WU9)', () => {
     expect(projectUnifiedThread(input).map(i => i.content)).toEqual(['same first', 'same second', 'later']);
   });
 
-  it('preserves standalone ID ties and padded live IDs beyond nine (WU10)', () => {
-    const input = projectUnifiedThread([row('z', 'ERROR', 'first'), row('a', 'USER_MESSAGE', 'second')]);
-    expect([...input].sort(compareUnifiedTurnItems).map(i => i.id)).toEqual(['a', 'z']);
-    const live = Array.from({ length: 12 }, (_, i) => ({ id: `live-${String(i).padStart(3, '0')}`, type: 'progress' as const, content: `${i}`, timestamp: 1 }));
-    expect(projectLiveAgentActivity([...live].reverse(), {}).map(i => i.id)).toEqual(live.map(i => i.id));
-  });
+});
+
+it('SA15 retains canonical workflow grouping without the retired live/record merge', () => {
+  const input = [row('z', 'USER_MESSAGE', 'outside'), row('s', 'PROGRESS', '', { nodeBoundary: 'start', nodeId: 'one' }),
+    row('y', 'ASSISTANT_MESSAGE', 'inside one'), row('e', 'PROGRESS', '', { nodeBoundary: 'end' }),
+    row('s2', 'PROGRESS', '', { nodeBoundary: 'start', nodeId: 'two' }), row('a', 'ERROR', 'inside two'),
+    row('e2', 'PROGRESS', '', { nodeBoundary: 'end' })];
+  const original = JSON.stringify(input);
+  expect(projectUnifiedThread(input).map(i => [i.content, i.segment?.nodeId])).toEqual([
+    ['outside', undefined], ['inside one', 'one'], ['inside two', 'two'],
+  ]);
+  expect(JSON.stringify(input)).toBe(original);
 });

@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:43a785d7580a8b25bd55895a88e6300605bf7adcd38a4fa7b5c901d687dac8e9",
+    "adapterPatch": "gates/test-intent/evidence/wp2.3a-filters/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, vitest with two workers, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-28T23:48:34.226Z",
+  "revision": "ae33f45a2e429c6a63b52ca8f971d12d408c2419",
+  "tree": "873691ddfbebcd71d7cdfbd4bf3324733a012423",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.knowledge.SearchRestrictionsTest.exactMaximumNullAndZeroSemantics\" --tests \"io.justsearch.app.api.knowledge.SearchRestrictionsTest.decimalParsingNeverRoundsAnInvalidBoundIntoTheDomain\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2157
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/SearchRestrictionsTest.java#exactMaximumNullAndZeroSemantics",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/SearchRestrictionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:577ce63586b9f3da907698e0bc82dcb42cb1408a0626aa111958bcf97d048cbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exactMaximumNullAndZeroSemantics()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/SearchRestrictionsTest.java#decimalParsingNeverRoundsAnInvalidBoundIntoTheDomain",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/SearchRestrictionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:577ce63586b9f3da907698e0bc82dcb42cb1408a0626aa111958bcf97d048cbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decimalParsingNeverRoundsAnInvalidBoundIntoTheDomain()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2eabb0940adc1d78e2815861b35ebc8e6364bc1cc81f3847bc4a3e210fce802e"
+}

@@ -645,10 +645,24 @@ export async function consumeShapeStream(
       `consumeShapeStream: HTTP ${response.status} from ${target} — ${text.slice(0, 200)}`,
     ) as Error & {
       status?: number;
+      code?: string;
       runNotFound?: RunNotFoundDetail;
       chatRefusal?: ChatRefusalDetail;
     };
     err.status = response.status;
+    // Restriction validation happens before SSE admission. Keep its sanitized field error so
+    // Search can put it beside the control, rather than losing it inside an HTTP diagnostic.
+    if (response.status === 400) {
+      try {
+        const failure = JSON.parse(text) as { errorCode?: unknown; error?: unknown };
+        if (failure.errorCode === 'INVALID_REQUEST' && typeof failure.error === 'string'
+          && /^(pathPrefix|modifiedAt|sizeBytes)([.:]|$)/.test(failure.error)) {
+          err.message = failure.error;
+          err.code = 'INVALID_REQUEST';
+        }
+      } catch { /* Non-JSON failures keep the existing diagnostic. */ }
+    }
+
     // Spec A step 9 — a refused chat request carries a typed refusal (why, and whether a person may
     // load chat anyway); the chat window words it instead of showing the raw HTTP error.
     const refusal = parseChatRefusal(text);

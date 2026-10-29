@@ -1,0 +1,30 @@
+{
+  "java": [
+    "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x1PhraseStaysWithinOneField",
+    "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x2ExclusionsApplyAcrossFieldsAndPhrases",
+    "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x3RequiredClausesComposeAcrossFieldsWithOptionalWords",
+    "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x4UnsupportedPunctuationIsLiteralInsideAdvancedQueries",
+    "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x6InvalidQueriesFailWithSpecificReasons",
+    "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x7PlainSearchEqualsHistoricalSimpleAndRawLuceneStillWorks",
+    "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#x5AdvancedSearchOverridesSemanticPipelineAndKeepsExplicitFilters",
+    "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#x6SearchRejectsInvalidSyntaxBeforeWorkerSearch",
+    "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#x7PlainSearchKeepsSimpleDispatchAndExpansionEligibility",
+    "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/FacetQuerySyntaxCouplingTest.java#x5SearchSubsetKeepsResultsCountsAndFacetsLexicalOnBothPasses",
+    "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/FacetQuerySyntaxCouplingTest.java"
+  ],
+  "ui": [
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 explicit submit keeps text and renders the Engine reason under the bar without stale rows",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 automatic 400 stays quiet and schedules no refined request then a correction resumes",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x5 withholds prior counts and facets while the new query awaits its Engine classification",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x5 advanced quick results keep counts and facets pending until refinement",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x8 legacy URL restoration keeps operator text and uses Search syntax",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 each edit supersedes an older success and an older error body",
+    "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) omits filters key when no active filter (quick pass carries the cheap pipeline)",
+    "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) buildSearchIntent is the one constructor: identical inputs \u2192 identical bodies",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 Delegate sends operator characters without a Search syntax claim",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 ask sends operator characters as prompt text",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 structured sends operator characters as prompt text",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 model-only sends operator characters as prompt text",
+    "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 restored quoted Search draft keeps its text and requires the existing review before Search"
+  ]
+}

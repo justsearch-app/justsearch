@@ -381,19 +381,26 @@ public final class RAGContext implements ContextInjector {
     // ASK can be scoped the same way a search is. Absent (the FE does not send it yet) = an empty
     // list = the default scope, i.e. behavior unchanged.
     List<String> collection = extractStringList(body, "collection");
+    var restrictions = io.justsearch.app.api.knowledge.SearchRestrictions.parse(body.get("filters"));
+    boolean restricted = io.justsearch.app.api.knowledge.SearchRestrictions.active(restrictions);
 
     // Try chunked RAG retrieval. When docIds is empty, use open-retrieval
     // (BM25 pre-search discovers relevant documents from the full index).
     RetrievalAttempt attempt;
     if (docIds.isEmpty()) {
-      attempt = tryOpenRetrieval(budget, question, topK, excludedSourceIds, collection, engineContext);
+      attempt = tryOpenRetrieval(budget, question, topK, excludedSourceIds, collection, restrictions, engineContext);
     } else {
       try {
-        attempt = tryRetrieveContext(question, docIdSet, topK, excludedSourceIds, collection, engineContext);
+        attempt = tryRetrieveContext(question, docIdSet, topK, excludedSourceIds, collection, restrictions, engineContext);
       } catch (RuntimeException e) {
         if (EngineRequestEnds.isDeadline(e)) return retrievalTimeout();
         throw e;
       }
+    }
+    if (attempt.failed() && (restricted || !attempt.failureCode().isEmpty())) {
+      if (attempt.timedOut()) return retrievalTimeout();
+      return InjectorResult.terminalError(errorEvent("RAG context retrieval failed",
+          attempt.failureCode().isEmpty() ? "RETRIEVAL_FAILED" : attempt.failureCode()));
     }
     ContextResult retrieval = attempt.result();
     String context = retrieval == null ? null : retrieval.context();
@@ -440,11 +447,16 @@ public final class RAGContext implements ContextInjector {
     boolean wholeDocumentFallback = false;
 
     // Fallback to whole-document fetch when chunks are unavailable or empty.
-    if (context == null || context.isBlank() || chunksUsed == 0) {
+    if (context == null || context.isBlank() || (chunksUsed == 0 && !restricted)) {
       if ("FALLBACK_FAILED".equals(retrievalModeReason)) {
         Map<String, Object> err = errorPayload("RAG context retrieval failed", "FETCH_FAILED");
         err.put("docIds", docIds);
         return InjectorResult.terminalError(new SseEvent("error", err));
+      }
+      if (restricted) {
+        Map<String, Object> err = errorPayload("No matching documents found with the supplied restrictions", "NO_CONTENT");
+        err.put("retrievalScoped", true);
+        return terminalRetrievalError(err, ragMeta);
       }
       if (docIds.isEmpty()) {
         // Tempdoc 806 B.2 (round-12): an unscoped ask whose retrieval never COMPLETED used to answer
@@ -812,13 +824,21 @@ public final class RAGContext implements ContextInjector {
    * @param timedOut the attempt exceeded its budget (this instance's timeout, or the Worker RPC deadline)
    * @param failed the attempt did not complete for any reason, timeout included
    */
-  private record RetrievalAttempt(ContextResult result, boolean timedOut, boolean failed) {
+  private record RetrievalAttempt(ContextResult result, boolean timedOut, boolean failed, String failureCode) {
     static RetrievalAttempt ok(ContextResult result) {
-      return new RetrievalAttempt(result, false, false);
+      return new RetrievalAttempt(result, false, false, "");
     }
 
     static RetrievalAttempt from(Exception e) {
-      return new RetrievalAttempt(null, EngineRequestEnds.isDeadline(e), true);
+      Throwable cause = e;
+      while ((cause instanceof java.util.concurrent.CompletionException
+          || cause instanceof java.util.concurrent.ExecutionException) && cause.getCause() != null) {
+        cause = cause.getCause();
+      }
+      String code = cause instanceof io.justsearch.app.api.knowledge.KnowledgeClientException port
+          && port.status() == io.justsearch.app.api.knowledge.KnowledgeClientException.Status.RESOURCE_EXHAUSTED
+          ? "RESOURCE_EXHAUSTED" : "";
+      return new RetrievalAttempt(null, EngineRequestEnds.isDeadline(e), true, code);
     }
   }
 
@@ -832,12 +852,14 @@ public final class RAGContext implements ContextInjector {
 
   private RetrievalAttempt tryRetrieveContext(
       String question, Set<String> docIdSet, int topK, List<String> excludedSourceIds,
-      List<String> collection, EngineContext engineContext) {
+      List<String> collection, io.justsearch.app.api.knowledge.KnowledgeSearchRequest.Filters restrictions,
+      EngineContext engineContext) {
     try {
       // Tempdoc 610 §J.3 — go through the rich params path so the hidden-source exclusion threads to
       // the Worker. maxContextTokens=0 preserves the scoped path's char-budget behavior.
       RetrieveContextParams params =
-          RetrieveContextParams.of(question, topK, 0, docIdSet, excludedSourceIds, collection);
+          RetrieveContextParams.of(question, topK, 0, docIdSet, excludedSourceIds, collection)
+              .withRestrictions(restrictions);
       return RetrievalAttempt.ok(
           documents
               .retrieveContext(params, engineContext)
@@ -859,7 +881,8 @@ public final class RAGContext implements ContextInjector {
       String question,
       int topK,
       List<String> excludedSourceIds,
-      List<String> collection, EngineContext engineContext) {
+      List<String> collection, io.justsearch.app.api.knowledge.KnowledgeSearchRequest.Filters restrictions,
+      EngineContext engineContext) {
     try {
       // Tempdoc 845 — the honest budget, not a hardcoded 8192/1024. This one crosses the wire as
       // the Worker's maxContextTokens, so it decides how many passages come back: an over-budget
@@ -870,7 +893,8 @@ public final class RAGContext implements ContextInjector {
       int budgetTokens = Math.max(1, budget.inputBudget());
       RetrieveContextParams params =
           RetrieveContextParams.of(
-              question, topK, budgetTokens, Set.of(), excludedSourceIds, collection);
+              question, topK, budgetTokens, Set.of(), excludedSourceIds, collection)
+                  .withRestrictions(restrictions);
       return RetrievalAttempt.ok(
           documents
               .retrieveContext(params, engineContext)

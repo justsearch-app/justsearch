@@ -268,7 +268,7 @@ final class RagContextOps {
     // We find matching parents first, then scope chunk search to those doc IDs.
     Set<String> effectiveDocIds = docIds;
     if (hasDocLevelFilters(filters)) {
-      var parentFilter = QueryFilterBuilder.buildFilterQueryOnly(withIncludeChunks(filters, false));
+      var parentFilter = QueryFilterBuilder.buildFilterQueryOnly(withIncludeChunks(filters, false).withDocIds(List.copyOf(docIds)));
       if (parentFilter != null) {
         Set<String> matchingParents =
             chunkSearchOps.findMatchingParentDocIds(parentFilter, 10_000);
@@ -1045,6 +1045,7 @@ final class RagContextOps {
         || request.getEntityOrganizationsCount() > 0
         || request.getEntityLocationsCount() > 0
         || request.hasModifiedAt()
+        || request.hasSizeBytes()
         || request.getMetaSourceCount() > 0
         || request.getMetaAuthorCount() > 0
         || request.getMetaCategoryCount() > 0
@@ -1075,6 +1076,10 @@ final class RagContextOps {
         .pathPrefix(request.getPathPrefix())
         .modifiedFromMs(fromMs > 0 ? fromMs : null)
         .modifiedToMs(toMs > 0 ? toMs : null)
+        .sizeFromBytes(request.hasSizeBytes() && request.getSizeBytes().hasFromBytes()
+            ? request.getSizeBytes().getFromBytes() : null)
+        .sizeToBytes(request.hasSizeBytes() && request.getSizeBytes().hasToBytes()
+            ? request.getSizeBytes().getToBytes() : null)
         .includeChunks(true)
         .entityPersons(request.getEntityPersonsList())
         .entityOrganizations(request.getEntityOrganizationsList())
@@ -1833,7 +1838,8 @@ final class RagContextOps {
         || nonEmpty(f.metaAuthor()) || nonEmpty(f.metaCategory())
         || f.metaPublishedFromMs() != null || f.metaPublishedToMs() != null
         || (f.pathPrefix() != null && !f.pathPrefix().isBlank())
-        || f.modifiedFromMs() != null || f.modifiedToMs() != null;
+        || f.modifiedFromMs() != null || f.modifiedToMs() != null
+        || f.sizeFromBytes() != null || f.sizeToBytes() != null;
   }
 
   private static boolean nonEmpty(List<?> list) {

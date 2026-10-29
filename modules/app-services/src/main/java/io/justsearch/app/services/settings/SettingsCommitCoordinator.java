@@ -354,6 +354,13 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   @Override
   public PreparedGenerationProjection prepareInstallerGenerationProjection(Reservation reservation,
       UiSettings candidate, AttemptControl control, RecordedInstallerGenerationPlan plan) {
+    return prepareInstallerGenerationProjection(reservation, candidate, control, plan, null);
+  }
+
+  @Override
+  public PreparedGenerationProjection prepareInstallerGenerationProjection(Reservation reservation,
+      UiSettings candidate, AttemptControl control, RecordedInstallerGenerationPlan plan,
+      GenerationEncoders encoders) {
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(control, "control");
     Objects.requireNonNull(plan, "plan");
@@ -393,6 +400,12 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       // must not recompose those same native sessions.
       Map<String, Set<String>> ordinaryComponents = ordinaryInstallerComponents(
           changed.component(), desired, plan);
+      if (encoders != null) {
+        // Only B's physical owner can consume these changes. The ordinary entry point still
+        // prepares non-path encoder drift through its guarded fixed owner.
+        encoders.requireRealized(desired, ordinaryComponents.getOrDefault("encoders", Set.of()));
+        ordinaryComponents.remove("encoders");
+      }
       if (!ordinaryComponents.isEmpty()) {
         preparedComponents = Objects.requireNonNull(components.prepare(preparedSettings.settings(),
             desired, ordinaryComponents), "Prepared installer components");

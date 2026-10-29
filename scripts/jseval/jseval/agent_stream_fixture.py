@@ -145,28 +145,9 @@ def sse_frame(event: str, payload: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
 
-# --- The one deterministic DONE run -----------------------------------------------------
-#
-# The minimal frame list that drives the activity rail's EXPANDED body to its full state:
-#   session_started -> the run exists (clears the "no run" summary),
-#   budget_update   -> the budget row + bar (tokensConsumed/tokensRemaining) AND the context
-#                      meter (promptTokens + contextWindow, both > 0 — `projectContextHorizon`
-#                      returns null without them, so the meter would silently not render),
-#   chunk           -> streamed answer text, so the conversation zone holds a real answer,
-#   done            -> the terminal frame. Without it `pumpHostAiStream` throws
-#                      STREAM_INCOMPLETE and the capture paints "Connection lost".
-#
-# DELIBERATELY NO `sources`/`citations` ON `done` (both optional in the schema): the evidence
-# rail's grounding comes from the THREAD RECORD (`ui_fixtures._thread_body`'s
-# `attributes.sources`, hydrated by `UnifiedChatView.hydrateAnswerEvidenceFromRecord` on the
-# post-run refresh). Keeping ONE provider is what makes the D1 assertion falsifiable: strip the
-# record's sources and the `.evidence-rail` requiredSelectors row goes red. If `done` also
-# carried sources the rail would be over-determined and that negative control would stay green.
-#
-# Budget arithmetic (budgetProjection.ts): ceiling = totalTokensConsumed + tokensRemaining =
-# 8192, pct = 22 (green, NOT the over-budget alarm — a DONE run is a fact, not an alarm).
-# Context: 3072 / 4096 = 75% (yellow), and 4096 matches `_inference_body`'s reported
-# `llmContextTokens` so the two fixtures cannot tell different stories about the same model.
+# A wire-valid completed run: session identity, measured budget/context, answer, terminal.
+# Sources are intentionally absent here. Record-based evidence cameras read canonical thread
+# sources; the held budget fixture reuses sse_frame validation with an open transport instead.
 DONE_RUN: tuple[tuple[str, dict[str, Any]], ...] = (
     ("session_started", {"sessionId": "fixture-agent-run-0001"}),
     (

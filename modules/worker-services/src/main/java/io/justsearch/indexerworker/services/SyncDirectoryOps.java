@@ -221,6 +221,18 @@ final class SyncDirectoryOps {
   }
 
   /**
+   * A walk member {@link #discoverCandidateDifference} could not read: the walk an ordinary sync
+   * makes keeps going past it and reports delete detection unverified.
+   */
+  static final class UnreadableWalkMemberException extends IOException {
+    private static final long serialVersionUID = 1L;
+
+    UnreadableWalkMemberException(String message, IOException cause) {
+      super(message, cause);
+    }
+  }
+
+  /**
    * Discovers a root difference for candidate-scoped admission.
    *
    * <p>Unlike ordinary maintenance sync, every incomplete observation throws. The caller cannot
@@ -267,7 +279,8 @@ final class SyncDirectoryOps {
               if (!dir.equals(root) && nativePolicy != null
                   && nativePolicy.excludesDirectory(dir, root, collection)) return FileVisitResult.SKIP_SUBTREE;
               if (!Files.isReadable(dir)) {
-                throw new IOException("Reconciliation directory is unreadable: " + dir);
+                throw new UnreadableWalkMemberException(
+                    "Reconciliation directory is unreadable: " + dir, null);
               }
               if (!dir.equals(root)) {
                 String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
@@ -297,7 +310,8 @@ final class SyncDirectoryOps {
                 return FileVisitResult.CONTINUE;
               }
               if (!Files.isReadable(file)) {
-                throw new IOException("Reconciliation file is unreadable: " + file);
+                throw new UnreadableWalkMemberException(
+                    "Reconciliation file is unreadable: " + file, null);
               }
               if ((nativePolicy == null ? !IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
                       : nativePolicy.allows(file, root, collection)) && !isCloudPlaceholder(file)) {
@@ -321,7 +335,8 @@ final class SyncDirectoryOps {
               if (!file.equals(root) && nativePolicy != null
                   && nativePolicy.excludesDirectory(file, root, collection)
                   && Files.isDirectory(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return FileVisitResult.CONTINUE;
-              throw new IOException("Reconciliation walk could not read: " + file, failure);
+              throw new UnreadableWalkMemberException(
+                  "Reconciliation walk could not read: " + file, failure);
             }
 
             @Override

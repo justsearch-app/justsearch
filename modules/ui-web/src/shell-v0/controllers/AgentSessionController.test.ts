@@ -45,7 +45,6 @@ import {
 } from '../substrates/effects/index.js';
 // WP6.2 — both windows' live projections, fed from this controller's state as the views feed them.
 import { projectSv3RunFeed } from '../views/search-v3/sv3-run.js';
-import { projectLiveAgentActivity } from '../views/unifiedThreadProjection.js';
 
 // ---------- SSE mock helpers ----------
 
@@ -1216,7 +1215,7 @@ describe('AgentSessionController interaction methods', () => {
 
   // WP6.2 S8.2 — the run's final report on a direction comes after `done` (the loop reports what it
   // never sent once it has stopped); the live display must take it, not keep "queued" for ever.
-  it('a final outcome reported after done reaches the live display of both windows', async () => {
+  it('a final outcome reported after done reaches the live display of Search', async () => {
     globalThis.fetch = mockFetchSse(
       sseChunk('session_started', { sessionId: 'sess-late' }) +
         sseChunk('directive_acknowledged', { directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' }) +
@@ -1234,10 +1233,7 @@ describe('AgentSessionController interaction methods', () => {
     expect(notes.map((n) => (n.kind === 'note' ? [n.label, n.text] : null))).toEqual([
       ['Not applied', "Answer in French. (the run finished before the agent's next step)"],
     ]);
-    const live = projectLiveAgentActivity(ctrl.conversation, ctrl.toolCalls).filter((i) => i.attributes.steer);
-    expect(live.map((i) => i.attributes)).toEqual([
-      { steer: true, directiveId: 'd1', directiveOutcome: 'not_applied', directiveReason: 'run_finished' },
-    ]);
+
   });
 
   it('after done, only direction reports still reach the display', async () => {
@@ -1305,33 +1301,24 @@ describe('AgentSessionController interaction methods', () => {
     expect(notes[0]?.content).not.toMatch(/not applied|finished/i);
   });
 
-  /** Both windows' live display of a run: Search v3's feed notes and the old window's projected items. */
-  function bothWindows(c: AgentSessionController): { v3: string[][]; old: string[][] } {
-    const v3 = projectSv3RunFeed(c, 0).items.flatMap((i) => (i.kind === 'note' ? [[i.label, i.text]] : []));
-    const old = projectLiveAgentActivity(c.conversation, c.toolCalls).flatMap((i) =>
-      i.attributes.steer === true
-        ? [['direction', i.content, String(i.attributes.directiveOutcome)]]
-        : i.kind === 'progress'
-          ? [['note', i.content]]
-          : [],
-    );
-    return { v3, old };
+  /** Search's surviving live feed. */
+  function searchFeed(c: AgentSessionController): { v3: string[][] } {
+    return { v3: projectSv3RunFeed(c, 0).items.flatMap(i => i.kind === 'note' ? [[i.label, i.text]] : []) };
   }
 
-  it('a lost answer to a direction the run took shows only the run report, in both windows', async () => {
+  it('a lost answer to a direction the run took shows only the run report, in Search', async () => {
     ctrl.sessionId = 'sess-lost';
     // The run reports the direction queued, echoing the send's request id, while the POST is in
     // flight; then the answer is lost.
     globalThis.fetch = takenSteer(ctrl, 'd1', 'lost');
     expect(await ctrl.steer('Answer in French.')).toBe(false);
     ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
-    expect(bothWindows(ctrl)).toEqual({
+    expect(searchFeed(ctrl)).toEqual({
       v3: [['Steered', 'Answer in French.']],
-      old: [['direction', 'Answer in French.', 'applied']],
     });
   });
 
-  it('a 5xx answer is settled by the run report that follows it, in both windows', async () => {
+  it('a 5xx answer is settled by the run report that follows it, in Search', async () => {
     ctrl.sessionId = 'sess-5xx';
     let requestId: string | undefined;
     globalThis.fetch = vi.fn((_url: string, init?: RequestInit) => {
@@ -1339,8 +1326,7 @@ describe('AgentSessionController interaction methods', () => {
       return Promise.resolve(new Response('bad gateway', { status: 502 }));
     }) as unknown as typeof fetch;
     expect(await ctrl.steer('Answer in French.')).toBe(false);
-    expect(bothWindows(ctrl).v3).toHaveLength(1);
-    expect(bothWindows(ctrl).old).toHaveLength(1);
+    expect(searchFeed(ctrl).v3).toHaveLength(1);
     ctrl.onDirectiveAcknowledged({
       directiveText: 'Answer in French.',
       directiveId: 'd2',
@@ -1348,9 +1334,8 @@ describe('AgentSessionController interaction methods', () => {
       clientRequestId: requestId,
     });
     ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd2', outcome: 'applied' });
-    expect(bothWindows(ctrl)).toEqual({
+    expect(searchFeed(ctrl)).toEqual({
       v3: [['Steered', 'Answer in French.']],
-      old: [['direction', 'Answer in French.', 'applied']],
     });
   });
 
@@ -1386,20 +1371,19 @@ describe('AgentSessionController interaction methods', () => {
     }) as unknown as typeof fetch;
   }
 
-  it('a blocked send keeps its note when an identical later send is reported, in both windows', async () => {
+  it('a blocked send keeps its note when an identical later send is reported, in Search', async () => {
     ctrl.sessionId = 'sess-f2';
     globalThis.fetch = blockedSteer();
     expect(await ctrl.steer('Answer in French.')).toBe(false);
     globalThis.fetch = takenSteer(ctrl, 'd1', 'ok');
     expect(await ctrl.steer('Answer in French.')).toBe(true);
     ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
-    expect(bothWindows(ctrl)).toEqual({
+    expect(searchFeed(ctrl)).toEqual({
       v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
-      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
     });
   });
 
-  it('a blocked send is not settled by an earlier identical send reported after it failed, in both windows', async () => {
+  it('a blocked send is not settled by an earlier identical send reported after it failed, in Search', async () => {
     ctrl.sessionId = 'sess-f2r';
     // The first send is taken, but its queued report reaches the window only after the second failed.
     let firstRequestId: string | undefined;
@@ -1417,13 +1401,12 @@ describe('AgentSessionController interaction methods', () => {
       clientRequestId: firstRequestId,
     });
     ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
-    expect(bothWindows(ctrl)).toEqual({
+    expect(searchFeed(ctrl)).toEqual({
       v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
-      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
     });
   });
 
-  it('two unconfirmed identical sends are each settled only by their own report, in both windows', async () => {
+  it('two unconfirmed identical sends are each settled only by their own report, in Search', async () => {
     ctrl.sessionId = 'sess-two';
     globalThis.fetch = blockedSteer();
     expect(await ctrl.steer('Answer in French.')).toBe(false);
@@ -1431,9 +1414,8 @@ describe('AgentSessionController interaction methods', () => {
     expect(await ctrl.steer('Answer in French.')).toBe(false);
     ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd2', outcome: 'applied' });
     // The second send's report settles the second send only; the first's note stays.
-    expect(bothWindows(ctrl)).toEqual({
+    expect(searchFeed(ctrl)).toEqual({
       v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
-      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
     });
   });
 
@@ -1444,30 +1426,28 @@ describe('AgentSessionController interaction methods', () => {
     ['blocked', () => blockedSteer()],
     ['5xx', () => mockFetchError(502, 'bad gateway')],
   ] as const)(
-    "another client's report without a request id never settles this window's %s note, in both windows",
+    "another client's report without a request id never settles this window's %s note, in Search",
     async (_failure, failedSend) => {
       ctrl.sessionId = 'sess-other-client';
       globalThis.fetch = failedSend();
       expect(await ctrl.steer('Answer in French.')).toBe(false);
-      const note = bothWindows(ctrl).v3[0]!;
+      const note = searchFeed(ctrl).v3[0]!;
       ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' });
       ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
-      expect(bothWindows(ctrl)).toEqual({
+      expect(searchFeed(ctrl)).toEqual({
         v3: [note, ['Steered', 'Answer in French.']],
-        old: [['note', note[1]], ['direction', 'Answer in French.', 'applied']],
       });
     },
   );
 
   // The steer handler answers 404 only when no live run took the direction, so it is the one failure
   // that is a known refusal, still named as the run having finished.
-  it('a 404 refusal of a direction still says the run already finished, in both windows', async () => {
+  it('a 404 refusal of a direction still says the run already finished, in Search', async () => {
     ctrl.sessionId = 'gone';
     globalThis.fetch = mockFetchJson({ error: 'session not found or finished' }, 404);
     expect(await ctrl.steer('Answer in French.')).toBe(false);
-    expect(bothWindows(ctrl)).toEqual({
+    expect(searchFeed(ctrl)).toEqual({
       v3: [['Progress', 'Could not steer — the run already finished.']],
-      old: [['note', 'Could not steer — the run already finished.']],
     });
   });
 

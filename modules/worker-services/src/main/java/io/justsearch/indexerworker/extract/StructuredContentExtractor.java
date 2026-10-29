@@ -217,6 +217,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     String content = annotated.text();
     String mimeType = metadata.get(Metadata.CONTENT_TYPE);
     String title = metadata.get(TikaCoreProperties.TITLE);
+    String author = metadata.get(TikaCoreProperties.CREATOR);
 
     // Fallback: YAML frontmatter title (same as ContentExtractor)
     Map<String, String> frontmatterMeta = Map.of();
@@ -236,7 +237,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
         mimeType);
 
     return new StructuredExtractionResult(
-        new ContentExtractor.ExtractionResult(content, title, mimeType, null, frontmatterMeta),
+        new ContentExtractor.ExtractionResult(content, title, mimeType, author, frontmatterMeta),
         handler.isLimitReached() || annotated.truncated(),
         StructuredDocumentSummary.fromDocument(doc), 0, 0,
         DecodingLossAudit.isLossy(input, metadata, parseContext));

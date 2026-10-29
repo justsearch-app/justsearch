@@ -314,6 +314,46 @@ _JS_DEEP = """
     };
 """
 
+async def assert_search_state(page, name: str) -> None:
+    """A clean axe scan counts only after the promised Search state is visible.
+
+    Run at measurement time too, so deleting content after setup cannot produce an empty pass.
+    Non-Search surfaces have their own setup predicates and do not claim Search coverage.
+    """
+    from .ui_selectors import SEARCH_STATE_WITNESSES, CSS_SV3_WINDOW
+    selectors = SEARCH_STATE_WITNESSES.get(name.removesuffix("-light"))
+    if selectors is None:
+        return
+    root = page.locator(CSS_SV3_WINDOW + ":visible")
+    if await root.count() != 1:
+        raise AssertionError(f"{name}: expected exactly one visible Search window")
+    registered = await root.evaluate("el => !!customElements.get(el.localName) && !!el.shadowRoot")
+    if not registered:
+        raise AssertionError(f"{name}: Search custom element is not registered/rendered")
+    for selector in selectors:
+        loc = root.locator(selector).first
+        if await loc.count() == 0 or not await loc.is_visible():
+            raise AssertionError(f"{name}: missing visible Search state witness {selector}")
+        valid = await loc.evaluate("""el => {
+            const r = el.getBoundingClientRect();
+            const text = node => {
+                if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+                if (node instanceof Element && ['STYLE','SCRIPT','TEMPLATE'].includes(node.tagName)) return '';
+                return [...node.childNodes].map(text).join(' ') + (node.shadowRoot ? text(node.shadowRoot) : '');
+            };
+            return r.width > 0 && r.height > 0 && el.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})
+                && (el.matches('textarea,input') || text(el).trim().length > 0);
+        }""")
+        if not valid:
+            raise AssertionError(f"{name}: empty/hidden Search state witness {selector}")
+
+
+    drafts = {"chat-mode": "What is this file about?", "chat-composer-small": "A longer draft remains reachable in a small window."}
+    expected = drafts.get(name.removesuffix("-light"))
+    if expected is not None and await root.locator('[data-testid="sv3-composer-input"]').input_value() != expected:
+        raise AssertionError(f"{name}: missing prepared Search draft witness")
+
+
 # Geometry + computed-style facts for a generic key set (landmarks, stage, rail,
 # inspector, h1, the focused element) + document overflow flags. Shadow-piercing.
 # Takes `extraSels` (tempdoc 697): the current step's registered chrome-proportion
@@ -370,6 +410,7 @@ _JS_GEOMETRY = """(extraSels) => {
             role: el.getAttribute && el.getAttribute('role') || null,
             label: el.getAttribute && el.getAttribute('aria-label') || null,
             rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
+            visible: r.width > 0 && r.height > 0 && el.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}),
             z: cs.zIndex, fontSize: cs.fontSize, display: cs.display,
             chPx: chPxOf(el, cs),
             scrollable: isScroller(el),
@@ -392,6 +433,9 @@ _JS_GEOMETRY = """(extraSels) => {
     for (const s of sels) { const e = deepQuery(s); if (e) elements[s] = pick(e); }
     const scrollableRegions = [];
     for (const el of deepAll()) {
+        if (!el.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) continue;
         const cs = getComputedStyle(el);
         const oy = cs.overflowY;
         if (oy !== 'auto' && oy !== 'scroll') continue;
@@ -507,6 +551,7 @@ async def capture_measure(
     correctness judgment). Never raises — measurement is best-effort and must not
     fail a capture.
     """
+    await assert_search_state(page, name)
     # Authoritative a11y fact set: a shadow-piercing landmark/role/heading collection
     # (the native `accessibility.snapshot()` is unreliable on this shadow-DOM app).
     a11y_landmarks: list[dict[str, Any]] = []

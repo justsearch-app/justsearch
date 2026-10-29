@@ -775,15 +775,22 @@ final class KnowledgeSearchEngine {
     SearchMode searchMode = SearchPipelinePresets.parseModeOrDefault(req.mode());
     SearchQuerySyntax querySyntax = SearchPipelinePresets.parseQuerySyntaxOrDefault(req.querySyntax());
     String queryText = req.query() == null ? "" : req.query();
+    boolean advancedSearch = querySyntax == SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SEARCH
+        && io.justsearch.core.search.SearchSyntax.parse(queryText).advanced();
+    if (querySyntax == SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SEARCH && !advancedSearch) {
+      querySyntax = SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE;
+    }
 
     // 256: Phase A — derive PipelineConfig from preset or use explicit config from request.
     // Tempdoc 598 R1: when the request expresses NEITHER an explicit pipeline NOR an explicit mode,
     // the default is capability-derived AUTO (the dense leg runs iff the index is embedding-COMPATIBLE),
     // not a static keyword preset — so the main search UI reaches semantic search by default. An
     // explicit mode (incl. "text") or an explicit pipeline is an override and is honored unchanged.
-    boolean denseAuto = req.pipeline() == null && (req.mode() == null || req.mode().isBlank());
+    boolean denseAuto = !advancedSearch && req.pipeline() == null && (req.mode() == null || req.mode().isBlank());
     PipelineConfig pipelineConfig =
-        req.pipeline() != null
+        advancedSearch
+            ? new PipelineConfig(true, false, false, "none", false, false, 0, false, false)
+            : req.pipeline() != null
             ? req.pipeline()
             : denseAuto
                 ? SearchPipelinePresets.autoPreset(rerankConfig)
@@ -798,14 +805,15 @@ final class KnowledgeSearchEngine {
         ? QueryClassifier.classify(queryText) : null;
     String classificationBypassReason = !classificationEnabled ? "DISABLED"
         : explicitPipeline ? "EXPLICIT_PIPELINE"
-        : querySyntax == SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE ? "LUCENE_SYNTAX" : null;
+        : querySyntax != SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE ? "LUCENE_SYNTAX" : null;
     QueryType effectiveQueryType = classificationBypassReason != null
         ? QueryType.INFORMATIONAL : queryType;
 
     // 385: Deterministic source extraction for structured queries (#10).
     // Synchronous (~0ms, regex against cached vocabulary). Results used by Phase 2/3 items.
     StructuredQueryAnalyzer.StructuredQueryAnalysis structuredAnalysis =
-        StructuredQueryAnalyzer.analyze(queryText, statusCache.sourceVocabulary());
+        advancedSearch ? new StructuredQueryAnalyzer.StructuredQueryAnalysis(List.of(), queryText)
+            : StructuredQueryAnalyzer.analyze(queryText, statusCache.sourceVocabulary());
     if (log.isDebugEnabled() && !structuredAnalysis.detectedSources().isEmpty()) {
       log.debug("385: source detection: sources={}, vocabSize={}",
           structuredAnalysis.detectedSources(), statusCache.sourceVocabulary().size());
@@ -840,7 +848,7 @@ final class KnowledgeSearchEngine {
       if (isExpansionEligible(
           pipelineConfig, querySyntax, queryText, req.cursor(), onlineAiService.isAvailable(),
           effectiveQueryType)) {
-        if (structuredAnalysis.detectedSources().size() >= 2) {
+        if (!advancedSearch && structuredAnalysis.detectedSources().size() >= 2) {
           expansionSkipReason = "PER_SOURCE_RETRIEVAL";
         } else if (expansionCompletionBy - System.nanoTime() <= 0) {
           expansionSkipReason = "TIMEOUT";
@@ -893,7 +901,7 @@ final class KnowledgeSearchEngine {
 
       // 366: Fire filter normalization async when explicit filters are present (mutually exclusive with QU)
       CompletableFuture<FilterNormalizationService.NormResult> normFuture = null;
-      if (hasExplicitFilters) {
+      if (hasExplicitFilters && !advancedSearch) {
         normFuture = normService.normalizeIfAvailable(req.filters(), statusCache.getCachedFacetSnapshot(),
             engineContext, capturedConfig.search().filterNormalizationEnabled());
       }
@@ -972,7 +980,7 @@ final class KnowledgeSearchEngine {
       }
 
       // 385: Temporal range injection when no QU boost is active (#9)
-      if (boost == null && !hasExplicitFilters) {
+      if (boost == null && !hasExplicitFilters && !advancedSearch) {
         SearchRequestMapper.applyTemporalOnlyBoost(b, temporalExtraction);
       }
 
@@ -986,12 +994,12 @@ final class KnowledgeSearchEngine {
       // 385: Per-source retrieval for queries with 2+ detected sources (#6 + #1).
       // Gate: any query mentioning 2+ sources benefits from balanced per-source retrieval,
       // not just COMPARISON queries (FeB4RAG research). Answer type remains a separate hint.
-      if (structuredAnalysis.detectedSources().size() >= 2) {
+      if (!advancedSearch && structuredAnalysis.detectedSources().size() >= 2) {
         resp = withinHead(head, () -> perSourceSearch.execute(
             client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext));
       } else {
         // Single-source: inject detected sources as boost if no boost already set
-        if (!structuredAnalysis.detectedSources().isEmpty() && !b.hasBoostFilters()) {
+        if (!advancedSearch && !structuredAnalysis.detectedSources().isEmpty() && !b.hasBoostFilters()) {
           SearchFilters.Builder srcBoost = SearchFilters.newBuilder();
           for (String src : structuredAnalysis.detectedSources()) {
             srcBoost.addMetaSource(src.toLowerCase(Locale.ROOT));

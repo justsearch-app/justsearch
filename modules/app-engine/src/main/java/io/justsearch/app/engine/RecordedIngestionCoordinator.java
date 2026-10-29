@@ -1472,6 +1472,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
   @Override public PreparedCompositeProjection prepareRecordedGenerationProjection(
       String operationKey, JobQueue queue) throws IOException {
+    return prepareRecordedGenerationProjection(operationKey, queue, null);
+  }
+
+  @Override public PreparedCompositeProjection prepareRecordedGenerationProjection(
+      String operationKey, JobQueue queue,
+      io.justsearch.app.api.settings.SettingsCommitOwner.GenerationEncoders encoders) throws IOException {
     final Bulk bulk;
     synchronized (lock) {
       if (!beforeRecordedPromotion(operationKey, queue)) {
@@ -1489,7 +1495,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     var installer = (RecordedInstallerGenerationPlan) bulk.plan;
     final io.justsearch.app.api.settings.SettingsCommitOwner.PreparedGenerationProjection projection;
     try {
-      projection = attempts.prepareInstallerGenerationProjection(bulk.handle, installer, bulk.work);
+      projection = attempts.prepareInstallerGenerationProjection(bulk.handle, installer, bulk.work, encoders);
     } catch (RuntimeException | Error failure) {
       // Preparation may have reserved the one-shot settings witness before it failed. A proven
       // pre-pointer failure must settle this accepted row; retrying that projection would retain

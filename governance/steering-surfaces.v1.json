@@ -6,13 +6,18 @@
     "symbol": "dispatchRunControl"
   },
   "adopters": [
-    "modules/ui-web/src/shell-v0/views/UnifiedChatView.ts",
     "modules/ui-web/src/shell-v0/components/RetrospectivePanel.ts",
     "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts"
   ],
   "runDirectiveChannels": {
     "comment": "Each per-run directive reaches the live run via a RECEIVER.method call (dot-prefixed, so the controller's own `async steer(`/`async cancelSession(` definitions do not match). It must flow ONLY through the seam — no view/component may call it directly. `.cancelSession(` is the halt channel; `.steer(` is the interject channel; `.raiseBudget(` is the raise-budget channel (tempdoc 577 Ext III); `.resumeSession(` is the resume channel (tempdoc 577 Move 1).",
-    "callPatterns": [".steer(", ".cancelSession(", ".raiseBudget(", ".resumeSession(", ".resolveBudgetGate("],
+    "callPatterns": [
+      ".steer(",
+      ".cancelSession(",
+      ".raiseBudget(",
+      ".resumeSession(",
+      ".resolveBudgetGate("
+    ],
     "allowed": [
       "modules/ui-web/src/shell-v0/controllers/runControlIntent.ts"
     ]

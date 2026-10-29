@@ -1,0 +1,3247 @@
+{
+  "kind": "installed-model-activation-round2-results",
+  "baseline": "7a6ab81ea11279008a853fa5574b11da4b051c02",
+  "candidate": "repair commit containing this file; production tree f00f25ff30; help test binds boot roots and uses v4 marker",
+  "rawArtifacts": "/home/elias/.cache/justsearch-rel-act-round2-20261028",
+  "results": {
+    "baseline": [
+      {
+        "class": "io.justsearch.app.engine.RecordedBulkEngineRestartTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:30:03.133Z",
+        "cases": [
+          {
+            "name": "cancellingAcceptedBulkRetiresItsCandidateAndReopensOnlyA()",
+            "status": "passed"
+          },
+          {
+            "name": "preparedBulkSurvivesBuildRestartAndActivatesInProcess()",
+            "status": "passed"
+          },
+          {
+            "name": "incompleteRegisteredSourceWaitsOnAForExactRecordedApproval()",
+            "status": "passed"
+          },
+          {
+            "name": "registeredNoFileSourceReplaysNewerUpdateDeleteAndAdditionAcrossBuildRestart()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.engine.RecordedBulkIngestionCoordinatorTest",
+        "tests": 29,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:31:20.348Z",
+        "cases": [
+          {
+            "name": "liveStartDoesNotAdoptAnotherOperationsGreen()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationAfterSettledRefusalCheckpointRecoversTerminalReceiptAndExactQueueAck()",
+            "status": "passed"
+          },
+          {
+            "name": "acknowledgementRepairCrossesFullPageOfRetainedContradictionsToLaterValidTerminalRow()",
+            "status": "passed"
+          },
+          {
+            "name": "exhaustedBulkRecoveryPersistsRefusalAndExactAcknowledgementWithoutAnotherAttempt()",
+            "status": "passed"
+          },
+          {
+            "name": "bufferedDeleteCoversCapturedMissingFileAndSettlesWithoutAcceptance(WATCHER)",
+            "status": "passed"
+          },
+          {
+            "name": "bufferedDeleteCoversCapturedMissingFileAndSettlesWithoutAcceptance(EXPLICIT)",
+            "status": "passed"
+          },
+          {
+            "name": "bufferedDeleteCoversCapturedMissingFileAndSettlesWithoutAcceptance(LEGACY)",
+            "status": "passed"
+          },
+          {
+            "name": "liveBuildingWitnessAdoptsTheAcceptedStartWithoutReplacement()",
+            "status": "passed"
+          },
+          {
+            "name": "recordedGenerationEncoderAndBulkDecoderAgreeOnCanonicalKeys()",
+            "status": "passed"
+          },
+          {
+            "name": "acceptedBulkWaitsForReplacementWhenOldBootIsFencedAndRetriesFailedRestartCallback()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationOverlappingEnteredPromotionLinearizesAfterCommittedEffect()",
+            "status": "passed"
+          },
+          {
+            "name": "promotedRecoveryRequiresWritableSealedAndReplaySettledBeforeCompletion()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationWithNoIssuedClaimsFinishesWithoutAnExternalQueueEventAndRetriesRefusalRestartOnce()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationBeforePromotionActionSuppressesAction()",
+            "status": "passed"
+          },
+          {
+            "name": "committedPointerReconcilesAfterWatchedRootAuthorityChanges()",
+            "status": "passed"
+          },
+          {
+            "name": "keyScopedCancellationCannotRefuseCommittedPointerBeforeSuccessorWriter()",
+            "status": "passed"
+          },
+          {
+            "name": "keyScopedUserCancellationSealsOriginalBulkBeforeReportingSuccess()",
+            "status": "passed"
+          },
+          {
+            "name": "unsupersededGapCannotAuthorizeRecordedPromotion()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] false",
+            "status": "passed"
+          },
+          {
+            "name": "[2] true",
+            "status": "passed"
+          },
+          {
+            "name": "versionedDeleteStillIndexedCannotCertifyCandidateCoverage(WATCHER)",
+            "status": "passed"
+          },
+          {
+            "name": "versionedDeleteStillIndexedCannotCertifyCandidateCoverage(EXPLICIT)",
+            "status": "passed"
+          },
+          {
+            "name": "promotedBulkWaitsForReplaySettlementBeforeCompletingExactlyOnce()",
+            "status": "passed"
+          },
+          {
+            "name": "candidateOnlyGapControlsPromotedReceiptAndFencedApprovalRejectsStaleHash()",
+            "status": "passed"
+          },
+          {
+            "name": "pendingGenerationAuthorityIsAvailableWithoutOpeningTheJobJournal()",
+            "status": "passed"
+          },
+          {
+            "name": "cancelledRefusalBeforeQueueRetirementSurvivesRestartUnderRestoredAllowingPolicy()",
+            "status": "passed"
+          },
+          {
+            "name": "replacedCandidateRowWithSameUnitAndReasonRevokesGapApproval()",
+            "status": "passed"
+          },
+          {
+            "name": "refusedBulkRetainsDurableIdentityUntilWorkerWitnessesCandidateRetirement()",
+            "status": "passed"
+          },
+          {
+            "name": "onlyExactBuildingReceiptsCanProveThePreviousSourcePointer()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.engine.RecordedIngestionSettlementTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:31:25.860Z",
+        "cases": [
+          {
+            "name": "mismatchingTerminalReceiptCannotAcknowledgeTheSealedWalk()",
+            "status": "passed"
+          },
+          {
+            "name": "changedPlanBetweenDecisionAndResumeBodyBecomesUnavailable()",
+            "status": "passed"
+          },
+          {
+            "name": "thirdDurableAttemptSettlesWithCurrentHandleWithoutSpendingFourthAttempt()",
+            "status": "passed"
+          },
+          {
+            "name": "exhaustedRecoveryFailsWithoutCheckpointAndCannotAcknowledge()",
+            "status": "passed"
+          },
+          {
+            "name": "unavailablePlanWaitsForIssuedClaimEvenAfterEnumerationExit()",
+            "status": "passed"
+          },
+          {
+            "name": "unavailableEvidenceWaitsForEnumerationEvenWithoutIssuedClaims()",
+            "status": "passed"
+          },
+          {
+            "name": "validReceiptCannotDecreaseConfirmedCounters()",
+            "status": "passed"
+          },
+          {
+            "name": "terminalWriteFailureCannotAcknowledgeAndRunnerSignalIsSticky()",
+            "status": "passed"
+          },
+          {
+            "name": "validReceiptBytesChangedBetweenDecisionAndBodyCannotCheckpoint()",
+            "status": "passed"
+          },
+          {
+            "name": "exactPreexistingCheckpointFinishesWithoutAnotherAttempt()",
+            "status": "passed"
+          },
+          {
+            "name": "validSealedReceiptsSettleCompleteFailedAndCancelledAndAckAfterTerminal()",
+            "status": "passed"
+          },
+          {
+            "name": "missingAndCorruptQueueEvidenceWaitForExitAndOwnerDrainThenFailUnavailable()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.engine.RecordedInstallerGenerationBootProjectionTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:33.069Z",
+        "cases": [
+          {
+            "name": "committedBRollsForwardExactCandidateAndSecondBootIsIdempotent()",
+            "status": "passed"
+          },
+          {
+            "name": "pointerBeforeCommitLeavesAAndDoesNotInstallCandidateSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedSettingsWitnessFailsClosedAfterB()",
+            "status": "passed"
+          },
+          {
+            "name": "committedBWithChangedSelectedChatBytesStaysFencedWithoutRollback()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] ",
+            "status": "passed"
+          },
+          {
+            "name": "[2] authority",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedPointerSourceFailsClosedWithoutChangingSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "successorWitnessWithWrongSettingsFailsClosedAsAmbiguousMove()",
+            "status": "passed"
+          },
+          {
+            "name": "legacyV2WithoutChatKeepsAThenRollsForwardCommittedB()",
+            "status": "passed"
+          },
+          {
+            "name": "legacyV2UnprovenChatAfterPointerStaysFencedWithoutFalseTerminal()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.InstallerEncoderConfigurationTest",
+        "tests": 7,
+        "failures": 7,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:37.366Z",
+        "cases": [
+          {
+            "name": "settingsOutsideBsPhysicalProjectionCannotBeConsumed(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: java.lang.IllegalStateException: Query settings require a running physical encoder owner ==> expected: <true> but was: <false>"
+          },
+          {
+            "name": "unknownObservationsDoNotCertifyGenerationSettings(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: java.lang.IllegalStateException: Query settings require a running physical encoder owner ==> expected: <true> but was: <false>"
+          },
+          {
+            "name": "selectedMetadataForDisabledRolesIsNotSettingsDrift(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.IllegalStateException: Query settings require a running physical encoder owner"
+          },
+          {
+            "name": "changedAutomaticCapCannotBeCertifiedByIndexIdentityDigest(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: java.lang.IllegalStateException: Query settings require a running physical encoder owner ==> expected: <true> but was: <false>"
+          },
+          {
+            "name": "missingRequestedRoleDoesNotCertifyGenerationSettings(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: java.lang.IllegalStateException: Query settings require a running physical encoder owner ==> expected: <true> but was: <false>"
+          },
+          {
+            "name": "generationCapChangesPublishThroughBWithoutCallingAsQueryOnlyOwner(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: B already owns these sessions; A's guarded query-only composer cannot prepare them ==> Unexpected exception thrown: java.lang.IllegalStateException: Query settings require a running physical encoder owner"
+          },
+          {
+            "name": "plannerDiagnosticsMustMatchTheComposedCandidate(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: java.lang.IllegalStateException: Query settings require a running physical encoder owner ==> expected: <true> but was: <false>"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.services.gpu.GpuProfileResolverTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:23:02.746Z",
+        "cases": [
+          {
+            "name": "bgeM3IsNeverPlacedOnTheGpuByAPlanUnlessTheUserPutsItThere()",
+            "status": "passed"
+          },
+          {
+            "name": "thePlansOwnContributionIsNotReadBackAsASetting()",
+            "status": "passed"
+          },
+          {
+            "name": "aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt()",
+            "status": "passed"
+          },
+          {
+            "name": "theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k()",
+            "status": "passed"
+          },
+          {
+            "name": "p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps()",
+            "status": "passed"
+          },
+          {
+            "name": "statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan()",
+            "status": "passed"
+          },
+          {
+            "name": "explicitSettingsKeepWinningAndABrokenPlanIsReportedUnmet()",
+            "status": "passed"
+          },
+          {
+            "name": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifierTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:33.763Z",
+        "cases": [
+          {
+            "name": "rejectsSymbolicLinkWithoutReadingItsTarget()",
+            "status": "passed"
+          },
+          {
+            "name": "rejectsMissingModelUsingItsIdentity()",
+            "status": "passed"
+          },
+          {
+            "name": "legacyChatPathWithoutRecordedOwnershipRefusesButNoChatAndExplicitNoneRemainSafe()",
+            "status": "passed"
+          },
+          {
+            "name": "verifiesModelAndAssetBytes()",
+            "status": "passed"
+          },
+          {
+            "name": "rejectsSamePathWithDifferentByteIdentity()",
+            "status": "passed"
+          },
+          {
+            "name": "selectedChatCompanionDriftRefuses()",
+            "status": "passed"
+          },
+          {
+            "name": "rejectsAssetByteDriftUsingItsIdentity()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.services.settings.SettingsCommitCoordinatorTest",
+        "tests": 59,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:34.717Z",
+        "cases": [
+          {
+            "name": "bootUnchangedWitnessFailsAndExactNewWitnessCompletes()",
+            "status": "passed"
+          },
+          {
+            "name": "installerPostmoveFailureWithMatchingWitnessButDifferentBytesRequiresRecovery()",
+            "status": "passed"
+          },
+          {
+            "name": "impossiblePostcommitInstallerFailureRetainsCommittedWitnessForOrderedRecovery()",
+            "status": "passed"
+          },
+          {
+            "name": "restartRequiredPortCompletesBeforeSchedulingOneRequestedRestart()",
+            "status": "passed"
+          },
+          {
+            "name": "processClosingRefusesBeforeReplacingSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "componentCancellationReachesAbortAndLeavesExactSettingsAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "reentrantPreparationAndCrossThreadNotificationCallsAreRefused()",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedSettingsChangeDoesNotPrepareAnyComponent()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionAddsEncoderToItsSingleSettingsBatchBeforePointer()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] false",
+            "status": "passed"
+          },
+          {
+            "name": "[2] true",
+            "status": "passed"
+          },
+          {
+            "name": "concurrentContenderIsRefusedWhilePreparationHoldsPhysicalMutex()",
+            "status": "passed"
+          },
+          {
+            "name": "multipleArmedRowsBlockTheWholeSettingsSet()",
+            "status": "passed"
+          },
+          {
+            "name": "snapshotBoundHybridDriftRefusesBeforeUnrelatedSettingsPublication()",
+            "status": "passed"
+          },
+          {
+            "name": "generationBoundChangeRefusesWithReindexPointerBeforeFileOrConfigPublication()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesFullWitnessConflictBeforePointer()",
+            "status": "passed"
+          },
+          {
+            "name": "committedTransientProfileWaitsForBootCompositionBeforeTerminalCompletion()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] missing",
+            "status": "passed"
+          },
+          {
+            "name": "[2] malformed-nonce",
+            "status": "passed"
+          },
+          {
+            "name": "[3] malformed-envelope",
+            "status": "passed"
+          },
+          {
+            "name": "indexPathChangeCommitsForRestartWhileServingRootAndTraceStayAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "maskedInstallerDesiredPathStillCommitsThroughOrdinarySettingsOwner()",
+            "status": "passed"
+          },
+          {
+            "name": "bootContradictoryQuarantinedAndInMemoryRowsWaitAndBlockHealth()",
+            "status": "passed"
+          },
+          {
+            "name": "chatEnabledChangeCannotEscapeThroughPostcommitReconciler()",
+            "status": "passed"
+          },
+          {
+            "name": "componentValidationFailureReachesAbortAndLeavesExactSettingsAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "acceptedProfilePreparationCannotBeChangedByExecutingBody()",
+            "status": "passed"
+          },
+          {
+            "name": "failedSqlArmDoesNotPrepareAndReleasesOnlyAfterDurableFailure()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionKeepsSettingsAtAUntilItsPointerCallback()",
+            "status": "passed"
+          },
+          {
+            "name": "secondComponentRefusalAbortsFirstAndLeavesAcceptedSettingsAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "installerGenerationRecoveryWaitsForCompositeOwnerOnBothSidesOfSettingsMove()",
+            "status": "passed"
+          },
+          {
+            "name": "generativeRefusalAfterQueryOwnerPreparationLeavesTheExactSettingsWitnessAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionKeepsNonPathComponentChangesOwnedByFixedComposer()",
+            "status": "passed"
+          },
+          {
+            "name": "thirdAndCorruptWitnessesRetainRunningRowRequestRestartAndBlockHealth()",
+            "status": "passed"
+          },
+          {
+            "name": "operatorMaskedQueryPathCannotCommitAnUnpreparedWitness()",
+            "status": "passed"
+          },
+          {
+            "name": "committedTransientProfileWithoutPreparationStaysRunningAndBlocksServing()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesGpuPolicyDriftBeforeOwnersOrPointer()",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedSettingsCommitRetainsCommittedQueryRoleSelection()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesEffectiveModelPathOverridesEvenWhenAlreadyServing()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRequiresExactlyOnePhysicalEncoderObservationBeforePointer()",
+            "status": "passed"
+          },
+          {
+            "name": "statusCounterTracksSettingsCommitAndNotExactReplay()",
+            "status": "passed"
+          },
+          {
+            "name": "installerRollForwardPersistsOnlyCompletePlanQueryIdentities()",
+            "status": "passed"
+          },
+          {
+            "name": "componentChangeRefusesBeforePublicationUntilItsRuntimeOwnerCanPrepare()",
+            "status": "passed"
+          },
+          {
+            "name": "terminalSqlFailureRetainsCommittedFenceForRestart()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationBeforeCommitAdmissionLeavesFileWitnessAndServingConfigUntouched()",
+            "status": "passed"
+          },
+          {
+            "name": "replacementBeforeMoveFailsAndAfterMoveCommitsByExactWitness()",
+            "status": "passed"
+          },
+          {
+            "name": "occupiedAndStaleReservationsRefuseBeforeSqlArm()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesModelPathsMissingOrContradictingAcceptedPlan()",
+            "status": "passed"
+          },
+          {
+            "name": "interruptedReconfigureBeforeFileMoveUsesEngineApplyFailureReason()",
+            "status": "passed"
+          },
+          {
+            "name": "recoveryIssueSubscriberCanCallOwnerAfterMutexIsReleased()",
+            "status": "passed"
+          },
+          {
+            "name": "fatalBeforeFileRequestsRestartAndReopensAsPrecommitFailure()",
+            "status": "passed"
+          },
+          {
+            "name": "missingRecoveredProfileModelLeavesCommittedRowRunningWithoutBootRestart()",
+            "status": "passed"
+          },
+          {
+            "name": "delayedRetryReturnsItsCommittedRevisionWithoutOverwritingLaterSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "normalCommitPublishesFileWitnessConfigAndPreparedResponse()",
+            "status": "passed"
+          },
+          {
+            "name": "installerTerminalGuardRequiresBothSuccessorWitnessAndExactCandidate()",
+            "status": "passed"
+          },
+          {
+            "name": "foreignAndRetiredReservationsCannotBeApplied()",
+            "status": "passed"
+          },
+          {
+            "name": "transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta()",
+            "status": "passed"
+          },
+          {
+            "name": "preparationFailureDoesNotWriteOrSwapAndTerminalFailureReleasesGuard()",
+            "status": "passed"
+          },
+          {
+            "name": "externalWitnessChangeDuringPreparationRefusesBeforeReplacingSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "fatalAfterFileIsRetainedAndAReopenedOwnerReconcilesExactWitness()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:23:02.764Z",
+        "cases": [
+          {
+            "name": "standardToCompactActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "compactToStandardActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.GenerationEmbeddingAttestationTest",
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:42.399Z",
+        "cases": [
+          {
+            "name": "aSelectedModelCannotStampAnUnattachedEmptyCandidateOrBorrowTheSourceStamp(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: a manifest's model identity and A's stamp are not B's embedding success evidence ==> expected: <false> but was: <true>"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.GpuOffNativeRerankerSessionTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:23:02.869Z",
+        "cases": [
+          {
+            "name": "gpuOffCreatesOnlyCpuRerankerSessions(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest",
+        "tests": 3,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:42.497Z",
+        "cases": [
+          {
+            "name": "settledInstallerCanRecoverItsPromotedEncodersWithoutAnotherMigration(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerReplaysBundledHelpDespiteTheStartupMarker(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: expected: <justsearch-help> but was: <null>"
+          },
+          {
+            "name": "installerBudgetChangeGovernsTheNextFailedNativeMigration(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:43.762Z",
+        "cases": [
+          {
+            "name": "queryOnlyPublicationRetainsIssuedAThenRetiresItWithoutReplacingIndexOwner(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceWaitsForIssuedARequestBeforeRetiringQuery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "retirementTimeoutRepublishesUntouchedA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceOlderIssuedQueryTimeoutRestoresUntouchedA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "besideCleanupErrorReleasesCapturedAAndOrderedShutdownRetriesCandidate(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "failedRestorationRetainsBothReasonsForExistingRecovery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "composeRefusalRestoresExactAWithoutComposerRegistration(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "unknownMemoryAndInsufficientReleaseRefuseBeforeRetirement(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceIgnoresOlderServiceCleanupAfterItsQueryCallsDrain(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceReleasesOwnCaptureAndKeepsIndexAndProducerDuringCompose(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "queryRecoveryCasLossReleasesReservationAndPreservesNewerOwner(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "retainedQueryRecoveryShutdownClosesDegradedAndRetriesCandidate(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "besideServesAWhileCandidateComposes(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "failedCandidateCleanupIsRetainedByQueryRecovery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "besideCleanupErrorPreservesEarlierServiceFailureAndCandidate(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest",
+        "tests": 46,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:58.803Z",
+        "cases": [
+          {
+            "name": "aCutAfterTheJournalAcknowledgementResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWhoseEnumeratorRunsKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "unprovedAdmissionStillRetainsGreen(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerEmptyProofIsNotReusedAfterAnInterveningWrite(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+          },
+          {
+            "name": "aRetiredLaterAdmissionWaitsForTheAJobItQueues(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anUnlatchedMigratingCandidateKeepsBuilding(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerEmptyCandidateCanFinalizeWithoutEarningAStamp(Path)",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: installer-only structural admission must succeed ==> expected: <true> but was: <false>"
+          },
+          {
+            "name": "aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAPendingRowKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "keywordOnlyEmptyCandidateIsNotRefused(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "[1] document",
+            "status": "passed"
+          },
+          {
+            "name": "[2] planned-unit",
+            "status": "passed"
+          },
+          {
+            "name": "[3] issued-claim",
+            "status": "passed"
+          },
+          {
+            "name": "[4] pending-row",
+            "status": "passed"
+          },
+          {
+            "name": "[5] processing-row",
+            "status": "passed"
+          },
+          {
+            "name": "[6] running-enumerator",
+            "status": "passed"
+          },
+          {
+            "name": "[7] unfinished-enumerator",
+            "status": "passed"
+          },
+          {
+            "name": "[8] incomplete-walk",
+            "status": "passed"
+          },
+          {
+            "name": "[9] uncaptured-walk",
+            "status": "passed"
+          },
+          {
+            "name": "[10] unreadable-count",
+            "status": "passed"
+          },
+          {
+            "name": "[11] upsert",
+            "status": "passed"
+          },
+          {
+            "name": "[12] projection",
+            "status": "passed"
+          },
+          {
+            "name": "[13] projection-source",
+            "status": "passed"
+          },
+          {
+            "name": "[14] replay-uncertain",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAnUnreadableWalkKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAPlannedUnitKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "cleanupRetriesUntilTheEngineRecordsTheRefusal(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAProjectionObligationKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCutAfterTheSourceCommitResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "latchedWatcherUncertaintyDoesNotBlockRollback(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "latchedSwitchingCandidateFailsPromptly(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCutAfterAbandonmentResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCutAfterPhysicalRetirementResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "claimedRowStillRetainsGreen(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAJournalObligationKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLatchedMigratingCandidateFailsBeforeItsEnumerationEnds(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLaterFinishedAdmissionWaitsForTheAJobItQueues(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithADocumentKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "provablyEmptyCandidateFailsPromptly(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aPendingLaterAdmissionHandsOverOnceACommitsIt(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anInFlightMutationDelaysTheRefusalWithoutHoldingTheSwapLock(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLaterAdmissionCommittedOnAHandsTheUpdateToA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anEmptyCandidateWithOnlyACollectionDeleteFailsPromptly(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.ops.HelpMigrationReviewRegressionTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:56.647Z",
+        "cases": [
+          {
+            "name": "defaultWatchedBindingWinsSamePathConfiguredCollection()",
+            "status": "passed"
+          },
+          {
+            "name": "evalMigrationExcludesPhysicalHelpButKeepsConfiguredCorpus()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.ops.HelpMigrationSourceTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:17:22.553Z",
+        "cases": [
+          {
+            "name": "configuredAndWatchedSourcesRetainTheirCollections()",
+            "status": "passed"
+          },
+          {
+            "name": "missingPhysicalHelpIsSkippedWithoutError()",
+            "status": "passed"
+          },
+          {
+            "name": "greenIncludesResolvedHelpDespiteCurrentStartupMarkerAndNoOldJobs()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.ops.InstallerEmptyMetadataTest",
+        "tests": 2,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:16:56.887Z",
+        "cases": [
+          {
+            "name": "installerEmptyProofOmitsOnlyTheMissingStamp()",
+            "status": "failed",
+            "failure": "org.opentest4j.AssertionFailedError: a proven empty installer B needs no invented embedding stamp ==> expected: <true> but was: <false>"
+          },
+          {
+            "name": "emptyProofRetainsTargetCompletionAndContradictionChecks()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.embed.EmbeddingCompatibilityControllerTest",
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:23:01.924Z",
+        "cases": [
+          {
+            "name": "refreshResolvesCompatibleOnAGenuinelyEmptyIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "maybeAutoStartRebuildForBlockedLegacyGuardsEmptyIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionCertifiesOnPendingZeroEvenWhenJobQueueNonEmpty()",
+            "status": "passed"
+          },
+          {
+            "name": "autoRescueDoesNotFireOnProperlyStampedGeneration()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionFinalizesRebuildAndEnablesFingerprintStamp()",
+            "status": "passed"
+          },
+          {
+            "name": "autoRescueTagsTheDiagnosticReasonForOperators()",
+            "status": "passed"
+          },
+          {
+            "name": "maybeAutoStartRebuildForBlockedLegacyFiresRegardlessOfDistribution()",
+            "status": "passed"
+          },
+          {
+            "name": "refreshWhileRebuildingIsIgnored()",
+            "status": "passed"
+          },
+          {
+            "name": "firstSuccessfulEmbeddingEarnsTheStampOnAFreshIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionRefusesButStaysRetryableWhenTheCountCannotBeRead()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionStillCertifiesThePoisonPillDistribution()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionStopsReAttemptingAfterARefusal()",
+            "status": "passed"
+          },
+          {
+            "name": "anAlreadyStampedIndexKeepsStampingWithoutFreshEvidence()",
+            "status": "passed"
+          },
+          {
+            "name": "anAlreadyStampedIndexKeepsOfferingItsFingerprintWithoutFreshEmbeddings()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionRefusesWhenEveryEmbeddingFailed()",
+            "status": "passed"
+          },
+          {
+            "name": "waivedEvidenceCertifiesWithoutConsultingTheIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "refreshFailsClosedWhenTheDocCountCannotBeRead()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionDoesNotFinalizeWhenEmbeddingsStillPending()",
+            "status": "passed"
+          },
+          {
+            "name": "maybeAutoStartRebuildForBlockedLegacyTransitionsToRebuilding()",
+            "status": "passed"
+          }
+        ]
+      }
+    ],
+    "candidate": [
+      {
+        "class": "io.justsearch.app.engine.RecordedBulkEngineRestartTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:28:15.232Z",
+        "cases": [
+          {
+            "name": "cancellingAcceptedBulkRetiresItsCandidateAndReopensOnlyA()",
+            "status": "passed"
+          },
+          {
+            "name": "preparedBulkSurvivesBuildRestartAndActivatesInProcess()",
+            "status": "passed"
+          },
+          {
+            "name": "incompleteRegisteredSourceWaitsOnAForExactRecordedApproval()",
+            "status": "passed"
+          },
+          {
+            "name": "registeredNoFileSourceReplaysNewerUpdateDeleteAndAdditionAcrossBuildRestart()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.engine.RecordedBulkIngestionCoordinatorTest",
+        "tests": 29,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:29:32.520Z",
+        "cases": [
+          {
+            "name": "liveStartDoesNotAdoptAnotherOperationsGreen()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationAfterSettledRefusalCheckpointRecoversTerminalReceiptAndExactQueueAck()",
+            "status": "passed"
+          },
+          {
+            "name": "acknowledgementRepairCrossesFullPageOfRetainedContradictionsToLaterValidTerminalRow()",
+            "status": "passed"
+          },
+          {
+            "name": "exhaustedBulkRecoveryPersistsRefusalAndExactAcknowledgementWithoutAnotherAttempt()",
+            "status": "passed"
+          },
+          {
+            "name": "bufferedDeleteCoversCapturedMissingFileAndSettlesWithoutAcceptance(WATCHER)",
+            "status": "passed"
+          },
+          {
+            "name": "bufferedDeleteCoversCapturedMissingFileAndSettlesWithoutAcceptance(EXPLICIT)",
+            "status": "passed"
+          },
+          {
+            "name": "bufferedDeleteCoversCapturedMissingFileAndSettlesWithoutAcceptance(LEGACY)",
+            "status": "passed"
+          },
+          {
+            "name": "liveBuildingWitnessAdoptsTheAcceptedStartWithoutReplacement()",
+            "status": "passed"
+          },
+          {
+            "name": "recordedGenerationEncoderAndBulkDecoderAgreeOnCanonicalKeys()",
+            "status": "passed"
+          },
+          {
+            "name": "acceptedBulkWaitsForReplacementWhenOldBootIsFencedAndRetriesFailedRestartCallback()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationOverlappingEnteredPromotionLinearizesAfterCommittedEffect()",
+            "status": "passed"
+          },
+          {
+            "name": "promotedRecoveryRequiresWritableSealedAndReplaySettledBeforeCompletion()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationWithNoIssuedClaimsFinishesWithoutAnExternalQueueEventAndRetriesRefusalRestartOnce()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationBeforePromotionActionSuppressesAction()",
+            "status": "passed"
+          },
+          {
+            "name": "committedPointerReconcilesAfterWatchedRootAuthorityChanges()",
+            "status": "passed"
+          },
+          {
+            "name": "keyScopedCancellationCannotRefuseCommittedPointerBeforeSuccessorWriter()",
+            "status": "passed"
+          },
+          {
+            "name": "keyScopedUserCancellationSealsOriginalBulkBeforeReportingSuccess()",
+            "status": "passed"
+          },
+          {
+            "name": "unsupersededGapCannotAuthorizeRecordedPromotion()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] false",
+            "status": "passed"
+          },
+          {
+            "name": "[2] true",
+            "status": "passed"
+          },
+          {
+            "name": "versionedDeleteStillIndexedCannotCertifyCandidateCoverage(WATCHER)",
+            "status": "passed"
+          },
+          {
+            "name": "versionedDeleteStillIndexedCannotCertifyCandidateCoverage(EXPLICIT)",
+            "status": "passed"
+          },
+          {
+            "name": "promotedBulkWaitsForReplaySettlementBeforeCompletingExactlyOnce()",
+            "status": "passed"
+          },
+          {
+            "name": "candidateOnlyGapControlsPromotedReceiptAndFencedApprovalRejectsStaleHash()",
+            "status": "passed"
+          },
+          {
+            "name": "pendingGenerationAuthorityIsAvailableWithoutOpeningTheJobJournal()",
+            "status": "passed"
+          },
+          {
+            "name": "cancelledRefusalBeforeQueueRetirementSurvivesRestartUnderRestoredAllowingPolicy()",
+            "status": "passed"
+          },
+          {
+            "name": "replacedCandidateRowWithSameUnitAndReasonRevokesGapApproval()",
+            "status": "passed"
+          },
+          {
+            "name": "refusedBulkRetainsDurableIdentityUntilWorkerWitnessesCandidateRetirement()",
+            "status": "passed"
+          },
+          {
+            "name": "onlyExactBuildingReceiptsCanProveThePreviousSourcePointer()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.engine.RecordedIngestionSettlementTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:29:37.912Z",
+        "cases": [
+          {
+            "name": "mismatchingTerminalReceiptCannotAcknowledgeTheSealedWalk()",
+            "status": "passed"
+          },
+          {
+            "name": "changedPlanBetweenDecisionAndResumeBodyBecomesUnavailable()",
+            "status": "passed"
+          },
+          {
+            "name": "thirdDurableAttemptSettlesWithCurrentHandleWithoutSpendingFourthAttempt()",
+            "status": "passed"
+          },
+          {
+            "name": "exhaustedRecoveryFailsWithoutCheckpointAndCannotAcknowledge()",
+            "status": "passed"
+          },
+          {
+            "name": "unavailablePlanWaitsForIssuedClaimEvenAfterEnumerationExit()",
+            "status": "passed"
+          },
+          {
+            "name": "unavailableEvidenceWaitsForEnumerationEvenWithoutIssuedClaims()",
+            "status": "passed"
+          },
+          {
+            "name": "validReceiptCannotDecreaseConfirmedCounters()",
+            "status": "passed"
+          },
+          {
+            "name": "terminalWriteFailureCannotAcknowledgeAndRunnerSignalIsSticky()",
+            "status": "passed"
+          },
+          {
+            "name": "validReceiptBytesChangedBetweenDecisionAndBodyCannotCheckpoint()",
+            "status": "passed"
+          },
+          {
+            "name": "exactPreexistingCheckpointFinishesWithoutAnotherAttempt()",
+            "status": "passed"
+          },
+          {
+            "name": "validSealedReceiptsSettleCompleteFailedAndCancelledAndAckAfterTerminal()",
+            "status": "passed"
+          },
+          {
+            "name": "missingAndCorruptQueueEvidenceWaitForExitAndOwnerDrainThenFailUnavailable()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.services.gpu.GpuProfileResolverTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:22:02.366Z",
+        "cases": [
+          {
+            "name": "bgeM3IsNeverPlacedOnTheGpuByAPlanUnlessTheUserPutsItThere()",
+            "status": "passed"
+          },
+          {
+            "name": "thePlansOwnContributionIsNotReadBackAsASetting()",
+            "status": "passed"
+          },
+          {
+            "name": "aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt()",
+            "status": "passed"
+          },
+          {
+            "name": "theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k()",
+            "status": "passed"
+          },
+          {
+            "name": "p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps()",
+            "status": "passed"
+          },
+          {
+            "name": "statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan()",
+            "status": "passed"
+          },
+          {
+            "name": "explicitSettingsKeepWinningAndABrokenPlanIsReportedUnmet()",
+            "status": "passed"
+          },
+          {
+            "name": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifierTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:22:03.072Z",
+        "cases": [
+          {
+            "name": "rejectsSymbolicLinkWithoutReadingItsTarget()",
+            "status": "passed"
+          },
+          {
+            "name": "rejectsMissingModelUsingItsIdentity()",
+            "status": "passed"
+          },
+          {
+            "name": "legacyChatPathWithoutRecordedOwnershipRefusesButNoChatAndExplicitNoneRemainSafe()",
+            "status": "passed"
+          },
+          {
+            "name": "verifiesModelAndAssetBytes()",
+            "status": "passed"
+          },
+          {
+            "name": "rejectsSamePathWithDifferentByteIdentity()",
+            "status": "passed"
+          },
+          {
+            "name": "selectedChatCompanionDriftRefuses()",
+            "status": "passed"
+          },
+          {
+            "name": "rejectsAssetByteDriftUsingItsIdentity()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.app.services.settings.SettingsCommitCoordinatorTest",
+        "tests": 59,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:22:03.255Z",
+        "cases": [
+          {
+            "name": "bootUnchangedWitnessFailsAndExactNewWitnessCompletes()",
+            "status": "passed"
+          },
+          {
+            "name": "installerPostmoveFailureWithMatchingWitnessButDifferentBytesRequiresRecovery()",
+            "status": "passed"
+          },
+          {
+            "name": "impossiblePostcommitInstallerFailureRetainsCommittedWitnessForOrderedRecovery()",
+            "status": "passed"
+          },
+          {
+            "name": "restartRequiredPortCompletesBeforeSchedulingOneRequestedRestart()",
+            "status": "passed"
+          },
+          {
+            "name": "processClosingRefusesBeforeReplacingSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "componentCancellationReachesAbortAndLeavesExactSettingsAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "reentrantPreparationAndCrossThreadNotificationCallsAreRefused()",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedSettingsChangeDoesNotPrepareAnyComponent()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionAddsEncoderToItsSingleSettingsBatchBeforePointer()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] false",
+            "status": "passed"
+          },
+          {
+            "name": "[2] true",
+            "status": "passed"
+          },
+          {
+            "name": "concurrentContenderIsRefusedWhilePreparationHoldsPhysicalMutex()",
+            "status": "passed"
+          },
+          {
+            "name": "multipleArmedRowsBlockTheWholeSettingsSet()",
+            "status": "passed"
+          },
+          {
+            "name": "snapshotBoundHybridDriftRefusesBeforeUnrelatedSettingsPublication()",
+            "status": "passed"
+          },
+          {
+            "name": "generationBoundChangeRefusesWithReindexPointerBeforeFileOrConfigPublication()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesFullWitnessConflictBeforePointer()",
+            "status": "passed"
+          },
+          {
+            "name": "committedTransientProfileWaitsForBootCompositionBeforeTerminalCompletion()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] missing",
+            "status": "passed"
+          },
+          {
+            "name": "[2] malformed-nonce",
+            "status": "passed"
+          },
+          {
+            "name": "[3] malformed-envelope",
+            "status": "passed"
+          },
+          {
+            "name": "indexPathChangeCommitsForRestartWhileServingRootAndTraceStayAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "maskedInstallerDesiredPathStillCommitsThroughOrdinarySettingsOwner()",
+            "status": "passed"
+          },
+          {
+            "name": "bootContradictoryQuarantinedAndInMemoryRowsWaitAndBlockHealth()",
+            "status": "passed"
+          },
+          {
+            "name": "chatEnabledChangeCannotEscapeThroughPostcommitReconciler()",
+            "status": "passed"
+          },
+          {
+            "name": "componentValidationFailureReachesAbortAndLeavesExactSettingsAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "acceptedProfilePreparationCannotBeChangedByExecutingBody()",
+            "status": "passed"
+          },
+          {
+            "name": "failedSqlArmDoesNotPrepareAndReleasesOnlyAfterDurableFailure()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionKeepsSettingsAtAUntilItsPointerCallback()",
+            "status": "passed"
+          },
+          {
+            "name": "secondComponentRefusalAbortsFirstAndLeavesAcceptedSettingsAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "installerGenerationRecoveryWaitsForCompositeOwnerOnBothSidesOfSettingsMove()",
+            "status": "passed"
+          },
+          {
+            "name": "generativeRefusalAfterQueryOwnerPreparationLeavesTheExactSettingsWitnessAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionKeepsNonPathComponentChangesOwnedByFixedComposer()",
+            "status": "passed"
+          },
+          {
+            "name": "thirdAndCorruptWitnessesRetainRunningRowRequestRestartAndBlockHealth()",
+            "status": "passed"
+          },
+          {
+            "name": "operatorMaskedQueryPathCannotCommitAnUnpreparedWitness()",
+            "status": "passed"
+          },
+          {
+            "name": "committedTransientProfileWithoutPreparationStaysRunningAndBlocksServing()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesGpuPolicyDriftBeforeOwnersOrPointer()",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedSettingsCommitRetainsCommittedQueryRoleSelection()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesEffectiveModelPathOverridesEvenWhenAlreadyServing()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRequiresExactlyOnePhysicalEncoderObservationBeforePointer()",
+            "status": "passed"
+          },
+          {
+            "name": "statusCounterTracksSettingsCommitAndNotExactReplay()",
+            "status": "passed"
+          },
+          {
+            "name": "installerRollForwardPersistsOnlyCompletePlanQueryIdentities()",
+            "status": "passed"
+          },
+          {
+            "name": "componentChangeRefusesBeforePublicationUntilItsRuntimeOwnerCanPrepare()",
+            "status": "passed"
+          },
+          {
+            "name": "terminalSqlFailureRetainsCommittedFenceForRestart()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationBeforeCommitAdmissionLeavesFileWitnessAndServingConfigUntouched()",
+            "status": "passed"
+          },
+          {
+            "name": "replacementBeforeMoveFailsAndAfterMoveCommitsByExactWitness()",
+            "status": "passed"
+          },
+          {
+            "name": "occupiedAndStaleReservationsRefuseBeforeSqlArm()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesModelPathsMissingOrContradictingAcceptedPlan()",
+            "status": "passed"
+          },
+          {
+            "name": "interruptedReconfigureBeforeFileMoveUsesEngineApplyFailureReason()",
+            "status": "passed"
+          },
+          {
+            "name": "recoveryIssueSubscriberCanCallOwnerAfterMutexIsReleased()",
+            "status": "passed"
+          },
+          {
+            "name": "fatalBeforeFileRequestsRestartAndReopensAsPrecommitFailure()",
+            "status": "passed"
+          },
+          {
+            "name": "missingRecoveredProfileModelLeavesCommittedRowRunningWithoutBootRestart()",
+            "status": "passed"
+          },
+          {
+            "name": "delayedRetryReturnsItsCommittedRevisionWithoutOverwritingLaterSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "normalCommitPublishesFileWitnessConfigAndPreparedResponse()",
+            "status": "passed"
+          },
+          {
+            "name": "installerTerminalGuardRequiresBothSuccessorWitnessAndExactCandidate()",
+            "status": "passed"
+          },
+          {
+            "name": "foreignAndRetiredReservationsCannotBeApplied()",
+            "status": "passed"
+          },
+          {
+            "name": "transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta()",
+            "status": "passed"
+          },
+          {
+            "name": "preparationFailureDoesNotWriteOrSwapAndTerminalFailureReleasesGuard()",
+            "status": "passed"
+          },
+          {
+            "name": "externalWitnessChangeDuringPreparationRefusesBeforeReplacingSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "fatalAfterFileIsRetainedAndAReopenedOwnerReconcilesExactWitness()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:21:06.762Z",
+        "cases": [
+          {
+            "name": "standardToCompactActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "compactToStandardActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.GpuOffNativeRerankerSessionTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:21:06.773Z",
+        "cases": [
+          {
+            "name": "gpuOffCreatesOnlyCpuRerankerSessions(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:21:12.780Z",
+        "cases": [
+          {
+            "name": "settledInstallerCanRecoverItsPromotedEncodersWithoutAnotherMigration(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerReplaysBundledHelpDespiteTheStartupMarker(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerBudgetChangeGovernsTheNextFailedNativeMigration(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:21:07.709Z",
+        "cases": [
+          {
+            "name": "queryOnlyPublicationRetainsIssuedAThenRetiresItWithoutReplacingIndexOwner(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceWaitsForIssuedARequestBeforeRetiringQuery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "retirementTimeoutRepublishesUntouchedA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceOlderIssuedQueryTimeoutRestoresUntouchedA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "besideCleanupErrorReleasesCapturedAAndOrderedShutdownRetriesCandidate(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "failedRestorationRetainsBothReasonsForExistingRecovery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "composeRefusalRestoresExactAWithoutComposerRegistration(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "unknownMemoryAndInsufficientReleaseRefuseBeforeRetirement(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceIgnoresOlderServiceCleanupAfterItsQueryCallsDrain(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceReleasesOwnCaptureAndKeepsIndexAndProducerDuringCompose(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "queryRecoveryCasLossReleasesReservationAndPreservesNewerOwner(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "retainedQueryRecoveryShutdownClosesDegradedAndRetriesCandidate(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "besideServesAWhileCandidateComposes(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "failedCandidateCleanupIsRetainedByQueryRecovery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "besideCleanupErrorPreservesEarlierServiceFailureAndCandidate(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest",
+        "tests": 46,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:21:31.037Z",
+        "cases": [
+          {
+            "name": "aCutAfterTheJournalAcknowledgementResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWhoseEnumeratorRunsKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "unprovedAdmissionStillRetainsGreen(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerEmptyProofIsNotReusedAfterAnInterveningWrite(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aRetiredLaterAdmissionWaitsForTheAJobItQueues(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anUnlatchedMigratingCandidateKeepsBuilding(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerEmptyCandidateCanFinalizeWithoutEarningAStamp(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAPendingRowKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "keywordOnlyEmptyCandidateIsNotRefused(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "[1] document",
+            "status": "passed"
+          },
+          {
+            "name": "[2] planned-unit",
+            "status": "passed"
+          },
+          {
+            "name": "[3] issued-claim",
+            "status": "passed"
+          },
+          {
+            "name": "[4] pending-row",
+            "status": "passed"
+          },
+          {
+            "name": "[5] processing-row",
+            "status": "passed"
+          },
+          {
+            "name": "[6] running-enumerator",
+            "status": "passed"
+          },
+          {
+            "name": "[7] unfinished-enumerator",
+            "status": "passed"
+          },
+          {
+            "name": "[8] incomplete-walk",
+            "status": "passed"
+          },
+          {
+            "name": "[9] uncaptured-walk",
+            "status": "passed"
+          },
+          {
+            "name": "[10] unreadable-count",
+            "status": "passed"
+          },
+          {
+            "name": "[11] upsert",
+            "status": "passed"
+          },
+          {
+            "name": "[12] projection",
+            "status": "passed"
+          },
+          {
+            "name": "[13] projection-source",
+            "status": "passed"
+          },
+          {
+            "name": "[14] replay-uncertain",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAnUnreadableWalkKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAPlannedUnitKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "cleanupRetriesUntilTheEngineRecordsTheRefusal(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAProjectionObligationKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCutAfterTheSourceCommitResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "latchedWatcherUncertaintyDoesNotBlockRollback(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "latchedSwitchingCandidateFailsPromptly(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCutAfterAbandonmentResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCutAfterPhysicalRetirementResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "claimedRowStillRetainsGreen(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAJournalObligationKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLatchedMigratingCandidateFailsBeforeItsEnumerationEnds(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLaterFinishedAdmissionWaitsForTheAJobItQueues(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithADocumentKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "provablyEmptyCandidateFailsPromptly(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aPendingLaterAdmissionHandsOverOnceACommitsIt(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anInFlightMutationDelaysTheRefusalWithoutHoldingTheSwapLock(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLaterAdmissionCommittedOnAHandsTheUpdateToA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anEmptyCandidateWithOnlyACollectionDeleteFailsPromptly(Path)",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.server.ops.InstallerEmptyMetadataTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:21:22.409Z",
+        "cases": [
+          {
+            "name": "installerEmptyProofOmitsOnlyTheMissingStamp()",
+            "status": "passed"
+          },
+          {
+            "name": "emptyProofRetainsTargetCompletionAndContradictionChecks()",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "class": "io.justsearch.indexerworker.embed.EmbeddingCompatibilityControllerTest",
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "timestamp": "2026-10-28T15:22:10.920Z",
+        "cases": [
+          {
+            "name": "refreshResolvesCompatibleOnAGenuinelyEmptyIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "maybeAutoStartRebuildForBlockedLegacyGuardsEmptyIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionCertifiesOnPendingZeroEvenWhenJobQueueNonEmpty()",
+            "status": "passed"
+          },
+          {
+            "name": "autoRescueDoesNotFireOnProperlyStampedGeneration()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionFinalizesRebuildAndEnablesFingerprintStamp()",
+            "status": "passed"
+          },
+          {
+            "name": "autoRescueTagsTheDiagnosticReasonForOperators()",
+            "status": "passed"
+          },
+          {
+            "name": "maybeAutoStartRebuildForBlockedLegacyFiresRegardlessOfDistribution()",
+            "status": "passed"
+          },
+          {
+            "name": "refreshWhileRebuildingIsIgnored()",
+            "status": "passed"
+          },
+          {
+            "name": "firstSuccessfulEmbeddingEarnsTheStampOnAFreshIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionRefusesButStaysRetryableWhenTheCountCannotBeRead()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionStillCertifiesThePoisonPillDistribution()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionStopsReAttemptingAfterARefusal()",
+            "status": "passed"
+          },
+          {
+            "name": "anAlreadyStampedIndexKeepsStampingWithoutFreshEvidence()",
+            "status": "passed"
+          },
+          {
+            "name": "anAlreadyStampedIndexKeepsOfferingItsFingerprintWithoutFreshEmbeddings()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionRefusesWhenEveryEmbeddingFailed()",
+            "status": "passed"
+          },
+          {
+            "name": "waivedEvidenceCertifiesWithoutConsultingTheIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "refreshFailsClosedWhenTheDocCountCannotBeRead()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionDoesNotFinalizeWhenEmbeddingsStillPending()",
+            "status": "passed"
+          },
+          {
+            "name": "maybeAutoStartRebuildForBlockedLegacyTransitionsToRebuilding()",
+            "status": "passed"
+          }
+        ]
+      }
+    ]
+  },
+  "commands": {
+    "help-before-repair": {
+      "log": "/home/elias/.cache/justsearch-rel-act-round2-20261028/help-before-repair.log",
+      "sha256": "abc2fd3e50693137b2f67bc9f4522602702a652cd79c8f41c591231c950b253a",
+      "resultLines": [
+        "1 test completed, 1 failed",
+        "BUILD FAILED in 47s"
+      ]
+    },
+    "candidate-selected": {
+      "log": "/home/elias/.cache/justsearch-rel-act-round2-20261028/candidate-selected.log",
+      "sha256": "eb923f424927e94a90f1f2f2ace7c606e99f68137a798982088bddb66c36e947",
+      "resultLines": [
+        "BUILD SUCCESSFUL in 47s"
+      ]
+    },
+    "baseline-selected": {
+      "log": "/home/elias/.cache/justsearch-rel-act-round2-20261028/baseline-selected.log",
+      "sha256": "5b594c611e3cb04feb2e8006db977ef199fe34fe3650fbf4196869062153ab77",
+      "resultLines": [
+        "17 tests completed, 7 failed",
+        "74 tests completed, 5 failed",
+        "BUILD FAILED in 56s"
+      ]
+    },
+    "baseline-additional": {
+      "log": "/home/elias/.cache/justsearch-rel-act-round2-20261028/baseline-additional.log",
+      "sha256": "c3d6f5cd881f5b143fe6b06f2500cf860e3aec4aad8c978df27569f47ee6a55e",
+      "resultLines": [
+        "BUILD SUCCESSFUL in 9s"
+      ]
+    },
+    "candidate-ci-help": {
+      "log": "/home/elias/.cache/justsearch-rel-act-round2-20261028/candidate-ci-help.log",
+      "sha256": "dda8f865be90e13fe3579ed5bee656561bb64da79b0540c49298c33ef625bf36",
+      "resultLines": [
+        "BUILD SUCCESSFUL in 10s"
+      ]
+    },
+    "baseline-ci-help": {
+      "log": "/home/elias/.cache/justsearch-rel-act-round2-20261028/baseline-ci-help.log",
+      "sha256": "7c695c41932be090383fe839b3b057bf0d101c3db308d38d1d6a0a2a381babb7",
+      "resultLines": [
+        "1 test completed, 1 failed",
+        "BUILD FAILED in 8s"
+      ]
+    },
+    "candidate-installDist": {
+      "log": "/home/elias/.cache/justsearch-rel-act-round2-20261028/candidate-installDist.log",
+      "sha256": "4dac45dd6ba77d5fe2379f1e66f349f157dff673b205d17a1644e676c075d429",
+      "resultLines": [
+        "BUILD SUCCESSFUL in 3s"
+      ]
+    },
+    "candidate-recovery-preservation": {
+      "log": "/home/elias/.cache/justsearch-rel-act-round2-20261028/candidate-recovery-preservation.log",
+      "sha256": "d863e289682ee10945682155507b3817ab04ea5a6653c91da1bfadae89546d1b",
+      "resultLines": [
+        "BUILD SUCCESSFUL in 1m 26s"
+      ]
+    },
+    "baseline-recovery-preservation": {
+      "log": "/home/elias/.cache/justsearch-rel-act-round2-20261028/baseline-recovery-preservation.log",
+      "sha256": "1e99b01939314d9a455c82ba92eafb6201e8b479e81ea1ee704b5b7e1214dde8",
+      "resultLines": [
+        "BUILD SUCCESSFUL in 1m 26s"
+      ]
+    }
+  },
+  "sourceDigests": {
+    "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java": "sha256:14d9c1917a94aaff98ed786631edc334a9ad0e8188ca90cb0428a4873a778b88"
+  },
+  "installed-model-activation-repaired.json": {
+    "digest": "sha256:1a77821fc95f4153e20797a8bccbed9d2811e88b3b4166105c27360782084465",
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java#installerReplaysBundledHelpDespiteTheStartupMarker",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "installerReplaysBundledHelpDespiteTheStartupMarker(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:14d9c1917a94aaff98ed786631edc334a9ad0e8188ca90cb0428a4873a778b88"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#installerEmptyCandidateCanFinalizeWithoutEarningAStamp",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "installerEmptyCandidateCanFinalizeWithoutEarningAStamp(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:90adacdb4d70529d23cd2a3a8bced3aea8bee28225a345ec1f94ebb85e013882"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#installerEmptyProofIsNotReusedAfterAnInterveningWrite",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "installerEmptyProofIsNotReusedAfterAnInterveningWrite(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:90adacdb4d70529d23cd2a3a8bced3aea8bee28225a345ec1f94ebb85e013882"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GenerationEmbeddingAttestationTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "aSelectedModelCannotStampAnUnattachedEmptyCandidateOrBorrowTheSourceStamp(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:7006a37d05e122970fa6c0f446aac79fb61c594861cc49bf8317ece9eded0623"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/InstallerEmptyMetadataTest.java#installerEmptyProofOmitsOnlyTheMissingStamp",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "installerEmptyProofOmitsOnlyTheMissingStamp()",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:4c96a066c827e36533fb22f9696932e772bc376b4388f0c99c690a84aa676672"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/indexerworker/server/InstallerEncoderConfigurationTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "settingsOutsideBsPhysicalProjectionCannotBeConsumed(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "unknownObservationsDoNotCertifyGenerationSettings(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "selectedMetadataForDisabledRolesIsNotSettingsDrift(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "changedAutomaticCapCannotBeCertifiedByIndexIdentityDigest(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "missingRequestedRoleDoesNotCertifyGenerationSettings(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "generationCapChangesPublishThroughBWithoutCallingAsQueryOnlyOwner(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "plannerDiagnosticsMustMatchTheComposedCandidate(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:72e45f39d4f775073c02cf579f1df5d840399472c014cf99bef217c2988601c1"
+      }
+    ]
+  },
+  "installed-model-activation-preservation.json": {
+    "digest": "sha256:caa8378d357c3254a1a65493d4a6fbde20ead211c1b00135593d9ce062568b3a",
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "aCutAfterTheJournalAcknowledgementResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWhoseEnumeratorRunsKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "unprovedAdmissionStillRetainsGreen(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerEmptyProofIsNotReusedAfterAnInterveningWrite(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aRetiredLaterAdmissionWaitsForTheAJobItQueues(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anUnlatchedMigratingCandidateKeepsBuilding(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerEmptyCandidateCanFinalizeWithoutEarningAStamp(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAPendingRowKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "keywordOnlyEmptyCandidateIsNotRefused(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "[1] document",
+            "status": "passed"
+          },
+          {
+            "name": "[2] planned-unit",
+            "status": "passed"
+          },
+          {
+            "name": "[3] issued-claim",
+            "status": "passed"
+          },
+          {
+            "name": "[4] pending-row",
+            "status": "passed"
+          },
+          {
+            "name": "[5] processing-row",
+            "status": "passed"
+          },
+          {
+            "name": "[6] running-enumerator",
+            "status": "passed"
+          },
+          {
+            "name": "[7] unfinished-enumerator",
+            "status": "passed"
+          },
+          {
+            "name": "[8] incomplete-walk",
+            "status": "passed"
+          },
+          {
+            "name": "[9] uncaptured-walk",
+            "status": "passed"
+          },
+          {
+            "name": "[10] unreadable-count",
+            "status": "passed"
+          },
+          {
+            "name": "[11] upsert",
+            "status": "passed"
+          },
+          {
+            "name": "[12] projection",
+            "status": "passed"
+          },
+          {
+            "name": "[13] projection-source",
+            "status": "passed"
+          },
+          {
+            "name": "[14] replay-uncertain",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAnUnreadableWalkKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAPlannedUnitKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "cleanupRetriesUntilTheEngineRecordsTheRefusal(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAProjectionObligationKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCutAfterTheSourceCommitResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "latchedWatcherUncertaintyDoesNotBlockRollback(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "latchedSwitchingCandidateFailsPromptly(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCutAfterAbandonmentResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCutAfterPhysicalRetirementResumesToCleanFailure(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "claimedRowStillRetainsGreen(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithAJournalObligationKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLatchedMigratingCandidateFailsBeforeItsEnumerationEnds(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLaterFinishedAdmissionWaitsForTheAJobItQueues(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aCandidateWithADocumentKeepsWaiting(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "provablyEmptyCandidateFailsPromptly(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aPendingLaterAdmissionHandsOverOnceACommitsIt(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anInFlightMutationDelaysTheRefusalWithoutHoldingTheSwapLock(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "aLaterAdmissionCommittedOnAHandsTheUpdateToA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anEmptyCandidateWithOnlyACollectionDeleteFailsPromptly(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:90adacdb4d70529d23cd2a3a8bced3aea8bee28225a345ec1f94ebb85e013882"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "settledInstallerCanRecoverItsPromotedEncodersWithoutAnotherMigration(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerReplaysBundledHelpDespiteTheStartupMarker(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "installerBudgetChangeGovernsTheNextFailedNativeMigration(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:14d9c1917a94aaff98ed786631edc334a9ad0e8188ca90cb0428a4873a778b88"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "queryOnlyPublicationRetainsIssuedAThenRetiresItWithoutReplacingIndexOwner(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceWaitsForIssuedARequestBeforeRetiringQuery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "retirementTimeoutRepublishesUntouchedA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceOlderIssuedQueryTimeoutRestoresUntouchedA(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "besideCleanupErrorReleasesCapturedAAndOrderedShutdownRetriesCandidate(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "failedRestorationRetainsBothReasonsForExistingRecovery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "composeRefusalRestoresExactAWithoutComposerRegistration(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "unknownMemoryAndInsufficientReleaseRefuseBeforeRetirement(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceIgnoresOlderServiceCleanupAfterItsQueryCallsDrain(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "inPlaceReleasesOwnCaptureAndKeepsIndexAndProducerDuringCompose(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "queryRecoveryCasLossReleasesReservationAndPreservesNewerOwner(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "retainedQueryRecoveryShutdownClosesDegradedAndRetriesCandidate(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "besideServesAWhileCandidateComposes(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "failedCandidateCleanupIsRetainedByQueryRecovery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "besideCleanupErrorPreservesEarlierServiceFailureAndCandidate(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "standardToCompactActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "compactToStandardActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:8533e66edb46fb0e0790498a4a208eb3ae570d5eda19091a574cbcc9f0ae9a2f"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GpuOffNativeRerankerSessionTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "gpuOffCreatesOnlyCpuRerankerSessions(Path)",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:a7509dc02a19065880f47771fec77cc70d02fbf9f9e6626cabaf109d19fbfff5"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/InstallerEmptyMetadataTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "installerEmptyProofOmitsOnlyTheMissingStamp()",
+            "status": "passed"
+          },
+          {
+            "name": "emptyProofRetainsTargetCompletionAndContradictionChecks()",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:4c96a066c827e36533fb22f9696932e772bc376b4388f0c99c690a84aa676672"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedInstallerGenerationBootProjectionTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "committedBRollsForwardExactCandidateAndSecondBootIsIdempotent()",
+            "status": "passed"
+          },
+          {
+            "name": "pointerBeforeCommitLeavesAAndDoesNotInstallCandidateSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedSettingsWitnessFailsClosedAfterB()",
+            "status": "passed"
+          },
+          {
+            "name": "committedBWithChangedSelectedChatBytesStaysFencedWithoutRollback()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] ",
+            "status": "passed"
+          },
+          {
+            "name": "[2] authority",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedPointerSourceFailsClosedWithoutChangingSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "successorWitnessWithWrongSettingsFailsClosedAsAmbiguousMove()",
+            "status": "passed"
+          },
+          {
+            "name": "legacyV2WithoutChatKeepsAThenRollsForwardCommittedB()",
+            "status": "passed"
+          },
+          {
+            "name": "legacyV2UnprovenChatAfterPointerStaysFencedWithoutFalseTerminal()",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:11aef9ddfce3b042269031e55dc69fd447dba028b2ca31f5d8b78e5ce4e82191"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "bootUnchangedWitnessFailsAndExactNewWitnessCompletes()",
+            "status": "passed"
+          },
+          {
+            "name": "installerPostmoveFailureWithMatchingWitnessButDifferentBytesRequiresRecovery()",
+            "status": "passed"
+          },
+          {
+            "name": "impossiblePostcommitInstallerFailureRetainsCommittedWitnessForOrderedRecovery()",
+            "status": "passed"
+          },
+          {
+            "name": "restartRequiredPortCompletesBeforeSchedulingOneRequestedRestart()",
+            "status": "passed"
+          },
+          {
+            "name": "processClosingRefusesBeforeReplacingSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "componentCancellationReachesAbortAndLeavesExactSettingsAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "reentrantPreparationAndCrossThreadNotificationCallsAreRefused()",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedSettingsChangeDoesNotPrepareAnyComponent()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionAddsEncoderToItsSingleSettingsBatchBeforePointer()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] false",
+            "status": "passed"
+          },
+          {
+            "name": "[2] true",
+            "status": "passed"
+          },
+          {
+            "name": "concurrentContenderIsRefusedWhilePreparationHoldsPhysicalMutex()",
+            "status": "passed"
+          },
+          {
+            "name": "multipleArmedRowsBlockTheWholeSettingsSet()",
+            "status": "passed"
+          },
+          {
+            "name": "snapshotBoundHybridDriftRefusesBeforeUnrelatedSettingsPublication()",
+            "status": "passed"
+          },
+          {
+            "name": "generationBoundChangeRefusesWithReindexPointerBeforeFileOrConfigPublication()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesFullWitnessConflictBeforePointer()",
+            "status": "passed"
+          },
+          {
+            "name": "committedTransientProfileWaitsForBootCompositionBeforeTerminalCompletion()",
+            "status": "passed"
+          },
+          {
+            "name": "[1] missing",
+            "status": "passed"
+          },
+          {
+            "name": "[2] malformed-nonce",
+            "status": "passed"
+          },
+          {
+            "name": "[3] malformed-envelope",
+            "status": "passed"
+          },
+          {
+            "name": "indexPathChangeCommitsForRestartWhileServingRootAndTraceStayAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "maskedInstallerDesiredPathStillCommitsThroughOrdinarySettingsOwner()",
+            "status": "passed"
+          },
+          {
+            "name": "bootContradictoryQuarantinedAndInMemoryRowsWaitAndBlockHealth()",
+            "status": "passed"
+          },
+          {
+            "name": "chatEnabledChangeCannotEscapeThroughPostcommitReconciler()",
+            "status": "passed"
+          },
+          {
+            "name": "componentValidationFailureReachesAbortAndLeavesExactSettingsAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "acceptedProfilePreparationCannotBeChangedByExecutingBody()",
+            "status": "passed"
+          },
+          {
+            "name": "failedSqlArmDoesNotPrepareAndReleasesOnlyAfterDurableFailure()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionKeepsSettingsAtAUntilItsPointerCallback()",
+            "status": "passed"
+          },
+          {
+            "name": "secondComponentRefusalAbortsFirstAndLeavesAcceptedSettingsAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "installerGenerationRecoveryWaitsForCompositeOwnerOnBothSidesOfSettingsMove()",
+            "status": "passed"
+          },
+          {
+            "name": "generativeRefusalAfterQueryOwnerPreparationLeavesTheExactSettingsWitnessAtA()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionKeepsNonPathComponentChangesOwnedByFixedComposer()",
+            "status": "passed"
+          },
+          {
+            "name": "thirdAndCorruptWitnessesRetainRunningRowRequestRestartAndBlockHealth()",
+            "status": "passed"
+          },
+          {
+            "name": "operatorMaskedQueryPathCannotCommitAnUnpreparedWitness()",
+            "status": "passed"
+          },
+          {
+            "name": "committedTransientProfileWithoutPreparationStaysRunningAndBlocksServing()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesGpuPolicyDriftBeforeOwnersOrPointer()",
+            "status": "passed"
+          },
+          {
+            "name": "unrelatedSettingsCommitRetainsCommittedQueryRoleSelection()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesEffectiveModelPathOverridesEvenWhenAlreadyServing()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRequiresExactlyOnePhysicalEncoderObservationBeforePointer()",
+            "status": "passed"
+          },
+          {
+            "name": "statusCounterTracksSettingsCommitAndNotExactReplay()",
+            "status": "passed"
+          },
+          {
+            "name": "installerRollForwardPersistsOnlyCompletePlanQueryIdentities()",
+            "status": "passed"
+          },
+          {
+            "name": "componentChangeRefusesBeforePublicationUntilItsRuntimeOwnerCanPrepare()",
+            "status": "passed"
+          },
+          {
+            "name": "terminalSqlFailureRetainsCommittedFenceForRestart()",
+            "status": "passed"
+          },
+          {
+            "name": "cancellationBeforeCommitAdmissionLeavesFileWitnessAndServingConfigUntouched()",
+            "status": "passed"
+          },
+          {
+            "name": "replacementBeforeMoveFailsAndAfterMoveCommitsByExactWitness()",
+            "status": "passed"
+          },
+          {
+            "name": "occupiedAndStaleReservationsRefuseBeforeSqlArm()",
+            "status": "passed"
+          },
+          {
+            "name": "installerProjectionRefusesModelPathsMissingOrContradictingAcceptedPlan()",
+            "status": "passed"
+          },
+          {
+            "name": "interruptedReconfigureBeforeFileMoveUsesEngineApplyFailureReason()",
+            "status": "passed"
+          },
+          {
+            "name": "recoveryIssueSubscriberCanCallOwnerAfterMutexIsReleased()",
+            "status": "passed"
+          },
+          {
+            "name": "fatalBeforeFileRequestsRestartAndReopensAsPrecommitFailure()",
+            "status": "passed"
+          },
+          {
+            "name": "missingRecoveredProfileModelLeavesCommittedRowRunningWithoutBootRestart()",
+            "status": "passed"
+          },
+          {
+            "name": "delayedRetryReturnsItsCommittedRevisionWithoutOverwritingLaterSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "normalCommitPublishesFileWitnessConfigAndPreparedResponse()",
+            "status": "passed"
+          },
+          {
+            "name": "installerTerminalGuardRequiresBothSuccessorWitnessAndExactCandidate()",
+            "status": "passed"
+          },
+          {
+            "name": "foreignAndRetiredReservationsCannotBeApplied()",
+            "status": "passed"
+          },
+          {
+            "name": "transientProfileForcesOnePreparedGenerativeOwnerEvenWithoutASettingsDelta()",
+            "status": "passed"
+          },
+          {
+            "name": "preparationFailureDoesNotWriteOrSwapAndTerminalFailureReleasesGuard()",
+            "status": "passed"
+          },
+          {
+            "name": "externalWitnessChangeDuringPreparationRefusesBeforeReplacingSettings()",
+            "status": "passed"
+          },
+          {
+            "name": "fatalAfterFileIsRetainedAndAReopenedOwnerReconcilesExactWitness()",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:367baa4049cdf9cc0a343275444f00f8279deed4d4ba9b40e4025d8ba64bd7af"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/RecordedInstallerAssetVerifierTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "rejectsSymbolicLinkWithoutReadingItsTarget()",
+            "status": "passed"
+          },
+          {
+            "name": "rejectsMissingModelUsingItsIdentity()",
+            "status": "passed"
+          },
+          {
+            "name": "legacyChatPathWithoutRecordedOwnershipRefusesButNoChatAndExplicitNoneRemainSafe()",
+            "status": "passed"
+          },
+          {
+            "name": "verifiesModelAndAssetBytes()",
+            "status": "passed"
+          },
+          {
+            "name": "rejectsSamePathWithDifferentByteIdentity()",
+            "status": "passed"
+          },
+          {
+            "name": "selectedChatCompanionDriftRefuses()",
+            "status": "passed"
+          },
+          {
+            "name": "rejectsAssetByteDriftUsingItsIdentity()",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:e75cd13c2b5fa72b06ddeb673c0cdeee25f9d946bfc11d151dfcf1984ae74cef"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "bgeM3IsNeverPlacedOnTheGpuByAPlanUnlessTheUserPutsItThere()",
+            "status": "passed"
+          },
+          {
+            "name": "thePlansOwnContributionIsNotReadBackAsASetting()",
+            "status": "passed"
+          },
+          {
+            "name": "aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt()",
+            "status": "passed"
+          },
+          {
+            "name": "theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead(Path)",
+            "status": "passed"
+          },
+          {
+            "name": "p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k()",
+            "status": "passed"
+          },
+          {
+            "name": "p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps()",
+            "status": "passed"
+          },
+          {
+            "name": "statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan()",
+            "status": "passed"
+          },
+          {
+            "name": "explicitSettingsKeepWinningAndABrokenPlanIsReportedUnmet()",
+            "status": "passed"
+          },
+          {
+            "name": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier()",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:8279b7d41f6335074a555cdba45bb983f34879c48992978405785071836c5787"
+      },
+      {
+        "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/EmbeddingCompatibilityControllerTest.java",
+        "outcome": "passed",
+        "executed": true,
+        "cases": [
+          {
+            "name": "refreshResolvesCompatibleOnAGenuinelyEmptyIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "maybeAutoStartRebuildForBlockedLegacyGuardsEmptyIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionCertifiesOnPendingZeroEvenWhenJobQueueNonEmpty()",
+            "status": "passed"
+          },
+          {
+            "name": "autoRescueDoesNotFireOnProperlyStampedGeneration()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionFinalizesRebuildAndEnablesFingerprintStamp()",
+            "status": "passed"
+          },
+          {
+            "name": "autoRescueTagsTheDiagnosticReasonForOperators()",
+            "status": "passed"
+          },
+          {
+            "name": "maybeAutoStartRebuildForBlockedLegacyFiresRegardlessOfDistribution()",
+            "status": "passed"
+          },
+          {
+            "name": "refreshWhileRebuildingIsIgnored()",
+            "status": "passed"
+          },
+          {
+            "name": "firstSuccessfulEmbeddingEarnsTheStampOnAFreshIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionRefusesButStaysRetryableWhenTheCountCannotBeRead()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionStillCertifiesThePoisonPillDistribution()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionStopsReAttemptingAfterARefusal()",
+            "status": "passed"
+          },
+          {
+            "name": "anAlreadyStampedIndexKeepsStampingWithoutFreshEvidence()",
+            "status": "passed"
+          },
+          {
+            "name": "anAlreadyStampedIndexKeepsOfferingItsFingerprintWithoutFreshEmbeddings()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionRefusesWhenEveryEmbeddingFailed()",
+            "status": "passed"
+          },
+          {
+            "name": "waivedEvidenceCertifiesWithoutConsultingTheIndex()",
+            "status": "passed"
+          },
+          {
+            "name": "refreshFailsClosedWhenTheDocCountCannotBeRead()",
+            "status": "passed"
+          },
+          {
+            "name": "checkRebuildCompletionDoesNotFinalizeWhenEmbeddingsStillPending()",
+            "status": "passed"
+          },
+          {
+            "name": "maybeAutoStartRebuildForBlockedLegacyTransitionsToRebuilding()",
+            "status": "passed"
+          }
+        ],
+        "contentDigest": "sha256:4cf7f60aac8226cbad0cce26f7be213645c78c943cf60fadd62f9a037b3239a0"
+      }
+    ]
+  },
+  "uniqueCaseSummary": {
+    "baseline": {
+      "uniqueCases": 234,
+      "statuses": {
+        "failed": 12,
+        "passed": 222
+      }
+    },
+    "candidate": {
+      "uniqueCases": 229,
+      "statuses": {
+        "passed": 229
+      }
+    }
+  },
+  "standardHelpInvocations": {
+    "test": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests 'io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest.installerReplaysBundledHelpDespiteTheStartupMarker' -PskipWebBuild=true",
+    "ci": "js-gradle-slot ./gradlew :modules:indexer-worker:ciUnitTest2 --tests 'io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest.installerReplaysBundledHelpDespiteTheStartupMarker' --rerun -PskipWebBuild=true",
+    "results": "Each passes on the candidate; each fails on 7a6ab81ea1 at the missing justsearch-help field assertion. No private Gradle profile or init script."
+  },
+  "testIntent": {
+    "command": "node scripts/governance/gates/test-intent/cli.mjs --base 7a6ab81ea1 --json",
+    "exitCode": 1,
+    "verdict": "fail",
+    "findings": [
+      {
+        "ruleId": "test-intent/isolated-new-test",
+        "level": "note",
+        "message": "modules/app-engine/src/test/java/io/justsearch/indexerworker/server/InstallerEncoderConfigurationTest.java: isolated new test source; no entry needed",
+        "uri": "modules/app-engine/src/test/java/io/justsearch/indexerworker/server/InstallerEncoderConfigurationTest.java"
+      },
+      {
+        "ruleId": "test-intent/isolated-new-test",
+        "level": "note",
+        "message": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GenerationEmbeddingAttestationTest.java: isolated new test source; no entry needed",
+        "uri": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GenerationEmbeddingAttestationTest.java"
+      },
+      {
+        "ruleId": "test-intent/isolated-new-test",
+        "level": "note",
+        "message": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/InstallerEmptyMetadataTest.java: isolated new test source; no entry needed",
+        "uri": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/InstallerEmptyMetadataTest.java"
+      },
+      {
+        "ruleId": "test-intent/stale-entry-item",
+        "level": "note",
+        "message": "gates/test-intent/.changesets/installed-model-activation.md entry 4: 'modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GenerationEmbeddingAttestationTest.java' is not flagged in this diff",
+        "uri": "gates/test-intent/.changesets/installed-model-activation.md"
+      },
+      {
+        "ruleId": "test-intent/stale-entry-item",
+        "level": "note",
+        "message": "gates/test-intent/.changesets/installed-model-activation.md entry 5: 'modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/InstallerEmptyMetadataTest.java' is not flagged in this diff",
+        "uri": "gates/test-intent/.changesets/installed-model-activation.md"
+      },
+      {
+        "ruleId": "test-intent/stale-entry-item",
+        "level": "note",
+        "message": "gates/test-intent/.changesets/installed-model-activation.md entry 6: 'modules/app-engine/src/test/java/io/justsearch/indexerworker/server/InstallerEncoderConfigurationTest.java' is not flagged in this diff",
+        "uri": "gates/test-intent/.changesets/installed-model-activation.md"
+      },
+      {
+        "ruleId": "test-intent/acceptance-missing",
+        "level": "error",
+        "message": "gates/test-intent/.changesets/installed-model-activation.md: no acceptance record (current digest sha256:ff48b68f7862de56c7a83e09262fb3f3f06c08b3b5baf8df4bba3ce0bee63a9f)",
+        "uri": "gates/test-intent/.changesets/installed-model-activation.md"
+      },
+      {
+        "ruleId": "test-intent/accepted",
+        "level": "note",
+        "message": "gates/test-intent/.changesets/installed-model-activation.md: PR number unknown here, so audit selection (every fifth PR) was not evaluated; CI evaluates it",
+        "uri": "gates/test-intent/.changesets/installed-model-activation.md"
+      },
+      {
+        "ruleId": "test-intent/out-of-scope",
+        "level": "note",
+        "message": "Out of scope by design (tempdoc 966 D1): script and gate self-tests under scripts/ and the jseval suite (governance tooling, not product tests)."
+      },
+      {
+        "ruleId": "test-intent/flagged-item",
+        "level": "note",
+        "message": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java (M, JVM test source set 'test') \u2014 covered",
+        "uri": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java"
+      },
+      {
+        "ruleId": "test-intent/flagged-item",
+        "level": "note",
+        "message": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java (M, JVM test source set 'test') \u2014 covered",
+        "uri": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java"
+      }
+    ],
+    "uncovered": [],
+    "changesetDigest": "sha256:ff48b68f7862de56c7a83e09262fb3f3f06c08b3b5baf8df4bba3ce0bee63a9f",
+    "independentAcceptance": "not authored by builder"
+  },
+  "provenanceLabelCheck": "All four original delegated-choice source objects are byte-for-value unchanged after removing only the added label: agent choice; other sources are newly added owner-word entries.",
+  "stagedSecretScan": {
+    "command": "gitleaks protect --staged --redact --config .gitleaks.toml",
+    "initialExitCode": 1,
+    "initialFindings": 32,
+    "initialRule": "generic-api-key",
+    "findingFields": [
+      "operation_key",
+      "operationKey",
+      "lastCommittedOperationKey"
+    ],
+    "repair": "Consistently label operation UUIDs in public live evidence; retain exact original raw logs and hashes. No scan configuration or check changed.",
+    "afterExitCode": 0
+  },
+  "postCommitGateChecks": [
+    {
+      "command": "node scripts/governance/gates/test-intent/cli.mjs --base 7a6ab81ea1 --json",
+      "exitCode": 1,
+      "verdict": "fail",
+      "uncoveredCount": 0,
+      "uncoveredItems": [],
+      "findingCounts": {
+        "test-intent/isolated-new-test": 3,
+        "test-intent/stale-entry-item": 3,
+        "test-intent/acceptance-missing": 1,
+        "test-intent/accepted": 1,
+        "test-intent/out-of-scope": 1,
+        "test-intent/flagged-item": 2
+      }
+    },
+    {
+      "command": "node scripts/governance/gates/test-intent/cli.mjs --base origin/main --json",
+      "exitCode": 1,
+      "verdict": "fail",
+      "uncoveredCount": 20,
+      "uncoveredItems": [
+        "governance/logic-seams.v1.json#law-targetTests",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DecodingLossJournalTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Utf8QueuedRestartTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueTest.java",
+        "modules/ui-web/src/shell-v0/components/IngestionSummary.test.ts",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PolicyTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionOutcomeClassifierTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/LossyDecodingExtractionTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LossyDecodingStoredDocumentTest.java",
+        "modules/worker-services/src/test/resources/fixtures/format-capability/expected-state.v1.json",
+        "modules/worker-services/src/testFixtures/java/io/justsearch/indexerworker/fixtures/FormatCapabilityExpectedState.java"
+      ],
+      "findingCounts": {
+        "test-intent/uncovered": 20,
+        "test-intent/acceptance-missing": 1,
+        "test-intent/accepted": 1,
+        "test-intent/out-of-scope": 1,
+        "test-intent/flagged-item": 25
+      }
+    }
+  ],
+  "originMainAtFinalCheck": "b744db87446b847edb306eb4d12c92781ac5b4dd",
+  "upstreamScopeNote": "origin/main advanced during the task. Fixed requested baseline 7a6ab81ea1 remains the before-state authority. Current origin/main adds 20 uncovered upstream-relative items outside this repair; they were not edited or given fabricated intent entries. Final amendment only records these check results and changes no tested source."
+}

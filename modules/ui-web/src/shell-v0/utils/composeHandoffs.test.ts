@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, expect, it, vi } from 'vitest';
-import { compose, takePendingForceShape, takePendingSelection } from './compose.js';
+import { compose, takePendingSelection } from './compose.js';
 import { buildRequestBody, type ShapeId } from '../views/unifiedChatRequest.js';
 vi.mock('../state/aiStateStore.js', () => ({ getAiState: () => ({ capabilities: { chat: true } }) }));
-afterEach(() => { document.body.replaceChildren(); takePendingForceShape(); takePendingSelection(); });
+afterEach(() => { document.body.replaceChildren(); takePendingSelection(); });
 it.each(['core.ask', 'core.summarize'] as const)('HO6 Browse %s carries the clicked document without an affordance', operation => {
   let state: { query: string; forceShapeId: ShapeId; docIds: string[] } | undefined;
   const listener = (e: Event): void => { state = (e as CustomEvent).detail.state; };

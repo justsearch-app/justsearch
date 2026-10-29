@@ -8,14 +8,37 @@
     "toast": "Dynamically-instantiated transient positioned at its instantiation site (not the Shell-mounted advisory toast host)."
   },
   "exempt": [
-    { "file": "shell-v0/components/BookmarksPopover.ts", "class": "anchored" },
-    { "file": "shell-v0/components/ContextMenu.ts", "class": "anchored" },
-    { "file": "shell-v0/components/Peek.ts", "class": "anchored" },
-    { "file": "shell-v0/components/SelectionActionsMenu.ts", "class": "anchored" },
-    { "file": "shell-v0/components/chat/CitationHoverCard.ts", "class": "anchored" },
-    { "file": "shell-v0/hover/HoverPreviewHost.ts", "class": "anchored" },
-    { "file": "shell-v0/components/EffectAuditLog.ts", "class": "dialog" },
-    { "file": "shell-v0/components/ConfirmDialog.ts", "class": "dialog" },
-    { "file": "shell-v0/components/chat/ResolutionToast.ts", "class": "toast" }
+    {
+      "file": "shell-v0/components/BookmarksPopover.ts",
+      "class": "anchored"
+    },
+    {
+      "file": "shell-v0/components/ContextMenu.ts",
+      "class": "anchored"
+    },
+    {
+      "file": "shell-v0/components/Peek.ts",
+      "class": "anchored"
+    },
+    {
+      "file": "shell-v0/components/chat/CitationHoverCard.ts",
+      "class": "anchored"
+    },
+    {
+      "file": "shell-v0/hover/HoverPreviewHost.ts",
+      "class": "anchored"
+    },
+    {
+      "file": "shell-v0/components/EffectAuditLog.ts",
+      "class": "dialog"
+    },
+    {
+      "file": "shell-v0/components/ConfirmDialog.ts",
+      "class": "dialog"
+    },
+    {
+      "file": "shell-v0/components/chat/ResolutionToast.ts",
+      "class": "toast"
+    }
   ]
 }

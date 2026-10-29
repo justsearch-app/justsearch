@@ -14,6 +14,7 @@ import java.util.Set;
  * DocumentService#retrieveContextWithMeta} methods. New callers (REST API, MCP tools)
  * should use this; existing callers can migrate incrementally.
  */
+@io.soabase.recordbuilder.core.RecordBuilder
 public record RetrieveContextParams(
     String question,
     Set<String> docIds,
@@ -37,7 +38,35 @@ public record RetrieveContextParams(
     // Tempdoc 821 §3-C2 — the collection scope for RAG retrieval. Non-empty = a POSITIVE include of
     // exactly those collections; EMPTY = the DEFAULT scope (the 585-D4b MUST_NOT agent-history
     // exclusion the Worker applies for null/empty filters), never "match nothing".
-    List<String> collection) {
+    List<String> collection,
+    io.justsearch.app.api.knowledge.KnowledgeSearchRequest.ByteRange sizeBytes)
+    implements RetrieveContextParamsBuilder.With {
+
+  public RetrieveContextParams(
+      String question, Set<String> docIds, int topK, int maxContextTokens,
+      List<String> entityPersons, List<String> entityOrganizations, List<String> entityLocations,
+      TimeRange modifiedAt, boolean freshnessEnabled, String pathPrefix, List<String> fileKind,
+      boolean autoEntityExtract, ContextFormat contextFormat, List<String> metaSource,
+      List<String> metaAuthor, List<String> metaCategory, TimeRange metaPublishedAt,
+      boolean returnFullDocuments, List<String> excludedSourceIds, List<String> collection) {
+    this(question, docIds, topK, maxContextTokens, entityPersons, entityOrganizations,
+        entityLocations, modifiedAt, freshnessEnabled, pathPrefix, fileKind, autoEntityExtract,
+        contextFormat, metaSource, metaAuthor, metaCategory, metaPublishedAt, returnFullDocuments,
+        excludedSourceIds, collection, null);
+  }
+
+  public boolean hasRestrictions() {
+    return !pathPrefix.isEmpty() || modifiedAt.isSet()
+        || (sizeBytes != null && (sizeBytes.fromBytes() != null || sizeBytes.toBytes() != null));
+  }
+
+  public RetrieveContextParams withRestrictions(
+      io.justsearch.app.api.knowledge.KnowledgeSearchRequest.Filters filters) {
+    var date = filters.modifiedAt();
+    return withPathPrefix(filters.pathPrefix()).withModifiedAt(date == null ? TimeRange.UNSET
+        : new TimeRange(date.fromMs() == null ? 0 : date.fromMs(),
+            date.toMs() == null ? 0 : date.toMs())).withSizeBytes(filters.sizeBytes());
+  }
 
   /** Time range filter (inclusive bounds, epoch millis). */
   public record TimeRange(long fromMs, long toMs) {

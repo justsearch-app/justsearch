@@ -315,7 +315,11 @@ public interface DocumentService {
    * @return result containing context string, chunk metadata, and quality signals
    */
   default CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params, EngineContext engineContext) {
-    // Default: delegate to legacy method (ignoring new filter params)
+    if (params.hasRestrictions()) {
+      return CompletableFuture.failedFuture(
+          new UnsupportedOperationException("Restricted retrieval requires the rich retrieval port"));
+    }
+    // Unrestricted callers retain legacy recovery.
     return retrieveContextWithMeta(
         params.question(), params.docIds(), params.topK(), params.maxContextTokens(), engineContext);
   }

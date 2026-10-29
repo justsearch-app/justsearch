@@ -1,4 +1,4 @@
-# Third-party notices — Search v3 (`search-v3/`)
+# Third-party notices — Search (`search-v3/`)
 
 The design tokens and component geometry in this directory are **derived from T3 Code's
 stylesheet**. This notice travels with the derived source, as the MIT license requires.

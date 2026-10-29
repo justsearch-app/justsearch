@@ -58,7 +58,6 @@ import {
 } from '../../utils/searchResultFormatters.js';
 import { ReceiptController } from '../../primitives/receiptController.js';
 import { openContextMenu } from '../ContextMenu.js';
-import { setMenuAnchor } from '../../utils/selectionAnchor.js';
 import { recordOpenDisposition } from '../../state/searchState.js';
 import { copyToClipboard } from '../../utils/clipboardCopy.js';
 import { formatRelative } from '../../utils/relativeTime.js';
@@ -85,6 +84,7 @@ export interface CardSnapshot {
   readonly query: string;
   readonly results: readonly CardHit[];
   readonly matchCount: number;
+  readonly countsPending?: boolean;
   readonly totalHits: number;
   readonly facetsTruncated: boolean;
   readonly isSearching: boolean;
@@ -309,13 +309,6 @@ export class ResultsCard extends JfElement {
       return;
     }
     if (!explicit) recordOpenDisposition(hit.id);
-    const rowEl = event.currentTarget as HTMLElement | null;
-    if (rowEl) {
-      const rect = rowEl.getBoundingClientRect();
-      if (rect.width > 0 || rect.height > 0) {
-        setMenuAnchor({ top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right });
-      }
-    }
     let nextIds: Set<string>;
     if (event.shiftKey && this.anchorIndex >= 0 && this.anchorIndex < hits.length && clickedIndex >= 0) {
       const start = Math.min(this.anchorIndex, clickedIndex);
@@ -460,6 +453,7 @@ export class ResultsCard extends JfElement {
       query: raw?.query ?? '',
       results: raw?.results ?? [],
       matchCount: raw?.matchCount ?? 0,
+      countsPending: raw?.countsPending ?? false,
       totalHits: raw?.totalHits ?? 0,
       facetsTruncated: raw?.facetsTruncated ?? false,
       isSearching: raw?.isSearching ?? false,
@@ -476,7 +470,7 @@ export class ResultsCard extends JfElement {
                 ? 'Searching your documents — almost there…'
                 : 'Searching…'}`
           : s.results.length > 0
-            ? html`${matchCountLabel(
+            ? html`${s.countsPending ? `${s.results.length} results · counts pending` : matchCountLabel(
                 s.matchCount,
                 s.results.length,
                 (s.searchTrace as SearchTrace | null | undefined)?.effectiveMode === 'VECTOR',
@@ -732,7 +726,7 @@ export class ResultsCard extends JfElement {
     if (!s || (!s.isSearching && results.length === 0 && !(s.query ?? '').trim())) return nothing;
     return html`
       ${this.renderMeta()}
-      ${renderFacetChips(s.facets as Parameters<typeof renderFacetChips>[0], this.facetSelections, {
+      ${renderFacetChips((s.countsPending ? null : s.facets) as Parameters<typeof renderFacetChips>[0], this.facetSelections, {
         onToggle: (field, value) => this.emitCard('card-facet-toggle', { field, value }),
       })}
       ${results.length > 0

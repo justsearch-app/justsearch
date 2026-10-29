@@ -1,7 +1,10 @@
 {
   "_doc": "Tempdoc 609 Phase 6 — surface task-state retention teeth + durability declaration. Makes the M1 defect (a surface destroying its own recoverable task state as a navigation side effect) UNREPRESENTABLE: a recoverable-store destroyer call inside a view's lifecycle callback fails the build. Clearing recoverable task state must be intent-driven (an explicit user action handler), never a connect/disconnect side effect. `recoverableStores` is the consumed durability declaration (609 §D.2): which singleton stores hold recoverable task state and at what durability — `url` (also reload/share-survivable via a StateBinding) or `memory` (navigation-survivable only). This register replaces an unconsumed `durability` wire field on StateBinding (substrate-without-consumer-flavors): the gate is the consumer, and durability is declared where it is enforced.",
   "scope": "modules/ui-web/src/shell-v0/views",
-  "lifecycleMethods": ["connectedCallback", "disconnectedCallback"],
+  "lifecycleMethods": [
+    "connectedCallback",
+    "disconnectedCallback"
+  ],
   "forbiddenDestroyers": [
     {
       "pattern": "setQuery('')",
@@ -12,11 +15,6 @@
       "pattern": "setQuery(\"\")",
       "store": "searchState",
       "why": "double-quoted form of the same empty-query wipe."
-    },
-    {
-      "pattern": "resetUnifiedChatState(",
-      "store": "unifiedChatState",
-      "why": "wipes the recoverable composer draft + mode. Clearing belongs to the explicit New chat action (newConversation), not connectedCallback."
     }
   ],
   "recoverableStores": [
@@ -26,29 +24,36 @@
       "note": "query is URL-projected via the StateBinding /query→search; results/counts/trace/facets are memory-recoverable (re-derived from query on reload, retained across navigation by the singleton)."
     },
     {
-      "store": "unifiedChatState",
-      "durability": "url",
-      "note": "composer draft (query) + affordance (mode) are URL-projectable and survive navigation via the singleton; reset only on explicit New chat."
-    },
-    {
       "store": "lastViewedConversation",
       "durability": "memory",
-      "note": "per-tab sessionStorage pointer; provides RELOAD restore of the chat thread (fresh instance, empty thread → reload via the pointer). Same-session navigation needs no store — the chat thread survives as retained instance @state (see instanceRetained)."
+      "note": "Per-tab sessionStorage pointer restores Search conversations after reload. Search retains its instance across ordinary navigation; drafts and recovery use their existing durability authorities."
     }
   ],
   "instanceRetained": {
-    "note": "Most recoverable task state needs NO store: the Stage retains each surface's element instance across navigation (chrome/Shell.ts _surfaceElCache, append-only), so component @state survives a tab switch by construction while streams still tear down on disconnect. This covers, for free: search selection + every surface's drafts/expanded-trees/sub-tab (PresentationEditor JSON draft, Settings theme/rename/delete-confirm drafts, Library folder/excludes drafts, Browse tree+filter, Brain sections, etc.). The ONLY non-free piece is DOM scroll offset (resets on re-attach), saved/restored via a per-surface instance field (e.g. SearchSurface.savedScrollTop). Stores remain ONLY for cross-boundary durability: url-projected fields (reload/share) + the lastViewedConversation reload pointer."
+    "note": "Most recoverable task state needs NO store: the Stage retains each surface's element instance across navigation (chrome/Shell.ts _surfaceElCache, append-only), so component @state survives a tab switch by construction while streams still tear down on disconnect. This covers, for free: search selection + every surface's drafts/expanded-trees/sub-tab (PresentationEditor JSON draft, Settings theme/rename/delete-confirm drafts, Library folder/excludes drafts, Browse tree+filter, Brain sections, etc.). The ONLY non-free piece is DOM scroll offset (resets on re-attach), saved/restored via a per-surface instance field (e.g. SearchV3View / Sv3Main scroll state). Stores remain ONLY for cross-boundary durability: url-projected fields (reload/share) + the lastViewedConversation reload pointer."
   },
   "retainedSurfaceManifest": "modules/ui-web/src/shell-v0/plugin-api/CorePlugin.ts",
   "_settleScopeDoc": "Settle-coverage applies ONLY to surfaces the Stage RETAINS (mounted via the surface catalog). A view file is in scope iff the `customElements.define('jf-…')` tag it defines appears as a `mountTag` in `retainedSurfaceManifest`. Conversation-shape views (NavigateView/SummarizeView, registered via viewFactoryRegistry, NOT catalog mountTags) and other non-stage-mounted sub-views are excluded — they are destroyed normally on navigation, so they have no instance-retention settle obligation.",
   "_settleDoc": "Tempdoc 609 settle-coverage — the SYMMETRIC half of this gate. Because instance-retention keeps ALL component @state across navigation, TRANSIENT @state (in-flight flags, errors, partial buffers, transient feedback) must be RESET on hide via the surface's `settleTransients()` (the JfElement seam), else a stale spinner / error survives a tab switch (the working rule's 'reset by default' list). The gate flags any reactive @state field (declared `name: { ... state: true }`) whose name matches `transientStatePatterns` and is NOT assigned in the surface's `settleTransients()` body — unless `<Surface>.<field>` is in `settleAllowlist` with a reason. This makes 'forgot to settle a transient' a build failure, closing the asymmetry where only the destroy direction was gated.",
   "transientStatePatterns": {
     "exactNames": [
-      "busy", "loading", "saving", "deleting", "refreshing",
-      "isStreaming", "isSearching", "streamingText",
-      "error", "errorMessage", "runtimeError", "inflight", "message"
+      "busy",
+      "loading",
+      "saving",
+      "deleting",
+      "refreshing",
+      "isStreaming",
+      "isSearching",
+      "streamingText",
+      "error",
+      "errorMessage",
+      "runtimeError",
+      "inflight",
+      "message"
     ],
-    "suffixes": ["Error"]
+    "suffixes": [
+      "Error"
+    ]
   },
   "settleAllowlist": [
     {

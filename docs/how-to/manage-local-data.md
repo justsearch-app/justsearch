@@ -7,7 +7,7 @@ description: "Forget indexed files or folders, review unfinished removals, and u
 
 # Manage local data
 
-Use **Forget** in Search v3 to remove a file or folder from search and the app's index.
+Use **Forget** in Search to remove a file or folder from search and the app's index.
 Its confirmation names the exact path. It does not delete the original file or promise to erase
 every copy of its content.
 

@@ -68,6 +68,7 @@ export type ComponentTag =
   | 'jf-help-surface'
   | 'jf-horizontal-layout'
   | 'jf-hover-preview-host'
+  | 'jf-indexing-controls'
   | 'jf-indexing-overlay'
   | 'jf-indexing-overlay-host'
   | 'jf-ingestion-summary'
@@ -217,6 +218,7 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-help-surface',
   'jf-horizontal-layout',
   'jf-hover-preview-host',
+  'jf-indexing-controls',
   'jf-indexing-overlay',
   'jf-indexing-overlay-host',
   'jf-ingestion-summary',

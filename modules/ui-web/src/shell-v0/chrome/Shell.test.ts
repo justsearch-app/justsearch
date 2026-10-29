@@ -34,7 +34,7 @@ import {
 } from '../router/storeRegistry.js';
 import { __resetBootstrapForTest } from '../router/bootstrap.js';
 import { __resetUserConfigForTest } from '../state/userConfigState.js';
-import { __resetAiStateForTest } from '../state/aiStateStore.js';
+import { __resetAiStateForTest, __feedForTest, __tickClockForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import {
   enqueueUiModePersistence,
   UI_MODE_INTENT_HEADER,
@@ -82,7 +82,7 @@ function makeRailSurface(id: string, mountTag: string): Surface {
 const SEARCH = makeRailSurface('core.search-surface', 'jf-search-surface');
 const LIBRARY = makeRailSurface('core.library-surface', 'jf-library-surface');
 const UNIFIED_SEARCH: Surface = {
-  ...makeRailSurface('core.unified-chat-surface', 'jf-unified-chat-view'),
+  ...makeRailSurface('core.unified-chat-surface', 'jf-sv3-window'),
   splitPairing: { secondary: 'core.library-surface' },
 };
 const LEGACY_ASK: Surface = {
@@ -202,6 +202,53 @@ describe('Shell — slice 492 substrate integration', () => {
     vi.unstubAllGlobals();
     __resetUiModeForTest();
     resetErrorCatalog();
+  });
+
+  it('S2 full Shell announces each indexing transition once while Search stays quiet across numeric and identical polls', async () => {
+    __resetAiStateForTest(); __resetConversationListForTest(); localStorage.clear(); sessionStorage.clear();
+    seedSurfaceCatalog({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface',
+      entries: [makeRailSurface('core.search-v3-surface', 'jf-sv3-window')] });
+    const shell = await renderShell();
+    type Rendered = HTMLElement & { updateComplete: Promise<unknown> };
+    const search = shell.shadowRoot!.querySelector('jf-stage')!.shadowRoot!.querySelector('jf-sv3-window') as Rendered;
+    expect(search, 'production Search really mounted in Shell').not.toBeNull();
+    const deck = shell.shadowRoot!.querySelector('jf-status-deck') as Rendered;
+    expect(deck).not.toBeNull();
+    async function feed(reasons: string[], jobs = 4): Promise<void> {
+      __feedForTest({ status: { worker: {
+        core: { indexState: 'INDEXING', pendingJobs: jobs, indexedDocuments: 1000, indexHealthy: true },
+        enrichment: { embeddingEnabled: true, embeddingDocCount: 1000, embeddingPendingCount: 80, spladeEnabled: false, nerEnabled: false },
+      }, power: { energyReduced: reasons.includes('energy_saver') },
+      operating: { indexing: { state: 'PAUSED', reasons }, freshness: { staleSources: [] } },
+      readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } },
+      } as unknown as StatusSnapshot, inference: { mode: 'indexing', starting: false } as never });
+      __tickClockForTest();
+      for (let i = 0; i < 4; i++) { await Promise.resolve(); await shell.updateComplete; await search.updateComplete; await deck.updateComplete; }
+    }
+    await feed(['energy_saver']);
+    const announcement = deck.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
+    expect(announcement.textContent).toContain('save energy');
+    const changed = new Set<Element>();
+    const observer = new MutationObserver(records => {
+      for (const record of records) {
+        const element = record.target.nodeType === Node.ELEMENT_NODE ? record.target as Element : record.target.parentElement;
+        const notice = element?.closest('jf-system-notice[live]');
+        if (notice) changed.add(notice);
+      }
+    });
+    observer.observe(deck.shadowRoot!, { subtree: true, childList: true, characterData: true });
+    try {
+      await feed(['energy_saver']); expect(changed.size, 'identical polls are silent').toBe(0);
+      await feed(['energy_saver'], 9); expect(changed.size, 'numeric progress is silent').toBe(0);
+      await feed(['game_mode'], 9);
+      expect([...changed], 'one shared authority announces the transition').toEqual([announcement]);
+      expect(announcement.textContent).toContain('a game is running');
+      changed.clear(); await feed(['game_mode'], 10); expect(changed.size).toBe(0);
+      const composer = search.shadowRoot!.querySelector('jf-sv3-composer') as Rendered;
+      await composer.updateComplete;
+      expect(composer.shadowRoot!.querySelector('[aria-live], [role="status"]'), 'Search banner remains quiet').toBeNull();
+      expect(search.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')).toBeNull();
+    } finally { observer.disconnect(); }
   });
 
   it.each(['invoke', 'undo'] as const)('906: %s failure uses handler facts through the real client and toast channel', async (kind) => {

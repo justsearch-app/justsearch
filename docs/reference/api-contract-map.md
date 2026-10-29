@@ -17,7 +17,7 @@ It requires the per-boot session token and has the OBSERVATION activity role. Re
 Only a successful Worker count under the same idle serving generation can establish absence.
 Read failures, missing capabilities, lock errors and index transitions are unknown; no disk probe
 or saved-conversation write occurs. Invalid bodies return 400; unavailable or timed-out checks convey no absence,
-either through an error response or an unknown state. Search v3 checks these pages after rendering its sources.
+either through an error response or an unknown state. Search checks these pages after rendering its sources.
 `GET /api/preview` returns 404 with `sourceState: "absent"` only after this membership check;
 an unreadable slice with no confirmed absence returns 503 with `sourceState: "unknown"`.
 
@@ -488,7 +488,7 @@ Substrate endpoints:
 - `POST /api/undo/{id}` — Undo a reversible operation. Body: `{executionId: string, idempotencyKey?: string, confirmationToken?: string}`. Uses the same key and error contract as invoke; identity distinguishes undo and its target execution id. A retry returns the recorded outcome without reversing again. The pending-authorization ceremony retains the original key and invoke/undo mode through server-side approval. Returns `OperationInvocationResponse`; unsupported undo returns `HANDLER_FAILURE`. Audited successful undo emits `UNDONE` history once. Both routes retain the existing local API authentication and mutation-authorization gates for new effects.
 - `GET /api/registry/resources` — Resource catalog. Entries are a generated single-authority projection of the `UIResourceView` wire record (`resource.v1.json` → {TS, Zod}, precise/required; tempdoc 560 §4c), with the same flat `{consumerId, audience}` consumer shape. V1 ships core OBSERVABLE resources (health-events, runtime-context, indexing/failed-jobs, capabilities, etc.) — not empty. Tempdoc 560 §29 Phase 2: plugin-contributed Resources (from a TRUSTED plugin's `Installation`) are composed in and served here too.
 - `GET /api/registry/prompts` — Prompt catalog. Tempdoc 560 §29 Phase 2: serves core + plugin-contributed Prompts (a TRUSTED plugin's `Installation` prompts are merged into the served catalog by `SubstrateGraphAssembler`); core prompts are empty in V1, so the catalog is plugin-only until a core prompt ships.
-- `GET /api/registry/workflows` — Workflow catalog (tempdoc 565 §26.C — the run-window's workflow PICKER wire). Same envelope `{$schema?, schemaVersion, catalogVersion, namespace, primitive, entries[]}`; each entry is the lean picker projection from `UIWorkflowEmitter` (`{id, type:"workflow", presentation:{labelKey, descriptionKey}, audience, nodes:[{nodeId, kind}]}`) — deliberately lighter than the operations/resources wire (no PreciseWire/generated Zod; a picker needs no fail-closed parse boundary). The FE `WorkflowCatalogClient` does a light parse; the launcher projects this catalog instead of a hardcoded `WORKFLOW_ID`.
+- `GET /api/registry/workflows` — Backend Workflow catalog. The envelope is `{$schema?, schemaVersion, catalogVersion, namespace, primitive, entries[]}`; `UIWorkflowEmitter` supplies `{id, type:"workflow", presentation:{labelKey, descriptionKey}, audience, nodes:[{nodeId, kind}]}`. The backend catalog remains available. Search has no workflow picker or run entry point; the former frontend `WorkflowCatalogClient` is retired. A workflow-run compatibility address opens Search with an unavailable notice and never dispatches a run.
 - `GET /api/registry/witness` — Run-tier witness OBSERVABILITY (tempdoc 560 §29 Phase 3; NOT a CI gate — the §5 witness gate stays deferred). Reads the LIVE composed `ContributionRegistry` (via `HeadAssembly.liveRegistry()`) and returns `{schemaVersion, namespace:"registry-witness", entries:[{kind, id, owner, buildWitnessed}]}`. Scope: every `operation` from all sources (core/agent/workflow/MCP/plugin) + plugin-contributed surfaces/resources/prompts/channels/shapes — core surfaces/resources live in their own catalogs (served above) and are NOT mirrored here. `buildWitnessed` is a meaningful runtime-only signal ONLY for the three kinds the build-time snapshot (`RegistrySnapshotExporter`) covers — `operation` / `resource` / `prompt`: a `false` there flags a runtime-composed contribution the snapshot is blind to (e.g. the `core_workflow_*_compose` workflow ops, MCP tools, plugin contributions). For `surface` / `diagnostic-channel` / `conversation-shape` the snapshot has no coverage, so `buildWitnessed` is ALWAYS `false` (a structural constant for those kinds, not a runtime-only indicator). Surfaced read-only in the Settings "Delivered contributions" panel.
 - `GET /api/messages/registry-operation/{locale}` — i18n catalog for Operation primitive (label, description, confirm prose). Served with ETag + `Cache-Control: public, max-age=3600`.
 - `GET /api/messages/registry-workflow/{locale}` — i18n catalog for Workflow labels/descriptions (tempdoc 565 §27.4; same `MessageCatalogController` namespace pattern). The picker falls back to a derived title when a key is absent.
@@ -794,7 +794,7 @@ Per-shape endpoints (static `shapeId`):
 
 Dynamic dispatch endpoint (reads `shapeId` from body):
 
-- `POST /api/chat/dispatch` — Unified surface dispatch. Body: `shapeId` (required), plus shape-specific fields. Validates shape exists and is USER-audience. Used by `UnifiedChatView` for affordance-routed per-message shape selection.
+- `POST /api/chat/dispatch` — Unified surface dispatch. Body: `shapeId` (required), plus shape-specific fields. Validates shape exists and is USER-audience. Used by Search (`views/search-v3/SearchV3View.ts` / `sv3-ask.ts`) for the chosen Ask, model-only, Structured or Delegate request; preparation waits for human Send.
 
 Conversation management (slice 513 + 515):
 
@@ -806,7 +806,7 @@ Conversation management (slice 513 + 515):
   - It does **not** perform the two-store join the list above does (tempdoc 859 slice C): the unified transcript's one authority is `GET /api/thread/{id}`, which already merges the answer and action planes. A run-backed conversation therefore answers here with an empty message list, which is the true thing about it.
 - `DELETE /api/chat/conversations/{sessionId}` — Delete a session. **409 Conflict** with `childSessionIds[]` body if the session has child branches (slice 515 FIX-3); the client must delete branches first or implement cascade deletion.
   - It also deletes the conversation's **agent runs** (tempdoc 859 slice C), which is what makes a run-backed row removable rather than a sidebar that only grows; the response carries `agentRunsDeleted`. Every run joined on that `conversationId` goes, whatever its shape — deleting a conversation destroys the conversation, and leaving other-shape runs alive would keep `GET /api/thread/{id}` serving content for a conversation the reader deleted. The store deletion runs first, so a 409 aborts before any run is destroyed, and the run deletion fails closed while the run store is sealed + locked.
-- `POST /api/chat/conversations/{sessionId}/stop` — The reader's Stop on a running turn. Body: `{turnId}`, the id the turn was dispatched with (`POST /api/chat/dispatch` carries it as `turnId`; Search v3's Ask sends one). The Engine cancels that turn's work with the reason `user_stop` and saves the turn as stopped: its question, its `standaloneQuestion` if the question was rewritten, and an assistant message holding whatever had streamed (empty for an early Stop), the thinking (`reasoning`) and sources (`citations`) the stream had shown, with `disposition: "CANCELLED"`, which the transcript reads as "stopped by you". The turn's stream then ends with one terminal, an `error` with `errorCode: "CANCELLED"`. A Stop that overtakes its dispatch (it arrives before the turn has started, for example while the chat model loads) is kept until the turn starts, however long that takes, and stops it the moment it starts, which is then saved as stopped with nothing rewritten or answered; at most 256 such Stops are kept (the oldest goes first), each used once. Response: `{stopped, pending}` — `stopped: true` when the running turn was stopped now; `pending: true` when it has not started yet and is stopped when it starts; both `false` when nothing changed: the turn's answer was already saved (its stream ends with `done`, and its late Stop is not kept, so it never stops a later dispatch naming the same turn), or it had already ended for another reason. A dispatch's `turnId` should name that dispatch alone (Search v3 sends a fresh random id each time). A closed connection is not a Stop: a dispatch whose client goes away keeps running and saves its answer. **400** without a `turnId`.
+- `POST /api/chat/conversations/{sessionId}/stop` — The reader's Stop on a running turn. Body: `{turnId}`, the id the turn was dispatched with (`POST /api/chat/dispatch` carries it as `turnId`; Search's Ask sends one). The Engine cancels that turn's work with the reason `user_stop` and saves the turn as stopped: its question, its `standaloneQuestion` if the question was rewritten, and an assistant message holding whatever had streamed (empty for an early Stop), the thinking (`reasoning`) and sources (`citations`) the stream had shown, with `disposition: "CANCELLED"`, which the transcript reads as "stopped by you". The turn's stream then ends with one terminal, an `error` with `errorCode: "CANCELLED"`. A Stop that overtakes its dispatch (it arrives before the turn has started, for example while the chat model loads) is kept until the turn starts, however long that takes, and stops it the moment it starts, which is then saved as stopped with nothing rewritten or answered; at most 256 such Stops are kept (the oldest goes first), each used once. Response: `{stopped, pending}` — `stopped: true` when the running turn was stopped now; `pending: true` when it has not started yet and is stopped when it starts; both `false` when nothing changed: the turn's answer was already saved (its stream ends with `done`, and its late Stop is not kept, so it never stops a later dispatch naming the same turn), or it had already ended for another reason. A dispatch's `turnId` should name that dispatch alone (Search sends a fresh random id each time). A closed connection is not a Stop: a dispatch whose client goes away keeps running and saves its answer. **400** without a `turnId`.
 - `POST /api/chat/conversations/{sessionId}/branch?fromMsgId=<id>` — Create a branch from an existing session at the given message id. Response: `{sessionId, parentSessionId, branchPointMessageId}`. **400** if `fromMsgId` doesn't exist in the parent's resolved history (slice 515 FIX-2). The branch carries no messages of its own; loadHistory resolves the parent prefix on every call.
 - `POST /api/chat/conversations/{sessionId}/title` — Name a conversation durably (tempdoc 838). Body: `{title, source?}` where `source` is `"user"` (default) or `"auto"`. Response: `{ok, title, titleSource}` — `title` is what was STORED, trimmed and capped at 200 characters. **400** on a blank title (clearing is `DELETE`) or an unrecognised `source`; **404** when the session has no `meta.json` (a rename must not mint a zero-message conversation); **423** when the conversation store's data key is locked, via the global `KeyLockedException` mapping.
   - With the request header `If-None-Match: *` the name is stored only while the conversation has none; otherwise **412** with `{error, errorCode: "INVALID_STATE", title, titleSource}` carrying the name it keeps. The web UI sends a browser's retained legacy name this way, so a late adoption can never replace a name a person gave the conversation meanwhile, from any window.
@@ -899,8 +899,21 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
   with HTTP `400` / `INVALID_REQUEST` (`KnowledgeClientException.Status.INVALID_ARGUMENT` from the
   index half) instead of being silently
   parsed as plain text.
+- `querySyntax: "search"` — the Search window subset. The Engine classifies it once as plain,
+  advanced or invalid. Plain uses the existing `simple` behavior. Advanced supports phrases,
+  exclusions and lowercase `title:`/`author:` with document-wide required/prohibited semantics;
+  it forces lexical retrieval on all passes and bypasses source inference, filter normalization,
+  chunk merging, expansion and typo correction. Explicit filters apply exactly as sent.
+  A successful Search response includes `advancedSyntax` (boolean), the Engine classification
+  that lets quick-pass clients withhold older facets and counts without parsing syntax themselves.
+  Invalid Search syntax returns HTTP `400`, `errorCode: "SEARCH_SYNTAX_INVALID"`,
+  `errorClass: "VALIDATION"`, `retryable: false`, and an `error` naming the problem.
+  Uppercase Boolean operators mixed with advanced syntax return
+  "OR, AND and NOT can't be combined with quotes, - or title:/author:".
+  `simple`, raw `lucene` (including its `advanced` alias), internal `*:*` probes and
+  expansion reissued as `lucene` retain their behavior. See the in-app help topic "Search syntax".
 - `projection[]`
-- `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`)
+- `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`, `sizeBytes`)
 - Entity filter fields: `entityPersons`, `entityOrganizations`, `entityLocations` (repeated string) (362)
 - Metadata filter fields: `metaSource`, `metaAuthor`, `metaCategory` (repeated string), `metaPublishedAt` (long range) (362)
 - `doc_ids` (repeated string, TermInSetQuery on PATH field — scopes search to specific documents) (366)
@@ -910,6 +923,54 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
 - `debug` (tempdoc 549 Phase D2: requests the optional numeric per-hit detail tier on
   `searchTrace`'s per-hit `HitStage.detail`; alias for `include_detail`. The structural per-hit
   trace slice is always-on regardless.)
+
+Folder, modified date and source-file size restrictions also apply to retrieval-backed Ask:
+`POST /api/chat/dispatch` with `shapeId: "core.rag-ask"` (or the fixed Ask route) accepts the
+same three restriction fields under `filters`; its existing collection scope stays in top-level
+`collection`. Other chat shapes keep their existing scope. This Engine capability adds no controls
+or saved filter state.
+
+```json
+{
+  "query": "quarterly report",
+  "filters": {
+    "pathPrefix": "/home/me/Reports",
+    "modifiedAt": { "fromMs": 1, "toMs": 253402300799999 },
+    "sizeBytes": { "fromBytes": 0, "toBytes": 1048576 }
+  }
+}
+```
+
+- `pathPrefix` is one literal absolute folder, including descendants. It must contain 1–4,096
+  characters. `/a` includes `/a/file` and excludes `/ab/file`; trailing separators, spaces,
+  Unicode, `%` and `_` are literal. Windows drive/UNC/case behavior is not verified here.
+- `modifiedAt.fromMs` and `toMs` are inclusive indexed filesystem modification times in exact epoch
+  milliseconds, in the range 1–253,402,300,799,999 (end of year 9999 UTC). Zero remains unset for
+  compatibility. This is neither publication time nor ingestion time.
+- `sizeBytes.fromBytes` and `toBytes` are inclusive source-file byte counts, integers from 0 through
+  9,007,199,254,740,991 (2^53 − 1). **Zero is an active bound.** The internal `ByteRange` wire uses
+  explicit presence for both endpoints (`SearchFilters.size_bytes = 17`,
+  `RetrieveContextRequest.size_bytes = 27`), independently of the date wire's zero sentinel.
+- Any endpoint, range or folder may be absent or JSON `null` to mean unset. Lower-only, upper-only,
+  equal and two-sided bounds are supported. Dimensions intersect with each other, explicit document
+  IDs, collection scope and hidden-source rules. Search facets retain their current behavior;
+  Ask carries folder, date and size only. Explicit passage/trace material keeps its existing meaning.
+- Search and Ask reject wrong types/shapes, fractional/negative/over-limit numbers, reversed ranges
+  and invalid folders with HTTP **400 / `INVALID_REQUEST`**, naming the field. Ask validates before
+  SSE or model admission. Bounds are never swapped, rounded or discarded. Unrelated publication
+  date and boost parsing is unchanged.
+- Unknown parent metadata does not match an active bound; known zero does. Whole-document,
+  chunkless-union and chunk retrieval apply eligibility before candidate budgets, including
+  `FULL_DOCUMENT_REQUESTED` and `FULLTEXT_FALLBACK`. Chunks use parent metadata; existing indexes
+  require no rebuild or new fields.
+- A capped RAG parent prefilter refuses more than 10,000 eligible parents with typed
+  `RESOURCE_EXHAUSTED` (knowledge-port status; HTTP 429 on Search and the same error code in Ask's
+  existing failure event). Explicit document IDs are applied before enumeration. This is a failure,
+  never `NO_CONTENT`, partial retrieval or an unrestricted retry.
+- A restricted Ask whose pre-search, rich retrieval or Head wait fails returns the existing
+  retrieval failure/timeout presentation without a model answer or chosen-file fetch. A completed
+  empty intersection returns `NO_CONTENT` mentioning restrictions. Unrestricted recovery is unchanged.
+  Earlier answers and summaries already in conversation context retain their existing controls.
 
 `POST /api/knowledge/collection-facet` is the observation read used by Library mount and
 corpus-growth hydration. Its body contains only a positive integer `maxDocsScanned`.
@@ -1399,7 +1460,7 @@ Other debug endpoints: `/api/debug/commit-metadata`, `/api/debug/effective-confi
 
 ### AI Runtime Status
 
-`GET /api/ai/runtime/status` returns ONNX feature status including a `modelActive: boolean` field per feature entry, derived from the actual ORT session state (not file discovery). This is the canonical source of truth for "is this model loaded and running". Both reranker (via `OrtCudaStatus`) and citation-scorer (via `CitationScorer.isAvailable()`) report runtime session state through this field. See [ADR-0023](../decisions/0023-api-responses-declare-runtime-context.md) for the general principle: endpoints whose behavior varies by runtime mode must declare that mode in the response.
+`GET /api/ai/runtime/status` returns ONNX feature status including a `modelActive: boolean` field per feature entry, derived from the actual ORT session state (not file discovery). This is the canonical source of truth for "is this model loaded and running". Both reranker (via `CrossEncoderReranker.isQueryWarm()`, through `WorkerSearchService.isRerankerActive()`) and citation-scorer (via `CitationScorer.isAvailable()`) report runtime session state through this field. See [ADR-0023](../decisions/0023-api-responses-declare-runtime-context.md) for the general principle: endpoints whose behavior varies by runtime mode must declare that mode in the response.
 
 ### AI install (`/api/ai/install/*`)
 
