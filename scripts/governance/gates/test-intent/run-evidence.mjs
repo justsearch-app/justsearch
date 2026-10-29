@@ -144,8 +144,9 @@ function workingTreeHash(root) {
     fs.mkdirSync(objectDirectory);
     const env = { ...process.env, GIT_INDEX_FILE: path.join(scratch, 'index'),
       GIT_OBJECT_DIRECTORY: objectDirectory, GIT_ALTERNATE_OBJECT_DIRECTORIES: JSON.stringify(objects) };
-    // A repository's split-index setting or index hooks must not write outside the scratch tree.
-    const config = ['-c', 'core.splitIndex=false', '-c', 'core.hooksPath=/dev/null'];
+    // Split indexes, index hooks and LFS clean filters must not write outside the scratch tree.
+    const config = ['-c', 'core.splitIndex=false', '-c', 'core.hooksPath=/dev/null',
+      '-c', `lfs.storage=${path.join(scratch, 'lfs')}`];
     gitOut([...config, 'read-tree', 'HEAD'], root, env);
     gitOut([...config, 'add', '-A'], root, env);
     return gitOut([...config, 'write-tree'], root, env);

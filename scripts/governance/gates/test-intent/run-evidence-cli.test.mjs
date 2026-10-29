@@ -64,6 +64,11 @@ async function fixture(options, check) {
     write('scripts/governance/lib/frontmatter.mjs', fs.readFileSync(path.join(HERE, '../../lib/frontmatter.mjs'), 'utf8'));
     write(CHECK.split('#')[0], '// deterministic CLI boundary fixture\n');
     write('.gitignore', 'modules/core/build/\n');
+    if (options.lfs) {
+      git('lfs', 'install', '--local', '--skip-smudge');
+      write('.gitattributes', '*.lfs-test filter=lfs diff=lfs merge=lfs -text\n');
+      write('modified.lfs-test', 'original LFS content\n');
+    }
     write('probe.cjs', `
 const fs = require('node:fs'), path = require('node:path');
 const before = process.cwd() !== process.env.PROBE_ROOT;
@@ -182,6 +187,11 @@ try {
       lockerClosed = once(locker, 'close');
     }
     if (options.candidate) write(CHECK.split('#')[0], '// changed candidate check\n');
+    if (options.lfs) {
+      write('modified.lfs-test', 'changed LFS content\n');
+      write('added.lfs-test', 'new LFS content\n');
+    }
+    const gitBefore = options.lfs ? gitSnapshot(path.join(root, '.git')) : null;
     const result = spawnSync(process.execPath, [path.join(root, CLI), '--out', out, '--check', CHECK,
       ...(options.mixed ? ['--check', CHECK.replace('#probe', '#noSuchMethod'),
         '--check', CHECK.replace('#probe', '#skipped')] : []),
@@ -198,7 +208,7 @@ try {
       assert.match(interrupted.output, /interrupted: CTRL_BREAK_EVENT/);
       assert.match(fs.readFileSync(path.join(scratch, 'interrupt-identity'), 'utf8'), /^\d+\/\d+$/);
     }
-    await check({ result, output, out, beforeRoot, git, scratch });
+    await check({ result, output, out, beforeRoot, git, scratch, root, env, gitBefore });
   } finally {
     fs.writeFileSync(path.join(scratch, 'lock-release'), 'release');
     if (locker) {
@@ -222,6 +232,43 @@ function readEvidence(out) {
   assert.equal(evidence.digest, evidenceSelfDigest(evidence));
   return evidence;
 }
+
+function gitSnapshot(dir) {
+  return Object.fromEntries(fs.readdirSync(dir, { recursive: true }).sort().map(rel => {
+    const file = path.join(dir, rel);
+    return [rel, fs.statSync(file).isFile() ? fs.readFileSync(file).toString('base64') : null];
+  }));
+}
+
+test('CLI: candidate-only LFS hashing leaves Git untouched and preserves the filtered tree', async t => {
+  const lfs = spawnSync('git-lfs', ['version'], { encoding: 'utf8' });
+  if (lfs.error?.code === 'ENOENT') return t.skip('git-lfs is not installed');
+  assert.equal(lfs.status, 0, lfs.stderr);
+  await fixture({ candidate: true, lfs: true }, ({ result, output, out, scratch, root, env, gitBefore }) => {
+    assert.equal(result.status, 0, output);
+    const gitAfter = gitSnapshot(path.join(root, '.git'));
+    assert.deepEqual([...new Set([...Object.keys(gitBefore), ...Object.keys(gitAfter)])]
+      .filter(rel => gitBefore[rel] !== gitAfter[rel]), [],
+      'candidate-only hashing must not write Git objects, LFS objects or LFS temporary files');
+    const copy = path.join(scratch, 'writable-copy');
+    const copyGit = (...args) => {
+      const result = spawnSync('git', args, { cwd: copy, env, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout.trim();
+    };
+    fs.mkdirSync(copy);
+    copyGit('clone', '--quiet', '--shared', '--no-checkout', root, '.');
+    fs.cpSync(root, copy, { recursive: true, filter: source => source !== path.join(root, '.git') });
+    copyGit('lfs', 'install', '--local', '--skip-smudge');
+    copyGit('add', '-A');
+    const expected = copyGit('write-tree');
+    for (const file of ['added.lfs-test', 'modified.lfs-test']) {
+      assert.match(copyGit('show', `${expected}:${file}`), /^version https:\/\/git-lfs.github.com\/spec\/v1\n/,
+        'the reference tree must contain cleaned LFS pointers');
+    }
+    assert.equal(readEvidence(out).tree, expected);
+  });
+});
 
 test('CLI: invalid before revision removes its empty reservation without a second error', async () => {
   await fixture({ invalidRef: true }, ({ result, output, beforeRoot, git }) => {
