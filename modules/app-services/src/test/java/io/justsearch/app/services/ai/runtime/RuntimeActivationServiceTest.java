@@ -55,37 +55,30 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 class RuntimeActivationServiceTest {
-  private String nativeFixtureOs;
-
-  @BeforeEach
-  void selectWindowsNativeFixture() {
-    nativeFixtureOs = System.getProperty("os.name");
-    System.setProperty("os.name", "Windows 11");
-  }
-
-  @AfterEach
-  void restoreNativeFixtureOs() {
-    if (nativeFixtureOs == null) System.clearProperty("os.name");
-    else System.setProperty("os.name", nativeFixtureOs);
-  }
-
-
   private final TestEngineExecutors processExecutors = new TestEngineExecutors();
 
   @TempDir Path tmp;
 
   private String prevHome;
   private final Map<String, String> prevProps = new HashMap<>();
+
+  {
+    // EnterprisePolicyServiceImpl publishes these; restore them so later tests see their own policy.
+    for (String key : List.of(
+        "policy.gpu_acceleration_enabled", "justsearch.policy.disallowExternalInferenceServers")) {
+      prevProps.put(key, System.getProperty(key));
+    }
+  }
 
   @AfterEach
   void cleanup() {
@@ -782,7 +775,8 @@ class RuntimeActivationServiceTest {
     FakeAiInstallService installService = new FakeAiInstallService("running");
     RuntimeActivationService svc = createServiceWithInstallHelper(installService);
 
-    List<ILoggingEvent> events = captureLogsDuring(() -> svc.getStatus());
+    List<ILoggingEvent> events =
+        captureLogsDuring(() -> withWindowsNativeFixture(svc::getStatus));
 
     assertFalse(
         events.stream().anyMatch(e -> e.getLevel() == Level.WARN && leftoverMessage(e, variantDir)),
@@ -807,7 +801,8 @@ class RuntimeActivationServiceTest {
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null, null);
 
-    List<ILoggingEvent> events = captureLogsDuring(() -> svc.getStatus());
+    List<ILoggingEvent> events =
+        captureLogsDuring(() -> withWindowsNativeFixture(svc::getStatus));
 
     assertFalse(
         events.stream().anyMatch(e -> e.getLevel() == Level.WARN && leftoverMessage(e, variantDir)),
@@ -831,9 +826,11 @@ class RuntimeActivationServiceTest {
     List<ILoggingEvent> events =
         captureLogsDuring(
             () -> {
-              svc.getStatus();
-              svc.getStatus();
-              svc.getStatus();
+              withWindowsNativeFixture(() -> {
+                svc.getStatus();
+                svc.getStatus();
+                return svc.getStatus();
+              });
             });
 
     long warnCount =
@@ -860,8 +857,10 @@ class RuntimeActivationServiceTest {
     assertTrue(Files.isRegularFile(chatModel));
 
     RuntimeActivationService svc = createServiceWithSettingsFile();
-    svc.startActivate("cuda12");
-    AiRuntimeActivationStatus st = awaitDone(svc, 60_000);
+    AiRuntimeActivationStatus st = withWindowsNativeFixture(() -> {
+      svc.startActivate("cuda12");
+      return awaitDone(svc, 60_000);
+    });
 
     assertNotEquals(
         "MODEL_PATH_REQUIRED",
@@ -898,8 +897,10 @@ class RuntimeActivationServiceTest {
     RuntimeActivationService svc =
         new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(), store, null, new EnterprisePolicyServiceImpl());
-    svc.startActivate("cuda12");
-    AiRuntimeActivationStatus st = awaitDone(svc, 60_000);
+    AiRuntimeActivationStatus st = withWindowsNativeFixture(() -> {
+      svc.startActivate("cuda12");
+      return awaitDone(svc, 60_000);
+    });
 
     assertNotEquals(
         "MODEL_NOT_FOUND",
@@ -924,8 +925,10 @@ class RuntimeActivationServiceTest {
     createVariantExe("cuda12");
 
     RuntimeActivationService svc = createServiceWithSettingsFile();
-    svc.startActivate("cuda12");
-    AiRuntimeActivationStatus st = awaitDone(svc, 30_000);
+    AiRuntimeActivationStatus st = withWindowsNativeFixture(() -> {
+      svc.startActivate("cuda12");
+      return awaitDone(svc, 30_000);
+    });
 
     assertEquals("failed", st.state);
     assertEquals("MODEL_PATH_REQUIRED", st.errorCode);
@@ -973,8 +976,10 @@ class RuntimeActivationServiceTest {
               null,
               new SettingsServiceImpl(settings, fixture.runner()));
 
-      service.startDeactivate();
-      AiRuntimeActivationStatus status = awaitDone(service);
+      AiRuntimeActivationStatus status = withWindowsNativeFixture(() -> {
+        service.startDeactivate();
+        return awaitDone(service);
+      });
 
       assertEquals("completed", status.state, "message=" + status.message);
       UiSettings persisted = settings.load();
@@ -994,6 +999,18 @@ class RuntimeActivationServiceTest {
     } finally {
       TestResolvedConfigHelper.restoreGlobal(previous);
       ConfigStoreRebuilder.rememberAutoDetected(Map.of());
+    }
+  }
+
+  /** Keep native-library initialization in fixture setup on the host OS. */
+  private static <T> T withWindowsNativeFixture(Callable<T> action) throws Exception {
+    String previousOs = System.getProperty("os.name");
+    System.setProperty("os.name", "Windows 11");
+    try {
+      return action.call();
+    } finally {
+      if (previousOs == null) System.clearProperty("os.name");
+      else System.setProperty("os.name", previousOs);
     }
   }
 
@@ -1155,7 +1172,7 @@ class RuntimeActivationServiceTest {
   private void setHome(Path home) {
     prevHome = System.getProperty("justsearch.home");
     System.setProperty("justsearch.home", home.toAbsolutePath().toString());
-    System.setProperty("justsearch.data.dir", home.toAbsolutePath().toString());
+    setProp("justsearch.data.dir", home.toAbsolutePath().toString());
   }
 
   private static AiRuntimeActivationStatus awaitDone(RuntimeActivationService svc) throws Exception {
