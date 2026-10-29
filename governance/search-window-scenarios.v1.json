@@ -2733,7 +2733,7 @@
     },
     {
       "id": "SW-READY-02",
-      "behavior": "Unknown or stale status never invents readiness, a document count, or an unlocked transcript.",
+      "behavior": "Unknown status never invents readiness, a document count, or an unlocked transcript, and status that is no longer live blocks every action.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -2993,6 +2993,19 @@
           "layer": "view",
           "binding": null,
           "reason": "The tests observe retained text, Retry timing, and Load anyway availability, but do not assert an explanation for a continuing admission block."
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-13",
+      "behavior": "Stale status never invents a document count or an unlocked transcript.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The bound tests observe unknown status before the first poll and null or incomplete status, not a stale status after a settled poll."
         }
       ]
     },

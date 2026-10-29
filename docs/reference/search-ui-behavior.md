@@ -22,8 +22,9 @@ product scenarios, known gaps, and their existing observation bindings. A redesi
 these scenarios and never drops one without a recorded retirement. The always-on catalog
 check validates bindings and retirements and requires complete literal test titles and function
 bodies, rejecting disabling modifiers, skip/todo/fails options, non-literal options, and conditional
-forms on tests or enclosing suites. It does not establish that checks ran: runtime skips,
-configuration include/exclude rules, and name filters are outside its scope.
+forms on tests or enclosing suites. It does not establish that checks ran: surrounding control
+flow (such as a test declared inside `if (false)`), runtime skips, configuration include/exclude
+rules, and name filters are outside its scope.
 
 ## 1. Window layout and modes
 

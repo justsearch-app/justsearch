@@ -3,7 +3,8 @@
  * Check bindings and retirements; bound tests need a complete literal title and function body,
  * without disabling modifiers, skip/todo/fails options, non-literal options or conditional forms
  * on the test or any enclosing suite.
- * This does not establish execution: runtime skips, config include/exclude and name filters are out of scope.
+ * This does not establish execution: surrounding control flow (e.g. `if (false)`), runtime skips,
+ * config include/exclude and name filters are out of scope.
  * Run from the repository root; --base-ref defaults to origin/main. Missing history fails closed.
  */
 import { readFileSync, statSync } from 'node:fs';
