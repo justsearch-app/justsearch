@@ -69,3 +69,14 @@ The orchestrator generates execution evidence after committing; the builder does
   "note": "Claude verifier on fe4172eab2: re-accepted after regenerated evidence; RuntimeManifestPredecessorRecoveryTest 7/7 pass, :modules:ui:test 2280 tests 0 failures; real-Engine malformed and hostile-link manifests are quarantined and start-up continues."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "auditor-1025-codex-2",
+  "verdict": "accept",
+  "digest": "sha256:18e5f5dc18167b1cd352d3cc283bf6d35662e9af1f7f507070b9c205d7f6d97b",
+  "note": "Checked predecessor recovery, future-schema handling and the superseded refusal expectations against the quoted recovery choice. Defect pin is justified: matching evidence records assertion fail-before and successful candidate execution, including quarantine privacy, invalid-ownership refusal and continued startup."
+}
+```

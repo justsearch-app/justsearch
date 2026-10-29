@@ -151,3 +151,14 @@ These entries cover the settled final review repairs. Existing accepted changese
   "note": "Re-accepted at 5f6bb672c9 after the engine_host test repair and evidence regeneration changed flagged items. retained_same_pid_manifest_cannot_bind_a_fresh_shell passes and catches a mutant that drops the session comparison (binds port 42424). Full shell lib suite 269/269 and tauri conformance 62/62 on the candidate; no change to this changeset's evidence since its prior acceptance."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "auditor-1025-codex-2",
+  "verdict": "accept",
+  "digest": "sha256:b295b2c3c364b5c6e35d723d422497f1c279d090f8e1714c3c716ff7526f4b76",
+  "note": "Checked same-PID predecessor rejection, symlink and hard-link quarantine, quarantine failure handling, bounded retry retention and fixture adaptations. Defect pin and Adaptation classifications are supported; evidence matches current test content and exposes the asserted defects before the repairs."
+}
+```

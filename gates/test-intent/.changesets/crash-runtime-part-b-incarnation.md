@@ -92,3 +92,14 @@ The builder leaves the candidate uncommitted. The orchestrator generates executi
   "note": "Re-accepted at 5f6bb672c9: real_reset_rejects_stale_manifests_and_emits_once_for_successor now injects the predecessor's session and incarnation 1 with the successor's PID and asserts refusal, no port/token and no restart event; a mutant dropping the incarnation-number comparison fails it (Some(BindingChange{port_available:true,token_available:true})) and competing_incarnation_with_reused_pid_never_binds. A mutant dropping the session comparison is caught by competing_incarnation_with_reused_pid_never_binds and retained_same_pid_manifest_cannot_bind_a_fresh_shell (the reset test cannot see it: one host, one session). Installed Engine live test binds through the incarnation check."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "auditor-1025-codex-2",
+  "verdict": "accept",
+  "digest": "sha256:11f17a8039a6c6a71c8e8ecd6b4e583bec43828393f910591d032270e3a18cc3",
+  "note": "Checked incarnation admission checks and all adapted manifest fixtures. The reset test now preserves predecessor session and generation, substitutes only the successor PID, and immediately asserts refusal, empty credentials and zero restart events; matching evidence records assertion fail-before for competing, missing and clock-rollback incarnation cases."
+}
+```
