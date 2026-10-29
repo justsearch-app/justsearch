@@ -29,9 +29,9 @@
       {"id": "search-open", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux default viewer; round-two decision: X11 runs J1 only"}]},
     {"id": "J3", "title": "Default production AI installation and activation on CPU", "scenarioIds": ["S3", "S7", "S22"], "checks": [
       {"id": "cpu-ai", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "CPU: search only; chat unavailable; round-two decision: X11 runs J1 only"}]},
-    {"id": "J4", "title": "Authored state and normal-launch persistence", "scenarioIds": ["S3", "S7"], "checks": [
+    {"id": "J4", "title": "Authored state and restart persistence", "scenarioIds": ["S3", "S7"], "checks": [
       {"id": "author-state", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux; round-two decision: X11 runs J1 only"},
-      {"id": "restart", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux; normal launch before WebDriver; round-two decision: X11 runs J1 only"}]},
+      {"id": "restart", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux; WebDriver restart DOM and stored bookmark; round-two decision: X11 runs J1 only"}]},
     {"id": "J5", "title": "Descriptor v2 in-app update", "scenarioIds": ["S3", "S8"], "checks": [
       {"id": "update-offer", "lanes": ["vm-linux-wayland"], "applicability": "Settled decision: mirror and PolicyKit update journey is Ubuntu VM only; round-two decision: X11 runs J1 only"},
       {"id": "update-cancel", "lanes": ["vm-linux-wayland"], "applicability": "Settled decision: PolicyKit cancellation is Ubuntu VM only; round-two decision: X11 runs J1 only"},
@@ -42,7 +42,8 @@
       {"id": "remove-retain-reinstall", "lanes": ["vm-linux-wayland"], "applicability": "Settled decision: apt remove retains user data; Ubuntu VM only; round-two decision: X11 runs J1 only"}]},
     {"id": "J7", "title": "Desktop integration and scanned PDF OCR", "scenarioIds": ["S3", "S7"], "checks": [
       {"id": "desktop-entry", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux menu entry and OS handler; round-two decision: X11 runs J1 only"},
-      {"id": "deep-links", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Normal cold and warm OS dispatch; round-two decision: X11 runs J1 only"},
+      {"id": "deep-link-cold", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Cold OS dispatch, destination needs owner validation; round-two decision: X11 runs J1 only"},
+      {"id": "deep-link-warm", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Warm OS dispatch into WebDriver app, DOM destination and original PID; round-two decision: X11 runs J1 only"},
       {"id": "shortcut", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "X11 global registration; Wayland desktop binding requires GNOME VM settings; round-two decision: X11 runs J1 only"},
       {"id": "ocr", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Image-only PDF, text search assertion; round-two decision: X11 runs J1 only"}]},
     {"id": "J8", "title": "Release MCPB through pinned Inspector stdio", "scenarioIds": ["S3", "S21", "S22"], "checks": [

@@ -1,5 +1,4 @@
 """Linux implementation of the shared journey definition; no product test hooks."""
-import hashlib
 import json
 from pathlib import Path
 import re
@@ -12,7 +11,7 @@ import time
 import zipfile
 
 from corpus import generate, OPEN_FILE, QUERY, OCR_QUERY
-from runner import HERE, Infrastructure, Observation, Unavailable, digest, wait_for, require_disposable_host
+from runner import HERE, Infrastructure, OwnerValidation, ProductFailure, Unavailable, digest, wait_for, require_disposable_host
 
 
 def apt(run, *args):
@@ -105,26 +104,22 @@ with zipfile.ZipFile(a['bundle']) as z:
 def first_run(run):
     if not run.binary:
         raise Unavailable('Package installation did not complete')
-    run.normal_launch()
-    try:
-        wait_for(run.native.app_window, 'Packaged window visible', seconds=60)
-    except AssertionError:
-        run.native.window_failure('J1-packaged')
-        raise
+    run.stop_app()
+    run.desktop_spawn(['gtk-launch', 'JustSearch'], run.work + '/first-run.log')
+    run.observe_window('J1-desktop-entry')
     run.evidence('J1-normal-ready', run.ready())
+    run.native.screen_text('J1-desktop-first-run') # Triage only; cannot certify visible text.
+    # This new session proves its own DOM, not the preceding desktop window's pixels.
     run.start_ui()
     wait_for(lambda: run.wd.execute("return all(document,'jf-shell').length > 0"),
              'Packaged web UI mounted', seconds=60, error=Infrastructure)
-    # Dismiss only the actual first-run welcome, if the candidate has one.
     buttons = run.wd.execute("return all(document,'button').map(e=>e.textContent.trim());")
     if 'Get started' in buttons:
         run.wd.click('button', 'Get started')
     if run.wd.execute("return all(document,'jf-walkthrough-card').some(e=>!e.hidden)"):
         run.wd.click('button[aria-label="Dismiss"]')
-    wait_for(lambda: 'Search' in run.native.screen_text('J1-first-run-visible'),
-             'Packaged UI visible after mounting', seconds=30, error=Observation)
     run.native.shot('J1-first-run')
-    return {'normalLaunch': True, 'webDriver': 'installed executable', 'buttons': buttons}
+    raise OwnerValidation('Desktop entry opened an owned, mapped installed app window and Engine is ready; validate first-run text in J1-desktop-first-run.png')
 
 
 def add_folder(run):
@@ -260,7 +255,7 @@ def install_ai(run):
         if status.get('state') in ('failed', 'error'):
             if any(x in raw.lower() for x in ('connection reset', 'timed out', 'timeout', 'resolve host', 'http 503', 'http 502', 'http 429')):
                 raise RuntimeError('Production AI download failed; see J3-install-observations.json')
-            raise AssertionError('Install AI failed: ' + raw)
+            raise ProductFailure('Install AI failed: ' + raw)
         if resumed:
             runtime = run.api('/api/ai/runtime/status')
             run.evidence('J3-resume-runtime', runtime)
@@ -296,6 +291,8 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
     def activated():
         sample_memory()
         install = run.api('/api/ai/install/status')
+        if install.get('state') in ('failed', 'error'):
+            raise ProductFailure('Install AI failed during activation: ' + json.dumps(install))
         runtime = run.api('/api/ai/runtime/status')
         ui = run.wd.text()
         outcomes = run.wd.execute("return all(document,'jf-operation-outcome-detail').map(e=>e.operationKey).filter(Boolean)")
@@ -304,7 +301,7 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
         run.evidence('J3-activation-observations', activation_samples)
         for operation in history:
             if operation.get('state') in ('failed', 'cancelled'):
-                raise AssertionError('Model activation failed: ' + json.dumps(operation))
+                raise ProductFailure('Model activation failed: ' + json.dumps(operation))
         features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
         return {'install': install, 'runtime': runtime} if install.get('installedFully') is True and all(
             features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
@@ -416,18 +413,11 @@ def author_state(run):
     run.nav('Library')
     run.wd.click('button[aria-label="Bookmark this view"]')
     run.wd.click('button[aria-label="View bookmarks"]')
-    text = bookmark_text(run)
-    assert 'Library' in text, 'Authored bookmark is not visible'
-    # Carry only measured control geometry across the normal restart. No DOM
-    # automation is attached to the persistence observation itself.
-    run.facts['bookmarkGeometry'] = run.wd.execute("""
-const button=all(document,'button[aria-label="View bookmarks"]')[0].getBoundingClientRect();
-const popup=all(document,'jf-bookmarks-popover').find(e=>e.hasAttribute('open'));
-const list=popup.shadowRoot.querySelector('[role="listbox"]').getBoundingClientRect();
-return {button:{x:button.x+button.width/2,y:button.y+button.height/2},
- popup:{x:Math.floor(list.x),y:Math.floor(list.y),width:Math.ceil(list.width),height:Math.ceil(list.height),
- viewportWidth:innerWidth,viewportHeight:innerHeight}};
-""")
+    bookmark = wait_for(lambda: next((v for v in stored_bookmarks(run)
+                        if v.get('label') == 'Library' and v.get('surfaceId') == 'core.library-surface'), None),
+                        'UI-authored Library bookmark stored through Web Storage API', seconds=30)
+    run.facts['bookmark'] = bookmark
+    bookmark_entry(run, bookmark)
     run.native.shot('J4-authored-bookmark')
     run.native.key('escape')
     run.nav('Settings')
@@ -454,38 +444,21 @@ def assert_state(run):
 
 def restart(run):
     run.require('beforeState')
-    run.normal_launch()
+    bookmark = run.require('bookmark')
+    run.start_ui()
     state = assert_state(run)
     run.evidence('J4-retained-state', state)
-    run.native.shot('J4-normal-restart')
-    geometry = run.require('bookmarkGeometry')
-    wait_for(run.native.app_window, 'Normal restarted app focused', seconds=30, error=Infrastructure)
-    # Engine readiness precedes restored UI state. Do not send Escape before
-    # the Settings modal we left open has actually mounted in the normal UI.
-    wait_for(lambda: 'Settings' in run.native.app_text('J4-restored-settings'),
-             'Restored Settings visible before dismissal', seconds=30, error=Observation)
-    run.native.key('escape')
-    wait_for(lambda: 'Settings' not in run.native.app_text('J4-settings-closed'),
-             'Restored Settings closed before bookmarks click', seconds=30, error=Observation)
-    before = []
-    for sample in range(3):
-        before.append(run.native.matching_text('J4-before-bookmarks-' + str(sample), r'\bLibrary\b', geometry['popup']))
-        run.evidence('J4-before-bookmarks', before)
-        if before[-1]:
-            raise Infrastructure('Bookmark observation region already contains Library before clicking')
-        if sample < 2:
-            time.sleep(.5)
+    stored = stored_bookmarks(run)
+    assert bookmark in stored, 'Authored bookmark differs after restart through Web Storage API'
+    # We left Settings open before restart. Wait for its restored DOM before closing.
+    run.wd.click('button[aria-label="Close Settings"]')
+    wait_for(lambda: run.wd.execute("return !all(document,'button[aria-label=\"Close Settings\"]').some(e=>e.getBoundingClientRect().height>0)"),
+             'Restored Settings closed before bookmarks', seconds=30)
     interaction_observation(run, 'J4-bookmarks-click')
-    window = run.native.app_window()
-    if not window:
-        raise Infrastructure('Normal restarted app lost focus before bookmark click')
-    run.native.click(window['rect']['x'] + geometry['button']['x'],
-                     window['rect']['y'] + geometry['button']['y'])
-    text = wait_for(lambda: run.native.matching_text('J4-restarted-bookmark', r'\bLibrary\b', geometry['popup']),
-                    'Authored Library bookmark visible in normal restarted popup; persisted bookmark corroborates product absence',
-                    seconds=30)
-    run.evidence('J4-native-bookmark', {'before': before, 'after': text, 'geometry': geometry,
-                                       'automationAttached': False})
+    run.wd.click('button[aria-label="View bookmarks"]')
+    entry = bookmark_entry(run, bookmark)
+    run.evidence('J4-restarted-bookmark', {'domEntry': entry, 'storedBookmark': bookmark,
+                 'storageAPI': 'Web Storage localStorage.getItem in harness WebDriver session'})
     run.native.shot('J4-restarted-bookmark')
     run.native.key('escape')
     return state
@@ -506,15 +479,23 @@ def interaction_observation(run, name):
     return observed
 
 
-def bookmark_text(run):
+def stored_bookmarks(run):
+    """Read the app's durable saved views through the production Web Storage API."""
+    return run.wd.execute("""
+const state=JSON.parse(localStorage.getItem('justsearch.userState.v2') || 'null');
+return state?.profiles?.[state.activeProfileId]?.savedViews || [];
+""")
+
+
+def bookmark_entry(run, bookmark):
     return wait_for(lambda: run.wd.execute("""
 const popup=all(document,'jf-bookmarks-popover').find(e=>e.hasAttribute('open'));
-if (!popup || !popup.shadowRoot) return null;
-const content=popup.shadowRoot.querySelector('[role="listbox"],.empty');
-if (!content) return null;
-const r=content.getBoundingClientRect();
-return r.width>0 && r.height>0 ? content.textContent : null;
-"""), 'Saved-views popover visibly opened', seconds=30, error=Infrastructure)
+if (!popup?.shadowRoot) return null;
+const entry=all(popup.shadowRoot,'[role="listbox"] [role="option"]').find(e=>
+ e.querySelector('.item-label')?.textContent.trim()===arguments[0].label &&
+ e.getAttribute('title')===arguments[0].url && e.getBoundingClientRect().height>0);
+return entry ? {label:entry.querySelector('.item-label').textContent.trim(),url:entry.getAttribute('title')} : null;
+""", [bookmark]), 'Authored bookmark entry visible in DOM list', seconds=30)
 
 
 def update_prepare(run):
@@ -718,86 +699,74 @@ def desktop_entry(run):
     assert handler == 'JustSearch.desktop', 'OS has not registered the installed deep-link handler'
     run.stop_app()
     run.desktop_spawn(['gtk-launch', 'JustSearch'], run.work + '/menu-launch.log')
+    run.observe_window('J7-menu-entry')
     run.ready()
     run.native.shot('J7-menu-entry-launch')
     return {'entry': entry, 'osHandler': handler}
 
 
-def deep_links(run):
+def cold_link(run):
     require_candidate(run)
     run.require('folder')
-    query = cold_link_query(run.run_id)
-    # The token is derived from this new run and is never entered before dispatch.
     run.stop_app()
-    from urllib.parse import quote
-    run.desktop_spawn(['xdg-open', 'justsearch://query?q=' + quote(query)], run.work + '/cold-deep-link.log')
+    run.desktop_spawn(['xdg-open', 'justsearch://query?q=orchid'], run.work + '/cold-deep-link.log')
     run.observe_window('cold-deep-link')
     run.ready()
     shells = [p for p in run.target.owned() if p['exe'] == run.binary]
     run.evidence('J7-deep-link-cold-processes', shells)
     assert len(shells) == 1, 'Cold OS deep link requires exactly one JustSearch UI process'
-    cold = wait_for(lambda: run.native.matching_text('J7-deep-link-cold', r'\s+'.join(map(re.escape, query.split()))),
-                    'Cold OS deep link unique query in app window; OCR absence uncorroborated',
-                    seconds=45, error=Observation)
-    before_window = run.native.app_window()
+    window = run.native.app_window(run.binary, focused=False)
+    assert window and window['pid'] == shells[0]['pid'], 'Cold OS deep link has no owned, mapped receiving window'
+    run.evidence('J7-deep-link-cold-window', window)
+    run.native.screen_text('J7-deep-link-cold') # Triage only.
+    raise OwnerValidation('Cold OS handler left exactly one installed UI process with an owned, mapped window; validate query destination in J7-deep-link-cold.png')
+
+
+def deep_links(run):
+    """Warm OS dispatch into the harness's own WebDriver-launched app."""
+    require_candidate(run)
+    run.require('folder')
+    run.start_ui()
+    run.nav('Search')
+    wait_for(lambda: run.wd.execute("return all(document,'jf-shell').some(e=>e.activeId==='core.search-v3-surface')"),
+             'Warm-link baseline Search route', seconds=30)
+    before_window = run.native.app_window(run.binary, focused=False)
     if not before_window:
-        raise Infrastructure('Warm deep-link receiving app is not focused before dispatch')
-    if native_library_destination(run, 'J7-deep-link-warm-before'):
-        raise Infrastructure('Warm deep-link top bar already contains Library before dispatch')
+        raise Infrastructure('Warm deep-link receiving app has no mapped window before dispatch')
     before_shells = [p for p in run.target.owned() if p['exe'] == run.binary]
+    assert len(before_shells) == 1, 'Warm OS deep link requires exactly one initial JustSearch UI process'
+    assert before_shells[0]['pid'] == before_window['pid'], 'Warm OS deep link receiver identity differs'
     run.evidence('J7-deep-link-warm-before', {'window': before_window, 'uiProcesses': before_shells})
-    assert len(before_shells) == 1, 'Cold OS deep link left multiple JustSearch UI processes'
     interaction_observation(run, 'J7-warm-dispatch')
     run.desktop_spawn(['xdg-open', 'justsearch://surface/core.library-surface'], run.work + '/warm-deep-link.log')
-    forwarding_failure = None
+    dispatched = time.monotonic()
     def warm_destination():
-        nonlocal forwarding_failure
-        if forwarding_failure:
-            raise forwarding_failure
-        try:
-            shells = [p for p in run.target.owned() if p['exe'] == run.binary]
-            run.evidence('J7-deep-link-warm-processes', shells)
-            assert len(shells) <= len(before_shells), 'Warm OS deep link started a second JustSearch UI process; forwarding failed'
-            window = run.native.app_window()
-            if not window:
-                raise Infrastructure('Warm deep-link receiving app is not focused')
-            assert window['pid'] == before_window['pid'], 'Warm OS deep link changed JustSearch receiver PID; forwarding failed'
-            destination = native_library_destination(run)
-            if destination:
-                assert destination['window']['pid'] == before_window['pid'], 'Warm OS deep link changed JustSearch receiver PID during capture'
-            shells = [p for p in run.target.owned() if p['exe'] == run.binary]
-            run.evidence('J7-deep-link-warm-processes-after-capture', shells)
-            assert len(shells) <= len(before_shells), 'Warm OS deep link started a second JustSearch UI process during capture; forwarding failed'
-            return destination
-        except AssertionError as exc:
-            # Once observed, broken forwarding cannot recover into a pass merely
-            # because the extra instance exits before the polling deadline.
-            forwarding_failure = exc
-            raise
-    warm = wait_for(warm_destination,
-                    'Warm OS deep link Library destination; OCR absence uncorroborated', seconds=45, error=Observation)
-    return {'cold': cold, 'warm': warm}
-
-
-def cold_link_query(run_id):
-    # A hexadecimal digest encoded as distinct dictionary words avoids 0/o,
-    # 1/l, b/6 and e/c glyph ambiguity in the native observer.
-    words = ('sun', 'fox', 'ivy', 'sky', 'pup', 'fin', 'rug', 'ash',
-             'hay', 'yak', 'sir', 'sip', 'fur', 'fig', 'jar', 'joy')
-    return ' '.join(words[int(n, 16)] for n in hashlib.sha256(run_id.encode()).hexdigest()[:8])
-
-
-def native_library_destination(run, name='J7-deep-link-warm'):
-    # The top bar names the current surface. Body OCR depends on layout and
-    # can miss the Add Folder button despite correct navigation.
-    window = run.native.app_window()
-    if not window:
-        raise Infrastructure('Deep-link receiving app is not focused')
-    rect = window['rect']
-    region = {'x': 160, 'y': 0, 'width': min(400, rect['width'] - 160), 'height': 40,
-              'viewportWidth': rect['width'], 'viewportHeight': rect['height']}
-    text = run.native.matching_text(name, r'\bLibrary\b', region)
-    return {'topBar': text, 'window': window} if text else None
+        shells = [p for p in run.target.owned() if p['exe'] == run.binary]
+        window = run.native.app_window(run.binary, focused=False)
+        run.evidence('J7-deep-link-warm-processes', {'uiProcesses': shells, 'window': window,
+                     'secondsSinceDispatch': round(time.monotonic() - dispatched, 3)})
+        assert any(p['pid'] == before_shells[0]['pid'] and p['ticks'] == before_shells[0]['ticks'] for p in shells), 'Warm OS deep link changed receiver PID or process identity'
+        assert window and window['pid'] == before_window['pid'], 'Warm OS deep link changed mapped receiver PID'
+        if len(shells) > 1 and time.monotonic() - dispatched >= 3:
+            raise ProductFailure('Warm OS deep link left an extra JustSearch process after the 3s forwarding grace period')
+        destination = run.wd.execute("""
+const shell=all(document,'jf-shell').find(e=>e.activeId==='core.library-surface');
+const heading=all(document,'h1.surface-title').find(e=>e.textContent.trim()==='Library' && e.getBoundingClientRect().height>0);
+return shell && heading ? {route:shell.activeId,heading:heading.textContent.trim()} : null;
+""")
+        if not destination:
+            return None
+        # Reobserve after DOM acceptance; a live forwarder cannot count as success.
+        shells = [p for p in run.target.owned() if p['exe'] == run.binary]
+        window = run.native.app_window(run.binary, focused=False)
+        run.evidence('J7-deep-link-warm-accepted', {'dom': destination, 'uiProcesses': shells, 'window': window})
+        assert len(shells) == 1, 'Warm OS deep link has an extra JustSearch process when destination was accepted'
+        assert shells[0]['pid'] == before_shells[0]['pid'] and shells[0]['ticks'] == before_shells[0]['ticks'], 'Warm OS deep link changed receiver PID or process identity at acceptance'
+        assert window and window['pid'] == before_window['pid'], 'Warm OS deep link changed mapped receiver PID at acceptance'
+        return destination
+    destination = wait_for(warm_destination, 'Warm OS deep link Library DOM destination', seconds=45)
+    run.native.shot('J7-deep-link-warm')
+    return {'destination': destination, 'receiver': before_shells[0], 'forwarderGraceSeconds': 3}
 
 
 def shortcut(run):
@@ -868,10 +837,11 @@ def shortcut(run):
 
 
 def shortcut_receiver(run, query=None):
-    window = run.native.app_window()
+    observation = run.native.windows()
+    window = run.native.app_window(run.binary, observation=observation)
     if not window:
         run.evidence('J7-shortcut-receiver', {'appFocused': False,
-                     'focusedWindow': run.native.focused_window(), 'expectedQuery': query})
+                     'focusedWindow': observation['focused'], 'expectedQuery': query})
         return None
     state = run.wd.execute("""
 let active=document.activeElement;
@@ -950,6 +920,6 @@ CHECKS = {
     'search-open': search_open, 'cpu-ai': install_ai, 'author-state': author_state,
     'restart': restart, 'update-offer': update_prepare, 'update-cancel': cancel_update,
     'update-success': update_success, 'update-lock': update_lock, 'reinstall': reinstall, 'remove-retain-reinstall': remove_reinstall,
-    'desktop-entry': desktop_entry, 'deep-links': deep_links, 'shortcut': shortcut,
+    'desktop-entry': desktop_entry, 'deep-link-cold': cold_link, 'deep-link-warm': deep_links, 'shortcut': shortcut,
     'ocr': ocr, 'mcp': mcp, 'mcp-metadata': mcp_metadata,
 }

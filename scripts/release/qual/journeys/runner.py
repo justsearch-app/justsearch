@@ -5,7 +5,6 @@ The same checks run locally on a disposable runner or over the VM harness's SSH.
 No production IPC is replaced, and no test-only application switches are used.
 """
 import argparse
-import base64
 import hashlib
 import json
 import os
@@ -20,7 +19,7 @@ import urllib.error
 import urllib.request
 
 HERE = Path(__file__).resolve().parent
-STATUSES = ('passed', 'failed-product', 'failed-infrastructure', 'skipped-by-decision', 'unavailable')
+STATUSES = ('passed', 'failed-product', 'failed-infrastructure', 'skipped-by-decision', 'unavailable', 'owner-validation')
 
 
 def phase_journeys(phase):
@@ -31,8 +30,16 @@ class Infrastructure(Exception):
     """An observed harness, desktop or download failure, not a product verdict."""
 
 
-class Observation(Infrastructure):
-    """Native OCR did not establish an outcome, without product corroboration."""
+class ProductFailure(AssertionError):
+    """A reported product end state; polling must never hide it."""
+
+
+class TransientAPI(AssertionError):
+    """An Engine API not yet available; retry within the caller's deadline."""
+
+
+class OwnerValidation(Exception):
+    """Automatic evidence is complete; the pictured visible result needs its owner."""
 
 
 class Unavailable(Exception):
@@ -72,8 +79,16 @@ def summarize(journeys, full_selection=True):
             if check['status'] not in counts:
                 raise ValueError(f"Unknown check status: {check['status']}")
             counts[check['status']] += 1
-    return {'counts': counts, 'fullSelection': full_selection, 'passed': full_selection and counts['passed'] > 0
-            and not any(counts[s] for s in ('failed-product', 'failed-infrastructure', 'unavailable'))}
+    pending = [{'journey': j['id'], 'check': c['name'],
+                'screenshots': [p for p in c.get('evidence', []) if p.endswith('.png')]}
+               for j in journeys for c in j['checks'] if c['status'] == 'owner-validation']
+    failed = any(counts[s] for s in ('failed-product', 'failed-infrastructure', 'unavailable'))
+    complete = full_selection and counts['passed'] + counts['owner-validation'] > 0 and not failed
+    status = ('failed' if failed else 'incomplete' if not complete else
+              'passed-pending-owner-validation' if pending else 'passed')
+    return {'counts': counts, 'fullSelection': full_selection,
+            'passed': complete and not pending, 'status': status, 'ownerValidation': pending}
+
 
 
 def preparation_failure(lane, reason):
@@ -123,19 +138,22 @@ def verify_assets(root, names):
 def wait_for(fn, description, seconds=90, interval=1, error=AssertionError):
     deadline = time.monotonic() + seconds
     last = None
+    product_error = None
     while time.monotonic() < deadline:
         try:
             value = fn()
             last = value
             if value:
                 return value
-        except (AssertionError, OSError, KeyError, ValueError, urllib.error.URLError, Infrastructure) as exc:
+        except TransientAPI as exc:
+            product_error = last = exc
+        except (OSError, KeyError, ValueError, urllib.error.URLError, Infrastructure) as exc:
             last = exc
         time.sleep(interval)
+    if product_error:
+        raise AssertionError(f'{description} timed out after {seconds}s; Engine failure: {product_error}; last observation: {last}')
     if isinstance(last, Exception):
-        error = AssertionError if isinstance(last, AssertionError) else Infrastructure
-    if isinstance(last, Observation) and issubclass(error, Infrastructure):
-        error = Observation
+        error = Infrastructure
     raise error(f'{description} timed out after {seconds}s; last observation: {last}')
 
 
@@ -372,117 +390,49 @@ class Native:
         else:
             self.target.run(['xdotool', 'mousemove', str(round(x)), str(round(y)), 'click', '1'])
 
-    def focused_window(self):
-        """Ask the compositor/X server, never infer foreground identity from OCR."""
+    def windows(self):
+        """One compositor observation supplies focus and mapped-window identities."""
         return self.target.json("""
 import json,os,subprocess
 if os.environ.get('WAYLAND_DISPLAY'):
  from gi.repository import Gio,GLib
  proxy=Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION,0,None,'org.gnome.Shell','/org/gnome/Shell','org.gnome.Shell',None)
- script='(()=>{if(typeof Main.modalCount!=="number")throw Error("GNOME modal observation unavailable");if(Main.modalCount!==0)throw Error("GNOME shell modal overlaps possible app pixels");let w=global.display.focus_window;if(!w)return null;let r=w.get_frame_rect();return {pid:w.get_pid(),title:w.get_title(),rect:{x:r.x,y:r.y,width:r.width,height:r.height}}})()'
+ script='(()=>{let focus=global.display.focus_window;let rows=global.get_window_actors().filter(a=>a.is_mapped()).map(a=>{let w=a.meta_window,r=w.get_frame_rect();return {pid:w.get_pid(),title:w.get_title(),focused:w===focus,rect:{x:r.x,y:r.y,width:r.width,height:r.height}}});return {focused:rows.find(w=>w.focused)||null,windows:rows}})()'
  ok,raw=proxy.call_sync('Eval',GLib.Variant('(s)',(script,)),0,5000,None).unpack()
  if not ok:raise RuntimeError('GNOME window observation unavailable; prepare the disposable compositor debugger: '+raw)
  result=json.loads(raw)
 else:
  def x(*args):return subprocess.check_output(['xdotool',*args],text=True).strip()
- window=x('getwindowfocus')
- geo=dict(line.split('=',1) for line in x('getwindowgeometry','--shell',window).splitlines())
- result={'pid':int(x('getwindowpid',window)),'title':x('getwindowname',window),
-         'rect':{k:int(geo[v]) for k,v in [('x','X'),('y','Y'),('width','WIDTH'),('height','HEIGHT')]}}
+ focus=x('getwindowfocus')
+ visible=subprocess.run(['xdotool','search','--onlyvisible','--name','.*'],capture_output=True,text=True)
+ if visible.returncode not in (0,1):raise RuntimeError('X11 mapped-window observation unavailable: '+visible.stderr)
+ rows=[]
+ for window in visible.stdout.splitlines():
+  try:
+   geo=dict(line.split('=',1) for line in x('getwindowgeometry','--shell',window).splitlines())
+   rows.append({'pid':int(x('getwindowpid',window)),'title':x('getwindowname',window),'focused':window==focus,
+                'rect':{k:int(geo[v]) for k,v in [('x','X'),('y','Y'),('width','WIDTH'),('height','HEIGHT')]}})
+  except subprocess.CalledProcessError:pass # A window can disappear during enumeration.
+ result={'focused':next((w for w in rows if w['focused']),None),'windows':rows}
 print(json.dumps(result))
 """)
 
-    def app_window(self):
-        window = self.focused_window()
-        if not window:
-            return None
-        return window if any(row['pid'] == window['pid'] and row['exe'].endswith('/JustSearch')
-                             for row in self.target.owned()) else None
+    def focused_window(self):
+        return self.windows()['focused']
 
-    def window_failure(self, name):
-        pids = [row['pid'] for row in self.target.owned() if row['exe'].endswith('/JustSearch')]
-        windows = self.target.json("""
-import json,os,subprocess,sys
-pids=json.loads(sys.argv[1])
-if os.environ.get('WAYLAND_DISPLAY'):
- from gi.repository import Gio,GLib
- proxy=Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION,0,None,'org.gnome.Shell','/org/gnome/Shell','org.gnome.Shell',None)
- script='global.get_window_actors().map(a=>a.meta_window).filter(w=>'+json.dumps(pids)+'.includes(w.get_pid())).map(w=>({pid:w.get_pid(),title:w.get_title()}))'
- ok,raw=proxy.call_sync('Eval',GLib.Variant('(s)',(script,)),0,5000,None).unpack()
- if not ok:raise RuntimeError('GNOME window list unavailable')
- rows=json.loads(raw)
-else:
- rows=[]
- for pid in pids:
-  result=subprocess.run(['xdotool','search','--onlyvisible','--pid',str(pid)],capture_output=True,text=True)
-  if result.returncode not in (0,1):raise RuntimeError('X11 window list unavailable: '+result.stderr)
-  rows.extend({'pid':pid,'window':w} for w in result.stdout.splitlines())
-print(json.dumps(rows))
-""", pids)
-        focused = self.focused_window()
+    def app_window(self, binary, focused=True, observation=None):
+        if observation is None:
+            observation = self.windows()
+        pids = {row['pid'] for row in self.target.owned() if row['exe'] == binary}
+        candidates = [observation['focused']] if focused else observation['windows']
+        return next((w for w in candidates if w and w['pid'] in pids), None)
+
+    def window_failure(self, name, binary):
+        observation = self.windows()
+        pids = [row['pid'] for row in self.target.owned() if row['exe'] == binary]
         (self.evidence / (name + '-window-miss.json')).write_text(
-            json.dumps({'ownedPids': pids, 'windows': windows, 'focused': focused}, indent=2) + '\n')
-        if windows:
-            raise Infrastructure('App window exists but is not focused; focused window: ' + json.dumps(focused))
-        raise AssertionError('Installed app has no window')
-
-    def reject_notification(self, name):
-        if not self.target.env.get('WAYLAND_DISPLAY'):
-            return
-        banner = self.target.json("""
-import json
-from gi.repository import Gio,GLib
-proxy=Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION,0,None,'org.gnome.Shell','/org/gnome/Shell','org.gnome.Shell',None)
-script='(()=>{if(!("_banner" in Main.messageTray))throw Error("GNOME banner field unavailable");let b=Main.messageTray._banner;return !!(b && b.visible && b.get_paint_visibility())})()'
-ok,raw=proxy.call_sync('Eval',GLib.Variant('(s)',(script,)),0,5000,None).unpack()
-if not ok:raise RuntimeError('GNOME notification observation unavailable')
-print(json.dumps(json.loads(raw)))
-""")
-        if banner:
-            (self.evidence / (name + '-notification.json')).write_text(json.dumps({'visibleBanner': True}) + '\n')
-            raise Infrastructure('Visible compositor notification overlaps possible app pixels')
-
-    def app_text(self, name, region=None, psm=6):
-        """OCR only the focused, owned app, optionally a viewport-relative region."""
-        window = self.app_window()
-        if not window:
-            raise Infrastructure('Focused window is not this run\'s JustSearch')
-        rect = window['rect']
-        box = dict(rect)
-        if region:
-            if (rect['width'], rect['height']) != (region['viewportWidth'], region['viewportHeight']):
-                raise Infrastructure('Native window size differs from the measured UI viewport')
-            box.update(x=rect['x'] + region['x'], y=rect['y'] + region['y'],
-                       width=region['width'], height=region['height'])
-        self.reject_notification(name)
-        shot = self.shot(name)
-        self.reject_notification(name)
-        from PIL import Image
-        with Image.open(shot) as source:
-            if box['width'] <= 0 or box['height'] <= 0 or box['x'] < 0 or box['y'] < 0 or box['x'] + box['width'] > source.width or box['y'] + box['height'] > source.height:
-                raise Infrastructure('App crop is outside the native screenshot')
-            crop = source.crop((box['x'], box['y'], box['x'] + box['width'], box['y'] + box['height']))
-            crop.save(self.evidence / (name + '-app.png'))
-            # Small native labels (12px in the top bar) need enough pixels for
-            # OCR to distinguish Library from Ubrary. Keep the original crop.
-            if region:
-                crop = crop.resize((crop.width * 3, crop.height * 3))
-            crop.save(self.evidence / (name + '-ocr.png'))
-        # Recheck focus after capture so another foreground window cannot qualify.
-        if self.app_window() != window:
-            raise Infrastructure('Focus changed during app observation')
-        (self.evidence / (name + '-window.json')).write_text(json.dumps(window, indent=2) + '\n')
-        return subprocess.check_output(['tesseract', str(self.evidence / (name + '-ocr.png')),
-                                        'stdout', '--psm', str(psm)], stderr=subprocess.DEVNULL, text=True, timeout=30)
-
-    def matching_text(self, name, pattern, region=None):
-        # Retry segmentation on the same measured region; neither OCR mode alone
-        # establishes a product failure when the app cannot corroborate it.
-        for psm in (6, 11):
-            text = self.app_text(name + '-psm' + str(psm), region, psm=psm)
-            if re.search(pattern, text, re.I):
-                return text
-        return None
+            json.dumps({'ownedPids': pids, **observation}, indent=2) + '\n')
+        raise ProductFailure('Installed app has no owned, mapped window')
 
     def shot(self, name):
         path = self.evidence / (name + '.png')
@@ -497,7 +447,9 @@ print(json.dumps(json.loads(raw)))
 
     def screen_text(self, name, psm=11):
         shot = self.shot(name)
-        return subprocess.check_output(['tesseract', str(shot), 'stdout', '--psm', str(psm)], stderr=subprocess.DEVNULL, text=True, timeout=30)
+        text = subprocess.check_output(['tesseract', str(shot), 'stdout', '--psm', str(psm)], stderr=subprocess.DEVNULL, text=True, timeout=30)
+        (self.evidence / (name + '.txt')).write_text(text)
+        return text
 
     def picker_visible(self, name):
         if self.target.vm:
@@ -550,10 +502,10 @@ class Run:
             row.update(status='passed', reason='assertions completed')
             if value is not None:
                 self.evidence(journey['id'] + '-' + name, value)
+        except OwnerValidation as exc:
+            row.update(status='owner-validation', reason=str(exc))
         except Exception as exc:
             row.update(status=classify(exc), reason=str(exc))
-            if isinstance(exc, Observation):
-                row['reasonTag'] = 'observation'
             (self.out / f"{journey['id']}-{name}.error.txt").write_text(traceback.format_exc())
             if not isinstance(exc, Unavailable):
                 try:
@@ -597,33 +549,20 @@ except TimeoutError as exc:
  print(json.dumps({'status':'infrastructure','reason':str(exc)}))
 """, {'data': self.data, 'endpoint': endpoint, 'body': body, 'runId': self.run_id})
         if result['status'] == 'product':
-            raise AssertionError('Installed Engine: ' + result['reason'])
+            raise TransientAPI('Installed Engine: ' + result['reason'])
         if result['status'] != 'ok':
             raise Infrastructure('Engine transport: ' + result.get('reason', 'invalid result'))
         return result['value']
 
     def ready(self):
-        last_product = None
         def probe():
-            nonlocal last_product
-            # A newly launched Engine may not have published its manifest yet.
-            # Retry only within this startup deadline; persistent API failures
-            # retain their product verdict and their actual diagnostic.
-            try:
-                status = self.api('/api/status')
-                health = self.api('/api/health')
-            except AssertionError as exc:
-                last_product = str(exc)
-                self.evidence('engine-readiness', {'lastProductFailure': last_product})
-                return None
+            status = self.api('/api/status')
             if status.get('knowledgeServerStartError'):
-                raise AssertionError(status['knowledgeServerStartError'])
+                raise ProductFailure(status['knowledgeServerStartError'])
+            health = self.api('/api/health')
             if status.get('indexAvailable') and health.get('components', {}).get('index', {}).get('state') == 'READY':
                 return {'status': status, 'health': health}
-        try:
-            result = wait_for(probe, 'Installed Engine ready', seconds=240)
-        except AssertionError as exc:
-            raise AssertionError(str(exc) + '; last Engine failure: ' + str(last_product)) from exc
+        result = wait_for(probe, 'Installed Engine ready', seconds=240)
         self.facts['ready'] = True
         return result
 
@@ -663,16 +602,17 @@ except TimeoutError as exc:
         name = name + '-' + str(time.time_ns())
         started = time.monotonic()
         try:
-            window = wait_for(self.native.app_window, 'Installed app window shown', seconds=60)
+            window = wait_for(lambda: self.native.app_window(self.binary, focused=False),
+                              'Installed app window shown', seconds=60)
         except AssertionError:
-            self.native.window_failure(name)
+            self.native.window_failure(name, self.binary)
             raise
         self.native.shot('window-shown-' + name)
         self.facts['windowShownAt'] = time.monotonic()
         self.facts['windowShownEvidence'] = 'window-shown-' + name + '.json'
         self.evidence('window-shown-' + name, {'window': window,
                       'secondsToObserve': round(time.monotonic() - started, 3),
-                      'signal': "Focused window belongs to this run's installed JustSearch process"})
+                      'signal': "Mapped window belongs to this run's exact installed JustSearch executable"})
 
     def desktop_spawn(self, command, logfile):
         if not self.target.vm:

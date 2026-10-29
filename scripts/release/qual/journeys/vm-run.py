@@ -217,20 +217,21 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
                     if key in ('ExecutablePath', 'Signal', 'ProblemType', 'Date', 'Package', 'ProcCmdline'):
                         row['fields'][key] = value.strip()
                 fields.append(row)
+        # Resolve attribution while the original reports are still present.
+        installed = vm.ssh('ubuntu', 'dpkg-query -L just-search', capture_output=True, text=True, timeout=30)
+        if installed.returncode not in (0, 1):
+            raise Infrastructure('Installed package paths unavailable for crash attribution; reports retained in place')
+        paths = set(installed.stdout.splitlines()) if installed.returncode == 0 else set()
+        for row in fields:
+            row['attribution'] = ('product' if row['fields'].get('Package', '').split()[:1] == ['just-search']
+                                  or row['fields'].get('ExecutablePath', '') in paths else 'unattributed')
         record = out / 'guest-crashes.json'
         previous = json.loads(record.read_text()) if record.exists() else []
         record.write_text(json.dumps(previous + fields, indent=2) + '\n')
         recorded = '/var/crash/qualification-recorded-' + str(time.time_ns())
         vm.guest_root('ubuntu', 'mkdir ' + shlex.quote(recorded) + '; mv -- '
                       + shlex.join('/var/crash/' + n for n in names) + ' ' + shlex.quote(recorded) + '/')
-        product = [r for r in fields if r['fields'].get('Package', '').split()[:1] == ['just-search']]
-        if product:
-            raise AssertionError('Product crash in guest: ' + json.dumps(product))
-        installed = vm.ssh('ubuntu', 'dpkg-query -L just-search', capture_output=True, text=True, timeout=30)
-        if installed.returncode not in (0, 1):
-            raise Infrastructure('Installed package paths unavailable for crash attribution')
-        paths = set(installed.stdout.splitlines()) if installed.returncode == 0 else set()
-        product = [r for r in fields if r['fields'].get('ExecutablePath', '') in paths]
+        product = [r for r in fields if r['attribution'] == 'product']
         if product:
             raise AssertionError('Product crash in guest: ' + json.dumps(product))
 
@@ -257,12 +258,6 @@ def prepare_desktop(args, out):
         vm.guest_root('ubuntu', 'systemctl restart gdm3')
         ready()
     (out / 'crash-notifications.txt').write_text(target.run(notify).stdout)
-    banners = ['gsettings', 'get', 'org.gnome.desktop.notifications', 'show-banners']
-    target.run(['gsettings', 'set', 'org.gnome.desktop.notifications', 'show-banners', 'false'])
-    observed = target.run(banners).stdout.strip()
-    (out / 'notification-banners.txt').write_text(observed + '\n')
-    if observed != 'false':
-        raise Infrastructure('GNOME notification banners could not be disabled')
     target.run(['gsettings', 'set', 'org.gnome.desktop.session', 'idle-delay', '0'])
     target.run(['gsettings', 'set', 'org.gnome.desktop.screensaver', 'lock-enabled', 'false'])
     target.run(['xdg-mime', 'default', 'org.xfce.mousepad.desktop', 'text/plain'])
@@ -423,6 +418,8 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
             finally:
                 clean = vm.stop()
             report = json.loads((out / 'summary.json').read_text())
+            crashes = out / 'guest-crashes.json'
+            report['guestCrashes'] = json.loads(crashes.read_text()) if crashes.exists() else []
             report.update(writeVolume=volume, execution={'mode': args.mode,
                 'requestedJourneys': journeys, 'snapshot': str(snapshot) if snapshot else None,
                 'memoryMiB': args.memory_mib, 'memoryReason': args.memory_reason})
@@ -444,7 +441,8 @@ def combine(args, out, sources):
             rows.append(row)
     report = dict(next(iter(sources.values())))
     total = sum(s.get('writeVolume', {}).get('writtenBytes', 0) for s in sources.values())
-    report.update(journeys=rows, overlays={p: p + '/summary.json' for p in sources},
+    report.update(guestCrashes=[dict(c, overlay=name) for name, source in sources.items() for c in source.get('guestCrashes', [])],
+                  journeys=rows, overlays={p: p + '/summary.json' for p in sources},
                   writeVolume={'writtenBytes': total,
                     'source': 'guest whole-device counters, boot to pre-shutdown, all overlays',
                     'complete': all('writtenBytes' in s.get('writeVolume', {}) for s in sources.values())},

@@ -84,6 +84,7 @@ class Repair2Tests(unittest.TestCase):
                 run.target.env = {'WAYLAND_DISPLAY': 'wayland-0', 'XDG_SESSION_TYPE': 'wayland'}
                 run.native.focused_window.return_value = {'pid': 42, 'title': 'fixture — Mousepad'}
                 run.native.app_window.return_value = None
+                run.native.windows.return_value = {'focused': {'pid': 42, 'title': 'fixture — Mousepad'}, 'windows': []}
                 with patch.object(linux, 'require_candidate'), patch.object(linux, 'wait_for', immediate):
                     with self.assertRaises(Exception) as failure:
                         linux.shortcut(run)

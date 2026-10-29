@@ -1,5 +1,4 @@
 """Regression counterexamples from the independent W4a verifier (S3/S7/S22)."""
-import json
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -28,42 +27,13 @@ class RepairTests(unittest.TestCase):
         run.native.screen_text.return_value = 'Search v3 orchid lighthouse'
         run.native.focused_window.return_value = {'pid': 42, 'title': 'fixture — Mousepad'}
         run.native.app_window.return_value = None
+        run.native.windows.return_value = {'focused': {'pid': 42, 'title': 'fixture — Mousepad'}, 'windows': []}
         run.target.json.return_value = {'pid': 123}
         with patch.object(linux, 'require_candidate'), patch.object(linux, 'wait_for', once):
             with self.assertRaisesRegex(AssertionError, 'foregrounded search'):
                 linux.shortcut(run)
         run.native.type.assert_not_called()
 
-    def test_warm_link_uses_library_title_even_when_body_ocr_misses_button(self):
-        run = Mock(work='/tmp/own-run')
-        run.native.matching_text.return_value = 'Library'
-        run.native.app_window.return_value = {'pid': 1, 'rect': {'x': 0, 'y': 0, 'width': 1024, 'height': 700}}
-        result = linux.native_library_destination(run)
-        self.assertIn('Library', json.dumps(result))
-        self.assertFalse(run.wd.execute.called)
-
-    def test_restart_bookmark_stays_in_normal_restarted_process(self):
-        run = Mock()
-        run.start_ui.side_effect = AssertionError('WebDriver relaunch invalidates normal restart observation')
-        geometry = {'button': {'x': 900, 'y': 20}, 'popup': {'x': 750, 'y': 40, 'width': 240,
-                    'height': 60, 'viewportWidth': 1024, 'viewportHeight': 700}}
-        run.require.side_effect = lambda key: geometry if key == 'bookmarkGeometry' else True
-        run.native.app_window.return_value = {'pid': 1, 'rect': {'x': 100, 'y': 80}}
-        events = []
-        texts = iter(['Settings INTERFACE & APPEARANCE', 'Search v3', '', 'Library just now'])
-        def app_text(name, *args):
-            events.append(name)
-            return next(texts)
-        run.native.app_text.side_effect = app_text
-        run.native.matching_text.side_effect = [None, None, None, 'Library just now']
-        run.native.key.side_effect = lambda key: events.append(key)
-        with patch.object(linux, 'assert_state', return_value={'retained': True}), \
-             patch.object(linux, 'interaction_observation'), patch.object(linux, 'wait_for', once):
-            self.assertEqual(linux.restart(run), {'retained': True})
-        run.start_ui.assert_not_called()
-        run.native.click.assert_called_once_with(1000, 100)
-        run.wd.click.assert_not_called()
-        self.assertEqual(events[:3], ['J4-restored-settings', 'escape', 'J4-settings-closed'])
 
     def test_apt_closed_proxy_failure_is_infrastructure(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -12,51 +12,14 @@ import unittest
 from unittest.mock import Mock, patch
 import urllib.error
 
-import linux
 import runner
 from test_repair2 import immediate
-import test_repair4
 from test_repair4 import DEFINITION
 from test_writes import wrapper
 
 
 class Round2Tests(unittest.TestCase):
-    def restart_run(self, before='', after='Library'):
-        run = test_repair4.Repair4Tests().restart_run(lambda psm: after)
-        original = run.native.app_text.side_effect
-        def text(name, *args, psm=6, **kw):
-            if name.startswith('J4-before-bookmarks'):
-                return before.get(psm, '') if isinstance(before, dict) else before
-            return original(name, *args, psm=psm, **kw)
-        run.native.app_text.side_effect = text
-        return run
 
-    def test_01_before_bookmarks_uses_both_segmentations_and_ignores_case(self):
-        for before in ({6: 'Ubrary', 11: 'Library'}, {6: 'library'}):
-            with self.subTest(before=before):
-                run = self.restart_run(before)
-                with patch.object(linux, 'wait_for', immediate), \
-                     patch.object(linux, 'assert_state', return_value={'savedFiles': {'savedViews': ['Library']}}), \
-                     patch.object(linux, 'interaction_observation'), \
-                     self.assertRaisesRegex(runner.Infrastructure, 'already contains Library'):
-                    linux.restart(run)
-                run.native.click.assert_not_called()
-
-    def link_run(self):
-        run = Mock(work='/tmp/isolated-run', run_id='w4a-round-two', binary='/usr/bin/JustSearch')
-        run.target.owned.return_value = [{'pid':1,'exe':run.binary}]
-        run.wd.execute.return_value = 'Search'
-        run.native.app_text.return_value = ''
-        run.native.app_window.return_value = {'pid':1, 'rect': {'width': 1024, 'height': 700}}
-        return run
-
-    def test_02_warm_link_rejects_already_visible_library(self):
-        run = self.link_run()
-        run.native.matching_text.side_effect = lambda name, *a: 'Library' if name == 'J7-deep-link-warm-before' else 'unique cold query'
-        with patch.object(linux, 'require_candidate'), patch.object(linux, 'interaction_observation'), \
-             patch.object(linux, 'wait_for', immediate), self.assertRaisesRegex(runner.Infrastructure, 'already contains Library'):
-            linux.deep_links(run)
-        self.assertEqual(run.desktop_spawn.call_count, 1)
 
     def desktop(self, target, out, wait=Mock(return_value=True)):
         with patch.object(wrapper, 'Target', return_value=target), patch.object(wrapper, 'Native'), \
@@ -64,31 +27,6 @@ class Round2Tests(unittest.TestCase):
              patch.object(wrapper.vm, 'QMP'), patch.object(wrapper, 'wait_for', wait), patch('screen.key'):
             wrapper.prepare_desktop(SimpleNamespace(session='wayland'), out)
 
-    def test_03_banner_setting_is_applied_and_verified(self):
-        for stuck in (False, True):
-            with self.subTest(stuck=stuck), tempfile.TemporaryDirectory() as temp:
-                target = Mock()
-                target.run.side_effect = lambda args, **kw: Mock(stdout='true' if stuck and args[:2] == ['gsettings','get'] and args[-1] == 'show-banners' else 'false')
-                if stuck:
-                    with self.assertRaisesRegex(runner.Infrastructure, 'banners could not be disabled'):
-                        self.desktop(target, Path(temp))
-                else:
-                    self.desktop(target, Path(temp))
-                    target.run.assert_any_call(['gsettings', 'set', 'org.gnome.desktop.notifications', 'show-banners', 'false'])
-                    self.assertEqual((Path(temp) / 'notification-banners.txt').read_text(), 'false\n')
-
-    def test_03_visible_compositor_banner_cannot_supply_app_text(self):
-        from PIL import Image
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); shot = root / 'screen.png'; Image.new('RGB',(400,200)).save(shot)
-            target = Mock(env={'WAYLAND_DISPLAY': 'wayland-0'})
-            target.json.return_value = True
-            native = runner.Native(target, root)
-            native.app_window = Mock(return_value={'pid': 1, 'rect': {'x':0,'y':0,'width':400,'height':200}})
-            native.shot = Mock(return_value=shot)
-            with patch.object(runner.subprocess, 'check_output', return_value='unique notification token'), \
-                 self.assertRaisesRegex(runner.Infrastructure, 'notification'):
-                native.matching_text('external', 'unique notification token')
 
     def api_run(self, temp, failure=None, live=None, endpoint_failure=False):
         run = runner.Run(SimpleNamespace(evidence=temp+'/evidence', vm=None), DEFINITION)
@@ -147,92 +85,28 @@ class Round2Tests(unittest.TestCase):
 
     def test_startup_wait_retries_product_api_failure_until_engine_publishes_manifest(self):
         run = Mock(facts={})
-        run.api.side_effect = [AssertionError('manifest missing'), {'indexAvailable': True},
+        run.api.side_effect = [runner.TransientAPI('manifest missing'), {'indexAvailable': True},
                                {'components': {'index': {'state': 'READY'}}}]
         with patch.object(runner.time, 'monotonic', side_effect=[0, 0, 1]), patch.object(runner.time, 'sleep'):
             runner.Run.ready(run)
         self.assertTrue(run.facts['ready'])
 
     def test_startup_wait_persistent_product_api_failure_still_fails_product(self):
-        run = Mock(facts={}); run.api.side_effect = AssertionError('manifest missing')
+        run = Mock(facts={}); run.api.side_effect = runner.TransientAPI('manifest missing')
         with patch.object(runner.time, 'monotonic', side_effect=[0, 0, 241]), patch.object(runner.time, 'sleep'), \
              self.assertRaisesRegex(AssertionError, 'manifest missing'):
             runner.Run.ready(run)
 
-    def test_05_existing_unfocused_window_is_infrastructure_in_launch_and_first_run(self):
-        for entry in ('launch','first-run'):
-            with self.subTest(entry=entry), tempfile.TemporaryDirectory() as temp:
-                target = Mock(env={}); target.owned.return_value = [{'pid':77,'exe':'/usr/bin/JustSearch'}]
-                target.json.return_value = [{'pid':77,'title':'JustSearch'}]
-                native = runner.Native(target, Path(temp)); native.app_window = Mock(return_value=None)
-                native.focused_window = Mock(return_value={'pid':88,'title':'Mousepad'})
-                run = Mock(native=native, binary='/usr/bin/JustSearch')
-                with patch.object(runner, 'wait_for', immediate), patch.object(linux, 'wait_for', immediate), \
-                     self.assertRaisesRegex(runner.Infrastructure, 'not focused'):
-                    runner.Run.observe_window(run,'probe') if entry == 'launch' else linux.first_run(run)
-                record = json.loads(next(Path(temp).glob('*window-miss.json')).read_text())
-                self.assertEqual(record['focused']['title'],'Mousepad')
-                self.assertEqual(record['ownedPids'], [77])
 
     def test_05_no_owned_window_remains_product(self):
         with tempfile.TemporaryDirectory() as temp:
-            target = Mock(env={}); target.owned.return_value = []; target.json.return_value = []
+            target = Mock(env={}); target.owned.return_value = []; target.json.return_value = {'focused': None, 'windows': []}
             native = runner.Native(target, Path(temp)); native.focused_window = Mock(return_value=None)
             run = Mock(native=native)
             native.app_window = Mock(return_value=None)
             with patch.object(runner,'wait_for',immediate), self.assertRaises(AssertionError):
                 runner.Run.observe_window(run,'none')
 
-    def test_06_persistent_bookmark_miss_with_stored_bookmark_is_product(self):
-        run = self.restart_run(after='Ubrary')
-        with patch.object(linux, 'wait_for', immediate), patch.object(linux, 'interaction_observation'), \
-             patch.object(linux, 'assert_state', return_value={'savedFiles': {'savedViews': ['Library']}}), \
-             self.assertRaises(AssertionError): linux.restart(run)
-
-    def test_06_uncorroborated_ocr_miss_has_observation_tag_in_summary(self):
-        with tempfile.TemporaryDirectory() as temp:
-            run = runner.Run(SimpleNamespace(evidence=temp+'/run', vm=None, lane='vm-linux-wayland'), DEFINITION)
-            run.work = '/tmp/isolated'; run.facts['folder'] = True
-            run.binary = '/usr/bin/JustSearch'
-            run.target.owned = Mock(return_value=[{'pid':1,'exe':run.binary}])
-            run.native = Mock(); run.native.matching_text.return_value = None
-            run.stop_app = Mock(); run.desktop_spawn = Mock(); run.observe_window = Mock(); run.ready = Mock()
-            # Baseline also needs its obsolete before-read to succeed.
-            run.start_ui = Mock(); run.nav = Mock(); run.wd = Mock(); run.wd.execute.return_value = 'Search'
-            journey = {'id':'J7','checks':[]}; run.results.append(journey)
-            with patch.object(linux,'require_candidate'), patch.object(linux,'wait_for',immediate):
-                run.check(journey,'deep-links',lambda: linux.deep_links(run))
-            row = json.loads((run.out/'summary.json').read_text())['journeys'][0]['checks'][0]
-            self.assertEqual(row['status'], 'failed-infrastructure')
-            self.assertEqual(row.get('reasonTag'), 'observation')
-
-    def test_07_cold_query_uses_distinct_words_derived_from_run_id(self):
-        queries = []
-        for run_id in ('w4a-123', 'w4a-124'):
-            run = self.link_run(); run.run_id = run_id
-            run.native.matching_text.side_effect = lambda name, *a: None if 'before' in name else 'query'
-            with patch.object(linux,'require_candidate'), patch.object(linux,'interaction_observation'), patch.object(linux,'wait_for',immediate):
-                linux.deep_links(run)
-            from urllib.parse import parse_qs, urlparse
-            query = parse_qs(urlparse(run.desktop_spawn.call_args_list[0].args[0][1]).query)['q'][0]
-            self.assertRegex(query, r'^[a-z]+(?: [a-z]+)+$')
-            self.assertTrue(set(query).isdisjoint('01bl6ec'))
-            queries.append(query)
-        self.assertNotEqual(*queries)
-
-    def test_08_cold_query_never_typed_or_launched_with_webdriver_before_link(self):
-        run = self.link_run(); events = []
-        run.stop_app.side_effect = lambda: events.append('stop')
-        run.desktop_spawn.side_effect = lambda *a: events.append('dispatch')
-        run.native.matching_text.side_effect = lambda name, *a: None if 'before' in name else 'query'
-        with patch.object(linux,'require_candidate'), patch.object(linux,'interaction_observation'), patch.object(linux,'wait_for',immediate):
-            linux.deep_links(run)
-        run.start_ui.assert_not_called(); run.wd.keys.assert_not_called(); run.native.type.assert_not_called()
-        self.assertEqual(events[:2], ['stop','dispatch'])
-
-    def test_09_retry_regression_has_no_tesseract_dependency(self):
-        with patch.object(subprocess,'check_output',side_effect=AssertionError('test must stub OCR')):
-            test_repair4.Repair4Tests().test_real_predecessor_bookmark_fixture_uses_alternate_ocr_on_miss()
 
     def test_10_self_hosted_action_is_rejected_before_tools(self):
         for environment in ('self-hosted',''):

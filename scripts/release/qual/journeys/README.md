@@ -132,14 +132,17 @@ Guest-only provisioning masks Snap refresh, firmware update, APT timers and
 the desktop file indexer, and sets swappiness to 1 to prefer reclaiming file
 cache over writing anonymous pages. At first boot, desktop preparation disables
 Ubuntu update-notifier crash pop-ups and renews the guest login session if needed.
-GNOME notification banners are disabled and the setting is verified. Native app
-captures reject visible GNOME banners before and after capture, and require a
-known zero shell modal count in the focus query. Missing observation fields fail
-as infrastructure. Apport still records crashes; only diagnostic header fields
-before CoreDump are transferred, even for oversized reports. Reports move aside
-after recording so snapshots do not repeat them. A crash of an installed package
-executable, or a report naming Package: just-search, is a product finding;
-command-line mentions alone do not attribute a crash. Journald and swap remain enabled.
+Screenshots and OCR text are retained for triage. OCR never determines a
+product pass: shell banners, notification-center text and foreign windows can
+cover app pixels even when its compositor PID and geometry are stable. Shell
+modal/banner guards, repeated OCR before-reads and unique OCR tokens are removed.
+Apport still records crashes; only bounded diagnostic headers before CoreDump
+are transferred. Installed package paths are read and every report is attributed
+before reports move aside, so a lookup failure leaves reports available for retry.
+A report naming Package: just-search or an installed package executable is a
+product finding. Other reports appear as `guestCrashes` with `unattributed`
+attribution in the summary; command-line mentions do not blame the product.
+Journald and swap remain enabled.
 Every journey records synced whole-device write and swap-counter deltas,
 without double-counting disk partitions. Overlay summaries record boot through
 pre-shutdown guest counters, QMP counters and QEMU's host process I/O; the top
@@ -160,8 +163,13 @@ private signing key is needed or used for these tests.
 
 ## What is asserted
 
-- J1: apt, installed payload checksums, bundled JVM, normal packaged window and
-  first-run WebDriver session against `/usr/bin/JustSearch`.
+- J1: apt, installed payload checksums and bundled JVM; launch through the
+  installed desktop entry, require a mapped window owned by a run-owned process
+  whose executable path exactly equals the installed binary, and Engine readiness.
+  First-run visible text in that desktop-launched window is `owner-validation`
+  with `J1-desktop-first-run.png`. A subsequent harness-launched WebDriver session
+  checks its own mounted DOM and prepares later journeys; it does not certify
+  the preceding desktop window's visible text.
 - J2: the real chooser, Ctrl+L and a generated corpus path on the Wayland VM;
   production API folder addition on hosted; index and search observations;
   **Open file** followed by the exact fixture path in the receiving Mousepad
@@ -177,14 +185,14 @@ private signing key is needed or used for these tests.
   cached reboots prove readiness through active runtime encoders and that query.
   Activation polls record `/proc/meminfo` samples about every five seconds. The CPU
   plan and chat-unavailable explanation are also checked. Downloads are not seeded.
-- J4: a UI-authored bookmark and theme, normal restart, retained settings,
+- J4: a UI-authored bookmark and theme, restart, retained settings,
   watched folder, indexed fixture, authored records and model file hashes.
-  After normal restart, wait for restored Settings to mount, then Escape and
-  confirm it closed. A physical click at the
-  previously DOM-measured bookmarks control opens the popup in that same normal
-  process. The focused window must belong to this run; OCR is restricted to the
-  previously measured popup area and must transition from three samples without
-  Library to Library.
+  Bookmark rendering after restart is checked in the harness's own newly launched
+  WebDriver session: the open list must contain the authored Library entry with
+  its exact label and URL. The persisted record (including ID) must also match
+  through the Web Storage API (`localStorage.getItem`) in that session. Bookmarks
+  are app-local browser state; the Engine exposes no bookmark endpoint. Existing
+  read-only saved-file checks also retain the record and model hashes.
 - J5 (VM): parent-state preparation, signed HTTPS update offer, cancelled
   PolicyKit prompt with old Engine recovery and re-offer, the **real 300-second
   dpkg lock timeout**, then accepted elevation and automatic candidate relaunch.
@@ -196,69 +204,74 @@ private signing key is needed or used for these tests.
   claiming a re-offer. The observed time and readiness signal are recorded.
 - J6 (VM): reinstall, apt remove, retained app data, reinstall and state checks.
 - J7: menu entry, cold/warm OS deep links, X11 registration or the physically
-  invoked GNOME Wayland `--focus-search` binding (Ctrl+Super+J, avoiding the
-  default input-source switch chord), and scanned-PDF OCR. Cold and
-  warm OS links run without WebDriver; the receiving app must be focused and
-  its app window must contain a query derived from this run ID for the cold
-  link. The query uses dictionary words derived from the new run ID and is
-  never entered through WebDriver or typed before dispatch. The app is stopped
-  before the cold link, which must leave exactly one owned JustSearch UI process.
-  The warm link must retain the focused app PID without growing the owned UI
-  process count and transition from no Library to Library using the same two OCR
-  segmentations in the cropped top bar. Query words avoid m/w ambiguity and allow
-  whitespace wrapping in OCR.
-  Shortcut input stays in a
-  WebDriver session, where compositor focus, document focus, the actual focused
-  search control, and its exact newly typed value must agree. The Wayland binding
-  runs a wrapper that records invocation before executing `--focus-search`. Missing
-  dispatch is infrastructure failure; dispatch followed by failed app/search focus
-  is product failure, with compositor session and focused-window evidence.
+  invoked GNOME Wayland `--focus-search` binding (Ctrl+Super+J), and scanned-PDF OCR.
+  Menu entry requires an owned, mapped installed app window and Engine readiness.
+  `deep-link-cold` stops the app, dispatches through the desktop handler and
+  requires exactly one run-owned UI process executing the exact installed binary,
+  with its mapped compositor window and Engine ready. Its visible query destination
+  is `owner-validation`, pictured in `J7-deep-link-cold.png`.
+  `deep-link-warm` launches the installed app under the harness's WebDriver,
+  establishes Search as the baseline, then dispatches the OS link. The session's
+  DOM must report the Library route and visible heading. The mapped receiver
+  retains its original PID and process start identity. An extra single-instance
+  forwarder may exit within three seconds, before the destination is accepted;
+  an extra JustSearch process alive at acceptance or after that grace period is
+  a product failure. Reported product failures end polling immediately.
+  Shortcut input stays in that harness-owned WebDriver session: compositor focus,
+  document focus, the focused search control and its exact typed value must agree.
+  The Wayland wrapper records invocation before executing `--focus-search`.
+  Missing dispatch is infrastructure failure; dispatch followed by failed search
+  focus is product failure, with session and focused-window evidence.
 - J8: release MCPB and tagged registry version/URL/checksum/platform checks;
   pinned Inspector CLI over stdio through the **extracted release bridge** for
   tools/list, status and a fixture-returning search.
 
 WebDriver sends pointer actions to DOM-derived viewport coordinates, after
 scrolling controls into view. This avoids WebKitGTK's nested-shadow-root
-element-click interception. Native dialog handling uses keyboard input and QMP
-screenshots. Full-screen OCR uses sparse-text segmentation; screenshots remain
-the primary evidence for diagnosing missed text and focus. Startup, persistence,
-deep links and updater relaunch are also checked without WebDriver automation.
-Native screenshots record when each new app window is first observed. J4's
-bookmarks click and J7's warm OS dispatch record elapsed time, indexing and worker
-state. These observations add no indexing-idle prerequisite.
+element-click interception. Native dialog handling uses keyboard input and screenshots. OCR may gate
+harness interaction with desktop dialogs, but only DOM, production app/Engine
+APIs, exact installed process identity or mapped compositor window identity can
+supply pass evidence. Picker and PolicyKit text alone cannot certify an app result.
+Startup and updater relaunch also use process/window identity and Engine readiness.
+Interaction observations retain elapsed time, indexing and worker state without
+adding an indexing-idle prerequisite.
 
 On the disposable Wayland guest only, the wrapper opens GNOME Looking Glass and
-sets `global.context.unsafe_mode = true` to query focused-window PID and geometry
-through the compositor debugger. This changes no product state and disappears
-with the overlay. Never enable it on the owner's desktop. X11 reads the focused
-window from xdotool. A window counts as the app only when its PID is an owned
-JustSearch process. Native OCR crops are saved with their window identity;
-whole-screen OCR cannot certify navigation or focus.
+sets `global.context.unsafe_mode = true` for compositor queries. This disappears
+with the overlay; never enable it on the owner's desktop. Each observation uses
+one Shell query for mapped windows and focus. X11 uses xdotool. An app window's
+PID must belong to this run and execute exactly the installed executable path;
+a same-named executable in another directory cannot qualify it. A mapped window
+can establish launch even when unfocused. Shortcut checks additionally require
+that exact app window to have compositor focus.
 
 `corpus.py` generates eight small, original CC0 documents: text, long Markdown
 and text reports, CSV, HTML, email, DOCX and an image-only PDF. The unique open
 fixture is `JustSearch-journey-orchid-open.txt`; only the scanned PDF contains
 `cobalt marmalade`. Per-run corpus hashes are retained. No external documents,
 personal information, models or generated corpus binary files are committed.
-Native destination OCR
-retries sparse segmentation on a miss, including before-state guards. A persistent
-J4 bookmark miss with the stored bookmark present is a product failure. Other
-missing OCR text without corroborating app state is infrastructure, with
-`reasonTag: observation` in the summary. Retry unit tests stub the OCR outputs.
-
 ## Results and tests
 
-Each check has one of `passed`, `failed-product`, `failed-infrastructure`,
-`skipped-by-decision`, or `unavailable`, a reason and evidence links. Missing
-prerequisites stay unavailable. Assertions about product outcomes fail as
-product failures; driver, focus, tool and transport failures are infrastructure.
-Unknown harness exceptions also stay infrastructure. Skips and unavailability
-never add a pass. An empty or incomplete report cannot report `passed: true`.
-The summary passes only with at least one passed check, every check applicable
-to the full lane present, and no failed or unavailable checks. Decision skips
-do not prevent a full lane from passing. The process exits nonzero whenever
-that verdict is false, including a successful partial development rerun;
-settled VM-only omissions in the hosted lane remain explicit decision skips.
+Each executed check has one of `passed`, `failed-product`,
+`failed-infrastructure`, `unavailable`, or `owner-validation`, with a reason and
+evidence links. Existing applicability omissions remain `skipped-by-decision`;
+they never add a pass. Product assertions and reported end states fail as product
+failures; driver/tool/transport failures are infrastructure. A terminal AI install,
+activation failure/cancellation or knowledge-server start error stops immediately,
+so a later recovery cannot turn that observation into a pass. Only transient API
+failures are retried; a product API failure seen during the deadline retains its
+attribution if the last observation is an infrastructure error.
+
+A complete lane without failed or unavailable checks reports `status: passed`
+only when every executed result is automatically proven. Any owner-validation
+rows change it to `passed-pending-owner-validation`; `ownerValidation` lists
+journey/check IDs and screenshot paths. Its `passed` boolean stays false and
+its process exits nonzero. Review those screenshots as part of the owner's final
+visual release validation and record that validation alongside the release
+evidence. The runner never converts an owner-validation row into a pass.
+Failed or unavailable rows keep the lane failing and cannot be cleared by visual
+validation. A partial development rerun reports incomplete (or failed when a
+check fails); it cannot qualify the full release. Empty reports cannot pass.
 
 `summary.json` includes asset hashes, exact scenario wording, scope and all
 check outcomes. JSON observations redact credentials. Logs, source/corpus

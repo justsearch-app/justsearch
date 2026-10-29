@@ -87,6 +87,7 @@ class Repair4Tests(unittest.TestCase):
         run = Mock()
         run.native.screen_text.return_value = 'Activities desktop'
         run.native.app_window.return_value = None
+        run.native.windows.return_value = {'focused': {'pid': 42, 'title': 'fixture — Mousepad'}, 'windows': []}
         run.native.window_failure.side_effect = AssertionError('Installed app has no window')
         with patch.object(runner, 'wait_for', immediate), self.assertRaises(AssertionError):
             runner.Run.observe_window(run, 'launched')
@@ -95,13 +96,16 @@ class Repair4Tests(unittest.TestCase):
         run = Mock()
         run.native.screen_text.return_value = 'Activities JustSearch desktop launcher'
         run.native.app_window.return_value = None
+        run.native.windows.return_value = {'focused': {'pid': 42, 'title': 'fixture — Mousepad'}, 'windows': []}
         run.native.window_failure.side_effect = AssertionError('Installed app has no window')
         with patch.object(runner, 'wait_for', immediate), self.assertRaises(AssertionError):
             runner.Run.observe_window(run, 'launched')
 
     def test_first_run_missing_window_is_product(self):
-        run = Mock(binary='/usr/bin/JustSearch')
+        run = Mock(binary='/usr/bin/JustSearch', work='/tmp/isolated')
         run.native.app_window.return_value = None
+        run.native.windows.return_value = {'focused': {'pid': 42, 'title': 'fixture — Mousepad'}, 'windows': []}
+        run.observe_window.side_effect = AssertionError('Installed app has no window')
         run.native.screen_text.return_value = 'Activities'
         run.native.window_failure.side_effect = AssertionError('Installed app has no window')
         with patch.object(linux, 'wait_for', immediate), self.assertRaises(AssertionError):
@@ -114,6 +118,7 @@ class Repair4Tests(unittest.TestCase):
         run.require.return_value = '/tmp/owned-corpus'
         run.native.focused_window.return_value = {'title': 'Fixture — Mousepad'}
         run.native.app_window.return_value = None
+        run.native.windows.return_value = {'focused': {'pid': 42, 'title': 'fixture — Mousepad'}, 'windows': []}
         run.native.window_failure.side_effect = AssertionError('Installed app has no window')
         with patch.object(linux, 'require_candidate'), patch.object(linux, 'wait_for', immediate):
             with self.assertRaisesRegex(AssertionError, 'foregrounded search'):
@@ -138,38 +143,7 @@ class Repair4Tests(unittest.TestCase):
                 linux.apt(run, 'install', '/tmp/candidate.deb')
             run.target.run.assert_not_called()
 
-    def test_cold_link_ignoring_dispatch_cannot_pass_from_restored_orchid(self):
-        run = Mock(work='/tmp/owned', run_id='w4a-123456789', binary='/usr/bin/JustSearch')
-        run.target.owned.return_value = [{'pid':1,'exe':run.binary}]
-        run.wd.execute.return_value = 'Search v3 orchid lighthouse'
-        run.native.app_text.side_effect = lambda name, *a, **kw: 'Library' if 'warm' in name else 'Search v3 orchid lighthouse'
-        run.native.matching_text.return_value = None
-        run.native.app_window.return_value = {'pid': 1, 'rect': {'width': 1024, 'height': 700}}
-        with patch.object(linux, 'require_candidate'), patch.object(linux, 'interaction_observation'), \
-             patch.object(linux, 'wait_for', immediate):
-            with self.assertRaisesRegex(runner.Infrastructure, 'Cold OS deep link'):
-                linux.deep_links(run)
-        run.start_ui.assert_not_called()
-        run.wd.keys.assert_not_called()
-        run.native.type.assert_not_called()
-        self.assertEqual(len(run.native.matching_text.call_args.args), 2)
 
-    def test_cold_link_accepts_unique_token_anywhere_in_owned_window(self):
-        run = Mock(work='/tmp/owned', run_id='w4a-moving-composer', binary='/usr/bin/JustSearch')
-        run.target.owned.return_value = [{'pid':1,'exe':run.binary}]
-        query = linux.cold_link_query(run.run_id)
-        run.native.matching_text.side_effect = [query, None, 'Library']
-        run.native.app_window.return_value = {'pid':1, 'rect': {'width': 1024, 'height': 700}}
-        with patch.object(linux, 'require_candidate'), patch.object(linux, 'interaction_observation'), \
-             patch.object(linux, 'wait_for', immediate):
-            result = linux.deep_links(run)
-        self.assertEqual(result['cold'], query)
-        run.wd.keys.assert_not_called()
-        cold, before, warm = run.native.matching_text.call_args_list
-        self.assertEqual(cold.args, ('J7-deep-link-cold', r'\s+'.join(map(re.escape, query.split()))))
-        self.assertEqual(before.args[2], warm.args[2])
-        self.assertEqual(warm.args[2]['height'], 40)
-        self.assertTrue(run.desktop_spawn.call_args_list[0].args[0][1].endswith(query.replace(' ', '%20')))
 
     def update_run(self, package='JustSearch_0.3.1_amd64.deb'):
         run = Mock(binary='/usr/lib/JustSearch/JustSearch', work='/tmp/owned')
@@ -206,34 +180,8 @@ class Repair4Tests(unittest.TestCase):
              patch.object(linux, 'wait_for', immediate):
             self.assertEqual(linux.update_success(run)['installedVersion'], '0.3.1')
 
-    def restart_run(self, text):
-        run = Mock()
-        run.native = runner.Native(Mock(), Path('/tmp/unused'))
-        run.native.app_window = Mock(return_value={'rect': {'x': 0, 'y': 0}})
-        run.native.shot = Mock(); run.native.key = Mock(); run.native.click = Mock()
-        run.require.side_effect = lambda key: {'button': {'x': 10, 'y': 20}, 'popup': {}} if key == 'bookmarkGeometry' else True
-        def app_text(name, *a, psm=6, **kw):
-            if name == 'J4-restored-settings': return 'Settings'
-            if name == 'J4-settings-closed' or name.startswith('J4-before-bookmarks'): return ''
-            return text(psm)
-        run.native.app_text = Mock(side_effect=app_text)
-        return run
 
-    def test_real_predecessor_bookmark_fixture_uses_alternate_ocr_on_miss(self):
-        def ocr(psm):
-            return {6: 'Ubrary', 11: 'Library'}[psm]
-        run = self.restart_run(ocr)
-        with patch.object(linux, 'assert_state', return_value={'savedFiles': {'savedViews': [{'title': 'Library'}]}}), \
-             patch.object(linux, 'interaction_observation'), patch.object(linux, 'wait_for', immediate):
-            self.assertEqual(linux.restart(run)['savedFiles']['savedViews'], [{'title': 'Library'}])
-        self.assertIn(11, [c.kwargs.get('psm') for c in run.native.app_text.call_args_list])
 
-    def test_persistent_bookmark_ocr_miss_with_retained_state_is_product(self):
-        run = self.restart_run(lambda psm: 'Ubrary')
-        with patch.object(linux, 'assert_state', return_value={'savedFiles': {'savedViews': [{'title': 'Library'}]}}), \
-             patch.object(linux, 'interaction_observation'), patch.object(linux, 'wait_for', immediate):
-            with self.assertRaises(AssertionError):
-                linux.restart(run)
 
     def test_black_desktop_retries_once_then_succeeds_or_stays_infrastructure(self):
         for persistent in (False, True):
