@@ -67,3 +67,14 @@ F1 and the persistent-denial case of F2 pin repaired behavior. Other added check
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-c1ea7e-codex-1",
+  "verdict": "accept",
+  "digest": "sha256:dc27a245b39108f4ea8966a297bd99012929107cd8d4fa781e9c4c3ae9efb237",
+  "note": "F1-F3 verified on Linux; seam preserves baseline behavior; catch-all IOException mutation caught."
+}
+```
