@@ -132,12 +132,17 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
           "test": "stops showing the previous rows the moment the query changes"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
+          "test": "x6 each edit supersedes an older success and an older error body"
         }
       ]
     },
     {
       "id": "SW-SRCH-07",
-      "behavior": "Searching while an answer or agent run is active leaves that work running and reachable.",
+      "behavior": "Searching leaves a streaming answer reachable and does not steer or cancel a live agent run.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -153,8 +158,8 @@
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
-          "test": "shows the run FEED once the reader claims the adopted session"
+          "binding": null,
+          "reason": "The run-feed test opens an adopted run but never searches while it is active."
         }
       ]
     },
@@ -178,7 +183,7 @@
     },
     {
       "id": "SW-SRCH-09",
-      "behavior": "Cancelled, uncertain, repeated, or late Forget actions cannot remove unrelated results or replace newer work.",
+      "behavior": "Cancelled or repeated Forget actions cause no removal, uncertain outcomes retain results and prepared work, and late completion preserves another conversation’s reader and draft.",
       "kind": "works-today",
       "races": [
         "concurrent-or-identical-send",
@@ -211,6 +216,29 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
           "test": "S56 %s never removes rows, selection, Ask scope or pane optimistically"
+        }
+      ]
+    },
+    {
+      "id": "SW-SRCH-10",
+      "behavior": "A late Forget completion never removes unrelated results.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The late-completion test checks another conversation’s reader and draft, without asserting unrelated search results."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The late-completion test checks another conversation’s reader and draft, without asserting unrelated search results."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The late-completion test checks another conversation’s reader and draft, without asserting unrelated search results."
         }
       ]
     },
@@ -532,7 +560,7 @@
     },
     {
       "id": "SW-QREC-08",
-      "behavior": "Restored and recent operator text remains Search syntax, while question modes treat operators as ordinary prompt text.",
+      "behavior": "Restored drafts use Search syntax, recent searches retain operator text, and question modes send operators as ordinary prompt text.",
       "kind": "works-today",
       "races": [
         "reload"
@@ -590,12 +618,17 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
           "test": "sends the submitted question after a context wait and keeps later input: %s"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "renders each turn as question-then-answer, oldest first, and appends deltas as they arrive"
         }
       ]
     },
     {
       "id": "SW-ASK-02",
-      "behavior": "Answers arrive below their questions in conversation order as text streams in.",
+      "behavior": "Answers remain paired with their questions in oldest-first conversation order and append streamed text.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -608,6 +641,24 @@
           "layer": "real-ui-fixture",
           "binding": null,
           "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-12",
+      "behavior": "Each answer appears below its own question.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The turn-rendering test checks question and answer sequences separately, without asserting their relative position."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The turn-rendering test checks question and answer sequences separately, without asserting their relative position."
         }
       ]
     },
@@ -671,7 +722,7 @@
     },
     {
       "id": "SW-ASK-06",
-      "behavior": "Leaving the screen or starting another conversation does not claim that an answer was stopped.",
+      "behavior": "Leaving the screen sends no Stop request, and starting another conversation does not label the previous answer stopped.",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab",
@@ -725,7 +776,7 @@
     },
     {
       "id": "SW-ASK-08",
-      "behavior": "Structured questions validate the schema before sending and show only accepted final JSON.",
+      "behavior": "Structured questions reject malformed or non-object schema input before sending and display accepted final JSON without rejected attempts.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -748,7 +799,7 @@
     },
     {
       "id": "SW-ASK-09",
-      "behavior": "Stopping or interrupting a Structured answer never presents partial or rejected JSON as completed output or later context.",
+      "behavior": "Stopping or interrupting a Structured answer hides partial JSON, and follow-up context includes only accepted completed JSON.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -780,8 +831,26 @@
       ]
     },
     {
+      "id": "SW-ASK-13",
+      "behavior": "Stopped or interrupted Structured output never enters a later question’s context.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The interruption and Stop tests check displayed output; the follow-up tests use completed or failed final-output responses, not a stopped or interrupted stream."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The interruption and Stop tests check displayed output; the follow-up tests use completed or failed final-output responses, not a stopped or interrupted stream."
+        }
+      ]
+    },
+    {
       "id": "SW-ASK-10",
-      "behavior": "When files provide no evidence, a separate model-answer action answers the original question without consuming an unrelated draft.",
+      "behavior": "When files provide no evidence, a separate action requests a model answer to the original question without consuming an unrelated draft.",
       "kind": "works-today",
       "races": [
         "late-response",
@@ -911,7 +980,7 @@
     },
     {
       "id": "SW-HIST-04",
-      "behavior": "Moving the context starting point dims earlier messages, and Restore makes the full context available again.",
+      "behavior": "Moving the context starting point dims earlier messages, and Restore clears that starting point and its dimming.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -934,7 +1003,7 @@
     },
     {
       "id": "SW-HIST-05",
-      "behavior": "Exclude and Include change the intended messages, including exclusions outside the visible transcript.",
+      "behavior": "Exclude and Include change the selected turn’s messages, and Include all clears recorded exclusions even outside the visible transcript.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -1067,7 +1136,7 @@
     },
     {
       "id": "SW-HIST-10",
-      "behavior": "Edit and Retry branch from the original question’s position and retain that question’s known mode and inputs.",
+      "behavior": "Edit and Retry fork before the original question and preserve its chosen files and live restrictions, while Retry keeps the original text and a saved Delegate turn’s mode.",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab",
@@ -1108,6 +1177,29 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
           "test": "F10 Ask captures at Send and follow-ups capture new controls while live Edit and Retry keep originals"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+          "test": "edits the FIRST question of a Delegate conversation at the empty-prefix sentinel"
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-13",
+      "behavior": "Edit and Retry preserve every known mode-specific input, including Structured schema and effort.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The bound tests check fork points, text, files, live restrictions, and Delegate mode; they do not assert preserved schema and effort for Edit and Retry."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The bound tests check fork points, text, files, live restrictions, and Delegate mode; they do not assert preserved schema and effort for Edit and Retry."
         }
       ]
     },
@@ -1322,7 +1414,7 @@
     },
     {
       "id": "SW-LIST-07",
-      "behavior": "Partial or uncertain deletion reports what was confirmed and never restores a deleted transcript from a late response.",
+      "behavior": "Partial deletion reports confirmed and failed branches, and late responses cannot restore a confirmed deleted transcript.",
       "kind": "works-today",
       "races": [
         "late-response",
@@ -1346,13 +1438,31 @@
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
-          "test": "TD10a a lost response closes the confirmed transcript without erasing the draft"
+          "binding": null,
+          "reason": "The lost-response test checks conversation identity and draft preservation, not the partial-deletion explanation or a late transcript response; its draft observation is bound under SW-LIST-08."
         },
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
           "test": "S2 confirmed deletion cannot be resurrected by a late %s response"
+        }
+      ]
+    },
+    {
+      "id": "SW-LIST-09",
+      "behavior": "An uncertain deletion explains which removals were confirmed.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The lost-response test checks transcript closure and draft preservation, but does not assert the deletion explanation."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The lost-response test checks transcript closure and draft preservation, but does not assert the deletion explanation."
         }
       ]
     },
@@ -1396,6 +1506,11 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
           "test": "falls back to a neutral deletion announcement when the list empties"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+          "test": "TD10a a lost response closes the confirmed transcript without erasing the draft"
         }
       ]
     },
@@ -1479,7 +1594,7 @@
     },
     {
       "id": "SW-RUN-04",
-      "behavior": "Typing during a steerable run sends a direction to that run instead of starting competing work.",
+      "behavior": "Submitting a direction during a steerable run steers that run instead of starting competing work.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -1497,7 +1612,7 @@
     },
     {
       "id": "SW-RUN-05",
-      "behavior": "Applied, queued, refused, and unconfirmed directions remain distinguishable.",
+      "behavior": "Applied, queued, not applied, and unconfirmed directions remain distinguishable.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -1572,7 +1687,7 @@
     },
     {
       "id": "SW-RUN-08",
-      "behavior": "Returning or reloading can reattach to the matching live run without adopting another conversation’s run.",
+      "behavior": "Opening the window requests reattachment to a live run, and reattachment accepts a matching conversation while rejecting another conversation’s run.",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab",
@@ -1646,7 +1761,7 @@
     },
     {
       "id": "SW-RUN-10",
-      "behavior": "Failed approvals say the action was not approved, and ending a run closes only that run’s pending approvals.",
+      "behavior": "A failed approval request reports an approval error, unavailable approval details say the action was not approved, and ending a run requests cancellation of that run’s pending approvals.",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab"
@@ -1681,6 +1796,31 @@
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
           "test": "cancelSession drains the halted run"
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-12",
+      "behavior": "Ending a run closes only that run’s pending approvals.",
+      "kind": "known-gap",
+      "races": [
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "binding": null,
+          "reason": "The controller tests record which run is sent to the cancellation callback; they do not assert which pending approval dialogs actually close."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The controller tests record which run is sent to the cancellation callback; they do not assert which pending approval dialogs actually close."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The controller tests record which run is sent to the cancellation callback; they do not assert which pending approval dialogs actually close."
         }
       ]
     },
@@ -1762,7 +1902,7 @@
     },
     {
       "id": "SW-DRFT-03",
-      "behavior": "A retained question and newer draft survive reload as separate items requiring review.",
+      "behavior": "A retained question and newer draft survive reload as separate items without automatic sending.",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab",
@@ -1782,8 +1922,26 @@
       ]
     },
     {
+      "id": "SW-DRFT-10",
+      "behavior": "A retained question and newer draft restored after reload require review before sending.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The reload test asserts retained text and no automatic dispatch, but never attempts to send before review."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The reload test asserts retained text and no automatic dispatch, but never attempts to send before review."
+        }
+      ]
+    },
+    {
       "id": "SW-DRFT-04",
-      "behavior": "A failed or unreadable recovery write preserves existing recoverable text and blocks unsafe sending.",
+      "behavior": "Failed recovery writes and invalid recovery records preserve stored and live text while blocking sending, and unreadable stored drafts are not overwritten on disconnect.",
       "kind": "works-today",
       "races": [
         "reload"
@@ -1930,7 +2088,7 @@
     },
     {
       "id": "SW-DOC-01",
-      "behavior": "Opening a result or citation shows the intended document without changing an unrelated inspector selection.",
+      "behavior": "Results and citations open the intended document in the reader, and citation opening leaves the shared inspector unselected.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -1957,8 +2115,26 @@
       ]
     },
     {
+      "id": "SW-DOC-10",
+      "behavior": "Opening a result or citation preserves an unrelated existing inspector selection.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The citation tests start with an unselected inspector, and the result-opening test does not assert inspector selection."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The citation tests start with an unselected inspector, and the result-opening test does not assert inspector selection."
+        }
+      ]
+    },
+    {
       "id": "SW-DOC-02",
-      "behavior": "Different passages of one document open their own passage, and an unresolved citation never opens an arbitrary source.",
+      "behavior": "Different passages of one document resolve to their own source indices, unresolved citations resolve to no source, and out-of-range citations create no answer link.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -1981,6 +2157,52 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
           "test": "an out-of-range index mints NO mark — no wrong-target link is constructible"
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-12",
+      "behavior": "An unresolved citation never opens an arbitrary document.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "binding": null,
+          "reason": "Source-index absence and missing answer links are asserted, but no test activates an unresolved citation and checks which document opens."
+        },
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "Source-index absence and missing answer links are asserted, but no test activates an unresolved citation and checks which document opens."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "Source-index absence and missing answer links are asserted, but no test activates an unresolved citation and checks which document opens."
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-09",
+      "behavior": "Different passages of one document each open the reader at their own span.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "binding": null,
+          "reason": "The passage test checks source-index resolution, while the reader test opens only one passage; neither checks opening two spans of the same document."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The passage test checks source-index resolution, while the reader test opens only one passage; neither checks opening two spans of the same document."
+        },
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The passage test checks source-index resolution, while the reader test opens only one passage; neither checks opening two spans of the same document."
         }
       ]
     },
@@ -2022,7 +2244,7 @@
     },
     {
       "id": "SW-DOC-04",
-      "behavior": "Sources distinguish retrieved, supplied, dropped, and unexamined evidence without claiming unsupported grounding.",
+      "behavior": "Sources distinguish retrieved passages sent, partly sent, or never sent to the model, and incomplete grounding checks, without claiming unsupported grounding.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -2091,7 +2313,7 @@
     },
     {
       "id": "SW-DOC-06",
-      "behavior": "The reader fits beside wide content or overlays narrow content, and its width can be adjusted and restored accessibly.",
+      "behavior": "The reader stays inline at wide widths or overlays narrow content, and its width can be changed by pointer or keyboard and restored within the available space.",
       "kind": "works-today",
       "races": [
         "reload"
@@ -2131,7 +2353,7 @@
     },
     {
       "id": "SW-DOC-07",
-      "behavior": "The final result, answer, and sources remain reachable above the docked composer.",
+      "behavior": "At the end of scrolling, the result list and open sources panel remain clear of the docked composer.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -2142,6 +2364,19 @@
         {
           "layer": "real-ui-fixture",
           "step": "sv3-search-results"
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-11",
+      "behavior": "The final answer remains reachable above the docked composer.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The occlusion checks measure the result card and open sources panel against the composer, without measuring the final answer itself."
         }
       ]
     },
@@ -2160,7 +2395,7 @@
     },
     {
       "id": "SW-KEY-01",
-      "behavior": "Enter submits the chosen mode, Ctrl plus Enter delegates when allowed, and Shift plus Enter inserts a newline.",
+      "behavior": "Enter submits the chosen mode, Ctrl plus Enter delegates when allowed, and Shift plus Enter submits nothing.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -2207,8 +2442,26 @@
       ]
     },
     {
+      "id": "SW-KEY-10",
+      "behavior": "Shift plus Enter inserts a newline into the composer.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The existing key tests dispatch synthetic key events and assert that nothing is submitted; none checks an inserted newline."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The existing key tests dispatch synthetic key events and assert that nothing is submitted; none checks an inserted newline."
+        }
+      ]
+    },
+    {
       "id": "SW-KEY-02",
-      "behavior": "The command palette opens only for its own window and stops responding after that window is removed.",
+      "behavior": "The command palette opens only for its own window and remains responsive after removal and reattachment.",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab",
@@ -2234,6 +2487,27 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
           "test": "ignores a chord raised outside the window entirely"
+        }
+      ]
+    },
+    {
+      "id": "SW-KEY-11",
+      "behavior": "The command palette stops responding after its window is removed.",
+      "kind": "known-gap",
+      "races": [
+        "second-conversation-or-tab",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The removal test checks one chord after reattachment, without raising a chord while the window is removed."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The removal test checks one chord after reattachment, without raising a chord while the window is removed."
         }
       ]
     },
@@ -2300,7 +2574,7 @@
     },
     {
       "id": "SW-KEY-05",
-      "behavior": "Escape dismisses the most local open edit, menu, reader, or sidebar without interrupting text composition.",
+      "behavior": "Escape dismisses the active rename, mode menu, reader, or sidebar, while an IME Escape leaves the composer and sidebar open.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -2343,7 +2617,7 @@
     },
     {
       "id": "SW-KEY-06",
-      "behavior": "Copy and export act on settled answers or the selected conversation and acknowledge the copy.",
+      "behavior": "Copy acts on settled answers and acknowledges success, while export copies the selected conversation and does nothing without one.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -2681,14 +2955,16 @@
     },
     {
       "id": "SW-READY-10",
-      "behavior": "Admission refusals explain a continuing block without losing the question.",
-      "kind": "known-gap",
-      "races": [],
+      "behavior": "An admission refusal retains the question and newer draft across reload and offers Retry and Load anyway according to the refusal response.",
+      "kind": "works-today",
+      "races": [
+        "reload"
+      ],
       "observations": [
         {
           "layer": "live-backend",
           "binding": null,
-          "reason": "No live backend check binds the continuing refusal explanation while preserving the question."
+          "reason": "No live backend check binds admission-refusal retention and the available recovery actions."
         },
         {
           "layer": "view",
@@ -2699,6 +2975,24 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
           "test": "uses authoritative %s forceAllowed=%s without automatic dispatch"
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-12",
+      "behavior": "Admission refusals explain a continuing block without losing the question.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The tests observe retained text, Retry timing, and Load anyway availability, but do not assert an explanation for a continuing admission block."
+        },
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The tests observe retained text, Retry timing, and Load anyway availability, but do not assert an explanation for a continuing admission block."
         }
       ]
     },

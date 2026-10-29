@@ -156,6 +156,42 @@ try {
       writeFileSync(join(root, 'search.test.ts'), "it('ignores an empty search', () => {});\n");
     }
   });
+  // These are separate regressions so each false binding has its own reported outcome.
+  for (const [label, source, expected] of [
+    ['division before a comment containing a test', "const ratio = 6 / 2; // it('target', () => {});\nconst other = 8 / 4;", false],
+    ['division before describe.skip', "const ratio = 6 / 2; describe.skip('disabled', () => { const other = 8 / 4; it('target', () => {}); });", false],
+    ['suite.skip', "suite.skip('disabled', () => { it('target', () => {}); });", false],
+    ['it.skip', "it.skip('target', () => {});", false],
+    ['it.skip.each', "it.skip.each([1])('target', () => {});", false],
+    ['it.todo', "it.todo('target');", false],
+    ['nested describe.skip', "describe('outer', () => { describe.skip('inner', () => { it('target', () => {}); }); });", false],
+    ['describe.skipIf', "describe.skipIf(true)('disabled', () => { it('target', () => {}); });", false],
+    ['it.runIf', "it.runIf(true)('target', () => {});", false],
+    ['concatenated title', "it('target' + ' extra', () => {});", false],
+    ['template title with substitution', 'it(`target${suffix}`, () => {});', false],
+    ['title inside a string', 'const source = "it(\'target\', () => {})";', false],
+    ['ordinary literal title', "it('target', () => {});", true],
+    ['each literal title', "it.each([1])('target', () => {});", true],
+    ['it.fails', "it.fails('target', () => {});", false],
+    ['suite.fails', "suite.fails('disabled', () => { it('target', () => {}); });", false],
+    ['xsuite', "xsuite('disabled', () => { it('target', () => {}); });", false],
+    ['computed skip', "describe['skip']('disabled', () => { it('target', () => {}); });", false],
+    ['it.extend skip', "it.extend({}).skip('target', () => {});", false],
+    ['parenthesized skipped suite', "(describe.skip)('disabled', () => { it('target', () => {}); });", false],
+    ['dynamic test modifier', "const only = 'skip'; it[only]('target', () => {});", false],
+    ['dynamic suite modifier', "describe[condition ? 'skip' : 'only']('disabled', () => { it('target', () => {}); });", false],
+    ['unknown suite factory', "suite.extend({}).skip('disabled', () => { it('target', () => {}); });", false],
+    ['unknown test modifier', "it.unknown('target', () => {});", false],
+    ['an each factory is not a title declaration', "it.each('target')('actual title', () => {});", false],
+    ['static template title', 'test(`target`, () => {});', true],
+    ['escaped literal title', "it('tar\\u0067et', () => {});", true],
+    ['escaped template substitution is literal', 'it(`target\\${suffix}`, () => {});', false],
+  ]) {
+    test(`AST binding: ${label}`, () => {
+      assert.equal(testTitles(source).has('target'), expected);
+      assert.equal(testTitles(source, 'bindings.test.js').has('target'), expected);
+    });
+  }
   test('repository-relative paths cannot escape to unrelated files', () => {
     const value = catalog(); value.entries[0].observations[0].file = '../search.test.ts';
     has(check(value), /file must be inside the repository/);

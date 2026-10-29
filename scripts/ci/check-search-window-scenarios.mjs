@@ -8,6 +8,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import ts from 'typescript';
 
 export const CATALOG = 'governance/search-window-scenarios.v1.json';
 const STEP_INDEX = 'scripts/jseval/jseval/ui_step_index.json';
@@ -15,55 +16,57 @@ export const LAYERS = ['controller', 'view', 'real-ui-fixture', 'live-backend'];
 const RACES = ['concurrent-or-identical-send', 'late-response', 'second-conversation-or-tab', 'reload', 'screen-switch'];
 const nonempty = value => typeof value === 'string' && value.trim().length > 0;
 
-/** Literal Vitest/Jest titles, including the declared template title of it.each. No code runs. */
-export function testTitles(source) {
-  // Tokenize strings before punctuation so parentheses inside a title or each row stay inert.
-  const tokens = [...source.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|`(?:\\[\s\S]|[^`\\])*`|\/(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\n\\[])+\/[dgimsuvy]*|[\w$]+|[^\s]/g)]
-    .map(match => match[0]).filter(token => !token.startsWith('//') && !token.startsWith('/*'));
-  // Pair delimiters once: a disabled suite excludes its entire call, including nested suites.
-  const closes = new Map();
-  const stack = [];
-  for (let i = 0; i < tokens.length; i++) {
-    if (['(', '[', '{'].includes(tokens[i])) stack.push(i);
-    else if ([')', ']', '}'].includes(tokens[i])) {
-      const open = stack.pop();
-      if (tokens[open] === ({ ')': '(', ']': '[', '}': '{' })[tokens[i]]) closes.set(open, i);
+/** Literal test declarations only. Parse syntax without executing repository code. */
+export function testTitles(source, filename = 'bindings.test.ts') {
+  const tree = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
+  if (tree.parseDiagnostics.length) return new Set();
+  const suites = new Set(['describe', 'suite', 'xdescribe', 'xsuite']);
+  const tests = new Set(['it', 'test', 'xit', 'xtest']);
+  const factories = new Set(['each', 'for', 'skipIf', 'runIf']);
+  const allowed = new Set(['only', 'concurrent', 'sequential', 'each']);
+
+  // Read the callee chain, including factory calls such as test.skip.each(rows).
+  function declaration(expression) {
+    while (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
+      || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
+      || ts.isSatisfiesExpression(expression)) expression = expression.expression;
+    if (ts.isIdentifier(expression)) return { name: expression.text, modifiers: [] };
+    if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+      const parent = declaration(expression.expression);
+      if (!parent) return null;
+      const property = ts.isPropertyAccessExpression(expression) ? expression.name.text
+        : ts.isStringLiteral(expression.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(expression.argumentExpression)
+          ? expression.argumentExpression.text : null;
+      return { ...parent, modifiers: [...parent.modifiers, { name: property, called: false }] };
     }
-  }
-  const declarations = [];
-  for (let i = 0; i < tokens.length; i++) {
-    if (!['it', 'test', 'describe', 'xit', 'xtest', 'xdescribe'].includes(tokens[i]) || tokens[i - 1] === '.') continue;
-    const suite = ['describe', 'xdescribe'].includes(tokens[i]);
-    let disabled = tokens[i].startsWith('x');
-    let j = i + 1;
-    while (tokens[j] === '.' && ['only', 'skip', 'todo', 'concurrent', 'sequential', 'fails', 'each', 'skipIf', 'runIf'].includes(tokens[j + 1])) {
-      const modifier = tokens[j + 1];
-      // Conditional declarations are unbindable: do not guess their runtime environment.
-      if (['skip', 'todo', 'skipIf', 'runIf'].includes(modifier)) disabled = true;
-      j += 2;
-      if (!['each', 'skipIf', 'runIf'].includes(modifier)) continue;
-      if (modifier === 'each' && tokens[j]?.startsWith('`')) { j++; continue; }
-      if (tokens[j] !== '(' || !closes.has(j)) break;
-      j = closes.get(j) + 1;
+    if (ts.isCallExpression(expression) || ts.isTaggedTemplateExpression(expression)) {
+      const parent = declaration(ts.isCallExpression(expression) ? expression.expression : expression.tag);
+      const modifier = parent?.modifiers.at(-1);
+      if (!modifier || modifier.called) return null;
+      if (ts.isTaggedTemplateExpression(expression) && modifier.name !== 'each') return null;
+      modifier.called = true;
+      return parent;
     }
-    if (tokens[j] === '(' && closes.has(j)) declarations.push({ start: i, call: j, end: closes.get(j), suite, disabled });
+    return null;
   }
-  const disabledSuites = declarations.filter(declaration => declaration.suite && declaration.disabled);
+
   const titles = new Set();
-  for (const declaration of declarations) {
-    if (declaration.suite || declaration.disabled || disabledSuites.some(suite => suite.call < declaration.start && declaration.start < suite.end)) continue;
-    const j = declaration.call;
-    const literal = tokens[j + 1];
-    // The entire first argument must be one literal, not a concatenation or other expression.
-    if (!/^['"`]/.test(literal ?? '') || tokens[j + 2] !== ',') continue;
-    // Decode escapes without evaluating repository code. Titles with substitutions are not static.
-    if (literal[0] === '`' && literal.includes('${')) continue;
-    titles.add(literal.slice(1, -1).replace(/\\(u\{[\da-fA-F]+\}|u[\da-fA-F]{4}|x[\da-fA-F]{2}|[\s\S])/g, (_, escaped) => {
-      if (escaped.startsWith('u{')) return String.fromCodePoint(parseInt(escaped.slice(2, -1), 16));
-      if (/^[ux]/.test(escaped)) return String.fromCharCode(parseInt(escaped.slice(1), 16));
-      return ({ n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', '0': '\0', '\n': '' })[escaped] ?? escaped;
-    }));
+  function visit(node, blocked = false) {
+    if (ts.isCallExpression(node)) {
+      const declared = declaration(node.expression);
+      if (declared && (suites.has(declared.name) || tests.has(declared.name))) {
+        const disabled = declared.name.startsWith('x') || declared.modifiers.some(modifier =>
+          !allowed.has(modifier.name) || factories.has(modifier.name) !== modifier.called);
+        if (suites.has(declared.name)) blocked ||= disabled;
+        else if (!blocked && !disabled) {
+          const title = node.arguments[0];
+          if (title && (ts.isStringLiteral(title) || ts.isNoSubstitutionTemplateLiteral(title))) titles.add(title.text);
+        }
+      }
+    }
+    ts.forEachChild(node, child => visit(child, blocked));
   }
+  visit(tree);
   return titles;
 }
 
@@ -129,7 +132,7 @@ export function checkSearchWindowScenarios({ root, catalog, stepIndex, baseline 
         continue;
       }
       if (!sources.has(file)) {
-        try { sources.set(file, statSync(file).isFile() ? testTitles(readFileSync(file, 'utf8')) : null); }
+        try { sources.set(file, statSync(file).isFile() ? testTitles(readFileSync(file, 'utf8'), file) : null); }
         catch { sources.set(file, null); }
       }
       const titles = sources.get(file);
