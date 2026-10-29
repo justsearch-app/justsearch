@@ -193,6 +193,14 @@ jobs:
       - name: Workflow trigger policy guard
         run: node scripts/ci/check-workflow-triggers.mjs
 
+      - name: Test runtime manifest closure guard
+        run: node scripts/ci/test-check-runtime-manifest-closure.mjs
+
+      - name: Runtime manifest closure guard
+        # Advisory: literal-path regexes match comments and non-dataDir bases; zero real violations found so far.
+        continue-on-error: true
+        run: node scripts/ci/check-runtime-manifest-closure.mjs
+
       - name: Governance production coverage regression tests
         run: node scripts/ci/test-check-governance-ci-coverage.mjs
 
