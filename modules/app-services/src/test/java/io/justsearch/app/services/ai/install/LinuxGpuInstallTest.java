@@ -86,7 +86,8 @@ class LinuxGpuInstallTest {
       var run = java.util.Arrays.stream(AiInstallService.class.getDeclaredMethods())
           .filter(m -> m.getName().equals("runInstallInternal")).findFirst().orElseThrow();
       run.setAccessible(true);
-      run.invoke(service, new Object[] {null});
+      assertDoesNotThrow(() -> run.invoke(service, new Object[] {null}),
+          "Repair must not require the deleted executable before acquiring the planned packs");
       assertEquals(1, stages.constructed().size(), "Pack acquisition must run before requiring the deleted executable");
       restore.verifyNoInteractions();
     } finally { TestResolvedConfigHelper.restoreGlobal(previous); }

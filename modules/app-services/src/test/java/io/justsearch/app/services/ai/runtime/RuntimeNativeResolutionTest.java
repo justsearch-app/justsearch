@@ -75,7 +75,9 @@ class RuntimeNativeResolutionTest {
     Files.writeString(cuda, "#!/bin/sh\nexit 0\n");
     assertTrue(cuda.toFile().setExecutable(true, true));
     for (String variant : new String[] {null, "", "default", "cuda12"}) {
-      assertEquals(cuda, RuntimeActivationService.activationExecutable(variants, variant, null));
+      assertEquals(cuda, assertDoesNotThrow(
+          () -> RuntimeActivationService.activationExecutable(variants, variant, null),
+          "variant " + variant + " must resolve the downloaded pack executable"));
     }
   }
 
