@@ -90,3 +90,13 @@ Independent acceptance is intentionally absent.
   "digest": "sha256:65a39a4c048d3438ac65ff0f5bb5b83011e8bd4705139f14954ed3276284d292"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18559-225e-72a1-ac33-b9394e8fdff4",
+  "verdict": "accept",
+  "digest": "sha256:717d7114d203f73b264bfa95f4a6d6ab7d5e97a88e7c4e4767ff28b5ffaa8b51"
+}
+```
