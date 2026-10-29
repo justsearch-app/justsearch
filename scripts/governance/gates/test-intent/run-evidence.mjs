@@ -152,10 +152,13 @@ function toolVersion(cmd) {
   return r.status === 0 ? `${r.stdout}${r.stderr}`.trim().split(/\r?\n/)[0] : null;
 }
 
-/** Vitest's own bin script: a copied .bin entry no longer resolves the package's relative imports. */
+/**
+ * Vitest's own bin script, relative to `uiWeb` so the shell never expands the checkout path: a
+ * copied .bin entry no longer resolves the package's relative imports.
+ */
 function vitestEntry(uiWeb) {
-  const dir = path.join(uiWeb, 'node_modules', 'vitest');
-  const { bin } = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  const dir = path.join('node_modules', 'vitest');
+  const { bin } = JSON.parse(fs.readFileSync(path.join(uiWeb, dir, 'package.json'), 'utf8'));
   return path.join(dir, typeof bin === 'string' ? bin : bin.vitest);
 }
 

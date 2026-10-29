@@ -59,8 +59,9 @@ test('--copy-node-modules creates independent ordinary files including linked de
 
 test('vitest checks run in a --copy-node-modules before-worktree', () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-vitest-copy-'));
-  const root = path.join(scratch, 'candidate');
-  const worktree = path.join(scratch, 'before');
+  // A shell-special checkout path must reach Vitest unexpanded.
+  const root = path.join(scratch, 'candidate$HOME');
+  const worktree = path.join(scratch, 'before$HOME');
   const modules = path.join(root, 'modules', 'ui-web', 'node_modules');
   const check = 'modules/ui-web/src/probe.test.ts#probe';
   try {
