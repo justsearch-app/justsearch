@@ -310,3 +310,13 @@ The assembler's tests under scripts/ are out of scope for this gate; S12 and rep
   "digest": "sha256:539990d57add52f0d3894dd09b575b3a9991267d9e9fba5e89a445bd56d4336f"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a18876-0e61-7d63-a619-509a0b816689",
+  "verdict": "accept",
+  "digest": "sha256:539990d57add52f0d3894dd09b575b3a9991267d9e9fba5e89a445bd56d4336f"
+}
+```
