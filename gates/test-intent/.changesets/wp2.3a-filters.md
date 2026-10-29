@@ -273,3 +273,14 @@ Agent choices under the quoted delegation; not owner-agreed. Execution evidence 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a184ed-7a0e-72b2-98f2-17888f49abc4",
+  "verdict": "accept",
+  "digest": "sha256:9d0e2ad0d2b47fed223a240983b4d1f67d7969d47cdfdc6a3a2ca2f0f4e387b7",
+  "note": "Codex verifier PASS: twenty repair checks fail before by assertion and pass after; preservation passes both; real HTTP establishes F5 fail-before"
+}
+```
