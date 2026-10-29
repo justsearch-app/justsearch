@@ -43,3 +43,25 @@ reranking. On a machine with a supported NVIDIA GPU they also include the chat
 model, which adds query expansion, questions answered with citations, and
 summarization (see AI Features). Connecting external AI tools over MCP works
 with or without the AI models. All inference runs locally on your machine.
+
+## Indexing restrictions
+
+Manual Pause keeps indexed files searchable. Resume clears the manual pause; saved indexing hours
+and the pause-on-battery preference still apply. Outside the saved hours, processing waits for the
+schedule. On a known battery reading, it waits for AC power or a change to the battery preference.
+An unknown power reading adds no battery hold. The battery preference is off by default and stays saved
+even when no battery is detected.
+
+Hours use local wall-clock minutes: the start is included and the end excluded. Overnight hours
+belong to the selected starting day, including Sunday into Monday. A repeated daylight-saving hour
+follows the same rule twice; a skipped hour never occurs. Windows follows current OS local time;
+if that read fails, the JVM zone is used until a later native read succeeds. That fallback can lag
+an OS zone change. Other systems use the JVM default zone: after an OS zone change, restart the Engine process (restarting indexing within
+the same process does not guarantee a zone refresh). An explicit JVM time-zone setting takes
+precedence over the OS zone.
+
+PAUSING means admitted work is finishing its publication. PAUSED means all processing lanes are
+quiet. Discovery, deletions and search remain available. With battery pause enabled, each indexing
+activation waits up to three seconds for a fresh power observation, then proceeds as UNKNOWN if
+it has none; a later battery observation still applies. Settings recovery remains authoritative:
+check exclusions and complete the existing settings-reset flow before indexing resumes.

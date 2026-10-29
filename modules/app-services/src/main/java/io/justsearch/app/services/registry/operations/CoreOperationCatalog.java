@@ -213,6 +213,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
   public static final OperationRef SET_CHAT_ENABLED = new OperationRef("core.set-chat-enabled");
   public static final OperationRef PAUSE_INDEXING = new OperationRef("core.indexing-pause");
   public static final OperationRef RESUME_INDEXING = new OperationRef("core.indexing-resume");
+  public static final OperationRef SET_INDEXING_RULES = new OperationRef("core.set-indexing-rules");
 
   /**
    * Slice 3a-2-c BrainRuntimeSection Trigger Offline Processing button.
@@ -366,6 +367,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
       setChatEnabled(),
       indexingPause(PAUSE_INDEXING, true),
       indexingPause(RESUME_INDEXING, false),
+      indexingRules(),
       triggerOfflineProcessing(),
       activateRuntimeVariant(),
       deactivateRuntimeVariant(),
@@ -984,6 +986,19 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Binding.of(SET_CHAT_ENABLED),
         Provenance.core("1.0"),
         Set.of(ExecutorTag.UI, ExecutorTag.AGENT));
+  }
+
+  private static Operation indexingRules() {
+    return new Operation(SET_INDEXING_RULES, Presentation.forId(SET_INDEXING_RULES),
+        Interface.of("{\"type\":\"object\",\"required\":[\"schedule\",\"pauseOnBattery\"],"
+            + "\"properties\":{\"schedule\":{\"type\":[\"object\",\"null\"]},"
+            + "\"pauseOnBattery\":{\"type\":\"boolean\"}},\"additionalProperties\":false}",
+            "{\"type\":\"object\"}"),
+        new OperationPolicy(RiskTier.LOW, ConfirmStrategy.None.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(SET_INDEXING_RULES),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI));
   }
 
   private static Operation indexingPause(OperationRef ref, boolean pause) {

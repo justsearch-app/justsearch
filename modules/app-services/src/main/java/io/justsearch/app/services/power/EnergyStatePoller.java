@@ -55,6 +55,9 @@ public final class EnergyStatePoller implements Closeable {
   private ScheduledExecutorService scheduler;
   private EngineExecutorRegistry.Registration schedulerRegistration;
   private ScheduledFuture<?> task;
+  private long activation;
+  private java.util.concurrent.CountDownLatch firstReading = new java.util.concurrent.CountDownLatch(1);
+  public static final long FIRST_READING_TIMEOUT_MS = 3000L;
 
   /**
    * @param gauge the in-process GPU-scheduling gauge this poller writes (required)
@@ -78,8 +81,9 @@ public final class EnergyStatePoller implements Closeable {
    * Starts the poll: once immediately, then every {@link #POLL_INTERVAL_MS}. Idempotent — a second
    * call while running is a no-op, so a restart of the process being supervised does not stack
    * pollers — and restartable after {@link #close()}, because {@code KnowledgeServerBootstrap} may
-   * be started again on the same instance (boot recovery, upgrade restart). The last polled state
-   * survives a stop/start cycle: the OS energy-intent does not change because we stopped looking.
+   * be started again on the same instance (boot recovery, upgrade restart). A battery-pause
+   * activation starts UNKNOWN and requires a fresh observation. With that preference off, the
+   * existing best-effort energy-saver cache survives restart. Old probes cannot publish into either.
    */
   public synchronized void start() {
     if (task != null) {
@@ -115,26 +119,55 @@ public final class EnergyStatePoller implements Closeable {
         throw failure;
       }
     }
-    task = scheduler.scheduleAtFixedRate(this::poll, 0, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS);
+    long current = ++activation;
+    firstReading = new java.util.concurrent.CountDownLatch(1);
+    if (gauge.indexingHold().pauseOnBattery()) publish(EnergyState.unknown());
+    task = scheduler.scheduleAtFixedRate(() -> poll(current), 0, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS);
   }
 
-  /**
-   * One poll. Best-effort: a probe failure is logged at debug and leaves the previously published
-   * state untouched (so a transient failure cannot flip the throttle on or off).
-   */
+  /** Wait only for the current activation when the saved battery rule requires it. */
+  public void awaitFirstReading() throws InterruptedException {
+    if (!gauge.indexingHold().pauseOnBattery()) return;
+    final java.util.concurrent.CountDownLatch completion;
+    synchronized (this) { completion = firstReading; }
+    // CountDownLatch uses elapsed/monotonic time, independent of wall-clock adjustments.
+    completion.await(FIRST_READING_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+  }
+
+  /** One best-effort poll; a first failure completes as UNKNOWN, later failures keep the reading. */
   public void poll() {
-    try {
-      EnergyState state = probe.get();
-      EnergyState before = latest.getAndSet(state);
-      io.justsearch.core.status.StatusChangeCounter.process().changed(before, state);
-      gauge.setEnergyReduced(state.reduced());
-      BulkWorkGate gate = bulkWork;
-      if (gate != null) {
-        gate.setEnergyReduced(state.reduced());
+    final long current;
+    synchronized (this) { current = activation; }
+    poll(current);
+  }
+
+  private void poll(long current) {
+    EnergyState observed;
+    try { observed = Objects.requireNonNull(probe.get(), "power observation"); }
+    catch (Exception failure) {
+      log.debug("Energy-state poll failed: {}", failure.getMessage());
+      synchronized (this) {
+        if (current == activation && firstReading.getCount() != 0) {
+          if (gauge.indexingHold().pauseOnBattery()) publish(EnergyState.unknown());
+          firstReading.countDown();
+        }
       }
-    } catch (Exception e) {
-      log.debug("Energy-state poll failed (treated as unknown): {}", e.getMessage());
+      return;
     }
+    synchronized (this) {
+      if (current != activation) return;
+      publish(observed);
+      firstReading.countDown();
+    }
+  }
+
+  private void publish(EnergyState state) {
+    EnergyState before = latest.getAndSet(state);
+    io.justsearch.core.status.StatusChangeCounter.process().changed(before, state);
+    gauge.setEnergyReduced(state.reduced());
+    gauge.indexingHold().setOnBattery(state.source() == EnergyState.Source.BATTERY);
+    BulkWorkGate gate = bulkWork;
+    if (gate != null) gate.setEnergyReduced(state.reduced());
   }
 
   /**
@@ -154,6 +187,8 @@ public final class EnergyStatePoller implements Closeable {
 
   @Override
   public synchronized void close() {
+    activation++;
+    firstReading.countDown();
     if (task != null) {
       task.cancel(false);
       task = null;

@@ -100,6 +100,8 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
       var pause = scheduling.indexingHold().snapshot();
       extras.put("indexingPauseState", pause.state().name());
       if (pause.reason() != null) extras.put("indexingPauseReason", pause.reason().toLowerCase(Locale.ROOT));
+      extras.put("indexingPauseReasons", pause.reasons().stream()
+          .map(reason -> reason.toLowerCase(Locale.ROOT)).toList());
       if (pause.untilEpochMs() != null) extras.put("indexingPauseUntilEpochMs", pause.untilEpochMs());
       extras.put("indexingWaitingForResume", pause.waiting() > 0);
     }

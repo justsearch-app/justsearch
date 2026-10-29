@@ -675,7 +675,7 @@
               "type" : "array",
               "items" : {
                 "type" : "string",
-                "enum" : [ "user_paused", "settings_recovery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating" ]
+                "enum" : [ "settings_recovery", "user_paused", "schedule", "on_battery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating" ]
               }
             },
             "sampledAt" : {
