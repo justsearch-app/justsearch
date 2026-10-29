@@ -14,7 +14,7 @@ its per-entry citations identify the relevant observations and limits. It exclud
 All 30 W6 changed paths are byte-identical between the verified candidate 5fa8dec6d4 and
 the rebased candidate b84dce56e8; unrelated changes in the new base are outside that comparison.
 
-D4 evidence was generated on 1b24571df8a26c5101dfcd2783add5302182f4e9 against base 9149f53ba6 with
+D4 evidence was generated on 7fb20ec60549eee4b8b85876b26e0b86ab91dfe9 against base 9149f53ba6 with
 `scripts/governance/gates/test-intent/run-evidence.mjs` in a temporary shared clone.
 The candidate run exited 0: all 11 check identifiers, comprising 35 cases, passed.
 The repaired run names each new or repaired check, including both parameterized tokenizer
