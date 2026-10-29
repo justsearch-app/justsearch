@@ -33,6 +33,10 @@ class Infrastructure(Exception):
     """An observed harness, desktop or download failure, not a product verdict."""
 
 
+class RunStopped(Infrastructure):
+    """The run has been stopped; no polling retry can recover it."""
+
+
 class ProductFailure(AssertionError):
     """A reported product end state; polling must never hide it."""
 
@@ -255,6 +259,8 @@ def wait_for(fn, description, seconds=90, interval=1, error=AssertionError):
                 return value
         except TransientAPI as exc:
             product_error = last = exc
+        except RunStopped:
+            raise
         except (OSError, KeyError, ValueError, urllib.error.URLError, Infrastructure) as exc:
             last = exc
         time.sleep(interval)

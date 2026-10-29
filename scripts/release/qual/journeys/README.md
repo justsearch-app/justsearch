@@ -378,10 +378,9 @@ WebView2 Update policies), SysMain, Windows Search, diagnostics/telemetry upload
 their scheduled work, scheduled optimisation and
 Defender real-time/scheduled scans. If Defender refuses, all test and app data
 folders must be excluded instead; the actual mode is recorded. Hibernation is
-off and the page file is fixed at 2048 MiB. The original 512 MiB setting
-exhausted Windows commit capacity during CPU model initialization in a 12 GiB
-guest, producing PowerShell OOM errors and a WebView2 crash. The larger fixed
-file retains the per-run write guard. A full shutdown/reboot precedes
+off and the page file is system-managed, as on a default Windows installation.
+Fixed 512 MiB and 2048 MiB qualification settings caused commit/allocation
+failures during CPU model use in a 12 GiB guest. A full shutdown/reboot precedes
 verification of each observed service, task, policy, exclusion and page-file
 allocation in `quiet-verify.json`. An unverified setting refuses snapshot
 sealing and all journeys. Setup caches EdgeDriver by the exact four-part WebView2
@@ -406,9 +405,9 @@ and WebDriver stay limited. The bundled VC++ prerequisite otherwise waits for
 elevation on a clean OS; its standard-token consent UI is not certified by this
 installer context. The hosted equivalent uses the hosted runner's elevated caller
 context. It stops only its
-recorded guest on every outcome. Candidate J1–J3 and predecessor J1–J4 each run
-fresh, with real production AI downloads. A clean shutdown seals each setup by
-renaming its disk/firmware into a snapshot. Remaining journeys use thin child
+recorded guest on every outcome. Both candidate and predecessor start with fresh
+J1–J2, then J3 downloads from production in its own thin overlay. A clean shutdown
+seals each stage by renaming its disk/firmware into a snapshot. Remaining journeys use thin child
 overlays; no model cache or candidate data is moved into the predecessor.
 
 Windows native-window discovery enumerates visible top-level HWNDs and reads
@@ -511,6 +510,14 @@ growth as `overlayGrowthBytes`. Guest and QEMU counters end before shutdown;
 overlay allocation is measured after shutdown. A background watcher also covers
 blocking guest commands. Exceeding **15 GB** in any measured write/growth counter
 stops only this owned VM and fails the run; report it before another run.
+The dedicated J3 overlay has a **25 GB** allowance for production model downloads,
+extraction and the default page file; every other overlay retains 15 GB. A write
+stop terminates polling immediately and prevents later full-run stages from
+starting. During J3, `J3-resources.jsonl` retains system commit charge/limit,
+available RAM, page-file allocation/use, app-tree private bytes and working sets,
+data-directory file sizes and recent Engine logs on the host every 30 seconds.
+These diagnostics survive a guarded VM shutdown. File sizes describe allocation,
+not cumulative writes; guest raw counters and QEMU I/O remain the write evidence.
 Preparation retains separate counters for both boots. Windows swap bytes are
 explicitly unavailable rather than zero. Allocation growth is not an I/O counter.
 

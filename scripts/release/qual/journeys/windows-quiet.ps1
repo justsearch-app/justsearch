@@ -52,10 +52,9 @@ if ($Mode -eq 'Apply') {
  & powercfg.exe /hibernate off
  if($LASTEXITCODE) {throw 'Disabling hibernation failed'}
  $computer=Get-CimInstance Win32_ComputerSystem
- $computer | Set-CimInstance -Property @{AutomaticManagedPagefile=$false} | Out-Null
- # Set the boot configuration directly. The WMI create provider rejects a
- # replacement of the currently active pagefile before the required reboot.
- New-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management' -Name PagingFiles -PropertyType MultiString -Value @('C:\pagefile.sys 2048 2048') -Force | Out-Null
+ # Use Windows' default commit capacity. Fixed qualification limits previously
+ # starved native ONNX allocations and WebView2 on the 12 GiB CPU guest.
+ $computer | Set-CimInstance -Property @{AutomaticManagedPagefile=$true} | Out-Null
  [IO.File]::WriteAllText('C:/Qual/quiet-applied.json',(@{boot=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o');errors=$errors.ToArray()} | ConvertTo-Json -Depth 5))
 }
 $rows=New-Object 'Collections.Generic.List[object]'
@@ -80,7 +79,7 @@ $page=@(Get-CimInstance Win32_PageFileSetting)
 $usage=@(Get-CimInstance Win32_PageFileUsage)
 $auto=(Get-CimInstance Win32_ComputerSystem).AutomaticManagedPagefile
 $rows.Add(@{setting='pagefile';observed=@{automatic=$auto;settings=$page | Select-Object Name,InitialSize,MaximumSize;usage=$usage | Select-Object Name,AllocatedBaseSize};
- verified=(!$auto -and $page.Count -eq 1 -and $page[0].InitialSize -eq 2048 -and $page[0].MaximumSize -eq 2048 -and $usage.Count -eq 1 -and $usage[0].AllocatedBaseSize -eq 2048)})
+ verified=($auto -and $usage.Count -gt 0 -and @($usage | Where-Object {$_.AllocatedBaseSize -gt 0}).Count -gt 0)})
 foreach($policy in @(
  @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU','NoAutoUpdate',1),
  @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection','AllowTelemetry',0),

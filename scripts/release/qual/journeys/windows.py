@@ -669,10 +669,7 @@ foreach($d in $disks) {$devices[$d.Name]=[long]$d.DiskWriteBytesPersec;$total+=[
             raise TransientAPI('Installed Engine unavailable: ' + str(exc)) from exc
 
     def memory_sample(self):
-        return ps_json(r"""
-$m=Get-CimInstance Win32_OperatingSystem
-@{totalKiB=$m.TotalVisibleMemorySize;freeKiB=$m.FreePhysicalMemory;epochSeconds=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()}
-""")
+        return ps_json(memory_counters())
 
     def state_snapshot(self):
         from linux import search_api, stored_bookmarks
@@ -830,6 +827,33 @@ def installer_version(path):
 def ps_value(value):
     """PowerShell single-quoted literal, including paths with apostrophes."""
     return "'" + value.replace("'", "''") + "'"
+
+
+def memory_counters():
+    """System commit and the installed app tree, without unrelated JVMs/browsers."""
+    return r"""
+$m=Get-CimInstance Win32_OperatingSystem
+$commit=Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory
+$all=@(Get-CimInstance Win32_Process)
+$app=Join-Path $env:LOCALAPPDATA 'JustSearch\JustSearch.exe'
+$ids=@($all | Where-Object {$_.ExecutablePath -ieq $app} | ForEach-Object {[int]$_.ProcessId})
+do {
+ $children=@($all | Where-Object {$_.ParentProcessId -in $ids -and $_.ProcessId -notin $ids} | ForEach-Object {[int]$_.ProcessId})
+ $ids+= $children
+} while($children.Count)
+$processes=@(foreach($row in $all | Where-Object {$_.ProcessId -in $ids}) {
+ try {
+  $p=Get-Process -Id $row.ProcessId -ErrorAction Stop
+  @{pid=$p.Id;created=$p.StartTime.ToUniversalTime().ToString('o');exe=$row.ExecutablePath;ppid=$row.ParentProcessId;
+    privateBytes=$p.PrivateMemorySize64;workingSetBytes=$p.WorkingSet64;peakWorkingSetBytes=$p.PeakWorkingSet64}
+ } catch {if(Get-Process -Id $row.ProcessId -ErrorAction SilentlyContinue){throw}}
+})
+@{totalKiB=$m.TotalVisibleMemorySize;freeKiB=$m.FreePhysicalMemory;availableBytes=$commit.AvailableBytes;
+ committedBytes=$commit.CommittedBytes;commitLimitBytes=$commit.CommitLimit;processes=$processes;
+ pagefiles=@(Get-CimInstance Win32_PageFileUsage | Select-Object Name,AllocatedBaseSize,CurrentUsage,PeakUsage);
+ automaticManagedPagefile=(Get-CimInstance Win32_ComputerSystem).AutomaticManagedPagefile;
+ epochSeconds=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()}
+"""
 
 
 

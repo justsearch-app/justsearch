@@ -19,8 +19,8 @@ import threading
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import vm
-from runner import Infrastructure, digest, verify_assets, preparation_failure, summarize, full_selection, report_exit_code, wait_for
-from windows import ps_value, verify_driver_receipt
+from runner import Infrastructure, RunStopped, digest, verify_assets, preparation_failure, summarize, full_selection, report_exit_code, wait_for
+from windows import ps_value, verify_driver_receipt, memory_counters
 
 spec = importlib.util.spec_from_file_location('linux_vm_wrapper', HERE / 'vm-run.py')
 common = importlib.util.module_from_spec(spec)
@@ -35,29 +35,56 @@ $total=[long]0;foreach($disk in $d){$total+=[long]$disk.DiskWriteBytesPersec}
 """
 
 
-def enforce_write_limit(volume):
+def write_limit(journeys):
+    return 25_000_000_000 if journeys == ['J3'] else WRITE_LIMIT
+
+
+def enforce_write_limit(volume, limit=WRITE_LIMIT):
     for key in ('hostQemuWrittenBytes', 'guestWrittenBytes', 'overlayGrowthBytes'):
-        if volume.get(key, 0) > WRITE_LIMIT:
-            raise Infrastructure(f'Windows run exceeded 15 GB write budget: {key}={volume[key]}; stopped, do not rerun')
+        if volume.get(key, 0) > limit:
+            raise RunStopped(f'Windows run exceeded {limit // 1_000_000_000} GB write budget: {key}={volume[key]}; stopped, do not rerun')
 
 
 class WriteBudget:
     """Watch even while an SSH command blocks; shut down only this owned VM."""
-    def __init__(self, started, out):
+    def __init__(self, started, out, limit=WRITE_LIMIT):
         self.started, self.out = started, out
         self.disk = Path(started['disk'])
         self.initial = self.disk.stat().st_blocks * 512
-        self.volume = {'limitBytes': WRITE_LIMIT, 'overlayInitialBytes': self.initial,
+        self.limit = limit
+        self.volume = {'limitBytes': limit, 'overlayInitialBytes': self.initial,
                        'measurement': 'QEMU process lifetime and guest boot through pre-shutdown; overlay allocation after shutdown'}
         self.done = threading.Event()
         self.error = None
+        self.next_resources = 0
         self.thread = threading.Thread(target=self.watch, daemon=True)
+
+    def resources(self):
+        """Keep J3 diagnostics on the host even if the write guard stops the VM."""
+        source = '$memory=& { ' + memory_counters() + r""" }
+$data=Join-Path $env:APPDATA 'io.justsearch.shell'
+$files=@(if(Test-Path $data){Get-ChildItem $data -File -Recurse -ErrorAction Stop})
+$sizes=@($files | Group-Object {($_.FullName.Substring($data.Length+1) -split '\\')[0]} | ForEach-Object {
+ @{directory=$_.Name;fileBytes=($_.Group | Measure-Object Length -Sum).Sum;files=$_.Count}
+})
+$logs=@(Get-ChildItem (Join-Path $data 'logs') -File -Recurse -ErrorAction SilentlyContinue | Where-Object {$_.Extension -in '.log','.jsonl'} | ForEach-Object {
+ @{path=$_.FullName;bytes=$_.Length;tail=@(Get-Content $_.FullName -Tail 120 -Encoding UTF8)}
+})
+@{memory=$memory;dataDirectories=$sizes;engineLogs=$logs} | ConvertTo-Json -Depth 8 -Compress
+"""
+        try:
+            observation = json.loads(guest_ps(source, timeout=25))
+        except Exception as exc:
+            observation = {'unavailable': str(exc), 'epochSeconds': time.time()}
+        observation['writeVolume'] = dict(self.volume)
+        with (self.out / 'J3-resources.jsonl').open('a', encoding='utf-8') as stream:
+            stream.write(json.dumps(observation) + '\n')
 
     def sample(self):
         io = dict(line.split(':', 1) for line in Path(f"/proc/{self.started['pid']}/io").read_text().splitlines())
         self.volume.update(hostQemuWrittenBytes=int(io['write_bytes']),
                            overlayGrowthBytes=max(0, self.disk.stat().st_blocks * 512 - self.initial))
-        enforce_write_limit(self.volume)
+        enforce_write_limit(self.volume, self.limit)
 
     def watch(self):
         count = 0
@@ -72,8 +99,11 @@ class WriteBudget:
                         self.volume.pop('guestUnavailable', None)
                     except Exception as exc:
                         self.volume['guestUnavailable'] = str(exc)
-                    enforce_write_limit(self.volume)
+                    enforce_write_limit(self.volume, self.limit)
                 count += 1
+                if self.limit == 25_000_000_000 and time.monotonic() >= self.next_resources:
+                    self.next_resources = time.monotonic() + 30
+                    self.resources()
             except Infrastructure as exc:
                 self.error = str(exc)
                 (self.out / 'write-budget-exceeded.json').write_text(json.dumps(self.volume, indent=2) + '\n')
@@ -87,7 +117,7 @@ class WriteBudget:
 
     def check(self):
         if self.error:
-            raise Infrastructure(self.error)
+            raise RunStopped(self.error)
 
     def finish(self):
         self.done.set()
@@ -96,10 +126,10 @@ class WriteBudget:
             try:
                 self.sample()
                 self.volume['guestWrittenBytes'] = json.loads(guest_ps(DISK_COUNTERS, timeout=15))['writtenBytes']
-                enforce_write_limit(self.volume)
+                enforce_write_limit(self.volume, self.limit)
             except Exception as exc:
                 self.volume['finalMeasurementError'] = str(exc)
-                if isinstance(exc, Infrastructure) and '15 GB' in str(exc):
+                if isinstance(exc, RunStopped):
                     self.error = str(exc)
         return self.volume
 
@@ -513,7 +543,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         else:
             vm.start('windows')
         started = vm.require_owner('windows')
-        budget = WriteBudget(started, out)
+        budget = WriteBudget(started, out, write_limit(journeys))
         budget.thread.start()
         inode = Path(started['disk']).stat().st_ino
         vm.wait_ssh('windows', timeout=600)
@@ -553,7 +583,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         if budget:
             report = json.loads((out / 'summary.json').read_text())
             if budget.error:
-                report['journeys'].append({'id': 'write-budget', 'checks': [{'name': '15-GB-limit',
+                report['journeys'].append({'id': 'write-budget', 'checks': [{'name': 'write-limit',
                     'status': 'failed-infrastructure', 'reason': budget.error, 'evidence': []}]})
             report.update(writeVolume=volume, **summarize(report['journeys'], report.get('fullSelection', False)))
             (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
@@ -629,6 +659,7 @@ def main():
     def stage(name, phase, journeys, snapshot=None, seal=False):
         run_overlay(args, out / name, phase, journeys, snapshot, seal)
         sources[name] = json.loads((out / name / 'summary.json').read_text())
+        return not any(row['id'] == 'write-budget' for row in sources[name]['journeys'])
     if args.mode == 'rerun':
         phase = json.loads((args.snapshot / 'manifest.json').read_text())['pins']['phase']
         stage('rerun', phase, args.journeys, args.snapshot, seal=True)
@@ -636,13 +667,21 @@ def main():
         stage('selected', 'candidate', args.journeys, args.setup_snapshot, seal=True)
     else:
         for phase in (['candidate'] if args.session == 'hosted' else ['candidate', 'predecessor']):
-            stage(phase + '-setup', phase, ['J1', 'J2', 'J3'] + (['J4'] if phase == 'predecessor' else []), args.setup_snapshot, seal=True)
+            # J3 alone has a 25 GB allowance. Other journeys retain their 15 GB
+            # overlay budget, including in a full qualification invocation.
+            if not stage(phase + '-install', phase, ['J1', 'J2'], args.setup_snapshot, seal=True):
+                return combine(args, out, sources)
+            installed = out / (phase + '-install') / 'snapshot'
+            if installed.exists():
+                if not stage(phase + '-setup', phase, ['J3'], installed, seal=True):
+                    return combine(args, out, sources)
             snapshot = out / (phase + '-setup') / 'snapshot'
             if snapshot.exists():
-                remaining = ['J5', 'J6'] if phase == 'predecessor' else ['J4', 'J8']
+                remaining = ['J4', 'J5', 'J6'] if phase == 'predecessor' else ['J4', 'J8']
                 if args.session == 'hosted':
                     remaining = ['J4', 'J5', 'J6', 'J7', 'J8']
-                stage(phase, phase, remaining, snapshot)
+                if not stage(phase, phase, remaining, snapshot):
+                    return combine(args, out, sources)
             else:
                 lane = 'hosted-windows' if args.session == 'hosted' else 'vm-windows'
                 sources[phase] = preparation_failure(lane, 'Setup did not produce a stopped checkpoint')

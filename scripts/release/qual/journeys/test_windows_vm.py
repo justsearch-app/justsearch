@@ -15,6 +15,53 @@ wrapper=importlib.util.module_from_spec(spec);spec.loader.exec_module(wrapper)
 
 
 class WindowsVMTests(unittest.TestCase):
+    def test_write_stop_ends_shared_polling_immediately_without_a_retry(self):
+        import runner
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); disk = root/'disk.qcow2'; disk.write_bytes(b'thin')
+            budget = wrapper.WriteBudget({'pid': 123, 'disk': str(disk)}, root)
+            budget.error = 'Windows run exceeded 15 GB write budget; stopped'
+            with patch.object(runner.time, 'monotonic', side_effect=[0, 0, 1]), \
+                 patch.object(runner.time, 'sleep') as sleep, \
+                 patch.object(budget, 'check', wraps=budget.check) as check:
+                with self.assertRaises(Infrastructure) as caught:
+                    runner.wait_for(budget.check, 'completion', seconds=0.5)
+            self.assertEqual(str(caught.exception), budget.error)
+            check.assert_called_once()
+            sleep.assert_not_called()
+
+    def test_only_a_dedicated_j3_run_gets_the_25_gb_allowance(self):
+        self.assertEqual(wrapper.write_limit(['J3']), 25_000_000_000)
+        for journeys in (['J1'], ['J5'], ['J1', 'J2'], ['J3', 'J4']):
+            self.assertEqual(wrapper.write_limit(journeys), 15_000_000_000)
+        wrapper.enforce_write_limit({'hostQemuWrittenBytes': 20_000_000_000}, 25_000_000_000)
+        with self.assertRaisesRegex(Infrastructure, '25 GB'):
+            wrapper.enforce_write_limit({'guestWrittenBytes': 25_000_000_001}, 25_000_000_000)
+
+    def test_full_run_isolates_j3_budget_and_stops_all_stages_after_a_write_stop(self):
+        import sys
+        for stop in (False, True):
+            with self.subTest(stop=stop), tempfile.TemporaryDirectory() as temp:
+                out = Path(temp)/'out'
+                calls = []
+                def run(args, folder, phase, journeys, snapshot, seal):
+                    calls.append((phase, journeys))
+                    folder.mkdir(parents=True)
+                    (folder/'snapshot').mkdir()
+                    rows = [{'id': 'write-budget', 'checks': []}] if stop and journeys == ['J3'] else []
+                    (folder/'summary.json').write_text(json.dumps({'journeys': rows}))
+                argv = ['vm-windows.py', '--assets', 'assets', '--package', 'candidate.exe',
+                        '--registry', 'registry.json', '--driver', 'driver.exe', '--predecessor', 'parent.exe',
+                        '--mirror', 'mirror', '--setup-snapshot', 'tools', '--evidence', str(out)]
+                with patch.object(sys, 'argv', argv), patch.object(wrapper.vm, 'owner'), \
+                     patch.object(wrapper, 'run_overlay', side_effect=run), patch.object(wrapper, 'combine', return_value=1):
+                    wrapper.main()
+                expected = [('candidate', ['J1', 'J2']), ('candidate', ['J3'])]
+                if not stop:
+                    expected += [('candidate', ['J4', 'J8']), ('predecessor', ['J1', 'J2']),
+                                 ('predecessor', ['J3']), ('predecessor', ['J4', 'J5', 'J6'])]
+                self.assertEqual(calls, expected)
+
     def test_chained_snapshot_reruns_keep_distinct_guest_evidence_directories(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
