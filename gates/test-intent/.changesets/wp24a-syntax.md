@@ -7,7 +7,7 @@ author-session: wp24a-builder-suo96vr2
 
 # Test-intent entries
 
-Agent choices under the quoted design delegation, never owner-agreed words. The orchestrator must generate execution evidence and obtain independent acceptance. The builder did not run run-evidence.mjs.
+Agent choices under the quoted design delegation, never owner-agreed words. Builder execution evidence is recorded under `gates/test-intent/evidence/wp24a-syntax/`; independent acceptance remains pending. Every selected check compiled and ran on both revisions. New repaired checks have assertion fail-before evidence; New preservation checks explicitly set `repaired: false` and retain their passing before-state results. Existing oracle adaptations and additions are accounted for separately.
 
 ```json
 {
@@ -28,7 +28,7 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-retrieval.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
       "newChecks": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x1PhraseStaysWithinOneField",
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x2ExclusionsApplyAcrossFieldsAndPhrases",
@@ -54,10 +54,11 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-preservation.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
       "newChecks": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SearchSyntaxRetrievalTest.java#x7PlainSearchEqualsHistoricalSimpleAndRawLuceneStillWorks"
-      ]
+      ],
+      "repaired": false
     },
     {
       "items": [
@@ -75,7 +76,7 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-head.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#x5AdvancedSearchOverridesSemanticPipelineAndKeepsExplicitFilters",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#x6SearchRejectsInvalidSyntaxBeforeWorkerSearch"
@@ -98,10 +99,31 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-preservation.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineClassificationDispatchTest.java#x7PlainSearchKeepsSimpleDispatchAndExpansionEligibility"
-      ]
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/FacetQuerySyntaxCouplingTest.java"
+      ],
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A4/X5: even explicit dense/SPLADE/auto/expansion input at the in-process Worker port resolves to lexical results, matchCount and facets satisfying the advanced phrase, with and without requested facets. This fixture has no model service; model-enabled runtime evidence is separate.",
+          "label": "agent choice"
+        }
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The existing fixed corpus gains metaSource=fixture so the new advanced-query case can distinguish exact metadata restrictions. No existing input query, expected result, count, facet, error, tag or condition changed. All six pre-existing checks execute and pass on baseline and candidate; their custom JUnit display names are retained in gates/test-intent/evidence/wp24a-syntax/worker-before.xml and worker-candidate.xml. The unchanged official selector captures the full class in java.json because method-name ids cannot match those display names."
     },
     {
       "items": [
@@ -119,7 +141,7 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-worker.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/java.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/FacetQuerySyntaxCouplingTest.java#x5SearchSubsetKeepsResultsCountsAndFacetsLexicalOnBothPasses"
       ],
@@ -141,7 +163,7 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-ui.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 explicit submit keeps text and renders the Engine reason under the bar without stale rows",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 automatic 400 stays quiet and schedules no refined request then a correction resumes",
@@ -167,17 +189,16 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-preservation.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 each edit supersedes an older success and an older error body"
-      ]
+      ],
+      "repaired": false
     },
     {
       "items": [
         "modules/ui-web/src/shell-v0/state/searchState.test.ts"
       ],
-      "class": "New",
-      "behaviour": "A0: the existing request-body oracles acquire querySyntax: search on both stages, retaining every existing filter/pipeline/facet expectation.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -188,7 +209,29 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-request.json",
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The two existing plain-query request-body oracles retain their inputs, timers, filter omission, limit, pipeline, excerpts and facet expectations. The wire encoding now explicitly names querySyntax: search. The added syntax discriminator is covered separately by the New entry and its two assertion fail-before checks; this adaptation covers the retained request contract around that discriminator."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/searchState.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A0: the two existing plain-query request constructors explicitly add querySyntax: search to quick and refined requests. Both modified assertions fail before on the absent discriminator and pass on the candidate; the surrounding request contract is retained as described in the Adaptation entry.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "A0: the existing request-body oracles acquire querySyntax: search on both stages, retaining every existing filter/pipeline/facet expectation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) omits filters key when no active filter (quick pass carries the cheap pipeline)",
         "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) buildSearchIntent is the one constructor: identical inputs → identical bodies"
@@ -211,10 +254,11 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-preservation.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 Delegate sends operator characters without a Search syntax claim"
-      ]
+      ],
+      "repaired": false
     },
     {
       "items": [
@@ -232,12 +276,13 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-preservation.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 ask sends operator characters as prompt text",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 structured sends operator characters as prompt text",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 model-only sends operator characters as prompt text"
-      ]
+      ],
+      "repaired": false
     },
     {
       "items": [
@@ -255,7 +300,7 @@ Agent choices under the quoted design delegation, never owner-agreed words. The 
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp24a-ui.json",
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/ui.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 restored quoted Search draft keeps its text and requires the existing review before Search"
       ],

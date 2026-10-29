@@ -1,0 +1,307 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:1af3793845a30070bc6d2de593bd6b41c5f578e91274459212b27363853582fa"
+  },
+  "createdAt": "2026-10-29T01:05:51.393Z",
+  "revision": "f7118134b867dba1cba64aaf69012f93dba5a8e3",
+  "tree": "c304fd542dcdaa533406bb7073c0cced6d0292e4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts\" \"src/shell-v0/state/searchState.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/test-intent-vitest-5-1793235936216.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5178
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 explicit submit keeps text and renders the Engine reason under the bar without stale rows",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d300ab87ff1c6a4357b38d1f8d67b0b41d01c63332e7edc74acfcb333d0da811",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "x6 explicit submit keeps text and renders the Engine reason under the bar without stale rows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 automatic 400 stays quiet and schedules no refined request then a correction resumes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d300ab87ff1c6a4357b38d1f8d67b0b41d01c63332e7edc74acfcb333d0da811",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "x6 automatic 400 stays quiet and schedules no refined request then a correction resumes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x5 withholds prior counts and facets while the new query awaits its Engine classification",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d300ab87ff1c6a4357b38d1f8d67b0b41d01c63332e7edc74acfcb333d0da811",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "x5 withholds prior counts and facets while the new query awaits its Engine classification",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x5 advanced quick results keep counts and facets pending until refinement",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d300ab87ff1c6a4357b38d1f8d67b0b41d01c63332e7edc74acfcb333d0da811",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "x5 advanced quick results keep counts and facets pending until refinement",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x8 legacy URL restoration keeps operator text and uses Search syntax",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d300ab87ff1c6a4357b38d1f8d67b0b41d01c63332e7edc74acfcb333d0da811",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "x8 legacy URL restoration keeps operator text and uses Search syntax",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 each edit supersedes an older success and an older error body",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d300ab87ff1c6a4357b38d1f8d67b0b41d01c63332e7edc74acfcb333d0da811",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "x6 each edit supersedes an older success and an older error body",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) omits filters key when no active filter (quick pass carries the cheap pipeline)",
+      "file": "modules/ui-web/src/shell-v0/state/searchState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8d6a9dcb3d83686e3fee5526569071a7d0c5147bc504f77c81f72dfdbc9bc4e3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchState (slice 463) omits filters key when no active filter (quick pass carries the cheap pipeline)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) buildSearchIntent is the one constructor: identical inputs → identical bodies",
+      "file": "modules/ui-web/src/shell-v0/state/searchState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8d6a9dcb3d83686e3fee5526569071a7d0c5147bc504f77c81f72dfdbc9bc4e3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchState (slice 463) buildSearchIntent is the one constructor: identical inputs → identical bodies",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 Delegate sends operator characters without a Search syntax claim",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:aa369c709ec0dd5676cfc52a1cc53f95a66bd7fecb2a7e55d31c6ed9eba86e6f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X8 Delegate sends operator characters without a Search syntax claim",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 ask sends operator characters as prompt text",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7cce363175cefd3b3d1a97fd2d13084d44c1e1774bf75d6e9bf1ef9b79efde64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X8 ask sends operator characters as prompt text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 structured sends operator characters as prompt text",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7cce363175cefd3b3d1a97fd2d13084d44c1e1774bf75d6e9bf1ef9b79efde64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X8 structured sends operator characters as prompt text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 model-only sends operator characters as prompt text",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7cce363175cefd3b3d1a97fd2d13084d44c1e1774bf75d6e9bf1ef9b79efde64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X8 model-only sends operator characters as prompt text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 restored quoted Search draft keeps its text and requires the existing review before Search",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:aa369c709ec0dd5676cfc52a1cc53f95a66bd7fecb2a7e55d31c6ed9eba86e6f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X8 restored quoted Search draft keeps its text and requires the existing review before Search",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e2a17382308201413adb2c8641cd1e9344f7e226",
+    "revision": "e2a17382308201413adb2c8641cd1e9344f7e226",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts\" \"src/shell-v0/state/searchState.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/test-intent-vitest-5-1793235945220.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5556,
+        "output": "JSON report written to /home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/test-intent-vitest-5-1793235945220.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 explicit submit keeps text and renders the Engine reason under the bar without stale rows",
+        "classification": "assertion",
+        "detail": "x6 explicit submit keeps text and renders the Engine reason under the bar without stale rows:  AssertionError: expected undefined to be 'Close the quoted phrase with a matchi…' // Object.is equality\n    at /home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/ui-before-root/test-intent-before-OGR05R/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts:68:91\n    at file:///home/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 automatic 400 stays quiet and schedules no refined request then a correction resumes",
+        "classification": "assertion",
+        "detail": "x6 automatic 400 stays quiet and schedules no refined request then a correction resumes:  AssertionError: expected 'Check the search syntax. Review the q…' to be null\n    at /home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/ui-before-root/test-intent-before-OGR05R/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts:84:34\n    at file:///home/elias/.cache/am/h5vuku1c/tm"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x5 withholds prior counts and facets while the new query awaits its Engine classification",
+        "classification": "assertion",
+        "detail": "x5 withholds prior counts and facets while the new query awaits its Engine classification:  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/ui-before-root/test-intent-before-OGR05R/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts:102:42\n    at file:///home/elias/.cache/am/h5vuku1c/tmp/wp24a-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x5 advanced quick results keep counts and facets pending until refinement",
+        "classification": "assertion",
+        "detail": "x5 advanced quick results keep counts and facets pending until refinement:  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/ui-before-root/test-intent-before-OGR05R/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts:144:42\n    at file:///home/elias/.cache/am/h5vuku1c/tmp/wp24a-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x8 legacy URL restoration keeps operator text and uses Search syntax",
+        "classification": "assertion",
+        "detail": "x8 legacy URL restoration keeps operator text and uses Search syntax:  AssertionError: expected { …(4) } to match object { …(2) }\n(12 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/ui-before-root/test-intent-before-OGR05R/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts#x6 each edit supersedes an older success and an older error body",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) omits filters key when no active filter (quick pass carries the cheap pipeline)",
+        "classification": "assertion",
+        "detail": "searchState (slice 463) omits filters key when no active filter (quick pass carries the cheap pipeline):  AssertionError: expected { query: 'test', limit: 50, …(2) } to deeply equal { query: 'test', …(4) }\n    at /home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/ui-before-root/test-intent-before-OGR05R/modules/ui-web/src/shell-v0/state/searchState.test.ts:90:18\n    at file:///home/elias/.cache/am/h5vuku"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/searchState.test.ts#searchState (slice 463) buildSearchIntent is the one constructor: identical inputs → identical bodies",
+        "classification": "assertion",
+        "detail": "searchState (slice 463) buildSearchIntent is the one constructor: identical inputs → identical bodies:  AssertionError: expected { query: 'q', limit: 50, …(2) } to deeply equal { query: 'q', …(4) }\n    at /home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/ui-before-root/test-intent-before-OGR05R/modules/ui-web/src/shell-v0/state/searchState.test.ts:298:49\n    at file:///home/elias/.cache/am/h5vuku1c/tm"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 Delegate sends operator characters without a Search syntax claim",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 ask sends operator characters as prompt text",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 structured sends operator characters as prompt text",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts#X8 model-only sends operator characters as prompt text",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#X8 restored quoted Search draft keeps its text and requires the existing review before Search",
+        "classification": "assertion",
+        "detail": "X8 restored quoted Search draft keeps its text and requires the existing review before Search:  AssertionError: expected { …(4) } to match object { …(2) }\n(5 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/h5vuku1c/tmp/wp24a-evidence/ui-before-root/test-intent-before-OGR05R/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at"
+      }
+    ]
+  },
+  "digest": "sha256:f2da163e7b863d39c93ca23f4453c9b9ce81713d92c6359fa25ed5faad28f7b8"
+}
