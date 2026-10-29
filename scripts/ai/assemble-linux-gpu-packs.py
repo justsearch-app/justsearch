@@ -29,7 +29,7 @@ import zipfile
 SYSTEM_LIBS = re.compile(r"^(?:ld-linux-x86-64\.so\.2|lib(?:c|m|dl|rt|pthread|resolv|util)\.so\.[0-9]+|libstdc\+\+\.so\.6|libgcc_s\.so\.1|libcuda\.so\.1|libnvidia-[\w-]+\.so\.[\d.]+)$")
 ORT_NAMES = ("libonnxruntime.so", "libonnxruntime4j_jni.so", "libonnxruntime_providers_shared.so", "libonnxruntime_providers_cuda.so")
 CUDA_NAMES = ("libcudart.so.12", "libcublas.so.12", "libcublasLt.so.12", "libcufft.so.11",
-              "libnvJitLink.so.12")
+              "libnvJitLink.so.12", "libcurand.so.10", "libcusparse.so.12", "libcusolver.so.11", "libz.so.1")
 CUDNN_NAMES = tuple("libcudnn" + suffix + ".so.9" for suffix in
                     ("", "_graph", "_heuristic", "_ops", "_cnn", "_adv", "_engines_runtime_compiled", "_engines_precompiled"))
 
@@ -75,22 +75,30 @@ def copy_elf(source, dest, patchelf, identities=None, only_names=None):
         # ggml discovers backends by their unversioned dlopen name.
         if path.name.startswith("libggml-") and ".so" in path.name:
             names.add(path.name.split(".so", 1)[0] + ".so")
-        for name in names:
+        identity = digest(path)
+        patched = None
+        for name in sorted(names):
             if Path(name).name != name:
                 raise ValueError(f"Unsafe SONAME: {name}")
+            if name.startswith(("libcuda.so", "libnvidia-")):
+                raise ValueError(f"Driver libraries must come from the OS, never the pack: {name}")
             target = dest / name
-            identity = digest(path)
             if target.exists():
                 if identities.get(name) != identity:
                     raise ValueError(f"Conflicting SONAME input: {name}")
                 continue
             identities[name] = identity
-            shutil.copyfile(path, target)
-            target.chmod(0o755)
-            run(patchelf, "--set-rpath", "$ORIGIN", str(target))
+            if patched is None:
+                # Write the patched payload once, directly to its destination. Never patch a
+                # hardlink to the immutable input and never stage a second full copy in /tmp.
+                run(patchelf, "--output", str(target), "--set-rpath", "$ORIGIN", str(path))
+                target.chmod(0o755)
+                patched = target
+            else:
+                target.hardlink_to(patched)
 
 
-def audit(directory, glibc_floor=(2, 39)):
+def audit(directory, glibc_floor=(2, 39), driver_stub=None):
     """Reject globally supplied CUDA libraries, even if this host's ldd finds them.
 
     DT_NEEDED must resolve inside the flattened pack or to an explicit OS/driver
@@ -102,7 +110,20 @@ def audit(directory, glibc_floor=(2, 39)):
     env = {key: value for key, value in os.environ.items()
            if not key.startswith("LD_") and key not in ("LIBRARY_PATH", "CUDA_PATH", "CUDA_HOME")}
     env["LC_ALL"] = "C"
-    env["LD_LIBRARY_PATH"] = str(directory)
+    library_path = str(directory)
+    stub = None
+    if driver_stub is not None:
+        # Hosted runners have no NVIDIA driver. Substitute only its link-time ABI;
+        # CUDA/cuDNN still must resolve from the pack. This directory is never archived.
+        dynamic = run("readelf", "-d", str(driver_stub))
+        if not re.search(r"\(SONAME\).*\[libcuda\.so\.1\]", dynamic):
+            raise ValueError("Driver audit stub must have SONAME libcuda.so.1")
+        stub_dir = directory / "driver-audit-only"
+        stub_dir.mkdir()
+        stub = stub_dir / "libcuda.so.1"
+        stub.symlink_to(driver_stub.resolve())
+        library_path += os.pathsep + str(stub_dir)
+    env["LD_LIBRARY_PATH"] = library_path
     checked = []
     for path in sorted(directory.iterdir()):
         if not path.is_file() or not elf(path):
@@ -125,6 +146,8 @@ def audit(directory, glibc_floor=(2, 39)):
         for name, location in re.findall(r"^\s*(\S+)\s+=>\s+(\S+)", output, re.M):
             resolved = Path(location).resolve()
             if resolved.parent != directory:
+                if stub is not None and name == "libcuda.so.1" and resolved == stub.resolve():
+                    continue
                 if not SYSTEM_LIBS.fullmatch(name) or not str(resolved).startswith(("/usr/lib/", "/lib/", "/lib64/", "/usr/lib64/")):
                     raise ValueError(f"ldd escaped pack: {path.name}: {name} => {location}")
         # Locate the system loader from ldd, without consulting /etc/ld.so.conf.d.
@@ -132,7 +155,7 @@ def audit(directory, glibc_floor=(2, 39)):
                        if Path(p).is_file()), None)
         if loader is None:
             raise ValueError("No x86_64 system loader")
-        run(loader, "--inhibit-cache", "--library-path", str(directory), "--list", str(path), env=env)
+        run(loader, "--inhibit-cache", "--library-path", library_path, "--list", str(path), env=env)
         checked.append(path.name)
     if not checked:
         raise ValueError("No ELF files to audit")
@@ -176,8 +199,8 @@ def assemble(args):
                 combined.mkdir(exist_ok=True)
                 if target.exists() and digest(target) != digest(path):
                     raise ValueError(f"Conflicting native filename: {path.name}")
-                shutil.copyfile(path, target)
-                target.chmod(0o755)
+                if not target.exists():
+                    target.hardlink_to(path)
         for name in ORT_NAMES:
             if not (args.ort_dir / name).is_file():
                 raise ValueError(f"Missing ORT 1.24.3 audit input: {name}")
@@ -186,7 +209,7 @@ def assemble(args):
             for path in combined.iterdir():
                 if re.search(r"\(NEEDED\).*\[lib(?:cudart|cublas|cublasLt)\.so\.13\]", run("readelf", "-d", str(path))):
                     raise ValueError(f"Release input uses CUDA 13: {path.name}")
-        checked = audit(combined, None if args.test_only else (2, 39))
+        checked = audit(combined, None if args.test_only else (2, 39), args.driver_stub)
         # Query the exact copied runtime, never a host toolkit directory. This API does not
         # initialize a device. A subprocess keeps the assembler free of native-library state.
         cuda_version = int(run(sys.executable, "-c",
@@ -198,12 +221,23 @@ def assemble(args):
         # llama dlopens its adjacent backends. Every ELF's RUNPATH is $ORIGIN;
         # dependencies ZIP extracts into this same directory (as on Windows).
         (llama / "runtime-version.txt").write_text("b8571\n")
-        (cuda / "linux-gpu-pack.json").write_text(json.dumps({
+        inputs = json.loads(args.input_manifest.read_text()) if args.input_manifest else None
+        if not args.test_only and not inputs:
+            raise ValueError("Release packs require --input-manifest with pinned input provenance")
+        if inputs:
+            for item in inputs["inputs"]:
+                if not re.fullmatch(r"[0-9a-f]{64}", item.get("sha256", "")) or not item.get("url", "").startswith("https://"):
+                    raise ValueError("Every input requires an HTTPS source URL and SHA-256")
+        metadata = json.dumps({
             "testOnly": args.test_only, "llamaVersion": "b8571", "ortVersion": "1.24.3",
             "cudaRuntimeVersion": cuda_version, "cudnn": "9", "minimumNvidiaDriver": "570",
             "maximumGlibc": None if args.test_only else "2.39", "auditedElfFiles": checked,
-        }, indent=2) + "\n")
-        shutil.copytree(args.notices, llama / "notices", symlinks=False)
+            "provenance": inputs,
+            "driverAudit": "linker stub (OS driver ABI only)" if args.driver_stub else "host driver",
+        }, indent=2) + "\n"
+        for directory in (llama, cuda):
+            (directory / "linux-gpu-pack.json").write_text(metadata)
+            shutil.copytree(args.notices, directory / "notices", symlinks=False)
         prefix = "TEST-ONLY-" if args.test_only else ""
         names = ((llama, "llama-b8571-linux-cuda12-x86_64.zip"),
                  (cuda, "ort-cuda12-cudnn9-linux-x86_64.zip"))
@@ -217,6 +251,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     for name in ("llama-dir", "cuda-dir", "cudnn-dir", "ort-dir", "notices", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--driver-stub", type=Path, help="CUDA lib/stubs/libcuda.so for driverless build runners; never packaged")
+    parser.add_argument("--input-manifest", type=Path, help="Verified build inputs (source URLs and SHA-256)")
     parser.add_argument("--patchelf", default="patchelf")
     parser.add_argument("--test-only", action="store_true")
     args = parser.parse_args()

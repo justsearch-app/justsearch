@@ -73,23 +73,42 @@ is `JUSTSEARCH_SERVER_EXE`; `JUSTSEARCH_GPU_LAYERS=99` sets the layer count. The
 server; the app still needs valid model/runtime settings and activation. `justsearch.server.exe`
 overrides executable discovery in `InferenceConfig`. See `docs/explanation/13-ai-setup-and-verification.md` section 3.3 for how variant selection works.
 
-## Linux GPU pack assembly and the later release workflow
+## Linux GPU pack build and assembly
 
 The app supports Linux runtime packs, but none are registered in the shipped registry yet.
-The later workflow should build llama.cpp **b8571 against CUDA 12 on ubuntu-24.04**, supply
-CUDA **12.8+**, cuDNN **9**, and the four Linux x64 native libraries extracted from the pinned
-ORT **1.24.3 GPU JAR**, then call:
+The pinned producer builds llama.cpp **b8571 against CUDA 12.8.1**, with cuDNN **9.8.0**
+and ORT **1.24.3**, on **Ubuntu 24.04** (glibc ceiling 2.39). It does not need a GPU.
+The source URLs, versions and SHA-256 values live in
+[`linux-gpu-inputs.v1.json`](../../scripts/ai/linux-gpu-inputs.v1.json); NVIDIA inputs come only
+from NVIDIA's official redistrib channel. A hash-pinned Ubuntu zlib runtime and its license
+are also bundled because cuDNN links to `libz.so.1`. On an Ubuntu 24.04 machine with Python 3.12,
+GCC/G++ 13, CMake, Ninja, binutils and patchelf already available:
+
+```bash
+python3 scripts/ai/build-linux-gpu-packs.py --work /scratch/linux-gpu-build \
+  --output /scratch/linux-gpu-output --jobs 2
+```
+
+This is the same command used by **Build Linux GPU Packs** (`build-linux-gpu-packs.yml`).
+Reuse the work folder after a failed build: every downloaded archive is checked again;
+completed extraction and compilation are reused. Keep each checkout's work folder private.
+The output folder must not contain previous ZIPs. `build-io.txt` records kernel block IO,
+including waited-for subprocesses, for the local SSD budget. No host package installation
+or publishing occurs in this script.
+
+To assemble pre-existing inputs directly:
 
 ```bash
 python3 scripts/ai/assemble-linux-gpu-packs.py \
   --llama-dir /inputs/llama/bin --cuda-dir /inputs/cuda/lib \
   --cudnn-dir /inputs/cudnn/lib --ort-dir /inputs/ort-linux-x64 \
-  --notices /inputs/licenses --output /output/linux-gpu
+  --notices /inputs/licenses --input-manifest /inputs/verified-inputs.json \
+  --output /output/linux-gpu
 ```
 
 Inputs must include their redistribution notices. Required tools are Python 3, `patchelf`,
 `readelf`, and `ldd`; tests also use `gcc`. `--patchelf /path/to/patchelf` selects an existing
-local tool. The later pack workflow installs `patchelf` on its Ubuntu runner with
+local tool. The pack workflow installs `patchelf` on its Ubuntu runner with
 `sudo apt-get update && sudo apt-get install -y patchelf`. For local assembler tests without
 a host installation, install the PyPI wheel into a fresh scratch directory and expose its
 executable only to the test command:
@@ -100,23 +119,38 @@ PATH="$TMPDIR/patchelf-wheel/bin:$PATH" \
   python3 -m unittest discover -s scripts/ai -p 'test_assemble_linux_gpu_packs.py'
 ```
 
-The assembler copies inputs, materializes SONAMEs and ggml backend aliases as
+The assembler writes each patched input once, hardlinks its audit view and aliases, and streams
+ZIP creation. It materializes SONAMEs and ggml backend aliases as
 regular ZIP entries, rewrites RUNPATH to `$ORIGIN`, and audits the combined dependency closure
-with `readelf`, `ldd`, and the loader with its cache disabled. It rejects dependencies outside
+with `readelf`, `ldd`, and the loader with its cache disabled. Driverless build runners
+use the pinned CUDA linker's `libcuda.so.1` stub only for that OS driver ABI during auditing;
+the stub is never packaged. Actual driver/GPU execution is a separate host check. It rejects dependencies outside
 the pack except the explicit OS/driver ABI allowlist, CUDA 13 release inputs, and GLIBC symbols
 above **2.39**. Both ZIPs extract into the same `cuda12` directory. ORT natives are audit inputs;
 the Engine's GPU ORT JAR continues to supply ORT itself.
 
-After publishing the two ZIPs, use their actual URLs, `sizeBytes`, and `sha256` from
-`registry-artifacts.json` in a new package in
-`modules/configuration/src/main/resources/ai/model-registry.v2.json`. Use a distinct
-`id: cuda-runtime-linux`, `replaces: cuda-runtime`, `nativeTarget: linux-x86_64`, `tier: runtime`,
-`requiresCuda: true`, `necessity: infrastructure`, `minVramBytes: 0`,
-`installRoot: native-bin/llama-server/variants`, `targetDir: cuda12`, `variants: []`, and two
-`supportingFiles` entries with `extract: true`. Retain NVIDIA terms and license metadata.
-The loader rewrites dependencies to that target's package ID before planning; Windows keeps
-its existing runtime package and plan. Linux hardware selection requires driver major **570+**.
-Do not register placeholder assets. The build/publish workflow is a later assignment.
+Each ZIP includes NVIDIA's redistribution notices and `linux-gpu-pack.json`, recording
+every input's URL and SHA-256, compiler versions, CUDA architectures and audit results.
+The workflow uploads both ZIPs, `SHA256SUMS`, `SIZES`, provenance and generated registry
+JSON to a **draft** release of `eliasjustus/justsearch-releases`. The owner publishes the
+exact draft after validation; agents do not promote it automatically. See
+[the release procedure](cut-a-release.md#linux-gpu-pack-procedure).
+
+Generate the registry PR from a run's downloaded output:
+
+```bash
+python3 scripts/ai/update-linux-gpu-registry.py --tag linux-cuda12-1 \
+  --checksums /output/linux-gpu/SHA256SUMS --sizes /output/linux-gpu/SIZES \
+  --output modules/configuration/src/main/resources/ai/model-registry.v2.json
+```
+
+The helper validates both exact filenames, hashes, positive sizes and tag syntax. It preserves
+Windows entries and creates the distinct `cuda-runtime-linux` package with
+`replaces: cuda-runtime` and `nativeTarget: linux-x86_64`. Its final release URLs become
+publicly downloadable only when the draft is published. Do not merge the registry update
+before that publication. The loader rewrites dependencies to the current target's package
+ID before planning; unsupported targets apply no replacements and exclude native packages.
+Linux GPU selection requires NVIDIA driver **570 or newer**.
 
 ## Host-only Install AI check with a registry override
 
@@ -189,7 +223,7 @@ to select an existing tool).
 
 ## Troubleshooting
 
-- **No CUDA devices found:** Verify your NVIDIA driver supports CUDA 12.4+ (`nvidia-smi` shows driver version)
+- **No CUDA devices found:** Verify your NVIDIA driver is 570 or newer on Linux and supports CUDA 12.4+ on Windows (`nvidia-smi` shows driver version)
 - **Windows only — missing DLL errors (exit code 0xC0000135):** The CUDA variant bundles its own runtime DLLs. If they're missing, re-extract or re-download the variant.
 - **Layers show as `CPU_Mapped`:** You're running the CPU variant, not the CUDA variant. Check which exe is being used in the logs.
 - **ORT session creation fails after NVIDIA driver upgrade:** The Engine stores derived optimized graphs in one per-machine store, keyed by model SHA-256, ORT version, execution provider and optimization level. The key does not include the CUDA driver version. If a driver upgrade triggers a loud `createSession` exception, stop the Engine and delete the affected CUDA entry directory (the graph and `entry.json` together), then restart. The default Windows store is `%LOCALAPPDATA%\JustSearch\cache\ort-optimized`; CUDA entries are under `<ortVersion>/cuda-EXTENDED_OPT/<sha256>/`. If configured, use the root from `JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR` / `-Djustsearch.ort.optimized_cache_dir` (YAML `ort.optimized_cache_dir`) instead. See [optimized graph ownership](../explanation/05-ai-architecture.md) for other platforms and the 16 GiB default cap.

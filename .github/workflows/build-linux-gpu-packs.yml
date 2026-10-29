@@ -1,0 +1,67 @@
+name: Build Linux GPU Packs
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: New immutable pack tag, linux-cuda12-<positive integer>
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: linux-gpu-packs
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate tag and one-time cross-repository credential
+        env:
+          PACK_TAG: ${{ inputs.tag }}
+          RELEASE_TOKEN: ${{ secrets.JUSTSEARCH_RELEASES_PACK_TOKEN }}
+        run: |
+          [[ "$PACK_TAG" =~ ^linux-cuda12-[1-9][0-9]*$ ]]
+          test -n "$RELEASE_TOKEN" || { echo 'Configure JUSTSEARCH_RELEASES_PACK_TOKEN (Contents write on eliasjustus/justsearch-releases)'; exit 1; }
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-13 g++-13 cmake ninja-build patchelf binutils
+      - name: Check pack tooling
+        run: python3 -m unittest discover -s scripts/ai -p 'test_*linux_gpu*.py' -v
+      - name: Build pinned inputs and audit glibc and pack closure
+        run: python3 scripts/ai/build-linux-gpu-packs.py --work "$RUNNER_TEMP/linux-gpu" --output dist/linux-gpu --jobs 2
+      - name: Generate reviewable registry from exact output
+        env:
+          PACK_TAG: ${{ inputs.tag }}
+        run: |
+          python3 scripts/ai/update-linux-gpu-registry.py --tag "$PACK_TAG" \
+            --checksums dist/linux-gpu/SHA256SUMS --sizes dist/linux-gpu/SIZES \
+            --output dist/linux-gpu/model-registry.v2.json
+      - name: Retain candidate and IO evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-gpu-packs-${{ github.run_id }}
+          path: |
+            dist/linux-gpu/
+            ${{ runner.temp }}/linux-gpu/build-io.txt
+          if-no-files-found: warn
+      - name: Create draft in payload repository (never publish)
+        env:
+          GH_TOKEN: ${{ secrets.JUSTSEARCH_RELEASES_PACK_TOKEN }}
+          PACK_TAG: ${{ inputs.tag }}
+        run: |
+          # New tag only; no overwrites or edits to existing public or draft assets.
+          # gh release create fails if this tag already has a release.
+          gh release create "$PACK_TAG" dist/linux-gpu/*.zip \
+            dist/linux-gpu/SHA256SUMS dist/linux-gpu/SIZES \
+            dist/linux-gpu/registry-artifacts.json dist/linux-gpu/verified-inputs.json \
+            dist/linux-gpu/model-registry.v2.json \
+            --repo eliasjustus/justsearch-releases --draft --latest=false \
+            --title "Linux CUDA12 packs $PACK_TAG" \
+            --notes "Pinned llama.cpp b8571, CUDA 12.8.1 and cuDNN 9.8.0; Ubuntu 24.04, driver 570+. Build: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID . Owner: validate this exact draft before publishing. Registry JSON is a PR input, not an automatic registry change."

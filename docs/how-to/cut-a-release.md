@@ -342,3 +342,38 @@ each release's convergence tempdoc + its GitHub Release):
 - MCPB bundle + registry: `packaging/mcpb/README.md`
 - Owner funnel: `docs/m1-operator-checklist.md`
 - Workflow: `.github/workflows/build-installer.yml`
+
+## Linux GPU pack procedure
+
+Linux GPU packs are produced once per pin bump by
+[Build Linux GPU Packs](../../.github/workflows/build-linux-gpu-packs.yml), dispatched on
+`main` with a new immutable tag such as `linux-cuda12-1`. The workflow builds on Ubuntu
+24.04, verifies every input's SHA-256 before using it, audits the glibc 2.39 ceiling and
+pack dependency closure, and creates a **draft** in `eliasjustus/justsearch-releases`.
+It never publishes or replaces an existing release. CUDA 12.8.1 and cuDNN 9.8.0 archives
+come from NVIDIA's official redistrib channel with redistribution notices in both packs.
+The pack manifest records input sources and hashes; `verified-inputs.json` also records
+compiler versions and build configuration. Ordinary application releases reuse these
+immutable packs; there is no per-release rebuild or owner preparation step.
+
+One-time owner setting: create repository Actions secret **`JUSTSEARCH_RELEASES_PACK_TOKEN`**
+in the source repository. Its value is a fine-grained personal access token restricted to
+**`eliasjustus/justsearch-releases`**, with **Contents: read and write** (and the mandatory
+Metadata read permission). The source repository's ordinary `GITHUB_TOKEN` cannot write to
+that other repository. Do not give the token access to other repositories or workflows.
+The workflow itself retains only `contents: read`; the credential is exposed only to the
+presence check and the final draft-upload step. No token is created by the build script.
+
+Download and validate those exact draft ZIPs through the
+[private Linux Install AI journey](test-gpu-locally.md#host-only-install-ai-check-with-a-registry-override),
+using a private registry pointing at the release-quality ZIPs (without `--test-only`). Require
+chat answers with sources and process maps showing CUDA/cuDNN libraries inside the installed
+pack, with OS driver libraries supplied by the host. Record sizes and hashes. Publish the
+draft only after the owner's final validation. Nothing is public while it is a draft.
+
+Use the workflow's generated `model-registry.v2.json`, or run
+`update-linux-gpu-registry.py` with that run's `SHA256SUMS` and `SIZES`, to prepare a registry
+PR. Inspect the two Linux URLs, sizes and SHA-256 values and preserve Windows packages.
+Merge the PR after the owner publishes the pack draft. No placeholder assets belong in the
+registry. The workflow is advisory in the workflow signal policy; its failure prevents that
+pack candidate's draft upload, without creating a general application release gate.
