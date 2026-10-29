@@ -61,7 +61,9 @@ public final class NativePolicyReplay {
   private record RootOmission(WatcherReconciliationFile file,
       RootIdentity identity) {}
 
-  private record Omission(List<SwitchBufferOp> journal, SwitchBufferOp op, Map<String, String> row) {
+  /** {@code owner} is the current binding whose policy omits the source. */
+  private record Omission(List<SwitchBufferOp> journal, SwitchBufferOp op, Map<String, String> row,
+      ResolvedConfig.FileSource owner) {
     Omission {
       journal = List.copyOf(journal);
       row = Collections.unmodifiableMap(new LinkedHashMap<>(row));
@@ -213,6 +215,20 @@ public final class NativePolicyReplay {
     return uiOmission && current() && owns(directory, root, collection) && rootScopeCurrent(directory, root)
         && protectedPaths.stream().noneMatch(protectedPath -> protectedPath.startsWith(directory.toAbsolutePath().normalize()))
         && excludedByAnyRoot(directory, root, true);
+  }
+
+  /**
+   * Whether a current owner of the source excludes it: the binding its receipt records or, when a
+   * root declared since owns the source instead, that root.
+   */
+  public boolean excludesUnderCurrentOwner(Path path, Path root, String collection) {
+    return excludingOwner(path, root, collection) != null;
+  }
+
+  private ResolvedConfig.FileSource excludingOwner(Path path, Path root, String collection) {
+    if (root != null && excludes(path, root, collection)) return new ResolvedConfig.FileSource(root, collection);
+    return roots.stream().filter(value -> excludes(path, value.path(), value.collection()))
+        .findFirst().orElse(null);
   }
 
   /** Ordinary current eligibility; no fail-open global exclusion cache supplies this proof. */
@@ -419,12 +435,13 @@ public final class NativePolicyReplay {
     final SwitchBufferUpsert file;
     try { file = SwitchBufferUpsert.decode(op.payload()); }
     catch (RuntimeException invalid) { return false; }
-    if (!excludes(Path.of(file.path()), file.ingestionRoot(), file.collection())) return false;
+    var excluding = excludingOwner(Path.of(file.path()), file.ingestionRoot(), file.collection());
+    if (excluding == null) return false;
     final Map<String, String> row;
     try { row = queue.watcherReconciliationRow(file.path()); }
     catch (RuntimeException unknown) { return false; }
     if (row == null) return false;
-    var proof = new Omission(frozen, op, row);
+    var proof = new Omission(frozen, op, row, excluding);
     if (!prove(proof)) return false;
     omissions.put(op, proof);
     return true;
@@ -432,10 +449,11 @@ public final class NativePolicyReplay {
 
   private boolean prove(Omission proof) {
     var file = SwitchBufferUpsert.decode(proof.op().payload());
-    if (!excludes(Path.of(file.path()), file.ingestionRoot(), file.collection())) return false;
+    var excluding = proof.owner();
+    if (!excludes(Path.of(file.path()), excluding.path(), excluding.collection())) return false;
     java.util.function.BooleanSupplier absence = () -> {
       try (var ignored = finalOwnership == null ? prepareOwnership(java.util.Set.of(file.path())) : null) {
-        return current() && excludes(Path.of(file.path()), file.ingestionRoot(), file.collection())
+        return current() && excludes(Path.of(file.path()), excluding.path(), excluding.collection())
             && ordinaryIndexOwner(Path.of(file.path()))
             && targetAbsent(file.path())
             && queue.tryMatchesNativePolicySkippedAdmission(candidate,
@@ -443,8 +461,8 @@ public final class NativePolicyReplay {
       } catch (IOException | RuntimeException unknown) { return false; }
     };
     return current() && (committedBoot
-        ? publisher.tryCommittedBootNativePolicyOmission(file.ingestionRoot(), absence)
-        : publisher.tryNativePolicyFileProof(file.ingestionRoot(), file.collection(), absence));
+        ? publisher.tryCommittedBootNativePolicyOmission(excluding.path(), absence)
+        : publisher.tryNativePolicyFileProof(excluding.path(), excluding.collection(), absence));
   }
 
   /** A root receipt may own an encoded predecessor; it is never an ordinary native unit. */

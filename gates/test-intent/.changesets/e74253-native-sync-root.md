@@ -12,25 +12,39 @@ evidence: `gates/test-intent/evidence/e74253-native-sync-root.json` records the 
 S5 and S8 against an uninterrupted migration followed by an ordinary restart, S5b and S8 also with a
 PROMOTED crash and once the root or permissions return; S2 with its unit supersession check;
 S4a/S4b/S4c; S6; S7a with the delete-after-sync S7b order; P6 and P7), the F1 checks (a DELETE a
-later sync restores, beside a projection, in the S7 restart and in the mixed unit settlement) and
-the all-or-nothing acknowledgement checks (partialAcknowledgementLeavesEverySelectedReceiptForTheRetry
-and partialMixedAcknowledgementLeavesEverySelectedReceiptForTheRetry, and their file-receipt-only
-variants partialFileAcknowledgementLeavesEverySelectedReceiptForTheRetry and
-partialMixedFileAcknowledgementLeavesEverySelectedReceiptForTheRetry) failing before and passing
+later sync restores, beside a projection, in the S7 restart and in the mixed unit settlement), the
+SYNC_ROOT retry checks partialAcknowledgementLeavesEverySelectedReceiptForTheRetry and
+partialMixedAcknowledgementLeavesEverySelectedReceiptForTheRetry, the all-or-nothing
+acknowledgement checks partialFileAcknowledgementLeavesEverySelectedReceiptForTheRetry and
+partialMixedFileAcknowledgementLeavesEverySelectedReceiptForTheRetry, failing before and passing
 after, and the S2 policy control allowedSourceUnderALaterRootSyncSettlesWithoutCertification. On
-the before state the SYNC_ROOT checks fail at their retry, because origin/main refuses a SYNC_ROOT
-before it acknowledges anything; the two variants hold no SYNC_ROOT, so origin/main settles them
-and its count-checked removal loses the receipt it did remove (the "stays too" assertion). The
+the before state the two SYNC_ROOT retry checks fail only at their retry, because origin/main
+refuses a SYNC_ROOT before it acknowledges anything: their before run shows that a retained
+SYNC_ROOT now settles on retry, not that removal is atomic. The atomicity claim rests on the two
+file-receipt-only checks: they hold no SYNC_ROOT, so origin/main settles them and its
+count-checked removal loses the receipt it did remove (the "stays too" assertion). The
 exclusion check ExcludedReceiptUnderRootSyncTest#excludedSourceUnderALaterRootSyncNeedsTheFinalOwner
 has its own evidence, `gates/test-intent/evidence/e74253-native-sync-root-policy.json`, before
 78042b4117: there the file-only route settled an excluded receipt a later SYNC_ROOT covers without
 the final committed-acknowledgement owner (the "missing final owner" assertion); the mixed route
-already refused it and passes on both. Since the merge of origin/main (#998, Forget), the before
+already refused it and passes on both. A current owner judges a receipt, not the binding it
+records: `gates/test-intent/evidence/e74253-native-sync-root-owner.json`, before 9872655430, records
+sourceANewerNestedRootExcludesNeedsTheFinalOwner and
+sourceANewerNestedRootExcludesSettlesWithTheFinalOwner, where a nested root declared after B
+committed owns and excludes a skipped source whose receipt names the parent. There, with a later
+SYNC_ROOT, both routes acknowledged it without the final owner (the "missing final owner" assertion,
+and no final-owner decision); without one, the receipt was never certified and the boot refused for
+good (the "certified against its current owner" and "does not stall" assertions), as on origin/main.
+The main evidence also records the controls sourceWithNoCurrentOwnerSettlesWithoutCertification
+(S5c, the root undeclared while stopped) and heldSourceExcludedSinceBCommittedKeepsItsExactWitness
+(B holds a source excluded since it committed), which fail on origin/main only because it refuses
+the SYNC_ROOT. Since the merge of origin/main (#998, Forget), the before
 state is origin/main b744db8744 with the volume seam overlaid: 9e492f703f lacks the
 KnowledgeServer policy constructor the merged S5 child uses. S5 also holds a forgotten (FILE
 literal) and an excluded (glob) file under the retained SYNC_ROOT's root, with the Engine's
-native policy owner composed; the recovered boot must publish and neither index nor requeue them. The S4c and both all-or-nothing checks also fail
-on 2d80a943ea with only the two test classes applied (a builder run, not recorded by the script):
+native policy owner composed; the recovered boot must publish and neither index nor requeue them. The S4c check and the two SYNC_ROOT retry checks also
+fail on 2d80a943ea with only the two test classes applied (a builder run, not recorded by the
+script, so no claim here rests on it):
 the restored file is missing from search after boot, and a refused DELETE removal leaves the DELETE
 without the SYNC_ROOT that supersedes it. The F1 control
 mixedSnapshotStillRefusesADeleteNoLaterRootSyncCovers is not recorded: it refuses on both sides.

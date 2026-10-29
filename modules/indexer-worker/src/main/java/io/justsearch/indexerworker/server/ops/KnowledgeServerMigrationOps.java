@@ -848,8 +848,8 @@ public final class KnowledgeServerMigrationOps {
    * acknowledges the selected receipts together or not at all.
    * A SYNC_ROOT was replayed onto B before its pointer moved: its exact receipt is validated and
    * acknowledged with the others in accepted order, never walked again. On either path, a file
-   * receipt a later SYNC_ROOT covers is checked as a receipt only, unless the exclusion policy
-   * excludes its source: that receipt is certified as an uncovered one is.
+   * receipt a later SYNC_ROOT covers is checked as a receipt only, unless a current owner's
+   * exclusion policy excludes its source: that receipt is certified as an uncovered one is.
    */
   public static boolean settleCommittedNativeFileWitnesses(
       JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log) {
@@ -1220,13 +1220,14 @@ public final class KnowledgeServerMigrationOps {
 
   /**
    * A later root walk skips an excluded source, so only the policy's omission proof, confirmed by
-   * the final owner, settles that source's receipt.
+   * the final owner, settles that source's receipt. The current owner judges, not the binding the
+   * receipt records: a root declared since B committed may own and exclude the source.
    */
   private static boolean policyExcludes(io.justsearch.indexerworker.services.NativePolicyReplay policy,
       SwitchBufferCapableQueue.SwitchBufferOp op) {
     if (policy == null || !"UPSERT".equals(op.op())) return false;
     var file = SwitchBufferUpsert.decode(op.payload());
-    return policy.excludes(Path.of(file.path()), file.ingestionRoot(), file.collection());
+    return policy.excludesUnderCurrentOwner(Path.of(file.path()), file.ingestionRoot(), file.collection());
   }
 
   /** File receipts whose path a SYNC_ROOT accepted after them walked again before B committed. */

@@ -31,8 +31,10 @@ import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferSyncRoot;
+import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
 import io.justsearch.indexing.SchemaFields;
+import io.justsearch.indexing.api.IndexDocument;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -48,13 +50,14 @@ import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * After a native pointer commit, a file receipt a later SYNC_ROOT covers is checked as a receipt
- * only, unless the exclusion policy excludes its source: that receipt still needs the policy's
+ * only, unless a current owner of its source excludes it: that receipt still needs the policy's
  * omission proof and the committed-boot final owner, as an uncovered receipt does. Runs on the
  * real queue, index, file fence and policy owner, through both committed settlement paths.
  */
@@ -135,6 +138,86 @@ final class ExcludedReceiptUnderRootSyncTest extends LuceneExecutorTestBase {
     assertEquals("PENDING", queue.watcherReconciliationRow(kept.toString()).get("state"));
   }
 
+  /**
+   * The counterexample: B holds no copy of a skipped source whose receipt names the parent root, and
+   * a nested root declared since B committed owns and excludes it. Without a later root sync, the
+   * same receipt took the uncovered path, which refused for good.
+   */
+  @ParameterizedTest(name = "sourceANewerNestedRootExcludesNeedsTheFinalOwner({0}, {1})")
+  @CsvSource({"simple, covered", "mixed, covered", "simple, uncovered", "mixed, uncovered"})
+  void sourceANewerNestedRootExcludesNeedsTheFinalOwner(String route, String coverage) throws Exception {
+    Path file = excludedUnderANewerNestedRoot(route, coverage);
+    var journal = queue.listSwitchBufferOpsStrict();
+    var policy = policy(configuration("[\"private.txt\"]"));
+    assertFalse(policy.excludes(file, root, null), "SETUP: the receipt's own binding no longer owns the source");
+
+    assertFalse(readmit(policy), "SETUP: the excluded source is not readmitted");
+    assertFalse(settle(route, policy), "a missing final owner cannot ACK the nested root's omission");
+    assertTrue(policy.hasOmissions(), "the receipt is certified against its current owner");
+    assertEquals(journal, queue.listSwitchBufferOpsStrict(), "every receipt is kept");
+  }
+
+  @ParameterizedTest(name = "sourceANewerNestedRootExcludesSettlesWithTheFinalOwner({0}, {1})")
+  @CsvSource({"simple, covered", "mixed, covered", "simple, uncovered", "mixed, uncovered"})
+  void sourceANewerNestedRootExcludesSettlesWithTheFinalOwner(String route, String coverage) throws Exception {
+    Path file = excludedUnderANewerNestedRoot(route, coverage);
+    var store = configuration("[\"private.txt\"]");
+    var policy = policy(store);
+    var decisions = new AtomicInteger();
+
+    assertTrue(settleWithFinalOwner(route, store, policy, decisions), "the boot does not stall");
+    assertEquals(1, decisions.get());
+    assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+    assertEquals(0, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()), "the file stays out of search");
+    assertEquals("DONE", queue.watcherReconciliationRow(file.toString()).get("state"), "the file is not requeued");
+  }
+
+  /** S5c: the root was undeclared while stopped, so no current owner excludes the source. */
+  @ParameterizedTest(name = "sourceWithNoCurrentOwnerSettlesWithoutCertification({0})")
+  @ValueSource(strings = {"simple", "mixed"})
+  void sourceWithNoCurrentOwnerSettlesWithoutCertification(String route) throws Exception {
+    open();
+    Path file = Files.writeString(root.resolve("private.txt"), "skipped, then undeclared");
+    skipped(file);
+    if (route.equals("mixed")) seedEmptyProjectionSource();
+    syncRoot();
+    commitPointer();
+    declare(List.of());
+    var policy = policy(configuration("[\"private.txt\"]"));
+
+    assertTrue(settle(route, policy), "no final owner is needed for a source no root owns");
+    assertFalse(policy.hasOmissions());
+    assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+  }
+
+  /** A source B holds, excluded only after B committed, publishes as an ordinary restart does. */
+  @ParameterizedTest(name = "heldSourceExcludedSinceBCommittedKeepsItsExactWitness({0})")
+  @ValueSource(strings = {"simple", "mixed"})
+  void heldSourceExcludedSinceBCommittedKeepsItsExactWitness(String route) throws Exception {
+    open();
+    Path file = Files.writeString(root.resolve("private.txt"), "already committed");
+    assertTrue(queue.enqueueAndBufferFileForGeneration(generation,
+        JobQueue.EnqueueEntry.stat(file, ORIGIN).withinRoot(root), null));
+    var receipt = SwitchBufferUpsert.decode(queue.listSwitchBufferOpsStrict().getFirst().payload());
+    assertTrue(queue.markClaimDone(queue.pollPending(1).getFirst(),
+        IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "INDEXED", IngestionRetryPolicy.NONE), null));
+    runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+        SchemaFields.DOC_ID, file.toString(), SchemaFields.DOC_UID, file + "#0",
+        SchemaFields.PATH, file.toString(), SchemaFields.CONTENT, "already committed",
+        SchemaFields.SOURCE_SHA256, receipt.sourceSha256())));
+    if (route.equals("mixed")) seedEmptyProjectionSource();
+    syncRoot();
+    commitPointer();
+    runtime.commitOps().maybeRefreshBlocking();
+    var policy = policy(configuration("[\"private.txt\"]"));
+    assertTrue(policy.excludes(file, root, null), "SETUP: the policy now excludes the source");
+
+    assertTrue(settle(route, policy), "B's copy is published without a final owner");
+    assertFalse(policy.hasOmissions(), "this source was indexed, not omitted");
+    assertEquals(List.of(), queue.listSwitchBufferOpsStrict());
+    assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()));
+  }
+
   // ---- fixture: a native migration to B with the committed-boot policy owner ----
 
   private void open() throws Exception {
@@ -183,6 +266,30 @@ final class ExcludedReceiptUnderRootSyncTest extends LuceneExecutorTestBase {
     var claim = queue.pollPending(1).getFirst();
     assertEquals(file, claim.path());
     assertTrue(queue.markClaimDone(claim, SKIP, null));
+  }
+
+  /**
+   * A skipped source under {@code root/nested}, its receipt naming {@code root}; after B commits,
+   * {@code nested} is declared as a watched root of its own.
+   */
+  private Path excludedUnderANewerNestedRoot(String route, String coverage) throws Exception {
+    open();
+    Path nested = Files.createDirectory(root.resolve("nested"));
+    Path file = Files.writeString(nested.resolve("private.txt"), "never index");
+    skipped(file);
+    if (route.equals("mixed")) seedEmptyProjectionSource();
+    if (coverage.equals("covered")) syncRoot();
+    commitPointer();
+    declare(List.of(root, nested));
+    return file;
+  }
+
+  /** The watched roots the person declares now, as the committed boot loads them. */
+  private void declare(List<Path> watched) throws Exception {
+    Files.writeString(data.resolve("watched_roots.json"), JsonMapper.builder().build().writeValueAsString(
+        Map.of("schemaVersion", 1, "roots", watched.stream().map(path -> Map.of("path", path.toString())).toList())));
+    rootsOwner = WatchedRootsState.load(data);
+    publisher.useExclusionRoots(rootsOwner::watchedPaths);
   }
 
   /** A complete empty projection source selects the mixed settlement path. */
