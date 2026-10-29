@@ -31,3 +31,14 @@ committed, 118 of 118 residency tests pass three times in a row under `TZ=UTC`.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a186f3-4aeb-7c41-9685-369c313403cb",
+  "verdict": "accept",
+  "digest": "sha256:45221ea7b188ed5fda212d3aabec06220547fd2119bcb6d80d6b84ecea597395",
+  "note": "Codex verifier-1: Adaptation (instrumentation), whole oracle preserved; late-interval before/after and three mutants rejected"
+}
+```
