@@ -54,16 +54,22 @@ export class Sv3Filters extends JfElement {
   }
   override disconnectedCallback(): void { this.unsubscribers.forEach(stop => stop()); super.disconnectedCallback(); }
   resetInputs(): void { this.text = { folder: '', from: '', to: '', minimum: '', maximum: '' }; this.errors = {}; }
+  private displayedText(spec: SearchFilterSpec): Sv3Filters['text'] {
+    return { folder: spec.pathPrefix ?? '',
+      from: spec.modifiedFromMs === undefined || spec.modifiedFromMs === 0 ? '' : localDay(spec.modifiedFromMs),
+      to: spec.modifiedToMs === undefined || spec.modifiedToMs === 0 ? '' : localDay(spec.modifiedToMs),
+      minimum: spec.sizeFromInput?.text ?? (spec.sizeFromBytes === undefined ? '' : String(spec.sizeFromBytes / 1024)),
+      maximum: spec.sizeToInput?.text ?? (spec.sizeToBytes === undefined ? '' : String(spec.sizeToBytes / 1024)) };
+  }
   private receive(spec: SearchFilterSpec): void {
-    const old = this.spec;
+    const old = this.spec, displayed = this.displayedText(spec);
     // Unrelated dimension commits must not erase unfinished text in another control.
-    if (spec.pathPrefix !== old.pathPrefix) this.text = { ...this.text, folder: spec.pathPrefix ?? '' };
+    if (spec.pathPrefix !== old.pathPrefix) this.text = { ...this.text, folder: displayed.folder };
     if (spec.modifiedFromMs !== old.modifiedFromMs || spec.modifiedToMs !== old.modifiedToMs) this.text = { ...this.text,
-      from: spec.modifiedFromMs === undefined || spec.modifiedFromMs === 0 ? '' : localDay(spec.modifiedFromMs), to: spec.modifiedToMs === undefined || spec.modifiedToMs === 0 ? '' : localDay(spec.modifiedToMs) };
+      from: displayed.from, to: displayed.to };
     if (spec.sizeFromBytes !== old.sizeFromBytes || spec.sizeToBytes !== old.sizeToBytes || spec.sizeFromInput !== old.sizeFromInput || spec.sizeToInput !== old.sizeToInput) {
       this.fromUnit = spec.sizeFromInput?.unit ?? 'KB'; this.toUnit = spec.sizeToInput?.unit ?? 'KB';
-      this.text = { ...this.text, minimum: spec.sizeFromInput?.text ?? (spec.sizeFromBytes === undefined ? '' : String(spec.sizeFromBytes / 1024)),
-        maximum: spec.sizeToInput?.text ?? (spec.sizeToBytes === undefined ? '' : String(spec.sizeToBytes / 1024)) };
+      this.text = { ...this.text, minimum: displayed.minimum, maximum: displayed.maximum };
     }
     this.spec = spec; this.active = restrictionLabels(spec).length > 0;
   }
@@ -74,22 +80,42 @@ export class Sv3Filters extends JfElement {
     const field = kind === 'folder' ? 'pathPrefix' : kind === 'date' ? 'modifiedAt' : 'sizeBytes';
     return this.errors[kind] || (this.serverError.includes(field) ? this.serverError : '');
   }
-  private commit(kind: RestrictionKind): void {
-    let next = withoutRestriction(getFilters(), kind), error = '';
+  private commit(kind: RestrictionKind, key: keyof Sv3Filters['text']): void {
+    const current = getFilters(), displayed = this.displayedText(current);
+    const fromChanged = key === 'from' && this.text.from !== displayed.from, toChanged = key === 'to' && this.text.to !== displayed.to;
+    const minimumChanged = key === 'minimum' && (this.text.minimum !== displayed.minimum || this.fromUnit !== (current.sizeFromInput?.unit ?? 'KB'));
+    const maximumChanged = key === 'maximum' && (this.text.maximum !== displayed.maximum || this.toUnit !== (current.sizeToInput?.unit ?? 'KB'));
+    const badDate = [...(this.shadowRoot?.querySelectorAll<HTMLInputElement>('input[type=date]') ?? [])].some(input => input.validity.badInput);
+    // A displayed day or unit value may be less precise than the stored API bound.
+    // Visiting a field, including Enter after a date-picker change, is not an edit.
+    if ((kind === 'folder' && this.text.folder === displayed.folder)
+      || (kind === 'date' && !fromChanged && !toChanged && !badDate)
+      || (kind === 'size' && !minimumChanged && !maximumChanged)) {
+      this.errors = { ...this.errors, [kind]: '' };
+      return;
+    }
+    let next = withoutRestriction(current, kind), error = '';
     if (kind === 'folder' && this.text.folder !== '') {
       if (this.text.folder.includes('\0') || this.text.folder.length > 4096 || !/^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(this.text.folder)) error = message('search.filters.folder-error');
       else next = { ...next, pathPrefix: this.text.folder };
     } else if (kind === 'date') {
-      const from = dateBound(this.text.from, false), to = dateBound(this.text.to, true);
-      if (Number.isNaN(from) || Number.isNaN(to) || [...(this.shadowRoot?.querySelectorAll<HTMLInputElement>('input[type=date]') ?? [])].some(input => input.validity.badInput)) error = message('search.filters.date-error');
+      const draftFrom = dateBound(this.text.from, false), draftTo = dateBound(this.text.to, true);
+      const from = fromChanged ? draftFrom : current.modifiedFromMs;
+      const to = toChanged ? draftTo : current.modifiedToMs;
+      if (Number.isNaN(draftFrom) || Number.isNaN(draftTo) || badDate) error = message('search.filters.date-error');
       else if (from !== undefined && to !== undefined && from > to) error = message('search.filters.date-order');
       else next = { ...next, ...(from === undefined ? {} : { modifiedFromMs: from }), ...(to === undefined ? {} : { modifiedToMs: to }) };
     } else if (kind === 'size') {
-      const from = sizeBound(this.text.minimum, this.fromUnit), to = sizeBound(this.text.maximum, this.toUnit);
-      if (Number.isNaN(from) || Number.isNaN(to)) error = message('search.filters.size-error');
+      const draftFrom = sizeBound(this.text.minimum, this.fromUnit), draftTo = sizeBound(this.text.maximum, this.toUnit);
+      const from = minimumChanged ? draftFrom : current.sizeFromBytes;
+      const to = maximumChanged ? draftTo : current.sizeToBytes;
+      if (Number.isNaN(draftFrom) || Number.isNaN(draftTo)) error = message('search.filters.size-error');
       else if (from !== undefined && to !== undefined && from > to) error = message('search.filters.size-order');
-      else next = { ...next, ...(from === undefined ? {} : { sizeFromBytes: from, sizeFromInput: { text: this.text.minimum, unit: this.fromUnit } }),
-        ...(to === undefined ? {} : { sizeToBytes: to, sizeToInput: { text: this.text.maximum, unit: this.toUnit } }) };
+      else next = { ...next, ...(from === undefined ? {} : { sizeFromBytes: from }), ...(to === undefined ? {} : { sizeToBytes: to }),
+        ...(minimumChanged ? (from === undefined ? {} : { sizeFromInput: { text: this.text.minimum, unit: this.fromUnit } })
+          : current.sizeFromInput ? { sizeFromInput: current.sizeFromInput } : {}),
+        ...(maximumChanged ? (to === undefined ? {} : { sizeToInput: { text: this.text.maximum, unit: this.toUnit } })
+          : current.sizeToInput ? { sizeToInput: current.sizeToInput } : {}) };
     }
     this.errors = { ...this.errors, [kind]: error };
     if (error === '') setFilters(next);
@@ -110,15 +136,15 @@ export class Sv3Filters extends JfElement {
       aria-label=${message(`search.filters.${key}`)}
       aria-invalid=${error ? 'true' : 'false'} aria-describedby=${`${kind}-hint ${kind}-error`}
       @input=${(e: Event) => { this.text = { ...this.text, [key]: (e.target as HTMLInputElement).value }; }}
-      @change=${() => { if (type === 'date') this.commit(kind); }} @blur=${() => this.commit(kind)}
-      @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); this.commit(kind); } }}>`;
+      @change=${() => { if (type === 'date') this.commit(kind, key); }} @blur=${() => this.commit(kind, key)}
+      @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); this.commit(kind, key); } }}>`;
   }
   private unit(end: boolean): TemplateResult {
     return html`<select aria-label=${message(end ? 'search.filters.maximum-unit' : 'search.filters.minimum-unit')}
       .value=${end ? this.toUnit : this.fromUnit} @change=${(e: Event) => {
         if (end) this.toUnit = (e.target as HTMLSelectElement).value as SizeUnit;
         else this.fromUnit = (e.target as HTMLSelectElement).value as SizeUnit;
-        this.commit('size');
+        this.commit('size', end ? 'maximum' : 'minimum');
       }}>${Object.keys(SIZE_UNITS).map(unit => html`<option value=${unit}>${unit}</option>`)}</select>`;
   }
   override render(): TemplateResult {

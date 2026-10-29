@@ -7,7 +7,7 @@ author-session: wp2.3b-builder-20261029
 
 # Test-intent entries
 
-The new cases use the existing mounted production Search harness; existing oracles remain unchanged. The launcher will generate evidence after committing this candidate.
+The new cases use the existing mounted production Search harness; existing oracles remain unchanged. Evidence is generated with the official runner in an isolated shared clone; the repair leaves the candidate uncommitted for the orchestrator.
 
 ```json
 {
@@ -44,6 +44,32 @@ The new cases use the existing mounted production Search harness; existing oracl
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F5 Engine 400 errors appear next to Search and Ask controls with the entered text intact",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F10 pre-admission held Ask owns its Send snapshot before a later authored follow-up",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F8 plugin date commits supersede an identical query before older delayed responses finish"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "WP2.3b repair: merely visiting or pressing Enter in an unchanged field preserves exact API timestamps, byte bounds, folder spelling and input metadata and sends no request. An edited field commits only its own bound at local-day or binary-unit granularity.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Remaining Search UI work in areas 1\u20135, WP2.3 package b.",
+          "choice": "D1, D12, F1, F9 and P1/P2, revision 3 in /home/elias/dev/justsearch/tmp/verify/wp2.3-filters/scenarios-wp2.3.md: only a changed field commits; preserve exact API restrictions in untouched controls and opposite bounds. UI-only repair under the existing design delegation.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp2.3b-unchanged-fields.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'folder' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'from' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'to' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'minimum' preserves exact API restrictions on blur and Enter and an edit commits only that bound",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F1 D12 unchanged 'maximum' preserves exact API restrictions on blur and Enter and an edit commits only that bound"
       ],
       "repaired": true
     },

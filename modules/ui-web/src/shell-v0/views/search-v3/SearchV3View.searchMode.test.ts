@@ -95,6 +95,7 @@ import {
   __resetSearchFiltersForTest,
   getFacetSelections,
   getFilters,
+  setFilters,
   setFilterRange,
   toggleFacetValue,
 } from '../../state/searchFiltersState.js';
@@ -1438,6 +1439,56 @@ it('F4b converts local DST calendar days and rounded binary units and keeps ente
   expect(filters.shadowRoot!.querySelector('[data-filter=size]')!.textContent).toContain('0.0005 MB');
   // The explicit non-UTC precondition makes this portable to UTC-hosted CI.
   expect((getFilters().modifiedToMs! - getFilters().modifiedFromMs! + 1) / 3600000).toBe(23);
+});
+
+it.each([
+  { key: 'folder', edited: '/another folder/', change: { pathPrefix: '/another folder/' } },
+  { key: 'from', edited: '2026-03-28', change: { modifiedFromMs: new Date(2026, 2, 28).getTime() } },
+  { key: 'to', edited: '2026-03-30', change: { modifiedToMs: new Date(2026, 2, 31).getTime() - 1 } },
+  { key: 'minimum', edited: '0.0005', change: { sizeFromBytes: 1, sizeFromInput: { text: '0.0005', unit: 'KB' } } },
+  { key: 'maximum', edited: '3.0005', change: { sizeToBytes: 3073, sizeToInput: { text: '3.0005', unit: 'KB' } } },
+])('F1 D12 unchanged $key preserves exact API restrictions on blur and Enter and an edit commits only that bound', async ({ key, edited, change }) => {
+  vi.stubEnv('TZ', 'Europe/Berlin');
+  aiOnline(); const el = await mount();
+  const { createHostApi } = await import('../../plugin-api/HostApiImpl.js');
+  const api = createHostApi('filter-regression', 'CORE', { apiBase: 'http://127.0.0.1:9999', registerSurfacePort: vi.fn() });
+  setFilters({ pathPrefix: '/inside folder/ ', sizeFromBytes: 1025, sizeToBytes: 2051 });
+  api.search.setFilterRange(new Date(2026, 2, 29, 12, 34, 56, 789).getTime(), new Date(2026, 2, 29, 13, 34, 56, 789).getTime());
+  await searchFor(el, 'needle');
+  const filters = await filtersOf(el);
+  const input = filters.shadowRoot!.querySelector<HTMLInputElement>(`[data-filter-input=${key}]`)!;
+  const original = structuredClone(getFilters()), originalJson = JSON.stringify(original);
+  const searches = backend.searches.length, requests = fetchMock.mock.calls.length;
+  const opposites: Partial<Record<string, [string, string]>> = { from: ['to', '2026-03-30'], to: ['from', '2026-03-28'], minimum: ['maximum', '3'], maximum: ['minimum', '0'] };
+  const opposite = opposites[key];
+  const pending = opposite ? filters.shadowRoot!.querySelector<HTMLInputElement>(`[data-filter-input=${opposite[0]}]`)! : null;
+  const pendingOriginal = pending?.value;
+  if (pending) { pending.value = opposite![1]!; pending.dispatchEvent(new Event('input')); await filters.updateComplete; }
+  for (const action of ['blur', 'Enter']) {
+    input.focus();
+    if (action === 'blur') input.blur();
+    else {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+      input.blur();
+    }
+    await settle(el);
+    expect(JSON.stringify(getFilters()), `${key} ${action} keeps the exact spec including API input metadata`).toBe(originalJson);
+    expect(backend.searches, `${key} ${action} never reruns Search`).toHaveLength(searches);
+    expect(fetchMock, `${key} ${action} sends no request`).toHaveBeenCalledTimes(requests);
+    if (pending) expect(pending.value, 'an unfinished opposite bound stays a draft').toBe(opposite![1]);
+  }
+  if (pending) { pending.value = pendingOriginal!; pending.dispatchEvent(new Event('input')); await filters.updateComplete; }
+  await filterEdit(el, key, edited, 'blur');
+  expect(getFilters()).toEqual({ ...original, ...change });
+  expect(backend.searches).toHaveLength(searches + 1);
+  expect(backend.searches.at(-1)?.filters).toEqual({ pathPrefix: key === 'folder' ? edited : original.pathPrefix,
+    modifiedAt: { fromMs: key === 'from' ? new Date(2026, 2, 28).getTime() : original.modifiedFromMs,
+      toMs: key === 'to' ? new Date(2026, 2, 31).getTime() - 1 : original.modifiedToMs },
+    sizeBytes: { fromBytes: key === 'minimum' ? 1 : original.sizeFromBytes, toBytes: key === 'maximum' ? 3073 : original.sizeToBytes } });
+  // Enter and the subsequent blur after this commit must also be no-ops.
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+  input.dispatchEvent(new Event('blur')); await settle(el);
+  expect(backend.searches).toHaveLength(searches + 1);
 });
 
 it('F5 keeps invalid text beside its error and applies no invalid or incomplete edit', async () => {
