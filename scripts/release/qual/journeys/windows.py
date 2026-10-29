@@ -1406,12 +1406,15 @@ def install_ai(run):
     # treating the earlier failed journey as readiness evidence.
     if run.args.resume and not run.facts.get('resumedSetup'):
         status = run.api('/api/ai/install/status')
+        run.evidence('J3-resume-install-status', status)
         required = {'embedding', 'splade', 'reranker', 'ner', 'citation-scorer'}
         installed = {p.get('packageId') for p in status.get('packages', [])
                      if p.get('state') == 'installed' and not p.get('error')}
-        if (status.get('state') == 'completed' and status.get('phase') in ('done', 'activation_required')
-                and status.get('repairNeeded') is False and not status.get('lastError')
-                and not status.get('errorCode') and required <= installed):
+        acquired = (status.get('installedFully') is True or (
+            status.get('state') == 'completed' and status.get('phase') in ('done', 'activation_required')
+            and required <= installed))
+        if (acquired and status.get('repairNeeded') is False and not status.get('lastError')
+                and not status.get('errorCode')):
             run.facts['resumedSetup'] = True
             run.evidence('J3-cached-acquisition', status)
     run.wd.execute("""

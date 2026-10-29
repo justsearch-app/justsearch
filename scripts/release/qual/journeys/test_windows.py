@@ -18,6 +18,8 @@ class WindowsEvidenceTests(unittest.TestCase):
         complete = {'state': 'completed', 'phase': 'activation_required', 'repairNeeded': False, 'packages': [
             {'packageId': name, 'state': 'installed', 'error': ''} for name in required]}
         cases = [(complete, True), (dict(complete, state='failed'), False),
+                 (dict(complete, state='idle', phase='', installedFully=True), True),
+                 (dict(complete, state='idle', phase='', installedFully='true'), False),
                  (dict(complete, repairNeeded=True), False),
                  (dict(complete, repairNeeded=None), False), (dict(complete, phase='unknown'), False),
                  (dict(complete, lastError='failed'), False), (dict(complete, errorCode='failure'), False),
