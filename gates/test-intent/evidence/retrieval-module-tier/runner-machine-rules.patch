@@ -20,7 +20,7 @@
  import {
    classifyFailBefore,
    gradleTarget,
-@@ -45,63 +45,25 @@
+@@ -45,63 +45,26 @@
    selectJUnitCases,
    selectVitestCases,
    summarize,
@@ -35,6 +35,7 @@
  const IS_WIN = process.platform === 'win32';
  
  function sh(command, cwd) {
++  if (/gradlew/.test(command)) command = `env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ${command} --max-workers=2`;
    const started = Date.now();
 +  console.error(`${new Date().toISOString()}: starting ${command} in ${cwd}`);
    // Native test extraction must be private to this invocation and checkout. Sharing the default
@@ -95,7 +96,7 @@
    if (/gradlew/.test(command) && env.LIGHTGBM_NATIVE_LIB_PATH) {
      // Resolve the named directory itself (it may be a junction); links inside it are not followed.
      const nativeSource = fs.realpathSync(env.LIGHTGBM_NATIVE_LIB_PATH);
-@@ -114,13 +76,32 @@
+@@ -114,13 +77,32 @@
        filter: (source) => !fs.lstatSync(source).isSymbolicLink(),
      });
    }
@@ -129,7 +130,7 @@
      output: [res.stdout ?? '', res.stderr ?? '',
        ...(signal ? [`command interrupted: ${signal}`] : []),
        ...(res.error ? [res.error.message] : []),
-@@ -198,7 +179,7 @@
+@@ -198,7 +180,7 @@
      const out = path.join(os.tmpdir(), `test-intent-vitest-${process.pid}-${Date.now()}.json`);
      const files = [...new Set(ids.map((id) => checkFile(id).replace(/^modules\/ui-web\//, '')))];
      const config = kind === 'lockdown' ? ' --config vitest.config.lockdown.ts' : '';
@@ -138,7 +139,7 @@
      runs.push(run);
      const parsed = fs.existsSync(out) ? parseVitestJson(fs.readFileSync(out, 'utf8')) : [];
      fs.rmSync(out, { force: true });
-@@ -252,14 +233,11 @@
+@@ -252,14 +234,11 @@
    return rustTestFileCache;
  }
  
@@ -157,7 +158,7 @@
  }
  
  /** Detach links without visiting their targets, including dangling links and linked ancestors. */
-@@ -274,19 +252,7 @@
+@@ -274,19 +253,7 @@
  }
  
  function removeBeforeWorktree(worktree, created) {
@@ -178,7 +179,7 @@
  }
  
  function parseArgs(argv) {
-@@ -346,13 +312,20 @@
+@@ -346,13 +313,20 @@
    let failBefore = null;
    let cleanupError;
    if (args.before) {
@@ -203,7 +204,7 @@
        created = true;
        // Explicit compatibility scaffolding for checks using newly added interfaces. Its bytes are
        // part of the evidence; repaired behavior must remain absent from this before-state patch.
-@@ -370,7 +343,7 @@
+@@ -370,7 +344,7 @@
          revision: gitOut(['rev-parse', `${args.before}^{commit}`], REPO_ROOT),
          overlays: args.overlays,
          patches,
@@ -212,7 +213,7 @@
          checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
        };
      } catch (e) {
-@@ -390,11 +363,18 @@
+@@ -390,11 +364,18 @@
  
    const evidence = {
      schema: EVIDENCE_SCHEMA,
@@ -220,7 +221,7 @@
 +    producer: {
 +      script: EVIDENCE_PRODUCER, scriptDigest: contentDigest(scriptText),
 +      adapterPatch: 'gates/test-intent/evidence/retrieval-module-tier/runner-machine-rules.patch',
-+      adaptation: 'Official result-selection, assertion-classification and digest algorithm; entire adapter launched once through env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node (inner Gradle calls unwrapped), cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, vitest with two workers, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources.'
++      adaptation: 'Official result-selection, assertion-classification and digest algorithm; each Gradle call launched through env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew, with slots held only for Gradle, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, vitest with two workers, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources.'
 +    },
      createdAt: new Date().toISOString(),
      revision: gitOut(['rev-parse', 'HEAD'], REPO_ROOT),

@@ -6,7 +6,7 @@ Their original assertion messages and XML snapshots, exact commands, whole-suite
 resource accounting are recorded in `tmp/verify/fix-it-report.md` and adjacent logs.
 
 The settled WP2.3 revision-3 scenarios D7/F3 deliberately refuse unchecked fallback for restricted
-retrieval; P1 preserves unrestricted recovery. The two request-end checks now assert both sides.
+retrieval; P1 preserves unrestricted recovery. The deadline and rich-port request-end checks assert both sides. A separate request-end check injects NaN into the real hybrid pre-search: restricted REST/MCP must fail without rich retrieval, batch fetch or outside-file material; the same provider without restrictions still recovers through BM25 with K passages/citations.
 The MMR check retains open REST/MCP retrieval, its folder scope and all passage/citation assertions,
 but returns valid vectors to the hybrid pre-search and injects NaN only at rank-only MMR. A new
 query-count assertion proves both interfaces actually reach those two stages. This avoids using
@@ -16,11 +16,10 @@ D7's newly terminal pre-search failure as an MMR fallback fixture.
 [WP2.4a](../wp24a-syntax/README.md). Its
 [local patch](runner-machine-rules.patch) adapts process environment,
 Gradle slots and temporary-checkout lifecycle; selection, classification and digest algorithms
-remain official. The local patch follows that precedent and wraps the entire adapter once with
-`env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node`; its inner Gradle calls are unwrapped
-to comply with the current machine rule and avoid nested slot acquisition. No official runner or production/build file was edited. The runner uses the
+remain official. The local patch wraps each Gradle call with
+`env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew`, holding a slot only for that call. The adapter itself runs with plain `node`. No official runner or production/build file was edited. The runner uses the
 real private Engine, loopback REST/MCP and saved-conversation interfaces composed by the tests.
-The three selected checks are preservation against main: production already implements D7/F3/P1.
+The four selected checks are preservation against main: production already implements D7/F3/P1.
 A before pass is not labelled an assertion failure. The runner returns 1 when checks pass on both
 trees because its aggregate success condition requires assertion failures before.
 Independent acceptance is pending.
@@ -35,13 +34,14 @@ node --check tmp/fix-it-runner/run-evidence.mjs
 
 Create an owned `$TMPDIR/before` shared clone detached at
 `63cce47daa3a87d9e7192f5178a88bcade94bcaa`, with its own build folders.
-Run the whole adapter through the slot wrapper once, with `--out gates/test-intent/evidence/retrieval-module-tier/java.json`,
+Run the adapter with plain `node tmp/fix-it-runner/run-evidence.mjs`, with `--out gates/test-intent/evidence/retrieval-module-tier/java.json`,
 `--before 63cce47daa3a87d9e7192f5178a88bcade94bcaa --before-root "$TMPDIR"`,
 and these separate `--check` arguments:
 
 - `modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/MmrFailureInterfacesIntegrationTest.java#invalidQueryGoesStraightToPositionWithoutPassageInference`
 - `modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#successfulEmptyAndOrdinaryFailureOutcomesStayDifferentThroughInterfaces`
 - `modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#chosenFileDeadlineKeepsWholeDocumentFallbackThroughInterfaces`
+- `modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted`
 
 Keep CUDA disabled and clear display, inherited JustSearch and JVM-option variables, preserving
 GRADLE_OPTS. Set `GIT_OBJECT_DIRECTORY` to an owned temporary object folder and
@@ -54,7 +54,7 @@ but MCP answer always performs open retrieval and ignores it. That diagnostic fa
 replaced by the staged provider; no fixture or product helper change remains. Its output is
 retained under `tmp/verify/evidence-initial-diagnostic.*`, outside the final evidence.
 
-## Final refresh and full validation
+## Earlier refresh and full validation
 
 Refreshed 2026-10-29T09:15:51.713Z against the exact required main SHA. All three checks
 execute and pass on both revisions; both child Gradle commands exit 0. All three
@@ -77,3 +77,40 @@ changed files are covered and evidence validation reports no problem. Final logs
 are `tmp/verify/final-evidence-runner.log` and `tmp/verify/final-test-intent-gate.log`.
 No exit-75 retry was needed. The owned baseline clone was removed after its full
 and selected XML results were retained. Independent acceptance remains pending.
+
+## Restricted pre-search mutation check
+
+The separate `preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted` method
+passes on the unmodified candidate. With the verifier's exact
+[unsafe fallback mutation](mutation-presearch.diff) applied only in an owned TMPDIR clone,
+it fails by assertion (`MultipleFailuresError`, ten failed assertions): both REST and MCP
+successfully return `FULLTEXT_FALLBACK` containing `OUTSIDE_SCOPE_SECRET`, and batch fetches
+occur. The [generated observations](mutation-presearch.json) use the official assertion classifier;
+the raw log and XML are in `tmp/verify/round2-mutation.log` and `round2-mutation-xml/`.
+Reproduce with a shared candidate clone, overlay the updated request-end test, apply the patch,
+and run only that named method through the prescribed Gradle environment and slot wrapper.
+Production in the source worktree is unchanged.
+
+## Restricted pre-search evidence refresh
+
+Refreshed 2026-10-29T13:05:11.382Z, digest `sha256:65ba1a4acfede28d7ca17ebd156492631a5a984e26a0148d9222ed7579442bc9`.
+All four selected checks execute/pass on the candidate and on exact main production
+`63cce47daa3a87d9e7192f5178a88bcade94bcaa` with only candidate test overlays.
+Both child Gradle commands exit 0 and no selected check is skipped. These remain preservation
+checks (`repaired: false`); the runner's aggregate exit 1 follows its unchanged requirement
+for a before assertion failure. The unsafe mutation above is separately rejected by assertion.
+Log: `tmp/verify/round2-evidence-runner.log`; XML snapshots: `round2-evidence-candidate-xml/`
+and `round2-evidence-main-xml/` beside the builder report.
+
+## Full validation after adding the pre-search check
+
+| Check | Result |
+| --- | --- |
+| Full `:modules:ui:integrationTest` | exit 1; 91 cases: 75 pass, 11 fail, 5 skip |
+| Failure/skip comparison | same eleven failures and five skipped cases as earlier candidate; every failure also on main, matching messages after fixture UUID normalization |
+| `compileTestJava compileIntegrationTestJava pmdAll`, Error Prone enabled | exit 0, BUILD SUCCESSFUL |
+| Test-intent gate against exact main SHA | exit 1, only `acceptance-missing`; both files covered |
+
+Exact commands, all failure messages and skip reasons, resource accounting and logs/XML locations
+are in `tmp/verify/fix-it-report-2.md`. New artifacts remain uncommitted. The two owned temporary
+clones were removed after their snapshots were retained. Independent acceptance remains pending.

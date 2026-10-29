@@ -49,6 +49,57 @@ final class RetrievalRequestEndInterfacesIntegrationTest extends MmrEngineFixtur
   private static final ConversationShapeRef SHAPE = new ConversationShapeRef("core.request-end");
 
   @Test
+  void preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted() throws Exception {
+    start(null);
+    try (var interfaces = new Interfaces()) {
+      // Fail the real hybrid pre-search, before the rich retrieval port is reached.
+      var provider = new MmrFailureInterfacesIntegrationTest.ScriptedProvider(
+          MmrFailureInterfacesIntegrationTest.Failure.QUERY_NAN);
+      worker.setEmbeddingProvider(provider);
+      clearInvocations(interfaces.adapter);
+      var rest = interfaces.request("rest", false, QUESTION);
+      var body = JSON.readTree(rest.body());
+      var mcp = interfaces.mcp(QUESTION);
+      System.out.println("PRESEARCH_FAILURE_REST status=" + rest.statusCode() + " body=" + body);
+      System.out.println("PRESEARCH_FAILURE_MCP " + mcp);
+      assertAll("restricted pre-search failure",
+          () -> assertEquals(500, rest.statusCode(), rest.body()),
+          () -> assertFalse(body.path("ok").asBoolean(true), body.toString()),
+          () -> assertTrue(body.path("error").asText().contains("non-finite"), body.toString()),
+          () -> assertFalse(body.has("context"), body.toString()),
+          () -> assertFalse(rest.body().contains(OUTSIDE), rest.body()),
+          () -> assertTrue(mcp.path("isError").asBoolean(), mcp.toString()),
+          () -> assertError(mcp.path("structuredContent"), "INTERNAL_ERROR"),
+          () -> assertTrue(mcp.path("structuredContent").path("error").asText()
+              .contains("non-finite"), mcp.toString()),
+          () -> assertFalse(mcp.toString().contains(OUTSIDE), mcp.toString()),
+          () -> verify(interfaces.adapter, never()).retrieveContext(any(RetrieveContextParams.class), any()),
+          () -> verify(interfaces.adapter, never()).fetchDocuments(any(), any()),
+          () -> assertEquals(2, provider.queries.get(), "one failed pre-search per interface"),
+          () -> assertEquals(0, provider.passages.get(), "pre-search fails before MMR"));
+
+      // P1: the same invalid pre-search vector without restrictions still recovers through
+      // BM25; the invalid MMR query then retains the positional passage pool.
+      var recovered = interfaces.request("rest", false, false, QUESTION);
+      var fallback = JSON.readTree(recovered.body());
+      var recoveredMcp = interfaces.mcp(QUESTION, false);
+      assertAll("unrestricted pre-search recovery",
+          () -> assertEquals(200, recovered.statusCode(), recovered.body()),
+          () -> assertTrue(fallback.path("ok").asBoolean(), fallback.toString()),
+          () -> assertEquals("BM25", fallback.path("quality").path("retrieval_mode").asText()),
+          () -> assertEquals(K, fallback.path("chunks").size(), fallback.toString()),
+          () -> assertFalse(recoveredMcp.path("isError").asBoolean(), recoveredMcp.toString()),
+          () -> assertEquals("BM25", recoveredMcp.path("structuredContent")
+              .path("quality").path("retrievalMode").asText()),
+          () -> assertEquals(K, recoveredMcp.path("structuredContent").path("citations").size()),
+          () -> verify(interfaces.adapter, times(2)).retrieveContext(any(RetrieveContextParams.class), any()),
+          () -> verify(interfaces.adapter, never()).fetchDocuments(any(), any()),
+          () -> assertEquals(6, provider.queries.get(), "unrestricted interfaces reach pre-search and MMR"),
+          () -> assertEquals(0, provider.passages.get(), "invalid MMR query avoids passage inference"));
+    }
+  }
+
+  @Test
   void realEngineBudgetExpiresThroughHttpAndSavedConversation() throws Exception {
     start(null);
     try (var interfaces = new Interfaces()) {

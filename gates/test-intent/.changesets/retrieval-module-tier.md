@@ -40,7 +40,7 @@ Production is unchanged. Independent acceptance is pending.
         "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java"
       ],
       "class": "New",
-      "behaviour": "D7/F3: folder-restricted chosen-file deadline returns REST TIMEOUT/504 and MCP TIMEOUT, and restricted ordinary rich-port failure returns an error, never NO_CONTENT or batch fetch. P1: the same failures without folder/date/size restrictions retain successful FULLTEXT_FALLBACK, successful MCP, and existing saved-conversation chosen-file recovery/no-content distinctions. Existing healthy, empty, local-wait and history assertions remain. Against the required main baseline 63cce47daa, these are preservation checks: production already implements D7/F3/P1. The older dc296275ac diagnostics establish why the original expectations became stale, but are not fail-before evidence against main. No production behavior changes in this repair.",
+      "behaviour": "D7/F3: folder-restricted chosen-file deadline returns REST TIMEOUT/504 and MCP TIMEOUT, and restricted ordinary rich-port failure returns an error, never NO_CONTENT or batch fetch. P1: the same failures without folder/date/size restrictions retain successful FULLTEXT_FALLBACK, successful MCP, and existing saved-conversation chosen-file recovery/no-content distinctions. Existing healthy, empty, local-wait and history assertions remain. Against the required main baseline 63cce47daa, these are preservation checks: production already implements D7/F3/P1. The older dc296275ac diagnostics establish why the original expectations became stale, but are not fail-before evidence against main. No production behavior changes in this repair. A separate real hybrid pre-search NaN failure now checks REST failure/500 and MCP INTERNAL_ERROR with no context, outside-file material, rich retrieval or batch fetch under the folder restriction. The same provider without restrictions recovers through BM25 with K passages/citations and no batch fetch; query counts distinguish the pre-search and MMR stages. A scratch-only unsafe unrestricted-search mutation must fail this new assertion on both interfaces.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -54,7 +54,8 @@ Production is unchanged. Independent acceptance is pending.
       "evidence": "gates/test-intent/evidence/retrieval-module-tier/java.json",
       "newChecks": [
         "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#chosenFileDeadlineKeepsWholeDocumentFallbackThroughInterfaces",
-        "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#successfulEmptyAndOrdinaryFailureOutcomesStayDifferentThroughInterfaces"
+        "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#successfulEmptyAndOrdinaryFailureOutcomesStayDifferentThroughInterfaces",
+        "modules/ui/src/integrationTest/java/io/justsearch/ui/api/mcp/RetrievalRequestEndInterfacesIntegrationTest.java#preSearchFailureFailsClosedWhenRestrictedAndRecoversWhenUnrestricted"
       ],
       "repaired": false
     }
