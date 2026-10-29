@@ -11,12 +11,14 @@
 <!-- ^ Official MCP Registry ownership marker (modelcontextprotocol.io/registry/package-types);
      must match "name" in packaging/mcpb/server.json. Do not remove. -->
 
-<!-- HERO VISUAL PLACEHOLDER (m1-shippability):
-     Add a hero screenshot + short demo GIF here. Exact shots to take and how:
-     docs/m1-screenshot-instructions.md
-     Suggested markup once assets exist in docs/assets/:
-     <p align="center"><img src="docs/assets/hero-search.png" width="820" alt="JustSearch: hybrid search over a local folder, with cited AI answers"></p>
--->
+<p align="center">
+  <img src="docs/assets/hero-search.png" width="820"
+       alt="JustSearch results for the search semantic understanding, across a folder of local documents">
+</p>
+<p align="center">
+  <img src="docs/assets/hero-answer.png" width="820"
+       alt="An on-device answer with citations, backed by an excerpt from a local document">
+</p>
 
 JustSearch is local-first: it indexes your local documents, such as PDF, email, Office and most common document
 formats (text extraction is backed by [Apache Tika](https://tika.apache.org/), plus OCR for scanned PDFs and

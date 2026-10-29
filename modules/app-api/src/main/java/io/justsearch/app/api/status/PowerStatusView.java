@@ -11,7 +11,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * Saver) and the Worker is deferring idle enrichment on CPU and GPU. Text indexing and sparse
  * enrichment interleaved between files may continue. The Health Queue card names that scope.
  * {@code source} ({@code AC}/{@code BATTERY}/{@code
- * UNKNOWN}) is wording-only. This is not a degradation: search keeps working.
+ * UNKNOWN}) also supplies the optional battery-pause rule: only known BATTERY holds processing
+ * when that preference is enabled, independently of energy intent. Search keeps working.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record PowerStatusView(boolean energyReduced, String source) {

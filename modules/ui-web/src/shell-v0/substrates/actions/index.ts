@@ -34,6 +34,7 @@ import { CORE_PROVENANCE } from '../../primitives/provenance.js';
 import { notifyAll } from '../../primitives/notify.js';
 import { copyToClipboard } from '../../utils/clipboardCopy.js';
 import { emitEphemeralToast } from '../../components/advisory/ephemeralToast.js';
+import { requestSurfaceNavigation } from '../../controllers/navigateRequest.js';
 // §25.β5 — DataEffect cache write target.
 import { setLatestDataResult } from '../evaluationContext/index.js';
 // §25.β3 — elicit substrate for mid-invocation user prompts.
@@ -794,6 +795,11 @@ export function registerShellActions(deps: ShellActionDeps): void {
   navigateAction('core.action.shell.go-to-search', 'Go to Search', 'core.search-v3-surface');
   navigateAction('core.action.shell.go-to-library', 'Go to Library', 'core.library-surface');
   navigateAction('core.action.shell.go-to-settings', 'Go to Settings', 'core.settings-surface');
+  // Rules need both saved values; use the same Settings arrival/focus path as the rule controls.
+  shellAction('core.action.shell.go-to-indexing-rules', 'Change indexing rules', () => {
+    requestSurfaceNavigation('core.settings-surface', { focusIndexingRule: 'hours' });
+    return { kind: 'noop' as const };
+  });
   navigateAction('core.action.shell.go-to-health', 'Go to System Health', 'core.health-surface');
   navigateAction('core.action.shell.go-to-activity', 'Go to Activity', 'core.activity-surface');
   navigateAction('core.action.shell.go-to-browse', 'Go to Browse', 'core.browse-surface');
@@ -881,7 +887,8 @@ export interface OperationProjectable {
 }
 
 function canProjectOperationAsZeroArgAction(op: OperationProjectable): boolean {
-  return op.id !== 'core.start-ai-install' && op.id !== 'core.repair-ai-install';
+  return op.id !== 'core.start-ai-install' && op.id !== 'core.repair-ai-install'
+    && op.id !== 'core.set-indexing-rules';
 }
 
 /**

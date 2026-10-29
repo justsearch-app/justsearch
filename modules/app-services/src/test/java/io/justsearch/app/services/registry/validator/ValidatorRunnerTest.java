@@ -61,6 +61,8 @@ final class ValidatorRunnerTest {
         new io.justsearch.app.services.registry.operations.handlers.IndexingPauseHandler(() -> null, true));
     handlers.register(CoreOperationCatalog.RESUME_INDEXING,
         new io.justsearch.app.services.registry.operations.handlers.IndexingPauseHandler(() -> null, false));
+    handlers.register(CoreOperationCatalog.SET_INDEXING_RULES,
+        new io.justsearch.app.services.registry.operations.handlers.IndexingRulesHandler(() -> null));
     handlers.register(CoreOperationCatalog.RECOVER_COMPONENT,
         new RecoverComponentHandler(() -> null));
     // Validator tests inspect registrations without invoking them; both durable bulk profiles

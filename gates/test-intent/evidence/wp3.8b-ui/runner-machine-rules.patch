@@ -1,0 +1,87 @@
+--- scripts/governance/gates/test-intent/run-evidence.mjs
++++ TMPDIR/run-evidence-wp38b.mjs
+@@ -33,8 +33,8 @@
+ import path from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ 
+-import { normalizeText } from './changeset.mjs';
+-import { EVIDENCE_PRODUCER, EVIDENCE_SCHEMA, checkFile, checkName, contentDigest, evidenceSelfDigest } from './evidence.mjs';
++import { normalizeText } from '/home/elias/dev/js-uiux-wp38b/scripts/governance/gates/test-intent/changeset.mjs';
++import { EVIDENCE_PRODUCER, EVIDENCE_SCHEMA, checkFile, checkName, contentDigest, evidenceSelfDigest } from '/home/elias/dev/js-uiux-wp38b/scripts/governance/gates/test-intent/evidence.mjs';
+ import {
+   classifyFailBefore,
+   gradleTarget,
+@@ -45,11 +45,11 @@
+   selectJUnitCases,
+   selectVitestCases,
+   summarize,
+-} from './evidence-runners.mjs';
+-import { extractTestItems, testModuleFiles } from './rust-tests.mjs';
++} from '/home/elias/dev/js-uiux-wp38b/scripts/governance/gates/test-intent/evidence-runners.mjs';
++import { extractTestItems, testModuleFiles } from '/home/elias/dev/js-uiux-wp38b/scripts/governance/gates/test-intent/rust-tests.mjs';
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+-const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..');
++const REPO_ROOT = process.cwd();
+ const IS_WIN = process.platform === 'win32';
+ 
+ function sh(command, cwd) {
+@@ -198,7 +198,7 @@
+     const out = path.join(os.tmpdir(), `test-intent-vitest-${process.pid}-${Date.now()}.json`);
+     const files = [...new Set(ids.map((id) => checkFile(id).replace(/^modules\/ui-web\//, '')))];
+     const config = kind === 'lockdown' ? ' --config vitest.config.lockdown.ts' : '';
+-    const run = sh(`npx vitest run ${files.map((f) => JSON.stringify(f)).join(' ')}${config} --reporter=json --outputFile=${JSON.stringify(out)}`, path.join(root, 'modules', 'ui-web'));
++    const run = sh(`npx vitest run ${files.map((f) => JSON.stringify(f)).join(' ')}${config} --configLoader runner --maxWorkers=2 --reporter=json --outputFile=${JSON.stringify(out)}`, path.join(root, 'modules', 'ui-web'));
+     runs.push(run);
+     const parsed = fs.existsSync(out) ? parseVitestJson(fs.readFileSync(out, 'utf8')) : [];
+     fs.rmSync(out, { force: true });
+@@ -252,14 +252,9 @@
+   return rustTestFileCache;
+ }
+ 
+-function prepareNodeModules(worktree, copyNodeModules = false) {
+-  const src = path.join(REPO_ROOT, 'modules', 'ui-web', 'node_modules');
+-  const dst = path.join(worktree, 'modules', 'ui-web', 'node_modules');
+-  if (!fs.existsSync(src) || fs.existsSync(dst)) return;
+-  // Node 24's native directory copier recreates POSIX symlinks even with dereference enabled.
+-  // An all-pass filter selects its stat-based copier, which follows each dependency link.
+-  if (copyNodeModules) fs.cpSync(src, dst, { recursive: true, dereference: true, filter: () => true });
+-  else fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
++function prepareNodeModules(worktree) {
++  const run = sh('npm ci', path.join(worktree, 'modules', 'ui-web'));
++  if (run.exitCode !== 0) throw new Error(`npm ci failed: ${run.output}`);
+ }
+ 
+ /** Detach links without visiting their targets, including dangling links and linked ancestors. */
+@@ -274,19 +269,8 @@
+ }
+ 
+ function removeBeforeWorktree(worktree, created) {
+-  // An invalid ref never creates/registers a worktree. Remove only our still-empty, real
+-  // reservation, non-recursively; anything populated still goes through guarded Git removal.
+-  if (!created && fs.lstatSync(worktree, { throwIfNoEntry: false })?.isDirectory()
+-      && fs.readdirSync(worktree).length === 0) {
+-    fs.rmdirSync(worktree);
+-    return;
+-  }
+-  // Git for Windows can traverse junctions during recursive removal. Detach every link first,
+-  // not only the node_modules link we created: a check or partial checkout can leave others.
+-  // An unreadable directory or failed unlink aborts removal, leaving the tree for inspection.
+-  unlinkWorktreeLinks(worktree);
+-  const removed = spawnSync('git', ['-c', 'core.longpaths=true', 'worktree', 'remove', '--force', worktree], { cwd: REPO_ROOT });
+-  if (removed.status !== 0) throw new Error(`before-state cleanup failed (${worktree}): ${removed.error?.message ?? removed.stderr}`);
++  // Retain this owned shared clone and its outputs under TMPDIR for inspection.
++  console.error(`retained before clone: ${worktree}, created=${created}`);
+ }
+ 
+ function parseArgs(argv) {
+@@ -352,7 +336,8 @@
+     try {
+       // Git accepts the reserved empty directory. Keep creation inside the cleanup scope so a
+       // failed checkout cannot leave links behind without even attempting to detach them.
+-      gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
++      gitOut(['clone', '--quiet', '--shared', '--no-checkout', REPO_ROOT, wt], REPO_ROOT);
++      gitOut(['checkout', '--quiet', '--detach', args.before], wt);
+       created = true;
+       // Explicit compatibility scaffolding for checks using newly added interfaces. Its bytes are
+       // part of the evidence; repaired behavior must remain absent from this before-state patch.

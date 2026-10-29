@@ -21,7 +21,7 @@ final class BulkWorkVocabularyMirrorTest {
   @Test
   void reasons() {
     assertEquals(names(IndexingReason.values()).stream()
-        .filter(reason -> !reason.equals("USER_PAUSED") && !reason.equals("SETTINGS_RECOVERY")).toList(),
+        .filter(reason -> !java.util.Set.of("USER_PAUSED", "SETTINGS_RECOVERY", "SCHEDULE", "ON_BATTERY").contains(reason)).toList(),
         names(BulkWorkGate.Reason.values()));
   }
 

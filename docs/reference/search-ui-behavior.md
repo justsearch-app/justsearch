@@ -17,6 +17,15 @@ Search is the production main window: `core.search-v3-surface`, mounted as
 is **Search**. The retired unified-chat, Search and Agent surface ids resolve directly
 to it; there is one interaction window.
 
+The [Search window scenario catalog](../../governance/search-window-scenarios.v1.json) records
+product scenarios, known gaps, and their existing observation bindings. A redesign rebinds
+these scenarios and never drops one without a recorded retirement. The always-on catalog
+check validates bindings and retirements and requires complete literal test titles and function
+bodies, rejecting disabling modifiers, skip/todo/fails options, non-literal options, and conditional
+forms on tests or enclosing suites. It does not establish that checks ran: surrounding control
+flow (such as a test declared inside `if (false)`), runtime skips, configuration include/exclude
+rules, and name filters are outside its scope.
+
 ## 1. Window layout and modes
 
 The Shell rail surrounds Search's session sidebar, main reading column and composer.

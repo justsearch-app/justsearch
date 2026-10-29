@@ -213,6 +213,18 @@
       "law": "estimate(totalBytes) returns Estimate.UNKNOWN (both fields -1, the 'no honest basis' sentinel) on EVERY arm that cannot support a reading: fewer than minSamples samples; a stalled series (now - newest.atNanos > stallNanos); a window shorter than minSpanNanos or non-positive; and a window over which deltaBytes <= 0. Otherwise bytesPerSecond = deltaBytes * 1e9 / spanNanos over the retained window, and remainingSeconds = round(max(0, totalBytes - newest.bytes) / bytesPerSecond) — except that totalBytes <= 0 yields a KNOWN rate with an unknown (-1) horizon, because rate and horizon are independently knowable. remainingSeconds == 0 is a VALUE (nothing left), never the sentinel; consumers must test rateKnown()/remainingKnown() before reading either field. sample() drops a negative reading, CLEARS the series when the cumulative count moves backwards (a fetch restarting a file from zero after an integrity failure is not the same monotone progression, and carrying the old baseline through the drop reports a rate that never happened), evicts samples older than windowNanos while always retaining at least one, and caps retention at MAX_SAMPLES. The clock is an injected monotonic nanos supplier — never wall-clock — so an adjustment mid-download cannot produce a negative span or an absurd rate.",
       "guard": "test:AcquisitionRateTest",
       "note": "Tempdoc 840 U1 — the backend half of the missing download ETA. The failure mode is exactly this register's class: every wrong answer here is a plausible NUMBER rendered to the user on a multi-GB download, not an exception. Collapsing any UNKNOWN arm to 0 is the specific defect — it renders as '0 B/s' or '0s left' on a transfer that is merely young, stalled, or unmeasured, which is the most confident lie the surface can tell. Sibling of windowed-embed-progress: stateful progress arithmetic whose state is fed only by samples and an injected clock, with no IO."
+    },
+    {
+      "id": "indexing-local-hours",
+      "gradlePath": ":modules:core",
+      "targetClass": "io.justsearch.core.scheduling.IndexingSchedule",
+      "targetTests": [
+        "io.justsearch.core.scheduling.IndexingRulesHoldTest"
+      ],
+      "pure": true,
+      "law": "Local wall-clock membership is start-inclusive/end-exclusive. Same-day windows require today selected; overnight windows require today selected after start or yesterday selected before end, with Sunday wrapping to Monday. Disabled windows allow every minute.",
+      "guard": "test:IndexingRulesHoldTest",
+      "note": "D2 / S38.2 revision 3; evaluator receives one local weekday/minute snapshot."
     }
   ]
 }

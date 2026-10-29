@@ -114,6 +114,10 @@ public final class UiSettingsStore {
   /** Bound once before any processor starts. Publication is part of the accepted settings commit. */
   public void bindIndexingHold(io.justsearch.core.scheduling.IndexingHold hold) {
     indexingHold = Objects.requireNonNull(hold, "hold");
+    hold.setLocalTime(() -> {
+      var now = io.justsearch.app.util.WindowsLocalTime.read();
+      return new io.justsearch.core.scheduling.IndexingHold.LocalMinute(now.weekday(), now.minute());
+    });
     publishIndexingPause(load());
   }
 
@@ -121,8 +125,9 @@ public final class UiSettingsStore {
     var hold = indexingHold;
     if (hold == null) return;
     var policy = settings.getIndexingPause();
-    if (policy != null && policy.paused()) hold.pause(policy.untilEpochMs(), policy.reason());
-    else hold.resume();
+    hold.setPolicy(policy != null && policy.paused(), policy == null ? null : policy.untilEpochMs(),
+        policy == null ? null : policy.reason(), policy == null ? null : policy.schedule(),
+        policy != null && policy.pauseOnBattery());
   }
 
   private static Snapshot recoveryDefaults() {
@@ -315,6 +320,12 @@ public final class UiSettingsStore {
               CURRENT_SCHEMA_VERSION,
               0,
               READABLE_LEGACY_VERSIONS);
+      // A future version must stay fail-loud and untouched. For readable versions, validate
+      // original rule tokens before trusting the tree or databinding can coerce/drop them.
+      try (var parser = MAPPER.createParser(original)) {
+        parser.nextToken();
+        validateRuleTokens(parser, 0);
+      }
       JsonNode policy = (envelope ? root.path("settings") : root).get("excludePatterns");
       if (resolvedVersion < 6 && policy != null && policy.isArray()) {
         for (JsonNode entry : policy) {
@@ -323,6 +334,8 @@ public final class UiSettingsStore {
           }
         }
       }
+      io.justsearch.app.api.settings.IndexingPausePolicy.validateRules(
+          (envelope ? root.path("settings") : root).get("indexingPause"));
       UiSettings settings =
           !envelope
               ? MAPPER.treeToValue(root, UiSettings.class)
@@ -364,6 +377,25 @@ public final class UiSettingsStore {
     } catch (Exception e) {
       throw new CorruptDurableStoreException(
           "ui-settings", "cannot parse " + settingsFile, e);
+    }
+  }
+
+  private static void validateRuleTokens(tools.jackson.core.JsonParser parser, int scope) {
+    if (parser.currentToken() != tools.jackson.core.JsonToken.START_OBJECT) {
+      parser.skipChildren();
+      return;
+    }
+    var seen = new java.util.HashSet<String>();
+    while (parser.nextToken() != tools.jackson.core.JsonToken.END_OBJECT) {
+      String name = parser.currentName();
+      if (!seen.add(name) && (scope >= 2 || "indexingPause".equals(name))) {
+        throw new IllegalArgumentException("Duplicate indexing rule field: " + name);
+      }
+      parser.nextToken();
+      if (scope == 0 && "settings".equals(name)) validateRuleTokens(parser, 1);
+      else if (scope < 2 && "indexingPause".equals(name)) validateRuleTokens(parser, 2);
+      else if (scope == 2 && "schedule".equals(name)) validateRuleTokens(parser, 3);
+      else parser.skipChildren();
     }
   }
 

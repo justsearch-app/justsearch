@@ -32,6 +32,7 @@ const { spawnSync } = require('node:child_process');
 const register = require('./lib/worktree-register.cjs');
 const archive = require('./lib/worktree-archive.cjs');
 const receipts = require('./lib/landing-receipt.cjs');
+const { makeDirectoriesWritable } = require('./remove-worktree.cjs');
 const { resolveMainRepoRoot, resolveCallerIdentity } = require('./lib/agent-spawn-sweep.cjs');
 
 const SCRIPT_DIR = __dirname;
@@ -296,6 +297,13 @@ async function finalize({ main, policy, entry, markers, sessionId, discardIgnore
     return { done: false, quarantined: false, dryRun: true, receipt, retireBranch, reason: 'dry-run' };
   }
 
+  // Reconcile and resumed finalizations bypass release's clean check. Open directories before
+  // creating or verifying an archive so every non-cache file is accounted for before removal.
+  if (fs.existsSync(entry.path)) {
+    try { makeDirectoriesWritable(entry.path); }
+    catch (err) { return { done: false, quarantined: true, receipt, reason: err.message }; }
+  }
+
   let record = existing && existing.phase !== 'done'
     ? existing
     : register.buildFinalizationRecord({ resource, worktreePath: entry.path, branch: entry.branch, head: entry.head, receipt: receipt ? { verdict: receipt.verdict, squash: receipt.squash, pr: receipt.pr } : null, by, leaseDurationSec: policy.thresholds.finalizationLeaseSec });
@@ -397,6 +405,8 @@ async function cmdRelease(flags) {
   // Validate every argument BEFORE the first marker write: a rejected --keep-branch must not leave
   // the resource RELEASED, which the reconciler would read as "retire the branch".
   const holdTriple = flags['keep-branch'] ? requireHoldTriple(flags) : null;
+  try { makeDirectoriesWritable(entry.path); }
+  catch (err) { fail(`quarantined: ${err.message}`, 3); }
   const clean = isClean(entry.path);
   if (flags['if-clean'] && clean !== true) {
     if (entry.branch) register.writeMarkers({ repoRoot: main, branch: entry.branch, markers: { released: nowIso() } });

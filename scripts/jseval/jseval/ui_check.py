@@ -1336,6 +1336,20 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     _settings_setup = _view_setup("settings")
 
+    def setup_indexing_rules(surface="settings", narrow=False):
+        async def setup(page):
+            if narrow:
+                await page.set_viewport_size({"width": 600, "height": 400})
+            await _view_setup(surface)(page)
+            if surface == "settings":
+                await page.locator('[data-settings-category="indexing"]').click()
+                await page.locator('#indexing-hours').wait_for(state="visible")
+                await page.locator('#indexing-hours').focus()
+            else:
+                await page.get_by_role("button", name="Change hours", exact=True).first.wait_for(state="visible")
+            await _settle_focus_marks(page)
+        return setup
+
     async def setup_settings_forced_colors(page):
         await _settings_setup(page)
         await page.keyboard.press("Tab")
@@ -2111,6 +2125,14 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              fixtures_variant="sv3-sources", forced_colors="active"),
         Step("sv3-palette-forced-colors", setup=setup_sv3_palette_forced_colors, isolated=True,
              forced_colors="active"),
+        *[Step(f"settings-indexing-{theme}", setup=setup_indexing_rules(), isolated=True,
+               fixtures_variant="indexing-rules", color_scheme="light" if theme == "light" else "dark",
+               forced_colors="active" if theme == "forced" else None)
+          for theme in ("dark", "light", "forced")],
+        Step("settings-indexing-minimum", setup=setup_indexing_rules(narrow=True), isolated=True,
+             fixtures_variant="indexing-rules"),
+        Step("library-indexing-held", setup=setup_indexing_rules("library"), isolated=True,
+             fixtures_variant="indexing-rules"),
         Step("settings-forced-colors", setup=setup_settings_forced_colors, isolated=True,
              forced_colors="active"),
         *[Step(f"sv3-recents-{state}-{width}-{theme}",

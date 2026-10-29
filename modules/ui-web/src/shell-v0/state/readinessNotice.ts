@@ -318,6 +318,31 @@ const CAUSE_ROWS: ReadonlyArray<{
       'Automatic picture reading is paused because the vision model could not start; it tries again later',
     severity: 'info',
   },
+  {
+    code: 'indexing.pausing_schedule',
+    wording: 'Pausing — finishing current files. Outside indexing hours.',
+    severity: 'info',
+  },
+  {
+    code: 'indexing.paused_schedule',
+    wording: 'Outside indexing hours.',
+    severity: 'info',
+  },
+  {
+    code: 'indexing.pausing_on_battery',
+    wording: 'Pausing — finishing current files while this computer is running on battery.',
+    severity: 'info',
+  },
+  {
+    code: 'indexing.paused_on_battery',
+    wording: 'Paused while this computer is running on battery.',
+    severity: 'info',
+  },
+  {
+    code: 'indexing.pausing_settings_recovery_check_exclusions',
+    wording: 'Pausing — finishing current files. Settings recovery — saved settings were damaged and replaced by defaults. Indexing stays held until the reset is confirmed in Settings. Check exclusions.',
+    severity: 'info',
+  },
   { code: 'index.throughput_stalled', wording: 'Indexing throughput has stalled' },
   {
     code: 'index.throughput_degraded',

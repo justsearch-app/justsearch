@@ -250,7 +250,7 @@ export interface StatusResponse {
       agingReleaseAt: string | null;
       pendingJobs: number;
       reasonCode: string | null;
-      reasons: ("user_paused" | "settings_recovery" | "game_mode" | "gpu_busy_external" | "energy_saver" | "chat_generating")[];
+      reasons: ("settings_recovery" | "user_paused" | "schedule" | "on_battery" | "game_mode" | "gpu_busy_external" | "energy_saver" | "chat_generating")[];
       sampledAt: string;
       since: string;
       state: "IDLE" | "RUNNING" | "SLOWED" | "PAUSING" | "PAUSED";
@@ -687,7 +687,7 @@ export const statusResponseSchema = z.strictObject({
       "agingReleaseAt": z.string().nullable(),
       "pendingJobs": z.number().int(),
       "reasonCode": z.string().nullable(),
-      "reasons": z.array(z.enum(["user_paused", "settings_recovery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating"])),
+      "reasons": z.array(z.enum(["settings_recovery", "user_paused", "schedule", "on_battery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating"])),
       "sampledAt": z.string(),
       "since": z.string(),
       "state": z.enum(["IDLE", "RUNNING", "SLOWED", "PAUSING", "PAUSED"]),

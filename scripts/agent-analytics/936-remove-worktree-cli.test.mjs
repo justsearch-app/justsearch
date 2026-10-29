@@ -685,20 +685,46 @@ try {
       assert.equal(fs.readFileSync(path.join(outside, 'sentinel'), 'utf8'), 'external junction witness\n');
     });
 
-    if (process.platform !== 'win32' && process.getuid() !== 0) await check('real permission-denied inspection cannot authorize actual removal', async () => {
-      const dest = addWorktree(primary, 'permission-denied', 'codex/936-permission-denied');
-      fs.mkdirSync(path.join(dest, 'private'));
-      fs.writeFileSync(path.join(dest, 'private/draft.txt'), 'retained private draft\n');
-      const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource: 'permission-denied', policy: DEFAULT_ARCHIVE_POLICY });
-      assert.equal(saved.refused, undefined, JSON.stringify(saved));
-      const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
-      let refused;
-      fs.chmodSync(path.join(dest, 'private'), 0);
-      try { refused = runCli(primary, dest, ['--archive-manifest', saved.manifestPath]); }
-      finally { fs.chmodSync(path.join(dest, 'private'), 0o755); }
-      assert.equal(refused.status, 1, refused.output);
-      assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
-    });
+    if (process.platform !== 'win32' && process.getuid() !== 0) for (const changed of [false, true]) {
+      await check(`access repair ${changed ? 'refuses a changed' : 'allows removal of an unchanged'} archived draft in a 000 directory`, async () => {
+        const resource = `permission-${changed ? 'changed' : 'unchanged'}`;
+        const dest = addWorktree(primary, resource, `codex/936-${resource}`);
+        const privateDir = path.join(dest, 'private');
+        const draft = path.join(privateDir, 'draft.txt');
+        const archivedContent = 'retained private draft\n';
+        fs.mkdirSync(privateDir, { mode: 0o700 });
+        fs.writeFileSync(draft, archivedContent);
+        const saved = archiveWorktree({ mainRepoRoot: primary.repo, worktreePath: dest, resource, policy: DEFAULT_ARCHIVE_POLICY });
+        assert.equal(saved.refused, undefined, JSON.stringify(saved));
+        const manifestBefore = fs.readFileSync(saved.manifestPath, 'utf8');
+        if (changed) fs.writeFileSync(draft, 'changed after archive\n');
+        const before = await snapshot(primary, dest, path.join(primary.root, 'isolated-state'));
+        fs.chmodSync(privateDir, 0);
+        try {
+          const result = runCli(primary, dest, ['--archive-manifest', saved.manifestPath]);
+          assert.equal(result.status, changed ? 1 : 0, result.output);
+          if (changed) {
+            assert.match(result.output, /does not verify/);
+            assert.equal(fs.statSync(privateDir).mode & 0o7777, 0o700, 'owner access was repaired before refusal');
+            assert.equal(fs.readFileSync(draft, 'utf8'), 'changed after archive\n');
+            assert.deepEqual(await snapshot(primary, dest, path.join(primary.root, 'isolated-state')), before);
+          } else {
+            assert.equal(fs.existsSync(dest), false);
+            assert.equal(registeredPaths(primary.repo).includes(dest), false);
+          }
+          assert.equal(fs.readFileSync(saved.manifestPath, 'utf8'), manifestBefore);
+          const manifest = JSON.parse(manifestBefore);
+          assert.equal(git(primary.repo, 'rev-parse', manifest.stateRef).trim(), saved.stateCommit);
+          assert.equal(git(primary.repo, 'rev-parse', manifest.tipRef).trim(), saved.head);
+          const archivedDraft = manifest.files.find((entry) => entry.path === 'private/draft.txt');
+          assert.ok(archivedDraft, 'the manifest retains the private draft');
+          assert.equal(git(primary.repo, 'show', `${manifest.stateRef}:private/draft.txt`), archivedContent);
+          assert.equal(git(primary.repo, 'cat-file', 'blob', archivedDraft.blob), archivedContent);
+        } finally {
+          if (fs.existsSync(privateDir)) fs.chmodSync(privateDir, 0o700);
+        }
+      });
+    }
 
     await check('new valuable dangling links block removal while declared disposal and recorded discards remain allowed', async () => {
       const fx = await makeRepo('ignored-policy');

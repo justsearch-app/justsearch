@@ -46,6 +46,9 @@ import { formatCount } from '../display/format.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import '../components/IndexingControls.js';
+import { getOperationClient, OperationError } from '../operations/OperationClient.js';
+import { requestAuthorization } from '../operations/authorizationBroker.js';
+import type { SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
 import { localizeResourceKey, onCatalogUpdated } from '../../i18n/resourceCatalog.js';
 import { applyAppearance, getSurfaceMode, setSurfaceMode } from '../state/themeState.js';
 // Tempdoc 874 — the Search v3 chat-column width preset (FE-only, user-state document).
@@ -158,6 +161,7 @@ interface UISettings {
   highContrast?: boolean;
   defaultAction?: 'open' | 'reveal' | 'preview';
   vimMode?: boolean;
+  indexingPause?: NonNullable<SettingsV2['ui']>['indexingPause'];
 }
 
 /**
@@ -192,6 +196,78 @@ function parseSearchShortcutStatus(value: unknown): SearchShortcutStatus {
 export class SettingsSurface extends JfElement {
   // Last reported recovery hold: freshness or a missing receipt cannot clear it.
   private settingsRecovery = false;
+  private indexingRulesDirty = false;
+  private indexingScheduleConfigured = false;
+  declare indexingRules: { enabled: boolean; days: number[]; start: string; end: string; pauseOnBattery: boolean };
+  declare indexingRulesLoaded: boolean;
+  declare indexingRulesSaving: boolean;
+  declare indexingRulesError: string;
+  declare indexingRulesMessage: string;
+
+  private indexingRuleFocus: 'hours' | 'battery' | null = null;
+
+  async focusIndexingRule(control: 'hours' | 'battery'): Promise<void> {
+    this.indexingRuleFocus = control;
+    this.activeCategory = 'indexing';
+    await this.focusPendingIndexingRule();
+  }
+
+  cancelIndexingRuleFocus(): void { this.indexingRuleFocus = null; }
+
+  private async focusPendingIndexingRule(): Promise<void> {
+    await this.updateComplete;
+    const control = this.indexingRuleFocus;
+    if (!control || !this.indexingRulesLoaded || this.activeCategory !== 'indexing') return;
+    const target = this.shadowRoot?.getElementById(control === 'hours' ? 'indexing-hours' : 'indexing-battery');
+    this.indexingRuleFocus = null;
+    target?.scrollIntoView({ block: 'nearest' });
+    target?.focus();
+  }
+
+  private editIndexingRules(patch: Partial<typeof this.indexingRules>): void {
+    this.indexingRulesDirty = true;
+    if (Object.keys(patch).some(key => key !== 'pauseOnBattery')) this.indexingScheduleConfigured = true;
+    this.indexingRules = { ...this.indexingRules, ...patch };
+    this.indexingRulesMessage = '';
+  }
+
+  private async saveIndexingRules(event: Event): Promise<void> {
+    event.preventDefault();
+    if (!this.indexingRulesLoaded || this.indexingRulesSaving || this.readOnly) return;
+    const draft = this.indexingRules;
+    const minute = (value: string): number => {
+      const parts = /^(\d{2}):(\d{2})$/.exec(value);
+      return parts ? Number(parts[1]) * 60 + Number(parts[2]) : NaN;
+    };
+    const startMinute = minute(draft.start), endMinute = minute(draft.end);
+    this.indexingRulesError = '';
+    this.indexingRulesMessage = '';
+    if (!Number.isInteger(startMinute) || !Number.isInteger(endMinute)) {
+      this.indexingRulesError = 'Enter a start time and an end time.';
+    } else if (startMinute === endMinute) {
+      this.indexingRulesError = 'Start and end times must be different.';
+    } else if (draft.enabled && !draft.days.length) {
+      this.indexingRulesError = 'Choose at least one day or turn indexing hours off.';
+    }
+    if (this.indexingRulesError) return;
+    this.indexingRulesSaving = true;
+    try {
+      await getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', {
+        args: { schedule: this.indexingScheduleConfigured
+          ? { enabled: draft.enabled, days: [...draft.days], startMinute, endMinute } : null,
+          pauseOnBattery: draft.pauseOnBattery },
+      }, { requestConsent: requestAuthorization });
+      this.indexingRulesDirty = false;
+      this.indexingRulesMessage = 'Indexing rules saved.';
+    } catch (error) {
+      this.indexingRulesError = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT')
+        ? `Settings changed before this save. Review your draft and save again. ${error.message}`
+        : `Could not save indexing rules. ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      this.indexingRulesSaving = false;
+    }
+  }
+
   private restoreRecoveryResetFocus = false;
   private recoveryFocusRequested = false;
 
@@ -260,6 +336,11 @@ export class SettingsSurface extends JfElement {
     surfaceMode: { state: true },
     // Tempdoc 874 — the Search v3 chat-column width preset (FE-only pref, mirrors surfaceMode).
     chatWidth: { state: true },
+    indexingRules: { state: true },
+    indexingRulesLoaded: { state: true },
+    indexingRulesSaving: { state: true },
+    indexingRulesError: { state: true },
+    indexingRulesMessage: { state: true },
   };
 
   declare apiBase: string;
@@ -367,6 +448,11 @@ export class SettingsSurface extends JfElement {
 
   constructor() {
     super();
+    this.indexingRules = { enabled: false, days: [1, 2, 3, 4, 5, 6, 7], start: '09:00', end: '17:00', pauseOnBattery: false };
+    this.indexingRulesLoaded = false;
+    this.indexingRulesSaving = false;
+    this.indexingRulesError = '';
+    this.indexingRulesMessage = '';
     this.apiBase = '';
     this.host_ = undefined as unknown as PluginHostApi;
     this.ui = {};
@@ -782,6 +868,18 @@ export class SettingsSurface extends JfElement {
       color: var(--text-primary);
       font-size: var(--font-size-sm);
     }
+    .indexing-rules { margin: 1rem 0 0; padding: .75rem; min-width: 0; border: 1px solid var(--border-subtle); }
+    .indexing-rules label { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .35rem; font-size: var(--font-size-sm); }
+    .indexing-days, .indexing-times { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: .75rem 0; }
+    .indexing-rules input, form[aria-label="Indexing rules"] button { font: inherit; color: var(--text-primary); background: var(--surface-tertiary); }
+    .indexing-rules input[type=time], form[aria-label="Indexing rules"] button { border: 1px solid var(--border-subtle); border-radius: .25rem; padding: .375rem; max-width: 100%; }
+    .indexing-rules input:focus-visible, form[aria-label="Indexing rules"] button:focus-visible { outline: 2px solid var(--accent-tint); outline-offset: 2px; }
+    form[aria-label="Indexing rules"] button { margin-top: .75rem; cursor: pointer; }
+    #indexing-rules-error { color: var(--text-primary); overflow-wrap: anywhere; }
+    @media (forced-colors: active) {
+      .indexing-rules, .indexing-rules input, form[aria-label="Indexing rules"] button { border-color: ButtonText; color: CanvasText; background: Canvas; }
+      .indexing-rules input:focus-visible, form[aria-label="Indexing rules"] button:focus-visible { outline-color: Highlight; }
+    }
     p.help {
       margin: 0.5rem 0 0 0;
       font-size: var(--font-size-xs);
@@ -1023,12 +1121,15 @@ export class SettingsSurface extends JfElement {
   protected override settleTransients(): void {
     this.restoreRecoveryResetFocus = false;
     this.cancelSettingsRecoveryFocus();
+    this.cancelIndexingRuleFocus();
     this.saving = false;
     this.deleting = false;
     this.error = null;
     this.deleteState = 'idle';
     this.confirmText = '';
     this.searchShortcutError = null;
+    this.indexingRulesError = '';
+    this.indexingRulesMessage = '';
   }
 
   override disconnectedCallback(): void {
@@ -1090,6 +1191,7 @@ export class SettingsSurface extends JfElement {
   override updated(changed: PropertyValues): void {
     super.updated(changed);
     if (this.recoveryFocusRequested) void this.focusPendingSettingsRecovery();
+    if (this.indexingRuleFocus) void this.focusPendingIndexingRule();
     // 569 Move 6 — apply-time RUNTIME conformance: once per applied presentation, audit the
     // declared region's RENDERED DOM (computed-contrast oracle). A failure quarantines the region
     // to the built-in render (degrade-never-fail). No-op when no declaration drives the region.
@@ -1135,6 +1237,17 @@ export class SettingsSurface extends JfElement {
       this.applyAppearance();
       this.llm = data.llm ?? {};
       this.readOnly = data.settingsMode === 'in_memory';
+      if (!this.indexingRulesDirty && !this.indexingRulesSaving) {
+        const policy = data.ui?.indexingPause;
+        const schedule = policy?.schedule;
+        this.indexingScheduleConfigured = schedule != null;
+        const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+        this.indexingRules = { enabled: schedule?.enabled ?? false,
+          days: schedule?.days ? [...schedule.days] : [1, 2, 3, 4, 5, 6, 7],
+          start: time(schedule?.startMinute ?? 540), end: time(schedule?.endMinute ?? 1020),
+          pauseOnBattery: policy?.pauseOnBattery ?? false };
+      }
+      this.indexingRulesLoaded = true;
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
     }
@@ -2953,8 +3066,39 @@ export class SettingsSurface extends JfElement {
     return html`<section class="section" data-testid="settings-indexing">
       <h3>Indexing</h3>
       <p>${progress.activity.summary}${progress.activity.detail ? ` — ${progress.activity.detail}` : ''}</p>
-      ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause processing while keeping indexed files searchable. New work waits for Resume.</p>` : nothing}
+      ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause processing while keeping indexed files searchable. Resume clears your manual pause; indexing hours and battery rules still apply.</p>` : nothing}
       <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
+      <form @submit=${(event: Event) => void this.saveIndexingRules(event)} novalidate aria-label="Indexing rules">
+        <fieldset class="indexing-rules" ?disabled=${!this.indexingRulesLoaded || this.indexingRulesSaving || this.readOnly}
+          aria-describedby="indexing-rules-error">
+          <legend>Indexing rules</legend>
+          <label><input id="indexing-hours" type="checkbox" .checked=${this.indexingRules.enabled}
+            @change=${(e: Event) => this.editIndexingRules({ enabled: (e.target as HTMLInputElement).checked })}>Use indexing hours</label>
+          <p id="indexing-local-time" class="help">Hours follow this computer's local time. An end time before the start continues into the next day. Turning hours off keeps your days and times.</p>
+          <div class="indexing-days" role="group" aria-label="Indexing days">
+            ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => html`
+              <label><input type="checkbox" .checked=${this.indexingRules.days.includes(index + 1)}
+                @change=${(e: Event) => this.editIndexingRules({ days: (e.target as HTMLInputElement).checked
+                  ? [...this.indexingRules.days, index + 1].sort((a, b) => a - b)
+                  : this.indexingRules.days.filter(d => d !== index + 1) })}>${day}</label>`)}
+          </div>
+          <div class="indexing-times">
+            <label>Start time <input type="time" .value=${this.indexingRules.start} aria-describedby="indexing-local-time indexing-rules-error"
+              @input=${(e: Event) => this.editIndexingRules({ start: (e.target as HTMLInputElement).value })}></label>
+            <label>End time <input type="time" .value=${this.indexingRules.end} aria-describedby="indexing-local-time indexing-rules-error"
+              @input=${(e: Event) => this.editIndexingRules({ end: (e.target as HTMLInputElement).value })}></label>
+          </div>
+          <label><input id="indexing-battery" type="checkbox" .checked=${this.indexingRules.pauseOnBattery}
+            aria-describedby="indexing-battery-help"
+            @change=${(e: Event) => this.editIndexingRules({ pauseOnBattery: (e.target as HTMLInputElement).checked })}>Pause indexing on battery</label>
+          <p id="indexing-battery-help" class="help">Applies only while this computer is known to run on battery. If the power source is unknown, this rule does not hold indexing. Your preference is kept.</p>
+        </fieldset>
+        <button type="submit" ?disabled=${!this.indexingRulesLoaded || this.readOnly}
+          aria-disabled=${this.indexingRulesSaving ? 'true' : 'false'}>${this.indexingRulesSaving ? 'Saving indexing rules…' : 'Save indexing rules'}</button>
+        <p id="indexing-rules-error" role="alert">${this.indexingRulesError}</p>
+        <p role="status">${this.indexingRulesMessage}</p>
+        ${!this.indexingRulesLoaded ? html`<p class="help">Waiting for saved indexing rules.</p>` : nothing}
+      </form>
     </section>`;
   }
 

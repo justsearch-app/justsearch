@@ -153,7 +153,15 @@ final class ForgetSettingsProjectionTest {
   void RF55ProjectionIsNonterminalAndWD55WithdrawalRemovesOnlyOwnedEntryAfterFreshMerge() throws Exception {
     OperationKind kind = kind();
     var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, directory.resolve("settings.json"));
-    var config = new ConfigStore(ConfigStoreRebuilder.prepare(initial(settings)));
+    var authored = initial(settings);
+    var rules = JSON.readTree("{\"enabled\":true,\"days\":[1,7],\"startMinute\":1320,\"endMinute\":360}");
+    var policy = JSON.readValue("{\"indexingPause\":{\"paused\":true,\"untilEpochMs\":1900000000000,"
+        + "\"reason\":\"USER_PAUSED\",\"schedule\":" + rules + ",\"pauseOnBattery\":true}}", UiSettings.class);
+    authored.setIndexingPause(policy.getIndexingPause());
+    settings.replacePrepared(settings.prepare(authored, new SettingsWitness(0, null), settings.inspect().queryRoles()));
+    assertEquals(rules, JSON.valueToTree(settings.load().getIndexingPause()).get("schedule"),
+        "S38.6: the settings owner must retain configured rules before Forget");
+    var config = new ConfigStore(ConfigStoreRebuilder.prepare(authored));
     try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
       var owner = new SettingsCommitCoordinator(settings, config, () -> {}, candidate -> OperationResult.success("prepared"));
       var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of(kind, OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE), owner);
@@ -174,12 +182,18 @@ final class ForgetSettingsProjectionTest {
       assertFalse(attempt.completion().toCompletableFuture().isDone());
       assertEquals(1, notifications.get());
       assertEquals(3, settings.load().getExcludePatterns().size());
+      assertEquals(JSON.valueToTree(policy.getIndexingPause()), JSON.valueToTree(settings.load().getIndexingPause()),
+          "Forget projection preserves manual fields, hours and battery preference");
       // An unrelated successful settings transaction happens before withdrawal. No stale whole
       // document from the first activation may replace its theme or any other policy entry.
       var ordinary = runner.accept(new OperationAttemptRunner.Request(OperationKeys.generate(CLOCK),
           new OperationDescriptor(OperationKind.SETTINGS_APPLY, "core.settings", "{}"), context(), null));
       runner.start(ordinary, handle -> {
         var changed = settings.load(); changed.setTheme("dark");
+        var disabled = JSON.readValue("{\"indexingPause\":{\"paused\":true,\"untilEpochMs\":1900000000000,"
+            + "\"reason\":\"USER_PAUSED\",\"schedule\":" + rules.toString().replace("true", "false")
+            + ",\"pauseOnBattery\":false}}", UiSettings.class);
+        changed.setIndexingPause(disabled.getIndexingPause());
         return OperationExecution.finished(runner.applySettings(handle, settings.inspect().witness(), changed));
       });
       String key = attempt.accepted().key();
@@ -196,6 +210,12 @@ final class ForgetSettingsProjectionTest {
       assertEquals(OperationState.CANCELLED, store.find(key).orElseThrow().state());
       assertEquals("dark", settings.load().getTheme());
       assertEquals(2, settings.load().getExcludePatterns().size());
+      var retained = JSON.valueToTree(settings.load().getIndexingPause());
+      assertEquals(JSON.readTree(rules.toString().replace("true", "false")), retained.get("schedule"),
+          "Forget withdrawal preserves a subsequent rules edit");
+      assertTrue(retained.get("paused").booleanValue());
+      assertEquals(1900000000000L, retained.get("untilEpochMs").longValue());
+      assertFalse(retained.has("pauseOnBattery") && retained.get("pauseOnBattery").booleanValue());
       String saved = JSON.writeValueAsString(settings.load().getExcludePatterns());
       assertTrue(saved.contains(FOREIGN)); assertFalse(saved.contains(OWN)); assertTrue(saved.contains("*.cache"));
       assertEquals(new QueryRoleSelection(QueryRoleSelection.Role.disabled(), QueryRoleSelection.Role.disabled()), settings.inspect().queryRoles());

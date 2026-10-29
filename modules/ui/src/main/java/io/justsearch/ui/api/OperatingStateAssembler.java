@@ -430,7 +430,7 @@ final class OperatingStateAssembler {
     // IDLE wins with nothing to drain; the present reasons are still listed, as before E1.
     EnumSet<IndexingReason> allReasons = EnumSet.noneOf(IndexingReason.class);
     present.stream().map(r -> IndexingReason.valueOf(r.name())).forEach(allReasons::add);
-    if (userHeld) allReasons.add(IndexingReason.valueOf(pause.reason()));
+    if (userHeld) pause.reasons().stream().map(IndexingReason::valueOf).forEach(allReasons::add);
     List<IndexingReason> reasons = List.copyOf(allReasons);
     IndexingState state =
         userHeld ? IndexingState.valueOf(pause.state().name()) : idle(worker)
@@ -446,10 +446,7 @@ final class OperatingStateAssembler {
       indexingSince = now.toString();
     }
     String reasonCode =
-        userHeld ? ("SETTINGS_RECOVERY".equals(pause.reason())
-            ? LifecycleReasonCode.INDEXING_PAUSED_SETTINGS_RECOVERY.code()
-            : state == IndexingState.PAUSING ? LifecycleReasonCode.INDEXING_PAUSING_USER.code()
-                : LifecycleReasonCode.INDEXING_PAUSED_USER.code())
+        userHeld ? policyReasonCode(pause)
             : state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.GAME_MODE
             ? LifecycleReasonCode.INDEXING_PAUSED_GAME_MODE.code()
             : state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.ENERGY_SAVER
@@ -475,6 +472,21 @@ final class OperatingStateAssembler {
         Instant.ofEpochMilli(workerSampledAtMs).toString(),
         userHeld ? pause.untilEpochMs() : null,
         userHeld && (pause.waiting() > 0 || worker != null && worker.core() != null && !idle(worker)));
+  }
+
+  private static String policyReasonCode(io.justsearch.core.scheduling.IndexingHold.Snapshot pause) {
+    boolean pausing = pause.state() == io.justsearch.core.scheduling.IndexingHold.State.PAUSING;
+    return switch (pause.reason()) {
+      case "SETTINGS_RECOVERY" -> (pausing ? LifecycleReasonCode.INDEXING_PAUSING_SETTINGS_RECOVERY
+          : LifecycleReasonCode.INDEXING_PAUSED_SETTINGS_RECOVERY).code();
+      case "USER_PAUSED" -> (pausing ? LifecycleReasonCode.INDEXING_PAUSING_USER
+          : LifecycleReasonCode.INDEXING_PAUSED_USER).code();
+      case "SCHEDULE" -> (pausing ? LifecycleReasonCode.INDEXING_PAUSING_SCHEDULE
+          : LifecycleReasonCode.INDEXING_PAUSED_SCHEDULE).code();
+      case "ON_BATTERY" -> (pausing ? LifecycleReasonCode.INDEXING_PAUSING_ON_BATTERY
+          : LifecycleReasonCode.INDEXING_PAUSED_ON_BATTERY).code();
+      default -> throw new IllegalArgumentException("Unknown indexing hold reason");
+    };
   }
 
   /**

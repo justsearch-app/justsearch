@@ -310,6 +310,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             // open and no PID to validate against a spawn. `workerHost` is required rather than
             // optional now, which is why the field is final and the constructor rejects null.
             energyPoller.start();
+            energyPoller.awaitFirstReading();
             try {
                 KnowledgeClient startedClient = workerHost.start(gpuScheduling, ipcTelemetry);
                 publicationLock.writeLock().lock();
