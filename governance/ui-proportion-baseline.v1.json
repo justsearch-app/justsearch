@@ -1549,6 +1549,7 @@
       "elements": [
         {
           "selector": "dialog[aria-label=\"Settings\"][open]",
+          "minWidthPx": 540,
           "maxWidthPx": 1200,
           "maxHeightPx": 614
         }
@@ -1563,6 +1564,7 @@
       "elements": [
         {
           "selector": "dialog[aria-label=\"Settings\"][open]",
+          "minWidthPx": 540,
           "maxWidthPx": 1200,
           "maxHeightPx": 614
         }
@@ -1577,6 +1579,7 @@
       "elements": [
         {
           "selector": "dialog[aria-label=\"Settings\"][open]",
+          "minWidthPx": 540,
           "maxWidthPx": 1200,
           "maxHeightPx": 614
         }
@@ -1591,6 +1594,7 @@
       "elements": [
         {
           "selector": "dialog[aria-label=\"Settings\"][open]",
+          "minWidthPx": 540,
           "maxWidthPx": 1200,
           "maxHeightPx": 342
         }
