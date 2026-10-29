@@ -39,7 +39,7 @@ import { hitStageSchema } from '../../api/generated/schema-types/hit-stage.js';
 // active filter and includes it in the request body when set.
 import {
   getFilters,
-  hasActiveFilter,
+  restrictionWire,
   getFacetSelections,
   type SearchFilterSpec,
 } from './searchFiltersState.js';
@@ -73,6 +73,8 @@ export type SearchPassStage = 'quick' | 'refined';
 
 export interface SearchState {
   query: string;
+  /** Restrictions that produced these rows; absent before the first response. */
+  restrictionsKey?: string;
   results: SearchHit[];
   /** The bounded fused-candidate-union (retrieval window). Diagnostic only — NOT the headline. */
   totalHits: number;
@@ -279,9 +281,11 @@ async function readSearchFailure(res: Response): Promise<ReturnType<typeof creat
     typeof value === 'string' && value.trim() ? value : undefined;
   const code = text(data.errorCode);
   const wireKey = text(data.i18nKey);
+  const restrictionError = res.status === 400 && code === 'INVALID_REQUEST'
+    && /^(pathPrefix|modifiedAt|sizeBytes)([.:]|$)/.test(text(data.error) ?? '');
   const message = code === 'SEARCH_SYNTAX_INVALID'
     ? text(data.error) ?? 'Check the search syntax.'
-    : localizeError({
+    : restrictionError ? text(data.error)! : localizeError({
     code,
     i18nKey: wireKey?.startsWith('errors.') ? wireKey : undefined,
     // ApiErrorHandler supplies sanitized English when the catalog is unavailable.
@@ -352,7 +356,7 @@ export interface SearchRequestBody {
   pipeline?: typeof QUICK_PIPELINE;
   includeExcerpts?: boolean;
   facets?: { include: boolean; fields: Array<{ field: string }> };
-  filters?: { modifiedAt?: SearchFilterSpec } & Partial<Record<string, unknown>>;
+  filters?: import('../../api/domains/search.js').SearchFilters;
 }
 
 /**
@@ -384,20 +388,7 @@ export function buildSearchIntent(
     body.includeExcerpts = true;
     body.facets = { include: true, fields: FACET_FIELDS.map((field) => ({ field })) };
   }
-  const filterObj: { modifiedAt?: SearchFilterSpec } & Record<string, unknown> = {};
-  if (hasActiveFilter(filters)) {
-    // Backend accepts `filters.modifiedAt: { fromMs?, toMs? }`
-    // (KnowledgeSearchController.java:170-173). Map the FE
-    // `modifiedFromMs/modifiedToMs` shape to the wire shape.
-    const modifiedAt: { fromMs?: number; toMs?: number } = {};
-    if (typeof filters.modifiedFromMs === 'number') {
-      modifiedAt.fromMs = filters.modifiedFromMs;
-    }
-    if (typeof filters.modifiedToMs === 'number') {
-      modifiedAt.toMs = filters.modifiedToMs;
-    }
-    filterObj.modifiedAt = modifiedAt as SearchFilterSpec;
-  }
+  const filterObj: Record<string, unknown> = { ...restrictionWire(filters) };
   // Facet selections → the wire's existing keyword filters (clickable half of dual filtering).
   for (const field of FACET_FIELDS) {
     const selected = facetSelections[field];
@@ -603,6 +594,18 @@ export function submitSearch(): void {
   void runSearch(q, 'refined', generation);
 }
 
+/** A committed restriction supersedes rows and pending passes even when no rerun is allowed. */
+export function invalidateSearchRestrictions(): void {
+  generation += 1;
+  clearTimers();
+  inflightAbort?.abort();
+  inflightAbort = null;
+  state = { ...state, results: [], totalHits: 0, matchCount: 0, facets: null,
+    facetsTruncated: false, isSearching: false, isRefining: false, error: null,
+    errorInfo: null, searchTrace: null, passStage: null, restrictionsKey: '' };
+  emit();
+}
+
 /** The staged keystroke path: quick pass now, refined pass after the input settles. */
 async function runStagedSearch(q: string, gen: number): Promise<void> {
   const accepted = await runSearch(q, 'quick', gen);
@@ -614,6 +617,8 @@ async function runStagedSearch(q: string, gen: number): Promise<void> {
 
 async function runSearch(q: string, stage: SearchPassStage, gen: number): Promise<boolean> {
   if (gen !== generation) return false;
+  const restrictions = getFilters();
+  const restrictionsKey = JSON.stringify(restrictionWire(restrictions));
   // Tempdoc 580 §17 P3 — a new query replacing a settled, unopened result set is the
   // recall-failure signal (the user looked at the whole set and opened nothing).
   if (stage === 'quick' && state.passStage === 'refined') {
@@ -643,7 +648,7 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
   try {
     const body = buildSearchIntent(
       q,
-      getFilters(),
+      restrictions,
       stage,
       getFacetSelections(),
       _searchScope,
@@ -655,10 +660,10 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       body: JSON.stringify(body),
       signal: inflightAbort.signal,
     });
-    if (gen !== generation) return false; // superseded while in flight — drop silently
+    if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return false; // superseded while in flight — drop silently
     if (!res.ok) {
       const errorInfo = await readSearchFailure(res);
-      if (gen !== generation) return false; // also guard the asynchronous body read
+      if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return false; // also guard the asynchronous body read
       const syntaxInvalid = errorInfo.code === 'SEARCH_SYNTAX_INVALID';
       state = { ...state, isSearching: false, isRefining: false, slowSearch: false,
         ...(syntaxInvalid ? { results: [], totalHits: 0, matchCount: 0, facets: null,
@@ -669,7 +674,7 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       return false;
     }
     const data = (await res.json()) as SearchResponse;
-    if (gen !== generation) return false;
+    if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return false;
     const hits: SearchHit[] = (data.results ?? []).map((r) => {
       // A pure-dense hit whose chunk-merge was skipped has no fields.path; r.id is then a raw
       // `chunk:<uuid>` — don't surface that scheme as the displayed title/path (searchState chunk-id leak).
@@ -707,6 +712,7 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
     state = {
       ...state,
       results: hits,
+      restrictionsKey,
       totalHits: data.totalHits ?? hits.length,
       // Tempdoc 597: the true matched total (M in "Top N of M matches"). Fall back to totalHits then
       // the hit count if an older worker omits matchCount.
@@ -734,7 +740,7 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
     return true;
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') return false;
-    if (gen !== generation) return false;
+    if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return false;
     state = {
       ...state,
       isSearching: false,

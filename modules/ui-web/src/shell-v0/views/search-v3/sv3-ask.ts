@@ -43,6 +43,7 @@ import {
   type RagMetaPayload,
 } from '../../../api/streams.js';
 import type { CoreRagAskHandlers } from '../../../api/generated/shape-handlers/core-rag-ask.js';
+import type { SearchFilters } from '../../../api/domains/search.js';
 import type { SelectionPayload } from '../../../api/types/selection.js';
 import { buildRequestBody, withHumanLoad, type ShapeId } from '../unifiedChatRequest.js';
 import { chatRefusalOf, type ChatRefusalDetail } from '../../state/chatResidency.js';
@@ -214,6 +215,7 @@ export interface Sv3AskRequest {
    * matches). Omitted asks the whole index; the window never sends an empty list for a choice.
    */
   readonly docIds?: readonly string[];
+  readonly filters?: SearchFilters;
   /**
    * The conversation so far, as `{role, content}` messages, for a FOLLOW-UP (S2.0) — the window's
    * effective context (`sv3-context.ts` sv3FollowUpContext). The ask shape is ephemeral, so this is
@@ -388,6 +390,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   const body = buildRequestBody(modelOnly ? SV3_MODEL_SHAPE_ID : req.shapeId ?? (req.schema === undefined ? SV3_ASK_SHAPE_ID : 'core.extract'), req.question, req.conversationId, req.schema ?? '', [
     ...(modelOnly ? [] : req.docIds ?? []),
   ], modelOnly ? undefined : req.selection);
+  if (!modelOnly && (req.shapeId ?? SV3_ASK_SHAPE_ID) === SV3_ASK_SHAPE_ID && req.schema === undefined && req.selection == null && !req.docIds?.length && req.filters && Object.keys(req.filters).length) body.filters = req.filters;
   // The turn is recorded against THIS window's session, exactly as the shipped window stamps it.
   body.conversationId = req.conversationId;
   if (!modelOnly && req.schema !== undefined && req.selection == null && (req.docIds?.length ?? 0) > 0) {

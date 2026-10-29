@@ -65,7 +65,7 @@ import { sv3Tokens } from './sv3-tokens.css.js';
 import { sv3Shared } from './sv3-shared-styles.js';
 import { COMPOSER_STATE_DEFAULT, WINDOW_TITLE, type Sv3ComposerState } from './fixtures.js';
 import { removeScopeChip, resetSearchState, setSearchApiBase } from '../../state/searchState.js';
-import { clearFilters, toggleFacetValue } from '../../state/searchFiltersState.js';
+import { clearFilters, getFilters, hasActiveFilter, restrictionWire, setFilters, toggleFacetValue, type SearchFilterSpec } from '../../state/searchFiltersState.js';
 import {
   adoptSv3MorphSheet,
   releaseSv3MorphSheet,
@@ -86,6 +86,8 @@ import {
   sv3ScopeLabel,
   type Sv3AskScope,
 } from './sv3-search.js';
+import { restrictionLabels, withoutRestriction } from './sv3-filter-input.js';
+import { localizeResourceKey } from '../../../i18n/resourceCatalog.js';
 import type { Sv3ResultsFilterRemove } from './Sv3Results.js';
 import type { CardSelectionDetail } from '../../components/searchResults/ResultsCard.js';
 import {
@@ -459,6 +461,7 @@ interface HumanTask {
   question: string;
   scope: Sv3AskScope | null;
   scopeOwner: Sv3AskScope | null;
+  filters: SearchFilterSpec;
   selection: SelectionPayload | null;
   composer: Sv3Composer | null;
   version: number | undefined;
@@ -1406,7 +1409,7 @@ export class SearchV3View extends JfElement {
     }
     if (payload.task !== null) {
       this.humanTask = {
-        saved: payload.task, question: '', scope: null, scopeOwner: null, selection: null, composer: null,
+        saved: payload.task, question: '', scope: null, scopeOwner: null, filters: {}, selection: null, composer: null,
         version: undefined, epoch: this.humanEpoch, ownsComposer: false, revoked: true, abandoned: true,
         restored: true, context: null, refusal: null, retryAt: 0,
       };
@@ -1457,7 +1460,7 @@ export class SearchV3View extends JfElement {
 
   private reserveHumanTask(question: string, scope: Sv3AskScope | null, schema: string | undefined,
     shape: RecoveryShape, selection: SelectionPayload | null, ownsComposer: boolean,
-    record: string | null = null, authored?: string): HumanTask | null {
+    record: string | null = null, authored?: string, filters?: SearchFilterSpec): HumanTask | null {
     if (this.humanTask !== null) {
       this.recoveryError = 'Review the retained question, then explicitly discard it before starting another submission.';
       this.requestUpdate(); return null;
@@ -1467,6 +1470,7 @@ export class SearchV3View extends JfElement {
         raw: this.recoveryText(authored ?? (ownsComposer ? this.currentDraft() : record === null ? question : ''), selection), schema: schema ?? null,
         shape, scope: [...(scope?.paths ?? [])], record, needsReselection: selection !== null,
         effort: this.effort, delivery: 'unaccepted' },
+      filters: filters ?? (shape === SV3_ASK_SHAPE_ID && scope === null && selection === null ? structuredClone(getFilters()) : {}),
       question, scope: scope === null ? null : { paths: [...scope.paths] }, scopeOwner: scope,
       selection: selection === null ? null : structuredClone(selection), composer: this.composer,
       version: this.composer?.draftVersion, epoch: this.humanEpoch, ownsComposer,
@@ -1710,7 +1714,7 @@ export class SearchV3View extends JfElement {
    * WP1.1 — Search mode: the shared search store's reader, the result list's chosen rows, and the
    * files a prepared Ask is limited to (`sv3-search.ts`). The window keeps only the navigation.
    */
-  private readonly search = new Sv3SearchController(this);
+  private readonly search = new Sv3SearchController(this, () => this.onRestrictionsCommitted());
   /**
    * WP1.1 S1.13 — each place's own unsent draft: a conversation's follow-up, or the result list's
    * query. Window-local, like the result list itself; the one persisted draft is still the composer's.
@@ -1860,6 +1864,8 @@ export class SearchV3View extends JfElement {
       this.recentConversationsReady = false;
       this.composer?.closeRecents();
       resetSearchState();
+      clearFilters();
+      this.composer?.shadowRoot?.querySelector('jf-sv3-filters')?.resetInputs();
       void this.refreshRecents();
     };
     const stopUserProfile = subscribeProfileSwitch(resetProfileRecents);
@@ -2601,7 +2607,7 @@ export class SearchV3View extends JfElement {
       : shapeId === 'core.extract' ? this.structuredNote(detail.turnId)
       : shapeId === 'core.summarize'
         ? this.summaryInputs.has(detail.turnId) ? 'Summarize with the original inputs.' : 'Opens Summarize; choose the original inputs before sending.'
-        : sv3ResendScopeNote(this.search.scopesByTurn.get(detail.turnId));
+        : sv3ResendScopeNote(this.search.scopesByTurn.get(detail.turnId), this.search.filtersOfTurn(detail.turnId));
     const chosen = await openContextMenu({
       // The branch acts lead: they fork the conversation, and the context acts change what the next
       // prompt carries within it. The reference window orders them the same way.
@@ -2611,7 +2617,7 @@ export class SearchV3View extends JfElement {
           // WP1.1 S1.7 — a Retry says what it will search before it is pressed: the same chosen
           // files when this window limited the turn, known unrestricted files, or a truthful unknown-input remedy after reload.
           label:
-            item.id === 'retry'
+            (item.id === 'retry' || item.id === 'edit')
               ? `${item.label} · ${retryNote}`
               : item.label,
           icon: 'git-branch' as const,
@@ -2943,7 +2949,7 @@ export class SearchV3View extends JfElement {
             : tier === 'structured' ? this.structuredInputs.get(detail.turnId)?.scope ?? null : this.search.scopeOfTurn(detail.turnId),
           tier === 'structured' ? this.structuredInputs.get(detail.turnId)?.schema : undefined,
           shape, summary ? this.summaryInputs.get(detail.turnId)?.selection ?? null : null,
-          false, lineage.forkKey, detail.action === 'edit' ? detail.text : undefined);
+          false, lineage.forkKey, detail.action === 'edit' ? detail.text : undefined, this.search.filtersOfTurn(detail.turnId));
         if (task === null) return;
         humanTask = task;
       }
@@ -3653,7 +3659,7 @@ export class SearchV3View extends JfElement {
     // so the row's `stopPropagation` cannot defend it — the window has to decline. Without this,
     // an Escape pressed while typing in the rename field closed the PANE, silently, in a region
     // the reader was not looking at, and left the edit open (F-series fit audit, DEFECT-7).
-    if (event.key === 'Escape' && !event.isComposing && this.composer?.recentsOpen
+    if (event.key === 'Escape' && !event.isComposing && (this.composer?.recentsOpen || this.composer?.filtersOpen)
       && event.composedPath().includes(this.composer)) return;
     if (event.key === 'Escape' && renamingRowInPath(event)) return;
     // An open control menu is served the same way and for the same reason: it is the most local
@@ -4042,16 +4048,29 @@ export class SearchV3View extends JfElement {
     this.search.hide();
   }
 
+  private onRestrictionsCommitted(): void {
+    this.askFilterError = '';
+    if (this.search.showing && this.currentDraft().trim() && !this.historyLocked
+      && this.humanTask === null && !this.draftReview && this.draftMayIssue(false)) this.search.rerun();
+  }
+
+  private get filterNote(): string {
+    if (!hasActiveFilter(getFilters())) return '';
+    if (this.tier === 'delegate' || this.tier === 'structured' || this.livePreparation().kind === 'model') return localizeResourceKey('search.filters.other-mode');
+    if (this.search.pendingScope !== null || this.preparedHandoff?.selection != null) return localizeResourceKey('search.filters.suspended');
+    return '';
+  }
+
   private onResultsFilterRemove(event: Event): void {
     const filter = (event as CustomEvent<Sv3ResultsFilterRemove>).detail;
     if (filter === undefined) return;
-    // A result place is an existing search owner, not an inference from B's text.
-    // Its C query may still be operated on while B waits for review; no B is staged.
-    if (this.draftReview ? !this.search.hasPlace : !this.draftMayIssue()) return;
+    if (filter.kind === 'date' || filter.kind === 'folder' || filter.kind === 'size') {
+      setFilters(withoutRestriction(getFilters(), filter.kind)); return;
+    }
+    if (this.humanTask !== null || this.historyLocked || !this.draftMayIssue(false)) return;
     if (filter.kind === 'scope') removeScopeChip(filter.index);
-    else if (filter.kind === 'date') clearFilters();
-    else toggleFacetValue(filter.field, filter.value);
-    this.search.rerun();
+    else if (filter.kind === 'facet') toggleFacetValue(filter.field, filter.value);
+    if (this.search.showing) this.search.rerun();
   }
 
   /** The card's facet chips — the default window's handler, on the same store. */
@@ -4526,6 +4545,8 @@ export class SearchV3View extends JfElement {
    * busy send before it leaves, and the model action checks its own gate. This method
    * opens the turn, dispatches through the window's single ask site, and settles that turn.
    */
+  private askFilterError = '';
+
   private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false,
     options: { task?: HumanTask; continuation?: boolean; turnAction?: boolean; record?: string; authored?: string } = {}): Promise<void> {
     let question = rawQuestion.trim();
@@ -4608,7 +4629,7 @@ export class SearchV3View extends JfElement {
     if (shapeId === 'core.summarize') this.summaryInputs.set(ref.turnId, { scope, selection: handoff?.selection ?? null });
     // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
     // store keeps no scope with a turn, so after reload its original scope is unknown and Retry/Edit must refuse.
-    if (shapeId === SV3_ASK_SHAPE_ID) this.search.recordTurnScope(ref.turnId, scope);
+    if (shapeId === SV3_ASK_SHAPE_ID) this.search.recordTurnScope(ref.turnId, task.scope, task.filters);
     if (schema === undefined && task.ownsComposer && this.composer === composer && composer?.draftVersion === draftVersion
       && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
     if (!modelAnswer) this.placeScopes.delete(ref.sessionId);
@@ -4729,6 +4750,7 @@ export class SearchV3View extends JfElement {
         // The chosen files' PATHS (what the backend's `docIds` filter matches), or none at all —
         // never an empty list standing in for a choice, which would mean the whole index.
         ...(task.scope !== null ? { docIds: task.scope.paths } : {}),
+        filters: restrictionWire(task.filters),
         context,
         turnId: dispatchId,
         signal: abort.signal,
@@ -4809,7 +4831,10 @@ export class SearchV3View extends JfElement {
           // delivery uncertainty or an answer for the next turn's context.
           if (code === 'NO_CONTENT') this.retireHumanTask(task);
           else { task.saved.delivery = 'unknown'; task.revoked = true; this.saveRecovery(task); }
-          const noEvidence = shapeId === SV3_ASK_SHAPE_ID && code === 'NO_CONTENT' && scope === null;
+          if (code === 'INVALID_REQUEST' && /pathPrefix|modifiedAt|sizeBytes/.test(message)) this.askFilterError = message;
+          const restricted = hasActiveFilter(task.filters);
+          if (code === 'NO_CONTENT' && restricted) message += ` ${localizeResourceKey('search.filters.no-content')} ${restrictionLabels(task.filters).map(f => f.label).join('; ')}`;
+          const noEvidence = !restricted && shapeId === SV3_ASK_SHAPE_ID && code === 'NO_CONTENT' && scope === null;
           settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
           void loadConversations();
           void this.refreshRecord(ref.sessionId);
@@ -5961,6 +5986,7 @@ export class SearchV3View extends JfElement {
           .turns=${turns}
           .conversationId=${session?.id ?? ''}
           .turnScopes=${this.search.scopesByTurn}
+          .turnFilters=${this.search.filtersByTurn}
           .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
           ?model-answer-busy=${this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true}
           .structuredNotes=${new Map(turns.filter(t => t.shapeId === 'core.extract').map(t => [t.id, this.structuredNote(t.id)]))}
@@ -6012,6 +6038,8 @@ export class SearchV3View extends JfElement {
           tier=${this.tier}
           .searchError=${this.search.snapshot?.errorInfo?.code === 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.error ?? '' : ''}
           .schemaDraft=${this.schemaDraft}
+          .filterNote=${this.filterNote}
+          .filterError=${this.askFilterError || (this.search.snapshot?.errorInfo?.status === 400 && this.search.snapshot.errorInfo.code !== 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.errorInfo.message : '')}
           .recentItems=${this.recentItems}
           .recentLocked=${this.historyLocked}
           @sv3-recents-refresh=${() => { void this.refreshRecents(); }}

@@ -409,6 +409,31 @@ Agent choices under the quoted design delegation, never owner-agreed words. Buil
         "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java#invalidRestrictionWinsOverInvalidSearchSyntaxBeforeDispatch"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "X1/X6 × F1/F5/F8: mounted Search combines querySyntax and folder/date/size, preserves filters through syntax errors, drops responses and delayed error bodies after restriction changes, displays Engine restriction errors, and reruns syntax after chip removal.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X1/X6 × F1/F5/F8: mounted Search combines querySyntax and folder/date/size, preserves filters through syntax errors, drops responses and delayed error bodies after restriction changes, displays Engine restriction errors, and reruns syntax after chip removal.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/combined-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters syntax requests carry querySyntax and every active restriction and chip removal reruns syntax",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters syntax errors show the Engine syntax message and preserve active filters",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters changing a restriction during syntax Search drops the old response and delayed error body",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#XFilters restriction errors on syntax queries retain the Engine restriction message"
+      ],
+      "repaired": true
     }
   ]
 }

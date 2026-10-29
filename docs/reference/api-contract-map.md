@@ -911,7 +911,7 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
   Uppercase Boolean operators mixed with advanced syntax return
   "OR, AND and NOT can't be combined with quotes, - or title:/author:".
   `simple`, raw `lucene` (including its `advanced` alias), internal `*:*` probes and
-  expansion reissued as `lucene` retain their behavior. See [Search syntax](../../SSOT/docs/help/search-syntax.md).
+  expansion reissued as `lucene` retain their behavior. See the in-app help topic "Search syntax".
 - `projection[]`
 - `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`, `sizeBytes`)
 - Entity filter fields: `entityPersons`, `entityOrganizations`, `entityLocations` (repeated string) (362)

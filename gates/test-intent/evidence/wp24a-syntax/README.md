@@ -149,3 +149,31 @@ logs and installed-Engine requests/responses are linked from
 clone at `$TMPDIR/before`; test files alone are transplanted. A private object
 directory prevents the tree-hash computation from writing Git objects into the
 source repository. Independent acceptance of the changed digest remains pending.
+
+## Filters UI merge (WP2.4a)
+
+The merge refresh uses the official Vitest runner unchanged, `TZ=UTC`, with
+`--configLoader runner --maxWorkers=2` supplied by the private npx launcher.
+`ui.json` retains its exact 13 check IDs and before SHA
+`e2a17382308201413adb2c8641cd1e9344f7e226`: 13 pass after, eight assertion failures
+and five preservation passes before (aggregate runner exit 1 for the preservation passes).
+The shared mounted-view file also required refreshing `../wp2.3b-filters.json`
+and `../wp2.3b-unchanged-fields.json` with their recorded IDs and before SHAs;
+all 19 pass after and fail by assertion before.
+
+`combined-ui.json` adds four mounted-view syntax × Filters checks. All four pass
+after and fail by assertion on Filters main `8363d7b9386b796c38bb7ef777df37a2c4ad1b2f`,
+where Search syntax is absent: three fail on the missing `querySyntax: search`
+and one on the missing inline Engine syntax reason. Chip removal reruns the
+unchanged syntax; delayed responses and error-body reads cannot override new restrictions.
+Sources remain delegated-choice under the original quote and location.
+
+The source merge remains uncommitted. The official runner executed in an owned
+shared-clone snapshot of its working files, so its tree hash and the check-file
+digests identify those bytes. The private Git launcher translated before-worktree
+creation/removal into owned shared clones and plain `npm ci` in each real
+dependency folder; candidate dependencies also used plain `npm ci`. Only temporary
+clone Git metadata was written. All owned candidate/before clones were removed.
+The launcher source, exact invocations, lifecycle log, suite logs and real-system
+requests/screenshots are linked from `tmp/verify/wp2.4a-merge-report.md`.
+Independent acceptance of both refreshed changesets remains pending.
