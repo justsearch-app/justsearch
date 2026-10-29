@@ -58,19 +58,29 @@ fs.mkdirSync(path.join(prep, 'scratch'), { recursive: true });
 const env = {
   ...process.env,
   TMPDIR: path.join(prep, 'scratch'),
-  npm_config_cache: path.join(prep, 'npm-cache'),
-  PIP_CACHE_DIR: path.join(prep, 'pip-cache'),
 };
-// Ignore pip's environment and config files, including destination settings such
-// as target/prefix/user/root. Explicitly restore only our session-local cache.
-for (const key of Object.keys(env)) {
-  if (key.startsWith('PIP_') || key.startsWith('PYTHON') || key === 'VIRTUAL_ENV') delete env[key];
-}
+// Clear whole inherited configuration families, rather than maintaining a list
+// of individual destinations. env.sh applies the same reset in the caller shell.
+const inheritedSettings = Object.keys(env).filter(key =>
+  /^(npm_config_|NPM_CONFIG_|PIP_|PYTHON)/.test(key) || key === 'VIRTUAL_ENV');
+for (const key of inheritedSettings) delete env[key];
+env.npm_config_cache = path.join(prep, 'npm-cache');
+env.npm_config_logs_dir = path.join(prep, 'npm-logs');
 env.PIP_CONFIG_FILE = os.devNull;
 env.PIP_CACHE_DIR = path.join(prep, 'pip-cache');
 // Avoid user-site packages, foreign module paths and redirected bytecode caches.
 env.PYTHONNOUSERSITE = '1';
-env.PYTHONPATH = '';
+env.PYTHONDONTWRITEBYTECODE = '1';
+env.PYTHONPATH = path.join(root, 'scripts/jseval');
+for (const [key, directory] of Object.entries({
+  JUSTSEARCH_DEV_RUNNER_STATE_ROOT: 'dev-runner',
+  JUSTSEARCH_HOME: 'home',
+  JUSTSEARCH_DATA_DIR: 'data',
+  JUSTSEARCH_JOB_RECORD_DIR: 'job-records',
+})) {
+  env[key] = path.join(prep, directory);
+  fs.mkdirSync(env[key], { recursive: true });
+}
 for (const source of installs) {
   run('npm', ['ci', '--prefix', source, '--audit=false'], env);
 }
@@ -86,7 +96,20 @@ if (version.status !== 0) {
   process.exit(version.status || 1);
 }
 const constraints = version.stdout.trim() === '3.13' ? ['-c', path.join(root, 'scripts/jseval/requirements.lock.txt')] : [];
-run(python, ['-m', 'pip', 'install', '-e', `${root}/scripts/jseval[ui]`, ...constraints], env);
+// Read the declared requirements without asking setuptools to build metadata in
+// the source tree. Import jseval directly via PYTHONPATH instead of installing it.
+const requirements = spawnSync(python, ['-c', `
+import json, sys, tomllib
+from pathlib import Path
+project = tomllib.loads(Path(sys.argv[1]).read_text())['project']
+print(json.dumps(project['dependencies'] + project['optional-dependencies']['ui']))
+`, path.join(root, 'scripts/jseval/pyproject.toml')], { env, encoding: 'utf8' });
+if (requirements.error) throw requirements.error;
+if (requirements.status !== 0) {
+  process.stderr.write(requirements.stderr);
+  process.exit(requirements.status || 1);
+}
+run(python, ['-m', 'pip', 'install', ...JSON.parse(requirements.stdout), ...constraints], env);
 
 // Chromium's executable_path comes from this Python Playwright, not playwright-core
 // in npm. Headless screenshots also need its matching headless-shell revision.
@@ -128,12 +151,20 @@ const variables = {
   VIRTUAL_ENV: path.join(prep, 'venv'),
   TMPDIR: env.TMPDIR,
   npm_config_cache: env.npm_config_cache,
+  npm_config_logs_dir: env.npm_config_logs_dir,
+  PIP_CONFIG_FILE: env.PIP_CONFIG_FILE,
   PIP_CACHE_DIR: env.PIP_CACHE_DIR,
   PYTHONNOUSERSITE: env.PYTHONNOUSERSITE,
+  PYTHONDONTWRITEBYTECODE: env.PYTHONDONTWRITEBYTECODE,
   PYTHONPATH: env.PYTHONPATH,
+  JUSTSEARCH_DEV_RUNNER_STATE_ROOT: env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT,
+  JUSTSEARCH_HOME: env.JUSTSEARCH_HOME,
+  JUSTSEARCH_DATA_DIR: env.JUSTSEARCH_DATA_DIR,
+  JUSTSEARCH_JOB_RECORD_DIR: env.JUSTSEARCH_JOB_RECORD_DIR,
   PLAYWRIGHT_BROWSERS_PATH: browsers,
 };
-const environment = Object.entries(variables).map(([key, value]) => `export ${key}=${quote(value)}`);
+const environment = inheritedSettings.map(key => `unset ${quote(key)}`);
+environment.push(...Object.entries(variables).map(([key, value]) => `export ${key}=${quote(value)}`));
 environment.push(`export PATH=${quote(path.join(prep, 'venv/bin'))}:"$PATH"`);
 const envFile = path.join(prep, 'env.sh');
 fs.writeFileSync(envFile, `${environment.join('\n')}\n`);

@@ -31,6 +31,7 @@ function fixture(t, version = '3.14') {
     fs.mkdirSync(dir, { recursive: true });
   }
   write(path.join(root, 'scripts/dev/prepare-ui-checks.cjs'), fs.readFileSync(script));
+  write(path.join(root, 'scripts/jseval/pyproject.toml'), fs.readFileSync(new URL('../jseval/pyproject.toml', import.meta.url)));
   const pkg = path.join(tools, 'packages/playwright');
   write(path.join(pkg, '__init__.py'));
   fs.mkdirSync(path.join(pkg, 'driver'), { recursive: true });
@@ -61,7 +62,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const args = process.argv.slice(2);
 const tool = path.basename(process.argv[1]);
-const selectedEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('PIP_') || key === 'PYTHONUSERBASE'));
+const selectedEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(npm_config_|NPM_CONFIG_|PIP_|PYTHON|JUSTSEARCH_)/.test(key)));
 fs.appendFileSync(${JSON.stringify(trace)}, JSON.stringify({ tool, args, env: selectedEnv }) + '\\n');
 if (tool === 'python3') {
   const bin = path.join(args[2], 'bin');
@@ -71,7 +72,7 @@ if (tool === 'python3') {
 } else if (args[0] === '-c') {
   if (args[1].startsWith('import sys; print(')) console.log(${JSON.stringify(version)});
   else {
-    const result = spawnSync(${JSON.stringify(realPython.stdout.trim())}, ['-c', 'import sys; sys.path.insert(0, ' + ${JSON.stringify(JSON.stringify(path.dirname(pkg)))} + ');\\n' + args[1]], { stdio: 'inherit' });
+    const result = spawnSync(${JSON.stringify(realPython.stdout.trim())}, ['-c', 'import sys; sys.path.insert(0, ' + ${JSON.stringify(JSON.stringify(path.dirname(pkg)))} + ');\\n' + args[1], ...args.slice(2)], { stdio: 'inherit' });
     process.exit(result.status ?? 2);
   }
 } else if (args[1] === 'pip' && process.env.PIP_TARGET) {
@@ -100,6 +101,8 @@ for (const destination of [
   'tmp/ui-checks/logs', 'tmp/ui-checks/scratch', 'tmp/ui-checks/captures',
   'tmp/ui-checks/a11y', 'tmp/ui-checks/venv/lib', 'tmp/ui-checks/npm-cache/_cacache',
   'tmp/ui-checks/logs/setup.log', 'node_modules', 'modules/ui-web/node_modules',
+  'tmp/ui-checks/npm-logs', 'tmp/ui-checks/dev-runner', 'tmp/ui-checks/home',
+  'tmp/ui-checks/data', 'tmp/ui-checks/job-records',
   'scripts/wire-contract/node_modules', 'modules', 'scripts/wire-contract',
 ]) {
   test(`refuses ${destination} symlink before any command or write`, t => {
@@ -136,8 +139,75 @@ test('pip ignores inherited destination configuration, including external PIP_TA
   });
   assert.equal(result.status, 0, result.stderr);
   const pip = f.calls().find(call => call.args[1] === 'pip');
-  assert.deepEqual(pip.env, { PIP_CONFIG_FILE: os.devNull, PIP_CACHE_DIR: path.join(f.root, 'tmp/ui-checks/pip-cache') });
+  assert.deepEqual(Object.fromEntries(Object.entries(pip.env).filter(([key]) => key.startsWith('PIP_'))), {
+    PIP_CONFIG_FILE: os.devNull, PIP_CACHE_DIR: path.join(f.root, 'tmp/ui-checks/pip-cache'),
+  });
+  assert.equal(pip.env.PYTHONUSERBASE, undefined);
+  assert.equal(pip.env.PYTHONPYCACHEPREFIX, undefined);
   assert.deepEqual(fs.readdirSync(f.outside), []);
+});
+
+test('clears inherited npm and Python settings during preparation and after sourcing env.sh', t => {
+  const f = fixture(t);
+  const inherited = {
+    npm_config_logs_dir: f.outside, NPM_CONFIG_PREFIX: f.outside,
+    npm_config_userconfig: path.join(f.outside, 'npmrc'),
+    PYTHONPYCACHEPREFIX: f.outside, PYTHONHOME: f.outside, PYTHONPATH: f.outside,
+    PIP_TARGET: f.outside, PIP_CONFIG_FILE: path.join(f.outside, 'pip.conf'),
+  };
+  const result = f.run(inherited);
+  assert.equal(result.status, 0, result.stderr);
+  const sourced = spawnSync('bash', ['--noprofile', '--norc', '-c',
+    'source "$1" && exec "$2" -e "console.log(JSON.stringify(process.env))"',
+    'source-env', path.join(f.root, 'tmp/ui-checks/env.sh'), process.execPath,
+  ], { encoding: 'utf8', env: { ...process.env, ...inherited } });
+  assert.equal(sourced.status, 0, sourced.stderr);
+  for (const env of [...f.calls().map(call => call.env), JSON.parse(sourced.stdout)]) {
+    assert.equal(env.npm_config_logs_dir, path.join(f.root, 'tmp/ui-checks/npm-logs'));
+    assert.equal(env.npm_config_cache, path.join(f.root, 'tmp/ui-checks/npm-cache'));
+    for (const key of ['NPM_CONFIG_PREFIX', 'npm_config_userconfig', 'PYTHONPYCACHEPREFIX', 'PYTHONHOME', 'PIP_TARGET']) {
+      assert.equal(env[key], undefined, key);
+    }
+    assert.equal(env.PIP_CONFIG_FILE, os.devNull);
+    assert.equal(env.PYTHONNOUSERSITE, '1');
+    assert.equal(env.PYTHONDONTWRITEBYTECODE, '1');
+    assert.equal(env.PYTHONPATH, path.join(f.root, 'scripts/jseval'));
+  }
+  assert.deepEqual(fs.readdirSync(f.outside), []);
+});
+
+test('confines state roots in preparation and the sourced environment', t => {
+  const f = fixture(t);
+  const directories = {
+    JUSTSEARCH_DEV_RUNNER_STATE_ROOT: 'dev-runner', JUSTSEARCH_HOME: 'home',
+    JUSTSEARCH_DATA_DIR: 'data', JUSTSEARCH_JOB_RECORD_DIR: 'job-records',
+  };
+  const inherited = Object.fromEntries(Object.keys(directories).map(key => [key, f.outside]));
+  const result = f.run(inherited);
+  assert.equal(result.status, 0, result.stderr);
+  const sourced = spawnSync('bash', ['--noprofile', '--norc', '-c',
+    'source "$1" && exec "$2" -e "console.log(JSON.stringify(process.env))"',
+    'source-env', path.join(f.root, 'tmp/ui-checks/env.sh'), process.execPath,
+  ], { encoding: 'utf8', env: { ...process.env, ...inherited } });
+  assert.equal(sourced.status, 0, sourced.stderr);
+  for (const env of [...f.calls().map(call => call.env), JSON.parse(sourced.stdout)]) {
+    for (const [key, directory] of Object.entries(directories)) {
+      assert.equal(env[key], path.join(f.root, 'tmp/ui-checks', directory));
+      assert.ok(fs.statSync(env[key]).isDirectory());
+    }
+  }
+});
+
+test('installs declared base and UI dependencies without building jseval metadata', t => {
+  const f = fixture(t);
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  const pip = f.calls().find(call => call.args[1] === 'pip');
+  assert.ok(pip.args.includes('httpx>=0.25.0'));
+  assert.ok(pip.args.includes('playwright>=1.40'));
+  assert.ok(!pip.args.includes('-e'));
+  assert.ok(!pip.args.some(arg => arg.startsWith(f.root)));
+  assert.deepEqual(fs.readdirSync(path.join(f.root, 'scripts/jseval')), ['pyproject.toml']);
 });
 
 test('shared browser probe supports the older unbundled registry layout', t => {

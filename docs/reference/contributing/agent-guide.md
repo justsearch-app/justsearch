@@ -125,11 +125,26 @@ checkout is nested inside another repository, without its ancestor-junction fall
 For another preparation run, first remove `tmp/ui-checks/` using the cleanup below:
 the generated venv itself contains symlinks. `npm ci` replaces local dependencies.
 
-The venv installs editable `scripts/jseval[ui]`, including all base dependencies
-(such as `httpx`), from this checkout. With Python 3.13 it uses CI's constraints,
-`-c scripts/jseval/requirements.lock.txt`. Other Python versions resolve dependencies
-without that file: its NumPy pin predates Python 3.14 wheels. Pip's inherited
-configuration and environment settings are ignored; its cache stays session-local.
+The venv installs the base and `ui` dependencies declared in
+`scripts/jseval/pyproject.toml` (including `httpx`). It imports jseval from this
+checkout through `PYTHONPATH`, without installing jseval or writing metadata or
+bytecode under `scripts/`. Python 3.13 with CI's constraint file,
+`-c scripts/jseval/requirements.lock.txt`, is the reproducible path. Other
+interpreters resolve dependencies freely without that file: its NumPy pin predates
+Python 3.14 wheels.
+
+Preparation and the generated `env.sh` clear every inherited `npm_config_*`,
+`NPM_CONFIG_*`, `PIP_*` and `PYTHON*` setting before setting their own cache,
+logging and import settings. Pip's configuration files are disabled. The venv,
+npm cache and logs, pip cache and scratch files stay under `tmp/ui-checks/`.
+`env.sh` also sets `JUSTSEARCH_DEV_RUNNER_STATE_ROOT`, `JUSTSEARCH_HOME`,
+`JUSTSEARCH_DATA_DIR` and `JUSTSEARCH_JOB_RECORD_DIR` to validated directories
+there, so captures do not write state into a linked worktree's main checkout.
+The recipe confines what it creates and the settings it inherits. Symlinks
+pre-placed inside source directories and other tools' global configuration are
+outside that scope; in role sessions the launcher's sandbox is the confinement
+boundary.
+
 The installed Python Playwright selects its own Chromium revision. Matching Chromium
 and headless-shell executables in `~/.cache/ms-playwright` are reused read-only
 only when both required revisions are present and executable;
@@ -147,7 +162,9 @@ a capture/measurement error. Keep that exit status when logging (use `set -o pip
 if piping through `tee`).
 
 Vite persists between captures; its PID, root, port and provenance are recorded in
-`tmp/ui-shot-server.json`. Stop only that session's verified process before removing
+`tmp/ui-shot-server.json`. On Windows its spawn record is under
+`tmp/ui-checks/dev-runner/agent-spawns/`; Linux currently skips that registration
+because its process creation-time reader is Windows-only. Stop only that session's verified process before removing
 the local installs; never stop another checkout's frontend. After stopping that
 process, clean up from the checkout root with:
 
