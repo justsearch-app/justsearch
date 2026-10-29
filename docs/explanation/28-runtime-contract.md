@@ -1,11 +1,11 @@
 ---
 status: stable
-description: The JustSearch Runtime Contract — the small, versioned local surface external apps and AI agents target; the desktop app is its first-party client. Defines the v1 stable core (health/status lifecycle subset + MCP endpoint/tools + runtime manifest), discovered through the manifest's runtimeContract descriptor. Matrix + policy + surface classification live in docs/reference/runtime-contract.md.
+description: "The JustSearch Runtime Contract: the small, versioned local surface external apps and AI agents target; the desktop app is its first-party client. Defines the v1 stable core (health/status lifecycle subset + MCP endpoint/tools + runtime manifest), discovered through the manifest's runtimeContract descriptor. Matrix + policy + surface classification live in docs/reference/runtime-contract.md."
 ---
 
 # The JustSearch Runtime Contract
 
-JustSearch exposes a **reusable local runtime** for apps and AI agents. The desktop app uses that runtime as its first-party client.
+JustSearch exposes a **local runtime** for apps and AI agents. The desktop app uses that runtime as its first-party client.
 
 External tools need *one stable object* to build against, not a bundle of
 strong-but-scattered subsystems. The **Runtime Contract** is that object: a

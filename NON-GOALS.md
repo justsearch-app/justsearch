@@ -1,16 +1,14 @@
 # Non-Goals
 
-JustSearch is for **finding what is inside your files, fast and accurately, whether you know exactly what you are looking for or only vaguely.** That focus implies some things
+JustSearch is for **finding what is inside your files, quickly and accurately, whether you know exactly what you are looking for or only vaguely.** That focus implies some things
 it deliberately is **not**. These boundaries keep the project coherent and maintainable by a small team —
 they're not judgments about other tools.
 
 ### Privacy & locality (design decision)
 
-Processing stays on your machine because cloud inference would bring running costs for development and
-upkeep, along with real privacy obligations that would realistically block releases. Keeping everything
-local removes both by design. That puts features that add running costs or send your data off your machine
-out of scope — including cloud inference, hosted services, and telemetry. An outside AI client you connect
-through MCP is your own choice. The existing update checks, Install AI downloads, and optional tracing are
+Everything runs on your machine. Cloud processing would add running costs and privacy obligations this
+project cannot carry, so it is out of scope by design: no cloud inference, no hosted services, no telemetry.
+An outside AI client you connect through MCP is your own choice. The existing update checks, Install AI downloads, and optional tracing are
 described below.
 
 - **No telemetry, analytics, or phone-home.** The product does not report usage anywhere. A PR that adds outbound
@@ -31,14 +29,13 @@ described below.
   downloads models and runtimes from `github.com` and `huggingface.co` with consent. Trace export is off by
   default; only if you enable tracing and set an OTLP endpoint are traces sent there. They can include paths
   and document excerpts. These network paths and external integrations are described in [Privacy](README.md#privacy).
-- **No cloud inference or JustSearch-hosted service.** JustSearch runs on *your* machine; operating cloud components or account services, and processing your documents server-side, are out of scope for the same reason.
 - **We don't train on your data**, and we never upload your files. Retrieval and inference are local.
   Today, connected AI clients and tools receive the data you pass to them; an enabled trace exporter receives
   paths and document excerpts included in traces.
 
 ### Product scope (what it is *for*)
 - **Not built to be a general-purpose chatbot.** A free-chat mode is available, but the product is *for*
-  finding what is inside your files and answering questions *grounded in your files* with citations — that's where the tuning and engineering go;
+  finding what is inside your files and answering questions *grounded in your files* with citations: that's where the tuning and engineering go;
   it isn't positioned or optimized as an open-domain assistant.
 - **Not a model trainer or fine-tuning platform.** It *uses* models (BYO-LLM via llama.cpp); it doesn't train them.
 - **Not a note-taking / PKM app.** It searches the files you already have in the formats you already use; it
