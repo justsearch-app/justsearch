@@ -23,7 +23,7 @@ The A1 live sequence is blocked after two stale-fixture layout attempts. Both ac
 
 PR preparation rebased all four commits unchanged onto `c54273315406`, including #1010, without conflict hunks. The cited execution evidence was regenerated against the rebased check sources. The ordinary empty-refusal regression has its own delegated-choice entry and assertion fail-before on `1c8c8ffec1`. All six installer crash cuts and all #1010 tests passed on the rebased candidate; six unrelated operation-harness parameters fail their Windows-only identity precondition on Linux. The exact compile/PMD command passed. See the coverage map for the launcher correction, individual execution scopes and remaining historical gaps. No product or test source was changed during this preparation, and no independent acceptance is authored here.
 
-CI follow-up removes the four-argument test-only metadata wrapper flagged by the frozen unreferenced-code rule. The existing green-verification assertions pass `false` explicitly; the installer-empty fixture invokes both overloads reflectively to retain its assertion fail-before on `c542733154`. The signature adaptation changes no assertions. The stale acceptance record is removed for independent re-acceptance.
+CI follow-up removes the four-argument test-only metadata wrapper flagged by the frozen unreferenced-code rule. The existing green-verification assertions pass `false` explicitly; the installer-empty fixture invokes both overloads reflectively to retain its assertion fail-before on `c542733154`. The signature adaptation changes no assertions. The earlier acceptance record is retained below as stale history; its digest no longer matches, and a fresh independent acceptance covers the current digest.
 
 The repaired and preservation evidence are refreshed by a temporary copy of the repository evidence producer at `/tmp/rel-act-ci-_5dajw5m/producer/scripts/governance/gates/test-intent/run-evidence.mjs`. It retains the standard profile isolation, check selection, JUnit parsing, classification, source digests and evidence writing; only the repository root, `js-gradle-slot` launch transport and shared-clone before-checkout/cleanup transport differ. Repaired evidence uses `c542733154` and records the intended installer metadata assertion failure there.
 
@@ -243,3 +243,24 @@ See [the condition-by-condition coverage map](../evidence/installed-model-activa
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-rel-act-acceptor-20261029-f7dec02a74",
+  "verdict": "accept",
+  "digest": "sha256:3e10ac5eeadf1b6d2fa6926dd5c7d723b0579bb8176e3e798d290f5ec1de5dec"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-rel-act-accept3-20261029-7cb10812e5",
+  "verdict": "reject",
+  "digest": "sha256:9a3ee35834972c9917f992048874ffa3f1e57e19d3227327e488b6fdcb4cba64",
+  "note": "Code delta, unchanged assertions and refreshed evidence verified. Rejected because this candidate deletes the committed acceptance record from session codex-rel-act-acceptor-20261029-f7dec02a74, contrary to docs/reference/testing/test-intent.md: Records are appended, never deleted. Restore the old record unchanged, correct the above-heading prose to say it is retained as stale history, then obtain fresh independent acceptance on the resulting digest."
+}
+```
