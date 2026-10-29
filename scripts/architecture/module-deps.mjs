@@ -33,7 +33,7 @@ const GENERATED_END_MARKER = '<!-- GENERATED:MODULE_DEPS:END -->';
 // Configuration types that indicate production dependencies
 const PRODUCTION_CONFIGS = new Set(['api', 'implementation', 'runtimeOnly', 'compileOnly', 'compileOnlyApi']);
 // Configuration types that indicate test-only dependencies
-const TEST_CONFIGS = new Set(['testImplementation', 'testRuntimeOnly', 'integrationTestImplementation']);
+const isTestConfig = (config) => /^(?:test|integrationTest|systemTest|determinismTest|testFixtures)(?:Api|Implementation|RuntimeOnly|CompileOnly|CompileOnlyApi)$/.test(config);
 
 // Staleness detection configuration
 const STALE_THRESHOLD_MONTHS = 6;
@@ -251,30 +251,34 @@ async function checkFileBetweenMarkers({ filePath, beginMarker, endMarker, conte
  * @returns {string[]} Array of Gradle project paths (e.g., ':modules:core', ':reports')
  */
 function parseSettingsGradle(settingsPath) {
-  const text = fs.readFileSync(settingsPath, 'utf8');
-  // Match the include(...) block which may span multiple lines
-  const includeMatch = text.match(/include\s*\(\s*([\s\S]*?)\s*\)/);
-  if (!includeMatch) return [];
+  return parseSettings(fs.readFileSync(settingsPath, 'utf8'));
+}
 
-  // Extract all quoted strings from the include block
-  const modules = [...includeMatch[1].matchAll(/"([^"]+)"/g)]
-    .map(m => m[1]);
+export function parseSettings(text) {
+  const tokens = kotlinTokens(text);
+  const modules = [];
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (tokens[i].value !== 'include' || tokens[i + 1]?.value !== '(') continue;
+    for (i += 2; i < tokens.length && tokens[i].value !== ')'; i += 1) {
+      const match = tokens[i].value.match(/^"(:[^"$]+)"$/);
+      if (match) modules.push(match[1]);
+    }
+  }
   return modules;
 }
 
 /**
  * Parse a build.gradle.kts file and extract project dependencies with their configuration type.
  * @param {string} buildFilePath - Path to build.gradle.kts
- * @returns {{ production: Set<string>, test: Set<string>, compileOnly: Set<string> }} Sets of dependency module names
+ * @returns {{ all: Set<string>, production: Set<string>, test: Set<string>, compileOnly: Set<string> }} Sets of dependency module names
  */
 function parseBuildGradleDeps(buildFilePath) {
-  const text = fs.readFileSync(buildFilePath, 'utf8');
-  const production = new Set();
-  const test = new Set();
+  return parseProjectDependencies(fs.readFileSync(buildFilePath, 'utf8'));
+}
 
-  const compileOnly = new Set();
+function kotlinTokens(text) {
   // Tokenize strings and comments separately: braces in either must not change block scope.
-  // Kotlin block comments may nest. Keep offsets so the declaration regex uses the original text.
+  // Kotlin block comments may nest.
   const tokens = [];
   const tokenRe = /\/\/[^\n]*|\/\*|"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_$][\w$]*|[{}]|[^\s]/gy;
   let offset = 0;
@@ -293,31 +297,53 @@ function parseBuildGradleDeps(buildFilePath) {
       }
       continue;
     }
-    if (!match[0].startsWith('//')) tokens.push({ value: match[0], index: match.index });
+    if (!match[0].startsWith('//')) tokens.push({ value: match[0] });
   }
 
+  return tokens;
+}
+
+export function parseProjectDependencies(text) {
+  const all = new Set();
+  const production = new Set();
+  const test = new Set();
+  const compileOnly = new Set();
+  const tokens = kotlinTokens(text);
   const blocks = [];
-  const declaration = /^(api|implementation|runtimeOnly|compileOnly|compileOnlyApi|testImplementation|testRuntimeOnly|integrationTestImplementation)\s*\(\s*project\s*\(\s*["'](:modules:[^"']+)["']\s*\)\s*\)/;
+  // Work on tokens so comments between arguments are harmless and strings/comments cannot
+  // invent declarations. Accept both Kotlin accessors and add(configuration, dependency).
+  const projectDependency = /^(?:testFixtures\()?project\((?:path=)?["'](:modules:[^"']+)["']\)\)/;
   for (let i = 0; i < tokens.length; i += 1) {
-    const { value, index } = tokens[i];
+    const { value } = tokens[i];
     if (value === '{') {
       blocks.push(tokens[i - 1]?.value === 'dependencies' && blocks.length === 0 ? 'main-dependencies' : tokens[i - 1]?.value);
     } else if (value === '}') {
       blocks.pop();
-    } else if (PRODUCTION_CONFIGS.has(value) || TEST_CONFIGS.has(value)) {
-      const m = text.slice(index).match(declaration);
+    } else if (PRODUCTION_CONFIGS.has(value) || isTestConfig(value) || value === 'add') {
+      if (!blocks.includes('dependencies') && !blocks.includes('main-dependencies')) continue;
+      if (blocks.includes('buildscript')) continue;
+      const declaration = tokens.slice(i, i + 20).map((token) => token.value).join('');
+      const call = value === 'add'
+        ? declaration.match(/^add\((?:["']([^"']+)["']|([\w$.]+)),/)
+        : declaration.match(/^([\w$]+)\(/);
+      if (!call) continue;
+      const config = call[1] || call[2];
+      const m = declaration.slice(call[0].length).match(projectDependency);
       // An interpolated path is not a literal module; document the audit loop separately.
-      if (!m || m[2].includes('$')) continue;
-      const depName = gradlePathToModuleName(m[2]);
-      if (PRODUCTION_CONFIGS.has(value) && blocks.includes('main-dependencies')) {
+      if (!m || m[1].includes('$')) continue;
+      const depName = gradlePathToModuleName(m[1]);
+      // Custom configurations still participate in pre-push closure, without guessing whether
+      // they belong in the architecture report's production or test-only layering.
+      all.add(depName);
+      if (PRODUCTION_CONFIGS.has(config) && blocks.includes('main-dependencies')) {
         production.add(depName);
-        if (value.startsWith('compileOnly')) compileOnly.add(depName);
-      } else if (TEST_CONFIGS.has(value) || (blocks.includes('testing') && blocks.includes('dependencies'))) {
+        if (config.startsWith('compileOnly')) compileOnly.add(depName);
+      } else if (isTestConfig(config) || (blocks.includes('testing') && blocks.includes('dependencies'))) {
         test.add(depName);
       }
     }
   }
-  return { production, test, compileOnly };
+  return { all, production, test, compileOnly };
 }
 
 /**
@@ -595,13 +621,15 @@ async function main() {
     if (!moduleTestDeps.has(moduleName)) moduleTestDeps.set(moduleName, new Set());
 
     // Parse with configuration type awareness
-    const { production, test, compileOnly } = parseBuildGradleDeps(bf);
+    const { all, production, test, compileOnly } = parseBuildGradleDeps(bf);
     moduleCompileOnlyDeps.set(moduleName, compileOnly);
+    for (const dep of all) {
+      if (dep !== moduleName) moduleDeps.get(moduleName).add(dep);
+    }
 
     for (const dep of production) {
       if (dep === moduleName) continue;
       moduleProductionDeps.get(moduleName).add(dep);
-      moduleDeps.get(moduleName).add(dep);
     }
 
     for (const dep of test) {
@@ -610,7 +638,6 @@ async function main() {
       if (!production.has(dep)) {
         moduleTestDeps.get(moduleName).add(dep);
       }
-      moduleDeps.get(moduleName).add(dep);
     }
   }
 
@@ -814,7 +841,7 @@ async function main() {
   console.log(outDirAbs);
 }
 
-main().catch((err) => {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((err) => {
   // eslint-disable-next-line no-console
   console.error('module-deps failed:', err);
   process.exit(2);

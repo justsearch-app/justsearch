@@ -46,7 +46,8 @@ Always: `node scripts/lib/tool-invoker.cjs gradle build -x test` from the candid
 
 Frontend: from `modules/ui-web`, `npm run typecheck` and `npm run test:unit:run`.
 
-Java: run `node scripts/dev/java-prepush.mjs` for test and integration-test compilation
+Java: run `node scripts/dev/java-prepush.mjs` for test and integration-test compilation,
+affected modules' integration tests (including transitive dependents in the hosted module tier),
 and all PMD checks. When available on PATH, `js-gradle-slot` (the maintainer machine's
 shared-build-slot tool) runs the Gradle wrapper; otherwise the command prints a
 notice and runs `./gradlew` (`gradlew.bat` on Windows) directly. Add `--unreferenced` when replacing or
