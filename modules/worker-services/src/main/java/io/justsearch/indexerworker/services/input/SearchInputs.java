@@ -57,8 +57,10 @@ public record SearchInputs(
    * counts cannot drift (tempdoc 821 §L.3).
    */
   public LuceneRuntimeTypes.QuerySyntax runtimeSyntax() {
-    return request.getQuerySyntax() == SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE
-        ? LuceneRuntimeTypes.QuerySyntax.LUCENE
-        : LuceneRuntimeTypes.QuerySyntax.SIMPLE;
+    return switch (request.getQuerySyntax()) {
+      case SEARCH_QUERY_SYNTAX_LUCENE -> LuceneRuntimeTypes.QuerySyntax.LUCENE;
+      case SEARCH_QUERY_SYNTAX_SEARCH -> LuceneRuntimeTypes.QuerySyntax.SEARCH;
+      default -> LuceneRuntimeTypes.QuerySyntax.SIMPLE;
+    };
   }
 }

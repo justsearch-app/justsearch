@@ -1,0 +1,203 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:e9712c4053be6b4ee2edb191dcdad5535ca1179bc20d2d04b0b9c74ce619f9b3",
+    "adapterPatch": "gates/test-intent/evidence/wp24a-syntax/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with js-gradle-slot, cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, vitest with two workers, existing per-task isolation (no init script), mandated ten-minute retries, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-29T03:35:14.526Z",
+  "revision": "51bba4727a9168d219c9fd3f1d6990cbc2369fa1",
+  "tree": "437f9a90cdc937f9501e329f2f5997da6b94a548",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.phraseHonoursEachRestrictionBeforeCandidateBudget\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.exclusionHonoursEachRestrictionBeforeCandidateBudget\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.titleHonoursEachRestrictionBeforeCandidateBudget\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.authorHonoursEachRestrictionBeforeCandidateBudget\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.combinedBoundsExcludeEachCrossedDecoyAndUnknownWithoutBroadening\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.plainSearchWithRestrictionsEqualsSimpleIncludingCountsAndFacets\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11536
+    },
+    {
+      "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.RestrictionValidationEntryTest.invalidRestrictionWinsOverInvalidSearchSyntaxBeforeDispatch\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6633
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#phraseHonoursEachRestrictionBeforeCandidateBudget",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c4863dbc1edd3f0369229f821929bdf3a8fd778ab5293f981022f0132693296d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "phraseHonoursEachRestrictionBeforeCandidateBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#exclusionHonoursEachRestrictionBeforeCandidateBudget",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c4863dbc1edd3f0369229f821929bdf3a8fd778ab5293f981022f0132693296d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exclusionHonoursEachRestrictionBeforeCandidateBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#titleHonoursEachRestrictionBeforeCandidateBudget",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c4863dbc1edd3f0369229f821929bdf3a8fd778ab5293f981022f0132693296d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "titleHonoursEachRestrictionBeforeCandidateBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#authorHonoursEachRestrictionBeforeCandidateBudget",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c4863dbc1edd3f0369229f821929bdf3a8fd778ab5293f981022f0132693296d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "authorHonoursEachRestrictionBeforeCandidateBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#combinedBoundsExcludeEachCrossedDecoyAndUnknownWithoutBroadening",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c4863dbc1edd3f0369229f821929bdf3a8fd778ab5293f981022f0132693296d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "combinedBoundsExcludeEachCrossedDecoyAndUnknownWithoutBroadening()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#plainSearchWithRestrictionsEqualsSimpleIncludingCountsAndFacets",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c4863dbc1edd3f0369229f821929bdf3a8fd778ab5293f981022f0132693296d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plainSearchWithRestrictionsEqualsSimpleIncludingCountsAndFacets()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java#invalidRestrictionWinsOverInvalidSearchSyntaxBeforeDispatch",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15d02bb96a62b2db9919a1e46cd1f51278561bc9864b9ecec4c935cb43b8c394",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidRestrictionWinsOverInvalidSearchSyntaxBeforeDispatch()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "51bba4727a9168d219c9fd3f1d6990cbc2369fa1",
+    "revision": "51bba4727a9168d219c9fd3f1d6990cbc2369fa1",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.phraseHonoursEachRestrictionBeforeCandidateBudget\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.exclusionHonoursEachRestrictionBeforeCandidateBudget\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.titleHonoursEachRestrictionBeforeCandidateBudget\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.authorHonoursEachRestrictionBeforeCandidateBudget\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.combinedBoundsExcludeEachCrossedDecoyAndUnknownWithoutBroadening\" --tests \"io.justsearch.indexerworker.services.SearchSyntaxRestrictionIntegrationTest.plainSearchWithRestrictionsEqualsSimpleIncludingCountsAndFacets\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 0,
+        "durationMs": 9118
+      },
+      {
+        "command": "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.RestrictionValidationEntryTest.invalidRestrictionWinsOverInvalidSearchSyntaxBeforeDispatch\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 0,
+        "durationMs": 5618
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#phraseHonoursEachRestrictionBeforeCandidateBudget",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#exclusionHonoursEachRestrictionBeforeCandidateBudget",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#titleHonoursEachRestrictionBeforeCandidateBudget",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#authorHonoursEachRestrictionBeforeCandidateBudget",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#combinedBoundsExcludeEachCrossedDecoyAndUnknownWithoutBroadening",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#plainSearchWithRestrictionsEqualsSimpleIncludingCountsAndFacets",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java#invalidRestrictionWinsOverInvalidSearchSyntaxBeforeDispatch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:69da08efa1d4b6976e4cfce48c327e68d4ce95dc68c324a9aa7e70c10125e1b9"
+}

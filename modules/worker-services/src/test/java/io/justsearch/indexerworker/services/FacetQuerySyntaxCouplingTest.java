@@ -304,6 +304,41 @@ final class FacetQuerySyntaxCouplingTest extends io.justsearch.adapters.lucene.r
     }
   }
 
+  @Test
+  void x5SearchSubsetKeepsResultsCountsAndFacetsLexicalOnBothPasses() throws Exception {
+    String previous = System.getProperty("justsearch.config");
+    try (RunningRuntime lifecycle = newLifecycleWithPdfDocs(CORPUS)) {
+      var service = new WorkerSearchService(lifecycle);
+      SearchQuerySyntax syntax;
+      try {
+        syntax = SearchQuerySyntax.valueOf("SEARCH_QUERY_SYNTAX_SEARCH");
+      } catch (IllegalArgumentException beforeSubset) {
+        syntax = SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE;
+      }
+      for (boolean facets : new boolean[] {false, true}) {
+        var request = hybridWithMimeFacet(syntax).toBuilder().setQuery("\"alpha shared\"")
+            .setPipeline(PipelineConfig.newBuilder().setSparseEnabled(true).setDenseEnabled(true)
+                .setDenseAuto(true).setSpladeEnabled(true).setExpansionEnabled(true));
+        if (!facets) request.clearFacets();
+        SearchResponse result = invokeSearch(service, request.build());
+        assertEquals(1, result.getResultsCount());
+        assertEquals("doc-a", result.getResults(0).getId());
+        assertEquals(1, result.getMatchCount());
+        assertEquals(1, result.getTotalHits());
+        if (facets) assertEquals(1, result.getFacetsOrThrow(SchemaFields.MIME).getCountsOrThrow("application/pdf"));
+        assertEquals("TEXT", result.getSearchTrace().getEffectiveMode());
+      }
+      var exact = SearchRequest.newBuilder().setQuery("\"alpha shared\"").setQuerySyntax(syntax)
+          .setLimit(10).setFilters(io.justsearch.ipc.SearchFilters.newBuilder().addMetaSource("FIXTURE"));
+      assertEquals(0, invokeSearch(service, exact.build()).getMatchCount(),
+          "advanced metadata restrictions must not be lowercased");
+      exact.setFilters(io.justsearch.ipc.SearchFilters.newBuilder().addMetaSource("fixture"));
+      assertEquals(1, invokeSearch(service, exact.build()).getMatchCount());
+    } finally {
+      restoreProperty("justsearch.config", previous);
+    }
+  }
+
   private static SearchRequest multiLeg(String query, SearchQuerySyntax syntax) {
     return SearchRequest.newBuilder()
         .setQuery(query)
@@ -365,6 +400,7 @@ final class FacetQuerySyntaxCouplingTest extends io.justsearch.adapters.lucene.r
       fields.put(SchemaFields.PATH, entry.getKey());
       fields.put(SchemaFields.CONTENT, entry.getValue());
       fields.put(SchemaFields.MIME, "application/pdf");
+      fields.put(SchemaFields.META_SOURCE, "fixture");
       lifecycle.indexingCoordinator().indexSingle(new IndexDocument(fields));
     }
     lifecycle.commitOps().commitAndTrack();

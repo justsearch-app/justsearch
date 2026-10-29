@@ -86,6 +86,7 @@ import {
   addScopeChip,
   buildSearchIntent,
   getScopeChips,
+  getSearchState,
   clearScopeChips,
   resetSearchState,
   setQuery,
@@ -1213,6 +1214,22 @@ describe('S1.10 — the composer, the heading and the rows describe the one shar
 
 /* ── S1.11 — the palette searches through Search mode ─────────────────────────────────────────── */
 
+it('X8 restored quoted Search draft keeps its text and requires the existing review before Search', async () => {
+  const query = '"budget review" -draft';
+  localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), query);
+  const el = await mount(); await settle(el);
+  expect((await fieldOf(el)).value).toBe(query);
+  expect(backend.searches).toHaveLength(0);
+  expect(await results(el)).toBeNull();
+  await pressEnter(el); await settle(el);
+  expect(backend.searches).toHaveLength(0);
+  ds1Button(el, 'sv3-draft-review-search').click(); await settle(el);
+  expect(backend.searches).toHaveLength(0);
+  await pressEnter(el); await settle(el);
+  expect(backend.searches).toHaveLength(1);
+  expect(backend.searches[0]).toMatchObject({ query, querySyntax: 'search' });
+});
+
 describe('S1.11 — the palette’s search uses Search mode', () => {
   it('has no developer "Search this text" entry, and "Search everything" shows results', async () => {
     backend.corpus.lease = [wireHit('a', 'docs/a.md')];
@@ -1383,6 +1400,14 @@ it('DS1 a known live unrestricted Ask still retries as Ask when the unrelated co
   restoreActiveConversation(original); await settle(el); expect((await fieldOf(el)).value).toBe('unrelated B');
 });
 
+it('X8 Delegate sends operator characters without a Search syntax claim', async () => {
+  aiOnline(); const el = await mount(); await chooseTier(el, 'delegate');
+  const text = '"budget review" -draft title:budget';
+  await askNow(el, text);
+  expect(ctrl.send).toHaveBeenCalledTimes(1);
+  expect(ctrl.send.mock.calls[0]?.[0]).toBe(text);
+  expect(backend.searches).toHaveLength(0);
+});
 
 /* WP2.3b: production view, controls, shared Search store and dispatch boundary. */
 async function filtersOf(el: Mounted): Promise<Mounted> {
@@ -1641,4 +1666,78 @@ it('F8 plugin date commits supersede an identical query before older delayed res
   const older = backend.held.splice(0); backend.corpus.needle = [wireHit('new', '/new.md')]; setFilterRange(2000, 3000); await settle(el);
   backend.held.splice(0).forEach(release => release()); await settle(el); older.forEach(release => release()); await settle(el);
   expect(await rowTitles(el)).toEqual(['new.md']);
+});
+
+
+/* WP2.4a: Search syntax and committed restrictions share one request and lifetime. */
+it('XFilters syntax requests carry querySyntax and every active restriction and chip removal reruns syntax', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el);
+  const query = '"budget review" -draft';
+  await searchFor(el, query);
+  expect(backend.searches.at(-1)).toMatchObject({ query, querySyntax: 'search', filters: wireRestrictions() });
+  const filters = await filtersOf(el);
+  filters.shadowRoot!.querySelector<HTMLButtonElement>('[data-filter=folder]')!.click(); await settle(el);
+  expect(backend.searches.at(-1)).toMatchObject({ query, querySyntax: 'search',
+    filters: { modifiedAt: wireRestrictions().modifiedAt, sizeBytes: wireRestrictions().sizeBytes } });
+  expect((backend.searches.at(-1)?.filters as Record<string, unknown>).pathPrefix).toBeUndefined();
+  expect((await fieldOf(el)).value).toBe(query);
+});
+
+it('XFilters syntax errors show the Engine syntax message and preserve active filters', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el);
+  backend.corpus.ordinary = [wireHit('old', '/inside/old.md')]; await searchFor(el, 'ordinary');
+  const original = structuredClone(getFilters());
+  const normal = fetchMock.getMockImplementation()! as (...args: unknown[]) => unknown;
+  const reason = 'Close the quoted phrase with a matching quote.';
+  fetchMock.mockImplementation(async (url: unknown, init: unknown) => String(url).includes('/api/knowledge/search')
+    ? json({ errorCode: 'SEARCH_SYNTAX_INVALID', error: reason }, 400) : normal(url, init));
+  await searchFor(el, '"');
+  const composer = await region(el, 'jf-sv3-composer');
+  expect(q(composer, 'sv3-search-error')?.textContent).toBe(reason);
+  expect((await fieldOf(el)).value).toBe('"');
+  expect(getFilters()).toEqual(original);
+  expect((await filtersOf(el)).shadowRoot!.querySelectorAll('[data-filter]')).toHaveLength(3);
+  expect((await filtersOf(el)).shadowRoot!.textContent).not.toContain(reason);
+  expect(getSearchState().results).toEqual([]);
+});
+
+it('XFilters changing a restriction during syntax Search drops the old response and delayed error body', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el);
+  const query = '"budget review"'; backend.corpus[query] = [wireHit('old', '/inside/old.md')];
+  backend.holdSearches = true; await searchFor(el, query);
+  expect(backend.searches.at(-1)?.querySyntax).toBe('search');
+  const old = backend.held.splice(0);
+  backend.corpus[query] = [wireHit('new', '/next/new.md')]; await filterEdit(el, 'folder', '/next');
+  backend.held.splice(0).forEach(release => release()); await settle(el);
+  old.forEach(release => release()); await settle(el);
+  expect(await rowTitles(el)).toEqual(['new.md']);
+  expect(getSearchState().restrictionsKey).toBe(JSON.stringify({ ...wireRestrictions(), pathPrefix: '/next' }));
+  backend.holdSearches = false;
+  const normal = fetchMock.getMockImplementation()! as (...args: unknown[]) => unknown;
+  let releaseBody!: (body: unknown) => void;
+  fetchMock.mockImplementation(async (url: unknown, init: unknown) => String(url).includes('/api/knowledge/search')
+    ? { ok: false, status: 400, json: () => new Promise(resolve => { releaseBody = resolve; }) } : normal(url, init));
+  await searchFor(el, query);
+  fetchMock.mockImplementation(normal);
+  await filterEdit(el, 'folder', '/current');
+  releaseBody({ errorCode: 'SEARCH_SYNTAX_INVALID', error: 'obsolete syntax reason' }); await settle(el);
+  expect(getSearchState().error).toBeNull();
+  expect(await rowTitles(el)).toEqual(['new.md']);
+  expect(getFilters().pathPrefix).toBe('/current');
+});
+
+it('XFilters restriction errors on syntax queries retain the Engine restriction message', async () => {
+  aiOnline(); const el = await mount(); await allRestrictions(el);
+  const original = structuredClone(getFilters()); const query = 'title:budget';
+  const normal = fetchMock.getMockImplementation()! as (...args: unknown[]) => unknown;
+  const reason = 'pathPrefix: rejected by Engine';
+  fetchMock.mockImplementation(async (url: unknown, init: unknown) => String(url).includes('/api/knowledge/search')
+    ? json({ errorCode: 'INVALID_REQUEST', error: reason }, 400) : normal(url, init));
+  await searchFor(el, query);
+  const request = fetchMock.mock.calls.filter(call => String(call[0]).includes('/api/knowledge/search')).at(-1);
+  expect(JSON.parse(String((request?.[1] as RequestInit).body))).toMatchObject({ query, querySyntax: 'search', filters: wireRestrictions() });
+  const filters = await filtersOf(el);
+  expect(filters.shadowRoot!.querySelector('#folder-error')?.textContent).toBe(reason);
+  expect(q(await region(el, 'jf-sv3-composer'), 'sv3-search-error')).toBeNull();
+  expect(getFilters()).toEqual(original); expect((await fieldOf(el)).value).toBe(query);
 });

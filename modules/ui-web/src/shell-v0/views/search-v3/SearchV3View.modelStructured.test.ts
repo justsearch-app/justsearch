@@ -125,3 +125,14 @@ it('remembered Structured Retry reuses its schema without becoming a model answe
   expect(dispatches()).toHaveLength(1);
   expect(dispatches()[0]).toMatchObject({ shapeId: 'core.extract', schema });
 });
+
+it.each(['ask', 'structured', 'model-only'] as const)('X8 %s sends operator characters as prompt text', async mode => {
+  const view = await mount();
+  const text = '"budget review" -draft title:budget author:"Ada Lovelace"';
+  await send(view, text, mode === 'structured' ? schema : undefined, mode === 'model-only');
+  expect(dispatches()).toHaveLength(1);
+  const body = dispatches()[0]!;
+  expect(body.prompt ?? body.question).toBe(text);
+  expect(body).not.toHaveProperty('querySyntax');
+  expect(fetchMock.mock.calls.filter(call => String(call[0]).includes('/api/knowledge/search'))).toHaveLength(0);
+});

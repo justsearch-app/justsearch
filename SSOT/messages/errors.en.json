@@ -116,6 +116,7 @@
     "errors.RUNTIME_ACTIVATION_START_FAILED" : "Failed to start AI runtime.",
     "errors.RUNTIME_DEACTIVATION_START_FAILED" : "Failed to stop AI runtime.",
     "errors.RUNTIME_MISSING" : "AI runtime is not installed. Run the AI installer first.",
+    "errors.SEARCH_SYNTAX_INVALID" : "Check the search syntax.",
     "errors.SERVICE_UNAVAILABLE" : "The search service is not available. Please wait and try again.",
     "errors.SETTINGS_READ_ONLY" : "Settings are session-only in this mode. Changes won't persist after restart.",
     "errors.SETTINGS_UNAVAILABLE" : "Settings are temporarily unavailable.",
