@@ -127,3 +127,25 @@ Shared resources touched: managed Gradle slots/cache, npm registry/cache and CPU
 checkouts, build folders, dependencies, fixtures and logs belonged to these checks. No Engine,
 dev stack, owner service/data, desktop/display, GPU inference, commit, push, publication or
 GitHub issue action was used. No process was manually stopped.
+
+## Search syntax × restrictions after rebase
+
+[restrictions-java.json](restrictions-java.json) records seven integration preservation
+checks on the working tree based on `51bba4727a9168d219c9fd3f1d6990cbc2369fa1` and
+on that exact before revision. All seven executed and passed on both; no production
+gap was found and no check claims a repair. The six Worker checks use actual
+planning/capture/Lucene retrieval, a one-result budget, stronger crossed decoys,
+individual and combined folder/date/size restrictions, counts/facets, inclusive
+bounds, unknown metadata, zero size, empty intersections and plain Search/SIMPLE
+preservation. The entry-handler check pins restriction validation before syntax
+validation when both inputs are invalid.
+
+This uses the same adapted Java runner reproduced from
+`runner-machine-rules.patch`, without an init script. The runner exits 1 because
+its generic fail-before condition requires assertion failures, whereas these are
+preservation passes; all four child Gradle commands exit 0. The exact invocation,
+logs and installed-Engine requests/responses are linked from
+`tmp/verify/wp2.4a-integration-report.md`. The before checkout is an owned shared
+clone at `$TMPDIR/before`; test files alone are transplanted. A private object
+directory prevents the tree-hash computation from writing Git objects into the
+source repository. Independent acceptance of the changed digest remains pending.

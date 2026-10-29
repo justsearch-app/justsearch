@@ -82,6 +82,18 @@ class RestrictionValidationEntryTest {
     }
   }
 
+  @Test
+  void invalidRestrictionWinsOverInvalidSearchSyntaxBeforeDispatch() throws Exception {
+    var bootstrap = mock(KnowledgeServerBootstrap.class);
+    var executor = mock(SearchPerSourceExecutor.class);
+    var search = new KnowledgeSearchController(bootstrap, executor);
+    var ctx = context("{\"query\":\"title:\",\"querySyntax\":\"search\","
+        + "\"filters\":{\"sizeBytes\":{\"fromBytes\":-1}}}");
+    search.handleSearch(ctx);
+    refused(ctx, "sizeBytes");
+    verifyNoInteractions(bootstrap, executor);
+  }
+
   @SuppressWarnings("unchecked")
   private static Context context(String body) {
     var ctx = mock(Context.class, RETURNS_SELF);

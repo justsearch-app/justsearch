@@ -360,6 +360,55 @@ Agent choices under the quoted design delegation, never owner-agreed words. Buil
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingAuthorExtractionTest.java#markdownAuthorRemainsFrontmatterFacet"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "X1–X3/X5/X7 × F2/F4/F7/F13–F14 preservation after rebase: actual Worker retrieval applies folder/date/size separately and together before a one-candidate budget despite stronger out-of-bounds matches, for phrases, exclusions, title and author. Counts/facets follow; inclusive equal bounds, unknown metadata exclusion, known zero, empty intersection and plain Search/SIMPLE equivalence remain intact.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X1–X3/X5/X7 × F2/F4/F7/F13–F14 preservation after rebase: actual Worker retrieval applies folder/date/size separately and together before a one-candidate budget despite stronger out-of-bounds matches, for phrases, exclusions, title and author. Counts/facets follow; inclusive equal bounds, unknown metadata exclusion, known zero, empty intersection and plain Search/SIMPLE equivalence remain intact.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/restrictions-java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#phraseHonoursEachRestrictionBeforeCandidateBudget",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#exclusionHonoursEachRestrictionBeforeCandidateBudget",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#titleHonoursEachRestrictionBeforeCandidateBudget",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#authorHonoursEachRestrictionBeforeCandidateBudget",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#combinedBoundsExcludeEachCrossedDecoyAndUnknownWithoutBroadening",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchSyntaxRestrictionIntegrationTest.java#plainSearchWithRestrictionsEqualsSimpleIncludingCountsAndFacets"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "X6 × F5 preservation: a request with invalid syntax and invalid size receives the restriction 400 before dispatch, retaining the existing HTTP-entry validation precedence.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "skip the lower tier for now. then proceed with designing and implementing the remaining work",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "Designing and implementing remaining Search window work, areas 1–5; WP2.4a A0–A6 and X1–X8, scenarios revision 4.",
+          "choice": "X6 × F5 preservation: a request with invalid syntax and invalid size receives the restriction 400 before dispatch, retaining the existing HTTP-entry validation precedence.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp24a-syntax/restrictions-java.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RestrictionValidationEntryTest.java#invalidRestrictionWinsOverInvalidSearchSyntaxBeforeDispatch"
+      ],
+      "repaired": false
     }
   ]
 }
