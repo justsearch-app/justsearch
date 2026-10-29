@@ -1,5 +1,5 @@
 /**
- * Task t-20261013-ef3c41, S5 — an index the backend could not count.
+ * #758 — an index the backend could not count.
  *
  * `/api/status` keeps `indexedDocuments: 0` for older readers and adds `indexedDocumentsUnknown: true`.
  * Before, the 0 was taken at its word: the UI said "0" files and treated the index as empty, which

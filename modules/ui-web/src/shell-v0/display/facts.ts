@@ -181,7 +181,7 @@ const FACTS: Record<string, FactDef> = {
     label: 'Files',
     source: {
       kind: 'observed',
-      // Task t-20261013-ef3c41: an index the backend could not count reads "Checking…" while the
+      // #758: an index the backend could not count reads "Checking…" while the
       // server is starting and "Unknown" after — never "0", which would say the index is empty.
       read: (s) =>
         unknownDocumentCountLabel(s.status) ??

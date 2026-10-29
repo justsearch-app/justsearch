@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, scenario S8: a watched folder that still exists but can no longer be
+ * #758: a watched folder that still exists but can no longer be
  * listed (expired share credentials, a changed permission) shows the one root-level "unavailable"
  * state, the same one a missing folder shows, instead of reading as available while its files fail
  * one by one. Real conditions: a deny ACE for listing on a folder this test creates, removed before

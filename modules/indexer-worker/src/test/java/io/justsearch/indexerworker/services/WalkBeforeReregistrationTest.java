@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 8b (decision 2) — no walk ever writes a volume record; only a
+ * #758 — no walk ever writes a volume record; only a
  * deliberate add does. After a Worker restart, and before the Head registers its roots again, the
  * Worker cannot tell which root a walked folder belongs to. A walk of a folder with no volume
  * recorded for it then is deferred: it records nothing, queues nothing, and a prune under it

@@ -431,7 +431,7 @@ final class StatusLifecycleHandlerTest {
   }
 
   /**
-   * Task t-20261013-ef3c41, S5 — the empty-corpus exemption needs a count that was read. An index
+   * #758 — the empty-corpus exemption needs a count that was read. An index
    * the Worker could not count carries indexedDocuments 0 only for older readers; it must not be
    * taken as the fresh, empty install that has nothing to embed. The view is built through the
    * record's canonical constructor so the check compiles against a revision without the field and

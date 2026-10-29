@@ -188,7 +188,7 @@ final class IndexRebuildBrakeTest {
    * Both the state file and its backup unreadable — nothing left to recover from. The manager must
    * re-establish a layout rather than throw, so the app still boots and serves.
    *
-   * <p>Task t-20261013-ef3c41, round 3 (owner's rule, delegated decision): the brake no longer reads
+   * <p>#758: the brake no longer reads
    * as zero. Whether rebuilds were already attempted cannot be told from lost bookkeeping, and
    * never acting on uncertainty means no automatic rebuild starts on its account; the re-established
    * record says the brake was lost, and a person's rebuild (which the brake never gates) remains the
@@ -222,7 +222,7 @@ final class IndexRebuildBrakeTest {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 2 — a brake that cannot be read counts as braked. Here the state
+   * #758 — a brake that cannot be read counts as braked. Here the state
    * file and its backup are both present and neither parses at the moment a rebuild would be
    * counted. Before, the failed read meant "no brake": the attempt rebuilt a fresh state and was
    * counted as the first, so an automatic rebuild started with no brake at all.

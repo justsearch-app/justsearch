@@ -30,7 +30,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 
 /**
- * Task t-20261013-ef3c41, round 6, S8 — the periodic sync walks one watched root per cycle, so a
+ * #758 — the periodic sync walks one watched root per cycle, so a
  * drive letter that starts holding another volume just after its root's turn would read indexed
  * for up to {@code roots × 60 s}. Each cycle asks every root's volume, and a root the Worker
  * refuses reads unavailable within that cycle while walking stays one root per cycle.

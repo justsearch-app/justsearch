@@ -46,7 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, S7 and S9, end to end through the entry points the Worker already had:
+ * #758, end to end through the entry points the Worker already had:
  * a real scan queues the file, the real durable queue issues the claim, the real batch extractor
  * and admission handle it, and the real queue records what happens next. Only the index side is
  * stubbed, so "the old text leaves the index" is read as a call to the stale-source handler.

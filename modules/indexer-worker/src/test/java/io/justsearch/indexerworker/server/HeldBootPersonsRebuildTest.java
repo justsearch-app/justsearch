@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 4 — after a person's explicit rebuild in a boot the rebuild brake
+ * #758 — after a person's explicit rebuild in a boot the rebuild brake
  * held, new and changed files are indexed again without any further action by the person.
  *
  * <p>The person's rebuild is driven the way the Engine drives it: the Worker accepts the migration
@@ -120,7 +120,7 @@ final class HeldBootPersonsRebuildTest {
 
   /**
    * {@code batch} as the person's explicit ingest sends it: with the add marker, on a build that
-   * has it (task t-20261013-ef3c41, round 8b: only an explicit ingest request records the volume
+   * has it (#758: only an explicit ingest request records the volume
    * of its files' folder, and a file whose folder has none recorded is not indexed).
    */
   private static BatchRequest.Builder explicitIngest(BatchRequest.Builder batch) {

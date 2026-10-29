@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 8 (refined decision 2) — a profiling reset that removes the roots
+ * #758 — a profiling reset that removes the roots
  * removes each one exactly as the person's removal does: the Worker is told to stop watching it,
  * which is what drops its volume record, its held watch and any deferred state of the root, and to
  * delete under it, so the same folder added again starts from its own add.

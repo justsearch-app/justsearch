@@ -187,7 +187,7 @@ final class DocumentIdentityBootImportTest {
     server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     server.releaseModelReadyLatchForTests();
-    // The person added the root, which records its volume (task t-20261013-ef3c41, round 8:
+    // The person added the root, which records its volume (#758:
     // only the add records it, and the migration's walk refuses a root with none recorded).
     addedWithoutWatching(server.appServices().ingestService(), root);
 
@@ -462,8 +462,8 @@ final class DocumentIdentityBootImportTest {
       assertEquals(1, queue.enqueueEntries(List.of(
           JobQueue.EnqueueEntry.stat(source).withinRoot(source))));
     }
-    // The explicit ingest that left this item also recorded its folder's volume (round 8b of task
-    // t-20261013-ef3c41: only that request records it; without it the item is never admitted).
+    // The explicit ingest that left this item also recorded its folder's volume (#758: only that
+    // request records it; without it the item is never admitted).
     io.justsearch.indexerworker.services.ExplicitIngestRecords.recordFileFolder(
         layout.indexBase(), source.getParent());
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");

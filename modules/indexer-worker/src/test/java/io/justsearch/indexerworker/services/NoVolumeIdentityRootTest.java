@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 9 — on a platform that exposes no volume identity (Linux, macOS),
+ * #758 — on a platform that exposes no volume identity (Linux, macOS),
  * a root is never deferred or reported unavailable for lack of a volume record: it is walked,
  * watched and its genuine deletions pruned as on main, and only the identity comparison is
  * skipped. The platform's answer is forced through {@link RootIdentity#VOLUME_IDENTITY_UNAVAILABLE},

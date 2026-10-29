@@ -4,8 +4,8 @@ Captured on Linux on **2026-10-21**, using tag `v0.3.0`, commit
 `76871d924` (`76871d924` is the release commit, not a reconstructed schema).
 The three archives total **575,276 bytes** (about 562 KiB).
 
-These are the inputs for task `t-20261020-c2e24a`, issue #739, and scenarios
-U1/U2/U6–U14b/U18/U20/U21. They do not implement the upgrade fixes.
+These inputs were introduced in PR #884 for issue #739.
+They do not implement the upgrade fixes.
 
 | Archive | Capture |
 | --- | --- |

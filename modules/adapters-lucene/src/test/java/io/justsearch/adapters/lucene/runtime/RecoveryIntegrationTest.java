@@ -168,7 +168,7 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   }
 
   /**
-   * Task t-20261013-ef3c41, scenario S4: a transient read error on the index folder at startup
+   * #758: a transient read error on the index folder at startup
    * never discards the index. A real sharing violation (a backup tool or virus scanner holding the
    * commit point open without sharing) used to be classified CORRUPT_INDEX, and auto-recovery
    * answered it by moving the index aside and starting empty. The open must instead fail as

@@ -99,7 +99,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
     when(failing.docCount()).thenReturn(12L);
     when(failing.countByField(anyString(), anyString())).thenReturn(2);
     // The real IndexCountOps answers the throwing and non-throwing count forms alike when its
-    // reader is healthy; the parent count is read through the throwing form (t-20261013-ef3c41).
+    // reader is healthy; the parent count is read through the throwing form (#758).
     when(failing.docCountOrThrow()).thenReturn(12L);
     when(failing.countByFieldOrThrow(anyString(), anyString())).thenReturn(2);
     when(failing.countQueryOrThrow(any())).thenThrow(new IOException("reader unavailable"));
@@ -120,7 +120,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
     when(healthy.docCount()).thenReturn(12L);
     when(healthy.countByField(anyString(), anyString())).thenReturn(2);
     // The real IndexCountOps answers the throwing and non-throwing count forms alike when its
-    // reader is healthy; the parent count is read through the throwing form (t-20261013-ef3c41).
+    // reader is healthy; the parent count is read through the throwing form (#758).
     when(healthy.docCountOrThrow()).thenReturn(12L);
     when(healthy.countByFieldOrThrow(anyString(), anyString())).thenReturn(2);
     when(healthy.countQueryOrThrow(any())).thenReturn(7);

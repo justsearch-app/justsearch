@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 7, scenario S8 — a boot that still has the previous index
+ * #758 — a boot that still has the previous index
  * generation (a stop between a migration's cutover and the old generation's removal) meets a root
  * whose drive letter now holds another volume. The committed boot defers that root instead of
  * failing start-up: every other root is reconciled and served, the root reads unavailable, nothing

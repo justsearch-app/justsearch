@@ -28,7 +28,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 
 /**
- * Task t-20261013-ef3c41, round 8, scenario S8 — the periodic cycle lists the watched roots when
+ * #758 — the periodic cycle lists the watched roots when
  * it begins, then walks one and asks every other root's volume. A root the person removes during
  * the cycle is not asked: asking the Worker about a removed root would record the volume at its
  * path, and the folder added again later would be judged against that.

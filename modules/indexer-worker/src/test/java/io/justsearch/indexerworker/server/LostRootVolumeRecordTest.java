@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 9 — the Worker's volume record ({@code root-volumes.properties})
+ * #758 — the Worker's volume record ({@code root-volumes.properties})
  * lost or corrupt after it was written. A lost or unreadable record never causes a deletion: at
  * the next boot every declared root awaits its one-time seeding on evidence, as after an upgrade
  * from a version without the record. A root whose indexed files are on the drive at its path is

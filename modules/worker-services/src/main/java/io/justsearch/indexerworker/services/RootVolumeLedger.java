@@ -21,14 +21,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The volume each declared root lives on, kept across restarts (task t-20261013-ef3c41, S8).
+ * The volume each declared root lives on, kept across restarts (#758).
  *
  * <p>A drive letter or a mount point can come back holding a different volume: another USB stick
  * at the same letter, a reformatted disk. Its folder of the same name is present and listable, so
- * without a record every file of the original would read as deleted. Round 8 (refined decision
- * 2): only a deliberate add records a volume: the person's add of a root, or an explicit ingest
- * request ({@link #record}, replacing what its own key held). No walk ever records (round 8b,
- * decision 2): every other path refuses a root with nothing recorded as unproven and records
+ * without a record every file of the original would read as deleted. Only a deliberate add records
+ * a volume: the person's add of a root, or an explicit ingest
+ * request ({@link #record}, replacing what its own key held). No walk ever records: every other
+ * path refuses a root with nothing recorded as unproven and records
  * nothing. The record is dropped when the person removes the root (its unwatch). A folder is
  * judged by the record of the nearest recorded folder at or above it.
  *
@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  * pending file first, then an empty record, so the moment happens once. A pending root is recorded
  * once, on evidence ({@link #seeded}); a pending file that exists with no record means an
  * interrupted upgrade, which resumes. A configured collection root with nothing recorded is
- * seeded the same way once ({@link #awaitSeedingUnlessRecorded}, round 8b, decision 3).
+ * seeded the same way once ({@link #awaitSeedingUnlessRecorded}).
  *
  * <p>The parent folder of an explicitly ingested file is not a root. Its volume is kept under its
  * own keys ({@link #recordedFileFolder}), recorded by the explicit ingest request alone ({@link
@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * disabled and checks nothing; an in-memory one (the unwired default of an authority or watcher,
  * never the Worker's own) records a folder the first time it is seen.
  *
- * <p>Loss and corruption (round 9): a file whose content is not a well-formed record (an entry
+ * <p>Loss and corruption: a file whose content is not a well-formed record (an entry
  * that is not an absolute folder with a volume, or a pending entry that is not an absolute folder
  * awaiting seeding) is corrupt; reading it is "cannot tell" like any unreadable file. At boot,
  * {@link #beginUpgradeSeeding} discards a corrupt file and treats a lost or discarded record like

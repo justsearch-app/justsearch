@@ -40,7 +40,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Task t-20261005-b6d536 scenarios FP2 and FP3: a search that waited for an inference thread
+ * #759: a search that waited for an inference thread
  * before it started keeps the semantic sub-budget its call began with. The cap counts from the
  * start of the call, not from the moment a thread picks it up, and a sub-budget that the wait
  * used up gives the existing Spec D outcome at once, without starting an encoder: keyword-only

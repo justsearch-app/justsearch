@@ -34,7 +34,7 @@ final class WorkerStatusMapperTest {
   }
 
   /**
-   * Task t-20261013-ef3c41, S5 — the Worker's "could not count" marker reaches /api/status as
+   * #758 — the Worker's "could not count" marker reaches /api/status as
    * {@code indexedDocumentsUnknown}, so the 0 kept in {@code indexedDocuments} for older readers is
    * never shown as an empty index. Built and read through descriptors and record components so the
    * check compiles against a revision without the field and fails there by assertion.

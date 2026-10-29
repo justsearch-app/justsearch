@@ -161,7 +161,7 @@ final class McpResourcesReadTest {
   }
 
   /**
-   * Task t-20261013-ef3c41, S5 — an index the Worker could not count reaches MCP as {@code
+   * #758 — an index the Worker could not count reaches MCP as {@code
    * docCount} 0 with the {@code docCountUnknown} marker. The agent must be told the count is unknown,
    * not that the index holds 0 documents (which reads as "nothing indexed, do not search").
    */

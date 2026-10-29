@@ -29,7 +29,7 @@ import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Task t-20261005-b6d536, FP4 and FP11: an MCP search refused because the Engine's inference
+ * #759: an MCP search refused because the Engine's inference
  * threads and their queue are full answers JSON-RPC -32000 with errorCode ADMISSION_INFERENCE_BUSY,
  * a 429 with Retry-After, and no safe replay; never ADMISSION_ENGINE_LIMIT.
  *

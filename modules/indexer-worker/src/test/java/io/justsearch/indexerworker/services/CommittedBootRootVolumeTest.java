@@ -42,10 +42,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, rounds 6 and 7, scenario S8 — the boot-root reconcile a migration
+ * #758 — the boot-root reconcile a migration
  * cutover runs goes through the same volume check as every other watch registration: no watcher is
  * registered on another volume at a root's drive letter, and the watch resumes when the recorded
- * volume returns. Round 7: such a root is deferred, not a failure, so it neither throws nor makes
+ * volume returns. Such a root is deferred, not a failure, so it neither throws nor makes
  * the cutover's replay uncertain.
  *
  * <p>Real conditions: a SUBST letter is mapped to a folder on one volume and its drive root is

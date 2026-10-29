@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Task t-20261020-a5fbcb, round 13. The ordinary promotion replay and the promoted-pointer
+ * #852. The ordinary promotion replay and the promoted-pointer
  * recovery replay an accepted watcher DELETE receipt against the path's state as refusal cleanup
  * confirms it. A watched file is replaced by a folder inside a parent folder that can be traversed
  * but not listed while the root vouches: that state is uncertain, so the receipt stays, nothing is

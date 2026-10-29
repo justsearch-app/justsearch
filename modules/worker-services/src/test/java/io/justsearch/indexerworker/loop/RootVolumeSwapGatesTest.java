@@ -37,13 +37,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 4, scenario S8 — a drive letter that comes back holding a different
+ * #758 — a drive letter that comes back holding a different
  * volume does not turn the original's files into deletions on the paths outside the prune.
  *
  * <p>Real conditions: a SUBST letter is mapped to a folder on one volume holding {@code notes.txt},
  * with the drive root as the ingestion root, and the file is admitted there. The letter is then
  * unmapped and mapped again, to a folder on another volume that does not hold the file. The folder
- * at the root is present and listable, so before this round admission (and the freshness check,
+ * at the root is present and listable, so before this change admission (and the freshness check,
  * re-hash and pre-write, which share one decision) read the file as deleted and retired it. Every
  * mapping and folder this test creates is removed before it returns.
  */

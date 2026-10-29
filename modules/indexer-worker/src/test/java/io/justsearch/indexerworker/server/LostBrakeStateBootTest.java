@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 3 — the repeat-rebuild brake when its state is lost, and what a
+ * #758 — the repeat-rebuild brake when its state is lost, and what a
  * held boot reports for the rest of that boot.
  *
  * <p>When neither {@code state.json} nor {@code state.json.prev} can be read, whether a brake was

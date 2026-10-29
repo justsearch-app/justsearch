@@ -712,7 +712,7 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
 
   /**
    * Records {@code root} as a root the person added. A watcher delete happens only under such a
-   * root, and only the add records a volume (task t-20261013-ef3c41, round 8b, decision 2).
+   * root, and only the add records a volume (#758).
    */
   private static void addedAsThePerson(WorkerIngestService service, Path root) {
     boolean recorded = ((RootWitness) service.rootCheck()).recordAdded(root);

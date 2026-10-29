@@ -45,13 +45,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 4, scenario S8 — the watcher's delete confirmation asks the same
+ * #758 — the watcher's delete confirmation asks the same
  * root-identity question the prune asks.
  *
  * <p>A SUBST letter is mapped to a folder on one volume and its drive root is indexed and pruned
  * once (which records the volume). After a restart (a new service over the same index and queue)
  * the letter holds a folder on another volume, without the file. A witnessed DELETE for the file
- * is then confirmed. Before this round the confirmation only asked whether the folder was listable,
+ * is then confirmed. Before this change the confirmation only asked whether the folder was listable,
  * so the document was removed. Every mapping and folder this test creates is removed before it
  * returns.
  */

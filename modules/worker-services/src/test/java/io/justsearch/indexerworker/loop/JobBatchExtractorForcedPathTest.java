@@ -98,7 +98,7 @@ final class JobBatchExtractorForcedPathTest {
     // decides the branch — otherwise both arms would skip the unchanged-check for the wrong reason.
     if (countReadable) {
       when(indexCountOps.docCount()).thenReturn(7L);
-      // Task t-20261013-ef3c41: the extractor decides "empty index" from the count it actually read.
+      // #758: the extractor decides "empty index" from the count it actually read.
       when(indexCountOps.docCountOrThrow()).thenReturn(7L);
     } else {
       // What IndexCountOps does when its reader cannot be read: the lenient count answers 0 and the
@@ -160,7 +160,7 @@ final class JobBatchExtractorForcedPathTest {
   }
 
   /**
-   * Task t-20261013-ef3c41, S5 — an index that cannot be counted is not an empty one. Before, the
+   * #758 — an index that cannot be counted is not an empty one. Before, the
    * failed count read as 0, the batch was treated as "first index of an empty index", the unchanged
    * check was skipped and every unchanged file was extracted and written again.
    */

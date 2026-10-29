@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, scenario S7 — an unreadable source whose content is in the index is
+ * #758 — an unreadable source whose content is in the index is
  * reported as "indexed, source unreadable", distinct from one that was never indexed and from a
  * missing file. Uses a real sharing violation (a handle opened without sharing).
  */

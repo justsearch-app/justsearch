@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 /**
- * Task t-20261005-b6d536, FP4 and FP11: a refusal because the Engine's foreground inference
+ * #759: a refusal because the Engine's foreground inference
  * threads and their queue are full reaches HTTP as {@code ADMISSION_INFERENCE_BUSY}, a 429 with
  * Retry-After, never as {@code ADMISSION_ENGINE_LIMIT}; raised mid-request it is never replayable.
  *

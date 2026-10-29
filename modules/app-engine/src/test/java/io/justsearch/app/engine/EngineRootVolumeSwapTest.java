@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 5, S8 — a drive letter that holds another volume does not put that
+ * #758 — a drive letter that holds another volume does not put that
  * volume's files in the place of the original's, on the whole running Engine.
  *
  * <p>Real conditions: a SUBST letter is mapped to a folder on one volume ("stick A") whose
@@ -46,7 +46,7 @@ import org.junit.jupiter.api.io.TempDir;
  * another volume ("stick B") whose {@code docs} folder holds a same-named file with different text
  * and a file of its own, either across an Engine restart or while it runs. A second watched root
  * on the temp volume is the control: its marker becoming findable shows the pipeline ran, so a B
- * marker that stays unfindable was refused, not merely slow. Round 6 adds the reindex button's
+ * marker that stays unfindable was refused, not merely slow. This also covers the reindex button's
  * recorded walk and a restart while the root reads unavailable. Every mapping and folder this test
  * creates is removed before it returns.
  */

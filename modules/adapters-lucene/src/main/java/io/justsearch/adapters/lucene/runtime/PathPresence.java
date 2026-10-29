@@ -13,7 +13,7 @@ import java.util.Map;
 
 /**
  * Three-way answer to "is this path there?" — the one file-level probe every deletion path uses
- * (task t-20261013-ef3c41).
+ * (#758).
  *
  * <p>{@link Files#exists} answers {@code false} for ANY failure (access denied, sharing violation,
  * an unreachable share), so "cannot tell" read as "gone" and indexed content was deleted on a read
@@ -59,7 +59,7 @@ public enum PathPresence {
   }
 
   /**
-   * Whether a path reported {@link #ABSENT} may count as absent (task t-20261013-ef3c41, round 4):
+   * Whether a path reported {@link #ABSENT} may count as absent (#758):
    * "not found" beneath a folder that cannot be listed proves nothing, so the nearest ancestor that
    * exists, at or below {@code boundary}, must be a folder whose entries can be listed (or not a
    * folder at all, which holds nothing). Walking stops at {@code boundary}; when nothing up to it

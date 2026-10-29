@@ -499,8 +499,8 @@ final class WorkerIngestServiceCandidateReconciliationTest {
   }
 
   /**
-   * Registers {@code root} as the person's added root. Round 8 of task t-20261013-ef3c41 (refined
-   * decision 2): only the add records a root's volume, so the add's record is taken here too.
+   * Registers {@code root} as the person's added root. #758: only the add records a root's volume,
+   * so the add's record is taken here too.
    */
   private static RootWatcherRegistry watch(Fixture fixture, Path root) {
     RootWatcherRegistry registry = new RootWatcherRegistry();

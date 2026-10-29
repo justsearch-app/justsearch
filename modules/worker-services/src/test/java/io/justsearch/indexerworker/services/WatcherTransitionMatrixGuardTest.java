@@ -68,7 +68,7 @@ final class WatcherTransitionMatrixGuardTest {
 
       // Cell: DELETE while watched root is PRESENT → forwarded to the delete sink.
       // Cell: DELETE cascade while watched root is GONE (unmount) → SKIPPED (599 data-loss guard).
-      // Task t-20261013-ef3c41: a DELETE is applied once its absence is confirmed, after a short
+      // #758: a DELETE is applied once its absence is confirmed, after a short
       // settle window, so both cells are read once the window has passed.
       watcher.dispatchEvent(presentRegistration, WorkerMethvinWatcher.Kind.DELETE, child);
       watcher.dispatchEvent(goneRegistration, WorkerMethvinWatcher.Kind.DELETE, goneChild);

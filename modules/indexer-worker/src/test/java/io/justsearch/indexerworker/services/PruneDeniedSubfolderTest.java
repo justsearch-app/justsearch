@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 4, P1 — one unreadable subfolder does not stop every genuine
+ * #758 — one unreadable subfolder does not stop every genuine
  * deletion under its root.
  *
  * <p>Real conditions: a root with folders {@code a}, {@code b} and {@code c}; {@code b} gets an
@@ -44,7 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
  * b/file-0} before {@code b} is denied. The prune removes the two documents whose files are reported
  * not found while their folder can be listed, keeps every document under {@code b} (including the
  * deleted one: a folder that cannot be listed never proves a file absent) and reports itself
- * incomplete. Before this round the first document under {@code b} stopped the whole run and
+ * incomplete. Before this change the first document under {@code b} stopped the whole run and
  * discarded the batch's confirmed deletions, so nothing was removed on any run.
  */
 final class PruneDeniedSubfolderTest

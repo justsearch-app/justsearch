@@ -45,7 +45,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Task t-20261013-ef3c41, round 8b (decision 3) — a configured collection ({@code
+ * #758 — a configured collection ({@code
  * index.collections}) is the person's configuration, not a root the person added, so no add ever
  * records its volume. Its files are indexed when a migration builds a new generation, and nothing
  * else walks or prunes them. When nothing is recorded for its root (an upgrade from a version
