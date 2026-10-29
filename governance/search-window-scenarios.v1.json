@@ -1,0 +1,1970 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "SW-SRCH-01",
+      "behavior": "A fresh window starts in Search, and submitting an empty field does nothing.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "starts in Search, says so to assistive tech, and words what Enter does"
+        }
+      ]
+    },
+    {
+      "id": "SW-SRCH-02",
+      "behavior": "Typing searches progressively, while Enter requests the full search immediately.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/state/searchState.test.ts",
+          "test": "staged: keystroke path runs the quick pass, then the refined pass after settle"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "runs the full pass at once on Enter, superseding the staged ones"
+        }
+      ]
+    },
+    {
+      "id": "SW-SRCH-03",
+      "behavior": "Search waits until text composition finishes before searching the composed text.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "does not search a half-composed IME string, and searches once composition ends"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-SRCH-04",
+      "behavior": "Results show the returned files, their paths, and an accurate explanation of the displayed count.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.search.test.ts",
+          "test": "names the surplus rather than hiding it when more renders than matched exactly"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-search-results"
+        }
+      ]
+    },
+    {
+      "id": "SW-SRCH-05",
+      "behavior": "No matches and a failed search have different explanations, and another search can recover.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.search.test.ts",
+          "test": "recovers: a second search replaces the failure with the results it gets"
+        }
+      ]
+    },
+    {
+      "id": "SW-SRCH-06",
+      "behavior": "Editing or clearing the query immediately removes obsolete results, even if an earlier response arrives later.",
+      "kind": "works-today",
+      "races": [
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "binding": null,
+          "reason": "The controller citation is implementation code, not a test of query invalidation."
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "shows nothing for a cleared query, even when the earlier request answers late"
+        }
+      ]
+    },
+    {
+      "id": "SW-SRCH-07",
+      "behavior": "Searching while an answer or agent run is active leaves that work running and reachable.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "leaves a streaming answer streaming, in the sidebar, and reopens it with one click"
+        }
+      ]
+    },
+    {
+      "id": "SW-SRCH-08",
+      "behavior": "Confirmed Forget refreshes results and removes the forgotten files from the current choice and prepared question.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
+          "test": "S56 confirmed success refreshes real current search counts, selection, pending Ask and the matching pane"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-SRCH-09",
+      "behavior": "Cancelled, uncertain, repeated, or late Forget actions cannot remove unrelated results or replace newer work.",
+      "kind": "works-today",
+      "races": [
+        "concurrent-or-identical-send",
+        "late-response",
+        "reload",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forget.test.ts",
+          "test": "S56 a late completed response cannot close another conversation pane or rewrite its new draft"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-FLTR-01",
+      "behavior": "Folder, date, and size restrictions remain visible and can each be removed without losing the query.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "F1 commits folder date and size controls and removes each restriction without losing the query"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-filters-hero-normal-dark"
+        }
+      ]
+    },
+    {
+      "id": "SW-FLTR-02",
+      "behavior": "Date and size restrictions use the entered local calendar days and units consistently.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "F4b converts local DST calendar days and rounded binary units and keeps entered chip values"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-FLTR-03",
+      "behavior": "Invalid or incomplete restrictions keep the entered text and explain the error without applying it.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "F5 keeps invalid text beside its error and applies no invalid or incomplete edit"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-filters-hero-normal-dark"
+        }
+      ]
+    },
+    {
+      "id": "SW-FLTR-04",
+      "behavior": "Changing a restriction while results load shows only results for the latest restrictions.",
+      "kind": "works-today",
+      "races": [
+        "concurrent-or-identical-send",
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "F8 same-query filter commits cancel stale rows counts facets and chosen-file preparation"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-FLTR-05",
+      "behavior": "A question captures its restrictions when sent, while Retry and Edit retain that question’s original restrictions.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "F10 Ask captures at Send and follow-ups capture new controls while live Edit and Retry keep originals"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-FLTR-06",
+      "behavior": "Asking about chosen files uses exactly those files and explains when ordinary restrictions are suspended.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.test.ts",
+          "test": "counts several hits from one document once"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "F11 prepared file Ask and non-retrieval modes explain restriction precedence"
+        }
+      ]
+    },
+    {
+      "id": "SW-FLTR-07",
+      "behavior": "Empty results under a restriction never silently turn into an unrestricted question.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "F7 empty Search names active restrictions and restricted Ask no-content never silently broadens"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-FLTR-08",
+      "behavior": "Returning to Search preserves session restrictions, while changing profile clears them and rejects old replies.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "F12 navigation keeps session filters and both profile signals clear and cancel older generations"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-QREC-01",
+      "behavior": "Recent items open only when the focused Search field is empty and support keyboard selection and dismissal.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+          "test": "Y1 opens only for an empty focused Search bar and owns selection and dismiss keys"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-recents-hero-normal-dark"
+        }
+      ]
+    },
+    {
+      "id": "SW-QREC-02",
+      "behavior": "Recent searches contain accepted explicit searches, with exact duplicates combined and a bounded list.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+          "test": "Y2 records only accepted explicit Search actions with exact dedup and an eight item cap"
+        }
+      ]
+    },
+    {
+      "id": "SW-QREC-03",
+      "behavior": "Selecting a recent search uses its original text with the current restrictions, while selecting a conversation opens that conversation.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+          "test": "Y3 replays operators with current restrictions and selects conversations through navigation"
+        }
+      ]
+    },
+    {
+      "id": "SW-QREC-04",
+      "behavior": "Clearing Recents hides the existing population even when an older list response arrives later.",
+      "kind": "works-today",
+      "races": [
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+          "test": "Y4 Clear before a first delayed list response suppresses every old row"
+        }
+      ]
+    },
+    {
+      "id": "SW-QREC-05",
+      "behavior": "Changing profile or observing a locked conversation store hides recent items that no longer belong in view.",
+      "kind": "works-today",
+      "races": [
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
+          "test": "Y6 observed lock hides cached optimistic and legacy labels and pre-lock responses until unlock refresh"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-QREC-06",
+      "behavior": "Search syntax errors preserve the query and show the Engine’s explanation without stale results.",
+      "kind": "works-today",
+      "races": [
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
+          "test": "x6 each edit supersedes an older success and an older error body"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-QREC-07",
+      "behavior": "Advanced searches retain all active restrictions, including after a restriction changes during the request.",
+      "kind": "works-today",
+      "races": [
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "XFilters changing a restriction during syntax Search drops the old response and delayed error body"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-QREC-08",
+      "behavior": "Restored and recent operator text remains Search syntax, while question modes treat operators as ordinary prompt text.",
+      "kind": "works-today",
+      "races": [
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
+          "test": "x8 legacy URL restoration keeps operator text and uses Search syntax"
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-01",
+      "behavior": "Sending a question adds it to the current conversation and clears only the accepted submitted draft.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "empties the draft on a send that was accepted"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-02",
+      "behavior": "Answers arrive below their questions in conversation order as text streams in.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "renders each turn as question-then-answer, oldest first, and appends deltas as they arrive"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-03",
+      "behavior": "While an answer streams, Stop replaces Send.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "is Send while idle and Stop while a response streams — never both"
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-04",
+      "behavior": "Stop targets the question being answered, keeps received text, and waits for the Engine’s terminal outcome.",
+      "kind": "works-today",
+      "races": [
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "says \"Stopping…\" until the Engine ends the turn, and keeps every word it sent before that"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-05",
+      "behavior": "If completion wins the Stop race, the answer remains completed rather than being labelled stopped.",
+      "kind": "works-today",
+      "races": [
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "shows the finished answer, not \"Stopped by you.\", when the Stop came after it was saved"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-06",
+      "behavior": "Leaving the screen or starting another conversation does not claim that an answer was stopped.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "sends no stop for an answer that finished, nor when the window goes away mid-answer"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-07",
+      "behavior": "An error, an empty completed answer, and an interrupted answer explain their own outcome.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "reports a failure with the stream's own words, and never as a halt"
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-08",
+      "behavior": "Structured questions validate the schema before sending and show only accepted final JSON.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
+          "test": "XT5 rejects schema %s at the box without sending or clearing"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-09",
+      "behavior": "Stopping or interrupting a Structured answer never presents partial or rejected JSON as completed output or later context.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts",
+          "test": "XT7 Structured %s discards partial attempts through the real stream reader"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-10",
+      "behavior": "When files provide no evidence, a separate model-answer action answers the original question without consuming an unrelated draft.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3NoEvidence.test.ts",
+          "test": "the action answers its own question and preserves an unsent composer draft (NE2)"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-ASK-11",
+      "behavior": "A second unresolved question cannot replace the retained first question, and uncertain delivery offers no blind retry.",
+      "kind": "works-today",
+      "races": [
+        "concurrent-or-identical-send"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+          "test": "a second unresolved submission cannot replace retained A with newer B"
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-01",
+      "behavior": "Reopening a conversation restores its saved questions, answers, agent activity, and evidence in their saved order.",
+      "kind": "works-today",
+      "races": [
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts",
+          "test": "projects the same conversations back into a FRESH window — the reload round-trip"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-02",
+      "behavior": "Late history or record responses cannot replace the conversation now in view or resurrect a confirmed deletion.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+          "test": "S2 confirmed deletion cannot be resurrected by a late %s response"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-03",
+      "behavior": "Follow-up questions use the conversation’s confirmed saved context in order, respecting its exclusions, starting point, and summary.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "binding": null,
+          "reason": "The supplied context tests exercise the view; no controller test is cited for this guarantee."
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+          "test": "leaves out excluded messages and everything above the floor, and leads with the summary"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-04",
+      "behavior": "Moving the context starting point dims earlier messages, and Restore makes the full context available again.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+          "test": "sets the floor on the turn’s own question, re-reads /history, and dims what is above"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-05",
+      "behavior": "Exclude and Include change the intended messages, including exclusions outside the visible transcript.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+          "test": "clears every recorded exclusion once each, on screen and off"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-06",
+      "behavior": "Compaction discloses its summary, and a refused summary edit keeps the user’s correction available.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+          "test": "keeps a REFUSED summary edit open, with the reader’s correction still in it"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-07",
+      "behavior": "Context changes are ordered, and a failed confirmation blocks a follow-up instead of silently using uncertain context.",
+      "kind": "works-today",
+      "races": [
+        "concurrent-or-identical-send",
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+          "test": "marks a saved %s unconfirmed when refresh fails and blocks Ask without losing its draft"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-08",
+      "behavior": "A question waiting for context keeps its original text and preserves newer input through screen changes and recovery.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+          "test": "keeps a refused question visible beside newer input through retry and recovery (X15)"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-09",
+      "behavior": "Branch opens a new conversation at the selected answer without running another question.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+          "test": "forks at the turn’s OWN answer, opens the branch, and loads both of its records"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-10",
+      "behavior": "Edit and Retry branch from the original question’s position and retain that question’s known mode and inputs.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab",
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+          "test": "retries a turn by re-sending its ORIGINAL question from the same fork point"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-HIST-11",
+      "behavior": "Version navigation discovers saved branches after reload and ignores obsolete branch-list responses.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+          "test": "S16.2 ignores a stale successful read after a newer deletion refresh"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-LIST-01",
+      "behavior": "New conversation opens a fresh composer while keeping earlier conversations reachable.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
+          "test": "empties the draft, un-docks, and keeps the session that was there"
+        }
+      ]
+    },
+    {
+      "id": "SW-LIST-02",
+      "behavior": "Selecting a conversation changes the transcript without resending a question or reordering the list.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
+          "test": "issues NOTHING — a claim is not a re-ask"
+        }
+      ]
+    },
+    {
+      "id": "SW-LIST-03",
+      "behavior": "Active, pinned, recent, and unread indicators follow the conversation’s own activity.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-sessions.test.ts",
+          "test": "keeps a BLOCKED run on Active even when it is pinned (blockers override)"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
+          "test": "marks a conversation unread when its answer lands while the reader is elsewhere"
+        }
+      ]
+    },
+    {
+      "id": "SW-LIST-04",
+      "behavior": "Renames survive reopening, and a refused rename restores the previously saved title.",
+      "kind": "works-today",
+      "races": [
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts",
+          "test": "puts a REFUSED rename back, and says so — the row never keeps a name nothing remembers"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-LIST-05",
+      "behavior": "Automatic titles never overwrite a user’s newer name, including a rename from another tab.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "second-conversation-or-tab",
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "binding": null,
+          "reason": "The cited reload test resumes a pending automatic title; it does not exercise a newer user rename from another tab."
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+          "test": "a late automatic title never writes this window's rename over a newer rename from another tab"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-LIST-06",
+      "behavior": "Deleting a conversation names the affected branch tree and leaves everything intact when consent is declined.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+          "test": "leaves everything when the reader declines, and says nothing"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-LIST-07",
+      "behavior": "Partial or uncertain deletion reports what was confirmed and never restores a deleted transcript from a late response.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+          "test": "forgets the open deleted child and cached turns when the next cascade child fails"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-LIST-08",
+      "behavior": "Deleting a conversation preserves newer or unrelated drafts and leaves keyboard focus on a safe remaining target.",
+      "kind": "works-today",
+      "races": [
+        "concurrent-or-identical-send",
+        "late-response",
+        "second-conversation-or-tab",
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+          "test": "TD10a a concurrent send elsewhere and its late failure cannot overwrite the next draft"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-01",
+      "behavior": "Delegate starts an agent run, while ordinary Ask sends a question to the answer service.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "delegates on Ctrl+Enter through the seam, with no ask dispatch at all"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-02",
+      "behavior": "A live agent run shows its actual activity and tool calls without invented step counts.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "states the tool calls and steps this run has ACTUALLY made, mid-run"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "chat-activity-rail-open"
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-03",
+      "behavior": "A held decision blocks ordinary sending and exposes the appropriate answer, budget, or context controls.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "dispatches NOTHING when the reader types and sends while a decision is held"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "chat-budget"
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-04",
+      "behavior": "Typing during a steerable run sends a direction to that run instead of starting competing work.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "steers through the seam, and starts no competing run on either key"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-05",
+      "behavior": "Applied, queued, refused, and unconfirmed directions remain distinguishable.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+          "test": "steer names a connection failure as such, not as a finished run, without claiming non-application"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run.test.ts",
+          "test": "labels applied, queued and not-applied directions differently"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-06",
+      "behavior": "Identical directions and reports from another client cannot confirm the wrong send.",
+      "kind": "works-today",
+      "races": [
+        "concurrent-or-identical-send",
+        "late-response",
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+          "test": "two unconfirmed identical sends are each settled only by their own report, in Search"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-07",
+      "behavior": "A direction whose delivery is uncertain keeps its notice until its own run report settles it.",
+      "kind": "works-today",
+      "races": [
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+          "test": "a lost answer to a direction the run took shows only the run report, in Search"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "drops the note once the run reports the direction that send produced"
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-08",
+      "behavior": "Returning or reloading can reattach to the matching live run without adopting another conversation’s run.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab",
+        "reload",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+          "test": "does NOT reattach when the live run belongs to a DIFFERENT conversation"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts",
+          "test": "asks the shared controller to reattach when the enumeration says a run is live"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-09",
+      "behavior": "Replayed approval requests open one ceremony, and stale requests cannot authorize a replacement run.",
+      "kind": "works-today",
+      "races": [
+        "concurrent-or-identical-send",
+        "late-response",
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts",
+          "test": "does not flush an unidentified old AUTO call into a replacement run"
+        },
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "No view test is bound for this scenario."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-10",
+      "behavior": "Failed approvals say the action was not approved, and ending a run closes only that run’s pending approvals.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+          "test": "approveCall surfaces an error when the POST is not ok (no silent stuck-PENDING)"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-11",
+      "behavior": "Halt reports a stopped run only after the backend confirms that outcome.",
+      "kind": "known-gap",
+      "races": [
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "binding": null,
+          "reason": "Halt concludes locally before the backend reply and ignores connection failure; existing controller checks do not establish backend confirmation."
+        },
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The existing Halt view checks cover narrower terminal and reconciliation cases, not backend-confirmed stopping."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live check binds this guarantee; a lost Halt request can leave the backend running."
+        }
+      ]
+    },
+    {
+      "id": "SW-DRFT-01",
+      "behavior": "Drafts remain associated with their own conversation or search place when the user moves elsewhere.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+          "test": "HO8 an outgoing conversation keeps its unsent draft and files one click away"
+        }
+      ]
+    },
+    {
+      "id": "SW-DRFT-02",
+      "behavior": "Restoring a draft displays it for review without automatically searching, asking, or delegating.",
+      "kind": "works-today",
+      "races": [
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts",
+          "test": "rehydrates a fresh instance from storage on first connect (the reload path)"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "restores the draft into the composer without searching, asking or delegating"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DRFT-03",
+      "behavior": "A retained question and newer draft survive reload as separate items requiring review.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab",
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+          "test": "retains A and newer B across same-tab reload, review-only"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DRFT-04",
+      "behavior": "A failed or unreadable recovery write preserves existing recoverable text and blocks unsafe sending.",
+      "kind": "works-today",
+      "races": [
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/draftPersistence.test.ts",
+          "test": "DS1 a failed raw read never authorizes overwriting an unread sole copy on disconnect"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+          "test": "refuses issuance when session retention fails, preserving raw and live input"
+        }
+      ]
+    },
+    {
+      "id": "SW-DRFT-05",
+      "behavior": "An explicit Load anyway continues the captured question once and loses that authority when the user changes or leaves it.",
+      "kind": "works-today",
+      "races": [
+        "concurrent-or-identical-send",
+        "late-response",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+          "test": "one explicit force continues captured A exactly once after %s without a READY poll"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DRFT-06",
+      "behavior": "Incoming answer links prepare the supplied task and files but wait for Send.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+          "test": "HO3 HO4 HO5 %s prepares the chosen files and waits"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DRFT-07",
+      "behavior": "An incoming task cannot silently overwrite more retained work than the recovery capacity can hold.",
+      "kind": "works-today",
+      "races": [
+        "concurrent-or-identical-send",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+          "test": "DS1 allows two whole same-text proposals, refusing a third before replacement or a request"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DRFT-08",
+      "behavior": "New search settles its empty address before reload and reports uncertainty if draft retirement cannot be confirmed.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.urlConversation.test.ts",
+          "test": "N14 C2 settles the accepted New address before an immediate reload can read it"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DRFT-09",
+      "behavior": "A draft restored after restarting the installed app can be reviewed and submitted.",
+      "kind": "known-gap",
+      "races": [
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "Enter, Send, and Use reviewed settings were inert after recovery in installed Ubuntu builds; view tests do not cover installed-app submission."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend check binds submission of the recovered installed-app draft."
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-01",
+      "behavior": "Opening a result or citation shows the intended document without changing an unrelated inspector selection.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+          "test": "opens the pane at the cited range and leaves the shared inspector selection untouched"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-02",
+      "behavior": "Different passages of one document open their own passage, and an unresolved citation never opens an arbitrary source.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-citation-anchor.test.ts",
+          "test": "T9 — a SECOND passage of the same document resolves to ITSELF, not to the first"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+          "test": "849 S10 — a DEGENERATE span opens a pane that says so"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-03",
+      "behavior": "Evidence arriving late updates the matching answer and document header without borrowing another turn’s evidence.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.citations.test.ts",
+          "test": "late evidence and its withdrawal update settled text without a new text delta"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-04",
+      "behavior": "Sources distinguish retrieved, supplied, dropped, and unexamined evidence without claiming unsupported grounding.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-citation-anchor.test.ts",
+          "test": "the MATCHER NEVER RAN: the pane says so, and does not say \"not cited\""
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+          "test": "a DROPPED source never gains a grounding claim, however the match lands"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The sv3-citation-dropped step requires live evidence and is not a deterministic fixture observation."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The live sv3-citation-dropped ceremony exists, but no backend test title is cited for this guarantee."
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-05",
+      "behavior": "Closing the reader or switching conversation closes the old document, while unrelated updates leave it open.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+          "test": "does NOT close on a non-switching update (the late-match claim upgrade)"
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-06",
+      "behavior": "The reader fits beside wide content or overlays narrow content, and its width can be adjusted and restored accessibly.",
+      "kind": "works-today",
+      "races": [
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+          "test": "moves and resets from the keyboard, and a double-click FORGETS"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-07",
+      "behavior": "The final result, answer, and sources remain reachable above the docked composer.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-composer-occlusion"
+        }
+      ]
+    },
+    {
+      "id": "SW-DOC-08",
+      "behavior": "At narrow widths with enlarged text, opening the sidebar leaves the answer readable.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "A 360 px window with 200% text had a zero-width answer; later reflow and sidebar tests do not establish this exact case."
+        }
+      ]
+    },
+    {
+      "id": "SW-KEY-01",
+      "behavior": "Enter submits the chosen mode, Ctrl or Command plus Enter delegates when allowed, and Shift plus Enter inserts a newline.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.tier.test.ts",
+          "test": "delegates on Ctrl+Enter from the DEFAULT mode, as it did before the control existed"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-KEY-02",
+      "behavior": "The command palette opens only for its own window and stops responding after that window is removed.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
+          "test": "leaves an unmounted window deaf, so a stale surface cannot answer the chord"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-KEY-03",
+      "behavior": "Palette commands can be filtered, selected with arrows, and activated by keyboard or pointer.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
+          "test": "runs the highlighted command on Enter, which becomes the new selection"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-KEY-04",
+      "behavior": "The palette contains keyboard focus and returns it to the opener when dismissed.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
+          "test": "traps Tab inside the popup instead of walking out into the shell behind the backdrop"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The sv3-palette-forced-colors step observes presentation, not focus containment or restoration."
+        }
+      ]
+    },
+    {
+      "id": "SW-KEY-05",
+      "behavior": "Escape dismisses the most local open edit, menu, reader, or sidebar without interrupting text composition.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+          "test": "864: an Escape that is dismissing an IME candidate window does not flip to hero"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-KEY-06",
+      "behavior": "Copy and export act on settled answers or the selected conversation and acknowledge the copy.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+          "test": "copies the settled answer and confirms it"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-KEY-07",
+      "behavior": "Returning from another window follows the shared search without overwriting an unsent question.",
+      "kind": "works-today",
+      "races": [
+        "second-conversation-or-tab",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "never overwrites an unsent Ask draft; Search mode then searches what the composer holds"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-KEY-08",
+      "behavior": "Opening a second conversation through an incoming address preserves the first conversation as a Back destination.",
+      "kind": "known-gap",
+      "races": [
+        "second-conversation-or-tab",
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "binding": null,
+          "reason": "An incoming address on the same surface replaces the prior navigation entry; no controller check binds preservation of Back."
+        },
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "No view check binds preservation of the prior conversation as a Back destination."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No fixture step binds incoming-address Back navigation."
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-01",
+      "behavior": "Unavailable AI actions explain the actual reason and start no work.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/state/availability.test.ts",
+          "test": "chat offline → settled offline reason + the shared-vocabulary remedy (§17)"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "shows the availability authority's reason and dispatches nothing"
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-02",
+      "behavior": "Unknown or stale status never invents readiness, a document count, or an unlocked transcript.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/state/availability.test.ts",
+          "test": "807: a not-live snapshot blocks every affordance, in the shared vocabulary"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+          "test": "S2 null or incomplete status never unlocks a locked transcript; disconnect tears down delivery"
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-03",
+      "behavior": "A locked conversation becomes unreadable until an explicit unlocked state is observed.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+          "test": "gives the transcript back when the lock lifts, and drops the refusal with it"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-04",
+      "behavior": "Degraded search explains its limitations once and offers the remedy owned by the appropriate screen.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts",
+          "test": "speaks the shared authority's wording, comparing against its own output rather than a literal"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts",
+          "test": "takes the reader to the fix in ONE click, through the window's one remedy exit"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "search-semantic-paused"
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-05",
+      "behavior": "No indexed documents, model-only answers, and retrieval impairment have distinct availability rules.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/state/availability.test.ts",
+          "test": "extract/agent only need chat (zero docs is irrelevant to them)"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+          "test": "grounded Ask still requires indexed documents and never falls through to model or Delegate"
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-06",
+      "behavior": "Checking progress and an unfinished evidence check remain visible on the correct answer without repeated announcements.",
+      "kind": "works-today",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "announces a checking attempt once across navigation, rerender and remount, then announces a new attempt"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "No real UI fixture step is bound for this scenario."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No live backend test is bound for this scenario."
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-07",
+      "behavior": "A search interrupted by index reload returns results or a truthful retryable refusal rather than an internal error.",
+      "kind": "works-today",
+      "races": [
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The historical live comparison has no repository test title to bind; the generic frontend failure test does not exercise index reload."
+        },
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The cited generic transport-failure view test does not exercise interruption by index reload."
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-08",
+      "behavior": "Expired retrieval remains distinguishable from successful fallback or no matching content.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The retrieval-deadline failure was inferred from the caller and not reproduced live; no backend check binds this distinction."
+        },
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "No view check binds expiry separately from fallback or no matching content."
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-09",
+      "behavior": "One chat submission cannot create repeated saved turns when the connection closes before response headers.",
+      "kind": "known-gap",
+      "races": [
+        "concurrent-or-identical-send"
+      ],
+      "observations": [
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "A single browser fetch produced repeated requests and saved messages; no fixture step binds this transport failure."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "No backend check binds this failure, and baseline behavior was not verified."
+        }
+      ]
+    },
+    {
+      "id": "SW-READY-10",
+      "behavior": "Admission refusals eventually recover or explain the continuing block without losing the question.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+          "test": "ordinary Retry becomes available after its interval but the timer never submits"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "A context-limit admission refusal persisted until restart; the view Retry timer test does not establish backend recovery."
+        }
+      ]
+    }
+  ],
+  "retired": []
+}
