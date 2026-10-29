@@ -59,6 +59,8 @@ try {
     ['scripts/dev/example.mjs', true],
     ['scripts/dev/example.cjs', true],
     ['scripts/dev/example.js', true],
+    ['modules/ui-web/src/example.ts', true],
+    ['scripts/example.mjs', true],
     ['docs/example.mjs', false],
     ['docs/example.cjs', false],
     ['docs/example.js', false],

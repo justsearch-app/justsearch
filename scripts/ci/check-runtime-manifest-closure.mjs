@@ -255,6 +255,7 @@ function matchesGlob(filePath, glob) {
     glob
       .replace(/[.+^$()|[\]\\]/g, '\\$&')
       .replace(/\{([^}]+)\}/g, (_, opts) => `(?:${opts.split(',').join('|')})`)
+      .replace(/\*\*\//g, '(?:.*/)?')
       .replace(/\*\*/g, '.*')
       .replace(/(?<!\.)\*/g, '[^/]*') +
     '$';
