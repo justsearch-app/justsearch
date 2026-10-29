@@ -378,7 +378,10 @@ WebView2 Update policies), SysMain, Windows Search, diagnostics/telemetry upload
 their scheduled work, scheduled optimisation and
 Defender real-time/scheduled scans. If Defender refuses, all test and app data
 folders must be excluded instead; the actual mode is recorded. Hibernation is
-off and the page file is fixed at 512 MiB. A full shutdown/reboot precedes
+off and the page file is fixed at 2048 MiB. The original 512 MiB setting
+exhausted Windows commit capacity during CPU model initialization in a 12 GiB
+guest, producing PowerShell OOM errors and a WebView2 crash. The larger fixed
+file retains the per-run write guard. A full shutdown/reboot precedes
 verification of each observed service, task, policy, exclusion and page-file
 allocation in `quiet-verify.json`. An unverified setting refuses snapshot
 sealing and all journeys. Setup caches EdgeDriver by the exact four-part WebView2
