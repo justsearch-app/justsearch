@@ -185,7 +185,7 @@ class LinuxGpuInstallTest {
       var effective = new GpuCapabilities.Effective(true, "fixture", GpuCapabilities.Confidence.HIGH,
           driver == null ? null : driver + ".0", driver, 0, 1, 12_000_000_000L, 10_000_000_000L, 0L,
           new GpuCapabilities.Cuda(true, "fixture", GpuCapabilities.Confidence.HIGH));
-      try (var gpu = mockConstruction(GpuCapabilityResolver.class,
+      try (var ignored = mockConstruction(GpuCapabilityResolver.class,
           (mock, context) -> when(mock.snapshot()).thenReturn(new GpuCapabilities(null, null, effective)))) {
         assertEquals(driver != null && driver >= 570, service.detectHardwareProfile().cudaFunctional());
       }
