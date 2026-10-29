@@ -20,7 +20,7 @@ background activation/deactivation and restores the original property even when 
       ],
       "class": "Adaptation",
       "moved": ["instrumentation"],
-      "whatMoved": "Replaced the class-wide os.name override with a try/finally scope around the three leftover-variant status checks, three model-resolution activation attempts and CPU-baseline deactivation. Those operations retain Windows 11 and the same Windows native files. All 32 tests and every assertion remain; settings/SQLite and Mockito initialize under the real host OS rather than depending on earlier tests in the JVM."
+      "whatMoved": "Replaced the class-wide os.name override with a try/finally scope around the three leftover-variant status checks, three model-resolution activation attempts and CPU-baseline deactivation. Those operations retain Windows 11 and the same Windows native files. All 32 tests and every assertion remain; settings/SQLite and Mockito initialize under the real host OS rather than depending on earlier tests in the JVM. The class also restores justsearch.data.dir and the two system properties EnterprisePolicyServiceImpl publishes (policy.gpu_acceleration_enabled, justsearch.policy.disallowExternalInferenceServers) after each test, so later tests in the JVM see their own values; no assertion changes."
     }
   ]
 }

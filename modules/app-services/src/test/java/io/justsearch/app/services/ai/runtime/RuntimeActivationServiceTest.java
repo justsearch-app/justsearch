@@ -72,6 +72,14 @@ class RuntimeActivationServiceTest {
   private String prevHome;
   private final Map<String, String> prevProps = new HashMap<>();
 
+  {
+    // EnterprisePolicyServiceImpl publishes these; restore them so later tests see their own policy.
+    for (String key : List.of(
+        "policy.gpu_acceleration_enabled", "justsearch.policy.disallowExternalInferenceServers")) {
+      prevProps.put(key, System.getProperty(key));
+    }
+  }
+
   @AfterEach
   void cleanup() {
     if (prevHome == null) System.clearProperty("justsearch.home");
@@ -1164,7 +1172,7 @@ class RuntimeActivationServiceTest {
   private void setHome(Path home) {
     prevHome = System.getProperty("justsearch.home");
     System.setProperty("justsearch.home", home.toAbsolutePath().toString());
-    System.setProperty("justsearch.data.dir", home.toAbsolutePath().toString());
+    setProp("justsearch.data.dir", home.toAbsolutePath().toString());
   }
 
   private static AiRuntimeActivationStatus awaitDone(RuntimeActivationService svc) throws Exception {
