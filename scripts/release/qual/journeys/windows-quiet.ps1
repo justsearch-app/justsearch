@@ -46,7 +46,7 @@ if ($Mode -eq 'Apply') {
   @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','UpdateDefault',0),
  @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','Update{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',0),
  @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization','DODownloadMode',99))) {
-  New-Item $policy[0] -Force | Out-Null
+  if(!(Test-Path $policy[0])) {New-Item $policy[0] -Force | Out-Null}
   New-ItemProperty $policy[0] -Name $policy[1] -Value $policy[2] -PropertyType DWord -Force | Out-Null
  }
  & powercfg.exe /hibernate off
