@@ -64,3 +64,14 @@ Production is unchanged. Independent acceptance is pending.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a187f0-953c-7421-8975-0f87ac1fe04a",
+  "verdict": "accept",
+  "digest": "sha256:75cd2f936efdf48c0f0a0591c7b161f9f15b639868e3b00674b2675119179829",
+  "note": "Codex verifier-2 on 43752d7c8a: PASS; four mutants rejected by assertion; New/repaired:false honest"
+}
+```
