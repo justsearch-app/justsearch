@@ -51,7 +51,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>A SUBST letter is mapped to a folder on one volume and its drive root is indexed and pruned
  * once (which records the volume). After a restart (a new service over the same index and queue)
  * the letter holds a folder on another volume, without the file. A witnessed DELETE for the file
- * is then confirmed. Before this change the confirmation only asked whether the folder was listable,
+ * is then confirmed. Before this fix the confirmation only asked whether the folder was listable,
  * so the document was removed. Every mapping and folder this test creates is removed before it
  * returns.
  */
