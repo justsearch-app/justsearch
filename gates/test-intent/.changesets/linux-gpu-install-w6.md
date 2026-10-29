@@ -300,3 +300,13 @@ The assembler's tests under scripts/ are out of scope for this gate; S12 and rep
   "digest": "sha256:caba1526e5738582e70eb7c2be75d459d169fd7858afb3642cb7bdb151ea79fc"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-w6-acceptor4-20261029T160641Z",
+  "verdict": "accept",
+  "digest": "sha256:539990d57add52f0d3894dd09b575b3a9991267d9e9fba5e89a445bd56d4336f"
+}
+```
