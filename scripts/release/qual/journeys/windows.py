@@ -446,10 +446,10 @@ if (!$p -or ([Diagnostics.Process]::GetProcessById($p.ProcessId)).StartTime.ToUn
 $w=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$a.window.handle)
 if ($w.Current.ProcessId -ne $a.window.pid -or $w.Current.ClassName -ne '#32770') {throw 'Folder picker identity changed'}
 $entries=@($w.FindAll($descendants,$all))
-$controls=@($entries | ForEach-Object {@{name=$_.Current.Name;automationId=$_.Current.AutomationId;type=$_.Current.ControlType.ProgrammaticName;class=$_.Current.ClassName}})
+$controls=@($entries | ForEach-Object {@{name=$_.Current.Name;automationId=$_.Current.AutomationId;type=$_.Current.ControlType.ProgrammaticName;class=$_.Current.ClassName;handle=$_.Current.NativeWindowHandle;patterns=@($_.GetSupportedPatterns() | ForEach-Object {$_.ProgrammaticName})}})
 [IO.File]::WriteAllText($a.diagnostics,($controls | ConvertTo-Json -Depth 5))
-$edit=@($entries | Where-Object {$_.Current.ControlType.ProgrammaticName -eq 'ControlType.Edit' -and $_.Current.Name.Trim().TrimEnd(':') -eq 'Folder'})
-$button=@($entries | Where-Object {$_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button' -and $_.Current.Name.Replace('&','').Trim() -eq 'Select Folder'})
+$edit=@($entries | Where-Object {$_.Current.AutomationId -eq '1152' -and $_.Current.ClassName -eq 'Edit'})
+$button=@($entries | Where-Object {$_.Current.AutomationId -eq '1' -and $_.Current.ClassName -eq 'Button'})
 if ($edit.Count -ne 1 -or $button.Count -ne 1) {throw 'Unique native folder picker controls unavailable; see J2-picker-controls.json'}
 $value=$edit[0].GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
 $value.SetValue($a.folder)
