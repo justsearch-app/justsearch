@@ -124,3 +124,13 @@ producer, or native Windows verification is claimed by this documentation task.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-w6b-accept-verifier-20261029T2325Z",
+  "verdict": "accept",
+  "digest": "sha256:bfecd3d9770e6a396eeb1b2ff68759f9eb866b1c1f7af8054c88d838f2647a3a"
+}
+```
