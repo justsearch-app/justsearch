@@ -219,3 +219,13 @@ See [the condition-by-condition coverage map](../evidence/installed-model-activa
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-rel-act-acceptor-20261029-f7dec02a74",
+  "verdict": "accept",
+  "digest": "sha256:3e10ac5eeadf1b6d2fa6926dd5c7d723b0579bb8176e3e798d290f5ec1de5dec"
+}
+```
