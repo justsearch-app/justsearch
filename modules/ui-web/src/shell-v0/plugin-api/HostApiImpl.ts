@@ -165,7 +165,7 @@ export function createHostApi(
       setSearchApiBase: (base: string) => setSearchApiBase(base),
       subscribePinnedSearches: (handler) => subscribePinnedSearches((pins) => handler(pins as readonly import('./plugin-types.js').SearchPinSnapshot[])),
       getPinnedSearches: () => getPinnedSearches() as readonly import('./plugin-types.js').SearchPinSnapshot[],
-      pinSearch: (query, filterSpec?) => pinSearch(query, filterSpec as import('../state/searchFiltersState.js').SearchFilterSpec | undefined) as import('./plugin-types.js').SearchPinSnapshot | null,
+      pinSearch: (query, filterSpec?) => pinSearch(query, filterSpec as import('../state/UserStateDocument.js').SearchFilterSpec | undefined) as import('./plugin-types.js').SearchPinSnapshot | null,
       unpinSearch: (id: string) => unpinSearch(id),
       isPinned: (query: string) => isPinned(query),
       recordSearchRun: (query: string, totalHits: number) => recordRun(query, totalHits),

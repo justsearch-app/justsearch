@@ -79,6 +79,7 @@ import {
   type Sv3RemedyDetail,
 } from './sv3-honesty.js';
 import { localizeResourceKey, onCatalogUpdated } from '../../../i18n/resourceCatalog.js';
+import './Sv3Filters.js';
 import { sv3ComposerReason, type Sv3Degradation } from './sv3-degradation.js';
 
 export interface Sv3RecentItem {
@@ -277,6 +278,13 @@ export class Sv3Composer extends JfElement {
         .recents [aria-selected='true'] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
         .recents [aria-selected='true'] * { color: HighlightText; }
       }
+      jf-sv3-filters[open] { margin-block-start: var(--space-1); }
+      .disclosures { display: grid; min-block-size: 0; }
+      .disclosures:has(jf-sv3-filters:is([open], [active])):has(.recents) { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-2); }
+      .disclosures:has(jf-sv3-filters[open]) .recents { margin-block-start: var(--space-1); }
+      .disclosures:has(jf-sv3-filters[open]) .recent-heading { flex-wrap: wrap; }
+
+      :host([state='docked']) .band:has(jf-sv3-filters[open]) { max-block-size: calc(100dvh - var(--workspace-topbar-height) - var(--space-16)); }
       .band {
         position: relative;
         width: 100%;
@@ -290,7 +298,8 @@ export class Sv3Composer extends JfElement {
         flex-direction: column;
         max-block-size: 100%;
       }
-      .band:has(.recents) > :not(.recents) { flex-shrink: 0; }
+      .band:has(jf-sv3-filters[open]) { display: flex; flex-direction: column; max-block-size: 100%; }
+      .band:has(.recents, jf-sv3-filters[open]) > :not(.disclosures) { flex-shrink: 0; }
 
       /* The hero INTRO — headline plus the corpus line under it (tempdoc 822 Phase F7, inventory
          E10). It sits directly above the composer box, which is the shipped landing's own placement
@@ -307,7 +316,7 @@ export class Sv3Composer extends JfElement {
 
       /* With Recent open the introduction participates in the hero's measured height, so
          a full list cannot move it above the column's clipped top edge. */
-      :host([state='hero']) .band:has(.recents) .landing {
+      :host([state='hero']) .band:has(.recents, jf-sv3-filters[open]) .landing {
         position: static;
         padding-bottom: var(--space-4);
       }
@@ -707,16 +716,16 @@ export class Sv3Composer extends JfElement {
       /* At the minimum window height the empty hero uses the existing compact field
          spacing, leaving a row below the heading/bar. Recent may cover the introduction. */
       @media (max-height: 600px) {
-        :host([state='hero']) .band:has(.recents) .field {
+        :host([state='hero']) .band:has(.recents, jf-sv3-filters[open]) .field {
           padding: var(--space-2) var(--space-3) var(--space-1);
         }
-        :host([state='hero']) .band:has(.recents) textarea {
+        :host([state='hero']) .band:has(.recents, jf-sv3-filters[open]) textarea {
           min-block-size: var(--composer-field-min-docked);
         }
-        :host([state='hero']) .band:has(.recents) .landing {
+        :host([state='hero']) .band:has(.recents, jf-sv3-filters[open]) .landing {
           padding-bottom: var(--space-2);
         }
-        :host([state='hero']) .band:has(.recents) .corpus { display: none; }
+        :host([state='hero']) .band:has(.recents, jf-sv3-filters[open]) .corpus { display: none; }
       }
       /* The placeholder is a real overlaid element rather than the input pseudo-element: that pseudo
          is an ambient facet this window may not re-author, and the spec overlays an element too. */
@@ -746,7 +755,7 @@ export class Sv3Composer extends JfElement {
         padding: 0 var(--space-3) var(--space-2);
       }
       @media (max-height: 600px) {
-        :host([state='hero']) .band:has(.recents) .footer {
+        :host([state='hero']) .band:has(.recents, jf-sv3-filters[open]) .footer {
           padding: 0 var(--space-3) var(--space-2);
         }
       }
@@ -1176,6 +1185,9 @@ export class Sv3Composer extends JfElement {
     recentLocked: { type: Boolean },
     recentsOpen: { state: true },
     recentIndex: { state: true },
+    filtersOpen: { state: true },
+    filterNote: { type: String },
+    filterError: { type: String },
   };
 
   declare state: Sv3ComposerState;
@@ -1274,6 +1286,9 @@ export class Sv3Composer extends JfElement {
   declare modelLabel: string;
   declare recentItems: readonly Sv3RecentItem[];
   declare recentLocked: boolean;
+  declare filtersOpen: boolean;
+  declare filterNote: string;
+  declare filterError: string;
   declare recentsOpen: boolean;
   declare private recentIndex: number;
   private catalogUnsubscribe: (() => void) | null = null;
@@ -1292,6 +1307,7 @@ export class Sv3Composer extends JfElement {
 
   override updated(changed: PropertyValues): void {
     super.updated(changed);
+    if (changed.has('filterError') && this.filterError) this.filtersOpen = true;
     if (changed.has('recentIndex') || changed.has('recentItems')) this.keepRecentSelectionVisible();
   }
 
@@ -1380,6 +1396,7 @@ export class Sv3Composer extends JfElement {
     super();
     this.state = COMPOSER_STATE_DEFAULT;
     this.recentItems = [];
+    this.filtersOpen = false; this.filterNote = ''; this.filterError = '';
     this.recentLocked = false;
     this.recentsOpen = false;
     this.recentIndex = -1;
@@ -1691,7 +1708,11 @@ export class Sv3Composer extends JfElement {
           </div>` : nothing}
           <div class="footer">
             <div class="controls" @focusout=${this.onControlsFocusOut}>
-              ${this.tierControl()}${this.effortControl()}${this.modelLabelFact()}
+              ${this.tierControl()}${this.effortControl()}
+              <button type="button" class="composer-control" data-testid="sv3-filters-trigger"
+                aria-expanded=${String(this.filtersOpen)} aria-controls="sv3-filters"
+                @click=${() => { this.filtersOpen = !this.filtersOpen; this.effortMenuOpen = false; this.tierMenuOpen = false; }}>${localizeResourceKey('search.filters')}</button>
+              ${this.modelLabelFact()}
             </div>
             <div class="actions">
               ${this.standingStop()}${this.primaryAction(
@@ -1702,7 +1723,10 @@ export class Sv3Composer extends JfElement {
             </div>
           </div>
         </div>
-      ${this.recentList()}
+      ${this.filterNote && !this.filtersOpen ? html`<p class="notice" data-testid="sv3-filter-note">${this.filterNote}</p>` : nothing}
+      <div class="disclosures"><jf-sv3-filters id="sv3-filters" .open=${this.filtersOpen} .note=${this.filterNote} .serverError=${this.filterError}
+        @sv3-filters-close=${() => { this.filtersOpen = false; this.focusTrigger('sv3-filters-trigger'); }}></jf-sv3-filters>
+      ${this.recentList()}</div>
       </div>
     `;
   }
@@ -1939,12 +1963,12 @@ export class Sv3Composer extends JfElement {
    */
   private readonly toggleEffortMenu = (): void => {
     this.effortMenuOpen = !this.effortMenuOpen;
-    if (this.effortMenuOpen) this.tierMenuOpen = false;
+    if (this.effortMenuOpen) { this.tierMenuOpen = false; this.filtersOpen = false; }
   };
 
   private readonly toggleTierMenu = (): void => {
     this.tierMenuOpen = !this.tierMenuOpen;
-    if (this.tierMenuOpen) this.effortMenuOpen = false;
+    if (this.tierMenuOpen) { this.effortMenuOpen = false; this.filtersOpen = false; }
   };
 
   /**
