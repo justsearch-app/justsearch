@@ -13,7 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 final class HeadlessAppTokenizerPrivacyTest {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}]")
   @CsvSource(value = {"unset,unset,unset", "false,false,cu122", "true,true,cpu"}, nullValues = "unset")
   void entryDefaultsDjlToPrivateOfflineLoading(
       String tracking, String offline, String flavor, @TempDir Path dir) throws Exception {
@@ -37,7 +37,7 @@ final class HeadlessAppTokenizerPrivacyTest {
     runProbe(arguments, dir.resolve("native.log"));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}]")
   @CsvSource({"RUST_FLAVOR,cu122", "RUST_LIBRARY_PATH,/operator/libtokenizers.so"})
   void entryRefusesOverridesThatBypassCpuFlavor(
       String key, String value, @TempDir Path dir) throws Exception {
