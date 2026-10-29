@@ -100,3 +100,14 @@ Independent acceptance is intentionally absent.
   "digest": "sha256:717d7114d203f73b264bfa95f4a6d6ab7d5e97a88e7c4e4767ff28b5ffaa8b51"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a18592-1422-7580-b757-ea4d45f02c1b",
+  "verdict": "accept",
+  "digest": "sha256:717d7114d203f73b264bfa95f4a6d6ab7d5e97a88e7c4e4767ff28b5ffaa8b51",
+  "note": "Incidental volume seam preserves existing oracles and state isolation; atomicity and exclusion reruns reproduce the claimed assertion failures before and pass on the candidate, with matching evidence digests."
+}
+```
