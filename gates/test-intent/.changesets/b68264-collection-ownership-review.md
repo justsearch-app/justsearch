@@ -79,12 +79,7 @@ accepted. The builder does not generate execution evidence or acceptance records
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:15:41Z",
           "delegationScope": "the testing task and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
           "label": "agent choice",
-          "choice": "R2: avoid reading and parsing watched-root declarations for each file; read once per scan/batch, before the queue lock where ordering permits, and refresh next time. Preserve frozen-plan, explicit and reserved collection authority."
-        },
-        {
-          "kind": "owner-words",
-          "quote": "the declaration supplier parses the registry at most once per registry change: cache the parsed declarations and revalidate with one cheap check of the file's identity (inode/fileKey, size, modification time) before reuse; re-parse when any differs.",
-          "location": "Builder assignment, user turn 2026-10-29, Settled design F2"
+          "choice": "R2: avoid reading and parsing watched-root declarations for each file; read once per scan/batch, before the queue lock where ordering permits, and refresh next time. Between operations, parse the registry at most once per change: reuse the parsed declarations while the file's key, size and modification time are unchanged. Preserve frozen-plan, explicit and reserved collection authority."
         }
       ],
       "evidence": "gates/test-intent/evidence/b68264-collection-ownership-review.json",
