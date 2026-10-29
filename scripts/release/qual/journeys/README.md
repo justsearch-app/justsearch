@@ -402,6 +402,20 @@ fresh, with real production AI downloads. A clean shutdown seals each setup by
 renaming its disk/firmware into a snapshot. Remaining journeys use thin child
 overlays; no model cache or candidate data is moved into the predecessor.
 
+Windows native-window discovery enumerates visible top-level HWNDs and reads
+each through UI Automation. UIA's desktop children omit owned dialogs, including
+the folder picker. Picker input still requires the exact installed image, PID
+and creation time; the app's returned DOM path and Engine roots decide success.
+The picker control inventory is retained for diagnosis.
+
+WebDriver uses the normal installed app's `LOCALAPPDATA/io.justsearch.shell`
+profile through `tauri:options.webviewOptions.userDataFolder`. Owned WebView2
+process arguments must confirm that profile (`webdriver-profile.json`).
+[EdgeDriver otherwise creates a temporary profile](https://learn.microsoft.com/en-us/microsoft-edge/webdriver/capabilities-edge-options),
+which cannot prove saved bookmarks survive a restart. The shared client's
+default Linux session request is unchanged. Each child run also gets a distinct
+guest evidence directory, since stopped checkpoints retain previous evidence.
+
 Use `--session hosted` without predecessor/mirror arguments for a local hosted
 equivalent in a fresh Windows VM. This executes `windows-hosted.py`, the same
 entry point as Actions. Prepare its tools snapshot with that same session first.
