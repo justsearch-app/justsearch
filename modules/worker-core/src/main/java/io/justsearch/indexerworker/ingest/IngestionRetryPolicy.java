@@ -7,7 +7,7 @@ public enum IngestionRetryPolicy {
   RETRY_WITH_BACKOFF,
   DEFER_WITHOUT_ATTEMPT,
   /**
-   * Task t-20261013-ef3c41: the source exists but cannot be read right now (locked, access
+   * #758: the source exists but cannot be read right now (locked, access
    * denied), or the folder holding it is unavailable. Retried on {@link IngestionRetryLadder}'s
    * counted, growing schedule, but never exhausted and never terminal: nothing about the file says
    * it is gone or unindexable, so its indexed content stays searchable with no time limit and the

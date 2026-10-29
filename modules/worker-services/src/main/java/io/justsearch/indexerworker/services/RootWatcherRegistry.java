@@ -74,7 +74,7 @@ public final class RootWatcherRegistry {
 
   private final Map<Path, Subscription> subscriptions = new ConcurrentHashMap<>();
   /**
-   * Task t-20261013-ef3c41, round 5 (S8): roots whose watch waits for the volume recorded for them
+   * #758: roots whose watch waits for the volume recorded for them
    * to be back at their path, with the collection each was asked for ({@code ""} for none).
    */
   private record AwaitingVolume(String collection) {}
@@ -195,8 +195,8 @@ public final class RootWatcherRegistry {
   }
 
   /**
-   * Holds the watch of {@code root} until the volume recorded for it is back at its path (task
-   * t-20261013-ef3c41, round 5, S8): the folder there now is another volume, whose files must not
+   * Holds the watch of {@code root} until the volume recorded for it is back at its path (#758):
+   * the folder there now is another volume, whose files must not
    * be indexed into the root, so no watcher is registered on it. A watch the root already had is
    * retired. {@link #resumeAwaitingVolume} registers it once a walk or sync finds the volume back.
    */

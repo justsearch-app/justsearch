@@ -634,22 +634,22 @@ fixes rather than open a PR each):
 
 | Change | How it should reach `main` |
 |---|---|
-| **tempdoc** edit (`docs/tempdocs/**`) — dated working history | Ride along in the same PR as the code it documents, **or** batch several into one `docs(tempdocs): …` PR. Do not open a standalone PR per tempdoc append. |
+| **tempdoc** (`docs/tempdocs/**`) — dated working history | None: tempdocs are frozen since 2026-10-05. Current design goes to a canonical doc or an ADR. |
 | **canonical doc** (`docs/{explanation,reference,how-to,decisions}`) — durable current truth | May stand alone as its own PR/commit. |
 | **docs + code together** | Already a ride-along — publish normally. |
 
-Worked example: a post-merge research pass that only appends a "future
+Worked example (from before the freeze): a post-merge research pass that only appends a "future
 directions" section to a tempdoc is working history, not a project-history unit.
 Landing it as its own PR (`docs(644): … (#16)`) is exactly the axis-2 miss —
 tidy under axis 1, but a standalone public commit for archaeology. It should have
 ridden along with the next substantive PR or batched.
 
-### 3.8. A tempdoc that changes a governed decision updates its ADR in the same PR
+### 3.8. A change to a governed decision updates its ADR in the same PR
 
-A tempdoc that changes a decision an ADR governs updates that ADR's
+A change that moves a decision an ADR governs updates that ADR's
 `last_reviewed:` and `probes:` in the **same PR** as the change.
 
-Why the same PR: a decision that moved in a tempdoc while its ADR still reads the
+Why the same PR: a decision that moved in code or another doc while its ADR still reads the
 old way is not a documentation lag, it is two authorities disagreeing — and the
 newer one is the one nobody consults. That is precisely the drift the premise-probe
 register (`governance/adr-probes.v1.json`, tempdoc 884) exists to catch, and it can

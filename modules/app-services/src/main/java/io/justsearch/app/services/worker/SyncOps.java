@@ -236,7 +236,7 @@ final class SyncOps {
     }
 
     /**
-     * Task t-20261013-ef3c41, round 5 (S8): a sync the Worker refused because the folder at the
+     * #758: a sync the Worker refused because the folder at the
      * root's path is not the volume it was first seen on makes the root read unavailable at once,
      * the periodic sync included; the next sync it accepts (the volume is back) clears that, and
      * the root reads indexed again. Every other outcome leaves the root's walk state alone.
