@@ -137,3 +137,14 @@ The orchestrator generates execution evidence after committing this candidate; t
   "note": "Claude verifier on fe4172eab2: re-accepted after regenerated evidence; :modules:ui:test and :modules:app-api:test pass, shell cargo test 266 pass, tauri 62/62 and dev-runner 52/52 conformance, real-Engine harness children/handoff/boot-quit/boot-failure PASS."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-91c3ab-b4-claude",
+  "verdict": "accept",
+  "digest": "sha256:2bb6b97cfb21527cb9f3614a4e641a4bc5361b0f89ce83a6cf33c7b685074424",
+  "note": "Re-accepted at 753deb42cb: only the evidence digests moved; no Java or product change outside modules/shell and the conformance fake. ui 2280 tests pass (rerun, quarantine checks included), LedgerSurvivorRotationTest passes, real-Engine harness children/handoff/boot-quit/boot-failure pass, tauri 62/62 and dev-runner 52/52 conformance pass on both trees."
+}
+```

@@ -129,3 +129,14 @@ These entries cover the settled final review repairs. Existing accepted changese
   "note": "Claude verifier on fe4172eab2: the 4 review checks fail on dabd685ad2 by assertion (port 42424 bound; referent 0755->0600; UncheckedIOException at construction; s-0..s-5 carried) and pass on candidate; mutations of snapshot, not-before, rebind, no-follow, continue-on-failure and intent bound are each caught (identity-only removal is not); real-Engine probes show no referent change, 0600 regular quarantine, no token in logs, start-up continues."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-91c3ab-b4-claude",
+  "verdict": "accept",
+  "digest": "sha256:0dcd3c8e66d788757b4f85bcb98d7181ba9ac4bd65c7ae667374c2c99a9def7e",
+  "note": "Re-accepted at 753deb42cb: only the evidence moved (fixture changes in shell_commit_transport_tests.rs; revision, timing and re-captured output). retained_same_pid_manifest_cannot_bind_a_fresh_shell, spawn_keeps_predecessor_evidence and losing_shell_cleanup_refuses_a_live_owners_helpers pass on the candidate; retained-same-PID passes on 11bcf0561c too; full shell crate 269 pass."
+}
+```

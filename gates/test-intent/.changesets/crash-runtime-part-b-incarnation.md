@@ -70,3 +70,14 @@ The builder leaves the candidate uncommitted. The orchestrator generates executi
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-91c3ab-b4-claude",
+  "verdict": "accept",
+  "digest": "sha256:159968f46204a254d6199129825db34f8f0e4ec02312c3124f37d88d04caed40",
+  "note": "Candidate 753deb42cb. The 3 new checks fail on 11bcf0561c by assertion (competing other-session reused-PID writer bound 42425, line 177; pre-spawn startedAt refused, line 211; absent incarnation bound, line 242) and pass on candidate. Mutations caught: drop session (lines 177, 120), drop number (line 179), accept missing incarnation (line 242). Real Linux Engine: all manifest versions carry the given incarnation on first publish, after handoff (n=4) and after SIGKILL (n=5); 0, 01 or absent value gives no incarnation. Shell crate 269 pass; tauri 62 and dev-runner 52 conformance on both trees; ui 2280 pass; harness children/handoff/boot-quit/boot-failure pass."
+}
+```
