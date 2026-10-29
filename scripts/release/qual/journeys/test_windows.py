@@ -211,6 +211,18 @@ class WindowsOperationalTests(unittest.TestCase):
             client.ElementFromHandle.return_value=Mock(CurrentProcessId=99,CurrentNativeWindowHandle=200,CurrentClassName='#32770')
             with self.assertRaisesRegex(Infrastructure,'window identity'):native.element(window)
 
+    def test_native_buttons_ignore_disabled_controls_and_reject_foreign_owners(self):
+        native=windows.Native(Mock(),Path('unused'))
+        window={'pid':50,'handle':200,'class':'#32770','process':process()}
+        button=Mock(CurrentAutomationId='1',CurrentClassName='Button',CurrentIsEnabled=True,
+                    CurrentIsOffscreen=False,CurrentProcessId=50)
+        with patch.object(native,'descendants',return_value=[button]):
+            self.assertEqual(native.buttons(window,1),[button])
+            button.CurrentIsEnabled=False
+            self.assertEqual(native.buttons(window,1),[])
+            button.CurrentIsEnabled=True;button.CurrentProcessId=99
+            with self.assertRaisesRegex(Infrastructure,'process identity'):native.buttons(window,1)
+
     def test_default_viewer_needs_exact_argv_path_image_new_lifetime_and_window(self):
         image = r'C:\Qual\viewer\notepad++.exe'
         fixture = r'C:\corpus\JustSearch-journey-orchid-open.txt'
@@ -454,11 +466,13 @@ class WindowsUpdateAndCrashTests(unittest.TestCase):
         installation={'process':process(60)}
         def twice(fn,*a,**k):
             self.assertFalse(fn());return fn()
-        with patch.object(windows,'ps_json',return_value=['&Install']),patch.object(windows,'invoke_nsis',return_value={'invoked':True}) as action,patch.object(windows,'wait_for',twice):
+        run.native.buttons.return_value=[Mock(CurrentName='&Install')]
+        with patch.object(windows,'invoke_nsis',return_value={'invoked':True}) as action,patch.object(windows,'wait_for',twice):
             self.assertEqual(windows.complete_nsis(run,installation),[{'invoked':True}])
         action.assert_called_once()
         run.target.alive.side_effect=None;run.target.alive.return_value=[process(60)]
-        with patch.object(windows,'ps_json',return_value=['Unexpected action']),patch.object(windows,'wait_for',once),self.assertRaises(Infrastructure):
+        run.native.buttons.return_value=[Mock(CurrentName='Unexpected action')]
+        with patch.object(windows,'wait_for',once),self.assertRaises(Infrastructure):
             windows.complete_nsis(run,installation)
 
     def test_crash_collection_preserves_product_unknown_before_and_jvm_outcomes(self):

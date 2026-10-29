@@ -383,6 +383,13 @@ class Native:
         elements = self.element(window).FindAll(module.TreeScope_Descendants, client.CreateTrueCondition())
         return [elements.GetElement(i) for i in range(elements.Length)]
 
+    def buttons(self, window, identifier):
+        buttons = [e for e in self.descendants(window) if e.CurrentAutomationId == str(identifier)
+                   and e.CurrentClassName == 'Button' and e.CurrentIsEnabled and not e.CurrentIsOffscreen]
+        if any(e.CurrentProcessId != window['process']['pid'] for e in buttons):
+            raise Infrastructure('Native button process identity differs from its dialog')
+        return buttons
+
     def windows(self):
         rows = ps_json(UIA + r"""
 @([QualWindow]::VisibleWindows() | ForEach-Object {
@@ -1167,19 +1174,17 @@ def invoke_nsis(run, installation, button_id):
     """Invoke a standard NSIS button through UIA on the witnessed process/window."""
     window = installation['window']
     run.evidence('J5-installer-window-' + str(time.time_ns()), installation)
-    payload = base64.b64encode(json.dumps({'window': window, 'button': str(button_id)}).encode()).decode()
-    return ps_json(UIA + r"""
-$a=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('""" + payload + r"""')) | ConvertFrom-Json
-$p=Get-CimInstance Win32_Process -Filter "ProcessId=$($a.window.process.pid)"
-if (!$p -or ([Diagnostics.Process]::GetProcessById($p.ProcessId)).StartTime.ToUniversalTime().ToString('o') -cne $a.window.process.created -or $p.ExecutablePath -ine $a.window.process.exe) {throw 'NSIS process identity changed'}
-$w=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$a.window.handle)
-if($w.Current.ProcessId -ne $p.ProcessId -or $w.Current.ClassName -ne '#32770') {throw 'NSIS window identity changed'}
-$button=@($w.FindAll($descendants,$all) | Where-Object {$_.Current.AutomationId -eq $a.button -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button' -and $_.Current.IsEnabled}) | Select-Object -First 1
-if(!$button) {throw 'Expected NSIS action unavailable'}
-$name=$button.Current.Name
-$button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-@{handle=$a.window.handle;pid=$p.ProcessId;button=$a.button;label=$name;invoked=$true}
-""")
+    buttons = run.native.buttons(window, button_id)
+    if len(buttons) != 1:
+        raise Infrastructure('Expected unique NSIS action unavailable')
+    _, module = run.native.automation()
+    button = buttons[0]
+    label = button.CurrentName
+    invoke = button.GetCurrentPattern(module.UIA_InvokePatternId).QueryInterface(module.IUIAutomationInvokePattern)
+    run.native.element(window) # Recheck exact lifetime and HWND before invocation.
+    invoke.Invoke()
+    return {'handle':window['handle'], 'pid':window['process']['pid'], 'button':str(button_id),
+            'label':label, 'invoked':True, 'interface':'IUIAutomation'}
 
 
 def update_prepare(run):
@@ -1261,15 +1266,9 @@ def confirm_nsis_cancel(run, process):
     for window in run.native.windows():
         if window['pid'] != process['pid'] or window['class'] != '#32770':
             continue
-        payload = base64.b64encode(json.dumps(dict(window, process=process)).encode()).decode()
-        found = ps_json(UIA + r"""
-$a=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('""" + payload + r"""')) | ConvertFrom-Json
-$w=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$a.handle)
-if($w.Current.ProcessId -ne $a.pid) {throw 'NSIS confirmation identity changed'}
-@($w.FindAll($descendants,$all) | Where-Object {$_.Current.AutomationId -eq '6' -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button'}).Count -gt 0
-""")
-        if found:
-            invoke_nsis(run, {'window': dict(window, process=process)}, 6)
+        owned_window = dict(window, process=process)
+        if run.native.buttons(owned_window, 6):
+            invoke_nsis(run, {'window': owned_window}, 6)
 
 
 
@@ -1282,13 +1281,8 @@ def complete_nsis(run, installation):
         for window in run.native.windows():
             if window['pid'] != installation['process']['pid'] or window['class'] != '#32770':
                 continue
-            data = base64.b64encode(json.dumps(window).encode()).decode()
-            buttons = ps_json(UIA + r"""
-$a=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('""" + data + r"""')) | ConvertFrom-Json
-$w=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$a.handle)
-if($w.Current.ProcessId -ne $a.pid){throw 'NSIS page identity changed'}
-@($w.FindAll($descendants,$all) | Where-Object {$_.Current.AutomationId -eq '1' -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button' -and $_.Current.IsEnabled -and !$_.Current.IsOffscreen} | ForEach-Object {$_.Current.Name})
-""", array=True)
+            owned_window = dict(window, process=installation['process'])
+            buttons = [b.CurrentName for b in run.native.buttons(owned_window, 1)]
             if not buttons:
                 continue # Real installation progress disables Next.
             if len(buttons) != 1 or buttons[0].replace('&', '').strip() not in allowed:
