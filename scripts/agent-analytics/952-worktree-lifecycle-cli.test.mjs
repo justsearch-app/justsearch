@@ -370,6 +370,100 @@ function landWorktree(fixture, name, sessionId, prNumber) {
 /* ── cases ────────────────────────────────────────────────────────────────────────────────── */
 
 try {
+  if (process.platform !== 'win32') for (const denyChmod of [false, true]) {
+    await check(`POSIX release ${denyChmod ? 'refuses chmod failure before any unlink' : 'repairs 0555 and 000 directories without changing external links'}`, async () => {
+      const fx = await makeFixture(`readonly-${denyChmod}`);
+      commitIn(fx.checkout, '.gitignore', `${fs.readFileSync(path.join(fx.checkout, '.gitignore'), 'utf8')}build/\n`, 'ignore build cache');
+      const name = `readonly-${denyChmod}`;
+      const { dest, head, env } = landWorktree(fx, name, 'readonly-owner', 1952);
+      const readonly = path.join(dest, 'build', 'readonly');
+      const inaccessible = path.join(readonly, 'mode-000');
+      const outside = path.join(fx.root, 'outside');
+      const outsideFile = path.join(outside, 'sentinel');
+      fs.mkdirSync(inaccessible, { recursive: true });
+      fs.mkdirSync(outside);
+      fs.writeFileSync(outsideFile, 'outside bytes\n');
+      fs.chmodSync(outsideFile, 0o400);
+      fs.linkSync(outsideFile, path.join(readonly, 'hard-link'));
+      fs.symlinkSync(outside, path.join(dest, 'build', 'outside-link'));
+      fs.writeFileSync(path.join(inaccessible, 'keep.txt'), 'inaccessible cache bytes\n');
+      fs.writeFileSync(path.join(dest, 'draft.txt'), 'valuable draft\n');
+      fs.chmodSync(outside, 0o500);
+      fs.chmodSync(inaccessible, 0);
+      fs.chmodSync(readonly, 0o555);
+      const beforeRegistration = git(fx.checkout, 'worktree', 'list', '--porcelain');
+      const outsideMode = fs.statSync(outside).mode;
+      const fileMode = fs.statSync(outsideFile).mode;
+      const trace = path.join(fx.root, 'filesystem-trace.json');
+      if (denyChmod) {
+        // Preload only into this fixture's processes: exercise the real release/remover CLI
+        // while injecting an otherwise filesystem-dependent chmod failure and recording unlinks.
+        const preload = path.join(fx.root, 'deny-chmod.cjs');
+        fs.writeFileSync(preload, `const fs = require('node:fs');
+const path = require('node:path');
+const target = ${JSON.stringify(dest)};
+const denied = ${JSON.stringify(inaccessible)};
+const trace = ${JSON.stringify(trace)};
+for (const name of ['chmodSync', 'unlinkSync', 'rmdirSync', 'rmSync']) {
+  const original = fs[name];
+  fs[name] = function (file, ...args) {
+    const absolute = path.resolve(String(file));
+    if (absolute === target || absolute.startsWith(target + path.sep)) {
+      const events = fs.existsSync(trace) ? JSON.parse(fs.readFileSync(trace, 'utf8')) : [];
+      events.push({ name, path: absolute });
+      fs.writeFileSync(trace, JSON.stringify(events));
+      if (name === 'chmodSync' && absolute === denied) {
+        throw Object.assign(new Error('injected chmod denial'), { code: 'EPERM' });
+      }
+    }
+    return original.call(this, file, ...args);
+  };
+}
+`);
+        env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ''} --require=${JSON.stringify(preload)}`;
+      }
+      try {
+        const result = runCli(fx, ['release', dest, '--no-fetch', '--session-id', 'readonly-owner'], { env });
+        assert.equal(result.status, denyChmod ? 3 : 0, result.out);
+        assert.equal(fs.statSync(outside).mode, outsideMode, 'outside directory permissions survive');
+        assert.equal(fs.statSync(outsideFile).mode, fileMode, 'hard-linked file permissions survive');
+        assert.equal(fs.readFileSync(outsideFile, 'utf8'), 'outside bytes\n');
+        assert.deepEqual(fs.readdirSync(outside), ['sentinel']);
+        const manifests = manifestFiles(fx, name);
+        assert.equal(manifests.length, 1, 'archive exists before removal is attempted');
+        const manifest = JSON.parse(fs.readFileSync(manifests[0], 'utf8'));
+        const savedDraft = manifest.files.find((entry) => entry.path === 'draft.txt');
+        assert.ok(savedDraft, 'valuable draft was archived');
+        assert.equal(git(fx.checkout, 'cat-file', 'blob', savedDraft.blob), 'valuable draft\n');
+        if (denyChmod) {
+          assert.ok(result.stderr.includes(inaccessible), result.out);
+          assert.match(result.stderr, /injected chmod denial/);
+          const events = JSON.parse(fs.readFileSync(trace, 'utf8'));
+          assert.ok(events.some((event) => event.name === 'chmodSync' && event.path === inaccessible));
+          assert.deepEqual(events.filter((event) => event.name !== 'chmodSync'), [], 'no unlink or tree deletion preceded the refusal');
+          assert.equal(git(fx.checkout, 'worktree', 'list', '--porcelain'), beforeRegistration);
+          assert.equal(refSha(fx.checkout, `refs/heads/worktree-${name}`), head);
+          assert.equal(readFinalization(fx, name).phase, 'verified');
+          assert.equal(fs.readlinkSync(path.join(dest, 'build', 'outside-link')), outside);
+          assert.equal(fs.readFileSync(path.join(dest, 'draft.txt'), 'utf8'), 'valuable draft\n');
+          fs.chmodSync(inaccessible, 0o700);
+          assert.equal(fs.readFileSync(path.join(inaccessible, 'keep.txt'), 'utf8'), 'inaccessible cache bytes\n');
+          assert.equal(fs.statSync(path.join(readonly, 'hard-link')).ino, fs.statSync(outsideFile).ino);
+        } else {
+          assert.equal(fs.existsSync(dest), false);
+          assert.equal(entryFor(fx.checkout, dest), null);
+          assert.equal(refSha(fx.checkout, `refs/heads/worktree-${name}`), null);
+          assert.equal(readFinalization(fx, name), null);
+        }
+      } finally {
+        // These are fixture-owned plain directories; restore access even on the before failure.
+        for (const directory of [readonly, inaccessible, outside]) {
+          if (fs.existsSync(directory)) fs.chmodSync(directory, 0o700);
+        }
+      }
+    });
+  }
+
   // ── 1-4: create, register, hold, status (no destructive step in this fixture) ──────────────
   const base = await makeFixture('base');
   const stagedRegister = require(path.join(base.checkout, 'scripts', 'dev', 'lib', 'worktree-register.cjs'));

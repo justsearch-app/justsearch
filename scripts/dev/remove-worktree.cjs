@@ -268,6 +268,22 @@ function reportHolders(p) {
   }
 }
 
+// Repair directory access before the first unlink, so a test's 0555/000 directory cannot
+// leave a partially deleted tree. Walk top-down to reach inaccessible children; never follow
+// links or chmod files (which may be hard-linked outside the worktree).
+function makeDirectoriesWritable(dir) {
+  const st = fs.lstatSync(dir);
+  if (st.isSymbolicLink() || !st.isDirectory()) return;
+  if ((st.mode & 0o700) !== 0o700) {
+    try {
+      fs.chmodSync(dir, (st.mode & 0o7777) | 0o700);
+    } catch (err) {
+      fail(`cannot make worktree directory writable: ${dir} (${err.message})`);
+    }
+  }
+  for (const name of fs.readdirSync(dir)) makeDirectoriesWritable(path.join(dir, name));
+}
+
 // 2. Delete the remaining tree, long-path aware, with a bounded retry for held handles.
 function deleteTree(p, { attempts = 5, retryDelayMs = 300 } = {}) {
   if (!fs.existsSync(p)) return true;
@@ -1150,6 +1166,8 @@ async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '.
         }
       }
     }
+    // Node's Windows rm already clears read-only attributes; POSIX needs directory access first.
+    if (process.platform !== 'win32') makeDirectoriesWritable(admission.abs);
     removeJunctions(admission.abs);
     if (!deleteTree(admission.abs)) fail(`failed to delete ${admission.abs}`);
     console.error(`[remove-worktree] deleted ${admission.abs}`);
