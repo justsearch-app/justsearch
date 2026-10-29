@@ -456,3 +456,14 @@ The evidence run, per-check outcomes, fixture coverage and gate result are recor
   "note": "Codex verifier round 2 PASS on 498b37c30e: X1-X8 incl. author repair on real ingestion; repaired checks fail before by assertion, preservation passes both"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a185ca-7eb7-7a62-82c9-6f82b66e1fdb",
+  "verdict": "accept",
+  "digest": "sha256:3b2451c0e15f1797376c173793393b553cec3954e06a6b8df826b6424cb2a708",
+  "note": "Codex verifier-a3 PASS on cb97bf8382 after rebase onto c542733154: syntax x restrictions 80/80 real HTTP, X6/X8 UI, 7 integration preservation checks honest"
+}
+```
