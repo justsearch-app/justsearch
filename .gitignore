@@ -110,6 +110,10 @@ test_automation.py
 !/modules/shell/src-tauri/icons/128x128.png
 !/modules/shell/src-tauri/icons/128x128@2x.png
 
+# README hero screenshots
+!/docs/assets/hero-search.png
+!/docs/assets/hero-answer.png
+
 # Development session artifacts
 *.bak
 *.out
