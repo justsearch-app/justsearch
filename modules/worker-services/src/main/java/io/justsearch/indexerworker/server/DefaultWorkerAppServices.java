@@ -776,10 +776,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         });
 
     // 6. Wire session-active suppliers for health check model status (368 RC3)
-    healthService.setModelActiveSupplier("reranker", () -> {
-      var status = searchService.getOrtCudaStatus();
-      return status != null && status.available();
-    });
+    healthService.setModelActiveSupplier("reranker", searchService::isRerankerActive);
     healthService.setModelActiveSupplier("citation-scorer",
         searchService::isCitationScorerActive);
     // Spec D §4.2 item 3: embedding readiness waits until a query would not create a session.
@@ -1007,10 +1004,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     ingestService.setRerankerModelPathSupplier(
         () -> rerankerModelPath != null ? rerankerModelPath.toString() : "");
     ingestService.setRuntimeGaugesSupplier(greenRuntime::runtimeGaugesSnapshot);
-    healthService.setModelActiveSupplier("reranker", () -> {
-      var status = searchService.getOrtCudaStatus();
-      return status != null && status.available();
-    });
+    healthService.setModelActiveSupplier("reranker", searchService::isRerankerActive);
     healthService.setModelActiveSupplier("citation-scorer", searchService::isCitationScorerActive);
     healthService.setQueryEncodersWarm(searchService::queryEncodersWarm);
     healthService.shareQueryReadiness(incumbent.healthService.queryReadiness());

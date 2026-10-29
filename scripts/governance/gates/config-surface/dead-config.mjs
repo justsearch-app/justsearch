@@ -63,7 +63,7 @@ const DECLARATION_FILES = [
 ];
 const PRIMITIVES = new Set(['int', 'long', 'double', 'boolean', 'float', 'short', 'byte', 'char']);
 
-function collectJavaMainSources(root) {
+export function collectJavaMainSources(root) {
   const out = [];
   const modules = resolve(root, 'modules');
   if (!existsSync(modules)) return out;

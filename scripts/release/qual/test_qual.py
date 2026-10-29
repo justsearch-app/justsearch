@@ -86,7 +86,7 @@ class HarnessTest(unittest.TestCase):
             with log.open('a') as output:
                 output.write('gtk initialization failed\n')
             return proc
-        with self.no_live(), patch.object(vm.os, 'sched_getaffinity', return_value=set(range(8))), patch.object(vm, 'identity', return_value='123'), patch.object(vm.socket, 'socket'), patch.object(vm.subprocess, 'Popen', side_effect=spawn):
+        with self.no_live(), patch.object(vm, 'wait_host_memory'), patch.object(vm.os, 'sched_getaffinity', return_value=set(range(8))), patch.object(vm, 'identity', return_value='123'), patch.object(vm.socket, 'socket'), patch.object(vm.subprocess, 'Popen', side_effect=spawn):
             with vm.locked() as lock:
                 with self.assertRaisesRegex(RuntimeError, '^QEMU exited 1: gtk initialization failed$'):
                     vm.launch('ubuntu', self.root / 'ubuntu/run.qcow2', self.root / 'ubuntu/run-vars.fd', visible=True, lease=lock.fileno())

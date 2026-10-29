@@ -742,7 +742,7 @@ is noted where available.
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+This review applies to all eleven constituent documents. Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
 
 ---
 
@@ -1178,7 +1178,7 @@ learned reranking with GPL data.
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
 
 ---
 
@@ -1649,7 +1649,7 @@ the search-layer improvements investigated in other §2/§3 targets.
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
 
 ---
 
@@ -2165,7 +2165,7 @@ produce weights that don't account for per-query leg strength variation.
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
 
 ---
 
@@ -2663,7 +2663,7 @@ precision is accepted, not solved) remains the most relevant data point.
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
 
 ---
 
@@ -3189,7 +3189,7 @@ None — all 5 original checklist items were fully answered from docs and source
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
 
 ---
 
@@ -3551,7 +3551,7 @@ further supports the finding that simple fusion outperforms overfit learned rera
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
 
 ---
 
@@ -4128,7 +4128,7 @@ precision loss is tolerable for SPLADE-v3 weight ranges.
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
 
 ---
 
@@ -4522,7 +4522,7 @@ through FFM.
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
 
 ---
 
@@ -4972,7 +4972,7 @@ uses min-max normalization — this is architecturally correct.
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
 
 ---
 
@@ -5539,4 +5539,4 @@ This is a simple heuristic that JustSearch could replicate in
 
 ## Staleness review (2026-05-18)
 
-Investigation-shape tempdoc (research / audit / findings) — terminal by nature per the README's "investigation log that produced a decision" definition. Body content preserved as design history. Classification: INVESTIGATION. Stale for 77 days at audit time.
+See the [shared staleness review](#staleness-review-2026-05-18), which applies to all eleven constituent documents.
