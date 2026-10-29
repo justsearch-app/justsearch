@@ -356,7 +356,7 @@ final class ComponentsFactory {
         try {
           exists = DirectoryReader.indexExists(dir);
         } catch (IOException e) {
-          // Task t-20261013-ef3c41: a folder that cannot be listed right now is not a corrupt
+          // #758: a folder that cannot be listed right now is not a corrupt
           // index. Only corruption may reach the backup-and-empty recovery.
           throw new IndexRuntimeIOException(
               openFailureReason(e),
@@ -696,8 +696,7 @@ final class ComponentsFactory {
   }
 
   /**
-   * How an I/O failure while opening or verifying the index is classified (task
-   * t-20261013-ef3c41).
+   * How an I/O failure while opening or verifying the index is classified (#758).
    *
    * <p>Every such failure used to be {@code CORRUPT_INDEX}, which the recovery dispatch answers by
    * moving the index aside and starting empty — so a sharing violation from a backup tool or an

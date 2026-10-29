@@ -60,7 +60,7 @@ public record KnowledgeStatusView(
     Boolean statusStale,
     Long statusStaleMs,
 
-    // Task t-20261013-ef3c41: true when indexedDocuments (and its aliases) is not a count — the
+    // #758: true when indexedDocuments (and its aliases) is not a count — the
     // index could not be counted and no earlier count exists. False means the count is known.
     Boolean indexedDocumentsUnknown) {
 
@@ -85,7 +85,7 @@ public record KnowledgeStatusView(
 
   /**
    * The {@link KnowledgeStatus#extras()} key that marks {@link KnowledgeStatus#docCount()} as not a
-   * count (task t-20261013-ef3c41). Present and true only then; absent means the count is known.
+   * count (#758). Present and true only then; absent means the count is known.
    */
   public static final String DOC_COUNT_UNKNOWN_EXTRA = "docCountUnknown";
 

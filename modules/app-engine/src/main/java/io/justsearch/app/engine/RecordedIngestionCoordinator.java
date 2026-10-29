@@ -475,7 +475,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
    * Binds the producers. Watched-root reindex must revalidate membership at the actual producer
    * entry, so it has its own {@code watchedRootProducer}. An explicit ingest that this process did
    * not just accept (recovered at boot, or resumed after the attachment stopped) goes to {@code
-   * recoveredProducer}. Task t-20261013-ef3c41, round 8b (decision 1): only the request a person or
+   * recoveredProducer}. #758: only the request a person or
    * an agent just made is a deliberate add that records a volume; a resumed one records nothing.
    */
   void bindProducer(Producer producer, Producer recoveredProducer, Producer watchedRootProducer) {

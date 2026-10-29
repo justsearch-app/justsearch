@@ -1,6 +1,6 @@
 # JustSearch
 
-**A private retrieval backend for your AI agents — and a neural search engine with a cited, on-device AI assistant for your own files. Hybrid search (BM25 + dense vectors + learned-sparse + reranking) plus grounded Q&A, summarization, and extraction over your documents — with indexing, search, and built-in AI on your machine. Windows installer; on Linux, runs from source.**
+**JustSearch finds what is inside your files, quickly and accurately, whether you know exactly what you are looking for or only vaguely. It is for anyone who keeps files on their computer, as a search app of its own or as a tool inside other apps and AI agents through MCP.** Under the hood: hybrid search (BM25, dense vectors, learned-sparse, reranking) and an on-device AI assistant for cited answers, summaries and extraction, all running on your machine. Windows installer; on Linux, runs from source.
 
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -18,9 +18,9 @@
      <p align="center"><img src="docs/assets/hero-search.png" width="820" alt="JustSearch: hybrid search over a local folder, with cited AI answers"></p>
 -->
 
-JustSearch is local-first: it indexes your local documents — PDF, email, Office, and most common document
+JustSearch is local-first: it indexes your local documents, such as PDF, email, Office and most common document
 formats (text extraction is backed by [Apache Tika](https://tika.apache.org/), plus OCR for scanned PDFs and
-images) — and answers questions over them with cited passages, **with indexing, retrieval, and built-in AI inference on your machine.**
+images), and answers questions over them with cited passages, **with indexing, retrieval, and built-in AI inference on your machine.**
 It combines three retrieval paradigms (keyword, dense-vector, learned-sparse) with a cross-encoder reranker,
 and exposes that retrieval over the **Model Context Protocol (MCP)** so any AI agent — local or cloud — can
 use it as a **private retrieval backend**: indexing and retrieval stay on your device. The built-in
@@ -230,7 +230,7 @@ Indexing, retrieval, and built-in AI inference run locally. Network activity has
   hardware also gets a CUDA build of `llama-server` when downloads and GPU acceleration are permitted by policy, selected automatically unless you chose your own executable.
 - **The desktop app checks for updates by default**, about 30 seconds after the desktop chrome mounts when a release URL is
   embedded. CI-built installers embed the repository's configured URL, including branch candidates and pre-releases.
-  Discovery fetches `release.v1.json`, `release.v1.json.sig` and `latest.json` from GitHub, following download/CDN redirects;
+  Discovery fetches `release.v2.json`, `release.v2.json.sig` and `latest.json` from GitHub, following download/CDN redirects;
   installation rechecks `latest.json` and downloads installer bytes only on request. Contacted hosts see
   your IP address and request time; these requests send no document content or queries.
   Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process to suppress automatic

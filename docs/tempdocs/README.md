@@ -6,6 +6,8 @@ status: noncanonical
 
 > **Noncanonical, and outdated by design.** These are dated working notes, not current truth.
 > For how the system behaves *now*, read `docs/explanation/`, `docs/reference/`, or the code.
+>
+> **Frozen since 2026-10-05.** Do not edit or add tempdocs. Current design goes to `docs/explanation/`, `docs/reference/` or an ADR in `docs/decisions/`.
 
 # Tempdocs
 

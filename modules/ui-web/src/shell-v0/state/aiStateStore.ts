@@ -422,7 +422,7 @@ function friendlyModel(id: string | null | undefined): string | null {
 }
 
 /**
- * Task t-20261013-ef3c41 — how long after the server starts an uncounted index reads "Checking…"
+ * #758 — how long after the server starts an uncounted index reads "Checking…"
  * rather than "Unknown". The first count is read while the index opens, so a count still missing
  * this long after start is not a start-up delay any more. Measured on the server's own clock
  * (`uptimeMs`), so a page opened late into a session does not restart the window.
@@ -430,7 +430,7 @@ function friendlyModel(id: string | null | undefined): string | null {
 const DOCUMENT_COUNT_STARTUP_WINDOW_MS = 120_000;
 
 /**
- * Task t-20261013-ef3c41 — whether the backend reported that it could not count the index
+ * #758 — whether the backend reported that it could not count the index
  * (`indexedDocumentsUnknown`). Its `indexedDocuments`/`searchableDocuments` then carry a 0 kept only
  * for older readers; it is not a count and must never read as an empty index. Absent ⇒ known.
  */
@@ -472,7 +472,7 @@ function computeCapabilities(chatDisabledBySpec: boolean): AiCapabilities {
   const docs = status?.worker?.core?.indexedDocuments ?? 0;
   return {
     chat,
-    // Task t-20261013-ef3c41: an index the backend could not count is not an empty one.
+    // #758: an index the backend could not count is not an empty one.
     rag: chat && (documentCountUnknown(status) || docs > 0),
     extract: chat,
     embedding: status?.embedding?.compatState === 'COMPATIBLE',
@@ -759,7 +759,7 @@ function computeIndex(): AiIndex {
     status === null || v === undefined || v === null ? UNKNOWN : known(v);
   const fromInference = <T>(v: T | undefined | null): Maybe<T> =>
     inference === null || v === undefined || v === null ? UNKNOWN : known(v);
-  // Task t-20261013-ef3c41: when the backend could not count the index, the 0 it carries for older
+  // #758: when the backend could not count the index, the 0 it carries for older
   // readers is not a count — both counts are UNKNOWN, never a known 0 that reads as an empty index.
   const countsUnknown = documentCountUnknown(status);
   return {
@@ -1135,7 +1135,7 @@ function stampSettledIndex(snap: StatusSnapshot): void {
     catchingUp: snap.catchingUp,
   });
   if (stability.kind !== 'settled') return;
-  // Task t-20261013-ef3c41: an uncounted index has no count to retain; the last settled one stays.
+  // #758: an uncounted index has no count to retain; the last settled one stays.
   if (documentCountUnknown(snap)) return;
   const documentCount = snap.worker?.core?.indexedDocuments;
   if (documentCount == null) return;

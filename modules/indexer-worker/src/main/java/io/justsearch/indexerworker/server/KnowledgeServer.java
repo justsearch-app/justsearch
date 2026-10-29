@@ -150,7 +150,7 @@ public final class KnowledgeServer implements Closeable {
       () -> bootRootBindings.stream().map(RootBinding::path).toList();
   private volatile String rootReconciliationSettledGeneration;
   /**
-   * Task t-20261013-ef3c41, round 7 (S8): the roots the committed boot deferred because the folder
+   * #758: the roots the committed boot deferred because the folder
    * at their path was not on the volume recorded for them, and the generation they were deferred
    * for. While any is left, the previous generation is kept and nothing settles this generation's
    * root reconciliation; the deferred-root check reconciles each once its volume is back.
@@ -462,8 +462,8 @@ public final class KnowledgeServer implements Closeable {
    * <p>The durable form of this state is {@code auto_rebuild_*} in {@code state.json}; this field is
    * only the in-process consequence for the remainder of {@code start()}.
    *
-   * <p>Task t-20261013-ef3c41: also set when that brake could not be read at all. A brake that
-   * cannot be read holds exactly like a spent one. Round 3: set by every automatic rebuild the brake
+   * <p>#758: also set when that brake could not be read at all. A brake that
+   * cannot be read holds exactly like a spent one. Set by every automatic rebuild the brake
    * stopped (schema mismatch, embedding-model change, rebuild of a recovered-to-empty index,
    * backup-first rebuild), never cleared within the boot; {@link #bootRebuildHold} says which
    * answer held it.
@@ -472,7 +472,7 @@ public final class KnowledgeServer implements Closeable {
 
   /**
    * The brake answer that stopped an automatic rebuild in this boot, or {@code null} when none did
-   * (task t-20261013-ef3c41, round 3). The status reports it for the whole boot: ingestion stays
+   * (#758). The status reports it for the whole boot: ingestion stays
    * stopped until the Worker restarts, so the status must not turn back to "compatible" because
    * {@code state.json} later reads differently.
    */
@@ -1586,7 +1586,7 @@ public final class KnowledgeServer implements Closeable {
         if (preOpenMismatch && policyHandledInCatch) {
           throw IndexMetadataParityGuard.schemaMismatch();
         }
-        // Task t-20261013-ef3c41, round 3: the backup-first policy replaces the mismatched index
+        // #758: the backup-first policy replaces the mismatched index
         // inside the writable open below, so the brake is asked BEFORE that open. Held, the index
         // is opened read-only instead and nothing is backed up or replaced.
         IndexGenerationManager.AutoRebuildBrake backupFirstBrake =
@@ -1616,7 +1616,7 @@ public final class KnowledgeServer implements Closeable {
               IndexGenerationManager.AutoRebuildBrake.RELEASED;
           if (IndexRecoveryMarker.exists(activeIndexPath)
               && IndexRecoveryPolicy.shouldRebuildFromSource(rc.index())) {
-            // Task t-20261013-ef3c41, round 3: an automatic rebuild like any other, so it asks
+            // #758: an automatic rebuild like any other, so it asks
             // the brake first. Held, the recovered index serves read-only and the marker stays:
             // the rebuild is still owed, and a person's rebuild provides it.
             recoveryBrake = consultAutoRebuildBrake(
@@ -1677,7 +1677,7 @@ public final class KnowledgeServer implements Closeable {
               java.util.Optional<String> currentFp = initialModelSelection == null
                   ? EmbeddingFingerprint.get()
                   : initialModelSelection.availableFingerprint("embedding");
-              // Task t-20261013-ef3c41, round 3: the re-embed is an automatic rebuild, so the brake
+              // #758: the re-embed is an automatic rebuild, so the brake
               // is asked before it starts; held, the index serves read-only and ingestion stops.
               IndexGenerationManager.AutoRebuildBrake reembedBrake =
                   currentFp.isPresent() && !storedFp.equals(currentFp.get())
@@ -1748,7 +1748,7 @@ public final class KnowledgeServer implements Closeable {
               this.buildingIndexPath = null;
             }
             String targetFingerprint = expectedIndexFingerprintOrNull();
-            // Task t-20261013-ef3c41: a brake that cannot be read holds like a spent one. Without
+            // #758: a brake that cannot be read holds like a spent one. Without
             // this the failed read either killed start() or, with the record re-initialized, read
             // as a fresh budget and started a rebuild.
             boolean brakeUnreadable = false;
@@ -7012,7 +7012,7 @@ public final class KnowledgeServer implements Closeable {
    * so the index that genuinely needed a rebuild would never get one. Package-private so the
    * distinction is testable without a running Worker.
    *
-   * <p>Task t-20261013-ef3c41, round 3: such a boot used to answer "attempt 1" and rebuild without
+   * <p>#758: such a boot used to answer "attempt 1" and rebuild without
    * consulting the brake at all, so a rebuild that failed every time ran on every boot, unbounded.
    * A rebuild whose budget cannot be consulted is held instead, as any brake that cannot be read
    * is ({@link IndexGenerationManager.AutoRebuildBrake#TARGET_UNKNOWN}); still nothing is charged.
@@ -7030,7 +7030,7 @@ public final class KnowledgeServer implements Closeable {
 
   /**
    * Asks the repeat-rebuild brake whether the automatic {@code rebuild} may start toward the shape
-   * this runtime writes (task t-20261013-ef3c41, round 3). {@code RELEASED} means it may, and its
+   * this runtime writes (#758). {@code RELEASED} means it may, and its
    * attempt has been recorded; any other answer means it must not, and has been logged.
    */
   private IndexGenerationManager.AutoRebuildBrake consultAutoRebuildBrake(
@@ -7352,7 +7352,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 8 (refined decision 2): before anything indexes, the one-time
+   * #758: before anything indexes, the one-time
    * upgrade seeding confirms the volume of each declared root on evidence. Only a boot that knows
    * the declared roots seeds; a root not confirmed now is retried by the periodic cycle.
    */
@@ -7607,7 +7607,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 8b (decision 3): a migration builds the new generation only from
+   * #758: a migration builds the new generation only from
    * roots on their recorded volume. A configured root with nothing recorded is first seeded once on
    * evidence. Any root still refused (another volume at its path, its drive not confirmed after an
    * upgrade, or nothing recorded) fails the enumeration, so the cutover keeps the active generation
@@ -7638,7 +7638,7 @@ public final class KnowledgeServer implements Closeable {
    * cannot be mistaken for a clean boot.
    *
    * <p>A root whose folder is not on the volume recorded for it is deferred, never a start-up
-   * failure (task t-20261013-ef3c41, round 7, S8): its watch is held, it is left out of the
+   * failure (#758): its watch is held, it is left out of the
    * convergence check so every other root is served, and this generation's root reconciliation
    * stays unsettled, which keeps the previous generation until {@link #settleDeferredBootRoots}
    * has reconciled the root on its returned volume. Every other failure fails the boot as before.

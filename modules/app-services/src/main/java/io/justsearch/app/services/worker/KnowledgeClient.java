@@ -280,7 +280,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         // Tempdoc 821 §3-C3 — same defect on the mode: this lambda hard-coded
         // SCAN_MODE_INITIAL, so a force-reindex arrived at the Worker indistinguishable from an
         // ordinary rewalk. The caller decides the mode now; this lambda only carries it.
-        // Task t-20261013-ef3c41, round 8: the person's add carries the add marker, which alone
+        // #758: the person's add carries the add marker, which alone
         // records the root's volume on the Worker; every other scan and watch goes without it.
         RootLifecycleOps.ScanRootFn scanRootFn =
             new RootLifecycleOps.ScanRootFn() {
@@ -677,7 +677,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         if (collection != null && !collection.isBlank()) {
             builder.setTargetCollection(collection);
         }
-        // Task t-20261013-ef3c41, round 8b (decision 1): an explicit ingest request, a person's or
+        // #758: an explicit ingest request, a person's or
         // an agent's, is a deliberate add and records the volume of each file's folder.
         builder.setRootAdded(true);
         BatchRequest request = builder.build();
@@ -1737,8 +1737,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     /**
      * As the {@link CancelToken} overload; {@code rootAdded} marks the scan as the person's add of
-     * the root, which alone records the root's volume on the Worker (task t-20261013-ef3c41,
-     * round 8). Every other scan passes {@code false}.
+     * the root, which alone records the root's volume on the Worker (#758). Every other scan passes
+     * {@code false}.
      */
     public io.justsearch.ipc.ScanRootProgress scanRoot(
             String rootPath,

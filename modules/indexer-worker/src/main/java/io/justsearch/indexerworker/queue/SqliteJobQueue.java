@@ -177,7 +177,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   static final String STATE_RETRY_EXHAUSTED = "RETRY_EXHAUSTED";
 
   /**
-   * Task t-20261013-ef3c41: a row being retried because its source exists but cannot be read
+   * #758: a row being retried because its source exists but cannot be read
    * ({@code RETRY_UNTIL_AVAILABLE} with a source-unreadable reason). It never becomes terminal, so
    * the failed-files surface lists it explicitly — as "indexed, source unreadable" when the index
    * holds its content — distinct from a file that is missing.
@@ -5065,7 +5065,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         outcome != null
             && outcome.retryPolicy()
                 == io.justsearch.indexerworker.ingest.IngestionRetryPolicy.RETRY_WITH_BACKOFF;
-    // Task t-20261013-ef3c41: a source that exists but cannot be read now (or whose folder is
+    // #758: a source that exists but cannot be read now (or whose folder is
     // unavailable) is retried on the same counted, growing ladder, but never exhausts: nothing
     // about it says the file is gone or unindexable, and its indexed content stays searchable.
     boolean untilAvailable =
@@ -6383,7 +6383,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
       String upper = upperBoundExclusive(lower);
 
-      // Task t-20261013-ef3c41: a source retried because it cannot be read is a problem for the
+      // #758: a source retried because it cannot be read is a problem for the
       // user to see, not work in flight — counted with the failures so a folder holding a locked
       // file does not read "indexing" forever.
       String sql = "SELECT CASE WHEN " + SOURCE_UNREADABLE_RETRY + " THEN '" + STATE_FAILED
