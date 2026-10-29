@@ -27,8 +27,10 @@ manifest."** The convention closes the door that today is open to nine
 variant answers.
 
 This rule is mechanically enforced by
-`scripts/ci/check-runtime-manifest-closure.mjs`. The script greps for
-any code that constructs `<dataDir>/runtime/<artifact>` paths and fails
+`scripts/ci/check-runtime-manifest-closure.mjs`, a blocking step in the
+**Public claims** CI job on every pull request and on main. Its fixture
+self-test runs alongside it. The script scans literal path constructions
+in selected production sources and scripts for `<dataDir>/runtime/<artifact>` and fails
 if the artifact isn't on the allowlist inside the script itself.
 Adding an artifact is therefore a deliberate design event, not a
 routine merge.

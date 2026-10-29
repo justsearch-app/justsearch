@@ -11,6 +11,8 @@
         "npm ci --audit=false",
         "node scripts/agent-analytics/run-all-tests.mjs",
         "node scripts/ci/check-workflow-triggers.mjs",
+        "node scripts/ci/test-check-runtime-manifest-closure.mjs",
+        "node scripts/ci/check-runtime-manifest-closure.mjs",
         "node scripts/ci/test-check-workflow-npm-audit-policy.mjs",
         "node scripts/ci/check-workflow-npm-audit-policy.mjs",
         "node scripts/ci/test-check-lockfile-completeness.mjs",

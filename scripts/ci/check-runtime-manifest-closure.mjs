@@ -18,8 +18,7 @@
  *      / ".json" / ".lock" path components in source) and flags any that
  *      aren't on the allowlist.
  *
- * Exit non-zero on any violation. Wire into pre-commit / CI to close the
- * door §6 promises is closed.
+ * Exit non-zero on any violation. Runs as a blocking Public claims CI step.
  *
  * Allowlist additions must include a `tempdoc-ref:` comment justifying
  * the new sibling file (e.g., "supersedes manifest field X" or "different
@@ -86,6 +85,10 @@ const ALLOWED_RUNTIME_ARTIFACTS = new Map([
   ['native-projection-actions-reached.json', 'lane F D1-16 — native projection action observation'],
   ['native-projection-actions-reached.pending', 'lane F D1-16 — atomic staging file for native projection action observation'],
   ['native-projection-actions-release', 'lane F D1-16 — native projection action release presence signal'],
+  // tempdoc-ref: Lane F installed journal-loss acceptance (real-writer-recovery.mjs).
+  // This sentinel is confined to the owned fixture data directory; KnowledgeServer's
+  // index-start barrier requires JUSTSEARCH_SUPERVISOR_HARNESS=1. No discovery payload.
+  ['index-start-initial-reached.json', 'lane F journal-loss acceptance — harness-only index-start rendezvous'],
   ['dev-reload.request', 'lane F stage A review S2 — dev-only hot-reload trigger, written by the dev MCP reload tool and deleted by the Engine on consumption. Not a discovery surface: existence is the whole payload, and the file is absent except for the instant between a bytecode push and the service reconstruction it asks for.'],
 ]);
 
@@ -138,6 +141,8 @@ const SKIP_PATHS = [
   //
   // This script itself.
   'scripts/ci/check-runtime-manifest-closure.mjs',
+  // The self-test deliberately embeds an unsanctioned fixture path.
+  'scripts/ci/test-check-runtime-manifest-closure.mjs',
 ];
 
 // Patterns the check fires on. Each must be SPECIFIC to "constructing a
