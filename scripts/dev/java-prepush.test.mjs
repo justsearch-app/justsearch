@@ -13,6 +13,8 @@ const gradleArgs = [
   '-PskipErrorProneTests=false', '-PskipWebBuild=true',
 ];
 const fallbackMessage = 'java-prepush: js-gradle-slot was not found on PATH; running the Gradle wrapper directly.\n';
+const exclusionList = '# runner\tsource\tidentifier\treason\r\ngradle\tmodules/ui\tFirstExcludedTest\tfixture\r\nnode\tscripts\tOtherRunnerTest\tfixture\r\n\r\ngradle\tmodules/core\tSecondExcludedTest\tfixture\r\n';
+const exclusionMessage = 'Pre-push excludes: FirstExcludedTest, SecondExcludedTest\n';
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-java-prepush-'));
 
 function run(flags, { slot = true, platform = process.platform, status = 0, spawnError = false,
@@ -37,7 +39,11 @@ function run(flags, { slot = true, platform = process.platform, status = 0, spaw
   const stub = `
     import assert from 'node:assert/strict';
     import childProcess from 'node:child_process';
+    import fs from 'node:fs';
     import { syncBuiltinESMExports } from 'node:module';
+    const readFileSync = fs.readFileSync;
+    fs.readFileSync = (file, ...args) => file === ${JSON.stringify(path.join(root, 'scripts/dev/prepush-excluded-tests.tsv'))}
+      ? ${JSON.stringify(exclusionList)} : readFileSync(file, ...args);
     Object.defineProperty(process, 'platform', { value: ${JSON.stringify(platform)} });
     let calls = 0;
     let gitCalls = 0;
@@ -83,7 +89,7 @@ try {
         const quote = platform === 'win32' ? '"' : "'";
         const args = result.expectedArgs.map((arg) => arg.includes('*') ? `${quote}${arg}${quote}` : arg);
         const environment = platform === 'win32' ? 'set "JUSTSEARCH_PREPUSH=true" &&' : 'JUSTSEARCH_PREPUSH=true';
-        assert.equal(result.stdout, `${[environment, result.expectedCommand, ...args].join(' ')}\n`);
+        assert.equal(result.stdout, `${exclusionMessage}${[environment, result.expectedCommand, ...args].join(' ')}\n`);
         assert.equal(result.stderr, slot ? '' : fallbackMessage);
       }
       for (const flags of [['--unknown'], ['--dry-run', '--unknown'], ['compileTestJava'], ['--unreferenced=false'], ['']]) {
@@ -96,17 +102,20 @@ try {
         for (const status of [0, 17]) {
           const result = run(unreferenced ? ['--unreferenced'] : [], { slot, platform, status });
           assert.equal(result.status, status, result.stderr);
-          assert.equal(result.stdout, 'Gradle invoked\n');
+          assert.equal(result.stdout, `${exclusionMessage}Gradle invoked\n`);
           assert.equal(result.stderr, slot ? '' : fallbackMessage);
         }
       }
       const failed = run([], { slot, platform, spawnError: true });
       assert.equal(failed.status, 1);
+      assert.equal(failed.stdout, `${exclusionMessage}Gradle invoked\n`);
       assert.equal(failed.stderr, `${slot ? '' : fallbackMessage}java-prepush: execution unavailable\n`);
       const noJava = run([], { slot, platform, changedPaths: ['docs/example.md'] });
       assert.equal(noJava.status, 0, noJava.stderr);
+      assert.equal(noJava.stdout, `${exclusionMessage}Gradle invoked\n`);
       const missingBase = run([], { slot, platform, gitError: true });
       assert.equal(missingBase.status, 1);
+      assert.equal(missingBase.stdout, '');
       assert.equal(missingBase.stderr, 'java-prepush: origin/main unavailable\n');
     }
   }
