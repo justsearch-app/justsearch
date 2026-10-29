@@ -333,6 +333,15 @@ using System.Runtime.InteropServices;
 public class QualWindow {
  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr handle);
+ delegate bool WindowCallback(IntPtr handle,IntPtr data);
+ [DllImport("user32.dll")] static extern bool EnumWindows(WindowCallback callback,IntPtr data);
+ [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr handle);
+ public static IntPtr[] VisibleWindows() {
+  var handles=new System.Collections.Generic.List<IntPtr>();
+  if(!EnumWindows(delegate(IntPtr handle,IntPtr data){if(IsWindowVisible(handle))handles.Add(handle);return true;},IntPtr.Zero))
+   throw new Exception("Native window enumeration failed");
+  return handles.ToArray();
+ }
 }
 '@
 $root = [System.Windows.Automation.AutomationElement]::RootElement
@@ -348,8 +357,11 @@ class Native:
 
     def windows(self):
         rows = ps_json(UIA + r"""
-@($root.FindAll($children,$all) | ForEach-Object {
- $c=$_.Current
+@([QualWindow]::VisibleWindows() | ForEach-Object {
+ # UIA can parent an owned native dialog under its app window. Enumerating
+ # desktop children alone omits that dialog; each HWND still gets UIA identity.
+ $element=[System.Windows.Automation.AutomationElement]::FromHandle($_)
+ $c=$element.Current
  if ($c.NativeWindowHandle -and !$c.IsOffscreen) {
   @{pid=$c.ProcessId;handle=$c.NativeWindowHandle;title=$c.Name;class=$c.ClassName;
     automationId=$c.AutomationId;focused=([QualWindow]::GetForegroundWindow().ToInt64() -eq $c.NativeWindowHandle)}
@@ -414,7 +426,9 @@ if ([QualWindow]::GetForegroundWindow().ToInt64() -ne $a.window.handle) {throw '
     def select_folder(self, folder):
         def picker():
             processes = self.target.owned()
-            for window in self.windows():
+            windows = self.windows()
+            (self.evidence / 'J2-picker-observation.json').write_text(json.dumps({'windows':windows,'processes':processes},indent=2))
+            for window in windows:
                 if window['class'] != '#32770':
                     continue
                 process = next((p for p in processes if p['pid'] == window['pid'] and
