@@ -111,9 +111,12 @@ See [the condition-by-condition coverage map](../evidence/installed-model-activa
       "behaviour": "A selected model identity or a source-generation stamp cannot stamp an unattached empty candidate.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Installer activation introduces no new stamp waiver and never manufactures or borrows success evidence; existing matching attestations, the corruption-recovery waiver and partial-success/gap acceptance behave as before.",
-          "location": "task rel-act user turn 2026-10-28 (repair round 2, repeated original scenarios A2-A3)"
+          "kind": "delegated-choice",
+          "label": "agent choice",
+          "delegationQuote": "well then proceed with researching, validating and derisking the plan. once thats passed you can proceed with implementation",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27 (the owner's grant to derisk and implement the release workflow)",
+          "delegationScope": "the release-workflow work and the activation repairs its derisking found (settled scenarios A1-A5 of task t-20261028-a03e1e)",
+          "choice": "Installer activation introduces no new stamp waiver and never manufactures or borrows success evidence; existing matching attestations, the corruption-recovery waiver and partial-success/gap acceptance behave as before."
         }
       ],
       "evidence": "gates/test-intent/evidence/installed-model-activation-repaired.json",
@@ -130,9 +133,12 @@ See [the condition-by-condition coverage map](../evidence/installed-model-activa
       "behaviour": "The installer empty exception omits only the absent stamp; ordinary migration still needs evidence.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "The installer-only empty exception requires the same exact candidate to satisfy the complete captured-walk, zero-planned-unit, no-issued-claim, drained-queue, no-projection-source, removal-only-journal and strict-zero-count proof under the final fence; replay uncertainty, incomplete capture, wrong target fingerprint or non-COMPLETE commit prevents promotion; recheck after intervening writes; emptiness is never persisted as permission to stamp.",
-          "location": "task rel-act user turn 2026-10-28 (repair round 2, repeated original scenarios A2-A3)"
+          "kind": "delegated-choice",
+          "label": "agent choice",
+          "delegationQuote": "well then proceed with researching, validating and derisking the plan. once thats passed you can proceed with implementation",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27 (the owner's grant to derisk and implement the release workflow)",
+          "delegationScope": "the release-workflow work and the activation repairs its derisking found (settled scenarios A1-A5 of task t-20261028-a03e1e)",
+          "choice": "The installer-only empty exception requires the same exact candidate to satisfy the complete captured-walk, zero-planned-unit, no-issued-claim, drained-queue, no-projection-source, removal-only-journal and strict-zero-count proof under the final fence; replay uncertainty, incomplete capture, wrong target fingerprint or non-COMPLETE commit prevents promotion; recheck after intervening writes; emptiness is never persisted as permission to stamp."
         }
       ],
       "evidence": "gates/test-intent/evidence/installed-model-activation-repaired.json",
@@ -149,9 +155,12 @@ See [the condition-by-condition coverage map](../evidence/installed-model-activa
       "behaviour": "B publishes changed encoder caps through its own settings owner. Only generationCapChangesPublishThroughBWithoutCallingAsQueryOnlyOwner is repaired (R); the five refusal negatives preserve behavior (P), although baseline diagnosis wording differs. selectedMetadataForDisabledRolesIsNotSettingsDrift is also P. Native execution is mocked.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "When the new generation (B) realises encoder settings that differ from the serving generation's (A) (e.g. per-role GPU memory caps derived for B), cutover publishes exactly what B's encoders realised, through the installer settings transaction, never through A's query-only owner.",
-          "location": "task rel-act user turn 2026-10-28 (repair round 2, repeated original scenarios A2-A3)"
+          "kind": "delegated-choice",
+          "label": "agent choice",
+          "delegationQuote": "well then proceed with researching, validating and derisking the plan. once thats passed you can proceed with implementation",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27 (the owner's grant to derisk and implement the release workflow)",
+          "delegationScope": "the release-workflow work and the activation repairs its derisking found (settled scenarios A1-A5 of task t-20261028-a03e1e)",
+          "choice": "When the new generation (B) realises encoder settings that differ from the serving generation's (A) (e.g. per-role GPU memory caps derived for B), cutover publishes exactly what B's encoders realised, through the installer settings transaction, never through A's query-only owner."
         }
       ],
       "evidence": "gates/test-intent/evidence/installed-model-activation-round3-original.json",
@@ -169,9 +178,12 @@ See [the condition-by-condition coverage map](../evidence/installed-model-activa
       "behaviour": "Failed jobs and any file queued by the migration enumerator (including bundled help) exclude the installer-empty exception. Real pointer admission repeats the proof after an intervening document or failed help job; refusal preserves A, its help and the unchanged settings witness. The document mutation is preservation; the failed-row and help-enqueued cases repair a74847e434.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Deliver: fixes for 1, 2, 3 and 6; 7 if clean; findings on 4, 5, 8 (fix 5/8 only if real). The test for 1 must fail on a74847e434 for that reason and pass after.",
-          "location": "task rel-act user turn 2026-10-28, repair round 3"
+          "kind": "delegated-choice",
+          "label": "agent choice",
+          "delegationQuote": "well then proceed with researching, validating and derisking the plan. once thats passed you can proceed with implementation",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27 (the owner's grant to derisk and implement the release workflow)",
+          "delegationScope": "the release-workflow work and the activation repairs its derisking found (settled scenarios A1-A5 of task t-20261028-a03e1e)",
+          "choice": "Failed jobs and any file queued by the migration enumerator (including bundled help) exclude the installer-empty exception; the check fails on a74847e434 because that version admits them as empty, and passes after (orchestrator decision on review finding 1, repair round 3)."
         }
       ],
       "evidence": "gates/test-intent/evidence/installed-model-activation-round3-repaired.json",
