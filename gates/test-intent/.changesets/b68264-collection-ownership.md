@@ -40,8 +40,7 @@ collection field and are handled by their existing replay authority.
       ],
       "evidence": "gates/test-intent/evidence/b68264-collection-ownership.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionAdmissionTest.java#hintlessMixedBatchUsesPersistedDeepestOwners",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionAdmissionTest.java#declaredDefaultClearsObsoleteCollectionOnReadmission"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionAdmissionTest.java"
       ]
     },
     {
@@ -67,8 +66,7 @@ collection field and are handled by their existing replay authority.
       ],
       "evidence": "gates/test-intent/evidence/b68264-collection-ownership.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionReconciliationTest.java#ordinaryScanAdmitsUnchangedFilesWithWrongCollection",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionReconciliationTest.java#candidateScanAdmitsUnchangedFilesWithWrongCollection"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionReconciliationTest.java"
       ]
     },
     {
@@ -114,9 +112,7 @@ collection field and are handled by their existing replay authority.
       ],
       "evidence": "gates/test-intent/evidence/b68264-collection-ownership.json",
       "newChecks": [
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineHintlessCollectionMigrationTest.java#hintlessChildAdmissionIsDeletedAcrossPausedMigration",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineHintlessCollectionMigrationTest.java#declaredDefaultReadmissionClearsParentAndChunkLabelsBeforeDeletingParentCollection",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineHintlessCollectionMigrationTest.java#legacyNullJobAndReceiptCannotSurviveCollectionDeletionAfterRestart"
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineHintlessCollectionMigrationTest.java"
       ]
     }
   ]
