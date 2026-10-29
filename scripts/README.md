@@ -90,6 +90,9 @@ python -m jseval --help
 
 There is no single "canonical gate" wrapper (slice 3a-1-8f §B.12 + §B.14, 2026-05-12). Pre-merge verification is per-subject — see [Pre-merge Checks](../docs/reference/contributing/pre-merge-checks.md).
 
+Run `node scripts/dev/run-gh.mjs shepherd N --timeout-sec 5400` in the background for validated enqueue and merge observation in one process (optional `--repo owner/repo`), ending with a verdict and bounded failure excerpts.
+Opt into one failed-job rerun with `--rerun-failed-once`; [the agent guide](../docs/reference/contributing/agent-guide.md) documents the enqueue/merge-wait exit contract.
+
 ## Prerequisites
 
 - **Node.js** 24.x (see `scripts/setup/bootstrap-node-win.ps1`)

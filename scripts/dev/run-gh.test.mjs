@@ -798,6 +798,200 @@ run('CLI does not treat HTTP text in stdout as a classic permission error', () =
   assert.equal(result.status, 2); assert.match(result.stderr, /connection failed/);
 });
 
+// --- shepherd CLI: all child processes replaced before importing the runner ---
+const actionCheck = (name = 'required', run = 101, job = 201) => ({
+  ...requiredRow('FAILURE', 'fail', name),
+  link: `https://github.com/owner/repo/actions/runs/${run}/job/${job}`,
+});
+function shepherdCli(options = {}, args = []) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'run-gh-shepherd-'));
+  const callsPath = path.join(directory, 'calls.jsonl');
+  const preload = `
+    import childProcess from 'node:child_process';
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    const options = ${JSON.stringify(options)};
+    const callsPath = ${JSON.stringify(callsPath)};
+    const open = ${JSON.stringify(openMergePr)};
+    const snapshot = ${JSON.stringify(snapshot)};
+    let clock = 0, poll = 0, views = 0, reruns = 0, attemptReads = 0;
+    Date.now = () => clock;
+    globalThis.setTimeout = (fn, ms) => { clock += ms; poll++; views = 0; queueMicrotask(fn); };
+    const json = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: '' });
+    childProcess.spawnSync = (bin, args, spawnOptions) => {
+      fs.appendFileSync(callsPath, JSON.stringify({ bin, args, spawnOptions }) + '\\n');
+      if (args[0] === 'shepherd') return { status: 0 }; // baseline's pass-through, never real gh
+      if (args[0] !== 'pr' && args[0] !== 'api' && args[0] !== 'run')
+        return { status: options.refuse ?? 0 };
+      if (args[0] === 'api') {
+        if (args[1].includes('/actions/runs/')) {
+          const attempt = options.attempts ? options.attempts[attemptReads++] : (reruns ? 2 : 1);
+          return json({ run_attempt: attempt, head_sha: options.runHead ?? snapshot.headRefOid });
+        }
+        return json(args[1].includes('/protection/') ? { contexts: ['required'], checks: [] } : []);
+      }
+      if (args[0] === 'run') {
+        if (args[1] === 'rerun') { reruns++; poll = 0; views = 0; return { status: options.rerunStatus ?? 0 }; }
+        return { status: options.logStatus ?? 0, stdout: options.log ?? 'setup\\nError: assertion expected true\\nteardown\\n', stderr: 'log unavailable' };
+      }
+      if (args[1] === 'merge') return { status: options.mergeStatus ?? 0 };
+      if (args[1] === 'view' && args[4].startsWith('headRefOid,title')) return json(snapshot);
+      const frames = reruns ? options.afterRerun ?? options.polls : options.polls;
+      const frame = frames?.[Math.min(poll, frames.length - 1)] ?? {};
+      if (args[1] === 'checks') {
+        if (frame.checkError) return { status: 1, stdout: 'not JSON', stderr: 'network failed' };
+        const rows = frame.checks ?? [${JSON.stringify(requiredRow('PENDING', 'pending'))}];
+        return json(args.includes('--required') ? rows.filter((row) => !row.advisory) : rows);
+      }
+      if (frame.viewError) return { status: 1, stdout: 'not JSON', stderr: 'network failed' };
+      return json({ ...open, ...(views++ % 2 ? frame.after ?? frame.before : frame.before) });
+    };
+    syncBuiltinESMExports();
+  `;
+  try {
+    const result = spawnSync(process.execPath, [
+      '--import', `data:text/javascript,${encodeURIComponent(preload)}`,
+      path.join(import.meta.dirname, 'run-gh.mjs'), 'shepherd', '7', ...args,
+    ], { encoding: 'utf8', timeout: 3000 });
+    assert.ifError(result.error);
+    const calls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, 'utf8').trim().split('\n').map(JSON.parse) : [];
+    const lines = result.stdout.trim().split('\n');
+    const final = lines.at(-1);
+    assert.equal(lines.filter((line) => line.startsWith('run-gh shepherd PR #7: ')).length, 1, result.stdout + result.stderr);
+    assert.match(final, /^run-gh shepherd PR #7: /);
+    return { ...result, calls, final, lines };
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+const mergedFrame = { before: { state: 'MERGED', mergeCommit: { oid: 'landed' } } };
+for (const [verdict, status, options] of [
+  ['MERGED', 0, { polls: [mergedFrame] }],
+  ['FAILED', 1, { polls: [{ checks: [actionCheck()] }] }],
+  ['CLOSED', 1, { polls: [{ before: { state: 'CLOSED' } }] }],
+  ['HEAD-CHANGED', 1, { polls: [{ before: { headRefOid: 'b'.repeat(40) } }] }],
+  ['STALLED', 1, { polls: [{ checks: [requiredRow()] }] }],
+  ['TIMEOUT', 3, { polls: [{}] }],
+  ['ENQUEUE-REFUSED', 1, { refuse: 1 }],
+  ['ENQUEUE-REFUSED', 2, { refuse: 2 }],
+  ['ERROR', 2, { polls: [{ viewError: true }] }],
+  ['ERROR', 2, { polls: [{ checkError: true }] }],
+  ['FAILED', 1, { polls: [{ before: { isDraft: true } }] }],
+  ['FAILED', 1, { polls: [{ before: { mergeStateStatus: 'DIRTY' } }] }],
+  ['FAILED', 1, { polls: [{ before: { autoMergeRequest: null } }] }],
+]) run(`shepherd final verdict ${verdict} exits ${status}`, () => {
+  const result = shepherdCli(options, ['--timeout-sec', '900']);
+  assert.equal(result.status, status, result.stderr);
+  assert.match(result.final, new RegExp(`: ${verdict}\\b`));
+  if (verdict === 'HEAD-CHANGED') assert.match(result.final, /new head/);
+  if (verdict === 'ERROR') assert.match(result.final, /network failed|invalid gh/);
+  if (verdict === 'TIMEOUT') assert.match(result.final, /TIMEOUT.*required checks/);
+  if (verdict === 'ENQUEUE-REFUSED') assert.ok(!result.calls.some(({ args }) => args[1] === 'checks'));
+});
+run('shepherd composes validation and observation with the enqueued head and repo', () => {
+  const result = shepherdCli({ polls: [mergedFrame] }, ['--repo', 'owner/repo']);
+  assert.equal(result.status, 0);
+  const calls = result.calls.map(({ args }) => args);
+  assert.deepEqual(calls.slice(0, 5).map((args) => args[1]), ['view', '--pr', 'check', 'view', 'merge']);
+  assert.equal(calls[4][calls[4].indexOf('--match-head-commit') + 1], snapshot.headRefOid);
+  for (const args of calls.filter((args) => args[0] === 'pr')) assert.equal(args[args.indexOf('--repo') + 1], 'owner/repo');
+  assert.doesNotMatch(result.stderr, /in the background/);
+});
+run('shepherd failed summary names every required failure with bounded preferred job excerpts', () => {
+  const noise = Array.from({ length: 80 }, (_, i) => `ordinary output ${i}`);
+  const errors = Array.from({ length: 30 }, (_, i) => `Error: assertion failure ${i}`);
+  const result = shepherdCli({ polls: [{ checks: [actionCheck('unit'), actionCheck('lint', 102, 202)] }], log: [...noise, ...errors].join('\n') });
+  assert.equal(result.status, 1);
+  assert.match(result.final, /FAILED.*unit.*lint/);
+  assert.match(result.stdout, /https:\/\/github.com\/owner\/repo\/actions\/runs\/101/);
+  assert.match(result.stdout, /https:\/\/github.com\/owner\/repo\/actions\/runs\/102/);
+  assert.ok(result.lines.length <= 45, `${result.lines.length} lines`);
+  assert.equal(result.lines.filter((line) => line.includes('Error: assertion failure')).length, 40);
+  assert.doesNotMatch(result.stdout, /ordinary output/);
+  const logs = result.calls.filter(({ args }) => args.includes('--log-failed'));
+  assert.equal(logs.length, 2);
+  assert.ok(logs.every(({ args }) => args.includes('--job')));
+  assert.equal(result.calls.some(({ args }) => args[1] === 'rerun'), false);
+});
+run('shepherd gives a bounded fallback excerpt when no error keywords occur', () => {
+  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], log: Array.from({ length: 100 }, (_, i) => `output ${i}`).join('\n') });
+  assert.equal(result.status, 1);
+  assert.equal(result.lines.filter((line) => /output \d/.test(line)).length, 20);
+});
+run('shepherd explains non-Actions check log unavailability without guessing a run', () => {
+  const result = shepherdCli({ polls: [{ checks: [requiredRow('ERROR', 'fail', 'external')] }] });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /external.*https:\/\/example.test/);
+  assert.match(result.stdout, /unavailable|not a GitHub Actions/i);
+  assert.equal(result.calls.some(({ args }) => args[0] === 'run'), false);
+});
+run('shepherd ignores failed advisory checks', () => {
+  const result = shepherdCli({ polls: [
+    { checks: [requiredRow(), { ...actionCheck('advisory'), advisory: true }] }, mergedFrame,
+  ] });
+  assert.equal(result.status, 0);
+  assert.match(result.final, /MERGED/);
+  assert.equal(result.calls.some(({ args }) => args[0] === 'run'), false);
+});
+for (const [label, afterRerun, status, verdict] of [
+  ['success', [mergedFrame], 0, 'MERGED'],
+  ['second failure', [{ checks: [actionCheck('required', 101, 301)] }], 1, 'FAILED'],
+  ['pending then success', [{}, mergedFrame], 0, 'MERGED'],
+]) run(`shepherd explicit rerun happens once: ${label}`, () => {
+  const result = shepherdCli({ polls: [{ checks: [actionCheck('unit'), actionCheck('lint', 101, 202)] }], afterRerun }, ['--rerun-failed-once', '--repo', 'owner/repo']);
+  assert.equal(result.status, status, result.stderr);
+  assert.match(result.final, new RegExp(`: ${verdict}\\b.*after.*rerun`));
+  const reruns = result.calls.filter(({ args }) => args[1] === 'rerun');
+  assert.deepEqual(reruns.map(({ args }) => args), [['run', 'rerun', '101', '--failed', '--repo', 'owner/repo']]);
+  assert.equal(result.calls.filter(({ args }) => args[0] === 'api' && args[1].includes('/actions/runs/')).length, 2);
+});
+run('shepherd waits through stale failed job links before judging the rerun', () => {
+  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], afterRerun: [
+    { checks: [actionCheck()] }, { checks: [actionCheck('required', 101, 301)] },
+  ] }, ['--rerun-failed-once']);
+  assert.equal(result.status, 1);
+  assert.match(result.final, /FAILED after a rerun/);
+  const logs = result.calls.filter(({ args }) => args.includes('--log-failed'));
+  assert.deepEqual(logs.map(({ args }) => args[args.indexOf('--job') + 1]), ['201', '301']);
+});
+run('enqueue prints shepherd as its one-step alternative', () => {
+  let message = '';
+  assert.equal(enqueuePullRequest('fake-gh', 7, 'owner/repo', {
+    run: (_bin, args) => args[1] === 'view' ? snapshotResult() : { status: 0 },
+    writeError: (text) => { message += text; },
+  }), 0);
+  assert.match(message, /one-step alternative: node scripts\/dev\/run-gh.mjs shepherd 7 --repo owner\/repo --timeout-sec 5400/);
+});
+for (const attempts of [[1, 1], [2, 1], [null], [1, '2']]) run(`shepherd refuses unconfirmed run_attempt increase ${JSON.stringify(attempts)}`, () => {
+  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], attempts }, ['--rerun-failed-once']);
+  assert.equal(result.status, 2);
+  assert.match(result.final, /ERROR.*run_attempt/);
+  assert.ok(result.calls.filter(({ args }) => args[1] === 'rerun').length <= 1);
+});
+run('shepherd checks the workflow head before rerunning', () => {
+  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], runHead: 'b'.repeat(40) }, ['--rerun-failed-once']);
+  assert.equal(result.status, 2); assert.match(result.final, /ERROR.*head/i);
+  assert.equal(result.calls.some(({ args }) => args[1] === 'rerun'), false);
+});
+run('shepherd reports rerun command errors and never waits on an unconfirmed rerun', () => {
+  const result = shepherdCli({ polls: [{ checks: [actionCheck()] }], rerunStatus: 1 }, ['--rerun-failed-once']);
+  assert.equal(result.status, 2); assert.match(result.final, /ERROR.*rerun/i);
+  assert.equal(result.calls.filter(({ args }) => args[1] === 'rerun').length, 1);
+});
+run('shepherd refuses rerunning an external required check', () => {
+  const result = shepherdCli({ polls: [{ checks: [requiredRow('ERROR', 'fail')] }] }, ['--rerun-failed-once']);
+  assert.equal(result.status, 2); assert.match(result.final, /ERROR/);
+  assert.equal(result.calls.some(({ args }) => args[1] === 'rerun'), false);
+});
+for (const args of [['--timeout-sec', '0'], ['--timeout-sec'], ['--timeout-sec', 'oops'],
+  ['--repo'], ['--repo', 'invalid'], ['--rerun-failed-once', '--rerun-failed-once'], ['--unknown']]) {
+  run(`shepherd rejects invalid arguments before enqueue ${JSON.stringify(args)}`, () => {
+    const result = shepherdCli({}, args);
+    assert.equal(result.status, 2); assert.match(result.final, /ERROR/);
+    assert.equal(result.calls.length, 0);
+  });
+}
+
 // --- Report ---
 if (failures.length > 0) {
   console.error(`run-gh.test: ${failures.length} FAILED, ${passed} passed`);

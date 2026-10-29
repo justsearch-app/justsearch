@@ -288,7 +288,12 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
   emit = emitTransition,
   repo = null,
   head = null,
+  onResult = () => {},
 } = {}) {
+  const finish = (code, result, rows = []) => {
+    onResult({ ...result, rows });
+    return code;
+  };
   const deadline = now() + timeoutSec * 1000;
   const viewArgs = ['pr', 'view', String(prNumber), '--json',
     'state,mergedAt,mergeCommit,headRefOid,baseRefName,isDraft,mergeStateStatus,autoMergeRequest'];
@@ -315,13 +320,13 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
     const before = readSnapshot();
     if (before.error) {
       process.stderr.write(`run-gh merge-wait: ${before.error.message}\n`);
-      return 2;
+      return finish(2, { key: 'ERROR', message: before.error.message });
     }
     if (watchedHead === null) watchedHead = before.value.headRefOid;
     const mergedBefore = classifyMergeSnapshot(before.value);
     if (mergedBefore.verdict === 'pass') {
       emit(`run-gh merge-wait PR #${prNumber}`, mergedBefore, previousKey);
-      return 0;
+      return finish(0, mergedBefore);
     }
     if (requiredContexts === null) {
       const base = encodeURIComponent(before.value.baseRefName);
@@ -361,7 +366,7 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
         if (reason) process.stderr.write(`run-gh merge-wait: stall detection disabled: ${reason}; timeout still applies\n`);
       } catch (error) {
         process.stderr.write(`run-gh merge-wait: ${error.message}\n`);
-        return 2;
+        return finish(2, { key: 'ERROR', message: error.message });
       }
     }
     const checks = loadJson(bin, checksArgs);
@@ -370,13 +375,13 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
     if (classified.verdict !== 'pass') {
       if (after.error) {
         process.stderr.write(`run-gh merge-wait: ${after.error.message}\n`);
-        return 2;
+        return finish(2, { key: 'ERROR', message: after.error.message });
       }
       classified = classifyMergeSnapshot(after.value);
       if (classified.verdict !== 'pass') {
         if (checks.error) {
           process.stderr.write(`run-gh merge-wait: ${checks.error.message}\n`);
-          return 2;
+          return finish(2, { key: 'ERROR', message: checks.error.message });
         }
         classified = classifyMergePoll(before.value, after.value, checks.value, watchedHead, 0, requiredContexts);
         if (classified.allPassed) {
@@ -388,12 +393,13 @@ export async function mergeWait(bin, prNumber, timeoutSec, {
       }
     }
     previousKey = emit(`run-gh merge-wait PR #${prNumber}`, classified, previousKey);
-    if (classified.verdict === 'pass') return 0;
-    if (classified.verdict === 'fail') return 1;
+    if (classified.verdict === 'pass') return finish(0, classified);
+    if (classified.verdict === 'fail') return finish(1, classified, checks.value);
     if (now() >= deadline) {
       const missing = requiredContexts.filter((context) => !checks.value.some((row) => row.name === context));
-      process.stderr.write(`run-gh merge-wait: TIMEOUT after ${timeoutSec}s; required checks: ${requiredChecksSummary(classifyRequiredChecks(checks.value))}${missing.length ? `; not reported yet: ${missing.join(', ')}` : ''}\n`);
-      return 3;
+      const message = `TIMEOUT after ${timeoutSec}s; required checks: ${requiredChecksSummary(classifyRequiredChecks(checks.value))}${missing.length ? `; not reported yet: ${missing.join(', ')}` : ''}`;
+      process.stderr.write(`run-gh merge-wait: ${message}\n`);
+      return finish(3, { key: 'TIMEOUT', message });
     }
     await pause(MERGE_POLL_INTERVAL_MS);
   }
@@ -583,6 +589,7 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
   previewScript = PREVIEW_SCRIPT,
   reviewRecordScript = REVIEW_RECORD_SCRIPT,
   writeError = (message) => process.stderr.write(message),
+  onEnqueued = (head) => writeError(`run-gh enqueue: run node scripts/dev/run-gh.mjs merge-wait ${prNumber}${repo ? ` --repo ${repo}` : ''} --head ${head} --timeout-sec 5400 in the background; one-step alternative: node scripts/dev/run-gh.mjs shepherd ${prNumber}${repo ? ` --repo ${repo}` : ''} --timeout-sec 5400.\n`),
 } = {}) {
   const readSnapshot = () => {
     const args = ['pr', 'view', String(prNumber), '--json', 'headRefOid,title,body,isDraft,mergeable'];
@@ -630,14 +637,155 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
   const result = run(bin, mergeArgs, { stdio: 'inherit', windowsHide: true });
   const failure = childFailure('squash auto-merge request', result, writeError);
   if (failure === 0) {
-    writeError(`run-gh enqueue: run node scripts/dev/run-gh.mjs merge-wait ${prNumber}${repo ? ` --repo ${repo}` : ''} --head ${after.value.headRefOid} --timeout-sec 5400 in the background.\n`);
+    onEnqueued(after.value.headRefOid);
   }
   return failure;
+}
+
+function parseShepherdArgs(args) {
+  let timeoutSec = 5400;
+  let rerunFailedOnce = false;
+  let hasTimeout = false;
+  const enqueueArgs = [args[0]];
+  for (let index = 1; index < args.length; index += 1) {
+    const flag = args[index];
+    if (flag === '--rerun-failed-once' && !rerunFailedOnce) {
+      rerunFailedOnce = true;
+    } else if (flag === '--timeout-sec' && !hasTimeout) {
+      hasTimeout = true;
+      timeoutSec = Number(args[++index]);
+      if (!Number.isFinite(timeoutSec) || timeoutSec <= 0) throw new Error('--timeout-sec requires a positive number');
+    } else if (flag === '--repo') {
+      enqueueArgs.push(flag, args[++index]);
+    } else {
+      throw new Error(`unexpected shepherd argument ${JSON.stringify(flag)}`);
+    }
+  }
+  return { ...parseEnqueueArgs(enqueueArgs), timeoutSec, rerunFailedOnce };
+}
+
+function actionsRun(check) {
+  try {
+    const url = new URL(check.link);
+    const match = /^\/([^/]+\/[^/]+)\/actions\/runs\/(\d+)(?:\/(?:job|jobs)\/(\d+))?\/?$/.exec(url.pathname);
+    if (!match) return null;
+    return { repo: match[1], id: match[2], job: match[3], url: `${url.origin}/${match[1]}/actions/runs/${match[2]}` };
+  } catch {
+    return null;
+  }
+}
+
+function shepherdGh(bin, args) {
+  const result = spawnSync(bin, args, { encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
+  if (result.error) throw result.error;
+  if (result.status !== 0 || result.signal) {
+    throw new Error(`gh ${args.slice(0, 3).join(' ')}: ${result.stderr || result.signal || `exit ${result.status}`}`);
+  }
+  return result.stdout;
+}
+
+function printFailureExcerpts(bin, failures, repo) {
+  for (const check of failures) {
+    const run = actionsRun(check);
+    process.stdout.write(`${check.name.replace(/[\r\n]/g, ' ')}: ${run?.url || check.link}\n`);
+    if (!run) {
+      process.stdout.write('  Failed-job log unavailable: not a GitHub Actions run link.\n');
+      continue;
+    }
+    const args = ['run', 'view', run.id, '--log-failed', '--repo', repo || run.repo];
+    if (run.job) args.push('--job', run.job);
+    const lines = shepherdGh(bin, args).split(/\r?\n/).filter((line) => line.trim());
+    const preferred = lines.filter((line) => /\b(error|fail(?:ed|ure|ures)?|exception|assert(?:ion)?|\w+Error|panic|fatal)\b|✗|not ok\b/i.test(line));
+    const excerpt = preferred.length ? preferred.slice(0, 20) : lines.slice(-20);
+    for (const line of excerpt) process.stdout.write(`  ${line.slice(0, 1000)}\n`);
+    if (!excerpt.length) process.stdout.write('  No failed-step log lines available.\n');
+  }
+}
+
+/** Compose the publication gateway and its observer; the observer owns all polling. */
+export async function shepherd(bin, prNumber, { repo, timeoutSec, rerunFailedOnce }) {
+  let result;
+  let reran = false;
+  const finish = (code, verdict, message) => {
+    process.stdout.write(`run-gh shepherd PR #${prNumber}: ${verdict}${reran ? ' after a rerun' : ''}; ${String(message).replace(/[\r\n]+/g, ' ')}\n`);
+    return code;
+  };
+  try {
+    let head;
+    let enqueueMessage = '';
+    const enqueued = enqueuePullRequest(bin, prNumber, repo, {
+      onEnqueued: (sha) => { head = sha; },
+      writeError: (message) => { enqueueMessage = message.trim(); process.stderr.write(message); },
+    });
+    if (enqueued) return finish(enqueued, 'ENQUEUE-REFUSED', enqueueMessage);
+    // A rerun shares the original observation deadline rather than buying another timeout.
+    const deadline = Date.now() + timeoutSec * 1000;
+    const observe = (loadJson = capturedJson) => mergeWait(bin, prNumber, Math.max(0, (deadline - Date.now()) / 1000), {
+      repo, head, loadJson, onResult: (terminal) => { result = terminal; },
+    });
+    let code = await observe();
+    if (result.key === 'CHECKS_FAILED') {
+      const failures = classifyRequiredChecks(result.rows).failures;
+      printFailureExcerpts(bin, failures, repo);
+      if (rerunFailedOnce) {
+        const runs = new Map();
+        for (const check of failures) {
+          const run = actionsRun(check);
+          if (!run) throw new Error(`cannot rerun required check ${check.name}: not a GitHub Actions run link`);
+          runs.set(`${run.repo}/${run.id}`, run);
+        }
+        const readAttempt = (run) => {
+          const loaded = capturedJson(bin, ['api', `repos/${repo || run.repo}/actions/runs/${run.id}`]);
+          if (loaded.error) throw loaded.error;
+          const value = loaded.value;
+          if (!Number.isSafeInteger(value?.run_attempt) || value.run_attempt < 1) throw new Error(`run ${run.id}: invalid run_attempt`);
+          if (value.head_sha !== head) throw new Error(`run ${run.id}: head does not match enqueued head ${head}`);
+          return value.run_attempt;
+        };
+        // Validate every target before starting any reruns.
+        const attempts = [...runs.values()].map((run) => ({ run, attempt: readAttempt(run) }));
+        for (const { run, attempt } of attempts) {
+          shepherdGh(bin, ['run', 'rerun', run.id, '--failed', '--repo', repo || run.repo]);
+          reran = true;
+          if (readAttempt(run) <= attempt) throw new Error(`run ${run.id}: run_attempt did not increase after rerun`);
+        }
+        // Check rollups can briefly retain the previous attempt's failed job links.
+        // Reruns create new jobs; let merge-wait keep observing while those old rows linger.
+        const oldJobs = new Set(failures.filter((check) => actionsRun(check)?.job).map((check) => check.link));
+        code = await observe((command, args) => {
+          const loaded = capturedJson(command, args);
+          if (args[0] === 'pr' && args[1] === 'checks' && !loaded.error) {
+            return { value: loaded.value.map((row) => oldJobs.has(row.link) && classifyRequiredChecks([row]).failures.length
+              ? { ...row, state: 'PENDING', bucket: 'pending' } : row) };
+          }
+          return loaded;
+        });
+        if (result.key === 'CHECKS_FAILED') printFailureExcerpts(bin, classifyRequiredChecks(result.rows).failures, repo);
+      }
+    }
+    const verdict = result.key.startsWith('MERGED:') ? 'MERGED' :
+      result.key === 'NEW_HEAD' ? 'HEAD-CHANGED' :
+      ['CLOSED', 'STALLED', 'TIMEOUT', 'ERROR'].includes(result.key) ? result.key : 'FAILED';
+    return finish(code, verdict, result.message);
+  } catch (error) {
+    return finish(2, 'ERROR', error.message);
+  }
 }
 
 async function main() {
   const argv = process.argv.slice(2);
   const bin = resolveGhBin();
+
+  if (argv[0] === 'shepherd') {
+    try {
+      const options = parseShepherdArgs(argv.slice(1));
+      process.exitCode = await shepherd(bin, options.prNumber, options);
+    } catch (error) {
+      process.stdout.write(`run-gh shepherd PR #${argv[1] || '?'}: ERROR; ${error.message}\n`);
+      process.exitCode = 2;
+    }
+    return;
+  }
 
   if (argv[0] === 'checks-wait') {
     const { timeoutSec, rest: afterTimeout } = parseTimeoutSec(argv.slice(1));
