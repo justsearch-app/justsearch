@@ -21,10 +21,9 @@ The cutover is complete. **Search** is the one main interaction window; its esta
 | **WP1.5b** | The old chat window and its mounts are retired. Surviving interaction coverage, captures and current docs use Search. Stored pins/history stay; their old automatic events and pin-run updates stop. | implemented |
 | **WP1.5c** | Rail, title band and catalog say Search; the catalog describes searching files and asking about them. Release notes describe compatibility and removed UI, and the explicit cutover marker closes the promotion check. | implemented |
 
-The original S0–S4 slice notes and dated verification below are history, retained as
-written. WP1.5a/b/c completed the remaining flip, sweep and marker work in place of
-the original S4-rest–S11 schedule. Current behaviour is described in
-[`search-ui-behavior.md`](../reference/search-ui-behavior.md).
+The original S0–S4 slice notes and dated verification below are history, retained as written.
+WP1.5a/b/c completed the remaining flip, sweep and marker work in place of the original
+S4-rest–S11 schedule. Current behaviour: [`search-ui-behavior.md`](../reference/search-ui-behavior.md).
 
 S0's second half — recording that record-attribute hydration lives in
 `modules/ui-web/src/shell-v0/components/chat/` (adopting 847-S1's location) — is a decision
