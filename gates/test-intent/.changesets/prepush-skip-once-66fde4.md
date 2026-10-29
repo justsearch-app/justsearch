@@ -45,3 +45,14 @@ The acceptor (not the author) appends the acceptance record under the heading at
   "note": "Structural rule kept: env predicates, list paths, gradle-row filter, identifier column and excludeTestsMatching unchanged; only the pre-push SKIP log moves to info, PR flake stays lifecycle"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "auditor-66fde4-claude-3",
+  "verdict": "accept",
+  "digest": "sha256:01006ea592db5ce26bc61d1ff90b226b4663452f001cad35bca21bdd86dd44a6",
+  "note": "Audit: Structural rule kept holds; excludeTestsMatching calls and env conditions unchanged, Gradle probe shows identical exclude sets in all four env modes on base and candidate; only pre-push SKIP log moved to info"
+}
+```
