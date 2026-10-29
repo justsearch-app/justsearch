@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:d0992acd2e0f998f1957b23f33e18b9307e9295404f3f9fcd7dd47bd15accf91",
+    "adapterPatch": "gates/test-intent/evidence/wp3.8a-rules/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with one js-gradle-slot around the whole runner (no nested slot), cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, existing per-task isolation (no init script), mandated ten-minute retries in the outer launcher, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-29T05:49:15.598Z",
+  "revision": "941ad6d4937705b9bb4912ed19c1d26196f014c8",
+  "tree": "73a919116b97fced8c4dd09f7550695f4570b47e",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.power.EnergyStateCachePreservationTest.defaultOffRestartKeepsEnergySaverUntilAFreshReading\" --tests \"io.justsearch.app.services.power.EnergyStateCachePreservationTest.defaultOffRestartFirstFailureKeepsExistingBestEffortEnergySaver\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2505
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateCachePreservationTest.java#defaultOffRestartKeepsEnergySaverUntilAFreshReading",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateCachePreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c5e84c8d029f41ce840fae3a9734cecdb2911039741a5c5b641a0c4297c5fac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "defaultOffRestartKeepsEnergySaverUntilAFreshReading()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateCachePreservationTest.java#defaultOffRestartFirstFailureKeepsExistingBestEffortEnergySaver",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateCachePreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c5e84c8d029f41ce840fae3a9734cecdb2911039741a5c5b641a0c4297c5fac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "defaultOffRestartFirstFailureKeepsExistingBestEffortEnergySaver()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093",
+    "revision": "2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.power.EnergyStateCachePreservationTest.defaultOffRestartKeepsEnergySaverUntilAFreshReading\" --tests \"io.justsearch.app.services.power.EnergyStateCachePreservationTest.defaultOffRestartFirstFailureKeepsExistingBestEffortEnergySaver\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 0,
+        "durationMs": 2505
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateCachePreservationTest.java#defaultOffRestartKeepsEnergySaverUntilAFreshReading",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateCachePreservationTest.java#defaultOffRestartFirstFailureKeepsExistingBestEffortEnergySaver",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:31bea5d06b5436dd9eb8db10ee3c2606fa15327136a637ff79e97d2c8d8da214"
+}

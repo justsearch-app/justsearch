@@ -7,7 +7,7 @@ author-session: 01a185ae-4d4b-7b41-b21b-992777acac9e
 
 # Test-intent entries
 
-All sources are agent choices under the specified design delegation. Evidence files and independent acceptance are intentionally left for the orchestrator; the builder was instructed not to run run-evidence.mjs.
+All sources remain agent choices under the specified design delegation. Builder execution evidence now records each test file separately on the candidate and the exact before revision. Entries distinguish assertion-proven repairs, preservation passes and after-only new-API controls. The runner adaptation and execution limits are documented in gates/test-intent/evidence/wp3.8a-rules/README.md. Independent acceptance remains for the orchestrator/verifier.
 
 ```json
 {
@@ -17,7 +17,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/core/src/test/java/io/justsearch/core/scheduling/IndexingRulesHoldTest.java"
       ],
       "class": "New",
-      "behaviour": "D2 table including every minute/day, overnight Sunday wrap, endpoints, DST wall-time membership, clock/zone jumps, residual reasons and lease acknowledgment; disabled schedules do not sample local time, queued work automatically continues.",
+      "behaviour": "D2 table including every minute/day, overnight Sunday wrap, endpoints, DST wall-time membership, clock/zone jumps, residual reasons and lease acknowledgment; disabled schedules do not sample local time, queued work automatically continues. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingSchedule and IndexingHold.LocalMinute/setLocalTime/setPolicy are absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -28,7 +28,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesHoldTest.json",
       "newChecks": [
         "modules/core/src/test/java/io/justsearch/core/scheduling/IndexingRulesHoldTest.java#localMinuteTableIncludesEndpointsOvernightSundayAndDisabledHours",
         "modules/core/src/test/java/io/justsearch/core/scheduling/IndexingRulesHoldTest.java#dstRepeatedSkippedHoursClockAndZoneChangesAreReevaluatedInTheRealHold",
@@ -41,7 +41,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-util/src/test/java/io/justsearch/app/util/WindowsLocalTimeTest.java"
       ],
       "class": "New",
-      "behaviour": "D3 native-local weekday/minute mapping, Windows Sunday mapping, fallback after binding/invocation failure and successful native read on the next evaluation; physical Windows invocation remains unverified.",
+      "behaviour": "D3 native-local weekday/minute mapping, Windows Sunday mapping, fallback after binding/invocation failure and successful native read on the next evaluation; physical Windows invocation remains unverified. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because the WindowsLocalTime type is absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -52,7 +52,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/WindowsLocalTimeTest.json",
       "newChecks": [
         "modules/app-util/src/test/java/io/justsearch/app/util/WindowsLocalTimeTest.java#sundayMappingAndMinuteSnapshotAreNativeLocalValues",
         "modules/app-util/src/test/java/io/justsearch/app/util/WindowsLocalTimeTest.java#nativeFailureFallsBackAndNextReadTriesNativeAgain"
@@ -63,7 +63,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/IndexingRulesPersistenceTest.java"
       ],
       "class": "New",
-      "behaviour": "D4/S38.6 old absent/null/three-field policies retain manual fields and load with unrestricted rules; future-version files remain fail-loud and untouched even with duplicate rule tokens. Preservation also passes before.",
+      "behaviour": "D4/S38.6 old absent/null/three-field policies retain manual fields and load with unrestricted rules; future-version files remain fail-loud and untouched even with duplicate rule tokens. Preservation also passes before. Execution: preservation checks pass on both before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 and the candidate; no fail-before or repair is claimed.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -74,7 +74,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesPersistenceTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/IndexingRulesPersistenceTest.java#futureVersionWithDuplicateRuleTokensFailsLoudWithoutQuarantine",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/IndexingRulesPersistenceTest.java#oldPoliciesKeepManualFieldsAndHaveNoRules"
@@ -85,7 +85,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/IndexingRulesPersistenceTest.java"
       ],
       "class": "New",
-      "behaviour": "D1/D4/S38.2/S38.6 malformed saved rules quarantine before coercion/duplicate loss and stay in recovery on a second restart; old policies retain manual fields; disabled hours persist and reset clears rules.",
+      "behaviour": "D1/D4/S38.2/S38.6 malformed saved rules quarantine before coercion/duplicate loss and stay in recovery on a second restart; old policies retain manual fields; disabled hours persist and reset clears rules. Execution: every named check passes on the candidate and fails by assertion for the guarded behavior on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -96,7 +96,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-before.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesPersistenceTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/IndexingRulesPersistenceTest.java#malformedSavedRulesQuarantineAndRemainInRecoveryOnSecondRestart",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/IndexingRulesPersistenceTest.java#disabledHoursAndBatteryPreferenceSurviveAcceptedSerializationAndResetClearsThem"
@@ -108,7 +108,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/IndexingRulesIntentTest.java"
       ],
       "class": "New",
-      "behaviour": "D4 UI-only accepted rules operation, whole-rule-pair replacement, witness/key/replay/conflict, atomic refusal and preservation with Pause/Resume/unrelated settings writes.",
+      "behaviour": "D4 UI-only accepted rules operation, whole-rule-pair replacement, witness/key/replay/conflict, atomic refusal and preservation with Pause/Resume/unrelated settings writes. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingHold.LocalMinute/setLocalTime are absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -119,7 +119,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesIntentTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/IndexingRulesIntentTest.java#acceptedRulesPauseResumeUnrelatedWritesAndReplayPreserveEachOther",
         "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/IndexingRulesIntentTest.java#rulesPreserveSavedRecoveryAndExpiredManualIntentAcrossRestart",
@@ -131,7 +131,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/power/IndexingRulesPowerTest.java"
       ],
       "class": "New",
-      "behaviour": "D7/S38.9: default-off fresh activation does not wait for a blocked first probe. Preservation expectation also passes before.",
+      "behaviour": "D7/S38.9: default-off fresh activation does not wait for a blocked first probe. Preservation expectation also passes before. Execution: preservation checks pass on both before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 and the candidate; no fail-before or repair is claimed.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -142,7 +142,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesPowerTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/power/IndexingRulesPowerTest.java#disabledBatteryRuleSkipsFreshBlockedActivationWait"
       ]
@@ -152,7 +152,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/power/IndexingRulesPowerTest.java"
       ],
       "class": "New",
-      "behaviour": "D6 independent source/intent matrix; D7 fresh first reading, bounded UNKNOWN timeout, delayed publication, battery before timeout, first exception and default-off no-wait.",
+      "behaviour": "D6 independent source/intent matrix; D7 fresh first reading, bounded UNKNOWN timeout, delayed publication, battery before timeout, first exception and default-off no-wait. Execution: every named check passes on the candidate and fails by assertion for the guarded behavior on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -163,7 +163,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-before.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesPowerTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/power/IndexingRulesPowerTest.java#powerMatrixAppliesThroughPollerAndHoldWithoutChangingEnergySaver",
         "modules/app-services/src/test/java/io/justsearch/app/services/power/IndexingRulesPowerTest.java#firstReadingWaitIsBoundedUnknownUntilKnownAndFreshOnEveryActivation",
@@ -177,7 +177,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateActivationTest.java"
       ],
       "class": "New",
-      "behaviour": "D7/S38.9 old blocked probe returning after restart cannot overwrite a fresh observation, in either source direction.",
+      "behaviour": "D7/S38.9 old blocked probe returning after restart cannot overwrite a fresh observation, in either source direction. Execution: every named check passes on the candidate and fails by assertion for the guarded behavior on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -188,7 +188,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-before.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/EnergyStateActivationTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateActivationTest.java#closedActivationCannotOverwriteNewReadingInEitherDirection"
       ],
@@ -199,7 +199,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/IndexingRulesVduTest.java"
       ],
       "class": "New",
-      "behaviour": "S38.8 actual OfflineCoordinator automatic yield, queued explicit picture reading and final-publication lease acknowledgment under the shared battery rule.",
+      "behaviour": "S38.8 actual OfflineCoordinator automatic yield, queued explicit picture reading and final-publication lease acknowledgment under the shared battery rule. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingHold.setOnBattery/setPolicy are absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -210,7 +210,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesVduTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/IndexingRulesVduTest.java#explicitPassWaitsAndAnActivePassMustFinishBeforeQuiet"
       ]
@@ -220,7 +220,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/gpl/IndexingRulesGplTest.java"
       ],
       "class": "New",
-      "behaviour": "S38.8 actual GplJobCoordinator queued continuation and final-publication acknowledgment under the shared battery rule.",
+      "behaviour": "S38.8 actual GplJobCoordinator queued continuation and final-publication acknowledgment under the shared battery rule. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingHold.setOnBattery/setPolicy are absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -231,7 +231,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesGplTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/gpl/IndexingRulesGplTest.java#queuedGplWaitsAndActiveGenerationKeepsPausingUntilItsOutcomeIsPublished"
       ]
@@ -241,7 +241,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopRulesTest.java"
       ],
       "class": "New",
-      "behaviour": "S38.8 IndexingLoop schedule restriction blocks queue polls, preserves GPU/transition handshakes and waits for reader publication before PAUSED.",
+      "behaviour": "S38.8 IndexingLoop schedule restriction blocks queue polls, preserves GPU/transition handshakes and waits for reader publication before PAUSED. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingSchedule and IndexingHold.LocalMinute/setLocalTime/setPolicy are absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -252,7 +252,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingLoopRulesTest.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopRulesTest.java#startsWithoutPollingAndCutoverAndUpgradeStillComplete",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopRulesTest.java#quietWaitsForTheReadersPublicationAndNoFurtherQueuePollStarts"
@@ -263,7 +263,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusIndexingRulesTest.java"
       ],
       "class": "New",
-      "behaviour": "D5 every representable recovery/manual/schedule/battery combination yields ordered complete reasons, matching primary code, truthful quiet state and no expired manual deadline.",
+      "behaviour": "D5 every representable recovery/manual/schedule/battery combination yields ordered complete reasons, matching primary code, truthful quiet state and no expired manual deadline. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingSchedule and IndexingHold.LocalMinute/setLocalTime/setOnBattery/setPolicy are absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -274,7 +274,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/StatusIndexingRulesTest.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusIndexingRulesTest.java#everyPolicyCombinationHasOrderedReasonsCoherentCodeAndNoExpiredDeadline"
       ]
@@ -284,7 +284,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/ui/src/integrationTest/java/io/justsearch/app/engine/IndexingRulesBootstrapIntegrationTest.java"
       ],
       "class": "New",
-      "behaviour": "BP38 full unchanged HeadlessApp.main with only the existing constructor Supplier replaced: durably queued work, blocked first observation, BATTERY before timeout starts held, timeout UNKNOWN permits work, delayed BATTERY then applies; real 15s cadence and actual same-bootstrap close/start re-arm.",
+      "behaviour": "BP38 full unchanged HeadlessApp.main with only the existing constructor Supplier replaced: durably queued work, blocked first observation, BATTERY before timeout starts held, timeout UNKNOWN permits work, delayed BATTERY then applies; real 15s cadence and actual same-bootstrap close/start re-arm. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingHold.setPolicy is absent in the shared test child source, so neither method can run. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -295,7 +295,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesBootstrapIntegrationTest.json",
       "newChecks": [
         "modules/ui/src/integrationTest/java/io/justsearch/app/engine/IndexingRulesBootstrapIntegrationTest.java#fullMainHoldsFreshBatteryAndTimesOutUnknownWithDurablyQueuedWork",
         "modules/ui/src/integrationTest/java/io/justsearch/app/engine/IndexingRulesBootstrapIntegrationTest.java#sameBootstrapCloseStartRearmsTheFreshReadingBarrier"
@@ -306,7 +306,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/IndexingRulesRegistrationTest.java"
       ],
       "class": "New",
-      "behaviour": "D4 catalog registration exposes the rules mutator to UI only, with no MCP/agent executor.",
+      "behaviour": "D4 catalog registration exposes the rules mutator to UI only, with no MCP/agent executor. Execution: every named check passes on the candidate and fails by assertion for the guarded behavior on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -317,7 +317,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-before.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesRegistrationTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/IndexingRulesRegistrationTest.java#rulesOperationIsUiOnly"
       ],
@@ -328,7 +328,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateCachePreservationTest.java"
       ],
       "class": "New",
-      "behaviour": "Must-not-break energy saver: with battery pause off, a blocked or failed first probe after restart preserves the previously known energy-saver intent and gauge. These preservation checks pass on the baseline and repaired candidate.",
+      "behaviour": "Must-not-break energy saver: with battery pause off, a blocked or failed first probe after restart preserves the previously known energy-saver intent and gauge. These preservation checks pass on the baseline and repaired candidate. Execution: preservation checks pass on both before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 and the candidate; no fail-before or repair is claimed.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -339,7 +339,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/EnergyStateCachePreservationTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateCachePreservationTest.java#defaultOffRestartKeepsEnergySaverUntilAFreshReading",
         "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStateCachePreservationTest.java#defaultOffRestartFirstFailureKeepsExistingBestEffortEnergySaver"
@@ -350,7 +350,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillIndexingRulesTest.java"
       ],
       "class": "New",
-      "behaviour": "S38.8 actual BackfillScheduler, in-process signal bus and shared hold prevent queued NER encoding until schedule and battery both clear, then publish the same pending work without manual Resume.",
+      "behaviour": "S38.8 actual BackfillScheduler, in-process signal bus and shared hold prevent queued NER encoding until schedule and battery both clear, then publish the same pending work without manual Resume. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingSchedule and IndexingHold.LocalMinute/setLocalTime/setPolicy/setOnBattery are absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -361,7 +361,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/BackfillIndexingRulesTest.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillIndexingRulesTest.java#scheduleAndBatteryHoldPendingNerUntilBothClearWithoutManualResume"
       ]
@@ -371,7 +371,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusRecoveryPausingTest.java"
       ],
       "class": "New",
-      "behaviour": "D5 recovery primary reason code agrees with PAUSING while an admitted lease drains and PAUSED after its final acknowledgment.",
+      "behaviour": "D5 recovery primary reason code agrees with PAUSING while an admitted lease drains and PAUSED after its final acknowledgment. Execution: every named check passes on the candidate and fails by assertion for the guarded behavior on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -382,7 +382,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-before.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/StatusRecoveryPausingTest.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/StatusRecoveryPausingTest.java#recoveryCodeDistinguishesDrainingFromAcknowledgedQuiet"
       ],
@@ -393,7 +393,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingRulesDeletionTest.java"
       ],
       "class": "New",
-      "behaviour": "S38.8 actual EngineRoot, accepted Forget operation, SQLite and Lucene remove indexed parent/chunks/jobs while the actual lane remains held by schedule and battery; source bytes and sibling survive.",
+      "behaviour": "S38.8 actual EngineRoot, accepted Forget operation, SQLite and Lucene remove indexed parent/chunks/jobs while the actual lane remains held by schedule and battery; source bytes and sibling survive. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingSchedule, IndexingHold.LocalMinute/setLocalTime/setOnBattery and Snapshot.reasons are absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -404,7 +404,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesDeletionTest.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingRulesDeletionTest.java#recordedForgetRemovesIndexedDataWhileScheduleAndBatteryKeepProcessingHeld"
       ]
@@ -414,7 +414,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/ForgetSettingsProjectionTest.java"
       ],
       "class": "New",
-      "behaviour": "D4/S38.6: real coordinator Forget projection preserves complete indexing policy; a later rules edit preserves exclusions; withdrawal preserves updated hours/battery/manual fields and existing query-role selection. Existing expectations remain.",
+      "behaviour": "D4/S38.6: real coordinator Forget projection preserves complete indexing policy; a later rules edit preserves exclusions; withdrawal preserves updated hours/battery/manual fields and existing query-role selection. Existing expectations remain. Execution: every named check passes on the candidate and fails by assertion for the guarded behavior on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -425,7 +425,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-before.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/ForgetSettingsProjectionTest.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/ForgetSettingsProjectionTest.java#RF55ProjectionIsNonterminalAndWD55WithdrawalRemovesOnlyOwnedEntryAfterFreshMerge"
       ],
@@ -454,7 +454,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
         "governance/logic-seams.v1.json#law-targetTests"
       ],
       "class": "New",
-      "behaviour": "D2 local-wall-clock membership law is registered with its exhaustive minute/day and owner-level hold guards; existing seams unchanged.",
+      "behaviour": "D2 local-wall-clock membership law is registered with its exhaustive minute/day and owner-level hold guards; existing seams unchanged. Execution: after-only checks pass on the candidate. The transplanted test file cannot compile on before revision 2ae5d5f23dfa7cfb5eeb901ad9c9616c6236b093 because IndexingSchedule and IndexingHold.LocalMinute/setLocalTime/setPolicy are absent. The recorded compile failure is not fail-before evidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -465,7 +465,7 @@ All sources are agent choices under the specified design delegation. Evidence fi
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/wp3.8a-after.json",
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesHoldTest.json",
       "newChecks": [
         "modules/core/src/test/java/io/justsearch/core/scheduling/IndexingRulesHoldTest.java#localMinuteTableIncludesEndpointsOvernightSundayAndDisabledHours"
       ]
