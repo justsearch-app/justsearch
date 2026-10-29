@@ -27,3 +27,14 @@ background activation/deactivation and restores the original property even when 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-ras-osname-codex",
+  "verdict": "accept",
+  "digest": "sha256:30d2860ca5f80d5d9536fd01abe3aa55ec4aec0580e1886c1e0a27d4772835f6",
+  "note": "Cold and random class runs pass 32/32; all seven fresh-JVM methods pass; primed before/after runs preserve all 32 tests and assertions. All 71 display-related suite failures reproduce before. The gate remains blocked by inherited uncovered changes."
+}
+```
