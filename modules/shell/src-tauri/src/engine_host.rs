@@ -1620,9 +1620,10 @@ mod tests {
     fn real_reset_rejects_stale_manifests_and_emits_once_for_successor() {
         let host = EngineHost::default();
         let first = host.admit(sleeper()).unwrap();
+        let mut predecessor_manifest = manifest(&host, "old", first.pid, 1111);
         assert!(
             !host
-                .observe_manifest(&manifest(&host, "old", first.pid, 1111))
+                .observe_manifest(&predecessor_manifest)
                 .unwrap()
                 .restarted
         );
@@ -1651,11 +1652,25 @@ mod tests {
 
         let second = host.admit(sleeper()).unwrap();
         let mut events = 0;
-        host.observe_manifest_with_sinks(
-            &manifest(&host, "old", second.pid, 1111),
-            |_| events += 1,
-            |_| {},
+        predecessor_manifest.pid = Some(second.pid);
+        assert_eq!(
+            host.observe_manifest_with_sinks(
+                &predecessor_manifest,
+                |_| events += 1,
+                |_| {},
+            ),
+            None,
+            "a predecessor incarnation cannot bind to the successor PID"
         );
+        assert_eq!(
+            host.binding_snapshot(),
+            Binding {
+                instance_id: Some("old".into()),
+                port: None,
+                token: None
+            }
+        );
+        assert_eq!(events, 0, "a predecessor manifest cannot emit a restart event");
         host.observe_manifest_with_sinks(
             &manifest(&host, "new", first.pid, 2222),
             |_| events += 1,

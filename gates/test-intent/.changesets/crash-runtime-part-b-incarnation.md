@@ -53,7 +53,7 @@ The builder leaves the candidate uncommitted. The orchestrator generates executi
         "input re-encoding",
         "signature"
       ],
-      "whatMoved": "Direct manifest fixtures include the current host's session and incarnation number, as a real supervised Engine does. The engine_host manifest helper takes its host to encode that provenance. The test-only child removal follows the simplified discovery state without a predecessor snapshot. Existing PID, instance, credential, probe, event, shutdown, timeout and retry assertions are retained. The conformance fake publishes the same incarnation block from its existing JUSTSEARCH_ENGINE_INCARNATION environment.",
+      "whatMoved": "Direct manifest fixtures include the current host's session and incarnation number, as a real supervised Engine does. The engine_host manifest helper takes its host to encode that provenance. real_reset_rejects_stale_manifests_and_emits_once_for_successor retains the predecessor's session and incarnation number captured before reset, substitutes the successor's PID to model PID reuse, and immediately asserts refusal, no port or token binding and no restart event before the successor publishes. Its remaining stale-PID, successor binding and exactly-once restart event assertions are retained. The test-only child removal follows the simplified discovery state without a predecessor snapshot. Existing PID, instance, credential, probe, event, shutdown, timeout and retry assertions are retained. The conformance fake publishes the same incarnation block from its existing JUSTSEARCH_ENGINE_INCARNATION environment.",
       "sources": [
         {
           "kind": "delegated-choice",
