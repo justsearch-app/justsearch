@@ -720,9 +720,10 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
       ? dispatches().length === 1 ? refusal(false, 'RELOAD_BACKOFF', 80) : done() : new Response('{}'));
     const el = await mount(); await send(el, 'A');
     expect(action(el, 'sv3-residency-retry')?.disabled).toBe(true);
+    // Real time, not a fixed sleep: a loaded runner can deliver the 80 ms interval late.
+    await vi.waitFor(async () => { await settle(el); expect(action(el, 'sv3-residency-retry')?.disabled).toBe(false); }, { timeout: 5000, interval: 20 });
     await new Promise(r => setTimeout(r, 100)); await settle(el);
     expect(dispatches()).toHaveLength(1); expect(loads()).toHaveLength(0);
-    expect(action(el, 'sv3-residency-retry')?.disabled).toBe(false);
     clickAction(el, 'sv3-residency-retry'); await settle(el); expect(dispatches()).toHaveLength(2);
   });
   it('context that changes during the follow-up confirmation cannot replace the captured force context', async () => {
