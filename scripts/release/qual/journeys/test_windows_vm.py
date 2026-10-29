@@ -15,6 +15,27 @@ wrapper=importlib.util.module_from_spec(spec);spec.loader.exec_module(wrapper)
 
 
 class WindowsVMTests(unittest.TestCase):
+    def test_chained_snapshot_reruns_keep_distinct_guest_evidence_directories(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            args=SimpleNamespace(session='vm',mirror=None,package='candidate.exe',predecessor=None)
+            scripts=[]
+            def capture(system,source,destination):
+                scripts.append(source.read_text())
+            def extract(archive,out,folder):
+                (out/'evidence').mkdir()
+                (out/'evidence/summary.json').write_text('{}')
+            with patch.object(wrapper,'stage_inputs'),patch.object(wrapper,'guest_ps',return_value='0'), \
+                 patch.object(wrapper.vm,'copy_in',side_effect=capture),patch.object(wrapper,'wait_for',return_value='0'), \
+                 patch.object(wrapper,'copy_out'),patch.object(wrapper.common,'extract_evidence',side_effect=extract) as extraction:
+                for name in ('j2','j3'):
+                    out=root/name/'rerun';out.mkdir(parents=True)
+                    wrapper.execute(args,out,'candidate',['J2'],None)
+            folders=[call.args[2] for call in extraction.call_args_list]
+            self.assertEqual(len(set(folders)),2,'A checkpoint retains earlier evidence; reusing its directory aborts the next journey')
+            for folder,script in zip(folders,scripts):
+                self.assertIn('C:/Qual/'+folder,script)
+
     def test_setup_verifies_exact_driver_after_reboot_and_records_snapshot_versions(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);disk=root/'run.qcow2';disk.write_bytes(b'cached tools')

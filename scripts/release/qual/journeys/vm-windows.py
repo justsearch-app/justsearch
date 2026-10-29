@@ -419,7 +419,10 @@ def execute(args, out, phase, journeys, snapshot, budget=None):
     stage_inputs(args, out, snapshot)
     if 'J5' in journeys and args.mirror:
         guest_ps('& C:/Qual/Python/Scripts/python.exe C:/Qual/mirror-windows.py resume; if($LASTEXITCODE){throw "Cached mirror resume failed"}')
-    remote = 'C:/Qual/evidence-' + out.name
+    # A stopped checkpoint retains earlier evidence/work directories. Every
+    # child run needs a new directory even when its host stage is named rerun.
+    remote_name = 'evidence-' + str(time.time_ns())
+    remote = 'C:/Qual/' + remote_name
     command = ['C:/Qual/Python/Scripts/python.exe', 'C:/Qual/journeys/' + ('windows-hosted.py' if args.session == 'hosted' else 'runner.py')]
     if args.session != 'hosted':
         command += ['--lane', 'vm-windows', '--driver', 'C:/Qual/tauri-driver.exe', '--native-driver', 'C:/Qual/edge/msedgedriver.exe']
@@ -457,9 +460,9 @@ def execute(args, out, phase, journeys, snapshot, budget=None):
     result = int(wait_for(completed, 'Interactive Windows journey completion', seconds=7200, interval=3, error=Infrastructure))
     copy_out('C:/Qual/journey-run.log', out / 'run.log')
     # tar excludes links through the shared bounded extraction validator.
-    guest_ps('& tar.exe -cf C:/Qual/evidence.tar -C C:/Qual ' + ps_value('evidence-' + out.name) + '; if($LASTEXITCODE){throw "Evidence archive failed"}')
+    guest_ps('& tar.exe -cf C:/Qual/evidence.tar -C C:/Qual ' + ps_value(remote_name) + '; if($LASTEXITCODE){throw "Evidence archive failed"}')
     copy_out('C:/Qual/evidence.tar', out / 'evidence.tar')
-    common.extract_evidence(out / 'evidence.tar', out, 'evidence-' + out.name)
+    common.extract_evidence(out / 'evidence.tar', out, remote_name)
     shutil.copyfile(out / 'evidence/summary.json', out / 'summary.json')
     copy_out('C:/Qual/next-checkpoint.json', out / 'checkpoint.json', check=False)
     return result
