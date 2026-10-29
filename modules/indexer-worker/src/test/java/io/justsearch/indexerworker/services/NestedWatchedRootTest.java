@@ -226,9 +226,11 @@ final class NestedWatchedRootTest extends LuceneExecutorTestBase {
         var active = open(manager.resolveGenerationPathStrict(blue));
         var candidate = open(manager.resolveGenerationPathStrict(green))) {
       queue.open();
-      var service = service(queue, base, candidate, active);
+      var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(), base,
+          candidate.openedIndexPath(), candidate, active, null, 0L);
       watch(service, parent, "parent");
       watch(service, child, "child");
+      service.setMutationAdmission(new WorkerMutationAdmission(candidate), candidate);
       for (var runtime : List.of(active, candidate)) {
         index(runtime, own, "parent");
         index(runtime, nested, "child");
@@ -452,8 +454,10 @@ final class NestedWatchedRootTest extends LuceneExecutorTestBase {
 
   private static WorkerIngestService service(SqliteJobQueue queue, Path base,
       RunningRuntime writer, RunningRuntime serving) {
-    return new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(), base,
+    var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(), base,
         writer.openedIndexPath(), writer, serving, null, 0L);
+    service.setMutationAdmission(new WorkerMutationAdmission(writer), writer);
+    return service;
   }
 
   private static void watch(WorkerIngestService service, Path root, String collection) {

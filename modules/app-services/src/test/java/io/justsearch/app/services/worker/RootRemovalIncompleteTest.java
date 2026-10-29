@@ -55,6 +55,7 @@ final class RootRemovalIncompleteTest {
       return call.callRealMethod();
     }).when(store).persistRoots(anyMap(), anyMap(), anySet(), anyMap());
     var ops = ops(roots, state, watcher, (path, context) -> {
+      watcher.unwatch(path.toString(), context); // Worker retirement is inside the deletion call.
       if (failing.get() && step.equals("delete")) {
         return DeleteByPathResponse.newBuilder().setDeletedJobs(-1).setError("forced delete failure").build();
       }
