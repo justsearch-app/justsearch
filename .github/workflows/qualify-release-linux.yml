@@ -77,10 +77,24 @@ jobs:
           set -euo pipefail
           mapfile -t packages < <(find "$RUNNER_TEMP/release-assets" -maxdepth 1 -name '*.deb' -printf '%f\n')
           [[ ${#packages[@]} == 1 ]]
+          set +e
           xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
             python3 scripts/release/qual/journeys/hosted.py \
               --assets "$RUNNER_TEMP/release-assets" --package "${packages[0]}" \
               --registry "$RUNNER_TEMP/server.json" --evidence "$RUNNER_TEMP/journey-evidence"
+          result=$?
+          set -e
+          python3 - <<'PY_SUMMARY'
+          import json, os
+          from pathlib import Path
+          summary = Path(os.environ['RUNNER_TEMP']) / 'journey-evidence/summary.json'
+          status = json.loads(summary.read_text())['status'] if summary.exists() else 'summary unavailable'
+          message = f'Linux release journeys: {status}'
+          print(message)
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as stream:
+              stream.write(message + '\n')
+          PY_SUMMARY
+          exit "$result"
       - name: Record unavailable journeys when preparation failed
         if: always()
         run: |

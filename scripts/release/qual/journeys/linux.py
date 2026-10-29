@@ -108,11 +108,11 @@ def first_run(run):
     run.desktop_spawn(['gtk-launch', 'JustSearch'], run.work + '/first-run.log')
     run.observe_window('J1-desktop-entry')
     run.evidence('J1-normal-ready', run.ready())
-    run.native.screen_text('J1-desktop-first-run') # Triage only; cannot certify visible text.
+    run.native.shot('J1-desktop-first-run') # Triage only; cannot certify visible text.
     # This new session proves its own DOM, not the preceding desktop window's pixels.
     run.start_ui()
     wait_for(lambda: run.wd.execute("return all(document,'jf-shell').length > 0"),
-             'Packaged web UI mounted', seconds=60, error=Infrastructure)
+             'Packaged web UI mounted', seconds=60)
     buttons = run.wd.execute("return all(document,'button').map(e=>e.textContent.trim());")
     if 'Get started' in buttons:
         run.wd.click('button', 'Get started')
@@ -222,14 +222,10 @@ def search_open(run):
             {'type': 'pointerDown', 'button': 2}, {'type': 'pointerUp', 'button': 2}]}]})
     run.wd.click('button,[role="menuitem"]', 'Open file')
     # Receiving-viewer evidence, not an IPC response or process-spawn assertion.
-    wait_for(lambda: (v if all(word in v for word in ('File', 'Edit', 'Document')) else None)
-             if (v := run.native.screen_text('J2-receiving-viewer-opening')) else None,
-             'Default text viewer visible', seconds=30, error=Infrastructure)
     viewer = wait_for(lambda: receiving_viewer(run),
                       'Receiving viewer opened exact fixture (cmdline or fd)', seconds=30)
     run.native.shot('J2-receiving-viewer')
     run.target.stop([viewer])
-    run.desktop_spawn([run.binary], run.work + '/return-from-viewer.log')
     run.facts['search'] = True
     return {'search': result, 'receivingViewerProcess': viewer}
 
@@ -253,7 +249,7 @@ def install_ai(run):
         run.evidence('J3-install-observations', samples)
         raw = json.dumps(status)
         if status.get('state') in ('failed', 'error'):
-            if any(x in raw.lower() for x in ('connection reset', 'timed out', 'timeout', 'resolve host', 'http 503', 'http 502', 'http 429')):
+            if any(x in raw.lower() for x in ('connection reset', 'connection timed out', 'connect timeout', 'read timed out', 'read timeout', 'download timed out', 'download timeout', 'curl exit 28', 'curl: (28)', 'resolve host', 'http 503', 'http 502', 'http 429')):
                 raise RuntimeError('Production AI download failed; see J3-install-observations.json')
             raise ProductFailure('Install AI failed: ' + raw)
         if resumed:
@@ -357,7 +353,7 @@ const typed=all(document,'input[data-testid="authorization-typed-input"]').some(
 });
 const operationKeys=all(document,'jf-operation-outcome-detail').map(e=>e.operationKey).filter(Boolean);
 return typed || operationKeys.length ? {typed,operationKeys} : null;
-"""), 'Activation authorization or accepted operation visible', seconds=30, error=Infrastructure)
+"""), 'Activation authorization or accepted operation visible', seconds=30)
     run.evidence('J3-activation-consent', consent)
     if consent['typed']:
         run.wd.keys('input[data-testid="authorization-typed-input"]', 'core.activate-installed-models')
@@ -450,10 +446,7 @@ def restart(run):
     run.evidence('J4-retained-state', state)
     stored = stored_bookmarks(run)
     assert bookmark in stored, 'Authored bookmark differs after restart through Web Storage API'
-    # We left Settings open before restart. Wait for its restored DOM before closing.
-    run.wd.click('button[aria-label="Close Settings"]')
-    wait_for(lambda: run.wd.execute("return !all(document,'button[aria-label=\"Close Settings\"]').some(e=>e.getBoundingClientRect().height>0)"),
-             'Restored Settings closed before bookmarks', seconds=30)
+    run.close_settings()
     interaction_observation(run, 'J4-bookmarks-click')
     run.wd.click('button[aria-label="View bookmarks"]')
     entry = bookmark_entry(run, bookmark)
@@ -488,6 +481,7 @@ return state?.profiles?.[state.activeProfileId]?.savedViews || [];
 
 
 def bookmark_entry(run, bookmark):
+    corroborated = bookmark in stored_bookmarks(run)
     return wait_for(lambda: run.wd.execute("""
 const popup=all(document,'jf-bookmarks-popover').find(e=>e.hasAttribute('open'));
 if (!popup?.shadowRoot) return null;
@@ -495,7 +489,8 @@ const entry=all(popup.shadowRoot,'[role="listbox"] [role="option"]').find(e=>
  e.querySelector('.item-label')?.textContent.trim()===arguments[0].label &&
  e.getAttribute('title')===arguments[0].url && e.getBoundingClientRect().height>0);
 return entry ? {label:entry.querySelector('.item-label').textContent.trim(),url:entry.getAttribute('title')} : null;
-""", [bookmark]), 'Authored bookmark entry visible in DOM list', seconds=30)
+""", [bookmark]), 'Authored bookmark entry visible in DOM list', seconds=30,
+            error=AssertionError if corroborated else Infrastructure)
 
 
 def update_prepare(run):
@@ -524,10 +519,8 @@ def open_update_offer(run, evidence):
     # to Settings; it does not directly install the update. Engine recovery
     # recreates Settings at Appearance, so do not reuse its former category.
     started = time.monotonic()
-    close = run.wd.execute("return all(document,'button[aria-label=\"Close Settings\"]').some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0})")
-    if close:
-        run.wd.click('button[aria-label="Close Settings"]')
-    banner = wait_for(lambda: run.wd.execute("return all(document,'jf-app-update-banner').filter(e=>!e.hidden).map(e=>e.shadowRoot.textContent).join(' ').trim()"),
+    run.close_settings()
+    banner = wait_for(lambda: update_banner(run),
                       'Update banner visible', seconds=45, error=Infrastructure)
     expected_candidate = run.require('initialVersion')
     assert expected_candidate in banner, 'Update banner does not name the candidate version'
@@ -544,6 +537,43 @@ def open_update_offer(run, evidence):
                           'readinessSignal': 'Banner names candidate; enabled Install update visible in Desktop settings'})
 
 
+def update_banner(run):
+    banner = run.wd.execute("""
+const banners=all(document,'jf-app-update-banner').filter(e=>!e.hidden);
+return {text:banners.map(e=>e.shadowRoot.textContent).join(' ').trim(),
+        repair:banners.some(e=>e.shadowRoot?.querySelector('[role="alert"]'))};
+""")
+    if banner['repair']:
+        raise ProductFailure('Updater requires repair: ' + banner['text'])
+    return banner['text']
+
+
+def update_elevation(run):
+    # pkexec is setuid; read its identity through guest sudo, never host sudo.
+    source = """
+import hashlib,json,sys
+from pathlib import Path
+a=json.loads(sys.argv[1]);marker=('QUAL_JOURNEY_RUN='+a['runId']).encode();rows=[]
+for p in Path('/proc').glob('[0-9]*'):
+ try:
+  argv=(p/'cmdline').read_bytes().decode().strip('\\0').split('\\0')
+  if not argv or Path(argv[0]).name != 'pkexec' or str((p/'exe').resolve()) != '/usr/bin/pkexec':continue
+  if argv[1:8] != ['env','DEBIAN_FRONTEND=noninteractive','apt-get','install','-y','-o','DPkg::Lock::Timeout=300'] or len(argv)!=9:continue
+  stat=(p/'stat').read_text().split(') ',1)[1].split()
+  if marker not in (p/'environ').read_bytes().split(b'\\0') and int(stat[1]) not in a['shellPids']:continue
+  artifact=Path(argv[-1])
+  if hashlib.file_digest(artifact.open('rb'),'sha256').hexdigest() != a['sha256']:continue
+  rows.append({'pid':int(p.name),'ticks':stat[19],'exe':str((p/'exe').resolve()),'argv':argv})
+ except (FileNotFoundError,ProcessLookupError):pass
+print(json.dumps(rows))
+"""
+    result = run.target.run(['sudo', '-S', '-p', '', 'python3', '-c', source, json.dumps({
+        'runId': run.run_id, 'sha256': run.require('assets')[run.args.package],
+        'shellPids': [p['pid'] for p in run.target.owned() if p['exe'] == run.binary]})],
+        input=run.target.vm.config()['password'] + '\n')
+    return json.loads(result.stdout)
+
+
 def cancel_update(run):
     run.require('updateOffered')
     old_version = installed_version(run)
@@ -551,19 +581,29 @@ def cancel_update(run):
     prompt = wait_for(lambda: (v if 'authenticat' in v.lower() or 'password' in v.lower() else None)
                       if (v := run.native.screen_text('J5-polkit-cancel-prompt', psm=6)) else None,
                       'PolicyKit prompt', seconds=180, error=Infrastructure)
+    elevation = wait_for(lambda: update_elevation(run), 'Run-owned candidate pkexec install awaiting authorization',
+                         seconds=30, error=Infrastructure)
+    run.evidence('J5-cancel-elevation-before', elevation)
     run.native.key('escape')
+    wait_for(lambda: not run.target.alive(elevation), 'Cancelled elevation process exited', seconds=30)
+    run.evidence('J5-cancel-elevation-after', {'remaining': run.target.alive(elevation)})
     run.ready()
     assert installed_version(run) == old_version, 'Cancelled update changed the installed version'
     open_update_offer(run, 'J5-cancel-reoffer-entry')
     state = assert_state(run)
     run.facts['updateCancelled'] = True
-    return {'prompt': prompt, 'resumedVersion': old_version, 'state': state}
+    return {'prompt': prompt, 'elevation': elevation, 'resumedVersion': old_version, 'state': state}
 
 
 def update_success(run):
     run.require('updateCancelled')
     open_update_offer(run, 'J5-success-entry')
-    old_shells = [p for p in run.target.owned() if p['exe'] == run.binary]
+    old_processes = [p for p in run.target.owned() if p['exe'].removesuffix(' (deleted)') == run.binary
+                     or p['exe'].removesuffix(' (deleted)').endswith('/runtime/bin/java')]
+    assert any(p['exe'].removesuffix(' (deleted)') == run.binary for p in old_processes), 'Pre-update shell identity unavailable'
+    assert any(p['exe'].removesuffix(' (deleted)').endswith('/runtime/bin/java') for p in old_processes), 'Pre-update Engine identity unavailable'
+    run.evidence('J5-pre-update-processes', old_processes)
+    run.facts['preLaunchProcesses'] = old_processes
     run.wd.click('button[aria-label="Install update"]')
     wait_for(lambda: (v if 'authenticat' in v.lower() or 'password' in v.lower() else None)
              if (v := run.native.screen_text('J5-polkit-accept-prompt', psm=6)) else None,
@@ -578,7 +618,7 @@ def update_success(run):
     run.ready()
     run.observe_window('updater-relaunch')
     shells = wait_for(lambda: [p for p in run.target.owned() if p['exe'] == run.binary
-                               and not any(p['pid'] == old['pid'] and p['ticks'] == old['ticks'] for old in old_shells)],
+                               and not any(p['pid'] == old['pid'] and p['ticks'] == old['ticks'] for old in old_processes)],
                       'Updater relaunched a new installed shell', seconds=60)
     # A retained old process can execute an unlinked predecessor inode even
     # after dpkg reports the candidate. Observe the actual running executable.
@@ -586,6 +626,8 @@ def update_success(run):
         same = run.target.py('import json,os,sys;from pathlib import Path;a=json.loads(sys.argv[1]);print(os.path.samestat(Path("/proc/"+str(a[0])+"/exe").stat(),Path(a[1]).stat()))',
                              [shell['pid'], run.binary]).strip()
         assert same == 'True', 'Relaunched shell is not executing the installed candidate binary'
+    wait_for(lambda: not run.target.alive(old_processes), 'Pre-update shell and Engine exited', seconds=60)
+    run.evidence('J5-pre-update-processes-after', {'remaining': run.target.alive(old_processes)})
     engine = candidate_engine(run)
     state = assert_state(run)
     run.native.shot('J5-normal-updater-relaunch')
@@ -656,7 +698,7 @@ with open('/var/lib/dpkg/lock-frontend','a') as lock:
         time_started = time.monotonic()
         # Recovery may recreate Settings at Appearance. Observe the banner's
         # own re-offer first, then follow it back to the install control.
-        wait_for(lambda: run.wd.execute("return all(document,'jf-app-update-banner').some(e=>!e.hidden && e.shadowRoot.textContent.includes(arguments[0]))", [run.require('initialVersion')]),
+        wait_for(lambda: run.require('initialVersion') in update_banner(run),
                  'Update re-offered after dpkg lock timeout', seconds=390)
         assert time.monotonic() - time_started >= 290, 'Update re-offered before the real lock timeout'
         run.ready()
@@ -718,7 +760,7 @@ def cold_link(run):
     window = run.native.app_window(run.binary, focused=False)
     assert window and window['pid'] == shells[0]['pid'], 'Cold OS deep link has no owned, mapped receiving window'
     run.evidence('J7-deep-link-cold-window', window)
-    run.native.screen_text('J7-deep-link-cold') # Triage only.
+    run.native.shot('J7-deep-link-cold') # Triage only.
     raise OwnerValidation('Cold OS handler left exactly one installed UI process with an owned, mapped window; validate query destination in J7-deep-link-cold.png')
 
 
@@ -729,7 +771,7 @@ def deep_links(run):
     run.start_ui()
     run.nav('Search')
     wait_for(lambda: run.wd.execute("return all(document,'jf-shell').some(e=>e.activeId==='core.search-v3-surface')"),
-             'Warm-link baseline Search route', seconds=30)
+             'Warm-link baseline Search route', seconds=30, error=Infrastructure)
     before_window = run.native.app_window(run.binary, focused=False)
     if not before_window:
         raise Infrastructure('Warm deep-link receiving app has no mapped window before dispatch')

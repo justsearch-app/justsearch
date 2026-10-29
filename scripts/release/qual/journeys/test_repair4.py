@@ -150,10 +150,12 @@ class Repair4Tests(unittest.TestCase):
         run.facts = {}; run.args.package = package
         run.target.vm.config.return_value = {'password': 'guest'}
         run.require.side_effect = lambda key: '0.3.1' if key == 'initialVersion' else True
-        run.target.owned.side_effect = [[{'pid': 1, 'ticks': '1', 'exe': run.binary}],
+        run.target.owned.side_effect = [[{'pid': 1, 'ticks': '1', 'exe': run.binary},
+                                        {'pid': 77, 'ticks': '77', 'exe': '/opt/app/runtime/bin/java'}],
                                        [{'pid': 2, 'ticks': '2', 'exe': run.binary}]]
         run.native.screen_text.return_value = 'Authentication password'
         run.target.py.return_value = 'True'
+        run.target.alive.return_value = []
         run.target.run.return_value = SimpleNamespace(stdout='', returncode=0)
         run.target.run.side_effect = lambda args, **kw: SimpleNamespace(returncode=0,
             stdout='/opt/app/runtime/bin/java\n/opt/app/ui-headless.jar' if args[0] == 'dpkg-query' else '')

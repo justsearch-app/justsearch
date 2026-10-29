@@ -155,7 +155,6 @@ console.log(JSON.stringify([true,JSON.stringify(eval(process.argv[1]))]));
         run=Mock(binary=BINARY,work='/tmp/isolated',run_id='isolated')
         run.target.owned.return_value=[SHELL]
         run.native.app_window.return_value=WINDOW
-        run.native.matching_text.side_effect=lambda name,*args: None if 'before' in name else 'Library'
         run.wd.execute.side_effect=[True,DESTINATION]
         return run
 
@@ -168,7 +167,7 @@ console.log(JSON.stringify([true,JSON.stringify(eval(process.argv[1]))]));
         result=self.warm(run)
         run.start_ui.assert_called_once();run.nav.assert_called_once_with('Search')
         self.assertEqual(result['destination'],DESTINATION)
-        run.native.matching_text.assert_not_called();run.native.screen_text.assert_not_called()
+        run.native.screen_text.assert_not_called()
 
     def test_foreign_library_pixels_cannot_pass_when_dom_did_not_navigate(self):
         run=self.warm_run();run.wd.execute.side_effect=[True,None]
@@ -217,6 +216,9 @@ console.log(JSON.stringify([true,JSON.stringify(eval(process.argv[1]))]));
                     self.assertEqual(type(exc).__name__,'OwnerValidation' if len(shells)==1 and window else 'AssertionError')
                 else:self.fail('Cold destination cannot be automatically passed')
                 run.start_ui.assert_not_called();run.wd.execute.assert_not_called()
+                run.wd.keys.assert_not_called();run.native.type.assert_not_called()
+                self.assertLess(run.mock_calls.index(unittest.mock.call.stop_app()),
+                                next(i for i,c in enumerate(run.mock_calls) if c[0]=='desktop_spawn'))
 
 
 class BookmarkTests(unittest.TestCase):
@@ -228,8 +230,6 @@ class BookmarkTests(unittest.TestCase):
         geometry={'button':{'x':10,'y':20},'popup':{}}
         run.require.side_effect=lambda key: self.bookmark if key=='bookmark' else geometry if key=='bookmarkGeometry' else True
         run.native.app_window.return_value=WINDOW
-        run.native.app_text.side_effect=lambda name,*a,**kw: 'Settings' if name=='J4-restored-settings' else 'Search'
-        run.native.matching_text.side_effect=[None,None,None,'Library']
         def dom(script,args=None):
             if 'localStorage' in script:return [self.bookmark] if stored else []
             if 'const popup=' in script:return {'label':'Library','url':self.bookmark['url']} if visible else None
@@ -247,7 +247,7 @@ class BookmarkTests(unittest.TestCase):
         run=self.restart_run()
         self.assertEqual(self.restart(run),{'retained':True})
         run.start_ui.assert_called_once()
-        run.native.matching_text.assert_not_called();run.native.app_text.assert_not_called()
+        run.native.screen_text.assert_not_called()
         run.wd.click.assert_any_call('button[aria-label="View bookmarks"]')
         self.assertTrue(any('localStorage.getItem' in c.args[0] for c in run.wd.execute.call_args_list))
 
@@ -264,6 +264,7 @@ class BookmarkTests(unittest.TestCase):
         for label,url,height in (('Library',self.bookmark['url'],20),('Other',self.bookmark['url'],20),
                                  ('Library','justsearch://other',20),('Library',self.bookmark['url'],0)):
             def execute(script,args=None):
+                if 'localStorage' in script:return [self.bookmark]
                 js='''const data=JSON.parse(process.argv[1]);
 const row={querySelector:()=>({textContent:data.label}),getAttribute:()=>data.url,getBoundingClientRect:()=>({height:data.height})};
 const popup={hasAttribute:()=>true,shadowRoot:{}};

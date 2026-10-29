@@ -20,7 +20,7 @@ import time
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import vm
-from runner import Native, Target, digest, verify_assets, preparation_failure, summarize, full_selection, wait_for, Infrastructure
+from runner import Native, Target, digest, verify_assets, preparation_failure, summarize, full_selection, wait_for, Infrastructure, report_exit_code
 from writes import COUNTERS
 
 
@@ -178,25 +178,27 @@ def crash_evidence(out):
         archive_path = out / 'guest-crashes.tar'
         if archive_path.exists():
             archive_path = out / ('guest-crashes-' + str(time.time_ns()) + '.tar')
-        # Stream only bounded diagnostic fields before CoreDump. A large core
+        # Stream only bounded diagnostic fields, skipping CoreDump bytes. A large core
         # must neither hide its product crash nor be copied to the host.
         source = """
 import io,sys,tarfile
 from pathlib import Path
-keys=(b'ExecutablePath:',b'Signal:',b'ProblemType:',b'Date:',b'Package:',b'ProcCmdline:')
+keys=(b'ExecutablePath:',b'Signal:',b'ProblemType:',b'Date:',b'Package:',b'ProcCmdline:',b'ProcStatus:',b'ProcStat:')
 with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
  for name in sys.argv[1:]:
   path=Path('/var/crash',name)
   assert not path.is_symlink(), 'Crash report is a symlink'
   fields={}
   with path.open('rb') as report:
-   continuation=False
+   continuation=False;key=None
    while True:
     raw=report.readline(65536)
     if not raw:break
     if not continuation:
-     if raw.startswith(b'CoreDump:'):break
-     if raw.startswith(keys):fields[raw.split(b':',1)[0]]=raw.rstrip(b'\\n')+b'\\n'
+     if raw.startswith(keys):
+      key=raw.split(b':',1)[0];fields[key]=raw.rstrip(b'\\n')+b'\\n'
+     elif raw[:1].isspace() and key in (b'ProcStatus',b'ProcStat') and len(fields[key])+len(raw)<=65536:fields[key]+=raw
+     else:key=None
     continuation=not raw.endswith(b'\\n')
   header=b''.join(fields.values()); member=tarfile.TarInfo(name);member.size=len(header)
   archive.addfile(member,io.BytesIO(header))
@@ -209,12 +211,17 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
         with tarfile.open(archive_path) as archive:
             for member in archive.getmembers():
                 row = {'file': '/var/crash/' + member.name, 'fields': {}}
+                key = None
                 for raw in archive.extractfile(member):
                     line = raw.decode(errors='replace')
-                    if line[:1].isspace() or ':' not in line:
+                    if line[:1].isspace():
+                        if key in ('ProcStatus', 'ProcStat'):
+                            row['fields'][key] += '\n' + line.strip()
+                        continue
+                    if ':' not in line:
                         continue
                     key, value = line.split(':', 1)
-                    if key in ('ExecutablePath', 'Signal', 'ProblemType', 'Date', 'Package', 'ProcCmdline'):
+                    if key in ('ExecutablePath', 'Signal', 'ProblemType', 'Date', 'Package', 'ProcCmdline', 'ProcStatus', 'ProcStat'):
                         row['fields'][key] = value.strip()
                 fields.append(row)
         # Resolve attribution while the original reports are still present.
@@ -222,9 +229,9 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
         if installed.returncode not in (0, 1):
             raise Infrastructure('Installed package paths unavailable for crash attribution; reports retained in place')
         paths = set(installed.stdout.splitlines()) if installed.returncode == 0 else set()
-        for row in fields:
-            row['attribution'] = ('product' if row['fields'].get('Package', '').split()[:1] == ['just-search']
-                                  or row['fields'].get('ExecutablePath', '') in paths else 'unattributed')
+        process_record = out / 'run/app-processes.json'
+        processes = json.loads(process_record.read_text()) if process_record.exists() else []
+        attribute_crashes(fields, paths, processes)
         record = out / 'guest-crashes.json'
         previous = json.loads(record.read_text()) if record.exists() else []
         record.write_text(json.dumps(previous + fields, indent=2) + '\n')
@@ -234,6 +241,42 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
         product = [r for r in fields if r['attribution'] == 'product']
         if product:
             raise AssertionError('Product crash in guest: ' + json.dumps(product))
+
+
+def attribute_crashes(reports, installed_paths, processes):
+    # A crashed helper can disappear from /proc before final collection. Keep
+    # observed app ancestry and use Apport's process/parent IDs as well as paths.
+    app_pids = {p['pid'] for p in processes}
+    for _ in range(len(reports) + 1):
+        previous_pids = set(app_pids)
+        for report in reports:
+            fields = report['fields']
+            exe = fields.get('ExecutablePath', '').removesuffix(' (deleted)')
+            status = dict(line.split(':', 1) for line in fields.get('ProcStatus', '').splitlines() if ':' in line)
+            report['attribution'] = ('product' if fields.get('Package', '').split()[:1] == ['just-search']
+                or exe in installed_paths
+                or Path(exe).name in ('WebKitWebProcess', 'WebKitNetworkProcess')
+                or (exe.endswith('/runtime/bin/java') and any(p.endswith('/runtime/bin/java') for p in installed_paths))
+                or any(status.get(key, '').strip() in {str(pid) for pid in app_pids} for key in ('Pid', 'PPid'))
+                else 'unattributed')
+            if report['attribution'] == 'product' and status.get('Pid', '').strip().isdigit():
+                app_pids.add(int(status['Pid'].strip()))
+        if app_pids == previous_pids:
+            break
+
+
+def record_unattributed_crashes(report, out):
+    record = out / 'guest-crashes.json'
+    crashes = json.loads(record.read_text()) if record.exists() else []
+    unknown = [c for c in crashes if c['attribution'] == 'unattributed']
+    if unknown:
+        # Triage is a plain screenshot; OCR is never needed for an owner row.
+        Native(Target('ubuntu'), out).shot('guest-crashes-owner-validation')
+        report['journeys'].append({'id': 'guest-crashes-owner-validation', 'checks': [{
+            'name': 'unattributed-crashes', 'status': 'owner-validation',
+            'reason': 'Guest crashes require owner attribution: ' + json.dumps(unknown),
+            'evidence': ['../guest-crashes.json', '../guest-crashes.tar', '../guest-crashes-owner-validation.png']}]})
+        report.update(summarize(report['journeys'], report.get('fullSelection', False)))
 
 
 def prepare_desktop(args, out):
@@ -403,6 +446,14 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
                     'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
                 report.update(summarize(report['journeys'], report.get('fullSelection', False)))
                 (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
+            report = json.loads((out / 'summary.json').read_text())
+            try:
+                record_unattributed_crashes(report, out)
+            except Exception as exc:
+                report['journeys'].append({'id': 'guest-crash-triage', 'checks': [{
+                    'name': 'screenshot', 'status': 'failed-infrastructure', 'reason': str(exc), 'evidence': []}]})
+                report.update(summarize(report['journeys'], report.get('fullSelection', False)))
+            (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
             try:
                 volume = Target('ubuntu').json(COUNTERS, desktop=False)
                 volume['hostQemuIo'] = Path('/proc/' + str(started['pid']) + '/io').read_text()
@@ -451,7 +502,7 @@ def combine(args, out, sources):
                   **summarize(rows, full_selection(rows,
                       'hosted-linux-x11' if args.session == 'hosted' else 'vm-linux-' + args.session)))
     (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
-    return int(not report['passed'])
+    return report_exit_code(report)
 
 
 def main():

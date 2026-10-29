@@ -91,6 +91,10 @@ def summarize(journeys, full_selection=True):
 
 
 
+def report_exit_code(report):
+    return 0 if report['passed'] else 2 if report['status'] == 'passed-pending-owner-validation' else 1
+
+
 def preparation_failure(lane, reason):
     definition = json.loads((HERE / 'journeys.json').read_text())
     rows = [{'id': 'preparation', 'checks': [{'name': 'preparation', 'status': 'failed-infrastructure',
@@ -171,6 +175,9 @@ class Target:
         self.vm = None
         self.name = vm_name
         self.env = {}
+        self.app_binary = None
+        self.app_processes = {}
+        self.process_evidence = None
         if vm_name:
             sys.path.insert(0, str(HERE.parent))
             import vm
@@ -252,7 +259,7 @@ print(json.dumps({'pid':p.pid,'ticks':Path('/proc/'+str(p.pid)+'/stat').read_tex
     def owned(self):
         # The marker is inherited only by processes this run starts, including
         # driver children, external viewers and updater relaunches.
-        return self.json("""
+        rows = self.json("""
 import json,sys
 from pathlib import Path
 marker=('QUAL_JOURNEY_RUN='+json.loads(sys.argv[1])).encode(); rows=[]
@@ -260,10 +267,38 @@ for path in Path('/proc').glob('[0-9]*/environ'):
  try:
   if marker in path.read_bytes().split(b'\\0'):
    rows.append({'pid':int(path.parent.name),'ticks':path.with_name('stat').read_text().split(') ',1)[1].split()[19],
-                'exe':str(path.with_name('exe').resolve())})
+                'exe':str(path.with_name('exe').resolve()),
+                'ppid':int(path.with_name('stat').read_text().split(') ',1)[1].split()[1])})
  except (OSError,IndexError): pass
 print(json.dumps(rows))
 """, self.env['QUAL_JOURNEY_RUN'], desktop=False)
+        if self.app_binary:
+            app_pids = {p['pid'] for p in rows if (p['pid'], p['ticks']) in self.app_processes}
+            for _ in range(len(rows) + 1):
+                children = [p for p in rows if p['exe'].removesuffix(' (deleted)') == self.app_binary
+                            or p['ppid'] in app_pids]
+                next_pids = app_pids | {p['pid'] for p in children}
+                for p in children:
+                    self.app_processes[(p['pid'], p['ticks'])] = p
+                if next_pids == app_pids:
+                    break
+                app_pids = next_pids
+            if self.process_evidence:
+                self.process_evidence.write_text(json.dumps(list(self.app_processes.values()), indent=2) + '\n')
+        return rows
+
+    def alive(self, identities):
+        return self.json("""
+import json,sys
+from pathlib import Path
+alive=[]
+for row in json.loads(sys.argv[1]):
+ try:
+  stat=Path('/proc/'+str(row['pid'])+'/stat').read_text().split(') ',1)[1].split()
+  if stat[19] == row['ticks'] and stat[0] != 'Z':alive.append(row)
+ except FileNotFoundError:pass
+print(json.dumps(alive))
+""", identities, desktop=False)
 
     def stop(self, identities):
         self.py("""
@@ -271,14 +306,18 @@ import json,os,signal,sys,time
 from pathlib import Path
 rows=json.loads(sys.argv[1])
 def same(row):
- try: return Path('/proc/'+str(row['pid'])+'/stat').read_text().split(') ',1)[1].split()[19] == row['ticks']
- except OSError: return False
+ try:
+  stat=Path('/proc/'+str(row['pid'])+'/stat').read_text().split(') ',1)[1].split()
+  return stat[19] == row['ticks'] and stat[0] != 'Z'
+ except (FileNotFoundError,ProcessLookupError): return False
 for sig in (signal.SIGTERM,signal.SIGKILL):
  for row in rows:
   if same(row):
    try: os.kill(row['pid'],sig)
    except ProcessLookupError: pass
- if sig == signal.SIGTERM: time.sleep(3)
+ deadline=time.monotonic()+(3 if sig == signal.SIGTERM else 10)
+ while any(same(row) for row in rows) and time.monotonic()<deadline:time.sleep(.1)
+if any(same(row) for row in rows):raise RuntimeError('Owned processes did not stop: '+json.dumps([row for row in rows if same(row)]))
 """, identities, desktop=False)
 
     def http(self, port, path, body=None, method=None):
@@ -381,15 +420,6 @@ class Native:
         else:
             self.target.run(['xdotool', 'type', '--clearmodifiers', '--delay', '30', text])
 
-    def click(self, x, y):
-        if self.target.vm:
-            import screen
-            self.target.vm.require_owner(self.target.name)
-            with self.target.vm.QMP(self.target.name) as qmp:
-                screen.perform(qmp, 'click', {'x': round(x), 'y': round(y), 'button': 'left'})
-        else:
-            self.target.run(['xdotool', 'mousemove', str(round(x)), str(round(y)), 'click', '1'])
-
     def windows(self):
         """One compositor observation supplies focus and mapped-window identities."""
         return self.target.json("""
@@ -420,10 +450,11 @@ print(json.dumps(result))
     def focused_window(self):
         return self.windows()['focused']
 
-    def app_window(self, binary, focused=True, observation=None):
+    def app_window(self, binary, focused=True, observation=None, exclude=()):
         if observation is None:
             observation = self.windows()
-        pids = {row['pid'] for row in self.target.owned() if row['exe'] == binary}
+        pids = {row['pid'] for row in self.target.owned() if row['exe'] == binary
+                and not any(row['pid'] == old['pid'] and row['ticks'] == old['ticks'] for old in exclude)}
         candidates = [observation['focused']] if focused else observation['windows']
         return next((w for w in candidates if w and w['pid'] in pids), None)
 
@@ -467,6 +498,7 @@ class Run:
         self.out = Path(args.evidence).resolve()
         self.out.mkdir(parents=True, exist_ok=False)
         self.target = Target(args.vm)
+        self.target.process_evidence = self.out / 'app-processes.json'
         self.native = Native(self.target, self.out)
         self.results = []
         self.facts = {}
@@ -568,6 +600,7 @@ except TimeoutError as exc:
 
     def start_ui(self):
         self.stop_app()
+        self.target.app_binary = self.binary
         driver = self.args.driver
         self.desktop_spawn([driver, '--port', '4444', '--native-port', '4445'], self.work + '/driver.log')
         self.wd = WebDriver(self.target, 4444)
@@ -576,7 +609,7 @@ except TimeoutError as exc:
         self.observe_window('automation')
         self.ready()
         wait_for(lambda: self.wd.execute("return all(document,'button[data-surface-id]').length > 0"),
-                 'Packaged UI rail mounted', seconds=60, error=Infrastructure)
+                 'Packaged UI rail mounted', seconds=60)
         self.facts['ui'] = True
 
     def stop_app(self):
@@ -590,7 +623,10 @@ except TimeoutError as exc:
             self.wd = None
         # Only identities observed with our inherited marker are eligible.
         identities = self.target.owned()
-        self.target.stop([row for row in identities if row['exe'].endswith(('/JustSearch', '/java', '/tauri-driver', '/WebKitWebDriver'))])
+        self.facts['preLaunchProcesses'] = identities
+        paths = self.target.run(['dpkg-query', '-L', 'just-search']).stdout.splitlines()
+        self.target.stop([row for row in identities if row['exe'].removesuffix(' (deleted)') in paths
+                          or row['exe'].removesuffix(' (deleted)').endswith(('/tauri-driver', '/WebKitWebDriver'))])
 
     def normal_launch(self, args=None):
         self.stop_app()
@@ -602,11 +638,11 @@ except TimeoutError as exc:
         name = name + '-' + str(time.time_ns())
         started = time.monotonic()
         try:
-            window = wait_for(lambda: self.native.app_window(self.binary, focused=False),
+            window = wait_for(lambda: self.native.app_window(self.binary, focused=False,
+                                  exclude=self.facts.get('preLaunchProcesses', [])),
                               'Installed app window shown', seconds=60)
         except AssertionError:
             self.native.window_failure(name, self.binary)
-            raise
         self.native.shot('window-shown-' + name)
         self.facts['windowShownAt'] = time.monotonic()
         self.facts['windowShownEvidence'] = 'window-shown-' + name + '.json'
@@ -615,6 +651,7 @@ except TimeoutError as exc:
                       'signal': "Mapped window belongs to this run's exact installed JustSearch executable"})
 
     def desktop_spawn(self, command, logfile):
+        self.target.app_binary = self.binary
         if not self.target.vm:
             self.processes.append(self.target.spawn(command, logfile))
             return
@@ -638,8 +675,16 @@ except TimeoutError as exc:
         wait_for(lambda: self.target.py('import json,sys;from pathlib import Path;print(Path(json.loads(sys.argv[1])).exists())', ack).strip() == 'True',
                  'Desktop launcher acknowledged execution', seconds=20, error=Infrastructure)
 
+    def close_settings(self):
+        script = "return all(document,'button[aria-label=\"Close Settings\"]').some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0})"
+        if self.wd.execute(script):
+            self.wd.click('button[aria-label="Close Settings"]')
+            wait_for(lambda: not self.wd.execute(script), 'Restored Settings closed before navigation',
+                     seconds=30, error=Infrastructure)
+
     def nav(self, surface):
         self.require('ui')
+        self.close_settings()
         ids = {'Library': 'core.library-surface', 'Search': 'core.search-v3-surface',
                'AI Brain': 'core.brain-surface', 'Settings': 'core.settings-surface'}
         # Rail buttons are ordinary native buttons in one shadow root. Use
@@ -773,7 +818,7 @@ def main():
     print(json.dumps(report['counts'], indent=2), flush=True)
     # VM-only omissions are explicitly scoped decisions, never passes. Applicable
     # unavailable/failing checks always fail the lane even if earlier checks passed.
-    return int(not report['passed'])
+    return report_exit_code(report)
 
 
 if __name__ == '__main__':

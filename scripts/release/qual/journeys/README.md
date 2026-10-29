@@ -136,12 +136,15 @@ Screenshots and OCR text are retained for triage. OCR never determines a
 product pass: shell banners, notification-center text and foreign windows can
 cover app pixels even when its compositor PID and geometry are stable. Shell
 modal/banner guards, repeated OCR before-reads and unique OCR tokens are removed.
-Apport still records crashes; only bounded diagnostic headers before CoreDump
-are transferred. Installed package paths are read and every report is attributed
+Apport still records crashes; only bounded diagnostic fields are transferred.
+CoreDump bytes are skipped while scanning, so later diagnostic fields are retained.
+Installed package paths are read and every report is attributed
 before reports move aside, so a lookup failure leaves reports available for retry.
-A report naming Package: just-search or an installed package executable is a
-product finding. Other reports appear as `guestCrashes` with `unattributed`
-attribution in the summary; command-line mentions do not blame the product.
+A report naming Package: just-search, an installed package executable, a bundled
+JVM or a WebKit subprocess is a product finding, as is a report belonging to the
+observed app process tree. Process observations retain PID/start identities and
+parent relationships. Other reports add an owner-validation row with their
+summary and a plain screenshot; command-line mentions alone do not blame the product.
 Journald and swap remain enabled.
 Every journey records synced whole-device write and swap-counter deltas,
 without double-counting disk partitions. Overlay summaries record boot through
@@ -201,7 +204,11 @@ private signing key is needed or used for these tests.
   visible banner has no action, and the chosen entry is recorded. Recovery
   can recreate Settings at Appearance; the runner closes that window, follows
   the banner again, and waits for an enabled Install update control before
-  claiming a re-offer. The observed time and readiness signal are recorded.
+  claiming a re-offer. Cancellation requires this run's pkexec apt-get install
+  process with the exact candidate artifact checksum before Escape, its exit
+  afterward, and unchanged installed version. Success records the old shell and
+  Engine identities and requires both to exit after automatic candidate launch.
+  The observed time and readiness signal are recorded.
 - J6 (VM): reinstall, apt remove, retained app data, reinstall and state checks.
 - J7: menu entry, cold/warm OS deep links, X11 registration or the physically
   invoked GNOME Wayland `--focus-search` binding (Ctrl+Super+J), and scanned-PDF OCR.
@@ -233,6 +240,9 @@ harness interaction with desktop dialogs, but only DOM, production app/Engine
 APIs, exact installed process identity or mapped compositor window identity can
 supply pass evidence. Picker and PolicyKit text alone cannot certify an app result.
 Startup and updater relaunch also use process/window identity and Engine readiness.
+Before rail navigation the harness closes any restored Settings window; failure
+to close it is infrastructure. Launch observation excludes pre-launch identities,
+and stopping waits for each recorded process identity to exit.
 Interaction observations retain elapsed time, indexing and worker state without
 adding an indexing-idle prerequisite.
 
@@ -266,7 +276,8 @@ A complete lane without failed or unavailable checks reports `status: passed`
 only when every executed result is automatically proven. Any owner-validation
 rows change it to `passed-pending-owner-validation`; `ownerValidation` lists
 journey/check IDs and screenshot paths. Its `passed` boolean stays false and
-its process exits nonzero. Review those screenshots as part of the owner's final
+its process exits with code 2 (failed or incomplete lanes use code 1). Review those
+screenshots as part of the owner's final
 visual release validation and record that validation alongside the release
 evidence. The runner never converts an owner-validation row into a pass.
 Failed or unavailable rows keep the lane failing and cannot be cleared by visual

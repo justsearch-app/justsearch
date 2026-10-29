@@ -198,7 +198,7 @@ class RunnerTests(unittest.TestCase):
         run.require.side_effect = lambda key: '0.3.1' if key == 'initialVersion' else {}
         run.target.run.side_effect = [types.SimpleNamespace(stdout='0.3.0'),
                                       types.SimpleNamespace(stdout='', returncode=0)]
-        run.wd.execute.side_effect = [False, 'JustSearch 0.3.1 is available. Review and install', True]
+        run.wd.execute.side_effect = [{'text': 'JustSearch 0.3.1 is available. Review and install', 'repair': False}, True]
         with patch.object(linux, 'installed_version', return_value='0.3.0'), \
              patch.object(linux, 'digest', return_value='package-hash'):
             linux.update_prepare(run)
@@ -213,10 +213,10 @@ class RunnerTests(unittest.TestCase):
         from unittest.mock import Mock, call
         run = Mock()
         run.require.return_value = '0.3.1'
-        run.wd.execute.side_effect = [True, 'JustSearch 0.3.1 is available. Review and install', True]
+        run.wd.execute.side_effect = [{'text': 'JustSearch 0.3.1 is available. Review and install', 'repair': False}, True]
         linux.open_update_offer(run, 'recovered')
+        run.close_settings.assert_called_once()
         self.assertEqual(run.wd.click.call_args_list, [
-            call('button[aria-label="Close Settings"]'),
             call('button[aria-label="Open app update settings"]'),
             call('button[data-settings-category="desktop"]')])
         run.nav.assert_not_called()
