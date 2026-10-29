@@ -142,8 +142,9 @@ public final class ChunkSearchOps {
         .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
             BooleanClause.Occur.MUST_NOT)
         .build();
-    SearchResult result = readPathOps.search(q, maxDocs, Set.of(SchemaFields.DOC_ID),
+    SearchResult result = readPathOps.search(q, Math.addExact(maxDocs, 1), Set.of(SchemaFields.DOC_ID),
         RuntimeSearchSort.RELEVANCE, null);
+    if (result.hits().size() > maxDocs) throw new ParentFilterOverflowException(maxDocs);
     return result.hits().stream()
         .map(SearchHit::docId)
         .collect(Collectors.toCollection(LinkedHashSet::new));

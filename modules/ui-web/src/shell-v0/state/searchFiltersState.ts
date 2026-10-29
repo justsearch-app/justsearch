@@ -1,29 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
-/**
- * searchFiltersState — ephemeral, session-only filter state for
- * the search surface.
- *
- * Slice 486 G36-widening (filter-snapshot): live filter inputs (date range on `modified_at`)
- * that the user toggles on the search surface. Deliberately
- * NOT persisted to localStorage — opening the surface fresh
- * starts with no filter applied. Saved searches (pinned chips)
- * capture a *snapshot* of the filter at pin time into
- * `SearchPin.filterSpec` and restore it on click.
- *
- * V1 shape (per slice 486 §G34):
- *   - Only `modifiedAt: { fromMs?, toMs? }`.
- *   - Both bounds optional. Empty (or undefined) = no filter
- *     sent on the request.
- *
- * Pub-sub posture mirrors searchState: listeners fire on every
- * mutation that changes the active filter; no-op writes (set
- * the same value) do not fire.
- */
+/** Session-only Search restrictions. Persisted pins retain their date-only type. */
+import type { SearchFilterSpec as PinFilterSpec } from './UserStateDocument.js';
+import type { SearchFilters } from '../../api/domains/search.js';
 
-// Re-export the canonical persistence shape so callers can
-// import the type from this module without a deeper dependency.
-export type { SearchFilterSpec } from './UserStateDocument.js';
-import type { SearchFilterSpec } from './UserStateDocument.js';
+export type SizeUnit = 'KB' | 'MB' | 'GB';
+interface SizeInput { readonly text: string; readonly unit: SizeUnit }
+export interface SearchFilterSpec extends PinFilterSpec {
+  readonly pathPrefix?: string;
+  readonly sizeFromBytes?: number;
+  readonly sizeToBytes?: number;
+  readonly sizeFromInput?: SizeInput;
+  readonly sizeToInput?: SizeInput;
+}
+
+/** The generated Engine filter contract, shared by Search and retrieval-backed Ask. */
+export function restrictionWire(spec: SearchFilterSpec): SearchFilters {
+  const out: SearchFilters = {};
+  if (spec.pathPrefix !== undefined) out.pathPrefix = spec.pathPrefix;
+  const from = spec.modifiedFromMs === 0 ? undefined : spec.modifiedFromMs;
+  const to = spec.modifiedToMs === 0 ? undefined : spec.modifiedToMs;
+  if (from !== undefined || to !== undefined) {
+    out.modifiedAt = { ...(from !== undefined ? { fromMs: from } : {}),
+      ...(to !== undefined ? { toMs: to } : {}) };
+  }
+  if (spec.sizeFromBytes !== undefined || spec.sizeToBytes !== undefined) {
+    out.sizeBytes = { ...(spec.sizeFromBytes !== undefined ? { fromBytes: spec.sizeFromBytes } : {}),
+      ...(spec.sizeToBytes !== undefined ? { toBytes: spec.sizeToBytes } : {}) };
+  }
+  return out;
+}
 
 const EMPTY: SearchFilterSpec = Object.freeze({});
 
@@ -55,8 +60,8 @@ export function subscribeFilters(
 }
 
 /**
- * Replace the active filter range. Pass `undefined` for either
- * bound to omit it. Passing both `undefined` clears the filter.
+ * Replace only the active date range. Pass `undefined` for either
+ * bound to omit it. Passing both `undefined` clears only the date restriction.
  *
  * No-op when the new spec is value-equal to the current one
  * (saves listeners from spurious fires).
@@ -65,52 +70,25 @@ export function setFilterRange(
   fromMs: number | undefined,
   toMs: number | undefined,
 ): void {
-  const next: SearchFilterSpec = (() => {
-    const out: { modifiedFromMs?: number; modifiedToMs?: number } = {};
-    if (typeof fromMs === 'number' && Number.isFinite(fromMs)) {
-      out.modifiedFromMs = fromMs;
-    }
-    if (typeof toMs === 'number' && Number.isFinite(toMs)) {
-      out.modifiedToMs = toMs;
-    }
-    return out;
-  })();
-  if (
-    next.modifiedFromMs === current.modifiedFromMs &&
-    next.modifiedToMs === current.modifiedToMs
-  ) {
-    return; // no-op
-  }
-  current = next;
-  for (const l of listeners) {
-    try {
-      l(current);
-    } catch {
-      // ignore — same posture as userConfigState
-    }
+  const { modifiedFromMs: _from, modifiedToMs: _to, ...rest } = current;
+  setFilters({ ...rest,
+    ...(typeof fromMs === 'number' && Number.isFinite(fromMs) ? { modifiedFromMs: fromMs } : {}),
+    ...(typeof toMs === 'number' && Number.isFinite(toMs) ? { modifiedToMs: toMs } : {}) });
+}
+
+/** Replace live restrictions only. Never writes pins, storage or the address. */
+export function setFilters(next: SearchFilterSpec): void {
+  if (JSON.stringify(next) === JSON.stringify(current)) return;
+  current = Object.freeze({ ...next });
+  for (const listener of listeners) {
+    try { listener(current); } catch { /* Same isolation as the other session stores. */ }
   }
 }
 
-/**
- * Tempdoc 508-followup §β4 — clear the active filter as part of a
- * profile switch invalidation. Equivalent to `setFilterRange(undefined,
- * undefined)` but named for the call site (so the boot-time wiring in
- * `main.jsx` reads intent-fully).
- */
-export function clearFilters(): void {
-  setFilterRange(undefined, undefined);
-}
+export function clearFilters(): void { setFilters(EMPTY); }
 
-/**
- * Returns true when the spec has at least one bound set.
- * Callers (searchState's request builder, SearchSurface chip
- * subscript) use this to decide whether to attach the filter.
- */
 export function hasActiveFilter(spec: SearchFilterSpec): boolean {
-  return (
-    typeof spec.modifiedFromMs === 'number' ||
-    typeof spec.modifiedToMs === 'number'
-  );
+  return Object.keys(restrictionWire(spec)).length > 0;
 }
 
 // ----- Tempdoc 577 Goal 1 Phase 6 (Move E) — keyword facet selections -----

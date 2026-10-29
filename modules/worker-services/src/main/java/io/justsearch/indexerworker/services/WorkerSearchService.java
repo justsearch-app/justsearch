@@ -476,6 +476,12 @@ public final class WorkerSearchService {
     return ragContextOps.getOrtCudaStatus();
   }
 
+  /** Returns true if the built reranker has a healthy session ready for queries on either device. */
+  public boolean isRerankerActive() {
+    CrossEncoderReranker reranker = searchReranker;
+    return reranker != null && reranker.isQueryWarm();
+  }
+
   /** Returns true if the citation scorer is initialized and ready for inference (368 RC3). */
   public boolean isCitationScorerActive() {
     return citationMatchOps.isCitationScorerActive();
@@ -521,6 +527,20 @@ public final class WorkerSearchService {
     return request.toBuilder().setPipeline(resolved).build();
   }
 
+  /** Enforce strict retrieval even for callers of the in-process Worker port. */
+  static SearchRequest resolveSearchSyntax(SearchRequest request) {
+    if (request.getQuerySyntax() != io.justsearch.ipc.SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SEARCH) {
+      return request;
+    }
+    var parsed = io.justsearch.core.search.SearchSyntax.parse(request.getQuery());
+    if (!parsed.advanced()) {
+      return request.toBuilder()
+          .setQuerySyntax(io.justsearch.ipc.SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE).build();
+    }
+    return request.toBuilder().setPipeline(io.justsearch.ipc.PipelineConfig.newBuilder()
+        .setSparseEnabled(true).setFusionAlgorithm("none").setPipelineName("sparse")).build();
+  }
+
   /** Opens an MDC scope with the trace_id and request_id the caller supplied on {@link CallContext}. */
   private MdcContext openRequestMdc(CallContext ctx) { // NOPMD - AutoCloseable for logging context side-effect
     return MdcContext.request(ctx.traceId(), ctx.requestId());
@@ -548,6 +568,11 @@ public final class WorkerSearchService {
   }
 
   public SearchResponse search(SearchRequest request, CallContext ctx) {
+    try {
+      request = resolveSearchSyntax(request);
+    } catch (io.justsearch.core.search.SearchSyntax.InvalidQuery invalid) {
+      throw WorkerServiceException.invalidArgument(invalid.getMessage());
+    }
     // Spec D §1.3: the semantic deadline is fixed first, before anything waits, so the models
     // latch, the device wait and the encoder runs all share it. It counts from the start of the
     // caller's call: time spent waiting for a thread does not restart the semantic cap, and a
@@ -1196,6 +1221,9 @@ public final class WorkerSearchService {
         }
         EngineFutures.rethrowExecutorRefusal(e);
         EngineFutures.rethrowCancellation(e);
+        if (e instanceof io.justsearch.adapters.lucene.runtime.ParentFilterOverflowException) {
+          throw WorkerServiceException.resourceExhausted(e.getMessage());
+        }
         log.error("RetrieveContext failed", e);
         throw WorkerServiceException.internal("RetrieveContext failed: " + e.getMessage());
       }

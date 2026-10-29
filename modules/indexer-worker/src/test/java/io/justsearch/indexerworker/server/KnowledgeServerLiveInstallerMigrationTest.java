@@ -9,7 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -29,6 +31,8 @@ import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.CandidateIndexTargetCapture;
+import io.justsearch.indexing.SchemaFields;
+import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.MigrationStartRequest;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,6 +54,98 @@ import org.junit.jupiter.api.io.TempDir;
 /** Real recorded installer candidate, producer transfer, pointer, replay and retirement paths. */
 @Timeout(180)
 final class KnowledgeServerLiveInstallerMigrationTest {
+  @Test
+  void installerReplaysBundledHelpDespiteTheStartupMarker(@TempDir Path tempDir) throws Exception {
+    Path help = Files.createDirectories(tempDir.resolve("data/SSOT/docs/help"));
+    Path file = Files.writeString(help.resolve("welcome.md"), "# Welcome\nhelpactivationmarker capybara");
+    Files.writeString(tempDir.resolve("data/.help-ingested-version"), "v4");
+    try (Fixture fixture = new Fixture(tempDir)) {
+      fixture.promoteInstaller(true);
+      try (var view = fixture.server.captureServingView()) {
+        assertEquals("justsearch-help", view.searchRuntime().documentFieldOps().getDocumentField(
+            io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file),
+            SchemaFields.COLLECTION));
+        assertEquals(1L, view.searchRuntime().indexCountOps().docCountOrThrow());
+      }
+      assertEquals("v4", Files.readString(tempDir.resolve("data/.help-ingested-version")));
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"document", "failed-help"})
+  void installerEmptyPromotionRechecksBeforePointer(String mutation, @TempDir Path tempDir)
+      throws Exception {
+    Path help = Files.writeString(tempDir.resolve("retained-help.md"), "# Welcome\nretainedhelpmarker");
+    AtomicInteger reached = new AtomicInteger();
+    AtomicReference<KnowledgeServer> serverRef = new AtomicReference<>();
+    try (Fixture fixture = new Fixture(tempDir, transition -> {
+        if ("migration-before-pointer-commit".equals(transition.point())) {
+          KnowledgeServer server = serverRef.get();
+          if ("document".equals(mutation)) {
+            var green = (RunningRuntime)
+                server.lifecycleManagerForTests();
+            green.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+                SchemaFields.DOC_ID, "intervening",
+                SchemaFields.DOC_UID, "intervening#0",
+                SchemaFields.CONTENT, "intervening document")));
+          } else {
+            JobQueue queue = server.jobQueueForTests();
+            assertEquals(1, queue.enqueue(List.of(help)));
+            assertEquals(1, queue.pollPending(1).size());
+            queue.markFailed(help, IngestionOutcome.of(IngestionOutcomeClass.PARSER_FAILED,
+                "fixture.help-extraction-failed", IngestionRetryPolicy.NONE));
+            assertEquals(1, queue.jobStateCountsStrict().failedCount());
+          }
+          reached.incrementAndGet();
+        }
+      })) {
+      serverRef.set(fixture.server);
+      String helpKey = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(help);
+      try (var view = fixture.server.captureServingView()) {
+        var active = (RunningRuntime) view.searchRuntime();
+        active.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+            SchemaFields.DOC_ID, helpKey,
+            SchemaFields.DOC_UID, helpKey + "#0",
+            SchemaFields.PATH, helpKey,
+            SchemaFields.COLLECTION, "justsearch-help",
+            SchemaFields.CONTENT, "retainedhelpmarker")));
+        active.commitOps().commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.DRAIN);
+      }
+      String source = fixture.manager.readStateBestEffort().active_generation();
+      var configuration = ConfigStore.global().get();
+      var witness = fixture.lifecycle.settingsWitness;
+      JobQueue queue = fixture.server.jobQueueForTests();
+      var walk = queue.beginCapturedWalk(InstallerLifecycle.OPERATION,
+          fixture.lifecycle.accepted.target().fingerprint(), true);
+      walk = queue.closeRecordedWalkEnumeration(InstallerLifecycle.OPERATION,
+          walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      assertTrue(walk.capturedPlan());
+      assertEquals(0L, walk.plannedUnits());
+      fixture.startInstaller(false);
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+      while (!fixture.lifecycle.aborted && !fixture.lifecycle.published
+          && System.nanoTime() < deadline) Thread.sleep(25);
+      // This fixture has no operation store to acknowledge failed-state cleanup. Once the
+      // projection has decided, stop its own monitor rather than waiting for that absent owner.
+      Thread monitor = (Thread) field(fixture.server, "migrationCutoverThread");
+      monitor.interrupt();
+      fixture.awaitMonitor();
+      assertEquals(1, reached.get(), "the empty candidate reaches pointer admission");
+      assertEquals(source, fixture.manager.readStateBestEffort().active_generation());
+      assertEquals(witness, fixture.lifecycle.settingsWitness, "no settings revision is published");
+      assertSame(configuration, ConfigStore.global().get());
+      assertFalse(fixture.lifecycle.published);
+      try (var view = fixture.server.captureServingView()) {
+        assertEquals("justsearch-help", view.searchRuntime().documentFieldOps().getDocumentField(
+            helpKey, SchemaFields.COLLECTION));
+        assertEquals(1L, view.searchRuntime().indexCountOps().docCountOrThrow());
+      }
+      assertTrue(Files.readString(help).contains("retainedhelpmarker"));
+      assertTrue(fixture.lifecycle.aborted, "the precommit projection is aborted");
+      assertEquals(0, fixture.restarts.get(), "a proven precommit refusal requires no recovery restart");
+    }
+  }
+
   @Test
   void installerBudgetChangeGovernsTheNextFailedNativeMigration(@TempDir Path tempDir)
       throws Exception {
@@ -152,6 +248,10 @@ final class KnowledgeServerLiveInstallerMigrationTest {
     private String building;
 
     private Fixture(Path tempDir) throws Exception {
+      this(tempDir, MigrationTransitionBarrier.NO_HOOK);
+    }
+
+    private Fixture(Path tempDir, MigrationTransitionBarrier.Hook barrier) throws Exception {
       var values = new HashMap<String, String>();
       values.put(EnvRegistry.DATA_DIR.configKey(), tempDir.resolve("data").toString());
       values.put(EnvRegistry.INDEX_BASE_PATH.configKey(), tempDir.resolve("index").toString());
@@ -171,6 +271,10 @@ final class KnowledgeServerLiveInstallerMigrationTest {
       server = new KnowledgeServer(executors, WorkerConfig.load(initial), null,
           ManagedChildRegistry.noop(), lifecycle, components.handle("index"), encoder, initial,
           () -> ConfigStore.global().get(), new ReentrantReadWriteLock(true));
+      // EngineRoot binds even an empty registry before start. This starts volume seeding for
+      // configured sources (including help); a startup marker is not source admission evidence.
+      server.installMigrationBarrierForTests(barrier);
+      server.bindBootRootBindings(List.of());
       server.start();
       if (server.deferredModelInit != null) server.deferredModelInit.get(30, TimeUnit.SECONDS);
       assertTrue(server.awaitIndexRecoveryModels(30_000));
@@ -183,7 +287,7 @@ final class KnowledgeServerLiveInstallerMigrationTest {
           CandidateIndexTargetCapture.capture(candidate), models);
     }
 
-    private void promoteInstaller(boolean terminalAllowed) throws Exception {
+    private void startInstaller(boolean terminalAllowed) throws Exception {
       lifecycle.terminalAllowed = terminalAllowed;
       lifecycle.source = manager.readStateBestEffort().active_generation();
       building = manager.startRecordedMigration(InstallerLifecycle.OPERATION, "installer_model_activation",
@@ -191,6 +295,10 @@ final class KnowledgeServerLiveInstallerMigrationTest {
       lifecycle.authorized = true;
       assertTrue(server.beginRecordedBuildingLiveAsync(InstallerLifecycle.OPERATION,
           restarts::incrementAndGet).get(30, TimeUnit.SECONDS));
+    }
+
+    private void promoteInstaller(boolean terminalAllowed) throws Exception {
+      startInstaller(terminalAllowed);
       awaitMonitor();
       assertTrue(lifecycle.published);
       assertEquals(building, manager.readStateBestEffort().active_generation());
@@ -229,6 +337,9 @@ final class KnowledgeServerLiveInstallerMigrationTest {
     private boolean authorized;
     private volatile boolean published;
     private volatile boolean terminalAllowed;
+    private volatile boolean aborted;
+    private SettingsWitness settingsWitness =
+        new SettingsWitness(0, null);
 
     private InstallerLifecycle(ComponentHandle encoder) { this.encoder = encoder; }
     @Override public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) {
@@ -257,6 +368,8 @@ final class KnowledgeServerLiveInstallerMigrationTest {
           @Override public void afterPointerCommitted() {
             observation.install();
             ConfigStore.setGlobal(new ConfigStore(accepted.configuration()));
+            settingsWitness = new SettingsWitness(
+                settingsWitness.acceptedRevision() + 1, OPERATION);
           }
           @Override public void afterRuntimePublished() { observation.notifyObservers(); published = true; }
           @Override public void abortBeforePointer() {}
@@ -264,7 +377,7 @@ final class KnowledgeServerLiveInstallerMigrationTest {
         @Override public IndexGenerationManager.State withOwnerLocks(CheckedPromotion promotion)
             throws IOException { return promotion.promote(); }
         @Override public CommittedProjection callbacks() { return callbacks; }
-        @Override public void abortBeforePointer() {}
+        @Override public void abortBeforePointer() { aborted = true; }
       };
     }
   }

@@ -18,6 +18,10 @@ the V1.5 follow-up per slice 3a-1-8f.
 
 ### Added
 
+- Wire 3.0.3: SearchFilters field 17 `sizeBytes` echoes inclusive source-file byte bounds.
+  ByteRange uses optional integer endpoints so zero remains a real bound. Additive optional;
+  no new index fields or saved state (WP2.3a).
+
 - Wire 3.0.2: OperationHistoryEntry field 12 `message` mirrors the existing optional
   read-time refusal explanation, including its support code. Additive optional; no stored state.
 - Operation history includes OPERATION_OUTCOME_UNDONE for successful undo (Lane F C2).

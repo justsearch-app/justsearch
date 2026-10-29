@@ -299,7 +299,7 @@ public final class SearchPlanner {
       return new ChunkMergeDirective.Skip(SearchReasonCode.SKIPPED_PAGINATED);
     }
     boolean querySyntaxEligible =
-        request.getQuerySyntax() != SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE;
+        request.getQuerySyntax() == SearchQuerySyntax.SEARCH_QUERY_SYNTAX_SIMPLE;
     if (!querySyntaxEligible) {
       return new ChunkMergeDirective.Skip(SearchReasonCode.SKIPPED_QUERY_SYNTAX);
     }

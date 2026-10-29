@@ -301,6 +301,12 @@ final class SearchRpcOps {
                     .setToMs(params.modifiedAt().toMs())
                     .build());
         }
+        if (params.sizeBytes() != null) {
+            var size = io.justsearch.ipc.ByteRange.newBuilder();
+            if (params.sizeBytes().fromBytes() != null) size.setFromBytes(params.sizeBytes().fromBytes());
+            if (params.sizeBytes().toBytes() != null) size.setToBytes(params.sizeBytes().toBytes());
+            builder.setSizeBytes(size);
+        }
         if (params.freshnessEnabled()) {
             builder.setFreshnessEnabled(true);
         }

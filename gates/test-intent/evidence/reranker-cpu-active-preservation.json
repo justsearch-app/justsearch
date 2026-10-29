@@ -1,0 +1,96 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:f0a99efd7db65d966ac470b847948194b3983f80a880262fc9c9035e98c3ca89"
+  },
+  "createdAt": "2026-10-29T08:08:43.411Z",
+  "revision": "7d120d858374c34449e9e0f643ef90ef57529bd5",
+  "tree": "95e0c3a130b524648cc5785faf829145b54c1509",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot ./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.warmGpuRerankerIsActive\" --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.unbuiltRerankerIsInactive\" --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.retiredOrFailedCpuRerankerIsInactive\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4851
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#warmGpuRerankerIsActive",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a425e100b8ee6b37af66342896f1372e540a503b8570e17f514758149b9a7db7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "warmGpuRerankerIsActive(boolean, Path) [1]",
+          "status": "passed"
+        },
+        {
+          "name": "warmGpuRerankerIsActive(boolean, Path) [2]",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#unbuiltRerankerIsInactive",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a425e100b8ee6b37af66342896f1372e540a503b8570e17f514758149b9a7db7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unbuiltRerankerIsInactive(boolean, Path) [1]",
+          "status": "passed"
+        },
+        {
+          "name": "unbuiltRerankerIsInactive(boolean, Path) [2]",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#retiredOrFailedCpuRerankerIsInactive",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a425e100b8ee6b37af66342896f1372e540a503b8570e17f514758149b9a7db7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retiredOrFailedCpuRerankerIsInactive(boolean, boolean, Path) [1]",
+          "status": "passed"
+        },
+        {
+          "name": "retiredOrFailedCpuRerankerIsInactive(boolean, boolean, Path) [2]",
+          "status": "passed"
+        },
+        {
+          "name": "retiredOrFailedCpuRerankerIsInactive(boolean, boolean, Path) [3]",
+          "status": "passed"
+        },
+        {
+          "name": "retiredOrFailedCpuRerankerIsInactive(boolean, boolean, Path) [4]",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cf90e5a25be7e0455cbdecaefc959818c9740e87ff8d823f743ca09de46f4e5d"
+}

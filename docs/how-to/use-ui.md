@@ -10,6 +10,7 @@ description: "Running dev modes and accessing debug dashboards."
 This guide explains how to run, use, and debug the JustSearch user interface.
 
 Related docs:
+- [Owner-run Windows screen-reader checklist](screen-reader-checklist.md)
 - UI workflow readiness checklist + known issues: `docs/reference/ui-user-readiness.md`
 - Troubleshooting schema mismatch / “reindex no-op”: `docs/reference/index-schema-mismatch-reindex-noop.md`
 - Schema migration architecture overview: `docs/explanation/11-index-schema-migration.md`
@@ -161,7 +162,7 @@ does not replace that recovery.
 
 ### Forgetting an Indexed File or Folder
 
-In Search v3, open a result's context menu and choose **Forget this file** or **Forget its folder**.
+In Search, open a result's context menu and choose **Forget this file** or **Forget its folder**.
 Check the exact path before confirming. Review incomplete removals in Library's **Unfinished forgets**.
 See [Manage local data](manage-local-data.md) for keep-out rules, Retry/Withdraw, the outside-root file
 exception, and the original files, Memory, conversations, logs and other copies that remain.

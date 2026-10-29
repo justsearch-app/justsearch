@@ -68,3 +68,36 @@ SA15 compatibility implementation. D4 files and independent acceptance are left 
   "note": "Codex verifier-2 (separate session, same family): SA15 New expectations and execution evidence fit delegation."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a183d3-0fd4-7a61-a8d0-73ceba0e387b",
+  "verdict": "accept",
+  "digest": "sha256:e5b650a316ea8d78bb50819e58bffb706e2d390201d1d308b86121b769cfee5b",
+  "note": "Codex verifier PASS on WP1.5c: refreshed wp15b-eager-search evidence reviewed (refresh only)"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a183d3-0fd4-7a61-a8d0-73ceba0e387b",
+  "verdict": "accept",
+  "digest": "sha256:d382874e3e794b0686da9a0f6111eb28c0e35d266da90601c66843d0481211aa",
+  "note": "Codex verifier PASS on WP1.5c: refreshed wp15b-eager-search evidence reviewed (refresh only)"
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a184b9-f209-7de1-a977-bdc41f590b2c",
+  "verdict": "accept",
+  "digest": "sha256:d382874e3e794b0686da9a0f6111eb28c0e35d266da90601c66843d0481211aa",
+  "note": "Refresh only: the unchanged eager-registration check passes before and after, and its digest matches current source."
+}
+```

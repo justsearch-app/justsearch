@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Facet/matchCount parse is coupled to the retrieval leg's parse (tempdoc 821 §L.3 + §P)" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-29T01:02:21.751Z" hostname="elias-systemproductname" time="1.918">
+  <properties/>
+  <testcase name="Malformed LUCENE on a DENSE-ONLY leg still signals — the counts parse it too" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="1.159"/>
+  <testcase name="No-facets multi-leg LUCENE request: computeMatchCount tallies the leg's parse" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.215"/>
+  <testcase name="LUCENE-syntax multi-leg request: leg honours LUCENE, facets + matchCount follow it" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.093"/>
+  <testcase name="SIMPLE-syntax multi-leg request is unchanged — and now diverges from the LUCENE one" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.144"/>
+  <testcase name="LUCENE quoted phrase retrieves phrase matches, not a token OR — counts follow" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.104"/>
+  <testcase name="Malformed LUCENE query: multi-leg mirrors the sparse shortcut's INVALID_ARGUMENT" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.09"/>
+  <testcase name="x5SearchSubsetKeepsResultsCountsAndFacetsLexicalOnBothPasses()" classname="io.justsearch.indexerworker.services.FacetQuerySyntaxCouplingTest" time="0.094"/>
+  
+  
+</testsuite>

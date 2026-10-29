@@ -204,7 +204,7 @@
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.ts",
       "openerId": "fetch-stream-shape",
       "class": "lazy",
-      "note": "Tempdoc 822 Phase F1 — the Search v3 window's ONE ask issuance site delegates to consumeShapeStream (core.rag-ask). Open only while the main Search window is mounted and a turn is streaming, closed at the terminal event or at the reader's Stop (the window aborts on unmount and on New session, so an unwatched stream cannot outlive its window). SA15 retired the old chat opener; the shared shape-stream transport and Search opener remain."
+      "note": "Tempdoc 822 Phase F1 — the Search window's ONE ask issuance site delegates to consumeShapeStream (core.rag-ask). Open only while the main Search window is mounted and a turn is streaming, closed at the terminal event or at the reader's Stop (the window aborts on unmount and on New session, so an unwatched stream cannot outlive its window). SA15 retired the old chat opener; the shared shape-stream transport and Search opener remain."
     }
   ]
 }

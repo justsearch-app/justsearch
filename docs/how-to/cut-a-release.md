@@ -61,6 +61,19 @@ above is the whole behavior.
 
 ## Release candidate and publication
 
+The [Linux journey suite](../../scripts/release/qual/journeys/README.md) qualifies
+the downloaded draft bytes on the hosted Ubuntu runner and the clean Ubuntu
+Wayland/X11 VMs. Its result summary keeps product failures, infrastructure
+failures, decision skips and unavailable checks separate. The hosted workflow
+accepts a draft tag and has no publishing or signing permission.
+
+On Linux, `apt remove just-search` removes the application package and retains
+the user's settings, index, downloaded models and authored records under
+`~/.local/share/io.justsearch.shell` (or the corresponding `$XDG_DATA_HOME`
+folder). Reinstalling the same or a newer package reuses that data. Removing
+the package does not delete the user's indexed source files. J6 checks this
+retention on a disposable Ubuntu VM.
+
 The owner decides when to cut a release. An agent prepares and lands the release PR only after
 that instruction: bump `version` in `gradle.properties`, run
 `node scripts/ci/sync-version.mjs` (Windows and Linux), and add the user-facing `CHANGELOG.md`

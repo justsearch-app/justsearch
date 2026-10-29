@@ -16,8 +16,10 @@
  * `fileCount`), so a reloaded turn has unknown inputs and cannot safely be replayed.
  */
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
+import { localizeResourceKey } from '../../../i18n/resourceCatalog.js';
 import {
   getScopeChips,
+  invalidateSearchRestrictions,
   setQuery,
   submitSearch,
   subscribeScopeChips,
@@ -29,11 +31,12 @@ import {
 import {
   getFacetSelections,
   getFilters,
-  hasActiveFilter,
+  restrictionWire,
   subscribeFacetSelections,
   subscribeFilters,
   type SearchFilterSpec,
 } from '../../state/searchFiltersState.js';
+import { restrictionLabels, type RestrictionKind } from './sv3-filter-input.js';
 import { FACET_LABELS } from '../../components/searchResults/facetChips.js';
 import { clearSelection, getSelection, setSelection, DEFAULT_CAPABILITIES_BY_KIND } from '../../state/selectionState.js';
 import type { Availability } from '../../state/availability.js';
@@ -108,9 +111,12 @@ export function sv3ScopeLabel(scope: Sv3AskScope): string {
 }
 
 /** What a Retry or an Edit of a turn will search, said before it is pressed. */
-export function sv3ResendScopeNote(scope: Sv3AskScope | null | undefined): string {
+export function sv3ResendScopeNote(scope: Sv3AskScope | null | undefined, filters: SearchFilterSpec = {}): string {
   if (scope === undefined) return 'Original Ask inputs are unknown. Prepare a new Ask and review its files.';
-  if (scope === null) return 'Searches all your files';
+  if (scope === null) {
+    const labels = restrictionLabels(filters).map(f => f.label);
+    return labels.length ? `${localizeResourceKey('search.filters.original')} ${labels.join('; ')}` : 'Searches all your files';
+  }
   return scope.paths.length === 1 ? 'Uses the same file' : `Uses the same ${scope.paths.length} files`;
 }
 
@@ -121,7 +127,7 @@ export const sv3ResultsStale = (snapshot: { readonly query: string }, answered: 
 /** One restriction on the list, as the filter row shows it and its remove control names it. */
 export type Sv3ActiveFilter =
   | { readonly key: string; readonly kind: 'scope'; readonly index: number; readonly label: string }
-  | { readonly key: 'date'; readonly kind: 'date'; readonly label: string }
+  | { readonly key: RestrictionKind; readonly kind: RestrictionKind; readonly label: string }
   | {
       readonly key: string;
       readonly kind: 'facet';
@@ -129,16 +135,6 @@ export type Sv3ActiveFilter =
       readonly value: string;
       readonly label: string;
     };
-
-const day = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
-
-function dateLabel(spec: SearchFilterSpec): string {
-  const from = typeof spec.modifiedFromMs === 'number' ? day(spec.modifiedFromMs) : null;
-  const to = typeof spec.modifiedToMs === 'number' ? day(spec.modifiedToMs) : null;
-  if (from !== null && to !== null) return `Modified ${from} – ${to}`;
-  if (from !== null) return `Modified since ${from}`;
-  return `Modified before ${to ?? ''}`;
-}
 
 /**
  * EVERY restriction the shared stores put on this list, so none of them restricts it invisibly —
@@ -156,7 +152,7 @@ function sv3ActiveFilters(
     index,
     label: `Only ${chip.label}`,
   }));
-  if (hasActiveFilter(dates)) out.push({ key: 'date', kind: 'date', label: dateLabel(dates) });
+  for (const { kind, label } of restrictionLabels(dates)) out.push({ key: kind, kind, label });
   for (const [field, values] of Object.entries(facets)) {
     for (const value of values) {
       out.push({
@@ -227,10 +223,11 @@ export class Sv3SearchController implements ReactiveController {
   private dates: SearchFilterSpec = getFilters();
   private facets: Record<string, string[]> = getFacetSelections();
   /** Which answered turn was limited to which files. Window-local, so a reload forgets it honestly. */
+  private readonly turnFilters = new Map<string, SearchFilterSpec>();
   private readonly turnScopes = new Map<string, Sv3AskScope | null>();
   private unsubscribers: Array<() => void> = [];
 
-  constructor(private readonly host: ReactiveControllerHost) {
+  constructor(private readonly host: ReactiveControllerHost, private readonly filtersChanged: () => void = () => {}) {
     host.addController(this);
   }
 
@@ -242,7 +239,9 @@ export class Sv3SearchController implements ReactiveController {
         this.host.requestUpdate();
       }),
       subscribeFilters((spec) => {
+        const changed = JSON.stringify(restrictionWire(spec)) !== JSON.stringify(restrictionWire(this.dates));
         this.dates = spec;
+        if (changed) { this.selected = new Set(); invalidateSearchRestrictions(); this.filtersChanged(); }
         this.host.requestUpdate();
       }),
       subscribeFacetSelections((selections) => {
@@ -369,7 +368,7 @@ export class Sv3SearchController implements ReactiveController {
 
   private publishSelection(): void {
     const hits = (this.snapshot?.results ?? []).filter(hit => this.selected.has(hit.id));
-    if (!this.showing || hits.length === 0 || this.snapshot?.query !== this.answered) {
+    if (!this.showing || hits.length === 0 || this.snapshot?.query !== this.answered || this.restrictionsStale) {
       this.clearPublishedSelection();
       return;
     }
@@ -381,7 +380,7 @@ export class Sv3SearchController implements ReactiveController {
 
   /** Fix the chosen rows as the next Ask's files. `null` when they name no document. */
   scopeFromSelection(): Sv3AskScope | null {
-    return sv3ScopeFromHits(this.snapshot?.results ?? [], this.selected);
+    return this.restrictionsStale ? null : sv3ScopeFromHits(this.snapshot?.results ?? [], this.selected);
   }
 
   prepareFromSelection(): Sv3AskScope | null {
@@ -407,8 +406,15 @@ export class Sv3SearchController implements ReactiveController {
     return scope;
   }
 
-  recordTurnScope(turnId: string, scope: Sv3AskScope | null): void {
+  recordTurnScope(turnId: string, scope: Sv3AskScope | null, filters: SearchFilterSpec = {}): void {
+    this.turnFilters.set(turnId, filters);
     this.turnScopes.set(turnId, scope);
+  }
+
+  filtersOfTurn(turnId: string): SearchFilterSpec { return this.turnFilters.get(turnId) ?? {}; }
+
+  private get restrictionsStale(): boolean {
+    return (this.snapshot?.restrictionsKey ?? '{}') !== JSON.stringify(restrictionWire(this.dates));
   }
 
   scopeOfTurn(turnId: string): Sv3AskScope | null {
@@ -416,6 +422,8 @@ export class Sv3SearchController implements ReactiveController {
   }
 
   hasTurnScope(turnId: string): boolean { return this.turnScopes.has(turnId); }
+
+  get filtersByTurn(): ReadonlyMap<string, SearchFilterSpec> { return this.turnFilters; }
 
   get scopesByTurn(): ReadonlyMap<string, Sv3AskScope | null> { return this.turnScopes; }
 
@@ -435,7 +443,7 @@ export class Sv3SearchController implements ReactiveController {
     const base = {
       query: snapshot.query.trim(),
       selectedIds: this.selected,
-      chosenCount: sv3ChosenDocumentCount(snapshot.results, this.selected),
+      chosenCount: this.restrictionsStale ? 0 : sv3ChosenDocumentCount(snapshot.results, this.selected),
       facetSelections: this.facets,
       filters: sv3ActiveFilters(this.chips, this.dates, this.facets),
       askAvailability,
@@ -446,7 +454,7 @@ export class Sv3SearchController implements ReactiveController {
     if (typeof snapshot.error === 'string' && snapshot.error !== '') {
       return { ...base, status: 'unreachable', snapshot: null, failure: snapshot.error };
     }
-    if (sv3ResultsStale(snapshot, this.answered)) {
+    if (sv3ResultsStale(snapshot, this.answered) || this.restrictionsStale) {
       return { ...base, status: 'loading', snapshot: null, failure: '' };
     }
     return {
