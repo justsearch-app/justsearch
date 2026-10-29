@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.util;
 
+import io.justsearch.configuration.PlatformPaths;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.ValueLayout;
 import java.time.ZonedDateTime;
-import java.util.Locale;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +25,7 @@ public final class WindowsLocalTime {
   }
 
   public static Snapshot read() {
-    return read(System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows"),
+    return read(PlatformPaths.isWindows(),
         WindowsLocalTime::readNative, () -> {
           var now = ZonedDateTime.now();
           return new Snapshot(now.getDayOfWeek().getValue(), now.getHour() * 60 + now.getMinute());
