@@ -327,6 +327,11 @@ UIA = r"""
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
+# Managed UIA does not register its Win32 proxies in this PowerShell host.
+# Without them standard Edit/Button controls are opaque Panes with no patterns.
+$proxyPath=Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'WPF/UIAutomationClientsideProviders.dll'
+$proxies=[Reflection.Assembly]::LoadFrom($proxyPath)
+[System.Windows.Automation.ClientSettings]::RegisterClientSideProviderAssembly($proxies.GetName())
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
