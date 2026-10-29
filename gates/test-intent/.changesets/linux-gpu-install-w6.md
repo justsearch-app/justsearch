@@ -14,7 +14,7 @@ its per-entry citations identify the relevant observations and limits. It exclud
 All 30 W6 changed paths are byte-identical between the verified candidate 5fa8dec6d4 and
 the rebased candidate b84dce56e8; unrelated changes in the new base are outside that comparison.
 
-D4 evidence was generated on b84dce56e8 against base 9149f53ba6 with
+D4 evidence was generated on 1b24571df8a26c5101dfcd2783add5302182f4e9 against base 9149f53ba6 with
 `scripts/governance/gates/test-intent/run-evidence.mjs` in a temporary shared clone.
 The candidate run exited 0: all 11 check identifiers, comprising 35 cases, passed.
 The repaired run names each new or repaired check, including both parameterized tokenizer
@@ -31,10 +31,10 @@ The repaired run overlays only the Linux registry test fixture on the base. Shar
 resources touched were the Gradle slot queue, Gradle cache and host CPU/memory; no GPU,
 dev stack or VM was used. The original product, test and runner code remain unchanged.
 
-The delegation location uses the orchestrator-supplied task-record form below. Acceptance
-remains empty. Generation logs and the candidate XML are in
-`/tmp/w6-intent-evidence-8pwwwl_e/`. Completing the evidence requires resolving the
-parameterized JUnit naming mismatch without changing the frozen product/test code.
+The delegation location uses the orchestrator-supplied task-record form below. The two
+rejection records below are kept as history; the parameterized naming mismatch they and the
+earlier prose describe is resolved (dcad0900c3), and the two formerly uncaught checks now have
+their own repaired entry citing the repaired evidence.
 
 The isolated new LinuxGpuPlanTest, WindowsPlanGoldenTest and LinuxOrtAfterCpuTest need no entries
 of their own. Checks in the first two also establish the warrants for their gated fixture files.
@@ -71,6 +71,31 @@ The assembler's tests under scripts/ are out of scope for this gate; S12 and rep
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppServerAutoSelectionTest.java#linuxRestartFindsDownloadedRuntimeAndRespectsOperatorSelection"
       ],
       "verification": "/tmp/w6v3/report.md V1 (Install AI, sourced GPU chat, activation, Engine restart, Repair and operator override), V3 (no Linux CPU chat fallback), V5 (saved-state compatibility). These committed tests use temporary files, mocked GPU capabilities and the managed chat seam; the report supplies the independent real-system evidence. Windows runtime and release-pack ABI compatibility are not certified by that report."
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxGpuInstallTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Repair after the downloaded Linux executable was deleted acquires the planned packs before requiring that executable, and activation resolves the downloaded pack executable for the explicit, empty and default variants. On the base both operations threw IllegalStateException; the checks assert they do not throw and then assert the intended result.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "label": "agent choice",
+          "delegationQuote": "well then proceed with researching, validating and derisking the plan. once thats passed you can proceed with implementation",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27",
+          "delegationScope": "implement the release plan W0-W8",
+          "choice": "Linux with a supported NVIDIA GPU and a registry that lists Linux packs: Install AI fetches the packs and chat answers with sources on the GPU; preview, install and readiness agree on what the plan includes. Activation, Engine restart and Repair use the downloaded executable; an explicit operator executable override keeps precedence. Every NVIDIA CUDA/cuDNN library the Engine and llama-server load resolves inside the installed pack. The shipped registry has no Linux pack entries yet, so Linux behaves as before: CPU search, chat unavailable. Windows plans are unchanged. Saved state from the base reads the same after upgrade. The pack assembler verifies closure, RUNPATH, glibc floor and SONAME file names. The tokenizer uses its bundled CPU native, never a runtime download."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/linux-gpu-install-w6-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxGpuInstallTest.java#missingDownloadedExecutableDoesNotBlockPlannedPackRepair",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java#linuxDownloadedPackIsUsedForExplicitAndDefaultActivation"
+      ],
+      "verification": "/tmp/w6v3/report.md V1 (Repair after deleting the downloaded executable; activation with the downloaded executable). The generated repaired D4 evidence records both checks passing on the candidate and failing by assertion on base 9149f53ba6.",
+      "repaired": true
     },
     {
       "items": [
@@ -252,5 +277,16 @@ The assembler's tests under scripts/ are out of scope for this gate; S12 and rep
   "verdict": "reject",
   "digest": "sha256:d5f5557bd20c46ccbedfd19af0791dbf48c09323ad5949681181dcdd85650b5d",
   "note": "Entry 1 lacks assertion fail-before for two new checks: LinuxGpuInstallTest#missingDownloadedExecutableDoesNotBlockPlannedPackRepair and RuntimeNativeResolutionTest#linuxDownloadedPackIsUsedForExplicitAndDefaultActivation throw uncaught IllegalStateException on 9149f53ba6. Both pass on 667157a671. Wrap the throwing operations in assertion-based checks and regenerate baseline/candidate evidence; identify repaired behavior explicitly. Correct the stale tokenizer evidence prose, which contradicts the now-valid six-identifier repaired evidence. See /tmp/w6-accept/report.md and case-results.json."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-w6-acceptor2-20261029T153743Z",
+  "verdict": "reject",
+  "digest": "sha256:b512bc1c8cd86c80c5503f90aae1b399e9505e8fbf1f70cec0a9b5bc6d20faab",
+  "note": "Both wrapped checks now fail by AssertionFailedError on 9149f53ba6 for the intended missing-executable reasons and pass on 0908068a1c; wrappers preserve expected values and all evidence digests match. Two issues remain: (1) Neither missingDownloadedExecutableDoesNotBlockPlannedPackRepair nor linuxDownloadedPackIsUsedForExplicitAndDefaultActivation is named by any repaired:true entry. Entry 1 still cites candidate-only evidence. Add both fully qualified IDs to a repaired:true entry citing linux-gpu-install-w6-repaired.json, updating its items, behaviour and verification as needed (for example, extend entry 2). (2) Correct the contradictory prose at lines 17 and 34-37: both regenerated evidence files name revision 1b24571df8a26c5101dfcd2783add5302182f4e9, acceptance records are not empty, and the parameterized tokenizer mismatch is resolved. Remove or replace the stale completion instructions and generation provenance. Keep the previous rejection. Existing D4 evidence can be reused if test files remain unchanged. See /tmp/w6-accept2/report.md, case-results.json, evidence-audit.jsonl and wiring-audit.json."
 }
 ```
