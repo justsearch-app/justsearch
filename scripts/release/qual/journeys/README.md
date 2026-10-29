@@ -503,6 +503,11 @@ Build local NSIS packages **inside a separate Windows build overlay** using the
 existing `scripts/ci/build-installer-windows.ps1` producer. That wrapper calls
 `package-installer-win.ps1` and applies `packaging/signed-mirrors.v1.json`; bypassing
 it can compare unsigned upstream Tesseract against the signed per-file manifest.
+Record each tested installer's source commit and SHA-256 in the evidence and run
+summary, separately from the harness commit. Include the predecessor's source
+commit too. Before classifying a product defect, check whether that source
+contains any relevant fix; rerunning a newer harness against an older package
+does not test the fix.
 Provision MSVC, Rust, Node, JDK 25 and 7-Zip there. Build the predecessor from the
 candidate parent's shared clone under `$TMPDIR`, in its own build folder, with
 identical generated test pins and a lower test version. Do not enable
