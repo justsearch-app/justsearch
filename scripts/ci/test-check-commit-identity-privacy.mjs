@@ -619,6 +619,64 @@ try {
     console.log('pre-push ancestry: new branch, fast-forward, force spellings, batch, tags, deletion, missing object: PASS');
   }
 
+  {
+    const source = makeRepo();
+    const remote = makeBareRepo();
+    const shallow = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-identity-shallow-'));
+    temporaryRepos.push(source, remote, shallow);
+    const base = commit(source, {
+      authorName: 'Contributor', authorEmail: CONTRIBUTOR_EMAIL, message: 'shallow push base',
+    });
+    git(source, ['branch', 'published', base]);
+    commit(source, {
+      authorName: 'Contributor', authorEmail: CONTRIBUTOR_EMAIL, message: 'hidden intermediate commit',
+    });
+    const head = commit(source, {
+      authorName: 'Contributor', authorEmail: CONTRIBUTOR_EMAIL, message: 'legitimate fast-forward',
+    });
+    git(source, ['merge-base', '--is-ancestor', base, head]);
+    git(source, ['push', '-q', remote, `${base}:refs/heads/main`]);
+    // file:// makes Git honour depth even though all resources are local fixtures.
+    const sourceUrl = pathToFileURL(source).href;
+    git(shallow, ['clone', '-q', '--depth=1', sourceUrl, '.']);
+    git(shallow, ['fetch', '-q', '--depth=1', 'origin', 'published']);
+    assert.equal(git(shallow, ['rev-parse', '--is-shallow-repository']), 'true');
+    for (const sha of [base, head]) git(shallow, ['cat-file', '-e', `${sha}^{commit}`]);
+    assert.equal(childProcess.spawnSync('git', ['merge-base', '--is-ancestor', base, head], { cwd: shallow }).status, 1);
+    git(shallow, ['remote', 'set-url', 'origin', remote]);
+    const hook = installHookFixture(shallow);
+    const capture = path.join(shallow, 'git-lfs-stdin.txt');
+    assert.equal(runHook(shallow, hook, remote, '', capture).status, 0);
+    fs.rmSync(capture);
+    git(shallow, ['config', 'core.hooksPath', '.githooks']);
+    // Force lets the update reach the hook despite Git's own shallow ancestry check.
+    const push = () => childProcess.spawnSync('git', ['push', '--force', 'origin', 'HEAD:refs/heads/main'], {
+      cwd: shallow,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${path.join(shallow, 'fake-bin')}${path.delimiter}${process.env.PATH ?? ''}`,
+        CAPTURE_FILE: capture,
+        JUSTSEARCH_SKIP_PUSH_GATES: '1',
+      },
+      windowsHide: true,
+    });
+    const refused = push();
+    assert.equal(refused.status, 1, refused.stderr);
+    assert.match(refused.stderr, /ancestry unknown in a shallow clone; run git fetch --unshallow \(or deepen\) and retry/);
+    assert.doesNotMatch(refused.stderr, /history replacement is not allowed/);
+    for (const value of ['refs/heads/main', base, head]) assert.ok(refused.stderr.includes(value), refused.stderr);
+    assert.ok(!fs.existsSync(capture), 'shallow refusal precedes Git LFS');
+    assert.ok(!fs.existsSync(path.join(shallow, 'gate-calls.txt')), 'shallow refusal precedes expensive gates');
+    assert.equal(git(remote, ['rev-parse', 'refs/heads/main']), base);
+    git(shallow, ['fetch', '-q', '--unshallow', sourceUrl]);
+    const allowed = push();
+    assert.equal(allowed.status, 0, allowed.stderr);
+    assert.equal(git(remote, ['rev-parse', 'refs/heads/main']), head);
+    assert.ok(fs.existsSync(capture), 'unshallowing restores the legitimate fast-forward');
+    console.log('pre-push ancestry: shallow fast-forward refused distinctly, unshallow retry allowed: PASS');
+  }
+
   console.log('test-check-commit-identity-privacy: PASS');
 } finally {
   for (const repo of temporaryRepos) fs.rmSync(repo, { recursive: true, force: true });

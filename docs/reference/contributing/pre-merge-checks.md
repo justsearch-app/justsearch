@@ -47,7 +47,9 @@ Always: `node scripts/lib/tool-invoker.cjs gradle build -x test` from the candid
 Frontend: from `modules/ui-web`, `npm run typecheck` and `npm run test:unit:run`.
 
 Java: run `node scripts/dev/java-prepush.mjs` for test and integration-test compilation
-and all PMD checks through `js-gradle-slot`. Add `--unreferenced` when replacing or
+and all PMD checks. When available on PATH, `js-gradle-slot` (the maintainer machine's
+shared-build-slot tool) runs the Gradle wrapper; otherwise the command prints a
+notice and runs `./gradlew` (`gradlew.bat` on Windows) directly. Add `--unreferenced` when replacing or
 overloading a non-public method to include `UnreferencedCodeTest` in the same Gradle
 invocation. Use `--dry-run` to print the command. This check is run manually; the
 pre-push hook does not run it.
