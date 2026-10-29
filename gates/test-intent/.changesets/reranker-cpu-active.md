@@ -143,3 +143,14 @@ accept this repair. Independent verification of this repair is pending.
   "note": "Accepted: six CPU readiness cases fail before and pass after; eight preservation cases pass both. Independent full worker suites and CPU dev-stack API/UI/reload checks confirm the intended status correction. The runner patch reproduces the recorded evidence producer digest."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-rel-rr-accept2-20261029",
+  "verdict": "accept",
+  "digest": "sha256:780ef77ac37276225d1d2efd3cdf2b2bb7f311926bc41bdc505580192835ad39",
+  "note": "Accepted: six repaired CPU status cases fail before by assertion and pass after; eight preservation and 27 existing cases pass both, without skips. Deferred CPU policy, unchanged product code, contract documentation, evidence producer and byte-identical stale acceptance history checked. Separate Codex session; GPU and dev stack excluded by brief."
+}
+```
