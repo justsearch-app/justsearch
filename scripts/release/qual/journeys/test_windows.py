@@ -13,6 +13,28 @@ import windows
 
 class WindowsEvidenceTests(unittest.TestCase):
     @unittest.skipUnless(windows.os.name == 'nt', 'Windows PowerShell fixture')
+    def test_resource_log_tails_are_plain_strings_without_powershell_file_metadata(self):
+        import ast
+        import json
+        import tempfile
+        from pathlib import Path
+        tree = ast.parse(Path(__file__).with_name('vm-windows.py').read_text())
+        budget = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'WriteBudget')
+        method = next(n for n in budget.body if isinstance(n, ast.FunctionDef) and n.name == 'resources')
+        assignment = next(n for n in method.body if isinstance(n, ast.Assign)
+                          and any(isinstance(t, ast.Name) and t.id == 'source' for t in n.targets))
+        suffix = ast.literal_eval(assignment.value.right)
+        with tempfile.TemporaryDirectory() as temp:
+            logs = Path(temp) / 'io.justsearch.shell/logs'
+            logs.mkdir(parents=True)
+            (logs / 'engine.log').write_text('engine fixture message\n', encoding='utf-8')
+            # Exercise the production file/log collector with owned fixture data;
+            # memory is fixed so the test never inspects a running application.
+            source = '$env:APPDATA=' + windows.ps_value(temp) + ';$memory=& { @{fixture=$true}' + suffix
+            result = json.loads(windows.ps_json(source))
+        self.assertEqual(result['engineLogs'][0]['tail'], ['engine fixture message'])
+
+    @unittest.skipUnless(windows.os.name == 'nt', 'Windows PowerShell fixture')
     def test_update_probe_stops_a_reverted_service_and_records_its_original_state(self):
         import ast
         from pathlib import Path

@@ -114,7 +114,7 @@ $sizes=@($files | Group-Object {($_.FullName.Substring($data.Length+1) -split '\
  @{directory=$_.Name;fileBytes=($_.Group | Measure-Object Length -Sum).Sum;files=$_.Count}
 })
 $logs=@(Get-ChildItem (Join-Path $data 'logs') -File -Recurse -ErrorAction SilentlyContinue | Where-Object {$_.Extension -in '.log','.jsonl'} | ForEach-Object {
- @{path=$_.FullName;bytes=$_.Length;tail=@(Get-Content $_.FullName -Tail 120 -Encoding UTF8)}
+ @{path=$_.FullName;bytes=$_.Length;tail=@(Get-Content $_.FullName -Tail 120 -Encoding UTF8 | ForEach-Object {$_.ToString()})}
 })
 @{memory=$memory;dataDirectories=$sizes;engineLogs=$logs} | ConvertTo-Json -Depth 8 -Compress
 """
