@@ -15,6 +15,50 @@ wrapper=importlib.util.module_from_spec(spec);spec.loader.exec_module(wrapper)
 
 
 class WindowsVMTests(unittest.TestCase):
+    def test_crash_access_requires_the_limited_task_success_receipt(self):
+        for verified in (False,True):
+            with tempfile.TemporaryDirectory() as temp:
+                root=Path(temp)
+                def copied(source,destination):
+                    destination.write_text(json.dumps({'verified':verified,'elevated':False,'error':None if verified else 'Access denied'}))
+                with patch.object(wrapper.vm,'copy_in'),patch.object(wrapper,'guest_ps',return_value='True') as guest, \
+                     patch.object(wrapper,'copy_out',side_effect=copied):
+                    if verified:
+                        wrapper.verify_crash_access(root)
+                    else:
+                        with self.assertRaisesRegex(Infrastructure,'cannot read crash archives'):
+                            wrapper.verify_crash_access(root)
+                self.assertTrue(any('-RunLevel Limited' in call.args[0] for call in guest.call_args_list))
+                self.assertTrue(any('Unregister-ScheduledTask' in call.args[0] for call in guest.call_args_list))
+
+    def test_application_snapshot_keeps_suspended_mirror_for_later_update(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);disk=root/'run.qcow2';disk.write_bytes(b'installed state')
+            (root/'run-vars.fd').write_bytes(b'firmware')
+            snapshot=root/'source';snapshot.mkdir()
+            (snapshot/'manifest.json').write_text(json.dumps({'kind':'tools','pins':{}}))
+            (snapshot/'quiet-verify.json').write_text(json.dumps({'verified':True}))
+            started={'disk':str(disk),'pid':999999999,'owner':'fixture'};current=[started]
+            args=SimpleNamespace(session='vm',mode='fresh',mirror=Path('mirror'))
+            def execute(args,out,*rest):
+                (out/'summary.json').write_text(json.dumps({'journeys':[],'fullSelection':False}))
+                (out/'checkpoint.json').write_text('{}')
+                return 0
+            def stop():current[0]=None;return True
+            with patch.object(wrapper,'pins',return_value={}),patch.object(wrapper.vm,'wait_free'), \
+                 patch.object(wrapper,'wait_for',return_value=True),patch.object(wrapper,'start_snapshot'), \
+                 patch.object(wrapper.vm,'require_owner',return_value=started),patch.object(wrapper.vm,'wait_ssh'), \
+                 patch.object(wrapper.vm,'read_state',side_effect=lambda:current[0]), \
+                 patch.object(wrapper,'guest_ps',return_value='True') as guest,patch.object(wrapper.vm,'mirror') as mirror, \
+                 patch.object(wrapper,'WriteBudget') as budget,patch.object(wrapper,'execute',side_effect=execute), \
+                 patch.object(wrapper.vm,'locked',return_value=contextlib.nullcontext()), \
+                 patch.object(wrapper.vm,'ensure_free'),patch.object(wrapper.vm,'stop',side_effect=stop):
+                budget.return_value.finish.return_value={};budget.return_value.initial=0;budget.return_value.error=None
+                self.assertEqual(wrapper.run_overlay(args,root/'out','candidate',['J1'],snapshot,seal=True),0)
+            self.assertTrue((root/'out/snapshot/disk.qcow2').is_file())
+            mirror.assert_not_called()
+            self.assertTrue(any('mirror-windows.py suspend' in call.args[0] for call in guest.call_args_list))
+
     def test_write_limit_uses_written_bytes_and_overlay_growth_independently(self):
         for key in ('hostQemuWrittenBytes', 'guestWrittenBytes', 'overlayGrowthBytes'):
             with self.subTest(key=key):

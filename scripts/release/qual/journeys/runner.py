@@ -22,8 +22,11 @@ HERE = Path(__file__).resolve().parent
 STATUSES = ('passed', 'failed-product', 'failed-infrastructure', 'skipped-by-decision', 'unavailable', 'owner-validation')
 
 
-def phase_journeys(phase):
-    return {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'} if phase == 'predecessor' else {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'}
+def phase_journeys(phase, lane=None):
+    selected = {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'} if phase == 'predecessor' else {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'}
+    if lane == 'vm-windows':
+        selected.add('J6') # Also develop retention against the installed candidate.
+    return selected
 
 
 class Infrastructure(Exception):
@@ -927,7 +930,7 @@ def main():
         for journey in definition['journeys']:
             if args.journeys and journey['id'] not in args.journeys:
                 continue
-            if journey['id'] not in phase_journeys(args.phase) and (args.vm or args.lane == 'vm-windows') and args.lane != 'vm-linux-x11':
+            if journey['id'] not in phase_journeys(args.phase, args.lane) and (args.vm or args.lane == 'vm-windows') and args.lane != 'vm-linux-x11':
                 continue
             row = {'id': journey['id'], 'title': journey['title'], 'scenarioIds': journey['scenarioIds'], 'checks': []}
             run.results.append(row)

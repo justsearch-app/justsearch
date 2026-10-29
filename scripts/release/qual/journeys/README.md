@@ -355,7 +355,7 @@ windows_inputs=( \
   --driver /path/to/windows/tauri-driver.exe \
   --predecessor /path/to/parent/JustSearch_0.3.1_x64-setup.exe \
   --mirror /path/to/signed-test-mirror )
-# Once: tools, matching driver, corpus and immutable release/mirror staging.
+# Once: tools, cached pinned Inspector, driver, corpus and release/mirror staging.
 python3 scripts/release/qual/journeys/vm-windows.py "${windows_inputs[@]}" \
   --mode prepare --evidence /path/to/windows-tools-snapshot
 # Development: work on one journey, from a thin overlay of that snapshot.
@@ -364,16 +364,29 @@ python3 scripts/release/qual/journeys/vm-windows.py "${windows_inputs[@]}" \
   --journeys J1 --evidence /path/to/new-j1-evidence
 ```
 
-Preparation applies `windows-quiet.ps1` as SYSTEM only in the owned guest. It
-disables Windows Update, SysMain, Windows Search, diagnostics/telemetry upload,
-Delivery Optimisation and their scheduled work, scheduled optimisation and
+Preparation first caches Inspector 0.21.1 through npm and proves offline package
+resolution (`inspector-cache.json`); later overlays reuse that cache. It applies
+`windows-quiet.ps1` as SYSTEM only in the owned guest, disabling Windows Update,
+Edge Update (edgeupdate/edgeupdatem, its scheduled tasks and both default and
+WebView2 Update policies), SysMain, Windows Search, diagnostics/telemetry upload,
+their scheduled work, scheduled optimisation and
 Defender real-time/scheduled scans. If Defender refuses, all test and app data
 folders must be excluded instead; the actual mode is recorded. Hibernation is
 off and the page file is fixed at 512 MiB. A full shutdown/reboot precedes
 verification of each observed service, task, policy, exclusion and page-file
 allocation in `quiet-verify.json`. An unverified setting refuses snapshot
-sealing and all journeys. WER remains enabled; the limited app task receives
+sealing and all journeys. Setup caches EdgeDriver by the exact four-part WebView2
+version, validates its vendor signature, and verifies the match again after reboot.
+Snapshot metadata records both versions; a runtime mismatch records both and fails
+as infrastructure. WER remains enabled; the limited app task receives
 read access to existing machine crash reports during SYSTEM provisioning.
+The guest's existing WER tree is given medium integrity as well as a read ACL:
+high-integrity archive labels otherwise deny reads even with the ACL. After
+reboot, a separate limited task must enumerate and open the reports before
+sealing (`crash-access.json`). Any later unreadable report fails collection.
+DoSvc is a recorded protected-service exception: its startup mode is observed,
+and `DODownloadMode=99` is verified after reboot instead. Disabled Windows Update
+and the per-run measured write limit remain required.
 
 The wrapper owns one headless, eight-thread Windows VM at a time and honors the
 harness's 14 GiB host-memory threshold. It runs the adapter through a **limited,
@@ -467,6 +480,6 @@ explicitly unavailable rather than zero. Allocation growth is not an I/O counter
 
 ```sh
 python3 -m unittest discover -s scripts/release/qual/journeys -p 'test_*.py'
-# Inside Windows: only platform-neutral Windows fixtures, without host VM modules.
+# Inside Windows: adapter fixtures and owned short-lived processes; no host VM modules.
 python -m unittest discover -s scripts/release/qual/journeys -p test_windows.py
 ```

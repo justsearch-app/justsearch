@@ -126,7 +126,7 @@ def pins(args, phase):
             'predecessor': digest(args.predecessor) if args.predecessor else None,
             'mirror': {str(p.relative_to(args.mirror)): digest(p) for p in sorted(args.mirror.rglob('*')) if p.is_file()} if args.mirror else None,
             'phase': phase, 'session': args.session,
-            'setupSources': {name: digest(HERE / name) for name in ('windows-tools.ps1', 'windows-quiet.ps1', 'corpus.py')},
+            'setupSources': {name: digest(HERE / name) for name in ('windows-tools.ps1', 'windows-edge.ps1', 'windows-cache-tools.ps1', 'windows-quiet.ps1', 'corpus.py')},
             'base': json.loads((vm.ROOT / 'windows/base.json').read_text())}
 
 
@@ -170,6 +170,7 @@ def provision(args, out):
     vm.copy_in('windows', args.driver, 'C:/Qual/tauri-driver.exe')
     vm.copy_in('windows', Path(str(args.driver) + '.json'), 'C:/Qual/tauri-driver.exe.json')
     vm.copy_in('windows', HERE / 'windows-tools.ps1', 'C:/Qual/windows-tools.ps1')
+    vm.copy_in('windows', HERE / 'windows-edge.ps1', 'C:/Qual/windows-edge.ps1')
     with (out / 'provision.log').open('wb') as log:
         result = vm.ssh('windows', 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Qual/windows-tools.ps1 -Driver C:/Qual/tauri-driver.exe',
                         stdout=log, stderr=subprocess.STDOUT, timeout=1200)
@@ -185,7 +186,6 @@ def quiet_guest(mode, out):
         script = Path(tmp) / 'quiet-worker.ps1'
         script.write_text("$ErrorActionPreference='Stop'\n$code=0\ntry { & C:/Qual/journeys/windows-quiet.ps1 -Mode " + mode +
             " > C:/Qual/quiet-worker.log 2>&1\n" +
-            "$p='C:/ProgramData/Microsoft/Windows/WER'; & icacls.exe $p /grant 'qual:(OI)(CI)(RX)' /T /C >> C:/Qual/quiet-worker.log; if($LASTEXITCODE){throw 'WER read access provisioning failed'}\n" +
             "} catch { $_ | Out-File C:/Qual/quiet-worker.log -Append; $_.ScriptStackTrace | Out-File C:/Qual/quiet-worker.log -Append; $code=1 }\n" +
             "[IO.File]::WriteAllText('C:/Qual/quiet-exit.txt',[string]$code)\n")
         vm.copy_in('windows', script, 'C:/Qual/quiet-worker.ps1')
@@ -201,6 +201,44 @@ def quiet_guest(mode, out):
         copy_out('C:/Qual/quiet-worker.log', out / ('quiet-' + mode.lower() + '.log'))
         if result != '0':
             raise Infrastructure('Windows write settings ' + mode + ' failed; see quiet-' + mode.lower() + '.log')
+    finally:
+        guest_ps('Unregister-ScheduledTask -TaskName ' + ps_value(task) + ' -Confirm:$false')
+
+
+def verify_crash_access(out):
+    """Prove archive reads with the same limited token as the app journeys."""
+    task = 'JustSearch-qual-crash-access'
+    with tempfile.TemporaryDirectory(prefix='windows-crash-access-') as tmp:
+        script = Path(tmp) / 'crash-access.py'
+        script.write_text("""import json,sys,traceback
+from pathlib import Path
+sys.path.insert(0,'C:/Qual/journeys')
+from windows import regular_files, ps_json
+result={'verified':False,'files':[]}
+try:
+    result['elevated']=ps_json('([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)')
+    if result['elevated']: raise RuntimeError('Crash read check must run limited')
+    for path in regular_files(Path('C:/ProgramData/Microsoft/Windows/WER')):
+        if path.suffix.lower() in ('.wer','.dmp'):
+            with path.open('rb') as stream: stream.read(1)
+            result['files'].append({'path':str(path),'bytes':path.stat().st_size})
+    result['verified']=True
+except Exception:
+    result['error']=traceback.format_exc()
+Path('C:/Qual/crash-access.json').write_text(json.dumps(result,indent=2))
+""")
+        vm.copy_in('windows', script, 'C:/Qual/crash-access.py')
+    guest_ps("Remove-Item C:/Qual/crash-access.json -ErrorAction SilentlyContinue;" +
+        "$a=New-ScheduledTaskAction -Execute C:/Qual/Python/Scripts/python.exe -Argument C:/Qual/crash-access.py;" +
+        "$p=New-ScheduledTaskPrincipal -UserId qual -LogonType Interactive -RunLevel Limited;" +
+        'Register-ScheduledTask -TaskName ' + ps_value(task) + ' -Action $a -Principal $p -Force | Out-Null;' +
+        'Start-ScheduledTask -TaskName ' + ps_value(task))
+    try:
+        wait_for(lambda: guest_ps('Test-Path C:/Qual/crash-access.json') == 'True',
+                 'Limited-token crash archive read check', seconds=120, interval=2, error=Infrastructure)
+        copy_out('C:/Qual/crash-access.json', out / 'crash-access.json')
+        if json.loads((out / 'crash-access.json').read_text()).get('verified') is not True:
+            raise Infrastructure('Limited app task cannot read crash archives; see crash-access.json')
     finally:
         guest_ps('Unregister-ScheduledTask -TaskName ' + ps_value(task) + ' -Confirm:$false')
 
@@ -224,6 +262,8 @@ def prepare_setup(args, out, source=None):
         if not source:
             provision(args, out)
         stage_inputs(args, out, source)
+        guest_ps('& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Qual/journeys/windows-cache-tools.ps1; if($LASTEXITCODE){throw "Qualification client cache failed"}', timeout=600)
+        copy_out('C:/Qual/inspector-cache.json', out / 'inspector-cache.json')
         if args.mirror:
             if guest_ps('Test-Path C:/Qual/mirror/server.json') != 'True':
                 vm.mirror('windows', str(args.mirror))
@@ -231,6 +271,7 @@ def prepare_setup(args, out, source=None):
         # Generate corpus once; subsequent runs verify these exact cached bytes.
         guest_ps("if(!(Test-Path C:/Qual/corpus-sha256.json)){ $hashes=& C:/Qual/Python/Scripts/python.exe C:/Qual/journeys/corpus.py C:/Qual/corpus; if($LASTEXITCODE){throw 'Corpus generation failed'}; [IO.File]::WriteAllText('C:/Qual/corpus-sha256.json',($hashes -join [Environment]::NewLine))}")
         quiet_guest('Apply', out)
+        guest_ps('& C:/Qual/journeys/windows-edge.ps1', timeout=300)
         volumes.append(budget.finish()); budget.check(); budget = None
         if not vm.stop():
             raise Infrastructure('Guest settings reboot required a forced stop')
@@ -245,6 +286,9 @@ def prepare_setup(args, out, source=None):
         budget = WriteBudget(started, out); budget.thread.start()
         vm.wait_ssh('windows', timeout=600)
         quiet_guest('Verify', out)
+        guest_ps('& C:/Qual/journeys/windows-edge.ps1 -VerifyOnly', timeout=60)
+        copy_out('C:/Qual/edge/versions.json', out / 'webdriver-versions.json')
+        verify_crash_access(out)
         budget.check()
         verified = json.loads((out / 'quiet-verify.json').read_text())
         if verified.get('verified') is not True:
@@ -256,6 +300,9 @@ def prepare_setup(args, out, source=None):
         inode = Path(started['disk']).stat().st_ino
         if not vm.stop():
             raise Infrastructure('Setup shutdown required a forced stop; snapshot not sealed')
+        volumes[-1]['overlayGrowthBytes'] = max(0, Path(started['disk']).stat().st_blocks * 512 - volumes[-1]['overlayInitialBytes'])
+        volumes[-1]['overlayAllocationMeasured'] = 'after shutdown'
+        enforce_write_limit(volumes[-1])
         with vm.locked():
             vm.ensure_free(check_lock=False)
             disk = Path(started['disk'])
@@ -263,7 +310,9 @@ def prepare_setup(args, out, source=None):
                 raise Infrastructure('Setup snapshot requires unchanged disk and same filesystem')
             disk.rename(out / 'disk.qcow2')
             disk.with_name('run-vars.fd').rename(out / 'vars.fd')
-        (out / 'manifest.json').write_text(json.dumps({'kind': 'tools', 'pins': pins(args, 'tools')}, indent=2) + '\n')
+        (out / 'manifest.json').write_text(json.dumps({'kind': 'tools', 'pins': pins(args, 'tools'),
+            'webview2': json.loads((out / 'webdriver-versions.json').read_text())['webview2'],
+            'edgeDriver': json.loads((out / 'webdriver-versions.json').read_text())}, indent=2) + '\n')
         (out / 'summary.json').write_text(json.dumps({'status': 'setup-ready', 'journeysExecuted': False,
             'writeVolume': volumes, 'guestSettings': 'quiet-verify.json'}, indent=2) + '\n')
         return 0
@@ -456,7 +505,10 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
             try:
                 guest_ps('if (Get-ScheduledTask -TaskName ' + ps_value(TASK) + ' -ErrorAction SilentlyContinue) {Unregister-ScheduledTask -TaskName ' + ps_value(TASK) + ' -Confirm:$false}')
                 if args.mirror and guest_ps('Test-Path C:/Qual/mirror/server.json') == 'True':
-                    vm.mirror('windows', remove=True)
+                    if seal:
+                        guest_ps('& C:/Qual/Python/Scripts/python.exe C:/Qual/mirror-windows.py suspend; if($LASTEXITCODE){throw "Mirror snapshot suspension failed"}')
+                    else:
+                        vm.mirror('windows', remove=True)
             except Exception as exc:
                 errors.append(str(exc))
             finally:

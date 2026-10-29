@@ -1,4 +1,4 @@
-"""Windows evidence contracts: fixtures only; no desktop or shared VM access.
+"""Windows evidence contracts: isolated fixtures and an owned process-handle check.
 
 S3 (Windows part): "Journeys J1-J9 run against the draft's exact bytes on hosted runners, the two clean VMs and the GPU host, and produce one result summary that separates passed, failed, skipped by decision (Windows GPU) and unavailable"
 S21 (Windows part): "The MCP bridge's manifest and registry entry carry the app's version, the release URL and checksum, declare Linux and Windows, and the bridge works on both (J8)"
@@ -13,7 +13,9 @@ import windows
 
 class WindowsEvidenceTests(unittest.TestCase):
     def test_driver_must_match_webview_build(self):
-        windows.match_driver('155.0.4283.62', 'MSEdgeDriver 155.0.4283.50')
+        windows.match_driver('155.0.4283.62', 'MSEdgeDriver 155.0.4283.62')
+        with self.assertRaisesRegex(Infrastructure, '155.0.4283.50'):
+            windows.match_driver('155.0.4283.62', 'MSEdgeDriver 155.0.4283.50')
         with self.assertRaises(Infrastructure):
             windows.match_driver('155.0.4283.62', 'MSEdgeDriver 154.0.4283.62')
         with self.assertRaises(Infrastructure):
@@ -91,6 +93,29 @@ import zipfile
 import linux
 from runner import Run as SharedRun, OwnerValidation, Unavailable, summarize, report_exit_code
 from writes import difference
+
+
+@unittest.skipUnless(os.name == 'nt', 'Windows held process handles')
+class WindowsLifecycleTests(unittest.TestCase):
+    def test_exited_handles_and_stops_keep_exact_lifetime_checks(self):
+        import sys
+        with tempfile.TemporaryDirectory() as temp:
+            target=windows.Target();target.env=dict(os.environ)
+            try:
+                for operation in ('owned','stop'):
+                    with self.subTest(operation=operation):
+                        row=target.spawn([sys.executable,'-c','import time;time.sleep(1)'],str(Path(temp)/'child.log'))
+                        target.handles[row['pid']].wait(timeout=10)
+                        if operation=='owned':self.assertEqual(target.owned(),[])
+                        else:target.stop([row])
+                row=target.spawn([sys.executable,'-c','import time;time.sleep(300)'],str(Path(temp)/'child.log'))
+                target.stop([dict(row,created='1900-01-01T00:00:00.0000000Z')])
+                self.assertIsNone(target.handles[row['pid']].poll(), 'A mismatched process lifetime must not be killed')
+                target.stop([row])
+                self.assertIsNotNone(target.handles[row['pid']].poll())
+            finally:
+                for handle in target.handles.values():
+                    if handle.poll() is None:handle.terminate();handle.wait(timeout=20)
 
 
 def once(fn, description, *args, error=AssertionError, **kwargs):
@@ -303,6 +328,21 @@ class WindowsOperationalTests(unittest.TestCase):
 
 
 class WindowsUpdateAndCrashTests(unittest.TestCase):
+    def test_log_collection_preserves_utf8_and_invalid_byte_diagnostics_on_windows(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);work=root/'work';work.mkdir()
+            (work/'normal.log').write_bytes('模型 log '.encode()+b'\xff')
+            run=Mock(out=root,work=str(work),data=str(root/'data'),results=[],args=SimpleNamespace(lane='vm-windows'))
+            read,write=Path.read_text,Path.write_text
+            def windows_read(path,*args,**kwargs):
+                kwargs.setdefault('encoding','cp1252');return read(path,*args,**kwargs)
+            def windows_write(path,text,*args,**kwargs):
+                kwargs.setdefault('encoding','cp1252');return write(path,text,*args,**kwargs)
+            with patch.object(Path,'read_text',windows_read),patch.object(Path,'write_text',windows_write):
+                windows.Run.finish(run)
+            self.assertEqual((root/'normal.log').read_text(encoding='utf-8'),'模型 log \ufffd')
+            self.assertFalse(run.results[-1]['checks'])
+
     def test_update_witness_requires_real_pid_lifetime_staged_path_and_exact_bytes(self):
         import datetime, threading
         with tempfile.TemporaryDirectory() as temp:
@@ -409,10 +449,38 @@ class WindowsUpdateAndCrashTests(unittest.TestCase):
 
 
 class WindowsInstallationTests(unittest.TestCase):
+    def test_checkpoint_before_ai_still_requires_production_download(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            tools=json.dumps({'driverVersion':'2.0.4','driverSha256':'fixture'})
+            original_read=Path.read_text
+            def read(path,*args,**kwargs):
+                return tools if str(path)=='C:/Qual/tools.json' else original_read(path,*args,**kwargs)
+            for ai in (None, {'installedFully':True}):
+                work=root/('before-ai' if ai is None else 'after-ai')
+                work.mkdir()
+                facts={'assets':{'candidate.exe':'sha'}}
+                if ai: facts['ai']=ai
+                state={'assets':facts['assets'],'lane':'vm-windows','phase':'candidate',
+                       'work':str(work),'data':str(root/'data'),'binary':str(root/'app.exe'),'facts':facts}
+                checkpoint=root/'checkpoint.json';checkpoint.write_text(json.dumps(state))
+                run=Mock(out=work,facts={'assets':facts['assets']},args=SimpleNamespace(
+                    resume=checkpoint,lane='vm-windows',phase='candidate'))
+                run.target.env={'PATH':''}
+                run.crash_directories.return_value=[]
+                with patch.object(Path,'read_text',read),patch.dict(os.environ,{'APPDATA':str(root),'LOCALAPPDATA':str(root)}), \
+                     patch.object(windows,'powershell',return_value='session'),patch.object(windows,'ps_json',return_value={
+                         'folder':r'C:\Qual\crash-dumps','type':1,'count':1024}):
+                    windows.Run.setup(run)
+                self.assertEqual(run.facts['resumedSetup'], ai is not None)
+                run.start_ui.assert_called_once()
+
     def test_verified_install_uses_unquoted_registry_root_real_shell_jvm_and_jar(self):
         with tempfile.TemporaryDirectory() as temp:
-            local=Path(temp);app=local/'JustSearch';java=app/'resources/headless/runtime/bin/java.exe';java.parent.mkdir(parents=True)
+            local=Path(temp);app=local/'JustSearch';java=app/'resources/headless/runtime/bin/javaw.exe';java.parent.mkdir(parents=True)
             java.write_bytes(b'JVM');shell=app/'JustSearch.exe';shell.write_bytes(b'MZshell');jar=app/'resources/headless/ui-headless.jar';jar.write_bytes(b'Engine')
+            # The console JVM is also bundled; it cannot identify the GUI Engine.
+            java.with_name('java.exe').write_bytes(b'console JVM')
             run=Mock(facts={});run.installed_version.return_value={'version':'0.3.2','location':str(app)}
             with patch.dict(os.environ,{'LOCALAPPDATA':str(local)}),patch.object(windows,'installer_version',return_value='0.3.2'):
                 result=windows.verify_install(run,'0.3.2')
@@ -453,23 +521,24 @@ class WindowsInstallationTests(unittest.TestCase):
         view=process(55,r'C:\EdgeWebView\143.0.12.1\msedgewebview2.exe')
         run=Mock(facts={'driverIdentity':{'version':'2.0.4','sha256':'tool-sha'}},binary=r'C:\app\JustSearch.exe',work='C:/work',args=SimpleNamespace(driver='tauri-driver.exe',native_driver='msedgedriver.exe'))
         run.target.owned.return_value=[view]
-        run.target.run.return_value=SimpleNamespace(stdout='MSEdgeDriver 143.0.12.2')
+        run.target.run.return_value=SimpleNamespace(stdout='MSEdgeDriver 143.0.12.1')
         driver=Mock();driver.execute.return_value=True
         with patch('socket.socket'),patch.object(windows,'digest',return_value='tool-sha'),patch.object(windows,'WebDriver',return_value=driver),patch.object(windows,'wait_for',once):
             windows.Run.start_ui(run)
         self.assertTrue(run.facts['ui'])
         driver.start.assert_called_once_with(run.binary)
-        run.target.run.return_value=SimpleNamespace(stdout='MSEdgeDriver 142.0.12.2')
+        run.target.run.return_value=SimpleNamespace(stdout='MSEdgeDriver 143.0.12.2')
         run.desktop_spawn.reset_mock()
         with patch('socket.socket'),patch.object(windows,'digest',return_value='tool-sha'),self.assertRaises(Infrastructure):windows.Run.start_ui(run)
         run.desktop_spawn.assert_not_called()
+        run.evidence.assert_called_with('webdriver-versions', {'webview2':'143.0.12.1','msedgedriver':'MSEdgeDriver 143.0.12.2'})
 
     def test_short_parent_lifetime_binds_only_children_born_before_its_recorded_exit(self):
         parent=process(50,r'C:\app\uninstall.exe');ended=dict(parent,exited='2026-10-29T09:00:02.0000000Z')
         child=process(51,r'C:\Temp\uninstall.exe','2026-10-29T09:00:01.0000000Z',50)
         late=process(52,r'C:\other\not-ours.exe','2026-10-29T09:00:03.0000000Z',50)
         target=windows.Target();target.roots=[parent];handle=Mock();handle.poll.return_value=0;target.handles={50:handle}
-        with patch.object(windows,'spawned_identity',return_value=ended),patch.object(windows,'ps_json',return_value=[child,late]):
+        with patch.object(windows,'process_times',return_value=ended),patch.object(windows,'ps_json',return_value=[child,late]):
             rows=target.owned()
         self.assertEqual([r['pid'] for r in rows],[51])
         self.assertEqual(rows[0]['parentCreated'],parent['created'])

@@ -17,6 +17,10 @@ class RunnerTests(unittest.TestCase):
     def test_assertion_is_product_failure(self):
         self.assertEqual(self.r.classify(AssertionError('wrong search result')), 'failed-product')
 
+    def test_windows_retention_can_run_before_update_without_enabling_candidate_update(self):
+        self.assertIn('J6', self.r.phase_journeys('candidate', 'vm-windows'))
+        self.assertNotIn('J5', self.r.phase_journeys('candidate', 'vm-windows'))
+
     def test_driver_failure_is_infrastructure(self):
         self.assertEqual(self.r.classify(self.r.Infrastructure('driver mismatch')), 'failed-infrastructure')
 

@@ -95,18 +95,10 @@ public class QualDeleteChoice {
  $code=[QualDeleteChoice]::RegDeleteKeyEx([IntPtr](-2147483647),'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.txt\UserChoice',0x100,0)
  if($code -notin @(0,2) -or (Test-Path $choice)) {throw "Disposable text association selection failed: $code"}
 }
-# WebView2 is supplied by the OS/installer, never replaced with browser pixels.
-$webviews=@(Get-ChildItem "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application" -Directory | Where-Object {$_.Name -match '^\d+\.\d+\.\d+\.\d+$'})
-if(!$webviews.Count) {throw 'Installed WebView2 version is missing'}
-$webview=($webviews | Sort-Object {[version]$_.Name} -Descending | Select-Object -First 1).Name
-Download "https://msedgedriver.microsoft.com/$webview/edgedriver_win64.zip" C:/Qual/downloads/edge.zip
-New-Item -ItemType Directory -Force C:/Qual/edge | Out-Null
-& tar.exe -xf C:/Qual/downloads/edge.zip -C C:/Qual/edge
-if($LASTEXITCODE) {throw 'Edge driver extraction failed'}
-if((Get-AuthenticodeSignature C:/Qual/edge/msedgedriver.exe).Status -ne 'Valid') {throw 'Edge driver vendor signature invalid'}
-$edgeVersion=& C:/Qual/edge/msedgedriver.exe --version
-$expected=($webview -split '\.')[0..2] -join '.'
-if($edgeVersion -notmatch ([regex]::Escape($expected)+'\.\d+')) {throw 'WebView2/Edge driver mismatch (infrastructure)'}
+# Refresh the vendor driver for the exact installed runtime; cache by version.
+& (Join-Path $PSScriptRoot 'windows-edge.ps1')
+$edge=Get-Content C:/Qual/edge/versions.json -Raw | ConvertFrom-Json
+$webview=$edge.webview2
 $driverHash=(Get-FileHash -LiteralPath $Driver -Algorithm SHA256).Hash.ToLowerInvariant()
 $receiptPath=$Driver+'.json'
 if(Test-Path -LiteralPath $receiptPath) {

@@ -1,7 +1,7 @@
 """Windows adapter for runner.py. Execute inside a disposable interactive guest.
 
 No OCR evidence, application test hooks, developer JVM or seeded model files.
-Windows process observations use CIM creation times as well as PID/image paths.
+Windows process observations bind handle-derived creation times to PID/image paths.
 """
 import base64
 import json
@@ -37,7 +37,7 @@ def regular_files(root):
 
 def match_driver(webview, driver):
     versions = [re.search(r'\b(\d+)\.(\d+)\.(\d+)\.(\d+)\b', value) for value in (webview, driver)]
-    if any(v is None for v in versions) or versions[0].groups()[:3] != versions[1].groups()[:3]:
+    if any(v is None for v in versions) or versions[0].groups() != versions[1].groups():
         raise Infrastructure(f'WebView2/msedgedriver build mismatch: {webview!r}, {driver!r}')
 
 
@@ -91,7 +91,7 @@ def powershell(source, *, timeout=60):
     result = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
                             capture_output=True, text=True, timeout=timeout)
     if result.returncode:
-        raise Infrastructure('PowerShell observation failed: ' + result.stderr[-3000:])
+        raise Infrastructure(f'PowerShell observation failed (exit={result.returncode}): ' + result.stderr[-3000:] + result.stdout[-1000:])
     return result.stdout.strip().lstrip('\ufeff')
 
 
@@ -115,8 +115,8 @@ PROCESSES = r"""
 """
 
 
-def spawned_identity(process, args):
-    """Read the held CreateProcess handle, including when a short parent exits."""
+def process_times(process):
+    """Creation/exit times remain queryable on the held handle after exit."""
     import ctypes
     from ctypes import wintypes
     import datetime
@@ -124,26 +124,33 @@ def spawned_identity(process, args):
     get_times = kernel.GetProcessTimes
     get_times.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4)]
     get_times.restype = wintypes.BOOL
-    query_image = kernel.QueryFullProcessImageNameW
-    query_image.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
-    query_image.restype = wintypes.BOOL
     created, exited, kernel_time, user_time = (wintypes.FILETIME() for _ in range(4))
     if not get_times(int(process._handle), ctypes.byref(created), ctypes.byref(exited), ctypes.byref(kernel_time), ctypes.byref(user_time)):
         raise Infrastructure('Cannot record held process creation time: ' + str(ctypes.get_last_error()))
-    buffer = ctypes.create_unicode_buffer(32768)
-    size = wintypes.DWORD(len(buffer))
-    if not query_image(int(process._handle), 0, buffer, ctypes.byref(size)):
-        raise Infrastructure('Cannot record held process image: ' + str(ctypes.get_last_error()))
     filetime = (created.dwHighDateTime << 32) | created.dwLowDateTime
     stamp = datetime.datetime(1601, 1, 1) + datetime.timedelta(seconds=filetime // 10_000_000)
-    result = {'pid': process.pid, 'ppid': os.getpid(), 'exe': buffer.value,
-              'created': stamp.strftime('%Y-%m-%dT%H:%M:%S') + f'.{filetime % 10_000_000:07d}Z',
-              'command': subprocess.list2cmdline(list(map(str, args)))}
+    result = {'created': stamp.strftime('%Y-%m-%dT%H:%M:%S') + f'.{filetime % 10_000_000:07d}Z'}
     end = (exited.dwHighDateTime << 32) | exited.dwLowDateTime
     if end:
         ended = datetime.datetime(1601, 1, 1) + datetime.timedelta(seconds=end // 10_000_000)
         result['exited'] = ended.strftime('%Y-%m-%dT%H:%M:%S') + f'.{end % 10_000_000:07d}Z'
     return result
+
+
+def spawned_identity(process, args):
+    """Record the image once while alive, plus times from the held handle."""
+    import ctypes
+    from ctypes import wintypes
+    result = process_times(process)
+    query_image = ctypes.WinDLL('kernel32', use_last_error=True).QueryFullProcessImageNameW
+    query_image.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    query_image.restype = wintypes.BOOL
+    buffer = ctypes.create_unicode_buffer(32768)
+    size = wintypes.DWORD(len(buffer))
+    if not query_image(int(process._handle), 0, buffer, ctypes.byref(size)):
+        raise Infrastructure('Cannot record held process image: ' + str(ctypes.get_last_error()))
+    return dict(result, pid=process.pid, ppid=os.getpid(), exe=buffer.value,
+                command=subprocess.list2cmdline(list(map(str, args))))
 
 
 
@@ -220,11 +227,11 @@ class Target(LinuxTarget):
             return self._owned()
 
     def _owned(self):
-        for handle in self.handles.values():
+        for pid, handle in self.handles.items():
             if handle.poll() is not None:
-                ended = spawned_identity(handle, [])
+                ended = process_times(handle)
                 for root in self.roots:
-                    if same_process(root, ended) and ended.get('exited'):
+                    if root['pid'] == pid and root['created'] == ended['created'] and ended.get('exited'):
                         root['exited'] = ended['exited']
         rows = ps_json(PROCESSES, array=True)
         owned = [r for r in rows if any(same_process(r, p) for p in self.roots)]
@@ -295,6 +302,10 @@ foreach ($row in $rows) {
   }
  } finally {$p.Dispose()}
 }
+# A caught GetProcessById failure for an already-exited child can leave $?
+# false. Reaching here means every requested identity was checked; unhandled
+# errors still terminate under ErrorActionPreference=Stop.
+exit 0
 """)
         wait_for(lambda: not self.alive(identities), 'Owned processes stopped', seconds=20, error=Infrastructure)
 
@@ -459,7 +470,9 @@ class Run(SharedRun):
                 raise Infrastructure('Setup checkpoint does not match assets, lane and phase')
             self.work, self.data, self.binary = (state[k] for k in ('work', 'data', 'binary'))
             self.facts.update(state['facts'])
-            self.facts['resumedSetup'] = True
+            # Windows development checkpoints can precede J3. Only a snapshot
+            # with completed AI installation can use the cached-model path.
+            self.facts['resumedSetup'] = bool(state['facts'].get('ai'))
         if (Path(self.data).exists() or (Path(os.environ['LOCALAPPDATA']) / 'io.justsearch.shell').exists()) and not self.args.resume:
             raise Infrastructure('Fresh Windows lane refuses inherited app state')
         self.crash_since_ns = time.time_ns()
@@ -531,8 +544,8 @@ foreach($d in $disks) {$devices[$d.Name]=[long]$d.DiskWriteBytesPersec;$total+=[
                 raise Infrastructure('Qualification WebDriver port already occupied: ' + str(port)) from exc
         verify_driver_receipt(self.args.driver, self.facts['driverIdentity'])
         driver_version = self.target.run([self.args.native_driver, '--version']).stdout.strip()
-        match_driver(versions[0], driver_version)
         self.evidence('webdriver-versions', {'webview2': versions[0], 'msedgedriver': driver_version})
+        match_driver(versions[0], driver_version)
         self.desktop_spawn([self.args.driver, '--port', '4444', '--native-port', '4445',
                             '--native-driver', self.args.native_driver], self.work + '/driver.log')
         self.wd = WebDriver(self.target, 4444)
@@ -720,9 +733,9 @@ if($events.Count -gt 10000) {throw 'Crash event collection exceeds 10000 records
                              ('engine.log', Path(self.data) / 'logs/engine.log')]:
             try:
                 if source.exists():
-                    content = source.read_text(errors='replace')[-4_000_000:]
+                    content = source.read_text(encoding='utf-8', errors='replace')[-4_000_000:]
                     content = re.sub(r'("sessionToken"\s*:\s*")[^"]+', r'\1<redacted>', content)
-                    (self.out / name).write_text(content)
+                    (self.out / name).write_text(content, encoding='utf-8')
             except Exception as exc:
                 errors.append(str(exc))
         if errors:
@@ -848,7 +861,8 @@ def verify_install(run, expected):
         raise ProductFailure('Installed JustSearch.exe is missing')
     if installer_version(run.binary) != expected:
         raise ProductFailure('Installed shell file version differs from NSIS registry version')
-    java = list(root.rglob('runtime/bin/java.exe'))
+    # Match lib.rs's production java-gui launcher on Windows exactly.
+    java = list(root.rglob('runtime/bin/javaw.exe'))
     jars = list(root.rglob('ui-headless.jar'))
     if len(java) != 1 or len(jars) != 1:
         raise ProductFailure('Installer did not ship a unique bundled JVM and Engine jar')

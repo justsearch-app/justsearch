@@ -4,22 +4,33 @@ param([ValidateSet('Apply','Verify')][string]$Mode='Verify')
 $ErrorActionPreference='Stop'
 if (!(Test-Path C:/Qual/justsearch-qualification-guest) -or
     (Get-Content C:/Qual/justsearch-qualification-guest -Raw) -cne "justsearch-vm`n") {throw 'An owned disposable VM is required'}
-$services=@('wuauserv','SysMain','WSearch','DiagTrack','dmwappushservice','DoSvc')
+# DoSvc is protected even from SYSTEM. Its verified no-download policy below,
+# together with disabled Windows Update, is the accepted qualification control.
+$services=@('wuauserv','SysMain','WSearch','DiagTrack','dmwappushservice','edgeupdate','edgeupdatem')
 $taskPaths=@('\Microsoft\Windows\WindowsUpdate\','\Microsoft\Windows\UpdateOrchestrator\',
  '\Microsoft\Windows\Defrag\','\Microsoft\Windows\Customer Experience Improvement Program\',
  '\Microsoft\Windows\Feedback\Siuf\','\Microsoft\Windows\Diagnosis\',
  '\Microsoft\Windows\DeliveryOptimization\')
+$edgeTasks=@(Get-ScheduledTask | Where-Object {$_.TaskName -like 'MicrosoftEdgeUpdateTask*'})
 $exclusions=@('C:\Qual','C:\Users\qual\AppData\Local\JustSearch',
  'C:\Users\qual\AppData\Local\io.justsearch.shell','C:\Users\qual\AppData\Roaming\io.justsearch.shell')
 $errors=New-Object 'Collections.Generic.List[string]'
 if ($Mode -eq 'Apply') {
+ # WER archives can carry High (NR,NX), which overrides an explicit read ACL
+ # for the medium-integrity app task. Retain the reports and make this disposable
+ # guest's existing archive readable; new unreadable reports still fail collection.
+ $wer='C:/ProgramData/Microsoft/Windows/WER'
+ & icacls.exe $wer /grant 'qual:(OI)(CI)(RX)' /T /C
+ if($LASTEXITCODE) {throw 'WER read access provisioning failed'}
+ & icacls.exe $wer /setintegritylevel '(OI)(CI)M' /T /C
+ if($LASTEXITCODE) {throw 'WER integrity provisioning failed'}
  foreach($name in $services) {
   if(Get-Service $name -ErrorAction SilentlyContinue) {
    try {Stop-Service $name -Force;Set-Service $name -StartupType Disabled}
    catch {$errors.Add("service ${name}: $($_.Exception.Message)")}
   }
  }
- foreach($task in @(Get-ScheduledTask | Where-Object {$_.TaskPath -in $taskPaths -or $_.TaskPath -eq '\Microsoft\Windows\Windows Defender\'})) {
+ foreach($task in @($edgeTasks)+@(Get-ScheduledTask | Where-Object {$_.TaskPath -in $taskPaths -or $_.TaskPath -eq '\Microsoft\Windows\Windows Defender\'})) {
   try {$task | Disable-ScheduledTask | Out-Null} catch {$errors.Add("task $($task.TaskPath)$($task.TaskName): $($_.Exception.Message)")}
  }
  try {Set-MpPreference -DisableRealtimeMonitoring $true -ScanScheduleDay 8 -DisableCatchupFullScan $true -DisableCatchupQuickScan $true}
@@ -32,7 +43,9 @@ if ($Mode -eq 'Apply') {
  foreach($policy in @(
   @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU','NoAutoUpdate',1),
   @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection','AllowTelemetry',0),
-  @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization','DODownloadMode',0))) {
+  @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','UpdateDefault',0),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','Update{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',0),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization','DODownloadMode',99))) {
   New-Item $policy[0] -Force | Out-Null
   New-ItemProperty $policy[0] -Name $policy[1] -Value $policy[2] -PropertyType DWord -Force | Out-Null
  }
@@ -54,6 +67,7 @@ foreach($path in $taskPaths) {
  $tasks=@(Get-ScheduledTask | Where-Object {$_.TaskPath -eq $path})
  $rows.Add(@{setting="tasks/$path";observed=@($tasks | Select-Object TaskName,State);verified=(@($tasks | Where-Object {$_.State -ne 'Disabled'}).Count -eq 0)})
 }
+$rows.Add(@{setting='tasks/EdgeUpdate';observed=@($edgeTasks | Select-Object TaskName,State);verified=(@($edgeTasks | Where-Object {$_.State -ne 'Disabled'}).Count -eq 0)})
 $mp=Get-MpPreference;$status=Get-MpComputerStatus
 $defenderTasks=@(Get-ScheduledTask | Where-Object {$_.TaskPath -eq '\Microsoft\Windows\Windows Defender\'})
 $disabled=($status.RealTimeProtectionEnabled -eq $false -and @($defenderTasks | Where-Object {$_.State -ne 'Disabled'}).Count -eq 0)
@@ -70,7 +84,9 @@ $rows.Add(@{setting='pagefile';observed=@{automatic=$auto;settings=$page | Selec
 foreach($policy in @(
  @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU','NoAutoUpdate',1),
  @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection','AllowTelemetry',0),
- @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization','DODownloadMode',0))) {
+ @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','UpdateDefault',0),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate','Update{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',0),
+ @('HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization','DODownloadMode',99))) {
  $value=(Get-ItemProperty $policy[0] -ErrorAction SilentlyContinue).($policy[1])
  $rows.Add(@{setting=$policy[1];observed=$value;verified=($null -ne $value -and $value -eq $policy[2])})
 }
@@ -78,6 +94,7 @@ $boot=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().T
 $applied=Get-Content C:/Qual/quiet-applied.json -Raw | ConvertFrom-Json
 $rebooted=$boot -ne $applied.boot
 $report=@{mode=$Mode;boot=$boot;appliedBoot=$applied.boot;rebooted=$rebooted;applyErrors=$applied.errors;settings=$rows.ToArray();
+ exceptions=@(@{setting='service/DoSvc';reason='Protected service: verify DODownloadMode=99 after reboot instead of startup mode; Windows Update disabled; measured writes remain the guard';observed=Get-CimInstance Win32_Service -Filter "Name='DoSvc'" | Select-Object Name,StartMode,State});
  verified=($Mode -eq 'Verify' -and $rebooted -and @($rows | Where-Object {!$_.verified}).Count -eq 0)}
 [IO.File]::WriteAllText('C:/Qual/quiet-'+$Mode.ToLowerInvariant()+'.json',($report | ConvertTo-Json -Depth 12))
 if($Mode -eq 'Verify' -and !$report.verified) {throw 'Guest write settings did not survive reboot; see quiet-verify.json'}
