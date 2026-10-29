@@ -992,7 +992,7 @@
           "drives": [
             "discovery"
           ],
-          "startTimeoutMs": 1500,
+          "startTimeoutMs": 4000,
           "enginePlan": [
             {
               "mode": "slow-start",
