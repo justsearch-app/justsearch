@@ -116,19 +116,23 @@ npm run lint:scripts
 The prep script prints the command to source its environment. It installs the three
 lockfile-pinned npm dependency trees directly into this checkout's ignored
 `node_modules`, `modules/ui-web/node_modules` and `scripts/wire-contract/node_modules`
-directories with `npm ci`. It refuses symlinks at any of those paths and paths that
-resolve outside this checkout, before installing anything. The Python venv,
+directories with `npm ci`. Before any mutation, it checks every destination's
+ancestors through the checkout root and every existing child in `tmp/ui-checks/`,
+refusing symlinks and paths that resolve outside this checkout. The Python venv,
 pip/npm caches and any downloaded browser live in `tmp/ui-checks/`. This makes
 `ui_shot.py` use the nearest checkout's Vite and dependencies, including when the
 checkout is nested inside another repository, without its ancestor-junction fallback.
-Setup can be rerun; `npm ci` replaces these local dependency directories.
+For another preparation run, first remove `tmp/ui-checks/` using the cleanup below:
+the generated venv itself contains symlinks. `npm ci` replaces local dependencies.
 
 The venv installs editable `scripts/jseval[ui]`, including all base dependencies
-(such as `httpx`), from this checkout. Unlike CI's Python 3.13 install, which uses
-`-c scripts/jseval/requirements.lock.txt`, this host-Python recipe resolves the base
-dependencies without that constraint file: its NumPy pin predates Python 3.14 wheels.
+(such as `httpx`), from this checkout. With Python 3.13 it uses CI's constraints,
+`-c scripts/jseval/requirements.lock.txt`. Other Python versions resolve dependencies
+without that file: its NumPy pin predates Python 3.14 wheels. Pip's inherited
+configuration and environment settings are ignored; its cache stays session-local.
 The installed Python Playwright selects its own Chromium revision. Matching Chromium
-and headless-shell directories in `~/.cache/ms-playwright` are reused read-only;
+and headless-shell executables in `~/.cache/ms-playwright` are reused read-only
+only when both required revisions are present and executable;
 otherwise Chromium is installed locally. This does not install system packages.
 A missing host library is a blocker to report to the orchestrator.
 

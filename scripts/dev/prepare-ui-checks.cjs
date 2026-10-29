@@ -5,6 +5,7 @@
 // the Python environment and session-local caches belong to this checkout's tmp/;
 // the shared Playwright cache is inspected and used read-only when it matches.
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
@@ -24,19 +25,34 @@ function run(command, args, env) {
   if (result.status !== 0) process.exit(result.status || 1);
 }
 
-// Validate every destination before npm ci can remove an existing installation.
-for (const source of installs) {
-  const modules = path.join(source, 'node_modules');
-  const stat = fs.lstatSync(modules, { throwIfNoEntry: false });
-  if (stat?.isSymbolicLink()) {
-    throw new Error(`${modules} is a symlink; remove it or use a fresh isolated checkout`);
-  }
-  const resolved = fs.realpathSync(stat ? modules : source);
-  const relative = path.relative(root, resolved);
+// Check ancestors too: lstat of a destination alone follows links in its parents.
+// Do all checks before the first mutation, including existing cache/output children.
+function validateDestination(destination) {
+  const relative = path.relative(root, destination);
   if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-    throw new Error(`${modules} must be a real directory inside this checkout; remove the link or use a fresh isolated checkout`);
+    throw new Error(`${destination} must stay inside this checkout`);
+  }
+  let current = root;
+  for (const part of relative.split(path.sep)) {
+    current = path.join(current, part);
+    const stat = fs.lstatSync(current, { throwIfNoEntry: false });
+    if (!stat) break;
+    if (stat.isSymbolicLink() || fs.realpathSync(current) !== current) {
+      throw new Error(`${current} is a symlink or resolves outside this checkout; remove it or use a fresh isolated checkout`);
+    }
   }
 }
+
+function validateSessionTree(destination) {
+  validateDestination(destination);
+  if (fs.lstatSync(destination, { throwIfNoEntry: false })?.isDirectory()) {
+    for (const child of fs.readdirSync(destination)) {
+      validateSessionTree(path.join(destination, child));
+    }
+  }
+}
+for (const source of installs) validateDestination(path.join(source, 'node_modules'));
+validateSessionTree(prep);
 
 fs.mkdirSync(path.join(prep, 'scratch'), { recursive: true });
 const env = {
@@ -44,32 +60,59 @@ const env = {
   TMPDIR: path.join(prep, 'scratch'),
   npm_config_cache: path.join(prep, 'npm-cache'),
   PIP_CACHE_DIR: path.join(prep, 'pip-cache'),
-  // Avoid inheriting a user-site or another session's Python packages.
-  PYTHONNOUSERSITE: '1',
-  PYTHONPATH: '',
 };
+// Ignore pip's environment and config files, including destination settings such
+// as target/prefix/user/root. Explicitly restore only our session-local cache.
+for (const key of Object.keys(env)) {
+  if (key.startsWith('PIP_') || key.startsWith('PYTHON') || key === 'VIRTUAL_ENV') delete env[key];
+}
+env.PIP_CONFIG_FILE = os.devNull;
+env.PIP_CACHE_DIR = path.join(prep, 'pip-cache');
+// Avoid user-site packages, foreign module paths and redirected bytecode caches.
+env.PYTHONNOUSERSITE = '1';
+env.PYTHONPATH = '';
 for (const source of installs) {
   run('npm', ['ci', '--prefix', source, '--audit=false'], env);
 }
 
 run('python3', ['-m', 'venv', path.join(prep, 'venv')], env);
 const python = path.join(prep, 'venv/bin/python');
-run(python, ['-m', 'pip', 'install', '-e', `${root}/scripts/jseval[ui]`], env);
+const version = spawnSync(python, ['-c', 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")'], {
+  env, encoding: 'utf8',
+});
+if (version.error) throw version.error;
+if (version.status !== 0) {
+  process.stderr.write(version.stderr);
+  process.exit(version.status || 1);
+}
+const constraints = version.stdout.trim() === '3.13' ? ['-c', path.join(root, 'scripts/jseval/requirements.lock.txt')] : [];
+run(python, ['-m', 'pip', 'install', '-e', `${root}/scripts/jseval[ui]`, ...constraints], env);
 
 // Chromium's executable_path comes from this Python Playwright, not playwright-core
 // in npm. Headless screenshots also need its matching headless-shell revision.
-const sharedBrowsers = path.join(require('node:os').homedir(), '.cache/ms-playwright');
+const sharedBrowsers = path.join(os.homedir(), '.cache/ms-playwright');
 const probe = spawnSync(python, ['-c', `
-import json
+import subprocess
 from pathlib import Path
 import playwright
-from playwright.sync_api import sync_playwright
-cache = Path(${JSON.stringify(sharedBrowsers)})
-registry = json.loads((Path(playwright.__file__).parent / 'driver/package/browsers.json').read_text())
-shell = next(b for b in registry['browsers'] if b['name'] == 'chromium-headless-shell')
-with sync_playwright() as p:
-    present = Path(p.chromium.executable_path).is_file()
-raise SystemExit(0 if present and (cache / ('chromium_headless_shell-' + shell['revision'])).is_dir() else 1)
+driver = Path(playwright.__file__).parent / 'driver'
+# Use Playwright's registry so platform paths and revision overrides match launch.
+raise SystemExit(subprocess.call([str(driver / 'node'), '-e', """
+const fs = require('node:fs');
+const path = require('node:path');
+process.on('uncaughtException', error => { console.error(error); process.exit(2); });
+const bundle = path.join(process.argv[1], 'lib/coreBundle.js');
+const registry = fs.existsSync(bundle) ? require(bundle).registry.registry
+  : require(path.join(process.argv[1], 'lib/server/registry/index.js')).registry;
+const present = ['chromium', 'chromium-headless-shell'].every(name => {
+  const executable = registry.findExecutable(name).executablePath();
+  try {
+    fs.accessSync(executable, fs.constants.X_OK);
+    return fs.statSync(executable).isFile();
+  } catch { return false; }
+});
+process.exit(present ? 0 : 1);
+""", str(driver / 'package')]))
 `], { env: { ...env, PLAYWRIGHT_BROWSERS_PATH: sharedBrowsers }, stdio: 'inherit' });
 if (probe.error) throw probe.error;
 if (probe.status !== 0 && probe.status !== 1) process.exit(probe.status || 1);
