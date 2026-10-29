@@ -2733,7 +2733,7 @@
     },
     {
       "id": "SW-READY-02",
-      "behavior": "Unknown status never invents readiness, a document count, or an unlocked transcript, and status that is no longer live blocks every action.",
+      "behavior": "Unknown status never invents readiness, a document count, or an unlocked transcript, and while the backend connection is not live, asking about files, extraction and agent runs are reported unavailable with the disconnection reason.",
       "kind": "works-today",
       "races": [],
       "observations": [
