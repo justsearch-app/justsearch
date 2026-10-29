@@ -38,3 +38,14 @@ background activation/deactivation and restores the original property even when 
   "note": "Cold and random class runs pass 32/32; all seven fresh-JVM methods pass; primed before/after runs preserve all 32 tests and assertions. All 71 display-related suite failures reproduce before. The gate remains blocked by inherited uncovered changes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-ras-osname-2-codex",
+  "verdict": "accept",
+  "digest": "sha256:5ff7423f3638fd61fb2c0843021a889ba7805c96dd09dce9b8a19378880f6ba7",
+  "note": "Same-JVM unset, seeded and forced-failure probes restore all three properties. Isolated/random runs pass 32/32; suite matches 71 baseline display failures. Inherited static-map and HTTP-client lifetime findings are recorded."
+}
+```
