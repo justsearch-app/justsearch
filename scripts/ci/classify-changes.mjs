@@ -57,6 +57,9 @@ export const RULES = [
   [/^governance\/(?:supervision-contract\.v1\.json$|store-recoverability\.v1\.json$|worktree-lifecycle\.v1\.json$|exit-ledger\.v1\.schema\.json$|fixtures\/exit-ledger\/)/, ['devrunner', 'windows']],
   [/^(?:contracts\/(?:native-targets|platform-paths)\/spec\.v1\.json|modules\/shell\/src-tauri\/tauri\.conf\.json|package(?:-lock)?\.json|dev-runner\.cjs)$/, ['devrunner', 'windows']],
   [/^\.gitignore$/, ['devrunner', 'windows', 'jseval']],
+  // The UI-check preparation suite (scripts/dev/test-dev-runner-prepare-ui-checks.mjs) reads
+  // jseval's declared dependencies; it runs on Linux only.
+  [/^scripts\/jseval\/pyproject\.toml$/, ['devrunner']],
   [/^models\//, [...contracts, 'license']],
   [/^(?:licenses?\/|notices?\/|NOTICE|LICENSE|native-licenses\/)/, ['license']],
 ];
