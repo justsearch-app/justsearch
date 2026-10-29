@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c600f0c8ddfc11a2eb9a605209d06a9c2333051e8030b2ec2e72f13e7fd9dbf2"
+  },
+  "createdAt": "2026-10-29T15:39:54.777Z",
+  "revision": "573d785aeb241e00b7d143dcdacc9f4a3ba8d9c5",
+  "tree": "d085d1e777539bb379f73b60d809d27325d24f2e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.LinuxChildReapingRaceTest.unchangedWrapperStillFailsAtTheExecDeadline\" --tests \"io.justsearch.app.api.runtime.child.LinuxChildReapingRaceTest.missingExeLinkKeepsPolling\" --tests \"io.justsearch.app.api.runtime.child.LinuxChildReapingRaceTest.wrapperRefusalStillIncludesExit125AndItsDetail\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6669
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LinuxChildReapingRaceTest.java#unchangedWrapperStillFailsAtTheExecDeadline",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LinuxChildReapingRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:798ce34508e8c7756bdb4dfabb563a72337370e4b664bd1ee4dd22b8e4f9c705",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unchangedWrapperStillFailsAtTheExecDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LinuxChildReapingRaceTest.java#missingExeLinkKeepsPolling",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LinuxChildReapingRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:798ce34508e8c7756bdb4dfabb563a72337370e4b664bd1ee4dd22b8e4f9c705",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingExeLinkKeepsPolling()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LinuxChildReapingRaceTest.java#wrapperRefusalStillIncludesExit125AndItsDetail",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LinuxChildReapingRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:798ce34508e8c7756bdb4dfabb563a72337370e4b664bd1ee4dd22b8e4f9c705",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "wrapperRefusalStillIncludesExit125AndItsDetail()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0cfeccbad283f77514c3caff61459a0715c60f221346679099f04d101ae679b5"
+}
