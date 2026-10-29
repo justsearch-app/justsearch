@@ -452,19 +452,8 @@ plus the scoped descriptive metrics listed above.
 - `workflow.session.silent_window_max_ms`
 - `workflow.session.silent_window_count`
 
-All of the scoped items below are now operationalized in the workflow-run store:
-
-- `workflow.start.ready_http_ms`
-- `workflow.start.index_serving_ms`
-- `workflow.start.direct_detection_used`
-- `workflow.stop.ports_closed`
-- `workflow.stop.orphan_process_reaped`
-- `workflow.runtime.stale_artifact_detected`
-- `workflow.eval.parameter_binding_error`
-- `workflow.eval.circuit_breaker_during_baseline`
-- `workflow.session.manual_forensics_count`
-- `workflow.session.silent_window_max_ms`
-- `workflow.session.silent_window_count`
+All of the [scoped metrics above](#historical-next-metrics-that-were-operationalized) are now
+operationalized in the workflow-run store.
 
 ## Status for this pass
 

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuite name="io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-29T08:08:57.266Z" hostname="elias-systemproductname" time="3.12">
+  <properties />
+  <testcase name="retiredOrFailedCpuRerankerIsInactive(boolean, boolean, Path) [1]" classname="io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest" time="2.879" />
+  <testcase name="retiredOrFailedCpuRerankerIsInactive(boolean, boolean, Path) [2]" classname="io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest" time="0.031" />
+  <testcase name="retiredOrFailedCpuRerankerIsInactive(boolean, boolean, Path) [3]" classname="io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest" time="0.025" />
+  <testcase name="retiredOrFailedCpuRerankerIsInactive(boolean, boolean, Path) [4]" classname="io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest" time="0.025" />
+  <testcase name="warmGpuRerankerIsActive(boolean, Path) [1]" classname="io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest" time="0.055" />
+  <testcase name="warmGpuRerankerIsActive(boolean, Path) [2]" classname="io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest" time="0.017" />
+  <testcase name="unbuiltRerankerIsInactive(boolean, Path) [1]" classname="io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest" time="0.009" />
+  <testcase name="unbuiltRerankerIsInactive(boolean, Path) [2]" classname="io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest" time="0.01" />
+  </testsuite>

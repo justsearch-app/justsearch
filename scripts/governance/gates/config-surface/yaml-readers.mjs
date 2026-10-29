@@ -39,10 +39,11 @@
  * whole gate family exists to avoid.
  */
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import yaml from 'js-yaml';
+import { collectJavaMainSources } from './dead-config.mjs';
 
 /** Same three files the dead-config scanner excludes from the reader corpus, for the same reason. */
 const DECLARATION_FILES = [
@@ -50,30 +51,6 @@ const DECLARATION_FILES = [
   '/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java',
   '/io/justsearch/configuration/resolved/ResolvedConfig.java',
 ];
-
-function collectJavaMainSources(root) {
-  const out = [];
-  const modules = resolve(root, 'modules');
-  if (!existsSync(modules)) return out;
-  const walk = (dir) => {
-    let entries;
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      const p = join(dir, e.name);
-      if (e.isDirectory()) {
-        if (!/^(build|node_modules|\.git|\.gradle|bin|out)$/.test(e.name)) walk(p);
-      } else if (e.name.endsWith('.java') && p.replace(/\\/g, '/').includes('/src/main/')) {
-        out.push(p);
-      }
-    }
-  };
-  walk(modules);
-  return out;
-}
 
 /**
  * Flatten a parsed YAML document to the set of dotted paths that carry a VALUE.
