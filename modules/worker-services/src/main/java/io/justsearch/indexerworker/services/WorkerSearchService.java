@@ -476,6 +476,12 @@ public final class WorkerSearchService {
     return ragContextOps.getOrtCudaStatus();
   }
 
+  /** Returns true if the built reranker has a healthy session ready for queries on either device. */
+  public boolean isRerankerActive() {
+    CrossEncoderReranker reranker = searchReranker;
+    return reranker != null && reranker.isQueryWarm();
+  }
+
   /** Returns true if the citation scorer is initialized and ready for inference (368 RC3). */
   public boolean isCitationScorerActive() {
     return citationMatchOps.isCitationScorerActive();
