@@ -1,0 +1,132 @@
+name: Qualify draft release (Linux journeys)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing draft release tag (for example v0.3.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qualify-linux-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  journeys:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      OMP_NUM_THREADS: '8'
+      OPENBLAS_NUM_THREADS: '8'
+      RAYON_NUM_THREADS: '8'
+    steps:
+      - name: Require a disposable GitHub-hosted runner
+        run: '[[ $RUNNER_ENVIRONMENT == github-hosted ]]'
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.20.0'
+      - name: Fetch draft bytes and tagged registry metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]
+          mkdir -p "$RUNNER_TEMP/release-assets"
+          gh release view "$RELEASE_TAG" --json isDraft,tagName,targetCommitish > "$RUNNER_TEMP/draft.json"
+          jq -e '.isDraft == true' "$RUNNER_TEMP/draft.json"
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/release-assets" \
+            --pattern '*.deb' --pattern justsearch-mcp.mcpb --pattern SHA256SUMS
+          gh api "repos/$GITHUB_REPOSITORY/contents/packaging/mcpb/server.json?ref=$RELEASE_TAG" \
+            --jq .content | base64 --decode > "$RUNNER_TEMP/server.json"
+          python3 - "$RUNNER_TEMP/release-assets" <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/release/qual/journeys')
+          from runner import verify_assets
+          root = Path(sys.argv[1])
+          packages = list(root.glob('*.deb'))
+          assert len(packages) == 1, 'Expected one Linux draft package'
+          verify_assets(root, [packages[0].name, 'justsearch-mcp.mcpb'])
+          PY
+      - name: Provision qualification tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y webkit2gtk-driver xvfb openbox xdotool scrot \
+            mousepad python3-pil fonts-dejavu-core tesseract-ocr dbus-x11 systemd-coredump
+          python3 - <<'PY'
+          import re, subprocess
+          # Hosted images carry development JDKs. Remove those packages from this
+          # disposable runner so a clean app launch cannot accidentally use one.
+          rows = subprocess.check_output(['dpkg-query', '-W', '-f=${Package}\t${db:Status-Status}\n'], text=True)
+          packages = [name for row in rows.splitlines() for name, status in [row.split('\t')]
+                      if status == 'installed' and re.search(r'(openjdk|temurin|msopenjdk|zulu).*(jdk|jre)', name)]
+          if packages:
+              subprocess.run(['sudo', 'apt-get', 'purge', '-y', *packages], check=True)
+          PY
+          cargo install tauri-driver --version 2.0.4 --locked
+          python3 -m unittest discover -s scripts/release/qual/journeys -p 'test_*.py' -v
+      - name: Run the shared journeys under X11
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find "$RUNNER_TEMP/release-assets" -maxdepth 1 -name '*.deb' -printf '%f\n')
+          [[ ${#packages[@]} == 1 ]]
+          crash_since=$(date --iso-8601=seconds)
+          set +e
+          xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
+            python3 scripts/release/qual/journeys/hosted.py \
+              --assets "$RUNNER_TEMP/release-assets" --package "${packages[0]}" \
+              --registry "$RUNNER_TEMP/server.json" --evidence "$RUNNER_TEMP/journey-evidence"
+          result=$?
+          python3 - "$crash_since" "$result" <<'PY_SUMMARY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/release/qual/journeys')
+          from runner import collect_hosted_crashes
+          out = Path(os.environ['RUNNER_TEMP']) / 'journey-evidence'
+          # Collection is not proven armed or finished; its owner-validation row
+          # caps a successful hosted result at pending validation (exit 2).
+          crash_result = collect_hosted_crashes(out, sys.argv[1])
+          summary = Path(os.environ['RUNNER_TEMP']) / 'journey-evidence/summary.json'
+          status = json.loads(summary.read_text())['status'] if summary.exists() else 'summary unavailable'
+          message = f'Linux release journeys: {status}'
+          print(message)
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as stream:
+              stream.write(message + '\n')
+          sys.exit(int(sys.argv[2]) if int(sys.argv[2]) not in (0, 2) else crash_result)
+          PY_SUMMARY
+          result=$?
+          set -e
+          exit "$result"
+      - name: Record unavailable journeys when preparation failed
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/release/qual/journeys')
+          from runner import preparation_failure
+          out = Path(os.environ['RUNNER_TEMP']) / 'journey-evidence'
+          out.mkdir(exist_ok=True)
+          if not (out / 'summary.json').exists():
+              report = preparation_failure('hosted-linux-x11', 'Workflow preparation failed; see job logs')
+              (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
+          PY
+      - name: Upload observations on every outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-journeys-${{ inputs.tag }}
+          path: |
+            ${{ runner.temp }}/journey-evidence/
+            ${{ runner.temp }}/draft.json
+          if-no-files-found: error
+          retention-days: 30

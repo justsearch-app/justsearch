@@ -1,7 +1,9 @@
 # Clean release test VMs
 
 Plain QEMU/KVM; one guest at a time, eight vCPUs pinned to eight allowed host
-threads, 6144 MiB RAM. No libvirt, guest agent or AI login. Requires existing
+threads, 12288 MiB RAM. Before launch, the harness waits up to 15 minutes for
+host MemAvailable to reach 14 GiB, then refuses if it is still lower.
+No libvirt, guest agent or AI login. Requires existing
 `qemu-system-x86_64`, `qemu-img`, `taskset`, `ssh`, `scp`, `ssh-keygen`,
 `openssl`, `xorriso`, `genisoimage`, KVM access and `/usr/share/OVMF/*_4M.fd`.
 Python code uses the standard library. No host package installs or sudo.
