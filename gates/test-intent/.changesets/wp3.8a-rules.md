@@ -581,3 +581,14 @@ All sources remain agent choices under the specified design delegation. Builder 
   "note": "Codex verifier-b2 on e535494115: PASS; classifications and evidence accepted"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1887f-da22-7961-80f7-243ede021e31",
+  "verdict": "accept",
+  "digest": "sha256:5370e669187f0061aad27be263f745bedd11988d53427c86459e542cbfc4c3be",
+  "note": "Codex verifier-b5 on 7ffff2f266: PASS; changeset accepted as it stands"
+}
+```

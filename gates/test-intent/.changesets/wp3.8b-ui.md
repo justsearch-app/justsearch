@@ -112,3 +112,14 @@ was changed. The earlier acceptance below has not been renewed by this builder.
   "note": "Codex verifier-b2 on e535494115: PASS; classifications and evidence accepted"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1887f-da22-7961-80f7-243ede021e31",
+  "verdict": "accept",
+  "digest": "sha256:d268213cdc2de9c3d0d1dbfd09d47f3f230b3feea4fb4078b3d9a86941a2e274",
+  "note": "Codex verifier-b5 on 7ffff2f266: PASS; changeset accepted as it stands"
+}
+```
