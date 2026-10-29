@@ -106,6 +106,11 @@ public final class TextQueryOps {
   private Query buildMultiFieldQuery(String queryText, QuerySyntax requestedSyntax)
       throws org.apache.lucene.queryparser.classic.ParseException {
     QuerySyntax syntax = (requestedSyntax == null) ? QuerySyntax.SIMPLE : requestedSyntax;
+    if (syntax == QuerySyntax.SEARCH) {
+      var parsed = io.justsearch.core.search.SearchSyntax.parse(queryText);
+      if (parsed.advanced()) return buildSearchQuery(parsed);
+      syntax = QuerySyntax.SIMPLE;
+    }
     Query contentQuery;
     Query titleQuery;
     if (syntax == QuerySyntax.SIMPLE) {
@@ -123,6 +128,41 @@ public final class TextQueryOps {
     // DisjunctionMaxQuery (Elasticsearch best_fields pattern). Best field score drives ranking,
     // with tie-breaker from other fields. Documents without titles/author are unaffected.
     return combineMultiField(contentQuery, titleQuery, authorQuery);
+  }
+
+  /** Builds each literal clause before combining it at document scope. */
+  private Query buildSearchQuery(io.justsearch.core.search.SearchSyntax.Parsed parsed) {
+    var builder = new BooleanQuery.Builder();
+    var queryBuilder = new org.apache.lucene.util.QueryBuilder(session.snapshot.indexAnalyzer());
+    boolean required = false;
+    for (var clause : parsed.clauses()) {
+      Query query;
+      if (clause.field() != null) {
+        query = literalClause(queryBuilder, clause, clause.field());
+      } else {
+        var fields = new ArrayList<Query>();
+        for (String field : List.of(SchemaFields.CONTENT, SchemaFields.TITLE, SchemaFields.AUTHOR)) {
+          Query fieldQuery = literalClause(queryBuilder, clause, field);
+          if (field.equals(SchemaFields.TITLE)) fieldQuery = new BoostQuery(fieldQuery, resolveTitleBoost());
+          if (field.equals(SchemaFields.AUTHOR)) fieldQuery = new BoostQuery(fieldQuery, AUTHOR_BOOST);
+          fields.add(fieldQuery);
+        }
+        query = new DisjunctionMaxQuery(fields, TITLE_TIE_BREAKER);
+      }
+      boolean must = !clause.excluded() && (clause.phrase() || clause.field() != null);
+      required |= must;
+      builder.add(query, clause.excluded() ? BooleanClause.Occur.MUST_NOT
+          : must ? BooleanClause.Occur.MUST : BooleanClause.Occur.SHOULD);
+    }
+    if (!required) builder.setMinimumNumberShouldMatch(1);
+    return builder.build();
+  }
+
+  private static Query literalClause(org.apache.lucene.util.QueryBuilder builder,
+      io.justsearch.core.search.SearchSyntax.Clause clause, String field) {
+    Query query = clause.phrase() ? builder.createPhraseQuery(field, clause.text())
+        : builder.createBooleanQuery(field, clause.text(), BooleanClause.Occur.SHOULD);
+    return query == null ? new org.apache.lucene.search.MatchNoDocsQuery() : query;
   }
 
   /**

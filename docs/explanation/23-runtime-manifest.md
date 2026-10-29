@@ -26,10 +26,16 @@ stdout line consumers parse — the review answer is **"extend the
 manifest."** The convention closes the door that today is open to nine
 variant answers.
 
-This rule is mechanically enforced by
-`scripts/ci/check-runtime-manifest-closure.mjs`. The script greps for
-any code that constructs `<dataDir>/runtime/<artifact>` paths and fails
-if the artifact isn't on the allowlist inside the script itself.
+This rule is checked by
+`scripts/ci/check-runtime-manifest-closure.mjs`, an advisory step in the
+**Public claims** CI job on every pull request and on main. Its fixture
+self-test remains blocking. The script scans literal path constructions
+in selected production sources and scripts for `<dataDir>/runtime/<artifact>` and exits
+non-zero if the artifact isn't on the allowlist inside the script itself.
+The CI step is advisory because these regexes also match comments (for example,
+`// Example: path.join(dataDir, "runtime", "retired.json")`) and other base directories
+(`path.join(outputDir, "runtime", "report.json")`). The self-test records both as known
+false positives; zero real violations have been found so far.
 Adding an artifact is therefore a deliberate design event, not a
 routine merge.
 
@@ -286,6 +292,6 @@ Step-by-step when a non-JVM consumer needs runtime fact F:
    well-known / MCP transports all carry it automatically.
 9. Do **not** add a new sibling file, env var, or stdout line. The
    closure-check script (`scripts/ci/check-runtime-manifest-closure.mjs`)
-   blocks new sibling files, unsanctioned stdout `JUSTSEARCH_X=` emits,
+   reports new sibling files, unsanctioned stdout `JUSTSEARCH_X=` emits,
    and `Files.write*` calls into `<dataDir>/runtime/` from outside the
-   publisher package — at PR time.
+   publisher package — as advisory findings at PR time.

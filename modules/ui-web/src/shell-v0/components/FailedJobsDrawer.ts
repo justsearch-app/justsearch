@@ -352,7 +352,7 @@ export class FailedJobsDrawer extends JfElement {
     // actually happened and what makes the queue try again, so the error stays as detail rather
     // than as the explanation.
     const exhausted = r.state.toUpperCase() === JOB_STATE_RETRY_EXHAUSTED;
-    // Task t-20261013-ef3c41 — a file that exists but cannot be read is retried without end and its
+    // #758 — a file that exists but cannot be read is retried without end and its
     // indexed content is kept; it must not read like a broken or a missing file.
     const indexedUnreadable = r.state.toUpperCase() === JOB_STATE_INDEXED_SOURCE_UNREADABLE;
     const unreadable = indexedUnreadable || r.state.toUpperCase() === JOB_STATE_SOURCE_UNREADABLE;

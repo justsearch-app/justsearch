@@ -227,6 +227,19 @@
       "advisory": false
     },
     {
+      "name": "Qualify draft release (Linux journeys)",
+      "path": ".github/workflows/qualify-release-linux.yml",
+      "class": "release-gate",
+      "expectedTriggers": [
+        "workflow_dispatch"
+      ],
+      "owner": "release workflow: Linux journey qualification of a draft release",
+      "failureDefault": "release-blocking-failure",
+      "staleDays": 14,
+      "blocking": false,
+      "advisory": true
+    },
+    {
       "name": "Daily Packaging Smoke",
       "path": ".github/workflows/packaging-smoke.yml",
       "class": "scheduled-quality-signal",

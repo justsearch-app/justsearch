@@ -52,6 +52,8 @@ enum SearchQuerySyntax {
   SEARCH_QUERY_SYNTAX_SIMPLE = 0;
   // Advanced: Lucene QueryParser syntax (phrases, boolean operators, field qualifiers).
   SEARCH_QUERY_SYNTAX_LUCENE = 1;
+  // Search subset: phrases, exclusions, title/author. Strict lexical retrieval.
+  SEARCH_QUERY_SYNTAX_SEARCH = 2;
 }
 
 // Component activation for the search pipeline (256: Phase A).
@@ -687,7 +689,7 @@ message BatchRequest {
   repeated string file_paths = 1;
   bool force_reindex = 2;  // Bypass "file unchanged" check, force re-extraction
   string target_collection = 3;  // Optional: tag indexed docs with this collection (empty = default)
-  // Task t-20261013-ef3c41, round 8b (decision 1): set only by an explicit ingest request, a
+  // #758: set only by an explicit ingest request, a
   // person's or an agent's, which is a deliberate add and records each file's folder volume. A
   // batch without it records nothing; a file whose folder has no recorded volume is not admitted.
   bool root_added = 4;
@@ -745,7 +747,7 @@ message CoreStatus {
   // yet — the signal that separates "the corpus shrank" from "the index has not merged yet".
   int64 index_max_doc = 21;
   int64 index_num_docs = 22;
-  // Task t-20261013-ef3c41: true when doc_count and searchable_doc_count are NOT counts — the index
+  // #758: true when doc_count and searchable_doc_count are NOT counts — the index
   // could not be counted and no earlier count exists (the first read failed). Both then carry 0 for
   // readers that predate this field; a reader that knows it must show the count as unknown, never
   // as an empty index. Absent (false) means the counts are known, as every earlier sender meant.
@@ -1377,7 +1379,7 @@ message FailedJob {
   // Tempdoc 885 item 21b: FAILED | RETRY_EXHAUSTED. Without it the failure API had to guess, and
   // guessed "FAILED" for every row -- relabelling a job that gave up after a week of retries as
   // one whose content could not be parsed.
-  // Task t-20261013-ef3c41: or SOURCE_UNREADABLE | INDEXED_SOURCE_UNREADABLE -- a source that
+  // #758: or SOURCE_UNREADABLE | INDEXED_SOURCE_UNREADABLE -- a source that
   // exists but cannot be read (locked, access denied) is retried without end and listed here, the
   // second form when its content is in the index and stays searchable. Never a missing file.
   string state = 6;
@@ -1635,9 +1637,9 @@ message ScanRootRequest {
   ScanMode mode = 3;
   // Operator overrides; the WorkerIngestionAuthority skip policy applies in addition.
   repeated string exclude_globs = 4;
-  // Task t-20261013-ef3c41, round 8: set only by a deliberate add, which alone records a volume:
-  // the person's add of the root, or an explicit ingest request of a folder or a file (round 8b,
-  // decision 1). No walk without it records; it refuses a folder with no recorded volume.
+  // #758: set only by a deliberate add, which alone records a volume:
+  // the person's add of the root, or an explicit ingest request of a folder or a file. No walk
+  // without it records; it refuses a folder with no recorded volume.
   bool root_added = 5;
 }
 
@@ -1662,7 +1664,7 @@ message ScanRootProgress {
 message WatchRootRequest {
   string root_path = 1;
   string collection = 2;
-  // Task t-20261013-ef3c41, round 8: set only by the person's add of the root, which alone
+  // #758: set only by the person's add of the root, which alone
   // records the root's volume. Every other registration holds a root with no recorded volume.
   bool root_added = 3;
 }

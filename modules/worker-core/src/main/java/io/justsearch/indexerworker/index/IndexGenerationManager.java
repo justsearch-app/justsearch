@@ -315,7 +315,7 @@ public final class IndexGenerationManager {
         cleanupAbandonedStateTemps();
         return resolveFromState(state);
       }
-      // Task t-20261013-ef3c41, round 3: neither state.json nor its backup can be read, yet one of
+      // #758: neither state.json nor its backup can be read, yet one of
       // them exists. Whatever brake it held is gone, so whether a rebuild budget was spent cannot be
       // told. The layout below is re-established as before (a compatible index boots and serves),
       // but the new record says the brake was lost, so no automatic rebuild starts on its account.
@@ -1416,7 +1416,7 @@ public final class IndexGenerationManager {
 
   /**
    * The brake key recorded when the state was re-established because neither {@code state.json}
-   * nor its backup could be read (task t-20261013-ef3c41, round 3). It names no target shape: it
+   * nor its backup could be read (#758). It names no target shape: it
    * says the brake that was there is unknown, so it holds for every target until a completed
    * cutover releases it. Never a valid {@code index_fingerprint}, so it cannot collide with one.
    */
@@ -1437,7 +1437,7 @@ public final class IndexGenerationManager {
     try (var ignored = stateControl()) {
       State current = readStateBestEffort();
       if (current == null) {
-        // Task t-20261013-ef3c41: a state record that exists but cannot be read holds a brake this
+        // #758: a state record that exists but cannot be read holds a brake this
         // call cannot see. Re-initializing used to adopt the generation into a FRESH record — no
         // attempts — so an unreadable brake read as "no brake" and a rebuild started.
         if (stateRecordPossiblyPresent()) {
@@ -1508,27 +1508,27 @@ public final class IndexGenerationManager {
     /** The budget for this target is spent: only a person's rebuild proceeds. */
     EXHAUSTED,
     /**
-     * The brake record names this target but its attempt count cannot be read (task
-     * t-20261013-ef3c41). Treated exactly like {@link #EXHAUSTED} — no automatic rebuild or index
+     * The brake record names this target but its attempt count cannot be read (#758). Treated
+     * exactly like {@link #EXHAUSTED} — no automatic rebuild or index
      * replacement starts — because a brake that cannot be read may be a spent one.
      */
     UNREADABLE,
     /**
      * The state record holding the brake exists but cannot be read at all, so neither the target
-     * nor the count is known (task t-20261013-ef3c41). Holds like {@link #UNREADABLE}; unlike it,
+     * nor the count is known (#758). Holds like {@link #UNREADABLE}; unlike it,
      * it says nothing about whether a rebuild toward this target was ever called for.
      */
     STATE_UNREADABLE,
     /**
      * The state record was re-established after neither it nor its backup could be read, so the
-     * brake it held is lost (task t-20261013-ef3c41, round 3). Holds for every target until a
+     * brake it held is lost (#758). Holds for every target until a
      * completed cutover; like {@link #STATE_UNREADABLE}, it says nothing about whether a rebuild
      * is called for.
      */
     STATE_LOST,
     /**
-     * The rebuild's target shape cannot be computed, so there is no brake to consult for it (task
-     * t-20261013-ef3c41, round 3). Holds: an attempt toward an unknown target cannot be bounded.
+     * The rebuild's target shape cannot be computed, so there is no brake to consult for it (#758).
+     * Holds: an attempt toward an unknown target cannot be bounded.
      */
     TARGET_UNKNOWN;
 
@@ -1590,8 +1590,8 @@ public final class IndexGenerationManager {
   }
 
   /**
-   * The brake record exists but could not be read, so no automatic rebuild may start (task
-   * t-20261013-ef3c41). An {@link IOException} so callers that do not distinguish it keep failing
+   * The brake record exists but could not be read, so no automatic rebuild may start (#758). An
+   * {@link IOException} so callers that do not distinguish it keep failing
    * closed, as they did when the read itself threw.
    */
   public static final class AutoRebuildBrakeUnreadableException extends IOException {

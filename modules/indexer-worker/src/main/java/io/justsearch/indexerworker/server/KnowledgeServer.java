@@ -150,7 +150,7 @@ public final class KnowledgeServer implements Closeable {
       () -> bootRootBindings.stream().map(RootBinding::path).toList();
   private volatile String rootReconciliationSettledGeneration;
   /**
-   * Task t-20261013-ef3c41, round 7 (S8): the roots the committed boot deferred because the folder
+   * #758: the roots the committed boot deferred because the folder
    * at their path was not on the volume recorded for them, and the generation they were deferred
    * for. While any is left, the previous generation is kept and nothing settles this generation's
    * root reconciliation; the deferred-root check reconciles each once its volume is back.
@@ -462,8 +462,8 @@ public final class KnowledgeServer implements Closeable {
    * <p>The durable form of this state is {@code auto_rebuild_*} in {@code state.json}; this field is
    * only the in-process consequence for the remainder of {@code start()}.
    *
-   * <p>Task t-20261013-ef3c41: also set when that brake could not be read at all. A brake that
-   * cannot be read holds exactly like a spent one. Round 3: set by every automatic rebuild the brake
+   * <p>#758: also set when that brake could not be read at all. A brake that
+   * cannot be read holds exactly like a spent one. Set by every automatic rebuild the brake
    * stopped (schema mismatch, embedding-model change, rebuild of a recovered-to-empty index,
    * backup-first rebuild), never cleared within the boot; {@link #bootRebuildHold} says which
    * answer held it.
@@ -472,7 +472,7 @@ public final class KnowledgeServer implements Closeable {
 
   /**
    * The brake answer that stopped an automatic rebuild in this boot, or {@code null} when none did
-   * (task t-20261013-ef3c41, round 3). The status reports it for the whole boot: ingestion stays
+   * (#758). The status reports it for the whole boot: ingestion stays
    * stopped until the Worker restarts, so the status must not turn back to "compatible" because
    * {@code state.json} later reads differently.
    */
@@ -1513,7 +1513,7 @@ public final class KnowledgeServer implements Closeable {
                 .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open());
             // File work was already enumerated for this candidate. Registered no-file sources
             // must be enumerated again from their authority before a resumed promotion.
-            this.migrationEnumeratorDone = expectedProjectionSourceIds().isEmpty();
+            this.migrationEnumeratorDone = recordedCandidate == null && expectedProjectionSourceIds().isEmpty();
           } else {
             boolean fencedSourceRecovery = generationBootDisposition
                 == IndexGenerationManager.BootDisposition.FENCED
@@ -1569,7 +1569,7 @@ public final class KnowledgeServer implements Closeable {
         if (preOpenMismatch && policyHandledInCatch) {
           throw IndexMetadataParityGuard.schemaMismatch();
         }
-        // Task t-20261013-ef3c41, round 3: the backup-first policy replaces the mismatched index
+        // #758: the backup-first policy replaces the mismatched index
         // inside the writable open below, so the brake is asked BEFORE that open. Held, the index
         // is opened read-only instead and nothing is backed up or replaced.
         IndexGenerationManager.AutoRebuildBrake backupFirstBrake =
@@ -1599,7 +1599,7 @@ public final class KnowledgeServer implements Closeable {
               IndexGenerationManager.AutoRebuildBrake.RELEASED;
           if (IndexRecoveryMarker.exists(activeIndexPath)
               && IndexRecoveryPolicy.shouldRebuildFromSource(rc.index())) {
-            // Task t-20261013-ef3c41, round 3: an automatic rebuild like any other, so it asks
+            // #758: an automatic rebuild like any other, so it asks
             // the brake first. Held, the recovered index serves read-only and the marker stays:
             // the rebuild is still owed, and a person's rebuild provides it.
             recoveryBrake = consultAutoRebuildBrake(
@@ -1660,7 +1660,7 @@ public final class KnowledgeServer implements Closeable {
               java.util.Optional<String> currentFp = initialModelSelection == null
                   ? EmbeddingFingerprint.get()
                   : initialModelSelection.availableFingerprint("embedding");
-              // Task t-20261013-ef3c41, round 3: the re-embed is an automatic rebuild, so the brake
+              // #758: the re-embed is an automatic rebuild, so the brake
               // is asked before it starts; held, the index serves read-only and ingestion stops.
               IndexGenerationManager.AutoRebuildBrake reembedBrake =
                   currentFp.isPresent() && !storedFp.equals(currentFp.get())
@@ -1731,7 +1731,7 @@ public final class KnowledgeServer implements Closeable {
               this.buildingIndexPath = null;
             }
             String targetFingerprint = expectedIndexFingerprintOrNull();
-            // Task t-20261013-ef3c41: a brake that cannot be read holds like a spent one. Without
+            // #758: a brake that cannot be read holds like a spent one. Without
             // this the failed read either killed start() or, with the record re-initialized, read
             // as a fresh budget and started a rebuild.
             boolean brakeUnreadable = false;
@@ -1929,7 +1929,8 @@ public final class KnowledgeServer implements Closeable {
       // Recorded recovery cannot run until the actual serving generation and owner are attached.
       attachRecordedIngestion();
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
-        if (!expectedProjectionSourceIds().isEmpty()) startMigrationEnumeratorBestEffort(rc, false);
+        if (recordedCandidate != null || !expectedProjectionSourceIds().isEmpty())
+          startMigrationEnumeratorBestEffort(rc, false);
         startMigrationCutoverMonitorBestEffort();
       }
       recoverStuckJobsAdmitted(jobQueue, null);
@@ -6618,6 +6619,7 @@ public final class KnowledgeServer implements Closeable {
         ? Objects.requireNonNull(recordedCandidateFingerprint,
             "Recorded candidate fingerprint inputs")
         : null;
+    boolean servingAtOpen = indexPath.equals(activeIndexPath);
     var boundSelection = modelSelectionFor(indexPath);
     var boundInputs = boundSelection == null ? configuredRuntimeFingerprintInputs(runtimeConfig)
         : boundSelection.runtimeFingerprintInputs();
@@ -6643,16 +6645,14 @@ public final class KnowledgeServer implements Closeable {
               var inputs = runtimeFingerprints.runtimeFingerprintInputs();
               return new EmbeddingMetadataOverlay(
                   new SsotCommitMetadataSource(runtimeConfig, inputs),
-                  () -> {
-                    var candidateEcc = candidateEmbeddingCompatController;
-                    return candidateEcc == null ? java.util.Optional.empty()
-                        : candidateEcc.fingerprintForCommit();
-                  },
+                  () -> generationEmbeddingFingerprintForCommit(indexPath, fingerprintSupplier,
+                      inputs.embeddingModel().sha(), servingAtOpen),
                   () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()));
             } : () -> new EmbeddingMetadataOverlay(
                  new SsotCommitMetadataSource(runtimeConfig, boundInputs),
                  boundSelection == null ? fingerprintSupplier
-                     : () -> java.util.Optional.ofNullable(boundInputs.embeddingModel().sha()),
+                     : () -> generationEmbeddingFingerprintForCommit(indexPath, fingerprintSupplier,
+                         boundInputs.embeddingModel().sha(), servingAtOpen),
                  boundSelection == null ? SpladeFingerprint::get
                      : () -> java.util.Optional.ofNullable(boundInputs.spladeModel().sha()));
 
@@ -6679,6 +6679,19 @@ public final class KnowledgeServer implements Closeable {
     // a predicate. Without this, enrichment-backfill document fetches reopened the searcher.
     builder.withForegroundActive(() -> foregroundLoad.inFlight() > 0);
     return builder;
+  }
+
+  /** Model selection fixes identity, never evidence that this generation produced an embedding. */
+  private java.util.Optional<String> generationEmbeddingFingerprintForCommit(Path indexPath,
+      java.util.function.Supplier<java.util.Optional<String>> sourceFingerprint, String expected,
+      boolean servingAtOpen) {
+    var controller = indexPath.equals(buildingIndexPath) ? candidateEmbeddingCompatController
+        : indexPath.equals(activeIndexPath) ? embeddingCompatController : null;
+    // A retained source may still close/commit after the pointer moves. Its original earned
+    // supplier can preserve A's stamp; a newly opened B can never borrow it, even at the same SHA.
+    var earned = controller != null ? controller.fingerprintForCommit()
+        : servingAtOpen ? sourceFingerprint.get() : java.util.Optional.<String>empty();
+    return earned.filter(value -> Objects.equals(value, expected));
   }
 
   private GenerationModelSelection modelSelectionFor(Path indexPath) {
@@ -6982,7 +6995,7 @@ public final class KnowledgeServer implements Closeable {
    * so the index that genuinely needed a rebuild would never get one. Package-private so the
    * distinction is testable without a running Worker.
    *
-   * <p>Task t-20261013-ef3c41, round 3: such a boot used to answer "attempt 1" and rebuild without
+   * <p>#758: such a boot used to answer "attempt 1" and rebuild without
    * consulting the brake at all, so a rebuild that failed every time ran on every boot, unbounded.
    * A rebuild whose budget cannot be consulted is held instead, as any brake that cannot be read
    * is ({@link IndexGenerationManager.AutoRebuildBrake#TARGET_UNKNOWN}); still nothing is charged.
@@ -7000,7 +7013,7 @@ public final class KnowledgeServer implements Closeable {
 
   /**
    * Asks the repeat-rebuild brake whether the automatic {@code rebuild} may start toward the shape
-   * this runtime writes (task t-20261013-ef3c41, round 3). {@code RELEASED} means it may, and its
+   * this runtime writes (#758). {@code RELEASED} means it may, and its
    * attempt has been recorded; any other answer means it must not, and has been logged.
    */
   private IndexGenerationManager.AutoRebuildBrake consultAutoRebuildBrake(
@@ -7322,7 +7335,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 8 (refined decision 2): before anything indexes, the one-time
+   * #758: before anything indexes, the one-time
    * upgrade seeding confirms the volume of each declared root on evidence. Only a boot that knows
    * the declared roots seeds; a root not confirmed now is retried by the periodic cycle.
    */
@@ -7577,7 +7590,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
-   * Task t-20261013-ef3c41, round 8b (decision 3): a migration builds the new generation only from
+   * #758: a migration builds the new generation only from
    * roots on their recorded volume. A configured root with nothing recorded is first seeded once on
    * evidence. Any root still refused (another volume at its path, its drive not confirmed after an
    * upgrade, or nothing recorded) fails the enumeration, so the cutover keeps the active generation
@@ -7608,7 +7621,7 @@ public final class KnowledgeServer implements Closeable {
    * cannot be mistaken for a clean boot.
    *
    * <p>A root whose folder is not on the volume recorded for it is deferred, never a start-up
-   * failure (task t-20261013-ef3c41, round 7, S8): its watch is held, it is left out of the
+   * failure (#758): its watch is held, it is left out of the
    * convergence check so every other root is served, and this generation's root reconciliation
    * stays unsettled, which keeps the previous generation until {@link #settleDeferredBootRoots}
    * has reconciled the root on its returned volume. Every other failure fails the boot as before.
@@ -9495,7 +9508,7 @@ public final class KnowledgeServer implements Closeable {
       }
       Path greenPath = indexGenerationManager.resolveGenerationPathStrict(
           boot.layout().state().building_generation());
-      enumerateSources = operationKey == null
+      enumerateSources = operationKey == null || accepted.isPresent()
           || !expectedProjectionSourceIds(greenPath, ownership).isEmpty();
       WorkerServiceConfiguration candidateConfiguration = accepted.isEmpty() ? null
           : WorkerServiceConfiguration.capture(accepted.orElseThrow().configuration(),
@@ -9748,14 +9761,15 @@ public final class KnowledgeServer implements Closeable {
   /**
    * The SWITCHING finalization step of a recorded candidate. Two candidates can never certify,
    * so waiting only spends the whole SWITCHING deadline: one whose producer latched an
-   * unrecorded watcher mutation (the latch never clears in this process), and one that is
-   * provably empty while an embedding model is configured (it never earns the embedding stamp,
-   * and an empty index is never attested). Both are refused now, before the pointer moves, and
-   * the ordinary refused-candidate cleanup restores A.
+   * unrecorded watcher mutation, and an ordinary bulk candidate that is provably empty while an
+   * embedding model is configured. Installer activation alone can admit a freshly proven empty
+   * candidate structurally; it still never earns an embedding stamp without real embeddings.
    */
   private boolean finalizeOrRefuseRecordedCandidateBeforeCutover() {
     if (refuseUncertifiableRecordedCandidate(false, 10_000)) return false;
     if (finalizeEmbeddingRebuildBeforeCutover()) return true;
+    // This is a structural admission only. No ECC evidence or saved stamp is manufactured.
+    if (installerCandidateEmptyUnderFence()) return true;
     refuseUncertifiableRecordedCandidate(true, 10_000);
     return false;
   }
@@ -9804,7 +9818,8 @@ public final class KnowledgeServer implements Closeable {
         String reason;
         if (!producer.mutationAdmission().runtimeReplayCertain()) {
           reason = "an unrecorded watcher mutation prevents certified promotion";
-        } else if (refuseProvablyEmpty && recordedCandidateProvablyEmpty(recorded, candidate)) {
+        } else if (refuseProvablyEmpty && recordedCandidate == null
+            && recordedCandidateProvablyEmpty(recorded, candidate)) {
           reason = "the candidate is empty and an empty index cannot earn the embedding stamp";
         } else {
           return false;
@@ -9824,6 +9839,46 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
+  /** Early SWITCHING check; the final promotion fence repeats the proof after replay. */
+  private boolean installerCandidateEmptyUnderFence() {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+        || recordedCandidate == null) return false;
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted || !(appServices instanceof DefaultWorkerAppServices producer)) return false;
+      try (var fence = producer.mutationAdmission().beginFinalFence(
+          producer.mutationOwnerToken(), 10_000)) {
+        return fence != null && producer.mutationAdmission().runtimeReplayCertain()
+            && installerCandidateProvablyEmpty(recorded);
+      }
+    } catch (IOException | RuntimeException unavailable) {
+      log.debug("Installer empty proof is unavailable", unavailable);
+      return false;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    } finally { runtimeSwapLock.unlock(); }
+  }
+
+  /** Must be called under the current producer's final mutation fence and runtime lock. */
+  private boolean installerCandidateProvablyEmpty(
+      IndexGenerationManager.BootOwnership.Recorded recorded) throws IOException {
+    if (recorded == null || recordedCandidate == null
+        || !"installer_model_activation".equals(recorded.source())
+        || !recorded.targetFingerprint().equals(recordedCandidate.target().fingerprint())) return false;
+    String candidate = IndexGenerationManager.recordedGenerationId(recorded.operationKey());
+    var state = indexGenerationManager.readStateBestEffort();
+    return state != null && "SWITCHING".equals(state.migration_state())
+        && !Boolean.TRUE.equals(state.migration_paused())
+        && recorded.sourceGeneration().equals(state.active_generation())
+        && candidate.equals(state.building_generation())
+        // Installer admission only: queued help or a failed row means B may lack content A
+        // holds. The plain refusal keeps the older proof; a failed row adds no document there.
+        && migrationEnumeratorFilesEnqueued.get() == 0L
+        && jobQueue.jobStateCountsStrict().failedCount() == 0
+        && recordedCandidateProvablyEmpty(recorded, candidate);
+  }
+
   /**
    * Provably empty: the captured walk closed complete with no planned unit, no recorded claim
    * was issued, no queue row is pending or claimed, no projection source seeds the candidate,
@@ -9835,7 +9890,7 @@ public final class KnowledgeServer implements Closeable {
   private boolean recordedCandidateProvablyEmpty(
       IndexGenerationManager.BootOwnership.Recorded recorded, String candidate) throws IOException {
     if (!(ingestLifecycle instanceof RunningRuntime green) || green == searchLifecycle
-        || recordedCandidateInPlace || buildingIndexPath == null
+        || (recordedCandidateInPlace && recordedCandidate == null) || buildingIndexPath == null
         || !indexGenerationManager.resolveGenerationPathStrict(candidate).equals(buildingIndexPath)
         || !migrationEnumeratorDone || migrationEnumeratorRunning.get()
         || !expectedProjectionSourceIds().isEmpty()) return false;
@@ -10037,12 +10092,13 @@ public final class KnowledgeServer implements Closeable {
         paused = true;
         var settled = recorded == null && jobQueue instanceof SqliteJobQueue queue
             ? queue.nativeCutoverCountsStrict() : jobQueue.jobStateCountsStrict();
+        boolean installerEmpty = installerCandidateProvablyEmpty(recorded);
         if (settled.processingCount() != 0 || settled.pendingReadyCount() != 0
             || settled.pendingBackoffCount() != 0 || !current.mutationAdmission().replayCertain()
             || (recorded == null && cutoverMaxFailedJobs >= 0
                 && Math.max(0L, settled.failedCount() - jobQueue.unownedFailureCount())
                     > cutoverMaxFailedJobs)
-            || !finalizeEmbeddingRebuildBeforeCutover()) return null;
+            || (!installerEmpty && !finalizeEmbeddingRebuildBeforeCutover())) return null;
         migrationTransition("migration-green-drained");
         // Failure callbacks can retain new root debt without taking the admission fence.
         if (!current.mutationAdmission().replayCertain()
@@ -10053,7 +10109,7 @@ public final class KnowledgeServer implements Closeable {
         green.commitOps().commitWithBuildState(
             LuceneRuntimeTypes.BuildState.COMPLETE,
             io.justsearch.adapters.lucene.runtime.CommitReason.MIGRATION_CUTOVER);
-        if (!verifyGreenCommitMetadataBestEffort()) return null;
+        if (!verifyGreenCommitMetadataBestEffort(installerEmpty)) return null;
         if (recorded != null && recordedIngestionLifecycle.recordedGapDecision(
             recorded.operationKey(), candidateJournalWitness())
                 == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) return null;
@@ -10068,7 +10124,8 @@ public final class KnowledgeServer implements Closeable {
         try {
           var prepared = recorded == null ? null
               : recordedIngestionLifecycle.prepareRecordedGenerationProjection(
-                  recorded.operationKey(), jobQueue);
+                  recorded.operationKey(), jobQueue, recordedCandidate == null ? null
+                      : installerEncoderProof());
           preparedProjection = prepared;
           var callbacks = prepared == null ? null : prepared.callbacks();
           GenerationModelSelection promotedSelection = recordedCandidate == null ? null
@@ -10149,6 +10206,14 @@ public final class KnowledgeServer implements Closeable {
                               publicationLock, finalDeclarations)
                               || !replay.orElseThrow().nativePolicy().reproveBeforePointer())) {
                         throw new IOException("Native policy omission proof changed before pointer commitment");
+                      }
+                      // Keep this proof exact under publication. Its SQLite reads take only
+                      // the queue lock (walk callbacks run after unlock); Lucene refresh takes
+                      // the SearcherManager refresh lock. NrtReopenStats/ChunkSetCompleteness
+                      // never capture a serving view or take the publication read lock.
+                      if (installerEmpty && (!installerCandidateProvablyEmpty(recorded)
+                          || !verifyGreenCommitMetadataBestEffort(true))) {
+                        throw new IOException("Installer empty proof changed before pointer commitment");
                       }
                       if (!fence.armReplayCertificate()) {
                         throw new IOException(
@@ -10385,7 +10450,50 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  private boolean verifyGreenCommitMetadataBestEffort() {
+  private io.justsearch.app.api.settings.SettingsCommitOwner.GenerationEncoders installerEncoderProof() {
+    CandidateModels models = Objects.requireNonNull(candidateModels, "Recorded B encoder owner");
+    var captured = models.indexPlan().projection();
+    return (desired, changedKeys) -> {
+      var expected = EncoderConfigurationProjection.from(desired);
+      var composedSettings = EncoderConfigurationProjection.from(captured.config());
+      var indexObservation = models.owner().surfaceForOwner().componentObservation();
+      var queryObservation = models.queryOwner().surfaceForOwner().componentObservation();
+      for (String key : changedKeys) {
+        if (EncoderConfigurationProjection.dependencies().contains(key)) continue;
+        // These two planner diagnostics describe B's captured device plan, rather than a
+        // session argument. Other component settings still need their proper fixed owner.
+        boolean devicePlan = key.equals(EnvRegistry.GPU_MEMORY_PLAN.configKey())
+            || key.equals(EnvRegistry.GPU_MEMORY_PLAN_UNPLANNED_ROLES.configKey());
+        var before = captured.config().resolution(key);
+        var after = desired.resolution(key);
+        if (!devicePlan || !Objects.equals(before == null ? null : before.value(),
+            after == null ? null : after.value())) {
+          throw new IllegalStateException("Installer has unprepared encoder component settings: " + key);
+        }
+      }
+      // Compare the complete captured projection, including automatically derived memory caps.
+      // Model identity's indexDigest alone intentionally cannot establish physical ownership.
+      if (models.owner().isClosed() || models.queryOwner().isClosed()
+          || !composedSettings.digest().equals(expected.digest())
+          || !indexObservation.configurationDigest().filter(captured.indexDigest()::equals).isPresent()
+          || !queryObservation.configurationDigest().filter(captured.queryDigest()::equals).isPresent()) {
+        throw new IllegalStateException("Installer encoder settings differ from B's physical configuration");
+      }
+      if (!changedKeys.isEmpty()) {
+        var selection = recordedCandidate == null ? null : GenerationModelSelection.accepted(
+            recordedCandidate.models(), recordedCandidate.configuration().ai().sparseModel(),
+            models.owner().modelIdentity().vectorDimension());
+        var publication = encoderPublication(models.owner(), models.queryOwner(), desired, selection);
+        if (!publication.coherent() || !publication.missingRoles().isEmpty()
+            || publication.appliedVersion() == null
+            || !captured.digest().equals(publication.appliedVersion())) {
+          throw new IllegalStateException("Installer encoder changes lack realized role observations");
+        }
+      }
+    };
+  }
+
+  private boolean verifyGreenCommitMetadataBestEffort(boolean installerEmpty) {
     // Tempdoc 598 R3: also verify the green carries a current-model embedding fingerprint before
     // promotion, so a blue/green rebuild cannot promote a generation that would still serve
     // BLOCKED_LEGACY. Null when no embedding model is resolvable (keyword-only rebuild → skipped).
@@ -10410,7 +10518,7 @@ public final class KnowledgeServer implements Closeable {
       return false;
     }
     return KnowledgeServerMigrationOps.verifyGreenCommitMetadataBestEffort(
-        ingestLifecycle, expectedIndexFp, expectedEmbeddingFp, log);
+        ingestLifecycle, expectedIndexFp, expectedEmbeddingFp, installerEmpty, log);
   }
 
   private void drainSwitchBufferBestEffort() {
@@ -10474,6 +10582,12 @@ public final class KnowledgeServer implements Closeable {
     return rc != null && rc.rag() != null && rc.rag().chunkSpladeEnabled();
   }
 
+  private static List<ResolvedConfig.FileSource> installerHelpRoots(ResolvedConfig configuration) {
+    var help = configuration.collections().bundledHelp();
+    return !EnvRegistry.EVAL_MODE.getBoolean(false) && help != null && Files.isDirectory(help.path())
+        ? List.of(help) : List.of();
+  }
+
   private void startMigrationEnumeratorBestEffort(ResolvedConfig rc) {
     startMigrationEnumeratorBestEffort(rc, true);
   }
@@ -10512,13 +10626,16 @@ public final class KnowledgeServer implements Closeable {
                       "Migration enumerator: models not ready after 120s, "
                           + "proceeding without inline embedding/SPLADE");
                 }
-                List<ResolvedConfig.FileSource> roots = enumerateFiles ? loadMigrationRoots(rc) : List.of();
+                // Captured walks own user roots. Installer candidates must also replay the
+                // app-owned bundled help source, regardless of its startup version marker.
+                List<ResolvedConfig.FileSource> roots = enumerateFiles ? loadMigrationRoots(rc)
+                    : recordedCandidate == null ? List.of() : installerHelpRoots(rc);
                 if (enumerateFiles) {
                   requireMigrationRootsOnRecordedVolume(roots, rc.collections());
                 }
                 if (enumerateFiles) migrationRootSnapshot = List.copyOf(roots);
                 migrationEnumeratorRootsTotal.set(roots.size());
-                int totalEnqueued = enumerateFiles ? enqueueAllFilesUnderRoots(roots) : 0;
+                int totalEnqueued = roots.isEmpty() ? 0 : enqueueAllFilesUnderRoots(roots);
                 List<String> expectedSources = expectedProjectionSourceIds();
                 // Completion is candidate-local. Drop retired candidates even when the next
                 // one has no registered sources, so repeated live activations stay bounded.

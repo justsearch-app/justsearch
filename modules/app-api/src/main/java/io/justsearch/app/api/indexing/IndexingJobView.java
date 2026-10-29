@@ -64,14 +64,14 @@ public record IndexingJobView(
   public static final String STATE_RETRY_EXHAUSTED = "RETRY_EXHAUSTED";
 
   /**
-   * Failed-files surface only (task t-20261013-ef3c41): the source exists but cannot be read right
+   * Failed-files surface only (#758): the source exists but cannot be read right
    * now (locked by another program, access denied), and the index holds no content for it. Retried
    * with growing back-off and no time limit. Distinct from a missing file, which is removed.
    */
   public static final String STATE_SOURCE_UNREADABLE = "SOURCE_UNREADABLE";
 
   /**
-   * Failed-files surface only (task t-20261013-ef3c41): "indexed, source unreadable" — as {@link
+   * Failed-files surface only (#758): "indexed, source unreadable" — as {@link
    * #STATE_SOURCE_UNREADABLE}, for a source whose indexed content is kept and stays searchable.
    */
   public static final String STATE_INDEXED_SOURCE_UNREADABLE = "INDEXED_SOURCE_UNREADABLE";

@@ -461,7 +461,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
    * Binds the producers. Watched-root reindex must revalidate membership at the actual producer
    * entry, so it has its own {@code watchedRootProducer}. An explicit ingest that this process did
    * not just accept (recovered at boot, or resumed after the attachment stopped) goes to {@code
-   * recoveredProducer}. Task t-20261013-ef3c41, round 8b (decision 1): only the request a person or
+   * recoveredProducer}. #758: only the request a person or
    * an agent just made is a deliberate add that records a volume; a resumed one records nothing.
    */
   void bindProducer(Producer producer, Producer recoveredProducer, Producer watchedRootProducer) {
@@ -1458,6 +1458,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
   @Override public PreparedCompositeProjection prepareRecordedGenerationProjection(
       String operationKey, JobQueue queue) throws IOException {
+    return prepareRecordedGenerationProjection(operationKey, queue, null);
+  }
+
+  @Override public PreparedCompositeProjection prepareRecordedGenerationProjection(
+      String operationKey, JobQueue queue,
+      io.justsearch.app.api.settings.SettingsCommitOwner.GenerationEncoders encoders) throws IOException {
     final Bulk bulk;
     synchronized (lock) {
       if (!beforeRecordedPromotion(operationKey, queue)) {
@@ -1475,7 +1481,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     var installer = (RecordedInstallerGenerationPlan) bulk.plan;
     final io.justsearch.app.api.settings.SettingsCommitOwner.PreparedGenerationProjection projection;
     try {
-      projection = attempts.prepareInstallerGenerationProjection(bulk.handle, installer, bulk.work);
+      projection = attempts.prepareInstallerGenerationProjection(bulk.handle, installer, bulk.work, encoders);
     } catch (RuntimeException | Error failure) {
       // Preparation may have reserved the one-shot settings witness before it failed. A proven
       // pre-pointer failure must settle this accepted row; retrying that projection would retain

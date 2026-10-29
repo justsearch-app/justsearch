@@ -55,7 +55,7 @@ public enum LifecycleReasonCode {
   // MAX_AUTO_REBUILD_ATTEMPTS. Search still serves the existing index read-only; ingestion does
   // not resume without an operator.
   INDEX_REBUILD_BRAKE_EXHAUSTED("index.rebuild_brake_exhausted"),
-  // Task t-20261013-ef3c41: the repeat-rebuild brake could not be read, and a brake that cannot be
+  // #758: the repeat-rebuild brake could not be read, and a brake that cannot be
   // read holds like a spent one. Same consequence as above; a different cause to word.
   INDEX_REBUILD_BRAKE_UNREADABLE("index.rebuild_brake_unreadable"),
   // Tempdoc 837 S6 (§2.1/§2.2) RETIRED the INDEX_REBUILDING member here. (Its code string is

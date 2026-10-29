@@ -83,6 +83,14 @@ occasions in one session, green on every isolated re-run), quarantined 2026-09-0
 2. Use full RAG quality runs (`*RagQualityEvalTest`) on a perf-capable environment (dedicated self-hosted runner or equivalent local setup), not every default `check` run.
 3. Run `node scripts/verify-prerequisites.mjs` before AI quality runs that depend on native runtime/model availability.
 
+### Recurring jobs
+
+- **Named checks, fresh results:** `js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs --out <evidence dir>/<name>.json --check <check id> ...` records executed, skipped and not-found checks. JVM IDs are test-class source paths, optionally `#<method>`. Vitest file paths require installed `modules/ui-web/node_modules` (launcher checkouts lack it). Rust IDs require `#<full libtest name>`; Rust checks are unqualified. The maintainer's `js-gradle-slot` wrapper covers the whole script because it runs Gradle itself. `--before` needs `git worktree add`, unavailable in sandboxes that refuse it. It needs Git LFS initialised in the repository (`git lfs install --local` once).
+- **Searchable after ingest:** with an Engine your session owns, poll `POST /api/knowledge/search` for a unique marker until the expected document ID is returned, with a deadline. `stageAndVerify` in `scripts/dev/lib/stage-reference-corpus.mjs` accepts any result; it is insufficient proof alone.
+- **Acceptance digest:** `node scripts/governance/gates/test-intent/cli.mjs digest <changeset> --base <task base>`.
+- **Test totals:** `node scripts/ci/report-unit-test-attribution.mjs` reads every test task under a module root. Running one task freshly can mix its results with another task's stale results. Use run-evidence for named checks.
+- **Isolated Engine:** `dev-runner` needs a fixed frontend port and always starts the frontend. Sandboxed sessions start an Engine with their own `JUSTSEARCH_HOME`, `JUSTSEARCH_DATA_DIR`, `JUSTSEARCH_DEV_RUNNER_STATE_ROOT` and API port 0; no one-command isolated start is listed here.
+
 ## 3. Development Workflow
 
 ### 3.1. Git Stash Warning
@@ -338,7 +346,7 @@ When editing files under `modules/ui-web/src/`, use `jseval ui-shot` for targete
 - **Single step**: `jseval ui-shot <step>` captures a screenshot of the named UI state. Read the output PNG path to see the result inline.
 - **Step discovery**: `jseval ui-shot --list` shows all available steps (chain and isolated) with their dependency relationships.
 - **Affected steps**: `jseval ui-shot --affected <file>` finds which steps exercise a given source file. Works with full Windows paths.
-- **Measurement companion (615 §6.2)**: every capture also writes a `<step>.measure.json` (accessibility tree + axe violations + element geometry/overflow + console errors) and prints a one-line fact summary. Judge correctness from the **facts** (cheaper + more reliable than the PNG); read the PNG for gestalt. The harness drives the **live Lit `shell-v0`** — there is no mock-data demo mode, so data/AI steps need the dev stack running (AI also needs `ai_activate`).
+- **Measurement companion (615 §6.2)**: every capture also writes a `<step>.measure.json` (accessibility tree + axe violations + element geometry/overflow + console errors) and prints a one-line fact summary. Judge correctness from the **facts** (cheaper + more reliable than the PNG); read the PNG for gestalt. The harness drives Lit `shell-v0`. `python -m jseval ui-shot` defaults to mock-data demo mode. For a real backend, use `--no-demo` with a running dev stack (AI also needs `ai_activate`), and choose a step without its own response mocks or demo-URL navigation: those steps still use demo data with `--no-demo`.
 
 ### 3.5. CI signal model
 
@@ -507,21 +515,18 @@ pull-request `GITHUB_TOKEN` cannot read branch-protection settings.
 
 ### 3.6. Module-Scoped Verification
 
-When you've changed a specific module, you don't need to test everything:
+Name the changed modules and the modules that depend on them in one Gradle invocation:
 
 ```powershell
-# Build + test the changed module and everything that depends on it
-node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:buildDependents
-
-# Build + test only the changed module (faster, but won't catch breaks in dependents)
-node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:build
+# Example: build + test app-engine and its app-launcher dependent together
+node scripts/lib/tool-invoker.cjs gradle :modules:app-engine:build :modules:app-launcher:build
 ```
 
-Rule of thumb:
-
-- Changed a **leaf module** (ui, indexer-worker, app-launcher): use `:modules:X:build` — nothing depends on these.
-- Changed a **core module** (core, configuration, infra-core): use `:modules:X:buildDependents` — many modules depend on these.
-- **Unsure?** Run `node scripts/architecture/module-deps.mjs --include-staleness` to see the dependency graph.
+Choose the modules from the dependency graph:
+`node scripts/architecture/module-deps.mjs --include-staleness`.
+If nothing depends on the changed module, its own `:modules:<module>:build` is sufficient.
+Do not use `:modules:<module>:buildDependents` in this build: it fails with a circular task
+dependency between app-engine, app-services and indexer-worker.
 
 ### 3.7. History publication (PR/commit granularity)
 
@@ -602,9 +607,10 @@ Four `gh` CLI quirks (tempdoc 695, 930) worth knowing at merge/wait time:
   which reverts that PR on push. Re-fetch immediately before every comparison
   and verify `git log -1 --format=%P` after any soft reset.
 
-`node scripts/dev/run-gh.mjs enqueue N` validates the squash preview and managed review
-record, then enables squash auto-merge bound to the validated head, title and body. A new push
-requires a new enqueue. After enqueue, run its printed command in the background:
+Follow [ADR-0053 § Decision](../../decisions/0053-one-pr-ci-run-and-squash-auto-merge.md#decision) for validated squash enqueueing.
+For one-step enqueue and observation, run `node scripts/dev/run-gh.mjs shepherd N --timeout-sec 5400` in the background (optional `--repo owner/repo`); it prints a final verdict and bounded failed-job excerpts.
+For failed jobs, decide and run `gh run rerun <run-id> --failed` yourself, then run `shepherd` or `merge-wait` again.
+After enqueue, run its printed command in the background:
 `node scripts/dev/run-gh.mjs merge-wait N --head <validated-head-sha> --timeout-sec 5400`
 (include `--repo owner/repo` if enqueue used it). The 40-hex `--head` binds observation to
 the enqueued head; omitting it watches the first poll's head. The observer polls every
@@ -618,22 +624,9 @@ Exit 0 means merged. Exit 1 means follow-up
 work on the same task; the message says what needs attention and when to enqueue again.
 Exit 3 means inspect the PR, then start observing again; enqueue again only if the message
 says to. Exit 2 means retry once, then investigate if it fails again.
-The PR runs the union of lanes that consume its changed files; all
-required names report, including intentional skips. Unknown inputs run every lane. Strict stays
-off, so an older green base needs no update push. There is no merge queue.
-`Measured axe` is required: serious and critical accessibility violations block merges.
-It runs for frontend inputs on PRs and always on main pushes and dispatch; unselected PRs
-report skipped, as the required `jseval Python suite` does.
 
-After merging, run `node scripts/dev/run-gh.mjs run-wait-sha <merge commit>`. Main runs the full
-suite, including both integration tiers (system-tests and module), Windows stop-census, supervisor
-conformance and Measured axe. The module tier runs app-api, app-services, indexing, reranker and ui
-integration tests on Linux. Both integration tiers run only on main pushes and manual dispatch;
-neither is a required PR check.
-Its running CI is never cancelled; only the newest pending commit runs, and the wait command
-follows a newer run that covers the requested commit. If main fails in your change's area, open
-a fix or revert PR at once through the normal path. Report a failure in a test listed in
-`scripts/ci/pr-flakes.tsv`; do not revert for that listed flake.
+For CI selection, publication and post-merge verification, follow [ADR-0053 § Decision](../../decisions/0053-one-pr-ci-run-and-squash-auto-merge.md#decision)
+and its [Measured axe amendment](../../decisions/0053-one-pr-ci-run-and-squash-auto-merge.md#amendment-2026-10-24-measured-axe-becomes-required).
 
 Validate the local reproduction inventory with `node scripts/ci/run-publish-preflight.mjs --check`
 before pushing. Confirm the merge with `node scripts/dev/run-gh.mjs merge-wait N` before cleanup.
@@ -648,22 +641,22 @@ fixes rather than open a PR each):
 
 | Change | How it should reach `main` |
 |---|---|
-| **tempdoc** edit (`docs/tempdocs/**`) — dated working history | Ride along in the same PR as the code it documents, **or** batch several into one `docs(tempdocs): …` PR. Do not open a standalone PR per tempdoc append. |
+| **tempdoc** (`docs/tempdocs/**`) — dated working history | None: tempdocs are frozen since 2026-10-05. Current design goes to a canonical doc or an ADR. |
 | **canonical doc** (`docs/{explanation,reference,how-to,decisions}`) — durable current truth | May stand alone as its own PR/commit. |
 | **docs + code together** | Already a ride-along — publish normally. |
 
-Worked example: a post-merge research pass that only appends a "future
+Worked example (from before the freeze): a post-merge research pass that only appends a "future
 directions" section to a tempdoc is working history, not a project-history unit.
 Landing it as its own PR (`docs(644): … (#16)`) is exactly the axis-2 miss —
 tidy under axis 1, but a standalone public commit for archaeology. It should have
 ridden along with the next substantive PR or batched.
 
-### 3.8. A tempdoc that changes a governed decision updates its ADR in the same PR
+### 3.8. A change to a governed decision updates its ADR in the same PR
 
-A tempdoc that changes a decision an ADR governs updates that ADR's
+A change that moves a decision an ADR governs updates that ADR's
 `last_reviewed:` and `probes:` in the **same PR** as the change.
 
-Why the same PR: a decision that moved in a tempdoc while its ADR still reads the
+Why the same PR: a decision that moved in code or another doc while its ADR still reads the
 old way is not a documentation lag, it is two authorities disagreeing — and the
 newer one is the one nobody consults. That is precisely the drift the premise-probe
 register (`governance/adr-probes.v1.json`, tempdoc 884) exists to catch, and it can

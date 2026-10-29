@@ -899,6 +899,19 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
   with HTTP `400` / `INVALID_REQUEST` (`KnowledgeClientException.Status.INVALID_ARGUMENT` from the
   index half) instead of being silently
   parsed as plain text.
+- `querySyntax: "search"` — the Search window subset. The Engine classifies it once as plain,
+  advanced or invalid. Plain uses the existing `simple` behavior. Advanced supports phrases,
+  exclusions and lowercase `title:`/`author:` with document-wide required/prohibited semantics;
+  it forces lexical retrieval on all passes and bypasses source inference, filter normalization,
+  chunk merging, expansion and typo correction. Explicit filters apply exactly as sent.
+  A successful Search response includes `advancedSyntax` (boolean), the Engine classification
+  that lets quick-pass clients withhold older facets and counts without parsing syntax themselves.
+  Invalid Search syntax returns HTTP `400`, `errorCode: "SEARCH_SYNTAX_INVALID"`,
+  `errorClass: "VALIDATION"`, `retryable: false`, and an `error` naming the problem.
+  Uppercase Boolean operators mixed with advanced syntax return
+  "OR, AND and NOT can't be combined with quotes, - or title:/author:".
+  `simple`, raw `lucene` (including its `advanced` alias), internal `*:*` probes and
+  expansion reissued as `lucene` retain their behavior. See the in-app help topic "Search syntax".
 - `projection[]`
 - `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`, `sizeBytes`)
 - Entity filter fields: `entityPersons`, `entityOrganizations`, `entityLocations` (repeated string) (362)
@@ -1447,7 +1460,7 @@ Other debug endpoints: `/api/debug/commit-metadata`, `/api/debug/effective-confi
 
 ### AI Runtime Status
 
-`GET /api/ai/runtime/status` returns ONNX feature status including a `modelActive: boolean` field per feature entry, derived from the actual ORT session state (not file discovery). This is the canonical source of truth for "is this model loaded and running". Both reranker (via `OrtCudaStatus`) and citation-scorer (via `CitationScorer.isAvailable()`) report runtime session state through this field. See [ADR-0023](../decisions/0023-api-responses-declare-runtime-context.md) for the general principle: endpoints whose behavior varies by runtime mode must declare that mode in the response.
+`GET /api/ai/runtime/status` returns ONNX feature status including a `modelActive: boolean` field per feature entry, derived from the actual ORT session state (not file discovery). This is the canonical source of truth for "is this model loaded and running". Both reranker (via `CrossEncoderReranker.isQueryWarm()`, through `WorkerSearchService.isRerankerActive()`) and citation-scorer (via `CitationScorer.isAvailable()`) report runtime session state through this field. See [ADR-0023](../decisions/0023-api-responses-declare-runtime-context.md) for the general principle: endpoints whose behavior varies by runtime mode must declare that mode in the response.
 
 ### AI install (`/api/ai/install/*`)
 

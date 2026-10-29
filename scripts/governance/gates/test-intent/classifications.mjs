@@ -8,7 +8,6 @@
 
 export const CHANGESET_SCHEMA = 'test-intent.v1';
 export const CHANGESETS_DIR = 'gates/test-intent/.changesets';
-export const EVIDENCE_DIR = 'gates/test-intent/evidence';
 export const RULES_DOC = 'docs/reference/testing/test-intent.md';
 export const ACCEPTANCE_HEADING = '## Acceptance records';
 
@@ -54,8 +53,6 @@ export const EXPECTATION_SOURCE_KINDS = Object.freeze([
 /** Words agents use for "the task said so" — never a citation (D2 Obsolete, S6). */
 export const NOT_A_CITATION_KINDS = Object.freeze(['task-scope', 'task', 'scope', 'heading', 'brief', 'agent-decision']);
 
-/** D2: the acceptor is the verifier, or the orchestrator when it did not build. */
-export const ACCEPTOR_ROLES = Object.freeze(['verifier', 'orchestrator']);
 export const RECORD_KINDS = Object.freeze(['acceptance', 'audit', 'tie-break']);
 export const VERDICTS = Object.freeze(['accept', 'reject']);
 

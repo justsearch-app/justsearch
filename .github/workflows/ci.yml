@@ -45,7 +45,6 @@ jobs:
       devrunner: ${{ steps.classify.outputs.devrunner }}
       rust: ${{ steps.classify.outputs.rust }}
       lifecycle: ${{ steps.classify.outputs.lifecycle }}
-      integration: ${{ steps.classify.outputs.integration }}
       jseval: ${{ steps.classify.outputs.jseval }}
       frontend: ${{ steps.classify.outputs.frontend }}
     steps:
@@ -193,6 +192,14 @@ jobs:
 
       - name: Workflow trigger policy guard
         run: node scripts/ci/check-workflow-triggers.mjs
+
+      - name: Test runtime manifest closure guard
+        run: node scripts/ci/test-check-runtime-manifest-closure.mjs
+
+      - name: Runtime manifest closure guard
+        # Advisory: literal-path regexes match comments and non-dataDir bases; zero real violations found so far.
+        continue-on-error: true
+        run: node scripts/ci/check-runtime-manifest-closure.mjs
 
       - name: Governance production coverage regression tests
         run: node scripts/ci/test-check-governance-ci-coverage.mjs
@@ -355,8 +362,10 @@ jobs:
       - name: Test managed PR review record
         run: node scripts/ci/test-pr-review-record.mjs
 
-      - name: Test validated publication enqueue
-        run: node scripts/dev/run-gh.test.mjs
+      - name: Test developer publication and pre-push commands
+        run: |
+          node scripts/dev/run-gh.test.mjs
+          node scripts/dev/java-prepush.test.mjs
 
       - name: Test bounded advisory reporting
         run: node scripts/ci/test-report-github-advisories.mjs
@@ -785,7 +794,8 @@ jobs:
       - name: Run jseval test suite
         # `-p no:cacheprovider`: a fresh runner has no cache to reuse and the plugin
         # would only write .pytest_cache into the checkout.
-        run: python -m pytest scripts/jseval/tests -q -p no:cacheprovider
+        # Release composition runs in Public claims above.
+        run: python -m pytest scripts/jseval/tests --ignore=scripts/jseval/tests/test_release.py -q -p no:cacheprovider
 
   measured-axe:
     needs: changes

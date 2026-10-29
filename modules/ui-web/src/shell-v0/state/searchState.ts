@@ -81,6 +81,8 @@ export interface SearchState {
   /** Tempdoc 597: the TRUE matched-document count. The headline reads "Top N of M matches" off
    *  this (M), so it can't contradict the facet chips (which count the same matched population). */
   matchCount: number;
+  /** Advanced quick results await the refined population count. */
+  countsPending?: boolean;
   /** Tempdoc 597 §16.2: true when the match scan hit its `maxDocsScanned` cap, so `matchCount` is a
    *  lower bound — the headline renders "M+" (the Elasticsearch `gte` / Lucene relation convention). */
   facetsTruncated: boolean;
@@ -253,6 +255,7 @@ interface SearchResponse {
     trace?: unknown;
     excerptRegions?: Array<{ text?: string; approxLine?: number }>;
   }>;
+  advancedSyntax?: boolean;
   totalHits?: number;
   /** Tempdoc 597: the true matched-document count (additive wire field; cast-tolerant parse). */
   matchCount?: number;
@@ -280,7 +283,9 @@ async function readSearchFailure(res: Response): Promise<ReturnType<typeof creat
   const wireKey = text(data.i18nKey);
   const restrictionError = res.status === 400 && code === 'INVALID_REQUEST'
     && /^(pathPrefix|modifiedAt|sizeBytes)([.:]|$)/.test(text(data.error) ?? '');
-  const message = restrictionError ? text(data.error)! : localizeError({
+  const message = code === 'SEARCH_SYNTAX_INVALID'
+    ? text(data.error) ?? 'Check the search syntax.'
+    : restrictionError ? text(data.error)! : localizeError({
     code,
     i18nKey: wireKey?.startsWith('errors.') ? wireKey : undefined,
     // ApiErrorHandler supplies sanitized English when the catalog is unavailable.
@@ -291,6 +296,7 @@ async function readSearchFailure(res: Response): Promise<ReturnType<typeof creat
 }
 
 function searchFailureMessage(error: ReturnType<typeof createApiError>): string {
+  if (error.code === 'SEARCH_SYNTAX_INVALID') return error.message;
   const recovery = error.retryable === true
     ? 'Try searching again. If the problem continues, open Health for details.'
     : error.retryable === false
@@ -344,6 +350,7 @@ export const FACET_FILTER_KEYS: Record<(typeof FACET_FIELDS)[number], string> = 
 /** The wire request body (the subset this store sends). */
 export interface SearchRequestBody {
   query: string;
+  querySyntax: 'search';
   limit: number;
   mode?: string;
   pipeline?: typeof QUICK_PIPELINE;
@@ -373,7 +380,7 @@ export function buildSearchIntent(
   // from module state) so this constructor stays pure/testable, mirroring `scope` above.
   chips: readonly SearchScopeChip[] = [],
 ): SearchRequestBody {
-  const body: SearchRequestBody = { query: q, limit: 50 };
+  const body: SearchRequestBody = { query: q, querySyntax: 'search', limit: 50 };
   if (stage === 'quick') {
     body.mode = 'text';
     body.pipeline = QUICK_PIPELINE;
@@ -455,9 +462,12 @@ function clearTimers(): void {
 }
 
 export function setQuery(q: string): void {
-  state = { ...state, query: q };
-  emit();
   generation += 1;
+  inflightAbort?.abort();
+  state = { ...state, query: q, totalHits: 0, matchCount: 0, countsPending: true,
+    facetsTruncated: false, passStage: null, searchTrace: null,
+    error: null, errorInfo: null, isSearching: !!q.trim(), isRefining: false, slowSearch: false };
+  emit();
   clearTimers();
   cancelDwell(); // a new query means the user has moved on from any opened result
   if (!q.trim()) {
@@ -476,6 +486,7 @@ export function setQuery(q: string): void {
       slowSearch: false,
       passStage: null,
       isRefining: false,
+      countsPending: false,
       facets: null,
     };
     emit();
@@ -597,14 +608,15 @@ export function invalidateSearchRestrictions(): void {
 
 /** The staged keystroke path: quick pass now, refined pass after the input settles. */
 async function runStagedSearch(q: string, gen: number): Promise<void> {
-  await runSearch(q, 'quick', gen);
-  if (gen !== generation || state.error) return;
+  const accepted = await runSearch(q, 'quick', gen);
+  if (!accepted || gen !== generation || state.error) return;
   settleTimer = window.setTimeout(() => {
     void runSearch(q, 'refined', gen);
   }, SETTLE_MS);
 }
 
-async function runSearch(q: string, stage: SearchPassStage, gen: number): Promise<void> {
+async function runSearch(q: string, stage: SearchPassStage, gen: number): Promise<boolean> {
+  if (gen !== generation) return false;
   const restrictions = getFilters();
   const restrictionsKey = JSON.stringify(restrictionWire(restrictions));
   // Tempdoc 580 §17 P3 — a new query replacing a settled, unopened result set is the
@@ -648,17 +660,21 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       body: JSON.stringify(body),
       signal: inflightAbort.signal,
     });
-    if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return; // superseded while in flight — drop silently
+    if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return false; // superseded while in flight — drop silently
     if (!res.ok) {
       const errorInfo = await readSearchFailure(res);
-      if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return; // also guard the asynchronous body read
+      if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return false; // also guard the asynchronous body read
+      const syntaxInvalid = errorInfo.code === 'SEARCH_SYNTAX_INVALID';
       state = { ...state, isSearching: false, isRefining: false, slowSearch: false,
-        error: searchFailureMessage(errorInfo), errorInfo };
+        ...(syntaxInvalid ? { results: [], totalHits: 0, matchCount: 0, facets: null,
+          facetsTruncated: false, passStage: null, searchTrace: null, countsPending: false } : {}),
+        error: syntaxInvalid && stage === 'quick' ? null : searchFailureMessage(errorInfo),
+        errorInfo };
       emit();
-      return;
+      return false;
     }
     const data = (await res.json()) as SearchResponse;
-    if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return;
+    if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return false;
     const hits: SearchHit[] = (data.results ?? []).map((r) => {
       // A pure-dense hit whose chunk-merge was skipped has no fields.path; r.id is then a raw
       // `chunk:<uuid>` — don't surface that scheme as the displayed title/path (searchState chunk-id leak).
@@ -701,6 +717,7 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       // Tempdoc 597: the true matched total (M in "Top N of M matches"). Fall back to totalHits then
       // the hit count if an older worker omits matchCount.
       matchCount: data.matchCount ?? data.totalHits ?? hits.length,
+      countsPending: data.advancedSyntax === true && stage === 'quick',
       // §16.2: the scan capped at `maxDocsScanned`, so the matched total above is a lower bound.
       facetsTruncated: data.facetsTruncated === true,
       isSearching: false,
@@ -713,15 +730,17 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       isRefining: false,
       // Phase 6: facet counts come from the refined pass; a quick pass keeps the
       // previous counts (stale-but-present beats flicker; refined replaces shortly).
-      facets: data.facets ?? (stage === 'refined' ? null : state.facets),
+      facets: stage === 'quick' && data.advancedSyntax === true ? null
+        : data.facets ?? (stage === 'refined' ? null : state.facets),
       // Tempdoc 580 §17 P3 — the per-query join key (additive wire field; FE parse is cast-tolerant).
       interactionId: (data as { interactionId?: string | null }).interactionId ?? null,
     };
     openedThisQuery = false;
     emit();
+    return true;
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') return;
-    if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return;
+    if (err instanceof Error && err.name === 'AbortError') return false;
+    if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return false;
     state = {
       ...state,
       isSearching: false,
@@ -730,6 +749,7 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       error: 'Search could not be completed. Open Health to check the connection and service status before trying again.',
     };
     emit();
+    return false;
   }
 }
 

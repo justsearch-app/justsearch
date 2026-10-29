@@ -91,7 +91,7 @@ final class SyncDirectoryOps {
   }
 
   /**
-   * Builds the presence authority for one prune of a root (task t-20261013-ef3c41). The default
+   * Builds the presence authority for one prune of a root (#758). The default
    * knows no registration or recorded volume; the ingest service supplies both.
    */
   private volatile java.util.function.Function<Path, PruneOps.PresenceGuard> pruneGuardFactory =
@@ -169,8 +169,7 @@ final class SyncDirectoryOps {
 
   /**
    * Supplies the presence authority for each prune, so a prune refuses a root that is now a
-   * different folder or volume than the one being watched or first indexed (task
-   * t-20261013-ef3c41).
+   * different folder or volume than the one being watched or first indexed (#758).
    */
   void setPruneGuardFactory(java.util.function.Function<Path, PruneOps.PresenceGuard> factory) {
     this.pruneGuardFactory = java.util.Objects.requireNonNull(factory, "factory");
@@ -390,8 +389,8 @@ final class SyncDirectoryOps {
   }
 
   /**
-   * One indexed file document's path, size and modification time, as the index holds them (task
-   * t-20261013-ef3c41, round 8, refined decision 2: the upgrade seeding's evidence). A missing
+   * One indexed file document's path, size and modification time, as the index holds them (#758:
+   * the upgrade seeding's evidence). A missing
    * size or time is {@code -1}.
    */
   record IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs) {
@@ -738,7 +737,7 @@ final class SyncDirectoryOps {
         return pruneAbort;
       }
       filesDeleted = pruneResult.pruned();
-      // Task t-20261013-ef3c41: a prune that stopped because the root or a subtree could not be
+      // #758: a prune that stopped because the root or a subtree could not be
       // read removed nothing after that point. Additions below are still safe; the response says
       // delete detection did not complete, never a silent "in sync".
       boolean pruneIncomplete = pruneResult.completion() == PruneOps.Completion.INCOMPLETE;
@@ -854,7 +853,7 @@ final class SyncDirectoryOps {
     if (pruneOps == null) {
       return new PruneOps.PruneResult(0, PruneOps.Completion.COMPLETE);
     }
-    // Tempdoc 599 §16/A1 (data-loss guard), generalised by task t-20261013-ef3c41: a document is
+    // Tempdoc 599 §16/A1 (data-loss guard), generalised by #758: a document is
     // pruned only when its file is reported not found while this same root (native identity, the
     // identity captured when the root was registered, and the volume recorded at its first prune)
     // is present and listable. The guard is

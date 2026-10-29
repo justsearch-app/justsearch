@@ -67,6 +67,9 @@ public enum ApiErrorCode {
     /** Request parameters are invalid. */
     INVALID_REQUEST(ErrorClass.VALIDATION),
 
+    /** The Search subset query is incomplete or invalid. */
+    SEARCH_SYNTAX_INVALID(ErrorClass.VALIDATION),
+
     /** Operation cannot be performed in the current state. */
     INVALID_STATE(ErrorClass.PERMANENT),
 

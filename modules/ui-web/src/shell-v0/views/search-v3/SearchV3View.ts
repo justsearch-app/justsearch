@@ -6036,9 +6036,10 @@ export class SearchV3View extends JfElement {
           .corpus=${projectSv3Corpus(this.aiSnapshot)}
           effort=${this.effort}
           tier=${this.tier}
+          .searchError=${this.search.snapshot?.errorInfo?.code === 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.error ?? '' : ''}
           .schemaDraft=${this.schemaDraft}
           .filterNote=${this.filterNote}
-          .filterError=${this.askFilterError || (this.search.snapshot?.errorInfo?.status === 400 ? this.search.snapshot.errorInfo.message : '')}
+          .filterError=${this.askFilterError || (this.search.snapshot?.errorInfo?.status === 400 && this.search.snapshot.errorInfo.code !== 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.errorInfo.message : '')}
           .recentItems=${this.recentItems}
           .recentLocked=${this.historyLocked}
           @sv3-recents-refresh=${() => { void this.refreshRecents(); }}

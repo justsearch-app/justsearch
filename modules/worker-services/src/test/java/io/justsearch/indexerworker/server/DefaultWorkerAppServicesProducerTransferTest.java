@@ -10,9 +10,9 @@ import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.core.execution.EngineExecutorRegistry;
-import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.core.execution.EngineExecutorSpec.Kind;
 import io.justsearch.core.execution.EngineExecutorSpec.Mode;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
@@ -20,14 +20,29 @@ import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.extract.ExtractionConfiguration;
 import io.justsearch.indexerworker.extract.ExtractionMetricCatalog;
 import io.justsearch.indexerworker.extract.OcrMetricCatalog;
+import io.justsearch.indexerworker.loop.EmbeddingProviderLifecycle;
 import io.justsearch.indexerworker.loop.IndexingPipelineMetricCatalog;
 import io.justsearch.indexerworker.loop.IngestionOutcomeMetricCatalog;
-import io.justsearch.indexerworker.loop.EmbeddingProviderLifecycle;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.services.WorkerWatcherMetricCatalog;
+import io.justsearch.ipc.HealthCheckRequest;
+import io.justsearch.ipc.RerankRequest;
+import io.justsearch.ort.Composition;
+import io.justsearch.ort.GpuSessionConfig;
+import io.justsearch.ort.ModelArtifacts;
+import io.justsearch.ort.ModelSessionPolicy;
+import io.justsearch.ort.NativeSessionHandle;
+import io.justsearch.ort.OrtCudaStatus;
+import io.justsearch.ort.OrtSessionAssembler;
+import io.justsearch.ort.RuntimePolicy;
+import io.justsearch.ort.telemetry.CpuRecreateCause;
 import io.justsearch.reranker.CitationScorerConfig;
+import io.justsearch.reranker.CrossEncoderReranker;
 import io.justsearch.reranker.RerankerConfig;
+import io.justsearch.reranker.RerankerShape;
+import io.justsearch.reranker.RerankerTokenizer;
+import io.justsearch.reranker.WorkerModelDiscovery;
 import io.justsearch.telemetry.catalog.MetricDefinition;
 import io.justsearch.telemetry.catalog.NoopMetricRegistry;
 import java.lang.reflect.Constructor;
@@ -36,20 +51,186 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 final class DefaultWorkerAppServicesProducerTransferTest {
+
+  @ParameterizedTest(name = "{displayName} [{index}]")
+  @ValueSource(booleans = {false, true})
+  void cpuRerankerIsActiveBeforeAndAfterRealRerank(boolean reload, @TempDir Path temp)
+      throws Exception {
+    try (Fixture fixture = rerankerFixture(temp);
+        var sessions = rerankerSessions(temp, false, () -> false);
+        var reranker = reranker(sessions)) {
+      var services = rerankerServices(fixture, reranker, reload);
+      try {
+        assertTrue(sessions.isQueryWarm(), "CPU session is ready without a first run");
+        assertFalse(services.searchService().getOrtCudaStatus().available());
+        assertTrue(rerankerActive(services), "a healthy CPU reranker must report active before search");
+        var response = services.searchService().rerank(RerankRequest.newBuilder()
+            .setQuery("question").addDocumentTexts("document").setDeadlineMs(30_000).build(),
+            io.justsearch.indexerworker.services.CallContext.none());
+        assertFalse(response.getSkipped(), response.getSkipReason());
+        assertEquals(List.of(1.0f), response.getScoresList());
+        assertTrue(rerankerActive(services), "a successful CPU rerank must keep the model active");
+      } finally {
+        if (reload) services.close();
+      }
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}]")
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  void cpuRerankerBecomesActiveAfterDeferredFallbackSearch(
+      boolean reload, boolean failed, @TempDir Path temp) throws Exception {
+    var gpuAllowed = new AtomicBoolean(true);
+    try (Fixture fixture = rerankerFixture(temp);
+        var sessions = rerankerSessions(temp, true, gpuAllowed::get);
+        var reranker = reranker(sessions)) {
+      if (failed) {
+        // ort-common has no reusable GPU failure-injection fixture. Inject the failed state
+        // without creating a GPU session or accessing hardware, as its own handle tests do.
+        setSessionField(sessions, "gpuSessionAttempted", true);
+        setSessionField(sessions, "gpuAvailable", false);
+        setSessionField(sessions, "ortCudaStatus",
+            OrtCudaStatus.providerFailed("test", temp, "controlled failure"));
+      } else {
+        gpuAllowed.set(false);
+        reranker.releaseGpuSession();
+      }
+      var services = rerankerServices(fixture, reranker, reload);
+      try {
+        // Production defers the CPU backup when GPU memory is reserved. Current behaviour:
+        // releasing/failing the GPU alone leaves the reranker inactive until a search creates it.
+        assertFalse(sessions.isQueryWarm(), "the deferred CPU session does not exist yet");
+        assertFalse(rerankerActive(services), "a missing CPU session is currently inactive");
+        var cuda = services.searchService().getOrtCudaStatus();
+        assertFalse(cuda.available());
+        var response = services.searchService().rerank(RerankRequest.newBuilder()
+            .setQuery("question").addDocumentTexts("document").setDeadlineMs(30_000).build(),
+            io.justsearch.indexerworker.services.CallContext.none());
+        assertFalse(response.getSkipped(), response.getSkipReason());
+        assertEquals(List.of(1.0f), response.getScoresList());
+        assertTrue(sessions.isQueryWarm(), "the search created a healthy CPU session");
+        assertTrue(rerankerActive(services), "GPU availability must not hide a healthy CPU session");
+        assertEquals(cuda, services.searchService().getOrtCudaStatus(), "health must not mutate diagnostics");
+      } finally {
+        if (reload) services.close();
+      }
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}]")
+  @ValueSource(booleans = {false, true})
+  void warmGpuRerankerIsActive(boolean reload, @TempDir Path temp) throws Exception {
+    try (Fixture fixture = rerankerFixture(temp)) {
+      // Wiring-level check with a mocked reranker; no real GPU readiness or hardware is tested.
+      var reranker = mock(CrossEncoderReranker.class);
+      when(reranker.isQueryWarm()).thenReturn(true);
+      when(reranker.getOrtCudaStatus()).thenReturn(OrtCudaStatus.ready("test", temp));
+      var services = rerankerServices(fixture, reranker, reload);
+      try {
+        assertTrue(rerankerActive(services));
+        assertTrue(services.searchService().getOrtCudaStatus().available());
+      } finally {
+        if (reload) services.close();
+      }
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}]")
+  @ValueSource(booleans = {false, true})
+  void unbuiltRerankerIsInactive(boolean reload, @TempDir Path temp) throws Exception {
+    try (Fixture fixture = rerankerFixture(temp)) {
+      var services = rerankerServices(fixture, null, reload);
+      try {
+        assertFalse(rerankerActive(services), "missing or disabled models have no built reranker");
+      } finally {
+        if (reload) services.close();
+      }
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}]")
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  void retiredOrFailedCpuRerankerIsInactive(boolean reload, boolean failed, @TempDir Path temp)
+      throws Exception {
+    try (Fixture fixture = rerankerFixture(temp);
+        var sessions = rerankerSessions(temp, false, () -> false);
+        var reranker = reranker(sessions)) {
+      var services = rerankerServices(fixture, reranker, reload);
+      try {
+        assertTrue(sessions.isQueryWarm());
+        if (failed) sessions.reportCpuSessionFailure(CpuRecreateCause.REPORTED_FAILURE);
+        else reranker.close();
+        assertFalse(rerankerActive(services), "retired or failed sessions cannot claim activity");
+      } finally {
+        if (reload) services.close();
+      }
+    }
+  }
+
+  private static Fixture rerankerFixture(Path temp) {
+    return new Fixture(temp, List.of(
+        new WorkerModelDiscovery.DiscoveredModel("reranker", true, temp.toString(), false)));
+  }
+
+  private static DefaultWorkerAppServices rerankerServices(
+      Fixture fixture, CrossEncoderReranker reranker, boolean reload) {
+    var incumbent = fixture.newIncumbent();
+    incumbent.wireSearchReranker(reranker);
+    return reload ? incumbent.prepareQueryServingSuccessor(fixture.greenContext(),
+        fixture.configuration.chunkReranker(), fixture.configuration.citationScorer()) : incumbent;
+  }
+
+  private static boolean rerankerActive(DefaultWorkerAppServices services) {
+    return services.healthService().check(HealthCheckRequest.getDefaultInstance())
+        .getOnnxModelsList().stream().filter(model -> model.getModelName().equals("reranker"))
+        .findFirst().orElseThrow().getSessionActive();
+  }
+
+  private static NativeSessionHandle rerankerSessions(
+      Path temp, boolean gpuConfigured, java.util.function.BooleanSupplier gpuAllowed) throws Exception {
+    // Tiny real ONNX Cast: input_ids -> float logits. No downloads or production model assets.
+    Path model = Files.write(temp.resolve("reranker.onnx"), Base64.getDecoder().decode(
+        "CAk6nQEKJAoJaW5wdXRfaWRzEgZsb2dpdHMiBENhc3QqCQoCdG8YAaABAhINdGlueS1yZXJhbmtlclogCglpbnB1dF9pZHMSEwoRCAcSDQoHEgViYXRjaAoCCAFaJQoOYXR0ZW50aW9uX21hc2sSEwoRCAcSDQoHEgViYXRjaAoCCAFiHQoGbG9naXRzEhMKEQgBEg0KBxIFYmF0Y2gKAggBQgIQEQ=="));
+    var policy = ModelSessionPolicy.forFallback(
+        gpuConfigured ? new GpuSessionConfig(0, 1024 * 1024) : null,
+        null, gpuConfigured, gpuConfigured, 60_000L);
+    return (NativeSessionHandle) OrtSessionAssembler.buildManager("reranker",
+        new Composition(RuntimePolicy.defaults(), policy, new ModelArtifacts(model, model)),
+        gpuAllowed::getAsBoolean);
+  }
+
+  private static CrossEncoderReranker reranker(NativeSessionHandle sessions) {
+    var tokenizer = mock(RerankerTokenizer.class);
+    var batch = new RerankerTokenizer.EncodedBatch(
+        new long[][] {{1}}, new long[][] {{1}}, new long[][] {{0}}, 1, 1, 0, 1);
+    when(tokenizer.encodePairs(anyString(), any(String[].class))).thenReturn(batch);
+    when(tokenizer.encodePairsStrict(anyString(), any(String[].class))).thenReturn(batch);
+    return new CrossEncoderReranker(sessions, new RerankerShape(8, false), tokenizer);
+  }
+
+  private static void setSessionField(NativeSessionHandle sessions, String name, Object value)
+      throws Exception {
+    Field field = NativeSessionHandle.class.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(sessions, value);
+  }
 
   @Test
   void watcherTargetChangeAfterEffectFailureDoesNotRetryTheEffect() throws Exception {
@@ -920,14 +1101,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
             .putDefault("justsearch.extraction.sandbox.mode", "in_process")
             .build();
     private final NoopMetricRegistry metricRegistry = new NoopMetricRegistry(metricDefinitions());
-    private final WorkerServiceConfiguration configuration =
-        new WorkerServiceConfiguration(
-            snapshot,
-            ExtractionConfiguration.capture(
-                snapshot, 1, DefaultWorkerAppServices.buildSkipPolicy(snapshot)),
-            RerankerConfig.ChunkRerankerConfig.from(snapshot),
-            CitationScorerConfig.from(snapshot),
-            List.of());
+    private final WorkerServiceConfiguration configuration;
     private final WorkerServiceConfiguration candidateConfiguration =
         new WorkerServiceConfiguration(
             snapshot,
@@ -940,6 +1114,14 @@ final class DefaultWorkerAppServicesProducerTransferTest {
     private DefaultWorkerAppServices incumbent;
 
     private Fixture(Path tempDir) {
+      this(tempDir, List.of());
+    }
+
+    private Fixture(Path tempDir, List<WorkerModelDiscovery.DiscoveredModel> discoveredModels) {
+      configuration = new WorkerServiceConfiguration(snapshot,
+          ExtractionConfiguration.capture(snapshot, 1, DefaultWorkerAppServices.buildSkipPolicy(snapshot)),
+          RerankerConfig.ChunkRerankerConfig.from(snapshot), CitationScorerConfig.from(snapshot),
+          discoveredModels);
       EngineExecutorRegistry.Registration watcher = mock(EngineExecutorRegistry.Registration.class);
       when(watcher.openScheduled(any())).thenReturn(watcherExecutor);
       when(executors.pdfOcr()).thenReturn(ocr);

@@ -296,7 +296,7 @@ message CoreIndexView {
   // unmerged index.
   int64 index_max_doc = 16 [json_name = "indexMaxDoc"];
   int64 index_num_docs = 17 [json_name = "indexNumDocs"];
-  // Task t-20261013-ef3c41: true when indexedDocuments and searchableDocuments are NOT counts — the
+  // #758: true when indexedDocuments and searchableDocuments are NOT counts — the
   // index could not be counted and no earlier count exists. Both then carry 0 for older readers; a
   // surface that knows this field shows the count as checking/unknown, never as an empty index.
   // Absent or false means the counts are known.

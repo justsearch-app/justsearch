@@ -5,8 +5,7 @@ import io.justsearch.adapters.lucene.runtime.PathPresence;
 import java.nio.file.Path;
 
 /**
- * The one Worker-side answer to "may this source's indexed content be removed?" (task
- * t-20261013-ef3c41).
+ * The one Worker-side answer to "may this source's indexed content be removed?" (#758).
  *
  * <p>Every check that can end in a deletion — the admission gate, the post-extraction re-hash, the
  * pre-publish freshness check, the writer's pre-write check and the watcher's delete confirmation
@@ -16,7 +15,7 @@ import java.nio.file.Path;
  * was), then the file is reported not found again, and the nearest folder above it that exists can
  * be listed. Windows reports an unplugged drive or a vanished share as "not found" as well, which
  * is why the root check sits between the two observations; a drive letter that now holds another
- * volume is why the root check asks for identity, not only presence (round 4). Any other failure is
+ * volume is why the root check asks for identity, not only presence. Any other failure is
  * "cannot tell", which keeps the content and retries.
  */
 public final class SourcePresence {
@@ -24,8 +23,7 @@ public final class SourcePresence {
 
   /**
    * The root-level question shared by every path that can end in a deletion, and by every path
-   * that adds or updates content, so each asks what the prune and the walks ask (task
-   * t-20261013-ef3c41, rounds 4 and 5).
+   * that adds or updates content, so each asks what the prune and the walks ask (#758).
    */
   public interface RootCheck {
     /** Release-v13 exact work has read authority only; its absence never authorizes deletion. */

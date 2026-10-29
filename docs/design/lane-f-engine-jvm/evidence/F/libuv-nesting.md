@@ -1,6 +1,6 @@
 # Engine job under Node's libuv job (Spec F step 0, spike case D) - 2026-10-06
 
-Task t-20261005-b6d536, Spec F §1.4 case D (RV2 F3). S1 measured job nesting under a plain parent.
+PR #759. An earlier measurement covered job nesting under a plain parent.
 This reproduces the dev chain exactly: Node spawns the Engine-like holder JVM the way dev-runner
 spawns the Engine, so libuv puts it in Node's job L, which allows silent breakaway.
 

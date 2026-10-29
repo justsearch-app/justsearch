@@ -478,6 +478,9 @@ public class KnowledgeSearchController {
       // Preserve legacy JSON shape (optional fields omitted when empty).
       Map<String, Object> out = new HashMap<>();
       out.put("interactionId", interactionId);
+      if ("search".equalsIgnoreCase(req.querySyntax())) {
+        out.put("advancedSyntax", io.justsearch.core.search.SearchSyntax.parse(query).advanced());
+      }
       out.put("totalHits", response.totalHits());
       // Tempdoc 597: the true matched-document count — the FE headline binds to this.
       out.put("matchCount", response.matchCount());
@@ -521,6 +524,9 @@ public class KnowledgeSearchController {
 
     } catch (io.justsearch.app.api.knowledge.SearchRestrictions.Invalid e) {
       ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, e.getMessage(), telemetry, ApiErrorHandler.routeOf(ctx)));
+    } catch (io.justsearch.core.search.SearchSyntax.InvalidQuery e) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.SEARCH_SYNTAX_INVALID,
+          e.getMessage(), telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (KnowledgeClientException e) {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       if (e.isInvalidCursor()) {
@@ -796,7 +802,7 @@ public class KnowledgeSearchController {
         .indexState("UNKNOWN")
         .statusStale(true)
         .statusStaleMs(snapshot != null ? System.currentTimeMillis() - snapshot.atMs() : 0L)
-        // Task t-20261013-ef3c41: nothing was counted, so the 0 in indexedDocuments is not a count.
+        // #758: nothing was counted, so the 0 in indexedDocuments is not a count.
         .indexedDocumentsUnknown(true)
         .build();
   }
