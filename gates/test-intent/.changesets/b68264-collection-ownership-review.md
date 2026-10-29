@@ -153,3 +153,14 @@ size and full FileTime together. An external in-place rewrite preserving all thr
 a filesystem without fileKey, or inode reuse over multiple unseen replacements with matching size
 and timestamp, can also collide. A change racing a probe is observed on the next call. Failed
 parses do not replace the previous snapshot, and are retried rather than served as a cache hit.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-b68264-codex-r5",
+  "verdict": "accept",
+  "digest": "sha256:50010fb501cda03d68f2acae99ab153186e39b53aa52dfac3d94592fc6d48bd1",
+  "note": "Verified merge retains both trees without overlapping file edits; 67 targeted cases pass without skips; baseline reproduces K1 and four cache/lock failures; repeated malformed-registry refusal and repair pass before and after; F2 is attributed as a delegated agent choice."
+}
+```
