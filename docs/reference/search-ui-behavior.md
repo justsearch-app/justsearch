@@ -20,7 +20,10 @@ to it; there is one interaction window.
 The [Search window scenario catalog](../../governance/search-window-scenarios.v1.json) records
 product scenarios, known gaps, and their existing observation bindings. A redesign rebinds
 these scenarios and never drops one without a recorded retirement. The always-on catalog
-check validates the bindings and retirements; it does not establish that the bound checks ran.
+check validates bindings and retirements and requires complete literal test titles and function
+bodies, rejecting disabling modifiers, skip/todo/fails options, non-literal options, and conditional
+forms on tests or enclosing suites. It does not establish that checks ran: runtime skips,
+configuration include/exclude rules, and name filters are outside its scope.
 
 ## 1. Window layout and modes
 

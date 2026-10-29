@@ -56,6 +56,13 @@ try {
     const value = catalog(); value.entries[0].observations[1].step = 'removed-step';
     has(check(value), /step "removed-step" is not in/);
   });
+  for (const field of ['file', 'test']) {
+    test(`a real UI fixture binding cannot declare ${field}`, () => {
+      const value = catalog();
+      value.entries[0].observations[1][field] = field === 'file' ? 'search.test.ts' : 'ignores an empty search';
+      has(check(value), /real-ui-fixture:.*cannot declare file or test/);
+    });
+  }
   test('removing a base scenario without retirement fails', () => {
     has(check({ version: 1, entries: [], retired: [] }, catalog()), /SW-SRCH-01: removed without a recorded retirement/);
   });
@@ -188,6 +195,50 @@ try {
     ['escaped template substitution is literal', 'it(`target\\${suffix}`, () => {});', false],
   ]) {
     test(`AST binding: ${label}`, () => {
+      assert.equal(testTitles(source).has('target'), expected);
+      assert.equal(testTitles(source, 'bindings.test.js').has('target'), expected);
+    });
+  }
+  for (const [label, source, expected] of [
+    ...['skip', 'todo', 'fails'].flatMap(option => [
+      [`test option ${option}`, `it('target', { ${option}: true }, () => {});`, false],
+      [`describe option ${option}`, `describe('outer', { ${option}: true }, () => { it('target', () => {}); });`, false],
+      [`suite option ${option}`, `suite('outer', { ${option}: true }, () => { describe('inner', () => { test('target', () => {}); }); });`, false],
+      [`false test option ${option}`, `it('target', { ${option}: false }, () => {});`, true],
+      [`false suite option ${option}`, `suite('outer', { ${option}: false }, () => { it('target', () => {}); });`, true],
+    ]),
+    ['test without a body', "it('target');", false],
+    ['test with options but no body', "test('target', {});", false],
+    ['test with undefined body', "test('target', {}, undefined);", false],
+    ['test with non-function body', "test('target', {}, 123);", false],
+    ['test with a referenced body', "test('target', callback);", false],
+    ['test with a conditional body', "test('target', enabled ? () => {} : undefined);", false],
+    ['test with dynamic options', "test('target', options, () => {});", false],
+    ['suite with dynamic options', "describe('outer', options, () => { it('target', () => {}); });", false],
+    ['test with conditional options', "test('target', enabled ? {} : { skip: true }, () => {});", false],
+    ['suite with conditional options', "suite('outer', enabled ? {} : { todo: true }, () => { it('target', () => {}); });", false],
+    ['dynamic skip value', "it('target', { skip: disabled }, () => {});", false],
+    ['dynamic suite todo value', "describe('outer', { todo: disabled }, () => { it('target', () => {}); });", false],
+    ['spread options', "it('target', { ...options }, () => {});", false],
+    ['spread suite options', "suite('outer', { ...options }, () => { it('target', () => {}); });", false],
+    ['shorthand skip option', "it('target', { skip }, () => {});", false],
+    ['computed skip option', "it('target', { ['skip']: true }, () => {});", false],
+    ['dynamic option name', "it('target', { [option]: true }, () => {});", false],
+    ['getter skip option', "it('target', { get skip() { return true; } }, () => {});", false],
+    ['inherited skip option', "it('target', { __proto__: { skip: true } }, () => {});", false],
+    ['options on an each test', "it.each([1])('target', { skip: true }, () => {});", false],
+    ['options on an each suite', "describe.each([1])('outer', { todo: true }, () => { it('target', () => {}); });", false],
+    ['legacy trailing options', "it('target', () => {}, { skip: true });", false],
+    ['dynamic trailing argument', "it('target', () => {}, options);", false],
+    ['literal timeout', "it('target', () => {}, 1000);", true],
+    ['ordinary literal options', "it('target', { timeout: 1000, retry: 2, concurrent: true, only: true }, () => {});", true],
+    ['function expression body', "test('target', {}, function () {});", true],
+    ['async function body', "test('target', {}, async () => {});", true],
+    ['expression body', "test('target', {}, () => expect(true).toBe(true));", true],
+    ['wrapped options and body', "test('target', ({ skip: false }), (() => {}));", true],
+    ['enabled sibling of option-disabled suite', "describe('outer', { skip: true }, () => { it('hidden', () => {}); }); it('target', () => {});", true],
+  ]) {
+    test(`options and body binding: ${label}`, () => {
       assert.equal(testTitles(source).has('target'), expected);
       assert.equal(testTitles(source, 'bindings.test.js').has('target'), expected);
     });

@@ -2134,7 +2134,7 @@
     },
     {
       "id": "SW-DOC-02",
-      "behavior": "Different passages of one document resolve to their own source indices, unresolved citations resolve to no source, and out-of-range citations create no answer link.",
+      "behavior": "Citations to different passages of one document each identify the matching passage, unresolved citations identify no source, and out-of-range citations create no answer link.",
       "kind": "works-today",
       "races": [],
       "observations": [

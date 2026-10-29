@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * Keep Search scenario bindings and retirements honest. This checks declarations, not execution:
- * a bound test or UI step is an observation to run, never evidence that it ran or passed.
+ * Check bindings and retirements; bound tests need a complete literal title and function body,
+ * without disabling modifiers, skip/todo/fails options, non-literal options or conditional forms
+ * on the test or any enclosing suite.
+ * This does not establish execution: runtime skips, config include/exclude and name filters are out of scope.
  * Run from the repository root; --base-ref defaults to origin/main. Missing history fails closed.
  */
 import { readFileSync, statSync } from 'node:fs';
@@ -25,11 +27,42 @@ export function testTitles(source, filename = 'bindings.test.ts') {
   const factories = new Set(['each', 'for', 'skipIf', 'runIf']);
   const allowed = new Set(['only', 'concurrent', 'sequential', 'each']);
 
+  function unwrap(expression) {
+    while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
+      || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
+      || ts.isSatisfiesExpression(expression))) expression = expression.expression;
+    return expression;
+  }
+
+  function enabledOptions(expression) {
+    if (!expression || !ts.isObjectLiteralExpression(expression)) return false;
+    return expression.properties.every(property => {
+      // Spreads, accessors and dynamic keys can hide disabling options.
+      if (!ts.isPropertyAssignment(property)) return false;
+      const name = ts.isComputedPropertyName(property.name) ? unwrap(property.name.expression) : property.name;
+      if (!ts.isIdentifier(name) && !ts.isStringLiteral(name) && !ts.isNoSubstitutionTemplateLiteral(name)) return false;
+      if (ts.isComputedPropertyName(property.name) && ts.isIdentifier(name)) return false;
+      if (name.text === '__proto__') return false;
+      return !['skip', 'todo', 'fails'].includes(name.text)
+        || unwrap(property.initializer).kind === ts.SyntaxKind.FalseKeyword;
+    });
+  }
+
+  function hasBody(expression) {
+    return expression && (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) && !!expression.body;
+  }
+
+  function bindableArguments(args) {
+    const [, second, third] = args.map(unwrap);
+    if (args.length > 3) return false;
+    // Vitest 4 accepts (title, body, timeout) or (title, options, body).
+    if (hasBody(second)) return !third || ts.isNumericLiteral(third);
+    return enabledOptions(second) && hasBody(third);
+  }
+
   // Read the callee chain, including factory calls such as test.skip.each(rows).
   function declaration(expression) {
-    while (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
-      || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
-      || ts.isSatisfiesExpression(expression)) expression = expression.expression;
+    expression = unwrap(expression);
     if (ts.isIdentifier(expression)) return { name: expression.text, modifiers: [] };
     if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
       const parent = declaration(expression.expression);
@@ -55,7 +88,7 @@ export function testTitles(source, filename = 'bindings.test.ts') {
     if (ts.isCallExpression(node)) {
       const declared = declaration(node.expression);
       if (declared && (suites.has(declared.name) || tests.has(declared.name))) {
-        const disabled = declared.name.startsWith('x') || declared.modifiers.some(modifier =>
+        const disabled = !bindableArguments(node.arguments) || declared.name.startsWith('x') || declared.modifiers.some(modifier =>
           !allowed.has(modifier.name) || factories.has(modifier.name) !== modifier.called);
         if (suites.has(declared.name)) blocked ||= disabled;
         else if (!blocked && !disabled) {
@@ -118,6 +151,7 @@ export function checkSearchWindowScenarios({ root, catalog, stepIndex, baseline 
       }
       counts[layer].bound++;
       if (layer === 'real-ui-fixture') {
+        if (observation.file !== undefined || observation.test !== undefined) failures.push(`${label}/${layer}: a step binding cannot declare file or test`);
         if (!nonempty(observation.step) || !steps.has(observation.step)) failures.push(`${label}/${layer}: step ${JSON.stringify(observation.step)} is not in ${STEP_INDEX}`);
         continue;
       }
