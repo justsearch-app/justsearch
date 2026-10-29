@@ -91,6 +91,69 @@ occasions in one session, green on every isolated re-run), quarantined 2026-09-0
 - **Test totals:** `node scripts/ci/report-unit-test-attribution.mjs` reads every test task under a module root. Running one task freshly can mix its results with another task's stale results. Use run-evidence for named checks.
 - **Isolated Engine:** `dev-runner` needs a fixed frontend port and always starts the frontend. Sandboxed sessions start an Engine with their own `JUSTSEARCH_HOME`, `JUSTSEARCH_DATA_DIR`, `JUSTSEARCH_DEV_RUNNER_STATE_ROOT` and API port 0; no one-command isolated start is listed here.
 
+### UI checks in an isolated session
+
+Run this from the root of a fresh Linux agent checkout with network access, Node/npm
+(the versions in `.github/workflows/ci.yml`), Python 3.11+ with `venv`, and Chromium's
+system libraries already installed on the host. No Engine, native helper, Java, GPU,
+or shared dev stack is needed. Do not use `serve-worktree-fe.cjs` for these checks.
+
+```bash
+node scripts/dev/prepare-ui-checks.cjs
+source tmp/ui-checks/env.sh
+du -sh node_modules modules/ui-web/node_modules scripts/wire-contract/node_modules tmp/ui-checks
+npm run test:unit:run --prefix modules/ui-web -- src/shell-v0/controllers/AgentSessionController.test.ts --maxWorkers=4
+npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4
+python -m jseval ui-shot sv3-search-results --fixtures --no-demo --output-dir "$UI_CHECKS_DIR/captures"
+python -m jseval ui-a11y-gate --output-dir "$UI_CHECKS_DIR/a11y"
+node scripts/ci/report-github-advisories.mjs
+npm --prefix modules/ui-web run knip:report
+node scripts/docs/generate-runtime-config-matrix.mjs
+node scripts/governance/run.mjs --mode gate
+npm run lint:scripts
+```
+
+The prep script prints the command to source its environment. It installs the three
+lockfile-pinned npm dependency trees directly into this checkout's ignored
+`node_modules`, `modules/ui-web/node_modules` and `scripts/wire-contract/node_modules`
+directories with `npm ci`. It refuses symlinks at any of those paths and paths that
+resolve outside this checkout, before installing anything. The Python venv,
+pip/npm caches and any downloaded browser live in `tmp/ui-checks/`. This makes
+`ui_shot.py` use the nearest checkout's Vite and dependencies, including when the
+checkout is nested inside another repository, without its ancestor-junction fallback.
+Setup can be rerun; `npm ci` replaces these local dependency directories.
+
+The venv installs editable `scripts/jseval[ui]`, including all base dependencies
+(such as `httpx`), from this checkout. Unlike CI's Python 3.13 install, which uses
+`-c scripts/jseval/requirements.lock.txt`, this host-Python recipe resolves the base
+dependencies without that constraint file: its NumPy pin predates Python 3.14 wheels.
+The installed Python Playwright selects its own Chromium revision. Matching Chromium
+and headless-shell directories in `~/.cache/ms-playwright` are reused read-only;
+otherwise Chromium is installed locally. This does not install system packages.
+A missing host library is a blocker to report to the orchestrator.
+
+The ordinary Vitest command matches CI's `Frontend unit tests` step; the separate
+lockdown suite is outside this recipe. The capture and gate use the same fixture
+path as CI's `Measured axe` job. `ui-shot` starts Vite itself on a free port in
+5174–5223 with `--strictPort`; omit `--ui-url`. Fixtures intercept API requests, and
+`--no-demo` disables demo mode. Each capture writes a PNG and a `.measure.json`.
+`ui-a11y-gate` sweeps the baseline register with fixtures and measurement enabled:
+exit 0 means clean, 1 means a new axe rule or serious/critical violation, and 2 means
+a capture/measurement error. Keep that exit status when logging (use `set -o pipefail`
+if piping through `tee`).
+
+Vite persists between captures; its PID, root, port and provenance are recorded in
+`tmp/ui-shot-server.json`. Stop only that session's verified process before removing
+the local installs; never stop another checkout's frontend. After stopping that
+process, clean up from the checkout root with:
+
+```bash
+rm -rf node_modules modules/ui-web/node_modules scripts/wire-contract/node_modules tmp/ui-checks
+```
+
+Close the shell that sourced `env.sh` to discard its exported environment. Keep
+`~/.cache/ms-playwright`; the preparation script only reads matching browsers there.
+
 ## 3. Development Workflow
 
 ### 3.1. Git Stash Warning
