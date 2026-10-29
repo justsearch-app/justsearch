@@ -1267,6 +1267,7 @@ def cancel_update(run):
     # Shipped currentUser NSIS requests no UAC. Exercise the settled alternative:
     # decline the actual installer; do not fabricate an elevation prompt.
     action = invoke_nsis(run, installation, 2) # IDCANCEL
+    run.evidence('J5-decline-action', action)
     # NSIS may ask for confirmation in a child dialog of the same process.
     def exited():
         if not run.target.alive([installation['process']]):
@@ -1274,6 +1275,8 @@ def cancel_update(run):
         confirm_nsis_cancel(run, installation['process'])
         return False
     wait_for(exited, 'Declined NSIS process exited', seconds=60, error=ProductFailure)
+    run.evidence('J5-decline-exit', {'installerExited': True, 'process': installation['process'],
+                                 'installedVersion': run.installed_version()['version']})
     run.ready()
     open_update_offer(run, 'J5-cancel-reoffer')
     observation = {'installerObserved': True, 'installerExited': not run.target.alive([installation['process']]),

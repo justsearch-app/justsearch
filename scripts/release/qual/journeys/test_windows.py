@@ -558,6 +558,31 @@ class WindowsUpdateAndCrashTests(unittest.TestCase):
             with patch.object(windows,'installer_witness',return_value=installation),patch.object(windows,'invoke_nsis'),patch.object(windows,'wait_for',once),self.assertRaisesRegex(ProductFailure,'never resumed'):
                 windows.cancel_update(run)
 
+    def test_decline_boundary_evidence_survives_failed_engine_recovery(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run=Mock(data=temp,facts={})
+            run.installed_version.return_value={'version':'0.3.2'}
+            run.target.alive.return_value=[]
+            installation={'process':process(60,'C:/stage/setup.exe'),'window':{'handle':200}}
+            action={'invoked':True,'button':'2','interface':'IUIAutomation'}
+            order=[]
+            run.evidence.side_effect=lambda name,value:order.append((name,value))
+            def failed_ready():
+                order.append(('ready',None))
+                raise ProductFailure('Old Engine never resumed')
+            run.ready.side_effect=failed_ready
+            with patch.object(windows,'launch_update',return_value=installation), \
+                 patch.object(windows,'invoke_nsis',return_value=action), \
+                 patch.object(windows,'wait_for',once), \
+                 patch.object(linux,'open_update_offer') as reoffer, \
+                 self.assertRaisesRegex(ProductFailure,'never resumed'):
+                windows.cancel_update(run)
+            self.assertEqual(order,[('J5-decline-action',action),('J5-decline-exit',{
+                'installerExited':True,'process':installation['process'],'installedVersion':'0.3.2'}),('ready',None)])
+            self.assertNotIn('updateCancelled',run.facts)
+            reoffer.assert_not_called()
+            run.start_ui.assert_not_called()
+
     def test_success_observes_automatic_relaunch_before_web_storage_restart(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);(root/'upgrade').mkdir();(root/'upgrade/installer-launch-witness.v1.json').write_text(json.dumps({'attemptId':'cancelled'}))
