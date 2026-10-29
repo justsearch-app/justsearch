@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:029e7b67b29488f1d59722cf245accb34aa4670a1003ff85558bfead3ae0d121"
+    "scriptDigest": "sha256:5aab4f22c25ccde3dd526a9161b4e59e7b750ae074eb3724933fd9938b784642"
   },
-  "createdAt": "2026-10-28T15:22:11.421Z",
-  "revision": "f00f25ff30ceb97d371fb48c48effc585264f1af",
-  "tree": "e1c1e18f3f708f85600b77a5b7b252f63e41a33b",
+  "createdAt": "2026-10-29T06:27:00.816Z",
+  "revision": "8bed3e17ed5fe6996bc7bdc6d27815820f3142bb",
+  "tree": "233c767419e6b2a0f761075b650177bef9cda030",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,28 +18,28 @@
   },
   "runs": [
     {
-      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest\" --tests \"io.justsearch.indexerworker.server.GpuOffNativeRerankerSessionTest\" --tests \"io.justsearch.indexerworker.server.ops.InstallerEmptyMetadataTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "js-gradle-slot ./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerLiveInstallerMigrationTest\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest\" --tests \"io.justsearch.indexerworker.server.GpuOffNativeRerankerSessionTest\" --tests \"io.justsearch.indexerworker.server.ops.InstallerEmptyMetadataTest\" --tests \"io.justsearch.indexerworker.server.ops.GreenCutoverEmbeddingFpVerifyTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 51238
+      "durationMs": 58420
     },
     {
-      "command": "js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedInstallerGenerationBootProjectionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "js-gradle-slot ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedInstallerGenerationBootProjectionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5161
+      "durationMs": 4626
     },
     {
-      "command": "js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest\" --tests \"io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifierTest\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "js-gradle-slot ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.SettingsCommitCoordinatorTest\" --tests \"io.justsearch.app.services.registry.executor.RecordedInstallerAssetVerifierTest\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9247
+      "durationMs": 13441
     },
     {
-      "command": "js-gradle-slot ./gradlew :modules:worker-core:test --tests \"io.justsearch.indexerworker.embed.EmbeddingCompatibilityControllerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "js-gradle-slot ./gradlew :modules:worker-core:test --tests \"io.justsearch.indexerworker.embed.EmbeddingCompatibilityControllerTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2535
+      "durationMs": 2859
     }
   ],
   "checks": [
@@ -47,7 +47,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:90adacdb4d70529d23cd2a3a8bced3aea8bee28225a345ec1f94ebb85e013882",
+      "contentDigest": "sha256:2b174f779aae214ab1b3a58fc6817f2b6c9741ce914a797bc3df5a4c7f0ed79c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,6 +89,10 @@
           "status": "passed"
         },
         {
+          "name": "provablyEmptyCandidateFailsPromptlyDespiteAnUnrelatedFailedRow(Path)",
+          "status": "passed"
+        },
+        {
           "name": "aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly(Path)",
           "status": "passed"
         },
@@ -117,39 +121,47 @@
           "status": "passed"
         },
         {
-          "name": "[6] running-enumerator",
+          "name": "[6] failed-row",
           "status": "passed"
         },
         {
-          "name": "[7] unfinished-enumerator",
+          "name": "[7] help-enqueued",
           "status": "passed"
         },
         {
-          "name": "[8] incomplete-walk",
+          "name": "[8] running-enumerator",
           "status": "passed"
         },
         {
-          "name": "[9] uncaptured-walk",
+          "name": "[9] unfinished-enumerator",
           "status": "passed"
         },
         {
-          "name": "[10] unreadable-count",
+          "name": "[10] incomplete-walk",
           "status": "passed"
         },
         {
-          "name": "[11] upsert",
+          "name": "[11] uncaptured-walk",
           "status": "passed"
         },
         {
-          "name": "[12] projection",
+          "name": "[12] unreadable-count",
           "status": "passed"
         },
         {
-          "name": "[13] projection-source",
+          "name": "[13] upsert",
           "status": "passed"
         },
         {
-          "name": "[14] replay-uncertain",
+          "name": "[14] projection",
+          "status": "passed"
+        },
+        {
+          "name": "[15] projection-source",
+          "status": "passed"
+        },
+        {
+          "name": "[16] replay-uncertain",
           "status": "passed"
         },
         {
@@ -242,13 +254,21 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:14d9c1917a94aaff98ed786631edc334a9ad0e8188ca90cb0428a4873a778b88",
+      "contentDigest": "sha256:e897b7658125f562344837bd056ca86064e329f5051bb10716213ae3572afc0e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "settledInstallerCanRecoverItsPromotedEncodersWithoutAnotherMigration(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "[1] document",
+          "status": "passed"
+        },
+        {
+          "name": "[2] failed-help",
           "status": "passed"
         },
         {
@@ -382,7 +402,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/InstallerEmptyMetadataTest.java",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/InstallerEmptyMetadataTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4c96a066c827e36533fb22f9696932e772bc376b4388f0c99c690a84aa676672",
+      "contentDigest": "sha256:db7fcba9c3db84fed0bad4541f3cc42fadff0c99fac1e0461692ba4eca0252df",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -867,8 +887,47 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/GreenCutoverEmbeddingFpVerifyTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/GreenCutoverEmbeddingFpVerifyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:893567186840ffe713079091060274829ca4f74549b83633f572e20c2d97b4e5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "expected fingerprint uncomputable -> green REJECTED rather than promoted blind",
+          "status": "passed"
+        },
+        {
+          "name": "missing embedding fingerprint when a model is expected → green REJECTED",
+          "status": "passed"
+        },
+        {
+          "name": "mismatched embedding fingerprint -> green REJECTED",
+          "status": "passed"
+        },
+        {
+          "name": "no embedding model expected (keyword-only rebuild) → embedding check skipped, verifies",
+          "status": "passed"
+        },
+        {
+          "name": "recordedGreenUsesItsFrozenTargetInsteadOfTheServingFingerprint()",
+          "status": "passed"
+        },
+        {
+          "name": "matching embedding fingerprint → green verifies",
+          "status": "passed"
+        },
+        {
+          "name": "incomplete green (build_state != COMPLETE) → REJECTED even with a valid embedding fp",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:caa8378d357c3254a1a65493d4a6fbde20ead211c1b00135593d9ce062568b3a"
+  "digest": "sha256:36aee69262947407e19192ad045df427e96fd0bc539c35004da424e4d1f36e36"
 }

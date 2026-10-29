@@ -514,11 +514,6 @@ public final class KnowledgeServerMigrationOps {
    * {@link #verifyGreenCommitMetadataBestEffort}). Package-private so the build-state /
    * index-fingerprint / embedding-fp rules can be unit-tested without a (sealed) {@link LuceneRuntime} double.
    */
-  static boolean verifyGreenMetadata(
-      Map<String, String> ud, String expectedIndexFp, String expectedEmbeddingFp, Logger log) {
-    return verifyGreenMetadata(ud, expectedIndexFp, expectedEmbeddingFp, false, log);
-  }
-
   static boolean verifyGreenMetadata(Map<String, String> ud, String expectedIndexFp,
       String expectedEmbeddingFp, boolean installerEmpty, Logger log) {
     String buildState = ud.get("build_state");

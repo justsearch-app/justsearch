@@ -23,6 +23,10 @@ The A1 live sequence is blocked after two stale-fixture layout attempts. Both ac
 
 PR preparation rebased all four commits unchanged onto `c54273315406`, including #1010, without conflict hunks. The cited execution evidence was regenerated against the rebased check sources. The ordinary empty-refusal regression has its own delegated-choice entry and assertion fail-before on `1c8c8ffec1`. All six installer crash cuts and all #1010 tests passed on the rebased candidate; six unrelated operation-harness parameters fail their Windows-only identity precondition on Linux. The exact compile/PMD command passed. See the coverage map for the launcher correction, individual execution scopes and remaining historical gaps. No product or test source was changed during this preparation, and no independent acceptance is authored here.
 
+CI follow-up removes the four-argument test-only metadata wrapper flagged by the frozen unreferenced-code rule. The existing green-verification assertions pass `false` explicitly; the installer-empty fixture invokes both overloads reflectively to retain its assertion fail-before on `c542733154`. The signature adaptation changes no assertions. The stale acceptance record is removed for independent re-acceptance.
+
+The repaired and preservation evidence are refreshed by a temporary copy of the repository evidence producer at `/tmp/rel-act-ci-_5dajw5m/producer/scripts/governance/gates/test-intent/run-evidence.mjs`. It retains the standard profile isolation, check selection, JUnit parsing, classification, source digests and evidence writing; only the repository root, `js-gradle-slot` launch transport and shared-clone before-checkout/cleanup transport differ. Repaired evidence uses `c542733154` and records the intended installer metadata assertion failure there.
+
 See [the condition-by-condition coverage map](../evidence/installed-model-activation-coverage.md). A passing unit check does not certify a missing live scenario. No acceptance is authored here.
 
 ```json
@@ -213,19 +217,29 @@ See [the condition-by-condition coverage map](../evidence/installed-model-activa
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#provablyEmptyCandidateFailsPromptlyDespiteAnUnrelatedFailedRow"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/GreenCutoverEmbeddingFpVerifyTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "Call the five-argument verifier with installerEmpty=false, the same value previously supplied by the removed wrapper; all inputs and assertions are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "label": "agent choice",
+          "delegationQuote": "well then proceed with researching, validating and derisking the plan. once thats passed you can proceed with implementation",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27 (the owner's grant to derisk and implement the release workflow)",
+          "delegationScope": "the release-workflow work and the activation repairs its derisking found (settled scenarios A1-A5 of task t-20261028-a03e1e)",
+          "choice": "remove the test-only wrapper the unreferenced-code rule flags; assertions unchanged"
+        }
+      ]
     }
   ]
 }
 ```
 
 ## Acceptance records
-
-```json
-{
-  "kind": "acceptance",
-  "role": "verifier",
-  "session": "codex-rel-act-acceptor-20261029-f7dec02a74",
-  "verdict": "accept",
-  "digest": "sha256:3e10ac5eeadf1b6d2fa6926dd5c7d723b0579bb8176e3e798d290f5ec1de5dec"
-}
-```

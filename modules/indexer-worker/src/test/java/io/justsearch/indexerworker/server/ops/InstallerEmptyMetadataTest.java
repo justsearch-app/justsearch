@@ -15,7 +15,7 @@ final class InstallerEmptyMetadataTest {
   void installerEmptyProofOmitsOnlyTheMissingStamp() throws Exception {
     var data = Map.of("build_state", "COMPLETE", "index_fingerprint", "exact-b");
     assertTrue(verify(data), "a proven empty installer B needs no invented embedding stamp");
-    assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(data, "exact-b", "model-b", LOG),
+    assertFalse(verify(data, false),
         "ordinary migration still needs its stamp");
   }
 
@@ -35,12 +35,18 @@ final class InstallerEmptyMetadataTest {
   }
 
   private static boolean verify(Map<String, String> data) throws Exception {
+    return verify(data, true);
+  }
+
+  private static boolean verify(Map<String, String> data, boolean installerEmpty) throws Exception {
     try {
       var method = KnowledgeServerMigrationOps.class.getDeclaredMethod("verifyGreenMetadata",
           Map.class, String.class, String.class, boolean.class, Logger.class);
-      return (boolean) method.invoke(null, data, "exact-b", "model-b", true, LOG);
+      return (boolean) method.invoke(null, data, "exact-b", "model-b", installerEmpty, LOG);
     } catch (NoSuchMethodException baseline) {
-      return KnowledgeServerMigrationOps.verifyGreenMetadata(data, "exact-b", "model-b", LOG);
+      var method = KnowledgeServerMigrationOps.class.getDeclaredMethod("verifyGreenMetadata",
+          Map.class, String.class, String.class, Logger.class);
+      return (boolean) method.invoke(null, data, "exact-b", "model-b", LOG);
     }
   }
 }
