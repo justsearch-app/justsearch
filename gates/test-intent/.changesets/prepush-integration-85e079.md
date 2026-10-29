@@ -44,3 +44,14 @@ The acceptor (not the author) appends the acceptance record under the heading at
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "acceptor-85e079-codex-1",
+  "verdict": "accept",
+  "digest": "sha256:49b17562eedf2ace4f496efb4a9ed2dc28ec96d83b53fd5ee9b11cb02492276a",
+  "note": "CI and PR predicates preserved; S4 local-only exclusion is within delegation; no stronger source conflict found."
+}
+```

@@ -142,6 +142,7 @@ try {
   assert.deepEqual(select('modules/ui-web/src/index.ts', 'modules/shell/src/main.rs', 'docs/guide.md'), []);
   assert.deepEqual(select(), []);
   assert.deepEqual(select('modules/ui/README.md', 'modules/core/docs/notes.md'), []);
+  assert.deepEqual(select('modules/ui/gradle.lockfile'), [':modules:ui:integrationTest']);
   assert.deepEqual(select('modules/core/src/main/java/Old.java', 'modules/runtime/src/main/java/New.java'), [
     ':modules:app-api:integrationTest', ':modules:app-services:integrationTest', ':modules:indexing:integrationTest',
   ]);
