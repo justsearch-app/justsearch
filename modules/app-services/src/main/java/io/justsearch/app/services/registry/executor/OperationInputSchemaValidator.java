@@ -9,6 +9,7 @@ import com.networknt.schema.SpecificationVersion;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationRef;
 import java.net.URI;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -112,7 +113,7 @@ public final class OperationInputSchemaValidator {
     String message = aggregate(violations);
     Map<String, Object> details = new LinkedHashMap<>();
     details.put("operationId", cacheKey);
-    details.put("violations", violations.stream().map(com.networknt.schema.Error::getMessage).toList());
+    details.put("violations", violations.stream().map(OperationInputSchemaValidator::describe).toList());
     return Optional.of(new ValidationResult(message, details));
   }
 
@@ -134,10 +135,18 @@ public final class OperationInputSchemaValidator {
     return ctx.newSchema(location, schemaNode, null);
   }
 
+  private static String describe(com.networknt.schema.Error violation) {
+    var location = violation.getInstanceLocation();
+    // Required/additional-property errors point at the containing object, not the field.
+    if (violation.getProperty() != null) location = location.append(violation.getProperty());
+    String field = location.toString();
+    return (field.isEmpty() ? "/" : field) + ": " + violation.getMessage();
+  }
+
   private static String aggregate(List<com.networknt.schema.Error> violations) {
     return violations.stream()
-        .map(com.networknt.schema.Error::getMessage)
-        .sorted()
+        .sorted(Comparator.comparing(com.networknt.schema.Error::getMessage))
+        .map(OperationInputSchemaValidator::describe)
         .reduce((a, b) -> a + "; " + b)
         .orElse("");
   }

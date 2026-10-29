@@ -469,6 +469,72 @@ All sources remain agent choices under the specified design delegation. Builder 
       "newChecks": [
         "modules/core/src/test/java/io/justsearch/core/scheduling/IndexingRulesHoldTest.java#localMinuteTableIncludesEndpointsOvernightSundayAndDisabledHours"
       ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "F2 / D1, D4, S38.2: a wrong-type pauseOnBattery is refused through the real HTTP invoke route with HTTP 400/BAD_REQUEST, the offending field in message and details, and accepted settings/revision/file bytes unchanged. Fails before 43daa48de4664301a99e54303230252c40eba88d by assertion because the field is missing.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "WP3.8 indexing-hours, battery and verification design within existing user policy choices",
+          "choice": "Implement settled revision 3 D1-D9 and S38.1-S38.6/S38.8/S38.9 Engine behavior and adopted BP38 test-only supplier seam; S38.7 and UI wording remain in the following package.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesRefusalHttpTest.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#wrongTypeBatteryNamesFieldAndPreservesSettings"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "F2 / D1, D4, S38.2 preservation: missing pauseOnBattery, missing schedule, an unknown top-level member, and a nested schedule.days refusal name the offending field through the real HTTP invoke route with 400/BAD_REQUEST and unchanged accepted settings/revision/file bytes. These checks pass both before 43daa48de4664301a99e54303230252c40eba88d and after.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "WP3.8 indexing-hours, battery and verification design within existing user policy choices",
+          "choice": "Implement settled revision 3 D1-D9 and S38.1-S38.6/S38.8/S38.9 Engine behavior and adopted BP38 test-only supplier seam; S38.7 and UI wording remain in the following package.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/wp3.8a-rules/IndexingRulesRefusalHttpTest.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#missingBatteryNamesFieldAndPreservesSettings",
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#missingScheduleNamesFieldAndPreservesSettings",
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#unknownMemberNamesFieldAndPreservesSettings",
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#nestedHandlerRefusalStillNamesFieldAndPreservesSettings"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/status/operating/OperatingStateViewTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "F3: adapt the literal wire-vocabulary expectation to settled D5: settings_recovery, user_paused, schedule, on_battery, then unchanged bulk reasons game_mode, gpu_busy_external, energy_saver, chat_generating. Preserve exact membership, lower-snake casing and precedence assertions, all inputs/preconditions, and every other check. The product vocabulary is unchanged. Explicit builder assignment requires this Adaptation.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "you dont need to wait for my opinion regarding the designs, i agree with you on them",
+          "delegationLocation": "task t-20261019-bd718f request (2026-10-19)",
+          "delegationScope": "WP3.8 indexing-hours, battery and verification design within existing user policy choices",
+          "choice": "Implement settled revision 3 D1-D9 and S38.1-S38.6/S38.8/S38.9 Engine behavior and adopted BP38 test-only supplier seam; S38.7 and UI wording remain in the following package.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }

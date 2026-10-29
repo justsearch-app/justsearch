@@ -79,3 +79,32 @@ integrationTest task. All four specified known failures reproduced on both revis
 excluded from passing evidence. The official validator accepts every evidence-bearing entry;
 the final test-intent gate exits 1 with only `test-intent/acceptance-missing`.
 The owned baseline clone was removed after diagnostic capture.
+
+## F2/F3 repair collection (43daa48de4 baseline)
+
+The separate `IndexingRulesRefusalHttpTest.json` collection uses candidate HEAD
+`43daa48de4664301a99e54303230252c40eba88d` plus the working-tree repair, and that exact commit
+as `--before`. It uses the same unmodified adapter patch and producer algorithms above.
+Only this new test source is transplanted into the owned `$TMPDIR/before` shared clone;
+no production or build compatibility changes are applied. This Java-only collection needs no
+frontend dependency installation in the clone and creates no node_modules link.
+The launcher still redirects Git object writes to `$TMPDIR/wp38-repair-objects`, with the
+source object directory used only as a read-only alternate.
+
+All five candidate checks pass without skips. The wrong-type battery case fails before by
+`AssertionFailedError`: neither the message nor the violation string named `pauseOnBattery`.
+The missing-battery, missing-schedule, unknown-member and nested-handler cases pass before
+and after: their existing text already named the field. The repaired shared binder now also
+prefixes each schema violation with its instance/field pointer; the nested handler still emits
+its existing `errorDetails.field`. Every case asserts HTTP 400/BAD_REQUEST and preserves the
+accepted settings, witness and exact saved file bytes. Thus the changeset separates the one
+repair from four preservation checks. The runner's real exit is 1 because preservation passes
+are intentionally not assertion failures; its generated evidence retains those classifications.
+
+F3 changes only the `OperatingStateViewTest.vocabulary` literal expectation to settled D5 and
+is recorded as an Adaptation in the same changeset. The original baseline test fails by
+assertion; the adapted test passes. None of the earlier evidence files covers a changed test
+source, so those files remain valid and unchanged. The repair report is
+`tmp/verify/wp3.8-repair-report.md`; it includes the broader checks and installed Engine HTTP
+requests/responses. Independent acceptance remains outstanding. The owned baseline clone is
+removed after collection.
