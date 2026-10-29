@@ -169,6 +169,26 @@ class WindowsOperationalTests(unittest.TestCase):
             native.key('escape')
             send.assert_called_once_with(owned, '{ESC}')
 
+    def test_picker_keys_follow_uia_focus_and_refuse_an_unowned_dialog(self):
+        with tempfile.TemporaryDirectory() as temp:
+            target=Mock(app_binary=r'C:\app\JustSearch.exe')
+            target.owned.return_value=[process()]
+            native=windows.Native(target,Path(temp))
+            window={'pid':50,'handle':200,'class':'#32770'}
+            folder=r'C:\folder+name{one}'
+            with patch.object(native,'windows',return_value=[dict(window,pid=99),window]), \
+                 patch.object(windows,'wait_for',once),patch.object(windows,'ps_json',return_value={'focused':True}) as focus, \
+                 patch.object(native,'send') as send,patch.object(native,'shot'):
+                result=native.select_folder(folder)
+            self.assertTrue(result['keyboardSubmitted'])
+            self.assertIn('SetFocus()',focus.call_args.args[0])
+            self.assertEqual([c.args[1] for c in send.call_args_list],[r'^aC:\folder{+}name{{}one{}}','{ENTER}'])
+            self.assertTrue(all(c.args[0]['process']==process() for c in send.call_args_list))
+            with patch.object(native,'windows',return_value=[dict(window,pid=99)]), \
+                 patch.object(windows,'wait_for',once),patch.object(windows,'ps_json') as focus,patch.object(native,'send') as send:
+                with self.assertRaises(ProductFailure):native.select_folder(folder)
+            focus.assert_not_called();send.assert_not_called()
+
     def test_default_viewer_needs_exact_argv_path_image_new_lifetime_and_window(self):
         image = r'C:\Qual\viewer\notepad++.exe'
         fixture = r'C:\corpus\JustSearch-journey-orchid-open.txt'
