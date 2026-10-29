@@ -399,7 +399,9 @@ are also recorded exceptions because Windows re-enables them. Update services
 recorded. Policies `NoAutoUpdate=1` and `AUOptions=2` are required. Every journey
 overlay retains `update-activity.json`: before/after SoftwareDistribution download
 folder sizes and inventories, service/policy observations and Windows Update
-events. Changed download files or download/install events fail the environment
+events. At each boundary the collector reapplies Stop to a restarted update
+service and records its original state and any refusal in `controlExceptions`.
+Changed download files or download/install events fail the environment
 check. The per-run measured write limit remains required.
 
 The wrapper owns one headless, eight-thread Windows VM at a time and honors the

@@ -12,6 +12,33 @@ import windows
 
 
 class WindowsEvidenceTests(unittest.TestCase):
+    @unittest.skipUnless(windows.os.name == 'nt', 'Windows PowerShell fixture')
+    def test_update_probe_stops_a_reverted_service_and_records_its_original_state(self):
+        import ast
+        from pathlib import Path
+        tree = ast.parse(Path(__file__).with_name('vm-windows.py').read_text())
+        source = next(ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign)
+                      and any(isinstance(target, ast.Name) and target.id == 'UPDATE_ACTIVITY' for target in node.targets))
+        # Shadow all guest interfaces: this fixture never controls real services.
+        mock = r"""
+$since=$null;$script:serviceState='Running'
+function Test-Path {param($Path) $false}
+function Get-CimInstance {param($ClassName)
+ [pscustomobject]@{Name='wuauserv';StartMode='Manual';State=$script:serviceState}
+ [pscustomobject]@{Name='UsoSvc';StartMode='Disabled';State='Stopped'}
+}
+function Stop-Service {param($Name,[switch]$Force,$ErrorAction) $script:serviceState='Stopped'}
+function Get-WinEvent {param($ListLog) [pscustomobject]@{LogName='fixture';IsEnabled=$true}}
+function Get-ItemProperty {param($Path) [pscustomobject]@{NoAutoUpdate=1;AUOptions=2}}
+"""
+        import json
+        result = json.loads(windows.ps_json(mock + source))
+        self.assertEqual(result['services'][0]['State'], 'Stopped')
+        exception = result['controlExceptions'][0]
+        self.assertEqual(exception['observed']['State'], 'Running')
+        self.assertIsNone(exception['controlError'])
+        self.assertEqual(result['downloadBytes'], 0)
+
     def test_driver_must_match_webview_build(self):
         windows.match_driver('155.0.4283.62', 'MSEdgeDriver 155.0.4283.62')
         with self.assertRaisesRegex(Infrastructure, '155.0.4283.50'):

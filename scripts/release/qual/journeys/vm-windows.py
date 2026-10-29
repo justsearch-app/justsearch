@@ -39,6 +39,15 @@ $files=@(if(Test-Path $folder){Get-ChildItem $folder -File -Recurse -ErrorAction
  @{name=$_.FullName.Substring($folder.Length);bytes=$_.Length;modified=$_.LastWriteTimeUtc.ToString('o')}
 }})
 $bytes=[long]0;foreach($file in $files){$bytes+=$file.bytes}
+$exceptions=@()
+foreach($s in @(Get-CimInstance Win32_Service | Where-Object {$_.Name -in 'wuauserv','UsoSvc'})) {
+ if($s.State -ne 'Stopped') {
+  $controlError=$null
+  try {Stop-Service $s.Name -Force -ErrorAction Stop} catch {$controlError=$_.Exception.Message}
+  $exceptions+=@{setting=('service/'+$s.Name);observed=$s | Select-Object Name,StartMode,State;
+   reason='Windows reverted the control; reapply stop and verify policy/download/install/write effects';controlError=$controlError}
+ }
+}
 $log=Get-WinEvent -ListLog 'Microsoft-Windows-WindowsUpdateClient/Operational'
 $events=@()
 if($since){
@@ -51,7 +60,7 @@ if($since){
 $policy=Get-ItemProperty 'HKLM:/SOFTWARE/Policies/Microsoft/Windows/WindowsUpdate/AU'
 @{time=[DateTime]::UtcNow.ToString('o');services=@(Get-CimInstance Win32_Service | Where-Object {$_.Name -in 'wuauserv','UsoSvc'} | Select-Object Name,StartMode,State);
  policies=@{NoAutoUpdate=$policy.NoAutoUpdate;AUOptions=$policy.AUOptions};downloads=$files;downloadBytes=$bytes;
- events=$events;eventLogEnabled=$log.IsEnabled} | ConvertTo-Json -Depth 8 -Compress
+ events=$events;eventLogEnabled=$log.IsEnabled;controlExceptions=$exceptions} | ConvertTo-Json -Depth 8 -Compress
 """
 
 
