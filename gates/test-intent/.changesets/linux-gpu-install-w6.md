@@ -244,3 +244,14 @@ The assembler's tests under scripts/ are out of scope for this gate; S12 and rep
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-w6-acceptor-20261029T141703Z",
+  "verdict": "reject",
+  "digest": "sha256:d5f5557bd20c46ccbedfd19af0791dbf48c09323ad5949681181dcdd85650b5d",
+  "note": "Entry 1 lacks assertion fail-before for two new checks: LinuxGpuInstallTest#missingDownloadedExecutableDoesNotBlockPlannedPackRepair and RuntimeNativeResolutionTest#linuxDownloadedPackIsUsedForExplicitAndDefaultActivation throw uncaught IllegalStateException on 9149f53ba6. Both pass on 667157a671. Wrap the throwing operations in assertion-based checks and regenerate baseline/candidate evidence; identify repaired behavior explicitly. Correct the stale tokenizer evidence prose, which contradicts the now-valid six-identifier repaired evidence. See /tmp/w6-accept/report.md and case-results.json."
+}
+```
