@@ -333,8 +333,14 @@ is involved. Its first step rejects a non-GitHub-hosted runner.
 
 The guest/hosted tooling script is `windows-tools.ps1`. It requires a disposable
 runner or the VM marker and runs elevated during provisioning. It installs Python
-3.13.7, Pillow 11.3.0, comtypes 1.4.13, Node 22.20.0 and a pinned, checksummed Notepad++ 8.9.8 portable
-viewer, then makes that viewer this disposable user's `.txt` default. It downloads
+3.13.7, Pillow 11.3.0, comtypes 1.4.13 and Node 22.20.0. The text viewer is
+PowerShell ISE already installed in the OS. Its actual image/hash/label are
+recorded in `tools.json`. `windows-association.py` uses native Default Apps
+Settings to select it when needed, then verifies the OS association API and a
+normal OS file open. The VM does this once before sealing and verifies the
+association with the limited user after reboot. Hosted provisioning performs
+the same native selection. Protected UserChoice hashes are never manufactured
+or deleted. The tooling script also downloads
 Microsoft's signed msedgedriver for the installed WebView2 version. Supply a
 separately built **tauri-driver 2.0.4 Windows binary** and an adjacent
 `tauri-driver.exe.json` receipt containing `version: "2.0.4"` and the binary
