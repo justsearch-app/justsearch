@@ -34,3 +34,14 @@ The acceptor (not the author) appends the acceptance record under the heading at
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "acceptor-66fde4-claude-2",
+  "verdict": "accept",
+  "digest": "sha256:01006ea592db5ce26bc61d1ff90b226b4663452f001cad35bca21bdd86dd44a6",
+  "note": "Structural rule kept: env predicates, list paths, gradle-row filter, identifier column and excludeTestsMatching unchanged; only the pre-push SKIP log moves to info, PR flake stays lifecycle"
+}
+```
