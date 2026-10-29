@@ -290,3 +290,13 @@ The assembler's tests under scripts/ are out of scope for this gate; S12 and rep
   "note": "Both wrapped checks now fail by AssertionFailedError on 9149f53ba6 for the intended missing-executable reasons and pass on 0908068a1c; wrappers preserve expected values and all evidence digests match. Two issues remain: (1) Neither missingDownloadedExecutableDoesNotBlockPlannedPackRepair nor linuxDownloadedPackIsUsedForExplicitAndDefaultActivation is named by any repaired:true entry. Entry 1 still cites candidate-only evidence. Add both fully qualified IDs to a repaired:true entry citing linux-gpu-install-w6-repaired.json, updating its items, behaviour and verification as needed (for example, extend entry 2). (2) Correct the contradictory prose at lines 17 and 34-37: both regenerated evidence files name revision 1b24571df8a26c5101dfcd2783add5302182f4e9, acceptance records are not empty, and the parameterized tokenizer mismatch is resolved. Remove or replace the stale completion instructions and generation provenance. Keep the previous rejection. Existing D4 evidence can be reused if test files remain unchanged. See /tmp/w6-accept2/report.md, case-results.json, evidence-audit.jsonl and wiring-audit.json."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-w6-acceptor3-20261029T154251Z",
+  "verdict": "accept",
+  "digest": "sha256:caba1526e5738582e70eb7c2be75d459d169fd7858afb3642cb7bdb151ea79fc"
+}
+```
