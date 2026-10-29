@@ -81,6 +81,8 @@ public final class LuceneRuntimeTypes {
     SIMPLE,
     /** Interpret user input as Lucene QueryParser syntax (phrases/boolean/field qualifiers). */
     LUCENE,
+    /** Search subset with document-wide required/prohibited clauses. */
+    SEARCH,
   }
 
   /**

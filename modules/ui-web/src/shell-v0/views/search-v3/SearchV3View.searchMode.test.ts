@@ -1207,6 +1207,22 @@ describe('S1.10 — the composer, the heading and the rows describe the one shar
 
 /* ── S1.11 — the palette searches through Search mode ─────────────────────────────────────────── */
 
+it('X8 restored quoted Search draft keeps its text and requires the existing review before Search', async () => {
+  const query = '"budget review" -draft';
+  localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), query);
+  const el = await mount(); await settle(el);
+  expect((await fieldOf(el)).value).toBe(query);
+  expect(backend.searches).toHaveLength(0);
+  expect(await results(el)).toBeNull();
+  await pressEnter(el); await settle(el);
+  expect(backend.searches).toHaveLength(0);
+  ds1Button(el, 'sv3-draft-review-search').click(); await settle(el);
+  expect(backend.searches).toHaveLength(0);
+  await pressEnter(el); await settle(el);
+  expect(backend.searches).toHaveLength(1);
+  expect(backend.searches[0]).toMatchObject({ query, querySyntax: 'search' });
+});
+
 describe('S1.11 — the palette’s search uses Search mode', () => {
   it('has no developer "Search this text" entry, and "Search everything" shows results', async () => {
     backend.corpus.lease = [wireHit('a', 'docs/a.md')];
@@ -1375,4 +1391,13 @@ it('DS1 a known live unrestricted Ask still retries as Ask when the unrelated co
   expect(backend.streams).toHaveLength(2); expect(backend.streams[1]!.body.shapeId).toBe('core.rag-ask');
   expect((backend.streams[1]!.body.docIds as string[] | undefined) ?? []).toEqual([]); expect(ctrl.send).not.toHaveBeenCalled();
   restoreActiveConversation(original); await settle(el); expect((await fieldOf(el)).value).toBe('unrelated B');
+});
+
+it('X8 Delegate sends operator characters without a Search syntax claim', async () => {
+  aiOnline(); const el = await mount(); await chooseTier(el, 'delegate');
+  const text = '"budget review" -draft title:budget';
+  await askNow(el, text);
+  expect(ctrl.send).toHaveBeenCalledTimes(1);
+  expect(ctrl.send.mock.calls[0]?.[0]).toBe(text);
+  expect(backend.searches).toHaveLength(0);
 });

@@ -298,6 +298,54 @@ final class KnowledgeSearchEngineClassificationDispatchTest {
     assertEquals(0, f.reranks.size());
   }
 
+  @Test
+  void x5AdvancedSearchOverridesSemanticPipelineAndKeepsExplicitFilters() {
+    var f = new Fixture();
+    var filter = KnowledgeSearchRequestFiltersBuilder.builder().metaSource(List.of("X")).build();
+    var semantic = new PipelineConfig(true, true, true, "rrf", true, true, 20, true, true);
+    var response = f.search(new KnowledgeSearchRequest("title:budget", 10, "hybrid", null,
+        null, List.of("title"), filter, null, null, "search", false, false, semantic));
+    assertEquals(1, f.requests.size());
+    var sent = f.requests.getFirst();
+    assertEquals("SEARCH_QUERY_SYNTAX_SEARCH", sent.getQuerySyntax().name());
+    assertTrue(sent.getPipeline().getSparseEnabled());
+    assertFalse(sent.getPipeline().getDenseEnabled());
+    assertFalse(sent.getPipeline().getDenseAuto());
+    assertFalse(sent.getPipeline().getSpladeEnabled());
+    assertFalse(sent.getPipeline().getExpansionEnabled());
+    assertFalse(sent.getPipeline().getCrossEncoderEnabled());
+    assertEquals(List.of("X"), sent.getFilters().getMetaSourceList());
+    assertNull(response.filterNormalization());
+    assertNull(response.queryUnderstanding());
+    assertTrue(f.completions.isEmpty());
+    assertTrue(f.reranks.isEmpty());
+  }
+
+  @Test
+  void x6SearchRejectsInvalidSyntaxBeforeWorkerSearch() {
+    for (String query : List.of("\"", "\"\"", "title:", "author:", "-foo",
+        "\"a b\" OR c", "\"budget review\" AND forecast", "\"budget review\" NOT forecast")) {
+      var f = new Fixture();
+      var failure = assertThrows(IllegalArgumentException.class,
+          () -> f.search(request(query, null, "search", null)), query);
+      assertFalse(failure.getMessage().isBlank());
+      assertTrue(f.requests.isEmpty());
+    }
+  }
+
+  @Test
+  void x7PlainSearchKeepsSimpleDispatchAndExpansionEligibility() {
+    for (String query : List.of("climate policy", "foo OR bar", "foo AND bar", "foo NOT bar", "bud")) {
+      var plain = new Fixture();
+      var search = new Fixture();
+      plain.search(request(query, null, "simple", null));
+      search.search(request(query, null, "search", null));
+      assertEquals(plain.requests, search.requests, query);
+      assertEquals(plain.completions, search.completions, query);
+      assertEquals(plain.reranks, search.reranks, query);
+    }
+  }
+
   private final class Fixture {
     final KnowledgeClient client = mock(KnowledgeClient.class);
     final OnlineAiService ai = mock(OnlineAiService.class);

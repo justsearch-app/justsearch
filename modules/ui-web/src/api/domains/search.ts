@@ -93,7 +93,7 @@ export type PipelineConfig = {
 export type SearchOptions = {
   limit?: number | undefined;
   mode?: 'text' | 'vector' | 'hybrid' | undefined;
-  querySyntax?: 'simple' | 'lucene' | undefined;
+  querySyntax?: 'simple' | 'lucene' | 'search' | undefined;
   sort?: 'relevance' | 'modified_desc' | 'modified_asc' | 'size_desc' | 'size_asc' | 'path_asc' | 'path_desc' | undefined;
   cursor?: string | undefined;
   filters?: SearchFilters | undefined;

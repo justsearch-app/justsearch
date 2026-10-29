@@ -1169,6 +1169,7 @@ export class Sv3Composer extends JfElement {
     tierMenuOpen: { state: true },
     schemaDraft: { type: String, attribute: false },
     schemaError: { state: true },
+    searchError: { type: String },
     structuredError: { type: String, attribute: false },
     taskNotice: { type: String, attribute: 'task-notice' },
     degradationOpen: { state: true },
@@ -1196,6 +1197,7 @@ export class Sv3Composer extends JfElement {
   declare haltReason: string;
   declare schemaDraft: string;
   declare private schemaError: string;
+  declare searchError: string;
   declare structuredError: string;
   declare taskNotice: string;
   /**
@@ -1401,6 +1403,7 @@ export class Sv3Composer extends JfElement {
     this.tier = SV3_TIER_DEFAULT;
     this.schemaDraft = '';
     this.schemaError = '';
+    this.searchError = '';
     this.structuredError = '';
     this.taskNotice = '';
     this.scopeLabel = '';
@@ -1655,6 +1658,8 @@ export class Sv3Composer extends JfElement {
                 aria-expanded=${this.tier === 'search' ? String(this.recentsOpen && this.draft === '') : nothing}
                 aria-controls=${this.recentsOpen && this.tier === 'search' && this.draft === '' ? 'sv3-recent-list' : nothing}
                 aria-activedescendant=${this.recentsOpen && this.recentItems[this.recentIndex] ? `sv3-recent-${this.recentIndex}` : nothing}
+                aria-invalid=${this.tier === 'search' && this.searchError ? 'true' : 'false'}
+                aria-describedby=${this.tier === 'search' && this.searchError ? 'sv3-search-error' : nothing}
                 @focus=${this.openRecents}
                 @input=${this.onInput}
                 @compositionstart=${() => { this.closeRecents(); this.draftVersion += 1; this.dispatchEvent(new CustomEvent('sv3-composer-assignment', { bubbles: true, composed: true })); }}
@@ -1671,6 +1676,9 @@ export class Sv3Composer extends JfElement {
                 : nothing}
             </div>
           </div>
+          ${this.tier === 'search' && this.searchError
+            ? html`<p class="notice" role="alert" id="sv3-search-error" data-testid="sv3-search-error">${this.searchError}</p>`
+            : nothing}
           ${this.taskNotice === '' ? nothing : html`<p class="notice" role="status">${this.taskNotice}</p>`}
           ${this.tier === 'structured' ? html`<div class="schema-field">
             <label for="sv3-schema">JSON schema</label>

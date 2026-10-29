@@ -6010,6 +6010,7 @@ export class SearchV3View extends JfElement {
           .corpus=${projectSv3Corpus(this.aiSnapshot)}
           effort=${this.effort}
           tier=${this.tier}
+          .searchError=${this.search.snapshot?.errorInfo?.code === 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.error ?? '' : ''}
           .schemaDraft=${this.schemaDraft}
           .recentItems=${this.recentItems}
           .recentLocked=${this.historyLocked}

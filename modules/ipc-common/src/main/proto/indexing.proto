@@ -52,6 +52,8 @@ enum SearchQuerySyntax {
   SEARCH_QUERY_SYNTAX_SIMPLE = 0;
   // Advanced: Lucene QueryParser syntax (phrases, boolean operators, field qualifiers).
   SEARCH_QUERY_SYNTAX_LUCENE = 1;
+  // Search subset: phrases, exclusions, title/author. Strict lexical retrieval.
+  SEARCH_QUERY_SYNTAX_SEARCH = 2;
 }
 
 // Component activation for the search pipeline (256: Phase A).
