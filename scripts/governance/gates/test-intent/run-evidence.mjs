@@ -25,6 +25,7 @@
  * Exit: 0 when every check executed and passed on the candidate (and, with --before, failed with an
  * assertion before); 1 otherwise; 2 usage/infrastructure error. Completed results are written
  * even when removing the before-worktree fails.
+ * Hashing requires a local lfs.repositoryformatversion key: run git lfs install --local once.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -136,14 +137,26 @@ function gitOut(args, cwd, env) {
 
 /** Tree hash of the working tree (tracked + untracked, ignored excluded), via a throwaway index. */
 function workingTreeHash(root) {
-  const idx = path.join(os.tmpdir(), `test-intent-index-${process.pid}-${Date.now()}`);
-  const env = { ...process.env, GIT_INDEX_FILE: idx };
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'test-intent-tree-'));
   try {
-    gitOut(['read-tree', 'HEAD'], root, env);
-    gitOut(['add', '-A'], root, env);
-    return gitOut(['write-tree'], root, env);
+    // Git LFS ignores command-line overrides for this local key and otherwise writes config.
+    // Refuse before invoking a clean filter; installing LFS is an explicit repository setup step.
+    const config = ['-c', 'core.splitIndex=false', '-c', 'core.hooksPath=/dev/null',
+      '-c', 'core.fsmonitor=false', '-c', `lfs.storage=${path.join(scratch, 'lfs')}`];
+    if (!gitOut([...config, 'config', '--local', '--default', '', '--get', 'lfs.repositoryformatversion'], root)) {
+      throw new Error('Hashing requires local lfs.repositoryformatversion; run git lfs install --local once in this repository');
+    }
+    // Git resolves the common object store for linked worktrees as well as ordinary checkouts.
+    const objects = path.resolve(root, gitOut([...config, 'rev-parse', '--git-path', 'objects'], root));
+    const objectDirectory = path.join(scratch, 'objects');
+    fs.mkdirSync(objectDirectory);
+    const env = { ...process.env, GIT_INDEX_FILE: path.join(scratch, 'index'),
+      GIT_OBJECT_DIRECTORY: objectDirectory, GIT_ALTERNATE_OBJECT_DIRECTORIES: JSON.stringify(objects) };
+    gitOut([...config, 'read-tree', 'HEAD'], root, env);
+    gitOut([...config, 'add', '-A'], root, env);
+    return gitOut([...config, 'write-tree'], root, env);
   } finally {
-    fs.rmSync(idx, { force: true });
+    fs.rmSync(scratch, { recursive: true, force: true });
   }
 }
 
