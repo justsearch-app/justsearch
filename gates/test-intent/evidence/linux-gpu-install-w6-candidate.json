@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cbc54fc29a13e929c50f626c7155d7018a54078f3667fb3a365e2618948e29ec"
   },
-  "createdAt": "2026-10-29T14:06:00.478Z",
-  "revision": "b84dce56e8b9b6cbfaee1cb55e2b64c2c7b5bc07",
-  "tree": "039156e3a07b59370f8d2223a579a66cd229995b",
+  "createdAt": "2026-10-29T15:04:30.940Z",
+  "revision": "1b24571df8a26c5101dfcd2783add5302182f4e9",
+  "tree": "dee82d70f5fd7f69c301cd213a424ca2386c1eb4",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": "js-gradle-slot -w 5400 ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.LinuxGpuInstallTest\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeNativeResolutionTest.linuxDownloadedPackIsUsedForExplicitAndDefaultActivation\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeNativeResolutionTest.linuxNeverDiscoversAnUnconfiguredFlatCpuFallback\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeLinuxDeactivationTest.noFallbackDisablesChatAndRetainsRuntimeAndGpuSettings\" --tests \"io.justsearch.app.services.ai.install.LinuxSearchOnlyInstallTest.laterLinuxCudaRuntimePackageCanSupplyTheRuntime\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1304955
+      "durationMs": 321084
     },
     {
       "command": "js-gradle-slot -w 5400 ./gradlew :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppServerAutoSelectionTest.linuxRestartFindsDownloadedRuntimeAndRespectsOperatorSelection\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 60690
+      "durationMs": 325646
     },
     {
       "command": "js-gradle-slot -w 5400 ./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.model.NativeRuntimePlannerTest.shippedLinuxRegistryUsesCpuModelsAndOmitsForeignRuntime\" --tests \"io.justsearch.configuration.model.LinuxGpuPlanTest\" --tests \"io.justsearch.configuration.model.ModelRegistryLoaderTest\" --tests \"io.justsearch.configuration.model.WindowsPlanGoldenTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 42313
+      "durationMs": 704911
     },
     {
       "command": "js-gradle-slot -w 5400 ./gradlew :modules:ort-common:test --tests \"io.justsearch.ort.OrtCudaHelperTest.linuxJitLinkIsPreloadedBeforeSparseAndSolver\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 58593
+      "durationMs": 1042939
     }
   ],
   "checks": [
@@ -47,7 +47,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxGpuInstallTest.java",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxGpuInstallTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3a3c77197cf6455faccf7c818c33e700f52cf63a00e4aec809c74a3d881c7de1",
+      "contentDigest": "sha256:ec33890d68ee943fa809a642e387003db6ffa0518ada3a59cd652ea38d7ecd13",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -86,7 +86,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java#linuxDownloadedPackIsUsedForExplicitAndDefaultActivation",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3751f60fe7f3b308d439d8d5d3df4003178dba591eea2a556746ae185b422714",
+      "contentDigest": "sha256:4c81d0738050bbaf20eb02b358297444596b69f59fc33370440ca1a946e8212b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -101,7 +101,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java#linuxNeverDiscoversAnUnconfiguredFlatCpuFallback",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeNativeResolutionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3751f60fe7f3b308d439d8d5d3df4003178dba591eea2a556746ae185b422714",
+      "contentDigest": "sha256:4c81d0738050bbaf20eb02b358297444596b69f59fc33370440ca1a946e8212b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -306,5 +306,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:930dccfc5269be99d6b86bee9e7e4351c7046676b55968a57e453b4b110ba1c4"
+  "digest": "sha256:cec1e9aa7a6d93541bde06a9bec142c26ebe9da15d1b0e10a31aff2a93e7c18d"
 }

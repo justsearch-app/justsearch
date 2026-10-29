@@ -17,12 +17,11 @@ the rebased candidate b84dce56e8; unrelated changes in the new base are outside 
 D4 evidence was generated on b84dce56e8 against base 9149f53ba6 with
 `scripts/governance/gates/test-intent/run-evidence.mjs` in a temporary shared clone.
 The candidate run exited 0: all 11 check identifiers, comprising 35 cases, passed.
-The repaired run exited 1: four check identifiers passed on the candidate and were
-classified as assertion failures on the base; the reader could not match the two
-parameterized tokenizer method identifiers to their XML case names. Those two identifiers
-are recorded as `not-found` on the candidate and `compile` on the base. The latter
-classification is a reader artifact: Gradle ran all six tokenizer cases and they failed
-with assertions on the base. The evidence is not accepted for those two identifiers.
+The repaired run names each new or repaired check, including both parameterized tokenizer
+methods (display names now start with the method name, dcad0900c3) and the two checks whose
+before-state threw IllegalStateException uncaught; those calls are now wrapped in
+assertDoesNotThrow so the base fails by an assertion for the reason under test. Every
+repaired identifier passes on the candidate and fails by assertion on base 9149f53ba6.
 
 The runner used `gates/test-intent/evidence/linux-gpu-install-w6-runner.patch`, applied
 only in the temporary clone: each Gradle call uses `js-gradle-slot -w 5400`, and before-state
@@ -215,7 +214,7 @@ The assembler's tests under scripts/ are out of scope for this gate; S12 and rep
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppTokenizerPrivacyTest.java#entryLoadsBundledCpuTokenizerWithoutNetwork",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppTokenizerPrivacyTest.java#entryRefusesOverridesThatBypassCpuFlavor"
       ],
-      "verification": "/tmp/w6v3/report.md V7: committed privacy probes fail before and pass after; empty-cache, network-denied loading passed. V1 independently audits Engine NVIDIA mappings, and the additional system-property override and standalone benchmark checks pass. The generated repaired D4 evidence certifies the bundled-native method, but cannot match the two parameterized method identifiers to the XML case names; those two identifiers remain unverified by D4. The additional probes are independent report evidence only.",
+      "verification": "/tmp/w6v3/report.md V7: committed privacy probes fail before and pass after; empty-cache, network-denied loading passed. V1 independently audits Engine NVIDIA mappings, and the additional system-property override and standalone benchmark checks pass. The generated repaired D4 evidence records all three tokenizer methods (six cases) passing on the candidate and failing by assertion on base 9149f53ba6.",
       "repaired": true
     },
     {
