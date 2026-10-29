@@ -148,3 +148,14 @@ The orchestrator generates execution evidence after committing this candidate; t
   "note": "Re-accepted at 753deb42cb: only the evidence digests moved; no Java or product change outside modules/shell and the conformance fake. ui 2280 tests pass (rerun, quarantine checks included), LedgerSurvivorRotationTest passes, real-Engine harness children/handoff/boot-quit/boot-failure pass, tauri 62/62 and dev-runner 52/52 conformance pass on both trees."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-91c3ab-b5-claude",
+  "verdict": "accept",
+  "digest": "sha256:42bc588f8c97434aa6f6e105fa9a43ef4fab3f35d029039d53a7d4036ae7184a",
+  "note": "Re-accepted at 5f6bb672c9: with the bound-exec helper overlaid on b744db8744, losing_shell_cleanup_refuses_a_live_owners_helpers fails by assertion (after_exit_cleanup: exit cleanup killed the live owner's helper) and passes on the candidate; a verifier variant exercising only the spawn-failure path also fails before and passes after. All four failBefore checks in crash-runtime-part-b.json fail by assertion for the reason under test. Full shell lib suite 269/269 (1 ignored live test run separately, passed), RuntimeManifestRecoveryTest 6/6, LedgerReconcilerTest 2/2, tauri conformance 62/62."
+}
+```

@@ -81,3 +81,14 @@ The builder leaves the candidate uncommitted. The orchestrator generates executi
   "note": "Candidate 753deb42cb. The 3 new checks fail on 11bcf0561c by assertion (competing other-session reused-PID writer bound 42425, line 177; pre-spawn startedAt refused, line 211; absent incarnation bound, line 242) and pass on candidate. Mutations caught: drop session (lines 177, 120), drop number (line 179), accept missing incarnation (line 242). Real Linux Engine: all manifest versions carry the given incarnation on first publish, after handoff (n=4) and after SIGKILL (n=5); 0, 01 or absent value gives no incarnation. Shell crate 269 pass; tauri 62 and dev-runner 52 conformance on both trees; ui 2280 pass; harness children/handoff/boot-quit/boot-failure pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-91c3ab-b5-claude",
+  "verdict": "accept",
+  "digest": "sha256:11f17a8039a6c6a71c8e8ecd6b4e583bec43828393f910591d032270e3a18cc3",
+  "note": "Re-accepted at 5f6bb672c9: real_reset_rejects_stale_manifests_and_emits_once_for_successor now injects the predecessor's session and incarnation 1 with the successor's PID and asserts refusal, no port/token and no restart event; a mutant dropping the incarnation-number comparison fails it (Some(BindingChange{port_available:true,token_available:true})) and competing_incarnation_with_reused_pid_never_binds. A mutant dropping the session comparison is caught by competing_incarnation_with_reused_pid_never_binds and retained_same_pid_manifest_cannot_bind_a_fresh_shell (the reset test cannot see it: one host, one session). Installed Engine live test binds through the incarnation check."
+}
+```
