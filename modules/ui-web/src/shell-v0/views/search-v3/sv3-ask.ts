@@ -602,25 +602,22 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
  *
  * The stream is NOT let go here: the turn's own stream says how it ended — stopped (and saved so)
  * or finished first — and carries every word the Engine sent before the Stop landed, which is what
- * it saves. Resolves whether the Engine took the Stop; false when it was refused or never answered,
- * and the answer goes on.
+ * it saves. The shared stop-attempt helper classifies this response or a lost answer;
+ * the stream alone reports the terminal outcome.
  */
 export async function sv3StopAsk(
   apiBase: string,
   conversationId: string,
   turnId: string,
-): Promise<boolean> {
-  try {
-    const response = await authorizedFetch(
-      `${apiBase}/api/chat/conversations/${encodeURIComponent(conversationId)}/stop`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ turnId }),
-      },
-    );
-    return response.ok;
-  } catch {
-    return false;
-  }
+  signal?: AbortSignal,
+): Promise<Response> {
+  return authorizedFetch(
+    `${apiBase}/api/chat/conversations/${encodeURIComponent(conversationId)}/stop`,
+    {
+      method: 'POST',
+      signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turnId }),
+    },
+  );
 }

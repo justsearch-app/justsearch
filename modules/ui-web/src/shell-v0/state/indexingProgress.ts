@@ -89,7 +89,7 @@ export interface EnrichSettleSample {
 
 export interface IndexingProgress {
   /** WP3.7: Engine-confirmed policy hold, distinct from automatic enrichment holds. */
-  pause?: { state: 'pausing' | 'paused'; reason: string; untilEpochMs: number | null; waiting: boolean } | null;
+  pause?: { state: 'pausing' | 'paused'; reason: string; reasons?: readonly string[]; untilEpochMs: number | null; waiting: boolean } | null;
   /** WP3.3: one account of current activity and automatic holds for every status surface. */
   activity: {
     summary: string;
@@ -435,15 +435,19 @@ const AUTOMATIC_REASONS: ReadonlySet<string> = new Set([
 ]);
 const PAUSE_REASON_WORDING: ReadonlyMap<string, string> = new Map([
   ['user_paused', 'Paused by you.'],
+  ['schedule', 'Outside indexing hours.'],
+  ['on_battery', 'Paused while this computer is running on battery.'],
   ['settings_recovery', 'Settings recovery — saved settings were damaged and replaced by defaults. Indexing stays held until the reset is confirmed in Settings. Check exclusions.'],
 ]);
 
 function policyPause(status: StatusResponse | null | undefined): IndexingProgress['pause'] {
   const indexing = status?.operating?.indexing;
   if (!indexing || (indexing.state !== 'PAUSING' && indexing.state !== 'PAUSED')) return null;
-  const reason = indexing.reasons.find(r => !AUTOMATIC_REASONS.has(r));
+  const ordered = ['settings_recovery', 'user_paused', 'schedule', 'on_battery'];
+  const reasons = ordered.filter(r => indexing.reasons.includes(r as typeof indexing.reasons[number]));
+  const reason = reasons[0] ?? indexing.reasons.find(r => !AUTOMATIC_REASONS.has(r));
   if (!reason) return null;
-  return { state: indexing.state === 'PAUSING' ? 'pausing' : 'paused', reason: reason ?? '',
+  return { state: indexing.state === 'PAUSING' ? 'pausing' : 'paused', reason: reason ?? '', reasons,
     untilEpochMs: indexing.untilEpochMs, waiting: indexing.waitingForResume };
 }
 
@@ -631,10 +635,14 @@ export function selectIndexingProgress(
   const phase = pause?.state ?? derivePhase(core.indexState, jobsPending, work);
   const activity = pause ? {
     summary: pause.state === 'pausing' ? 'Pausing — finishing current files' : 'Indexing paused',
-    detail: [PAUSE_REASON_WORDING.get(pause.reason) ?? 'Indexing is on hold; reason unavailable.',
-      pause.reason === 'user_paused' && pause.untilEpochMs != null
+    detail: [(pause.reasons?.length ? pause.reasons : [pause.reason]).map(reason =>
+      PAUSE_REASON_WORDING.get(reason) ?? 'Indexing is on hold; reason unavailable.').join(' '),
+      (pause.reasons ?? [pause.reason]).includes('user_paused') && pause.untilEpochMs != null
         ? `Until ${new Date(pause.untilEpochMs).toLocaleString()}.` : '',
-      pause.waiting && pause.reason !== 'settings_recovery' ? 'Work is waiting for Resume.' : '',
+      pause.waiting && pause.reason !== 'settings_recovery'
+        ? pause.reasons?.includes('schedule') || pause.reasons?.includes('on_battery')
+          ? `Work is waiting for ${pause.reasons.includes('schedule') ? 'indexing hours' : 'the battery rule to clear'}${pause.reasons.includes('schedule') && pause.reasons.includes('on_battery') ? ' and the battery rule to clear' : ''}${pause.reasons.includes('user_paused') ? ' and Resume' : ''}.`
+          : 'Work is waiting for Resume.' : '',
     ].filter(Boolean).join(' '),
     confirmed: true, enrichmentDeferred: true,
   } : indexingActivity(status, indexingStatusLive, phase, work.rawPending);

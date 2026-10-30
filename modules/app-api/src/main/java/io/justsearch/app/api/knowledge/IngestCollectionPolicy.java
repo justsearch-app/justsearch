@@ -97,6 +97,16 @@ public final class IngestCollectionPolicy {
     if (requested != null && !requested.isBlank()) {
       return requested.trim();
     }
+    RootBinding best = owningRoot(input, roots);
+    if (best == null) {
+      return OUT_OF_ROOT;
+    }
+    String rootCollection = best.collection();
+    return rootCollection == null || rootCollection.isBlank() ? null : rootCollection;
+  }
+
+  /** Deepest declared owner, or null for an out-of-root file (without the ad-hoc default). */
+  public static RootBinding owningRoot(Path input, List<RootBinding> roots) {
     RootBinding best = null;
     int bestDepth = -1;
     if (roots != null && input != null) {
@@ -114,11 +124,7 @@ public final class IngestCollectionPolicy {
         }
       }
     }
-    if (best == null) {
-      return OUT_OF_ROOT;
-    }
-    String rootCollection = best.collection();
-    return rootCollection == null || rootCollection.isBlank() ? null : rootCollection;
+    return best;
   }
 
   /**

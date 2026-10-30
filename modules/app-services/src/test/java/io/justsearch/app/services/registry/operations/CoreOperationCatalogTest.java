@@ -70,6 +70,7 @@ final class CoreOperationCatalogTest {
             "core.set-chat-enabled",
             "core.indexing-pause",
             "core.indexing-resume",
+            "core.set-indexing-rules",
             "core.trigger-offline-processing",
             "core.activate-runtime-variant",
             "core.deactivate-runtime-variant",

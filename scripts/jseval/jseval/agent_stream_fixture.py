@@ -8,12 +8,9 @@ frame, `pumpHostAiStream` threw `STREAM_INCOMPLETE`, and the run ended as the
 "Connection lost — the response was interrupted." row visible in the agent-mode captures.
 This module supplies the missing body.
 
-WHY A STATIC BODY IS ENOUGH: Playwright's `route.fulfill` can only serve a COMPLETE
-body, but both parsers are buffer-based frame splitters (`ai.ts:parseSseStream` splits on
-`\\n\\n`; `api/streams.ts` does the same), so one whole multi-frame body yields every
-event in order — byte-stable, which is exactly what a capture wants. The cost is recorded
-in §D8.3: a stream that never terminates (the PAUSED-awaiting-budget state) is NOT
-reachable this way.
+Completed captures use the static DONE_RUN_BODY. AgentStreamHandle extends the
+same frame/schema authority with a context-owned loopback HTTP server for flows
+that need an open response and stepwise event release; route.fulfill closes a body.
 
 SCHEMA AUTHORITY (projection, not fork): every payload here is validated at IMPORT time
 against `scripts/codegen/shapes.fixture.json`'s `core.agent-run` `eventSchema` — the
@@ -24,6 +21,7 @@ assertions passing against a stale shape.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -183,3 +181,100 @@ DONE_RUN: tuple[tuple[str, dict[str, Any]], ...] = (
 # Built at IMPORT time so a schema drift fails at `import jseval.ui_fixtures`, not at the
 # first capture (and so the ui-shot step and the unit tests read the same bytes).
 DONE_RUN_BODY: str = "".join(sse_frame(event, payload) for event, payload in DONE_RUN)
+
+
+class AgentStreamHandle:
+    """One context's loopback SSE transport, driven by a step through real HTTP.
+
+    Frames are validated before enqueueing. A pending stream sends comments so the
+    real parser/idle watchdog remains active. Closing the owning context closes the
+    listener, client sockets and handler tasks, including a disconnected client.
+    """
+
+    def __init__(self):
+        self.connected = asyncio.Event()
+        self._frames = asyncio.Queue()
+        self._writers = set()
+        self._tasks = set()
+        self._closed = False
+
+    async def start(self, ctx):
+        self._server = await asyncio.start_server(self._serve, "127.0.0.1", 0)
+        port = self._server.sockets[0].getsockname()[1]
+        self.url = f"http://127.0.0.1:{port}/api/chat/dispatch"
+        ctx.on("close", self.close)
+        return self
+
+    def queue(self, event: str, payload: dict[str, Any]) -> None:
+        if self._closed:
+            raise RuntimeError("agent fixture stream is closed")
+        self._frames.put_nowait(sse_frame(event, payload).encode())
+
+    async def emit(self, event: str, payload: dict[str, Any]) -> None:
+        self.queue(event, payload)
+        await asyncio.wait_for(self.connected.wait(), 10)
+
+    async def end(self, **payload) -> None:
+        self.queue("done", payload)
+        self._frames.put_nowait(None)
+
+    async def fail(self, message: str = "Fixture run failed") -> None:
+        self.queue("error", {"error": message, "errorCode": "FIXTURE_FAILURE"})
+        self._frames.put_nowait(None)
+
+    async def disconnect(self) -> None:
+        """Close without a terminal frame, exercising the real incomplete-stream path."""
+        self._frames.put_nowait(None)
+
+    async def _serve(self, reader, writer):
+        task = asyncio.current_task()
+        self._tasks.add(task)
+        self._writers.add(writer)
+        disconnected = None
+        try:
+            headers = (await reader.readuntil(b"\r\n\r\n")).decode()
+            # Consume the POST body before watching for the client closing the socket.
+            length = next((int(line.split(":", 1)[1]) for line in headers.split("\r\n")
+                           if line.lower().startswith("content-length:")), 0)
+            if length:
+                await reader.readexactly(length)
+            writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n"
+                         b"Access-Control-Allow-Origin: *\r\nCache-Control: no-cache\r\n"
+                         b"Connection: close\r\n\r\n: connected\n\n")
+            await writer.drain()
+            self.connected.set()
+            disconnected = asyncio.create_task(reader.read())
+            while not self._closed:
+                frame = asyncio.create_task(self._frames.get())
+                try:
+                    done, _ = await asyncio.wait({frame, disconnected}, timeout=1,
+                                                 return_when=asyncio.FIRST_COMPLETED)
+                    if disconnected in done:
+                        break
+                    body = frame.result() if frame in done else b": heartbeat\n\n"
+                    if body is None:
+                        break
+                    writer.write(body)
+                    await writer.drain()
+                finally:
+                    if not frame.done():
+                        frame.cancel()
+                    await asyncio.gather(frame, return_exceptions=True)
+        except (ConnectionError, asyncio.IncompleteReadError):
+            pass  # A client abort is an expected fixture outcome.
+        finally:
+            if disconnected:
+                disconnected.cancel()
+                await asyncio.gather(disconnected, return_exceptions=True)
+            writer.close()
+            await writer.wait_closed()
+            self._writers.discard(writer)
+            self._tasks.discard(task)
+
+    async def close(self):
+        self._closed = True
+        self._server.close()
+        await self._server.wait_closed()
+        for task in list(self._tasks):
+            task.cancel()
+        await asyncio.gather(*self._tasks, return_exceptions=True)

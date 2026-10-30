@@ -82,6 +82,38 @@ afterEach(() => {
 });
 
 describe('IR15 initial context confirmation', () => {
+  it('CP8 pre-render writes seed once and later renders preserve typing, focus and caret', async () => {
+    const el = document.createElement('jf-sv3-window') as SearchV3View;
+    const writer = el as unknown as { writeDraft(text: string): void };
+    writer.writeDraft('A'); writer.writeDraft('B'); writer.writeDraft('last seed');
+    document.body.append(el); await settle(el);
+    expect(field(el).value).toBe('last seed');
+    await type(el, 'typed after render'); const input = field(el);
+    input.focus(); input.setSelectionRange(2, 7);
+    el.requestUpdate(); await settle(el);
+    expect(field(el)).toBe(input); expect(input.value).toBe('typed after render');
+    expect(composer(el).shadowRoot!.activeElement).toBe(input);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 7]);
+    writer.writeDraft('assigned text'); await settle(el);
+    expect(field(el)).toBe(input); expect(input.value).toBe('assigned text');
+    expect(composer(el).shadowRoot!.activeElement).toBe(input);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([13, 13]);
+  });
+
+  it('CP8 reconnect keeps the live draft while a fresh view reads another window snapshot', async () => {
+    const storageKey = 'justsearch.draft.search-v3.composer';
+    localStorage.setItem(storageKey, 'saved A'); const el = await mount();
+    await type(el, 'live B'); el.remove();
+    localStorage.setItem(storageKey, 'other window C');
+    document.body.append(el); await settle(el);
+    expect(field(el).value).toBe('live B');
+    el.remove(); localStorage.setItem(storageKey, 'other window C');
+    const fresh = await mount(); expect(field(fresh).value).toBe('other window C');
+    localStorage.setItem(storageKey, 'newer other window D');
+    window.dispatchEvent(new Event('pagehide'));
+    expect(localStorage.getItem(storageKey)).toBe('newer other window D');
+  });
+
   it.each(['pagehide', 'pagehide-return', 'hidden', 'hidden-return'])(
     '%s latches abandonment before a delayed initial Send can issue or clear', async mode => {
       const el = await mount(); await send(el);

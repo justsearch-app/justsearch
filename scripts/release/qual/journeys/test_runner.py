@@ -14,8 +14,25 @@ class RunnerTests(unittest.TestCase):
         self.r = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.r)
 
+    def test_windows_webdriver_profile_option_and_default_linux_request(self):
+        from unittest.mock import Mock
+        target=Mock()
+        target.http.return_value={'value':{'sessionId':'owned'}}
+        driver=self.r.WebDriver(target,4444)
+        driver.start('/installed/app')
+        self.assertEqual(target.http.call_args.args[2],{'capabilities':{'alwaysMatch':{'tauri:options':{'application':'/installed/app'}}}})
+        profile={'userDataFolder':r'C:\Users\qual\AppData\Local\io.justsearch.shell'}
+        driver.start('C:/installed/app.exe',webview_options=profile)
+        self.assertEqual(target.http.call_args.args[2]['capabilities']['alwaysMatch']['tauri:options'],
+                         {'application':'C:/installed/app.exe','webviewOptions':profile})
+        self.assertEqual(driver.session,'owned')
+
     def test_assertion_is_product_failure(self):
         self.assertEqual(self.r.classify(AssertionError('wrong search result')), 'failed-product')
+
+    def test_windows_retention_can_run_before_update_without_enabling_candidate_update(self):
+        self.assertIn('J6', self.r.phase_journeys('candidate', 'vm-windows'))
+        self.assertNotIn('J5', self.r.phase_journeys('candidate', 'vm-windows'))
 
     def test_driver_failure_is_infrastructure(self):
         self.assertEqual(self.r.classify(self.r.Infrastructure('driver mismatch')), 'failed-infrastructure')
@@ -114,6 +131,10 @@ class RunnerTests(unittest.TestCase):
             'S22': 'Journeys run on clean installs without a developer JDK, models or inherited runtime paths; a missing download, skipped or unavailable check is reported as such, never as a pass',
         }
         definition = json.loads(Path(__file__).with_name('journeys.json').read_text())
+        expected['S-Windows-update'] = 'Windows in-app update via descriptor v2 from a VM-local mirror: success relaunches the new version with data kept; a cancelled elevation or failed install resumes the old version and re-offers'
+        expected['S12'] = 'Linux with a supported NVIDIA GPU: Install AI fetches Linux GPU packs and chat answers with sources on the GPU; preview, install and readiness agree on what the plan includes (isIncludedByPlan native-target gate) (does not block the release)'
+        expected['S14'] = 'Soak J9: 60 min on the GPU with long documents, steady progress, no crash loop, memory under its guard; only when indexing/enrichment/inference changed'
+        expected['Isolation'] = "The lane never reads or changes the owner's own JustSearch data, settings, running instance or desktop session; its processes, ports and state are private and removed after the run (prove with a sentinel in the owner's real data folder and a check that no owner-visible window appeared)"
         self.assertEqual(definition['scenarios'], expected)
 
     def test_preparation_failure_retains_unavailable_checks(self):
@@ -194,13 +215,16 @@ class RunnerTests(unittest.TestCase):
         run.args.phase = 'predecessor'
         run.args.predecessor.name = 'JustSearch_0.3.0_amd64.deb'
         run.work = '/tmp/own-run'
-        run.facts = {}
+        bookmark = {'id': 'authored'}
+        state = {'savedFiles': {'files': {'models/embedding.onnx': 'sha'}, 'savedViews': [bookmark]}}
+        run.facts = {'ai': {'state': 'completed'}, 'authored': True, 'bookmark': bookmark, 'beforeState': state}
         run.require.side_effect = lambda key: '0.3.1' if key == 'initialVersion' else {}
         run.target.run.side_effect = [types.SimpleNamespace(stdout='0.3.0'),
                                       types.SimpleNamespace(stdout='', returncode=0)]
         run.wd.execute.side_effect = [{'text': 'JustSearch 0.3.1 is available. Review and install', 'repair': False}, True]
         with patch.object(linux, 'installed_version', return_value='0.3.0'), \
-             patch.object(linux, 'digest', return_value='package-hash'):
+             patch.object(linux, 'digest', return_value='package-hash'), \
+             patch.object(linux, 'snapshot', return_value=state):
             linux.update_prepare(run)
         run.nav.assert_not_called()
         self.assertEqual(run.wd.click.call_args_list[0].args,

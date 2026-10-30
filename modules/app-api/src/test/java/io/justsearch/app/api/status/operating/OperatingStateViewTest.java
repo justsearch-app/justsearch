@@ -31,7 +31,8 @@ final class OperatingStateViewTest {
     assertEquals(List.of("P16_PLUS", "P12", "P8", "NO_GPU", "UNRESOLVED"), names(Profile.class));
     assertEquals(List.of("MEASURED", "USER_OVERRIDE"), names(ProfileSource.class));
     assertEquals(
-        List.of("user_paused", "settings_recovery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating"),
+        List.of("settings_recovery", "user_paused", "schedule", "on_battery",
+            "game_mode", "gpu_busy_external", "energy_saver", "chat_generating"),
         Arrays.stream(IndexingReason.values()).map(r -> MAPPER.writeValueAsString(r)
             .replace("\"", "")).toList(),
         "lower_snake on the wire, in precedence order");

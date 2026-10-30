@@ -5,49 +5,339 @@
     "S7": "Clean Ubuntu 24.04 (Wayland and X11): .deb installs, launches, adds a folder via the system picker, indexes, searches, opens a result, Install AI gives search without chat on CPU; X11 shortcut registers, Wayland shows the --focus-search alternative; uninstall/reinstall keeps data",
     "S8": "Linux in-app update via descriptor v2 and pkexec apt-get: success relaunches the new version; cancelled prompt, lock timeout or failure resumes the old Engine and re-offers the update",
     "S21": "The MCP bridge's manifest and registry entry carry the app's version, the release URL and checksum, declare Linux and Windows, and the bridge works on both (J8)",
-    "S22": "Journeys run on clean installs without a developer JDK, models or inherited runtime paths; a missing download, skipped or unavailable check is reported as such, never as a pass"
+    "S22": "Journeys run on clean installs without a developer JDK, models or inherited runtime paths; a missing download, skipped or unavailable check is reported as such, never as a pass",
+    "S-Windows-update": "Windows in-app update via descriptor v2 from a VM-local mirror: success relaunches the new version with data kept; a cancelled elevation or failed install resumes the old version and re-offers",
+    "S12": "Linux with a supported NVIDIA GPU: Install AI fetches Linux GPU packs and chat answers with sources on the GPU; preview, install and readiness agree on what the plan includes (isIncludedByPlan native-target gate) (does not block the release)",
+    "S14": "Soak J9: 60 min on the GPU with long documents, steady progress, no crash loop, memory under its guard; only when indexing/enrichment/inference changed",
+    "Isolation": "The lane never reads or changes the owner's own JustSearch data, settings, running instance or desktop session; its processes, ports and state are private and removed after the run (prove with a sentinel in the owner's real data folder and a check that no owner-visible window appeared)"
   },
   "scope": {
     "implemented": [
       "hosted-linux-x11",
       "vm-linux-wayland",
-      "vm-linux-x11"
+      "vm-linux-x11",
+      "vm-windows",
+      "hosted-windows",
+      "gpu-linux"
     ],
-    "unavailable": {
-      "windows": "W4a covers Linux; Windows is a later assignment",
-      "gpu-linux": "GPU lane and J9 soak are a later assignment",
-      "J9": "Soak is outside W4a"
+    "unavailable": {},
+    "skippedByDecision": {
+      "windows-gpu": "Owner decision: skip GPU tests on Windows"
     }
   },
   "journeys": [
-    {"id": "J1", "title": "Fresh apt install and packaged window", "scenarioIds": ["S3", "S7", "S22"], "checks": [
-      {"id": "install", "lanes": ["hosted-linux-x11", "vm-linux-wayland", "vm-linux-x11"], "applicability": "Linux"},
-      {"id": "first-run", "lanes": ["hosted-linux-x11", "vm-linux-wayland", "vm-linux-x11"], "applicability": "Linux"}]},
-    {"id": "J2", "title": "System picker, index, search and receiving viewer", "scenarioIds": ["S3", "S7"], "checks": [
-      {"id": "folder-picker", "lanes": ["vm-linux-wayland"], "applicability": "Round-two decision: native picker is tested on the Wayland VM; hosted uses the production HTTP API; X11 runs J1 only"},
-      {"id": "folder-api", "lanes": ["hosted-linux-x11"], "applicability": "Round-two decision: hosted folder addition uses the production HTTP API; VM exercises the native picker"},
-      {"id": "search-open", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux default viewer; round-two decision: X11 runs J1 only"}]},
-    {"id": "J3", "title": "Default production AI installation and activation on CPU", "scenarioIds": ["S3", "S7", "S22"], "checks": [
-      {"id": "cpu-ai", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "CPU: search only; chat unavailable; round-two decision: X11 runs J1 only"}]},
-    {"id": "J4", "title": "Authored state and restart persistence", "scenarioIds": ["S3", "S7"], "checks": [
-      {"id": "author-state", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux; round-two decision: X11 runs J1 only"},
-      {"id": "restart", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux; WebDriver restart DOM and stored bookmark; round-two decision: X11 runs J1 only"}]},
-    {"id": "J5", "title": "Descriptor v2 in-app update", "scenarioIds": ["S3", "S8"], "checks": [
-      {"id": "update-offer", "lanes": ["vm-linux-wayland"], "applicability": "Settled decision: mirror and PolicyKit update journey is Ubuntu VM only; round-two decision: X11 runs J1 only"},
-      {"id": "update-cancel", "lanes": ["vm-linux-wayland"], "applicability": "Settled decision: PolicyKit cancellation is Ubuntu VM only; round-two decision: X11 runs J1 only"},
-      {"id": "update-lock", "lanes": ["vm-linux-wayland"], "applicability": "Real dpkg lock and packaged 300-second timeout; Ubuntu VM only; round-two decision: X11 runs J1 only"},
-      {"id": "update-success", "lanes": ["vm-linux-wayland"], "applicability": "Settled decision: updater relaunch is Ubuntu VM only; round-two decision: X11 runs J1 only"}]},
-    {"id": "J6", "title": "Reinstall and remove with retained user data", "scenarioIds": ["S3", "S7"], "checks": [
-      {"id": "reinstall", "lanes": ["vm-linux-wayland"], "applicability": "Settled decision: destructive package operations are Ubuntu VM only; round-two decision: X11 runs J1 only"},
-      {"id": "remove-retain-reinstall", "lanes": ["vm-linux-wayland"], "applicability": "Settled decision: apt remove retains user data; Ubuntu VM only; round-two decision: X11 runs J1 only"}]},
-    {"id": "J7", "title": "Desktop integration and scanned PDF OCR", "scenarioIds": ["S3", "S7"], "checks": [
-      {"id": "desktop-entry", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux menu entry and OS handler; round-two decision: X11 runs J1 only"},
-      {"id": "deep-link-cold", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Cold OS dispatch, destination needs owner validation; round-two decision: X11 runs J1 only"},
-      {"id": "deep-link-warm", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Warm OS dispatch into WebDriver app, DOM destination and original PID; round-two decision: X11 runs J1 only"},
-      {"id": "shortcut", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "X11 global registration; Wayland desktop binding requires GNOME VM settings; round-two decision: X11 runs J1 only"},
-      {"id": "ocr", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Image-only PDF, text search assertion; round-two decision: X11 runs J1 only"}]},
-    {"id": "J8", "title": "Release MCPB through pinned Inspector stdio", "scenarioIds": ["S3", "S21", "S22"], "checks": [
-      {"id": "mcp-metadata", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Linux and Windows declarations; tagged registry metadata; round-two decision: X11 runs J1 only"},
-      {"id": "mcp", "lanes": ["hosted-linux-x11", "vm-linux-wayland"], "applicability": "Installed Linux app and exact release bridge; round-two decision: X11 runs J1 only"}]}
+    {
+      "id": "J1",
+      "title": "Fresh platform package install and packaged window",
+      "scenarioIds": [
+        "S3",
+        "S7",
+        "S22"
+      ],
+      "checks": [
+        {
+          "id": "install",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland",
+            "vm-linux-x11",
+            "hosted-windows",
+            "vm-windows",
+            "gpu-linux"
+          ],
+          "applicability": "Linux; Windows hosted and VM use NSIS, UI Automation and the production API; GPU host extracts exact .deb without installing"
+        },
+        {
+          "id": "first-run",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland",
+            "vm-linux-x11",
+            "hosted-windows",
+            "vm-windows",
+            "gpu-linux"
+          ],
+          "applicability": "Linux; Windows hosted and VM use NSIS, UI Automation and the production API"
+        }
+      ]
+    },
+    {
+      "id": "J2",
+      "title": "System picker, index, search and receiving viewer",
+      "scenarioIds": [
+        "S3",
+        "S7",
+        "S22"
+      ],
+      "checks": [
+        {
+          "id": "folder-picker",
+          "lanes": [
+            "vm-linux-wayland",
+            "hosted-windows",
+            "vm-windows"
+          ],
+          "applicability": "Round-two decision: native picker is tested on the Wayland VM; hosted uses the production HTTP API; X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        },
+        {
+          "id": "folder-api",
+          "lanes": [
+            "hosted-linux-x11",
+            "gpu-linux"
+          ],
+          "applicability": "Round-two decision: hosted folder addition uses the production HTTP API; VM exercises the native picker"
+        },
+        {
+          "id": "search-open",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland",
+            "hosted-windows",
+            "vm-windows"
+          ],
+          "applicability": "Linux default viewer; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        },
+        {
+          "id": "gpu-search",
+          "lanes": [
+            "gpu-linux"
+          ],
+          "applicability": "GPU host: production index/search; open-result is covered in VMs"
+        }
+      ]
+    },
+    {
+      "id": "J3",
+      "title": "Default production AI installation and activation",
+      "scenarioIds": [
+        "S3",
+        "S7",
+        "S22",
+        "S12"
+      ],
+      "checks": [
+        {
+          "id": "cpu-ai",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland",
+            "hosted-windows",
+            "vm-windows"
+          ],
+          "applicability": "CPU: search only; chat unavailable; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        },
+        {
+          "id": "gpu-ai",
+          "lanes": [
+            "gpu-linux"
+          ],
+          "applicability": "Supported Linux NVIDIA GPU: installation through the production API request sent by Accept and download; UI install/consent qualified in CPU VMs; GPU_FULL defaults, UI activation and Start AI, chat with sources, actual CUDA providers and pack-owned mapped libraries"
+        }
+      ]
+    },
+    {
+      "id": "J4",
+      "title": "Authored state and restart persistence",
+      "scenarioIds": [
+        "S3",
+        "S7",
+        "S22"
+      ],
+      "checks": [
+        {
+          "id": "author-state",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland",
+            "hosted-windows",
+            "vm-windows",
+            "gpu-linux"
+          ],
+          "applicability": "Linux; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        },
+        {
+          "id": "restart",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland",
+            "hosted-windows",
+            "vm-windows",
+            "gpu-linux"
+          ],
+          "applicability": "Linux; WebDriver restart DOM and stored bookmark; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        }
+      ]
+    },
+    {
+      "id": "J5",
+      "title": "Descriptor v2 in-app update",
+      "scenarioIds": [
+        "S3",
+        "S8",
+        "S22",
+        "S-Windows-update"
+      ],
+      "checks": [
+        {
+          "id": "update-offer",
+          "lanes": [
+            "vm-linux-wayland",
+            "vm-windows"
+          ],
+          "applicability": "Settled decision: mirror and PolicyKit update journey is Ubuntu VM only; round-two decision: X11 runs J1 only; Windows VM uses descriptor v2 and a declined currentUser NSIS install"
+        },
+        {
+          "id": "update-cancel",
+          "lanes": [
+            "vm-linux-wayland",
+            "vm-windows"
+          ],
+          "applicability": "Settled decision: PolicyKit cancellation is Ubuntu VM only; round-two decision: X11 runs J1 only; Windows VM uses descriptor v2 and a declined currentUser NSIS install"
+        },
+        {
+          "id": "update-lock",
+          "lanes": [
+            "vm-linux-wayland"
+          ],
+          "applicability": "Real dpkg lock and packaged 300-second timeout; Ubuntu VM only; round-two decision: X11 runs J1 only"
+        },
+        {
+          "id": "update-success",
+          "lanes": [
+            "vm-linux-wayland",
+            "vm-windows"
+          ],
+          "applicability": "Settled decision: updater relaunch is Ubuntu VM only; round-two decision: X11 runs J1 only; Windows VM uses descriptor v2 and a declined currentUser NSIS install"
+        }
+      ]
+    },
+    {
+      "id": "J6",
+      "title": "Reinstall and remove with retained user data",
+      "scenarioIds": [
+        "S3",
+        "S7",
+        "S22"
+      ],
+      "checks": [
+        {
+          "id": "reinstall",
+          "lanes": [
+            "vm-linux-wayland",
+            "hosted-windows",
+            "vm-windows"
+          ],
+          "applicability": "Settled decision: destructive package operations are Ubuntu VM only; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        },
+        {
+          "id": "remove-retain-reinstall",
+          "lanes": [
+            "vm-linux-wayland",
+            "hosted-windows",
+            "vm-windows"
+          ],
+          "applicability": "Settled decision: apt remove retains user data; Ubuntu VM only; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        }
+      ]
+    },
+    {
+      "id": "J7",
+      "title": "Desktop integration and scanned PDF OCR",
+      "scenarioIds": [
+        "S3",
+        "S7"
+      ],
+      "checks": [
+        {
+          "id": "desktop-entry",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland"
+          ],
+          "applicability": "Linux menu entry and OS handler; round-two decision: X11 runs J1 only; J7 is Linux-only by the Windows assignment"
+        },
+        {
+          "id": "deep-link-cold",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland"
+          ],
+          "applicability": "Cold OS dispatch, destination needs owner validation; round-two decision: X11 runs J1 only; J7 is Linux-only by the Windows assignment"
+        },
+        {
+          "id": "deep-link-warm",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland"
+          ],
+          "applicability": "Warm OS dispatch into WebDriver app, DOM destination and original PID; round-two decision: X11 runs J1 only; J7 is Linux-only by the Windows assignment"
+        },
+        {
+          "id": "shortcut",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland"
+          ],
+          "applicability": "X11 global registration; Wayland desktop binding requires GNOME VM settings; round-two decision: X11 runs J1 only; J7 is Linux-only by the Windows assignment"
+        },
+        {
+          "id": "ocr",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland"
+          ],
+          "applicability": "Image-only PDF, text search assertion; round-two decision: X11 runs J1 only; J7 is Linux-only by the Windows assignment"
+        }
+      ]
+    },
+    {
+      "id": "J8",
+      "title": "Release MCPB through pinned Inspector stdio",
+      "scenarioIds": [
+        "S3",
+        "S21",
+        "S22"
+      ],
+      "checks": [
+        {
+          "id": "mcp-metadata",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland",
+            "hosted-windows",
+            "vm-windows"
+          ],
+          "applicability": "Linux and Windows declarations; tagged registry metadata; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        },
+        {
+          "id": "mcp",
+          "lanes": [
+            "hosted-linux-x11",
+            "vm-linux-wayland",
+            "hosted-windows",
+            "vm-windows"
+          ],
+          "applicability": "Installed Linux app and exact release bridge; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        }
+      ]
+    },
+    {
+      "id": "J9",
+      "title": "60-minute GPU indexing and enrichment soak",
+      "scenarioIds": [
+        "S3",
+        "S14",
+        "S22"
+      ],
+      "checks": [
+        {
+          "id": "soak",
+          "lanes": [
+            "gpu-linux"
+          ],
+          "applicability": "GPU host only; skipped by decision when no named indexing/enrichment/inference owner changed since last release"
+        }
+      ]
+    }
   ]
 }

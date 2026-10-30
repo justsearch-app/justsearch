@@ -19,7 +19,12 @@ print(json.dumps({'devices':devices,'writtenBytes':sum(devices.values()),
 def difference(before, after):
     if set(before['devices']) != set(after['devices']):
         raise RuntimeError('Guest block devices changed during measurement')
-    result = {key: after[key] - before[key] for key in ('writtenBytes', 'swapWrittenBytes')}
-    if any(value < 0 for value in result.values()):
+    result = {'writtenBytes': after['writtenBytes'] - before['writtenBytes']}
+    if before.get('swapWrittenBytes') is None or after.get('swapWrittenBytes') is None:
+        result['swapWrittenBytes'] = None
+        result['swapMeasurement'] = after.get('swapMeasurement', 'unavailable')
+    else:
+        result['swapWrittenBytes'] = after['swapWrittenBytes'] - before['swapWrittenBytes']
+    if any(value < 0 for value in result.values() if isinstance(value, (int, float))):
         raise RuntimeError('Guest write counters reset during measurement')
-    return dict(result, source='guest whole-device disk counters; sync at boundaries')
+    return dict(result, source=after.get('source', 'guest whole-device disk counters; sync at boundaries'))

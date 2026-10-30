@@ -1,0 +1,152 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:d0992acd2e0f998f1957b23f33e18b9307e9295404f3f9fcd7dd47bd15accf91",
+    "adapterPatch": "gates/test-intent/evidence/wp3.8a-rules/runner-machine-rules.patch",
+    "adaptation": "Official result-selection, assertion-classification and digest algorithm with one js-gradle-slot around the whole runner (no nested slot), cleared display/JVM/JustSearch variables and disabled CUDA, independently installed npm dependencies, existing per-task isolation (no init script), mandated ten-minute retries in the outer launcher, and a retained TMPDIR shared clone checked for exact baseline production/build sources."
+  },
+  "createdAt": "2026-10-29T06:50:44.071Z",
+  "revision": "43daa48de4664301a99e54303230252c40eba88d",
+  "tree": "782015e520f036a60b4f25608fdcd5363b87e74e",
+  "environment": {
+    "cudaVisibleDevices": "-1",
+    "displayUnset": true,
+    "waylandDisplayUnset": true,
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.wrongTypeBatteryNamesFieldAndPreservesSettings\" --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.missingBatteryNamesFieldAndPreservesSettings\" --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.missingScheduleNamesFieldAndPreservesSettings\" --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.unknownMemberNamesFieldAndPreservesSettings\" --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.nestedHandlerRefusalStillNamesFieldAndPreservesSettings\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10169
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#wrongTypeBatteryNamesFieldAndPreservesSettings",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f75d98f9dad7a179e018fd9d5e1d680e628cd9ba466209a98bb0622119ee6b5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "wrongTypeBatteryNamesFieldAndPreservesSettings()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#missingBatteryNamesFieldAndPreservesSettings",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f75d98f9dad7a179e018fd9d5e1d680e628cd9ba466209a98bb0622119ee6b5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingBatteryNamesFieldAndPreservesSettings()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#missingScheduleNamesFieldAndPreservesSettings",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f75d98f9dad7a179e018fd9d5e1d680e628cd9ba466209a98bb0622119ee6b5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingScheduleNamesFieldAndPreservesSettings()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#unknownMemberNamesFieldAndPreservesSettings",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f75d98f9dad7a179e018fd9d5e1d680e628cd9ba466209a98bb0622119ee6b5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownMemberNamesFieldAndPreservesSettings()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#nestedHandlerRefusalStillNamesFieldAndPreservesSettings",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f75d98f9dad7a179e018fd9d5e1d680e628cd9ba466209a98bb0622119ee6b5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nestedHandlerRefusalStillNamesFieldAndPreservesSettings()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "43daa48de4664301a99e54303230252c40eba88d",
+    "revision": "43daa48de4664301a99e54303230252c40eba88d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.wrongTypeBatteryNamesFieldAndPreservesSettings\" --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.missingBatteryNamesFieldAndPreservesSettings\" --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.missingScheduleNamesFieldAndPreservesSettings\" --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.unknownMemberNamesFieldAndPreservesSettings\" --tests \"io.justsearch.ui.api.IndexingRulesRefusalHttpTest.nestedHandlerRefusalStillNamesFieldAndPreservesSettings\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-shared-clone>",
+        "exitCode": 1,
+        "durationMs": 4034,
+        "output": "Reusing configuration cache.\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractIncludeProto UP-TO-DATE\n> Task :modules:extension-substrate:compileJava UP-TO-DATE\n> Task :modules:infra-core:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProto UP-TO-DATE\n> Task :modules:core-contracts:compileJava UP-TO-DATE\n> Task :modules:app-api:buildLinuxBoundExec UP-TO-DATE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:core:compileJava UP-TO-DATE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:app-api:processResources UP-TO-DATE\n> Task :modules:configuration:processResources UP-TO-DATE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:indexing:compileJava UP-TO-DATE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:extractProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos UP-TO-DATE\n> Task :modules:configuration:compileJava UP-TO-DATE\n> Task :modules:telemetry:compileJava UP-TO-DATE\n> Task :modules:prompt-support:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:processProtoResources UP-TO-DATE\n> Task :modules:ui:syncSsotSchemas UP-TO-DATE\n> Task :modules:app-config:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:processResources UP-TO-DATE\n> Task :modules:app-util:compileJava UP-TO-DATE\n> Task :modules:app-agent-api:compileJava UP-TO-DATE\n> Task :modules:ipc-common:extractIncludeProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:generateProto UP-TO-DATE\n> Task :modules:ui:processResources UP-TO-DATE\n> Task :modules:adapters-lucene:syncSsotCatalogs UP-TO-DATE\n> Task :modules:adapters-lucene:compileJava UP-TO-DATE\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:ort-common:compileJava UP-TO-DATE\n> Task :modules:ai-backend:processResources UP-TO-DATE\n> Task :modules:adapters-lucene:processResources UP-TO-DATE\n> Task :modules:adapters-lucene:classes UP-TO-DATE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:app-agent-api:jar UP-TO-DATE\n> Task :modules:app-config:jar UP-TO-DATE\n> Task :modules:adapters-lucene:jar UP-TO-DATE\n> Task :modules:app-engine:processResources UP-TO-DATE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:reranker:compileJava UP-TO-DATE\n> Task :modules:configuration:classes UP-TO-DATE\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-services:processResources UP-TO-DATE\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:app-observability:processResources UP-TO-DATE\n> Task :modules:ipc-common:generateProto UP-TO-DATE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:configuration:jar UP-TO-DATE\n> Task :modules:app-util:jar UP-TO-DATE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:core:jar UP-TO-DATE\n> Task :modules:core-contracts:jar UP-TO-DATE\n> Task :modules:extension-substrate:jar UP-TO-DATE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:indexer-worker:processResources NO-SOURCE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:configuration:compileTestFixturesJava FROM-CACHE\n> Task :modules:ipc-common:processProtoResources UP-TO-DATE\n> Task :modules:indexing:jar UP-TO-DATE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:infra-core:jar UP-TO-DATE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:configuration:testFixturesJar UP-TO-DATE\n> Task :modules:ipc-common:processResources UP-TO-DATE\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:core:testFixturesJar UP-TO-DATE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:compileJava UP-TO-DATE\n> Task :modules:ort-common:jar UP-TO-DATE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:classes UP-TO-DATE\n> Task :modules:prompt-support:jar UP-TO-DATE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:ui:processTestResources UP-TO-DATE\n> Task :modules:reranker:jar UP-TO-DATE\n> Task :modules:telemetry:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:jar UP-TO-DATE\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:app-api:compileJava UP-TO-DATE\n> Task :modules:app-api:classes UP-TO-DATE\n> Task :modules:app-api:jar UP-TO-DATE\n> Task :modules:ai-backend:compileJava UP-TO-DATE\n> Task :modules:gpu-bridge:compileJava UP-TO-DATE\n> Task :modules:app-agent:compileJava UP-TO-DATE\n> Task :modules:ai-backend:classes UP-TO-DATE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:ai-backend:jar UP-TO-DATE\n> Task :modules:app-agent:jar UP-TO-DATE\n> Task :modules:gpu-bridge:jar UP-TO-DATE\n> Task :modules:app-inference:compileJava UP-TO-DATE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:app-inference:jar UP-TO-DATE\n> Task :modules:ipc-common:compileJava UP-TO-DATE\n> Task :modules:worker-core:compileJava UP-TO-DATE\n> Task :modules:ipc-common:classes UP-TO-DATE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:ipc-common:jar UP-TO-DATE\n> Task :modules:worker-core:jar UP-TO-DATE\n> Task :modules:worker-services:compileJava UP-TO-DATE\n> Task :modules:app-observability:compileJava UP-TO-DATE\n> Task :modules:app-observability:classes UP-TO-DATE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:jar UP-TO-DATE\n> Task :modules:app-observability:jar UP-TO-DATE\n> Task :modules:indexer-worker:compileJava UP-TO-DATE\n> Task :modules:indexer-worker:classes UP-TO-DATE\n> Task :modules:indexer-worker:jar UP-TO-DATE\n> Task :modules:app-services:compileJava UP-TO-DATE\n> Task :modules:app-services:classes UP-TO-DATE\n> Task :modules:app-services:jar UP-TO-DATE\n> Task :modules:app-engine:compileJava UP-TO-DATE\n> Task :modules:app-engine:classes UP-TO-DATE\n> Task :modules:app-engine:jar UP-TO-DATE\n> Task :modules:ui:compileJava UP-TO-DATE\n> Task :modules:ui:classes UP-TO-DATE\n> Task :modules:ui:jar UP-TO-DATE\n> Task :modules:ui:compileTestJava UP-TO-DATE\n> Task :modules:ui:testClasses UP-TO-DATE\n\n> Task :modules:ui:test\n\nIndexingRulesRefusalHttpTest > wrongTypeBatteryNamesFieldAndPreservesSettings() FAILED\n    org.opentest4j.AssertionFailedError at IndexingRulesRefusalHttpTest.java:103\n\n> Task :modules:ui:test FAILED\n> Task :modules:ui:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/.cache/am/rty5uvfl/tmp/before/build/reports/problems/problems-report.html\n85 actionable tasks: 1 executed, 2 from cache, 82 up-to-date\nConfiguration cache entry reused.\n\n\n5 tests completed, 1 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:ui:test'.\n> There were failing tests. See the report at: file:///home/elias/.cache/am/rty5uvfl/tmp/before/modules/ui/build/reports/tests/test/index.html\n\nBUILD FAILED in 3s\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#wrongTypeBatteryNamesFieldAndPreservesSettings",
+        "classification": "assertion",
+        "detail": "wrongTypeBatteryNamesFieldAndPreservesSettings(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: refusal message names pauseOnBattery: {\"success\":false,\"message\":\"string found, boolean expected\",\"structuredData\":{\"operationRecordId\":1,\"operationKey\":\"01a1866c-dafc-74ee-b6de-12f91e6d3c40\"},\"errorClass\":\"HANDLER_FAILURE\",\"errorCode\":\"BAD_REQUEST\",\"errorDetails"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#missingBatteryNamesFieldAndPreservesSettings",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#missingScheduleNamesFieldAndPreservesSettings",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#unknownMemberNamesFieldAndPreservesSettings",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingRulesRefusalHttpTest.java#nestedHandlerRefusalStillNamesFieldAndPreservesSettings",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:445977c7d084e013ff2c4038006d9062aa5eef5c1b9dee7cc3d67e547cc35d8b"
+}

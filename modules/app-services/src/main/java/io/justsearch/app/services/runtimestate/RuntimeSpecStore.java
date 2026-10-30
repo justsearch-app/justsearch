@@ -70,7 +70,30 @@ public final class RuntimeSpecStore {
       return OperationResult.failure("Settings changed since pause intent was prepared",
           "VERSION_CONFLICT", Map.of(), false);
     }
-    snapshot.settings().setIndexingPause(policy);
+    var previous = snapshot.settings().getIndexingPause();
+    snapshot.settings().setIndexingPause(new io.justsearch.app.api.settings.IndexingPausePolicy(
+        policy != null && policy.paused(), policy == null ? null : policy.untilEpochMs(),
+        policy == null ? null : policy.reason(), previous == null ? null : previous.schedule(),
+        previous != null && previous.pauseOnBattery()));
+    return attempts.applySettings(record, expected, snapshot.settings());
+  }
+
+  /** The rules replace only the rule pair, preserving the authored manual/recovery intent. */
+  public OperationResult applyIndexingRules(OperationPreparation prepared,
+      io.justsearch.core.scheduling.IndexingSchedule schedule, boolean pauseOnBattery,
+      OperationRecordHandle record) {
+    var expected = RuntimeIntentPreparation.validate(prepared);
+    final UiSettingsStore.Snapshot snapshot;
+    try { snapshot = capture(); }
+    catch (OperationPreparationRefused refusal) { return refusal.refusal(); }
+    if (!expected.equals(snapshot.witness())) {
+      return OperationResult.failure("Settings changed since rules were prepared",
+          "VERSION_CONFLICT", Map.of(), false);
+    }
+    var previous = snapshot.settings().getIndexingPause();
+    snapshot.settings().setIndexingPause(new io.justsearch.app.api.settings.IndexingPausePolicy(
+        previous != null && previous.paused(), previous == null ? null : previous.untilEpochMs(),
+        previous == null ? null : previous.reason(), schedule, pauseOnBattery));
     return attempts.applySettings(record, expected, snapshot.settings());
   }
 

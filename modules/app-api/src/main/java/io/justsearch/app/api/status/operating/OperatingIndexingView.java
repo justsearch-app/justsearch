@@ -13,9 +13,9 @@ import java.util.Objects;
  * describe enrichment/GPU bulk holds, not a stop of text indexing. Energy saver defers idle
  * CPU/GPU enrichment; sparse work interleaved between files may continue. Game/external GPU
  * holds defer GPU-bound idle cycles and all interleaved sparse work, including CPU sparse work;
- * CPU-only idle cycles may continue. USER_PAUSED and SETTINGS_RECOVERY instead hold every
- * processing lane: PAUSING means admitted work has not yet acknowledged its final publication,
- * PAUSED means all covered lanes are quiet. Their deadline uses epoch milliseconds; waiting work
+ * CPU-only idle cycles may continue. USER_PAUSED, SETTINGS_RECOVERY, SCHEDULE and ON_BATTERY
+ * instead hold every processing lane: PAUSING means admitted work has not yet acknowledged its final publication,
+ * PAUSED means all covered lanes are quiet. Only manual intent has an epoch-millisecond deadline; waiting work
  * remains queued. Discovery, deletion and cutover are permitted in both states.
  */
 public record OperatingIndexingView(

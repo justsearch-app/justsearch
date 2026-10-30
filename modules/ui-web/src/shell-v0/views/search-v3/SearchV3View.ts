@@ -48,6 +48,8 @@
 import { subscribeProfileSwitch } from '../../state/UserStateDocument.js';
 import { subscribeProfiles, getActiveProfileId as getWorkspaceProfileId } from '../../substrates/profiles/index.js';
 import type { Sv3RecentItem } from './Sv3Composer.js';
+import { Sv3ComposerPort } from './Sv3ComposerPort.js';
+import type { ComposerCapture } from '../../state/composerPort.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
 import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
 import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/coreInteractionShapes.js';
@@ -281,6 +283,7 @@ import {
   subscribeAgentSession,
 } from '../../state/agentSessionStore.js';
 import type { AgentSessionController } from '../../controllers/AgentSessionController.js';
+import { StopAttempt, STOP_RESPONSE_WAIT_MS } from '../../state/stopAttempt.js';
 import {
   directiveAvailable,
   dispatchRunControl,
@@ -463,8 +466,7 @@ interface HumanTask {
   scopeOwner: Sv3AskScope | null;
   filters: SearchFilterSpec;
   selection: SelectionPayload | null;
-  composer: Sv3Composer | null;
-  version: number | undefined;
+  draft: ComposerCapture;
   epoch: number;
   ownsComposer: boolean;
   revoked: boolean;
@@ -1072,7 +1074,7 @@ export class SearchV3View extends JfElement {
   private readonly recordReads = new Map<string, AbortController>();
   /** A local terminal can precede the Engine's journal and checkpoint writes. */
   private readonly pendingRunRecords = new Map<string, {
-    local: Sv3RunLocal; runId: string; doneGraceUntil?: number;
+    local: Sv3RunLocal; runId: string; conversationId: string; doneGraceUntil?: number;
   }>();
   private readonly announcedStops = new Set<string>();
   private recordRetryTimer: number | null = null;
@@ -1215,7 +1217,7 @@ export class SearchV3View extends JfElement {
   /** ACK the next current snapshot before replacement/retirement; never grow a third slot. */
   private persistDraft(next: Sv3RecoveryDraft, keepCurrent = false, leaving?: Sv3RecoveryDraft, retired?: Sv3RecoveryDraft): boolean {
     if (!this.recoveryOpened) this.openRecovery();
-    const composer = this.composer, version = composer?.draftVersion;
+    const draft = this.composerDraft.snapshot();
     const revision = this.preparationRevision, place = this.humanPlace(), text = this.currentDraft();
     const previous = this.recoveryPayload();
     const retained = keepCurrent ? [leaving ?? previous.drafts[0]!, ...previous.drafts.slice(1)] : previous.drafts.slice(1);
@@ -1227,7 +1229,7 @@ export class SearchV3View extends JfElement {
     }
     const payload: Sv3Recovery = { version: 2, task: previous.task, drafts };
     if (!this.saveRecoveryPayload(payload)) return false;
-    if (!this.isConnected || this.composer !== composer || composer?.draftVersion !== version
+    if (!this.isConnected || !draft.port.isCurrent(draft)
       || this.preparationRevision !== revision || this.humanPlace() !== place || this.currentDraft() !== text) {
       this.recoveryError = 'The draft or its settings changed while recovery was being saved. Current text is kept; review again.';
       this.requestUpdate(); return false;
@@ -1239,13 +1241,12 @@ export class SearchV3View extends JfElement {
   private reviewDraft(search: boolean): void {
     const preparation = search ? { kind: 'search' as const } : this.draftProposal;
     if (!this.draftReview || !this.preparationUsable(preparation)) return;
-    const composer = this.composer;
-    const version = composer?.draftVersion;
+    const draft = this.composerDraft.snapshot();
     const revision = this.preparationRevision;
     const place = this.humanPlace();
     const summary = this.preparationSummary(preparation);
     if (!this.persistDraft({ place, text: this.recoveryText(this.currentDraft()), preparation })) return;
-    if (!this.isConnected || this.composer !== composer || composer?.draftVersion !== version
+    if (!this.isConnected || !draft.port.isCurrent(draft)
       || this.preparationRevision !== revision || this.humanPlace() !== place
       || this.preparationSummary(preparation) !== summary) return;
     this.revokeHumanTask();
@@ -1259,12 +1260,11 @@ export class SearchV3View extends JfElement {
   }
 
   private acknowledgePreparation(preparation: Sv3Preparation): boolean {
-    const composer = this.composer;
-    const version = composer?.draftVersion;
+    const draft = this.composerDraft.snapshot();
     const revision = this.preparationRevision;
     const place = this.humanPlace();
     if (!this.persistDraft({ place, text: this.recoveryText(this.currentDraft()), preparation })) return false;
-    return this.isConnected && this.composer === composer && composer?.draftVersion === version
+    return this.isConnected && draft.port.isCurrent(draft)
       && this.preparationRevision === revision && this.humanPlace() === place;
   }
 
@@ -1409,8 +1409,8 @@ export class SearchV3View extends JfElement {
     }
     if (payload.task !== null) {
       this.humanTask = {
-        saved: payload.task, question: '', scope: null, scopeOwner: null, filters: {}, selection: null, composer: null,
-        version: undefined, epoch: this.humanEpoch, ownsComposer: false, revoked: true, abandoned: true,
+        saved: payload.task, question: '', scope: null, scopeOwner: null, filters: {}, selection: null,
+        draft: this.composerDraft.snapshot(), epoch: this.humanEpoch, ownsComposer: false, revoked: true, abandoned: true,
         restored: true, context: null, refusal: null, retryAt: 0,
       };
     }
@@ -1448,7 +1448,7 @@ export class SearchV3View extends JfElement {
   private humanOwned(task: HumanTask): boolean {
     return this.isConnected && this.humanTask === task && !task.revoked && !task.restored
       && this.humanEpoch === task.epoch && this.sessions.activeId === task.saved.target
-      && this.composer === task.composer && this.composer?.draftVersion === task.version;
+      && task.draft.port.isCurrent(task.draft);
   }
 
   private humanUnavailable(shape: RecoveryShape, continuation = false): string {
@@ -1472,8 +1472,8 @@ export class SearchV3View extends JfElement {
         effort: this.effort, delivery: 'unaccepted' },
       filters: filters ?? (shape === SV3_ASK_SHAPE_ID && scope === null && selection === null ? structuredClone(getFilters()) : {}),
       question, scope: scope === null ? null : { paths: [...scope.paths] }, scopeOwner: scope,
-      selection: selection === null ? null : structuredClone(selection), composer: this.composer,
-      version: this.composer?.draftVersion, epoch: this.humanEpoch, ownsComposer,
+      selection: selection === null ? null : structuredClone(selection), draft: this.composerDraft.snapshot(),
+      epoch: this.humanEpoch, ownsComposer,
       revoked: false, abandoned: false, restored: false, context: null, refusal: null, retryAt: 0,
     };
     // Reserve before context waits or forks. A failed ACK never sacrifices live input or old bytes.
@@ -1644,13 +1644,7 @@ export class SearchV3View extends JfElement {
    * would re-attach a run the reader has since halted.
    */
   private reattachChecked = false;
-  /**
-   * The draft restored from storage before the composer existed to receive it. `DraftPersistence`
-   * rehydrates during `hostConnected`, which is BEFORE the first render, so the value is parked here
-   * and applied on the update that first creates the composer.
-   */
-  private draftSeed = '';
-  private draftSeedPending = false;
+  private readonly composerDraft = new Sv3ComposerPort(() => this.composer);
   /** The in-flight ask's abort handle; null exactly when no response is streaming. */
   private askAbort: AbortController | null = null;
   /** The reader's Stop for that ask: the Engine is asked to end the turn, and its stream says how. */
@@ -1722,8 +1716,8 @@ export class SearchV3View extends JfElement {
   private readonly placeDrafts = new Map<string, { text: string; preparation: Sv3Preparation | null; review: boolean }>();
 
   /** Only a live edit establishes ownership; restored text and equal strings do not. */
-  private liveDraftOwner: { id: string; composer: Sv3Composer; version: number } | null = null;
-  private removalDraft: { id: string; composer: Sv3Composer; version: number } | null = null;
+  private liveDraftOwner: { id: string; draft: ComposerCapture } | null = null;
+  private removalDraft: { id: string; draft: ComposerCapture } | null = null;
   private removalConfirmation: AbortController | null = null;
   private removing = false;
   private readonly onOtherWindowStorage = () => { this.removalDraft = null; this.liveDraftOwner = null; };
@@ -1798,7 +1792,7 @@ export class SearchV3View extends JfElement {
 
   /** The draft as it stands, wherever it currently lives — the composer owns it once it exists. */
   private currentDraft(): string {
-    return this.composer?.draft ?? this.draftSeed;
+    return this.composerDraft.read();
   }
 
   override connectedCallback(): void {
@@ -2236,13 +2230,7 @@ export class SearchV3View extends JfElement {
     if (changed.has('composerState')) this.publishOcclusion();
     // The restored draft reaches the composer on the first update that produced one. Once only: a
     // later re-application would clobber what the reader has typed since.
-    if (this.draftSeedPending) {
-      const composer = this.composer;
-      if (composer !== null) {
-        this.draftSeedPending = false;
-        composer.draft = this.draftSeed;
-      }
-    }
+    this.composerDraft.flushSeed();
     // Tempdoc 610 §K — keep the OPEN inspector current. Its subject is "what the last turn sent", so
     // a new turn, a moved floor or a hidden turn changes it; a drawer left showing the previous
     // answer's prompt would be the stalest possible answer to the one question it exists to answer.
@@ -2404,26 +2392,57 @@ export class SearchV3View extends JfElement {
     const abort = new AbortController();
     this.recordReads.set(conversationId, abort);
     let failed = false;
+    const stopping = this.agentController();
+    const timer = stopping?.stopAttempt?.intent
+      && (stopping.runConversationId ?? stopping.conversationId) === conversationId
+      ? setTimeout(() => abort.abort(), STOP_RESPONSE_WAIT_MS) : undefined;
     const record = await fetchUnifiedThread(this.apiBase, conversationId, abort.signal, () => {
       failed = true;
-    });
+    }).finally(() => clearTimeout(timer));
     // Reads supersede only their own conversation; a pending Stop can settle after navigation.
     if (abort.signal.aborted) return false;
     this.recordReads.delete(conversationId);
     if (this.sessions.activeId === conversationId) this.recordNotice = failed;
     if (!failed) {
+      const ctrl = this.agentController();
+      if (ctrl?.stopAttempt?.intent && (ctrl.runConversationId ?? ctrl.conversationId) === conversationId) {
+        const lifecycle = record.lifecycles.find((row) => row.sessionId === ctrl.sessionId);
+        if (lifecycle) ctrl.reconcileRunLifecycle(lifecycle.sessionId, lifecycle.state);
+      }
+      // Navigation detaches the local handle. Its addressed turn still follows its record.
+      for (const { local, runId, conversationId: recordConversationId } of this.pendingRunRecords.values()) {
+        if (recordConversationId !== conversationId || this.run === local) continue;
+        const state = record.lifecycles.find((row) => row.sessionId === runId)?.state;
+        if (state !== 'CANCELLED' && state !== 'DONE' && state !== 'ERROR') continue;
+        const turn = sessionById(this.sessions, local.sessionId)?.turns.find((t) => t.id === local.turnId);
+        if (turn?.status !== 'streaming') continue;
+        this.sessions = settleAgentTurn(this.sessions, local,
+          state === 'CANCELLED' ? 'halted' : state === 'DONE' ? 'complete' : 'failed',
+          turn.toolCalls, Date.now(), '', turn.disposition);
+      }
+      const failedRun = ctrl?.stopAttempt?.intent && ctrl.terminalOutcome === 'failed'
+        && (ctrl.runConversationId ?? ctrl.conversationId) === conversationId ? this.run : null;
+      const failedTurn = failedRun === null ? undefined
+        : sessionById(this.sessions, failedRun.sessionId)?.turns.find((turn) => turn.id === failedRun.turnId);
       this.sessions = applySv3Record(
         this.sessions,
         conversationId,
         projectSv3RecordTurns(record.events),
       );
+      // The lifecycle can confirm failure before an ERROR item reaches the record. Preserve the
+      // live receipt across that partial snapshot without changing the saved-record projection.
+      if (failedRun !== null && failedTurn?.status === 'failed') {
+        this.sessions = { ...this.sessions, sessions: this.sessions.sessions.map((session) =>
+          session.id !== failedRun.sessionId ? session : { ...session, turns: session.turns.map((turn) =>
+            turn.id !== failedRun.turnId ? turn : { ...turn, status: 'failed', detail: failedTurn.detail }) }) };
+      }
       const stopIds = new Set(record.events
         .filter((e) => sv3RecordItemStopsRun(e.kind.toLowerCase(), e.attributes))
         .map((e) => e.id));
       for (const [id, pending] of this.pendingRunRecords) {
         const { local, runId } = pending;
-        if (local.sessionId !== conversationId) continue;
-        const turn = sessionById(this.sessions, conversationId)?.turns.find((t) => t.id === local.turnId);
+        if (pending.conversationId !== conversationId) continue;
+        const turn = sessionById(this.sessions, local.sessionId)?.turns.find((t) => t.id === local.turnId);
         if (turn === undefined) {
           this.pendingRunRecords.delete(id);
           continue;
@@ -2436,7 +2455,8 @@ export class SearchV3View extends JfElement {
         const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
         if (state === 'DONE' && stop === undefined && !local.haltRequested) {
           pending.doneGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
-        } else {
+        } else if (!local.haltRequested || state === 'DONE') {
+          // Our Halt still needs its saved confirmation when completion wins the race.
           delete pending.doneGraceUntil;
         }
         // A saved Stop can precede the final checkpoint; keep reading through both edges.
@@ -2458,7 +2478,7 @@ export class SearchV3View extends JfElement {
   private retireExpiredRecordReads(): void {
     const now = Date.now();
     for (const [id, pending] of this.pendingRunRecords) {
-      if (!pending.local.haltRequested && pending.doneGraceUntil !== undefined
+      if (pending.doneGraceUntil !== undefined
         && now >= pending.doneGraceUntil) this.pendingRunRecords.delete(id);
     }
   }
@@ -2470,7 +2490,7 @@ export class SearchV3View extends JfElement {
     this.recordRetryTimer = window.setTimeout(() => {
       this.recordRetryTimer = null;
       this.retireExpiredRecordReads();
-      for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+      for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.conversationId))) {
         void this.refreshRecord(id);
       }
     }, 500);
@@ -2547,7 +2567,7 @@ export class SearchV3View extends JfElement {
 
   private retryContextOnReconnect = (): void => {
     this.clearRecordRetry();
-    for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+    for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.conversationId))) {
       void this.refreshRecord(id);
     }
     this.clearContextRetry();
@@ -3121,7 +3141,7 @@ export class SearchV3View extends JfElement {
     this.sessions = focusSession(this.sessions, id, now);
     if (task !== undefined) {
       task.saved.target = id;
-      task.version = this.composer?.draftVersion;
+      task.draft = { ...task.draft, edit: this.composerDraft.snapshot().edit };
       this.saveRecovery(task);
     }
     this.claimConversation(id);
@@ -3868,7 +3888,7 @@ export class SearchV3View extends JfElement {
     const composer = this.composer;
     if (composer !== null) {
       const id = this.search.showing ? null : this.sessions.activeId;
-      this.liveDraftOwner = id === null ? null : { id, composer, version: composer.draftVersion };
+      this.liveDraftOwner = id === null ? null : { id, draft: this.composerDraft.snapshot() };
     }
     if (this.retiredHandoffText !== null && detail.text !== this.retiredHandoffText) {
       this.clearRetiredHandoff();
@@ -3906,13 +3926,7 @@ export class SearchV3View extends JfElement {
   /** Put text in the composer — or, before its first render, where the composer will take it from. */
   private writeDraft(text: string): void {
     if (this.retiredHandoffText !== null && text !== this.retiredHandoffText) this.clearRetiredHandoff();
-    const composer = this.composer;
-    if (composer !== null) {
-      composer.draft = text;
-      return;
-    }
-    this.draftSeed = text;
-    this.draftSeedPending = true;
+    this.composerDraft.replace(text);
   }
 
   /** Enter in Search mode, or the palette's search: the full pass, now. */
@@ -4580,8 +4594,7 @@ export class SearchV3View extends JfElement {
       modelAnswer ? null : handoff?.selection ?? null, options.turnAction !== true, options.record ?? null, options.authored);
     if (task === null || this.humanTask !== task) return;
     if (options.task && !this.humanOwned(task)) return;
-    const composer = task.composer;
-    const draftVersion = task.version;
+    const draft = task.draft;
     const sessionId = this.sessions.activeId;
     if (sessionId !== null && this.contextAskPending.has(sessionId)) return;
     let context: ReturnType<typeof sv3FollowUpContext> = [];
@@ -4616,8 +4629,7 @@ export class SearchV3View extends JfElement {
     if (!this.saveRecovery(task) || !this.isConnected || this.sessions.activeId !== sessionId
       || this.humanTask !== task || task.abandoned || this.humanUnavailable(shapeId, options.continuation) !== '') return;
     if (options.task && !this.humanOwned(task)) return;
-    if (!modelAnswer && task.ownsComposer && this.composer === composer
-      && composer?.draftVersion === draftVersion && this.preparedHandoff === handoff) {
+    if (!modelAnswer && task.ownsComposer && draft.port.isCurrent(draft) && this.preparedHandoff === handoff) {
       this.preparedHandoff = null;
       this.handoffNotice = ''; this.handoffBlocked = false;
     }
@@ -4630,18 +4642,18 @@ export class SearchV3View extends JfElement {
     // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
     // store keeps no scope with a turn, so after reload its original scope is unknown and Retry/Edit must refuse.
     if (shapeId === SV3_ASK_SHAPE_ID) this.search.recordTurnScope(ref.turnId, task.scope, task.filters);
-    if (schema === undefined && task.ownsComposer && this.composer === composer && composer?.draftVersion === draftVersion
+    if (schema === undefined && task.ownsComposer && draft.port.isCurrent(draft)
       && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
     if (!modelAnswer) this.placeScopes.delete(ref.sessionId);
     this.claimConversation(ref.sessionId);
     // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
-    if (task.ownsComposer && schema === undefined && this.composer === composer && composer?.draftVersion === draftVersion) {
+    if (task.ownsComposer && schema === undefined && draft.port.isCurrent(draft)) {
       this.assigningHumanDraft = true;
-      try { composer?.clearDraft(); } finally { this.assigningHumanDraft = false; }
-      task.version = composer?.draftVersion;
+      try { draft.port.clearIf(draft); } finally { this.assigningHumanDraft = false; }
+      task.draft = draft.port.snapshot();
     }
     this.saveRecovery(task);
-    const sentDraftVersion = composer?.draftVersion;
+    const sentDraft = draft.port.snapshot();
     void this.setComposerState('docked');
 
     const abort = new AbortController();
@@ -4656,20 +4668,19 @@ export class SearchV3View extends JfElement {
     // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
     const dispatchId = crypto.randomUUID();
     const reasoning = new ReasoningController(() => this.requestUpdate());
-    let stopAsked = false;
+    const stopAttempt = new StopAttempt();
     const stop = (): void => {
-      if (stopAsked) return;
-      stopAsked = true;
+      if (stopAttempt.pending || stopAttempt.outcome === 'accepted') return;
+      stopAttempt.latch();
       this.revokeHumanTask();
       this.saveRecovery();
       const ask = this.liveAsks.get(ref.sessionId);
       if (ask === undefined) return;
       ask.stopping = { turnId: ref.turnId, state: 'stopping' };
       this.syncActiveAsk();
-      void sv3StopAsk(this.apiBase, ref.sessionId, dispatchId).then((taken) => {
-        if (taken || this.liveAsks.get(ref.sessionId)?.abort !== abort) return;
+      void stopAttempt.deliver((signal) => sv3StopAsk(this.apiBase, ref.sessionId, dispatchId, signal)).then(() => {
+        if (stopAttempt.outcome === 'accepted' || this.liveAsks.get(ref.sessionId)?.abort !== abort) return;
         // Refused or unanswered: the answer goes on, and Stop can be pressed again.
-        stopAsked = false;
         ask.stopping = { turnId: ref.turnId, state: 'failed' };
         this.syncActiveAsk();
       });
@@ -4776,11 +4787,10 @@ export class SearchV3View extends JfElement {
           this.sessions = setTurnRewrite(this.sessions, ref, standalone);
         },
         onDone: (usage) => {
-          if (schema !== undefined && task.ownsComposer && this.composer === composer
-            && composer?.draftVersion === draftVersion && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
-          if (schema !== undefined && task.ownsComposer && this.composer === composer && composer?.draftVersion === draftVersion) {
+          if (schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft) && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
+          if (schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft)) {
             this.assigningHumanDraft = true;
-            try { composer?.clearDraft(); } finally { this.assigningHumanDraft = false; }
+            try { draft.port.clearIf(draft); } finally { this.assigningHumanDraft = false; }
           }
           this.retireHumanTask(task);
           // Tempdoc 610 §E.4 — the occupancy this turn reported, recorded on the CONVERSATION that
@@ -4838,7 +4848,7 @@ export class SearchV3View extends JfElement {
           settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
           void loadConversations();
           void this.refreshRecord(ref.sessionId);
-          if (handoff !== null && this.sessions.activeId === ref.sessionId && task.ownsComposer && this.composer === composer && composer?.draftVersion === sentDraftVersion) {
+          if (handoff !== null && this.sessions.activeId === ref.sessionId && task.ownsComposer && sentDraft.port.isCurrent(sentDraft)) {
             this.preparedHandoff = handoff;
             this.search.prepare(scope);
             this.assigningHumanDraft = true;
@@ -5018,7 +5028,7 @@ export class SearchV3View extends JfElement {
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
     this.claimConversation(ref.sessionId);
-    this.composer?.clearDraft();
+    this.composerDraft.clear();
     void this.setComposerState('docked');
 
     const ctrl = getAgentSessionController(this.apiBase);
@@ -5065,20 +5075,26 @@ export class SearchV3View extends JfElement {
     const ctrl = this.steerableRun;
     if (ctrl === null) return;
     if (!this.persistDraft({ place: this.humanPlace(), text: '', preparation: this.currentPreparation() })) return;
-    this.composer?.clearDraft();
+    this.composerDraft.clear();
     void dispatchRunControl(ctrl, { kind: 'interject', text });
   }
 
-  /**
-   * The reader's stop. Recorded FIRST and dispatched second, because the record of the decision is
-   * what makes `halted` an honest receipt outcome — and because a stop pressed before the stream
-   * opened cannot be delivered yet (the seam's predicate refuses a halt on a run with no abort handle
-   * yet). Remembering it means the next update delivers it, instead of the decision being dropped.
-   */
+  /** Ask and Halt share the same pending and unconfirmed presentation. */
+  private runStopping(): Sv3StopState | null {
+    const ctrl = this.agentController();
+    const local = this.run;
+    if (!ctrl?.stopAttempt?.intent || ctrl.terminalOutcome !== null || local === null
+        || local.sessionId !== this.sessions.activeId) return null;
+    return { turnId: local.turnId, state: ctrl.stopAttempt.outcome === 'refused'
+      || ctrl.stopAttempt.outcome === 'unknown' || ctrl.stopObservationLost ? 'failed' : 'stopping' };
+  }
+
+  /** Latch before dispatch; the controller keeps observing until the backend ends this run. */
   private haltRun(): void {
     const local = this.run;
     if (local === null) return;
     local.haltRequested = true;
+    local.haltDispatched = false;
     this.deliverHalt();
     this.requestUpdate();
   }
@@ -5087,10 +5103,10 @@ export class SearchV3View extends JfElement {
     const ctrl = this.agentController();
     const local = this.run;
     if (ctrl === null || local === null || local.haltDispatched) return;
+    local.haltDispatched = true;
     void dispatchRunControl(ctrl, { kind: 'halt' }).then((result) => {
-      // Only an ACCEPTED halt closes the door; a lifecycle refusal leaves the request pending so the
-      // next update can try again, and does so without a retry storm.
-      if ((result as RunControlRefusal | undefined)?.refused !== true) local.haltDispatched = true;
+      // A lifecycle refusal may be retried by the next update. HTTP failures require another press.
+      if ((result as RunControlRefusal | undefined)?.refused === true) local.haltDispatched = false;
     });
   }
 
@@ -5194,6 +5210,20 @@ export class SearchV3View extends JfElement {
       // A run this window is already rendering is a run it must never ALSO adopt as presence — the
       // id is only knowable once the server names it, which is here rather than at dispatch.
       if (ctrl.sessionId !== null) this.adoptedRunIds.add(ctrl.sessionId);
+      if (ctrl.stopAttempt?.intent && !local.haltRequested) local.haltRequested = true;
+      const recordConversationId = ctrl.runConversationId ?? ctrl.conversationId;
+      if (local.haltRequested && ctrl.sessionId !== null && ctrl.terminalOutcome === null
+          && recordConversationId !== null) {
+        local.stopRecordGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
+        const pending = this.pendingRunRecords.get(local.turnId);
+        if (!pending && Date.now() < local.stopRecordGraceUntil) {
+          this.pendingRunRecords.set(local.turnId, {
+            local, runId: ctrl.sessionId, conversationId: recordConversationId,
+            doneGraceUntil: local.stopRecordGraceUntil,
+          });
+          void this.refreshRecord(recordConversationId);
+        }
+      }
       const feed = projectSv3RunFeed(ctrl, local.entryStart);
       this.keepUnconfirmedSteerNotes(local.turnId, sv3UnconfirmedSteerNotes(ctrl, local.entryStart, feed));
       const status = sv3RunSessionStatus(ctrl, feed);
@@ -5233,6 +5263,7 @@ export class SearchV3View extends JfElement {
    * gate stays held until the raise lands, so without it one gate would fire a raise per frame.
    */
   private maybeAutoContinue(ctrl: AgentSessionController, local: Sv3RunLocal): void {
+    if (ctrl.stopAttempt?.intent) return;
     if (ctrl.budgetGate === null) {
       // The gate cleared — re-arm for the NEXT one.
       this.budgetGateHandled = false;
@@ -5335,7 +5366,8 @@ export class SearchV3View extends JfElement {
     this.sessions = settleAgentTurn(
       this.sessions,
       { sessionId: local.sessionId, turnId: local.turnId },
-      sv3RunOutcome(feed, local.haltRequested),
+      ctrl?.terminalOutcome === 'failed' ? 'failed' : sv3RunOutcome(feed, ctrl?.terminalOutcome === 'cancelled'
+        || (ctrl?.terminalOutcome === 'completed' && local.haltRequested && ctrl.stopAttempt.outcome === 'accepted' && ctrl.answerEvidenceRunId === ctrl.sessionId)),
       feed.toolCallCount,
       Date.now(),
       '',
@@ -5346,13 +5378,18 @@ export class SearchV3View extends JfElement {
       // cut-short badge.
       terminalBelongsToThisRun && ctrl !== null ? ctrl.terminalDisposition : null,
     );
-    if (local.acknowledged && ctrl?.sessionId != null) {
-      this.pendingRunRecords.set(local.turnId, { local, runId: ctrl.sessionId });
+    const recordConversationId = ctrl?.runConversationId ?? ctrl?.conversationId;
+    if (local.acknowledged && ctrl?.sessionId != null && recordConversationId != null) {
+      this.pendingRunRecords.set(local.turnId, {
+        local, runId: ctrl.sessionId, conversationId: recordConversationId,
+        ...(local.haltRequested
+          ? { doneGraceUntil: Date.now() + COMPLETED_RECORD_GRACE_MS } : {}),
+      });
     }
     // The live feed was ATTENTION; the record is what survives it. Refreshing at the terminal is what
     // makes the yield happen (inventory D1): the settled turn re-renders from the canonical record's
     // interleaved items instead of vanishing with the controller that produced them.
-    void this.refreshRecord(local.sessionId);
+    if (ctrl?.sessionId != null && recordConversationId != null) void this.refreshRecord(recordConversationId);
   }
 
   /** A typed prompt resolved by its OWN control — never by anything typed into the composer. */
@@ -5608,7 +5645,7 @@ export class SearchV3View extends JfElement {
     // Capture before discovery, not when its reads eventually return.
     const owner = this.liveDraftOwner;
     const originalDraft = owner !== null && owner.id === this.sessions.activeId
-      && owner.composer === this.composer && owner.version === owner.composer.draftVersion ? owner : null;
+      && owner.draft.port.isCurrent(owner.draft) ? owner : null;
     this.removalDraft = null;
     let tree: DeleteTreeEntry[] = [];
     const report = (result: DeleteCascadeResult) => {
@@ -5642,8 +5679,7 @@ export class SearchV3View extends JfElement {
     for (const gone of ids) {
       const owned = this.removalDraft;
       if (owned?.id === gone) {
-        if (this.isConnected && this.sessions.activeId === gone && this.composer === owned.composer
-          && owned.composer.draftVersion === owned.version) owned.composer.clearDraft();
+        if (this.isConnected && this.sessions.activeId === gone && owned.draft.port.isCurrent(owned.draft)) owned.draft.port.clearIf(owned.draft);
         this.removalDraft = null;
       }
       this.placeScopes.delete(gone);
@@ -6005,7 +6041,7 @@ export class SearchV3View extends JfElement {
           .continuationVersions=${this.continuationVersions()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
-          .stopping=${this.askStopping}
+          .stopping=${this.askStopping ?? this.runStopping()}
           .checkingTurnId=${this.askCheckingTurnId}
           data-testid="sv3-main"
         ></jf-sv3-main>

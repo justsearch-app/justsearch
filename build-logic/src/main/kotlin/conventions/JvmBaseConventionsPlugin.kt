@@ -154,7 +154,11 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
               .map { it.split('\t')[2] }
               .forEach { identifier ->
                 filter.excludeTestsMatching(identifier)
-                logger.lifecycle("SKIP $reason: $identifier")
+                if (reason == "pre-push exclusion") {
+                  logger.info("SKIP $reason: $identifier")
+                } else {
+                  logger.lifecycle("SKIP $reason: $identifier")
+                }
               }
         }
         if (!includeRealDrives && name == "integrationTest") {

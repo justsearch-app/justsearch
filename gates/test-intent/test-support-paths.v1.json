@@ -6,6 +6,7 @@
     "modules/ui-web/src/api/contract/contractEventsBridge.ts",
     "modules/ui-web/src/api/lifecycleState.ts",
     "modules/ui-web/src/shell-v0/aggregate-substrate/behavioralPass8.ts",
+    "modules/ui-web/src/shell-v0/controllers/testing/HaltBackend.ts",
     "modules/ui-web/src/shell-v0/plugin-api/testHostApi.ts",
     "modules/ui-web/src/shell-v0/renderers/resourceViewContract.ts",
     "modules/ui-web/src/shell-v0/substrates/profiles/diff.ts",

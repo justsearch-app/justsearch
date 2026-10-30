@@ -27,6 +27,11 @@ class HarnessTest(unittest.TestCase):
             mock = patch.object(module, key, value)
             mock.start()
             self.addCleanup(mock.stop)
+        # Ownership/launch fixtures must not wait on another session's host RAM.
+        # test_memory.py covers the memory guard with synthetic procfs readings.
+        memory = patch.object(vm, 'wait_host_memory')
+        memory.start()
+        self.addCleanup(memory.stop)
         mock = patch.dict(os.environ, {'QUAL_OWNER': 'test-owner'})
         mock.start()
         self.addCleanup(mock.stop)
@@ -149,7 +154,7 @@ class HarnessTest(unittest.TestCase):
 
     def test_all_ports_block_both_os_before_any_write(self):
         for spec in vm.OS.values():
-            for port in (spec['ssh'], spec['qmp']):
+            for port in (spec['ssh'], spec['legacy_qmp']):
                 for guest in vm.OS:
                     with self.subTest(port=port, guest=guest):
                         before = self.snapshot()

@@ -159,6 +159,8 @@ public final class OperationHandlerRegistrations {
     handlers.register(CoreOperationCatalog.PAUSE_INDEXING,
         new io.justsearch.app.services.registry.operations.handlers.IndexingPauseHandler(
             runtimeSpecStoreSupplier, true));
+    handlers.register(CoreOperationCatalog.SET_INDEXING_RULES,
+        new io.justsearch.app.services.registry.operations.handlers.IndexingRulesHandler(runtimeSpecStoreSupplier));
     handlers.register(CoreOperationCatalog.RESUME_INDEXING,
         new io.justsearch.app.services.registry.operations.handlers.IndexingPauseHandler(
             runtimeSpecStoreSupplier, false));

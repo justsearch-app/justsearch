@@ -17,19 +17,26 @@ public final class WatchedRootsFormat {
   /** Reads declarations without probing their volumes or requiring the folders to exist. */
   public static java.util.Set<java.nio.file.Path> declaredPaths(java.nio.file.Path dataDir)
       throws java.io.IOException {
+    return declaredCollections(dataDir).keySet();
+  }
+
+  /** Authored labels, including null for a declared default root; no watch or volume probe. */
+  public static java.util.Map<java.nio.file.Path, String> declaredCollections(java.nio.file.Path dataDir)
+      throws java.io.IOException {
     var document = readDocument(dataDir);
-    if (document == null) return java.util.Set.of();
+    if (document == null) return java.util.Map.of();
     boolean object = document.isObject();
     var entries = object ? document.get("roots") : document;
-    var paths = new java.util.HashSet<java.nio.file.Path>();
+    var paths = new java.util.LinkedHashMap<java.nio.file.Path, String>();
     for (var entry : entries) {
       var path = object ? entry.get("path") : entry;
       if (path == null || !path.isString() || path.stringValue().isBlank()) {
         throw new java.io.IOException("Invalid watched-roots declaration");
       }
-      paths.add(java.nio.file.Path.of(path.stringValue()).toAbsolutePath().normalize());
+      paths.put(java.nio.file.Path.of(path.stringValue()).toAbsolutePath().normalize(),
+          object ? entry.path("collection").asText(null) : null);
     }
-    return java.util.Set.copyOf(paths);
+    return java.util.Collections.unmodifiableMap(paths);
   }
 
   /** Durable removal intent survives a stop before the Worker has journalled its deletion. */

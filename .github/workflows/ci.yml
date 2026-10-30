@@ -893,6 +893,23 @@ jobs:
             build/ci/ui-a11y/gate-report.log
           if-no-files-found: warn
 
+      - name: Agent run fixture flows through the real UI
+        run: |
+          set -euo pipefail
+          mkdir -p build/ci/ui-run-flows
+          for step in sv3-run-activity-steering sv3-run-budget sv3-run-approval sv3-run-approval-failure sv3-run-halt sv3-run-halt-failure sv3-run-halt-timeout sv3-ask-stop-late-response; do
+            python -m jseval ui-shot "$step" --fixtures --no-demo --output-dir build/ci/ui-run-flows 2>&1 \
+              | tee "build/ci/ui-run-flows/$step.log"
+          done
+
+      - name: Upload failed agent run flow evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: agent-run-flow-failures
+          path: build/ci/ui-run-flows/
+          if-no-files-found: warn
+
   license-and-notices:
     needs: changes
     if: needs.changes.outputs.license != 'false'

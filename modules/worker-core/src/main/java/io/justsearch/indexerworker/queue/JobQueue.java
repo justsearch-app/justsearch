@@ -23,6 +23,10 @@ import io.justsearch.indexerworker.ingest.IngestionOutcome;
  */
 public interface JobQueue extends Closeable {
 
+  /** Declared ownership for hintless maintenance admissions; recorded plans remain authoritative. */
+  default void useDeclaredCollectionRoots(
+      java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> roots) {}
+
   /**
    * Batch-exit return of exact issued claims that have no pending commit owner. Implementations
    * must preserve replacements, terminal rows, retry budgets and forged/unissued identities.

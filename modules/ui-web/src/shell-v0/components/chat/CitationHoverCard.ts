@@ -9,6 +9,7 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../../primitives/JfElement.js';
+import { displayPassageExcerpt } from './passageExcerptPresentation.js';
 // Tempdoc 565 §15.A — the ONE grounding-tier authority (was a forked `scoreLabel` here).
 import { groundingLabel } from './evidenceProjection.js';
 
@@ -93,7 +94,7 @@ export class CitationHoverCard extends JfElement {
       <div class="card" style="transform: translate(${this.x}px, ${this.y}px)">
         <div class="doc-name">${this.data.headingText || docName}</div>
         ${this.data.excerpt
-          ? html`<div class="excerpt">${this.data.excerpt}</div>`
+          ? html`<div class="excerpt">${displayPassageExcerpt(this.data.excerpt)}</div>`
           : nothing}
         <div class="score">${scoreLabel} match · ${Math.round(this.data.score * 100)}%</div>
       </div>

@@ -5,6 +5,7 @@ import { render } from 'lit';
 import { renderWhyDisclosure } from '../../components/searchResults/whyThisResult.js';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
+import type { Sv3Composer } from './Sv3Composer.js';
 import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
@@ -412,6 +413,27 @@ it('HO8 a locked conversation is left intact by incoming preparation', async () 
   expect(c.shadowRoot!.textContent).toContain('chosen.md'); expect(dispatches()).toHaveLength(0);
   expect(fetchMock.mock.calls.filter(call => (call[1] as RequestInit | undefined)?.method === 'POST')).toHaveLength(0);
 });
+it.each(['unchanged', 'identical assignment', 'A-B-A', 'newer input', 'composition start'])(
+  'CP5 a failed Ask handoff restores only the unchanged post-send draft: %s', async change => {
+    const previous = fetchMock.getMockImplementation()! as (url: unknown, init?: RequestInit) => Promise<unknown>;
+    let release!: (response: Response) => void;
+    fetchMock.mockImplementation(async (url: unknown, init?: RequestInit) =>
+      String(url).includes('/api/chat/dispatch') ? new Promise<Response>(resolve => { release = resolve; }) : previous(url, init));
+    const view = await mount();
+    await navigate({ query: 'Only summarize risks', forceShapeId: 'core.summarize', docIds: ['deleted.md'] });
+    await drain(view); await send(view);
+    const c = await composer(view) as Sv3Composer;
+    const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!;
+    expect(input.value).toBe('');
+    if (change === 'identical assignment') c.draft = '';
+    if (change === 'A-B-A') { c.draft = 'B'; c.draft = ''; }
+    if (change === 'newer input') { input.value = 'newer B'; input.dispatchEvent(new Event('input')); }
+    if (change === 'composition start') input.dispatchEvent(new Event('compositionstart'));
+    release(new Response('event: error\ndata: {"errorCode":"DOC_UNAVAILABLE","error":"Cannot read selected file"}\n\n'));
+    await drain(view); await c.updateComplete;
+    expect(input.value).toBe(change === 'unchanged' ? 'Only summarize risks' : change === 'newer input' ? 'newer B' : '');
+  });
+
 it('HO13 a refused unreadable-document hand-off keeps the instruction and files', async () => {
   const previous = fetchMock.getMockImplementation()! as (url: unknown, init?: RequestInit) => Promise<unknown>;
   fetchMock.mockImplementation(async (url: unknown, init?: RequestInit) => {

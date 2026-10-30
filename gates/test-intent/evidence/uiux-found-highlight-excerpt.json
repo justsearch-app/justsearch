@@ -1,0 +1,327 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T10:15:54.190Z",
+  "revision": "0aa08cd3d0a9e1c088042f692f68b7d5746d8317",
+  "tree": "a3ba31e83b7db4d0b065361630c6a2769e288e84",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts\" \"src/shell-v0/components/chat/passageExcerptPresentation.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1799565-1793355350732.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1030
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A1 marks word prefixes, never interior substrings",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef64661e6174058a84ee55988d548fde58c39314d2780de617d37fb4ba73b594",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search presentation word matches A1 marks word prefixes, never interior substrings",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A1 treats Unicode letters and digits as words, case insensitively",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef64661e6174058a84ee55988d548fde58c39314d2780de617d37fb4ba73b594",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search presentation word matches A1 treats Unicode letters and digits as words, case insensitively",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A2 ignores every default English stopword, including in phrases",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef64661e6174058a84ee55988d548fde58c39314d2780de617d37fb4ba73b594",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search presentation word matches A2 ignores every default English stopword, including in phrases",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A3 excludes words and quoted phrases from highlighting",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef64661e6174058a84ee55988d548fde58c39314d2780de617d37fb4ba73b594",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search presentation word matches A3 excludes words and quoted phrases from highlighting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A3 separates recognized field prefixes and phrase words",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef64661e6174058a84ee55988d548fde58c39314d2780de617d37fb4ba73b594",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search presentation word matches A3 separates recognized field prefixes and phrase words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A3 follows escaped quotes, escaped exclusions and case-sensitive field names",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef64661e6174058a84ee55988d548fde58c39314d2780de617d37fb4ba73b594",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search presentation word matches A3 follows escaped quotes, escaped exclusions and case-sensitive field names",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A4 preserves literal text and safely renders untrusted query and snippet text",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef64661e6174058a84ee55988d548fde58c39314d2780de617d37fb4ba73b594",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search presentation word matches A4 preserves literal text and safely renders untrusted query and snippet text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 hides closed leading front matter in the source card, expanded preview and hover",
+      "file": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ba3142557ae095144d9fce99245783cca0e61c53f93bfffb5a6e077a2a9cf98",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search citation excerpt presentation B1 hides closed leading front matter in the source card, expanded preview and hover",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 handles an empty closed block without removing later separators",
+      "file": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ba3142557ae095144d9fce99245783cca0e61c53f93bfffb5a6e077a2a9cf98",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search citation excerpt presentation B1 handles an empty closed block without removing later separators",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 removes a closed header longer than the card budget before the card shortens it",
+      "file": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ba3142557ae095144d9fce99245783cca0e61c53f93bfffb5a6e077a2a9cf98",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search citation excerpt presentation B1 removes a closed header longer than the card budget before the card shortens it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 preserves empty, unclosed, non-leading and front-matter-only passages verbatim",
+      "file": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ba3142557ae095144d9fce99245783cca0e61c53f93bfffb5a6e077a2a9cf98",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search citation excerpt presentation B2 preserves empty, unclosed, non-leading and front-matter-only passages verbatim",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps original evidence, verification, citation identity and character anchors",
+      "file": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ba3142557ae095144d9fce99245783cca0e61c53f93bfffb5a6e077a2a9cf98",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search citation excerpt presentation B2 keeps original evidence, verification, citation identity and character anchors",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps ordinary Markdown between two leading horizontal rules",
+      "file": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ba3142557ae095144d9fce99245783cca0e61c53f93bfffb5a6e077a2a9cf98",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search citation excerpt presentation B2 keeps ordinary Markdown between two leading horizontal rules",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps a URL between two leading horizontal rules",
+      "file": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ba3142557ae095144d9fce99245783cca0e61c53f93bfffb5a6e077a2a9cf98",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search citation excerpt presentation B2 keeps a URL between two leading horizontal rules",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7959b712fd",
+    "revision": "7959b712fd0f30b76c1fb007e1556e74f7e335c2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts\" \"src/shell-v0/components/chat/passageExcerptPresentation.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1799565-1793355352997.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1030,
+        "output": "JSON report written to /tmp/test-intent-vitest-1799565-1793355352997.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A1 marks word prefixes, never interior substrings",
+        "classification": "assertion",
+        "detail": "Search presentation word matches A1 marks word prefixes, never interior substrings:  AssertionError: expected [ 'to', 'to', 'port', 'port', …(2) ] to deeply equal [ 'port', 'Invoice', 'invoice' ]\n    at /tmp/test-intent-before-8BIwqi/modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts:18:88\n    at file:///home/elias/dev/justsearch/.claude/w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A1 treats Unicode letters and digits as words, case insensitively",
+        "classification": "assertion",
+        "detail": "Search presentation word matches A1 treats Unicode letters and digits as words, case insensitively:  AssertionError: expected [ 'Éco', 'éco', 'ÉCO', '中文', …(5) ] to deeply equal [ Array(6) ]\n    at /tmp/test-intent-before-8BIwqi/modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts:22:81\n    at file:///home/elias/dev/justsearch/.claude/worktrees/js-uiux-foun"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A2 ignores every default English stopword, including in phrases",
+        "classification": "assertion",
+        "detail": "Search presentation word matches A2 ignores every default English stopword, including in phrases:  AssertionError: expected { '_$litType$': 1, …(2) } to be 'a an and are as at be but by for if i…' // Object.is equality\n    at /tmp/test-intent-before-8BIwqi/modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts:27:50\n    at file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A3 excludes words and quoted phrases from highlighting",
+        "classification": "assertion",
+        "detail": "Search presentation word matches A3 excludes words and quoted phrases from highlighting:  AssertionError: expected [ 'invoice', 'draft', 'late', …(2) ] to deeply equal [ 'invoice' ]\n    at /tmp/test-intent-before-8BIwqi/modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts:32:100\n    at file:///home/elias/dev/justsearch/.claude/worktrees/js-uiux-f"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A3 separates recognized field prefixes and phrase words",
+        "classification": "assertion",
+        "detail": "Search presentation word matches A3 separates recognized field prefixes and phrase words:  AssertionError: expected [ 'annual', 'budget' ] to deeply equal [ 'report', 'Ada', 'annual', 'budget' ]\n    at /tmp/test-intent-before-8BIwqi/modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts:39:103\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A3 follows escaped quotes, escaped exclusions and case-sensitive field names",
+        "classification": "assertion",
+        "detail": "Search presentation word matches A3 follows escaped quotes, escaped exclusions and case-sensitive field names:  AssertionError: expected [ 'invoice', 'draft', 'annual', …(2) ] to deeply equal [ 'invoice', 'draft', 'annual', …(4) ]\n    at /tmp/test-intent-before-8BIwqi/modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts:43:155\n    at file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.wordMatches.test.ts#A4 preserves literal text and safely renders untrusted query and snippet text",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 hides closed leading front matter in the source card, expanded preview and hover",
+        "classification": "assertion",
+        "detail": "Search citation excerpt presentation B1 hides closed leading front matter in the source card, expanded preview and hover:  AssertionError: expected '---\\ntitle: Search\\ntype: reference\\n…' to be '# Search\\nRead your documents.' // Object.is equality\n    at /tmp/test-intent-before-8BIwqi/modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts:37:81\n    at processTicksAndRejections (node:internal/pr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 handles an empty closed block without removing later separators",
+        "classification": "assertion",
+        "detail": "Search citation excerpt presentation B1 handles an empty closed block without removing later separators:  AssertionError: expected '---\\n---\\n\\nBody\\n---\\nLater' to be 'Body\\n---\\nLater' // Object.is equality\n    at /tmp/test-intent-before-8BIwqi/modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts:45:79\n    at file:///home/elias/dev/justsearch/.claude/worktrees/js-uiux-found/m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 removes a closed header longer than the card budget before the card shortens it",
+        "classification": "assertion",
+        "detail": "Search citation excerpt presentation B1 removes a closed header longer than the card budget before the card shortens it:  AssertionError: expected '---\\ntitle: Long header\\ntag0: value …' to contain 'Open the desktop folder'\n    at /tmp/test-intent-before-8BIwqi/modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts:73:79\n    at file:///home/elias/dev/justsearch/.claude/worktrees/js-uiux-found/m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 preserves empty, unclosed, non-leading and front-matter-only passages verbatim",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps original evidence, verification, citation identity and character anchors",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps ordinary Markdown between two leading horizontal rules",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps a URL between two leading horizontal rules",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:7b8c6c3c4b05b453ff5281882a0adf91c5ad8e6f336cbfbceb0b896630990e89"
+}

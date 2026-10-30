@@ -1,0 +1,144 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:72ba910f272805e3040d98d50e8d9f72d62ad6868338d362351336c08b5c4955"
+  },
+  "createdAt": "2026-10-29T23:20:34.144Z",
+  "revision": "9ecb962e5a395a48b536957460e77df4d91ec7ce",
+  "tree": "c030c2a499f768903c6434a66a4df87308ff0053",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot -w 5400 ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.LinuxGpuInstallTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6395
+    },
+    {
+      "command": "js-gradle-slot -w 5400 ./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.model.LinuxGpuPlanTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2189
+    },
+    {
+      "command": "js-gradle-slot -w 5400 ./gradlew :modules:ort-common:test --tests \"io.justsearch.ort.OrtCudaHelperTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2595
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxGpuInstallTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/LinuxGpuInstallTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:119619f12996e345d8ecb00111f1a9b5dc2a84a981e0489df0d1b6484dbcd3bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linuxGpuRequiresDriver570OrNewer()",
+          "status": "passed"
+        },
+        {
+          "name": "oldDriverWithoutVramStillReportsDetectedGpuAndDriverAdvice()",
+          "status": "passed"
+        },
+        {
+          "name": "downloadedRuntimeIsRestoredInPlaceAndRepairUsesIt()",
+          "status": "passed"
+        },
+        {
+          "name": "missingDownloadedExecutableDoesNotBlockPlannedPackRepair()",
+          "status": "passed"
+        },
+        {
+          "name": "postInstallSelectsDownloadedExecutableThroughSettingsOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "existingInstallContractAndActivationSettingsRoundTripWithoutMigration()",
+          "status": "passed"
+        },
+        {
+          "name": "linuxRuntimeAcquisitionDoesNotMutateRestartRequiredNativePath()",
+          "status": "passed"
+        },
+        {
+          "name": "coreStageWaitsForChatModelBeforeCommittingDownloadedExecutable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/model/LinuxGpuPlanTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/model/LinuxGpuPlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:340d03c7e54df9ae2a937085cf4af794b1cc57b216c0586537e8684ce0dfdee3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "detectedGpuWithoutUsableLinuxCudaNamesDriverRequirement()",
+          "status": "passed"
+        },
+        {
+          "name": "unlistedTargetKeepsBaseDependenciesAndExcludesNativePackages()",
+          "status": "passed"
+        },
+        {
+          "name": "publishedLinuxRuntimeEnablesGpuAndPreviewMatchesEveryPlanGate()",
+          "status": "passed"
+        },
+        {
+          "name": "unpublishedLinuxRuntimeKeepsCpuSearchAndChatUnavailable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/OrtCudaHelperTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/OrtCudaHelperTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bc0c0513e46012e047f727152e985ddef2811eef4cfa569fa31acb915522c021",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "checkMissingCudaDlls reports EP DLLs missing for cuda12 layout (pre-fix behaviour pinned)",
+          "status": "passed"
+        },
+        {
+          "name": "alpha.15+ cuda12 layout (runtime DLLs present, EP DLLs absent) → empty (Bug Q fix)",
+          "status": "passed"
+        },
+        {
+          "name": "cuda12 layout missing cudart64_12.dll → reports it (real failure mode)",
+          "status": "passed"
+        },
+        {
+          "name": "linuxResolvesPackInstalledAfterBootWithoutChangingProcessSources()",
+          "status": "passed"
+        },
+        {
+          "name": "linuxJitLinkIsPreloadedBeforeSparseAndSolver()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:86b3e8f28007be5aa9f8e994f6a0de55b1f478f54d12b8f9fdaaf26780793f27"
+}

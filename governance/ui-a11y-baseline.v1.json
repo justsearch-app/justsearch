@@ -417,6 +417,31 @@
       "knownRules": []
     },
     {
+      "surface": "settings-indexing-dark",
+      "uiShotStep": "settings-indexing-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "settings-indexing-light",
+      "uiShotStep": "settings-indexing-light",
+      "knownRules": []
+    },
+    {
+      "surface": "settings-indexing-forced",
+      "uiShotStep": "settings-indexing-forced",
+      "knownRules": []
+    },
+    {
+      "surface": "settings-indexing-minimum",
+      "uiShotStep": "settings-indexing-minimum",
+      "knownRules": []
+    },
+    {
+      "surface": "library-indexing-held",
+      "uiShotStep": "library-indexing-held",
+      "knownRules": []
+    },
+    {
       "surface": "search-filters",
       "uiShotStep": "sv3-filters-hero-normal-dark",
       "knownRules": []

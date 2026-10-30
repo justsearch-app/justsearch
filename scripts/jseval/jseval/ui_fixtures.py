@@ -25,10 +25,11 @@ import asyncio
 import json
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse, unquote
 
-from .agent_stream_fixture import DONE_RUN_BODY, sse_frame
+from .agent_stream_fixture import AgentStreamHandle, DONE_RUN_BODY
 
 
 # One legacy-token compatibility check uses the real public plugin construction path.
@@ -414,7 +415,7 @@ VARIANTS = ("default", "empty")
 # Structural Search variants are separate from the data-extreme fuzzer axis above.
 # degraded: compact notice + ready human Ask; degraded-detailed: expanded notice.
 # agent-run: canonical recorded activity/evidence; agent-budget: held live decision.
-_DEGRADED_VARIANTS = frozenset({"degraded", "degraded-detailed", "agent-run", "agent-budget", "no-evidence"})
+_DEGRADED_VARIANTS = frozenset({"degraded", "degraded-detailed", "agent-run", "agent-budget", "agent-live", "no-evidence"})
 _THREAD_RECORD_VARIANTS = frozenset({"agent-run", "sv3-sources"})
 
 # Search restores through the shared per-tab pointer, never another tab's recency.
@@ -631,6 +632,12 @@ def _status_body(variant: str) -> str:
     Degraded variants have a real warning code, indexed content, and authoritative READY
     chat operation; only those variants claim that a human Ask or Delegate is available.
     """
+    if variant == "indexing-rules":
+        d = json.loads(_status_body("indexing"))
+        d["operating"]["indexing"].update({"state": "PAUSED", "reasons": ["schedule", "on_battery"],
+            "reasonCode": "indexing.paused_schedule", "untilEpochMs": None, "waitingForResume": True})
+        d["worker"]["migration"]["processingJobsCount"] = 0
+        return json.dumps(d)
     if variant == "semantic-paused":
         # D1-14: an in-place model-change build serves keyword results while
         # the dense leg is rebuilding. The reason code, not the migration
@@ -743,7 +750,12 @@ def _inference_body(variant: str) -> str:
 
 def _settings_body(variant: str) -> str:
     """Compact disclosure unless this fixture explicitly promises Detailed."""
-    if variant in ("degraded", "agent-run", "agent-budget", "no-evidence"):
+    if variant == "indexing-rules":
+        d = json.loads(_BODY_SETTINGS)
+        d["ui"]["indexingPause"] = {"paused": False, "pauseOnBattery": True,
+            "schedule": {"enabled": True, "days": [1, 2, 3, 4, 5], "startMinute": 540, "endMinute": 1020}}
+        return json.dumps(d)
+    if variant in ("degraded", "agent-run", "agent-budget", "agent-live", "no-evidence"):
         d = json.loads(_BODY_SETTINGS)
         d["ui"]["mode"] = "simple"
         return json.dumps(d)
@@ -820,7 +832,7 @@ def fixture_body(url: str, variant: str = "default") -> str:
         return json.dumps({"conversationId": conversation_id, "events": [], "lifecycles": []})
     if urlparse(url).path.startswith("/api/chat/conversations/") and urlparse(url).path.endswith("/history"):
         return json.dumps({"messages": []})
-    if "/api/chat/agent/tools" in url and variant in ("agent-run", "agent-budget"):
+    if "/api/chat/agent/tools" in url and variant in ("agent-run", "agent-budget", "agent-live"):
         return _AGENT_TOOLS_BODY
     if "/api/operation-history/" in url and variant == "gap-decision":
         return _GAP_OUTCOME
@@ -886,6 +898,112 @@ class _SettingsFixtureState:
         return 200, json.dumps(receipt)
 
 
+@dataclass
+class FixtureReply:
+    """Exact-route outcome. An unset gate models no answer; release it for delayed success.
+
+    A non-2xx status models refusal; abort models a lost connection. All waits belong
+    to the context and are cancelled when it closes, even if the step times out.
+    """
+    status: int = 200
+    body: dict = field(default_factory=dict)
+    gate: asyncio.Event | None = None
+    delay: float = 0
+    abort: bool = False
+
+
+@dataclass
+class FixtureRequest:
+    method: str
+    path: str
+    query: str
+    body: object
+    answered: asyncio.Event = field(default_factory=asyncio.Event)
+
+
+class AgentUIFixture:
+    """Context-owned stream, exact method/path replies, and every API request observed."""
+
+    session_id = "fixture-live-run"
+
+    def __init__(self, stream):
+        self.stream = stream
+        self.requests: list[FixtureRequest] = []
+        self.replies: dict[tuple[str, str], FixtureReply] = {
+            ("POST", path): FixtureReply() for path in (
+                "/api/chat/agent/steer", "/api/chat/approve", "/api/chat/agent/budget-decision")
+        }
+        self.replies[("DELETE", f"/api/chat/sessions/{self.session_id}")] = FixtureReply()
+        self._changed = asyncio.Condition()
+        self._pending = set()
+
+    def matching(self, method, path):
+        return [r for r in self.requests if (r.method, r.path) == (method, path)]
+
+    async def wait_request(self, method, path, count=1):
+        try:
+            async with self._changed:
+                await asyncio.wait_for(self._changed.wait_for(
+                    lambda: len(self.matching(method, path)) >= count), 10)
+        except TimeoutError as error:
+            writes = [(r.method, r.path, r.body) for r in self.requests if r.method != "GET"]
+            raise AssertionError(f"Expected request {count}: {method} {path}; observed writes: {writes}") from error
+        return self.matching(method, path)[count - 1]
+
+    async def record(self, req):
+        parsed = urlparse(req.url)
+        try:
+            body = json.loads(req.post_data) if req.post_data else None
+        except json.JSONDecodeError:
+            body = req.post_data  # Recording must not change the unmapped-route fallback.
+        observed = FixtureRequest(req.method, parsed.path, parsed.query, body)
+        async with self._changed:
+            self.requests.append(observed)
+            self._changed.notify_all()
+        return observed
+
+    async def route(self, route, observed):
+        reply = self.replies.get((observed.method, observed.path))
+        if (observed.method, observed.path) == ("GET", "/api/chat/approval"):
+            from urllib.parse import parse_qs
+            query = parse_qs(observed.query)
+            reply = FixtureReply(body={
+                "callId": query["callId"][0], "operationId": "core.search",
+                "argsSummary": "Search fixture documents", "riskTier": "LOW",
+                "gateBehavior": "INLINE_CONFIRM",
+            })
+        if reply is None:
+            return False
+        task = asyncio.current_task()
+        self._pending.add(task)
+        try:
+            if reply.gate is not None:
+                await reply.gate.wait()
+            if reply.delay:
+                await asyncio.sleep(reply.delay)
+            if reply.abort:
+                await route.abort("connectionfailed")
+            else:
+                await route.fulfill(status=reply.status, content_type="application/json",
+                                    body=json.dumps(reply.body))
+            observed.answered.set()
+        finally:
+            self._pending.discard(task)
+        return True
+
+    async def close(self):
+        for task in list(self._pending):
+            task.cancel()
+        await asyncio.gather(*self._pending, return_exceptions=True)
+
+
+def agent_fixture(ctx) -> AgentUIFixture:
+    fixture = getattr(ctx, "_jseval_agent_fixture", None)
+    if fixture is None:
+        raise RuntimeError("This flow requires --fixtures and the agent-live variant")
+    return fixture
+
+
 async def install_fixtures(ctx, variant: str = "default", color_scheme: str = "dark") -> None:
     """Make a browser context deterministic: seed the dismissed walkthrough and
     serve fixtures for every `/api/*` call (so the no-backend 502 storm can't occur).
@@ -901,45 +1019,29 @@ async def install_fixtures(ctx, variant: str = "default", color_scheme: str = "d
         await ctx.add_init_script(THREAD_POINTER_SEED)
     settings = _SettingsFixtureState(variant, color_scheme=color_scheme)
 
-    # A held budget decision needs an OPEN SSE response. route.fulfill closes a body and
-    # correctly causes STREAM_INCOMPLETE; it cannot model this state. Own a loopback-only
-    # transport for this one fixture, and close every connection with its browser context.
-    budget_url = None
-    if variant == "agent-budget":
-        writers = set()
-        async def held_stream(reader, writer):
-            writers.add(writer)
-            try:
-                await reader.readuntil(b"\r\n\r\n")
-                body = sse_frame("session_started", {"sessionId": "fixture-held-budget"})
-                body += sse_frame("budget_update", {"phase": "llm_response", "tokensConsumed": 8192,
-                    "tokensRemaining": 0, "totalTokensConsumed": 8192,
-                    "promptTokens": 3072, "contextWindow": 4096})
-                body += sse_frame("budget_gate", {"tokensNeeded": 2048, "tokensRemaining": 0,
-                    "totalTokensConsumed": 8192})
-                writer.write(("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n"
-                    "Access-Control-Allow-Origin: *\r\nCache-Control: no-cache\r\n\r\n" + body).encode())
-                await writer.drain()
-                await reader.read()
-            finally:
-                writer.close()
-                await writer.wait_closed()
-                writers.discard(writer)
-        server = await asyncio.start_server(held_stream, "127.0.0.1", 0)
-        budget_url = f"http://127.0.0.1:{server.sockets[0].getsockname()[1]}/api/chat/dispatch"
-        async def close_budget_transport():
-            server.close()
-            await server.wait_closed()
-            for writer in list(writers):
-                writer.close()
-                await writer.wait_closed()
-        ctx.on("close", close_budget_transport)
+    live = None
+    if variant in ("agent-budget", "agent-live"):
+        stream = await AgentStreamHandle().start(ctx)
+        live = AgentUIFixture(stream)
+        ctx._jseval_agent_fixture = live
+        ctx.on("close", live.close)
+        if variant == "agent-budget":
+            stream.queue("session_started", {"sessionId": "fixture-held-budget"})
+            stream.queue("budget_update", {"phase": "llm_response", "tokensConsumed": 8192,
+                "tokensRemaining": 0, "totalTokensConsumed": 8192,
+                "promptTokens": 3072, "contextWindow": 4096})
+            stream.queue("budget_gate", {"tokensNeeded": 2048, "tokensRemaining": 0,
+                "totalTokensConsumed": 8192})
 
     async def _handler(route):
         req = route.request
-        if "/api/chat/dispatch" in req.url and budget_url is not None:
-            await route.continue_(url=budget_url)
-            return
+        if live is not None:
+            observed = await live.record(req)
+            if (req.method, observed.path) == ("POST", "/api/chat/dispatch"):
+                await route.continue_(url=live.stream.url)
+                return
+            if await live.route(route, observed):
+                return
         if "/api/chat/dispatch" in req.url and variant in _DEGRADED_VARIANTS:
             shape = json.loads(req.post_data or "{}").get("shapeId")
             if shape == "core.rag-ask" and variant == "no-evidence":

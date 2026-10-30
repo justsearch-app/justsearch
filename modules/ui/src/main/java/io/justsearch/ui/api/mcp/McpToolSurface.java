@@ -1564,12 +1564,21 @@ public final class McpToolSurface {
           && !"RUNNING".equals(pauseState)) {
         sb.append("indexing: ").append(pauseState.toLowerCase(java.util.Locale.ROOT))
             .append(" (reason: ").append(extras.get("indexingPauseReason"));
+        if (extras.containsKey("indexingPauseReasons")) {
+          sb.append(", reasons: ").append(extras.get("indexingPauseReasons"));
+        }
         if (extras.containsKey("indexingPauseUntilEpochMs")) {
           sb.append(", untilEpochMs: ").append(extras.get("indexingPauseUntilEpochMs"));
         }
         sb.append(")\n");
         if (status.queueDepth() > 0 || Boolean.TRUE.equals(extras.get("indexingWaitingForResume"))) {
-          sb.append("processing: waiting for Resume\n");
+          String waiting = switch (String.valueOf(extras.get("indexingPauseReason"))) {
+            case "schedule" -> "indexing hours";
+            case "on_battery" -> "AC power or a change to the battery setting";
+            case "settings_recovery" -> "settings recovery";
+            default -> "Resume";
+          };
+          sb.append("processing: waiting for ").append(waiting).append("\n");
         }
         if ("settings_recovery".equals(extras.get("indexingPauseReason"))) {
           sb.append("Check exclusions: settings recovery may have lost them.\n");

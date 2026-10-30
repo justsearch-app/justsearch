@@ -9,6 +9,7 @@ than leaving a capture assertion passing against a stale shape.
 from __future__ import annotations
 
 import json
+import asyncio
 
 import pytest
 
@@ -120,3 +121,60 @@ class TestDoneRunBody:
     def test_the_body_splits_into_exactly_the_declared_frames(self):
         frames = [f for f in asf.DONE_RUN_BODY.split("\n\n") if f.strip()]
         assert len(frames) == len(asf.DONE_RUN)
+
+
+class _Context:
+    def __init__(self):
+        self.callbacks = []
+
+    def on(self, event, callback):
+        assert event == "close"
+        self.callbacks.append(callback)
+
+
+class TestOpenStream:
+    @pytest.mark.parametrize("terminal", ["done", "error", "disconnect", "context-close"])
+    def test_real_http_incremental_frames_heartbeat_and_each_terminal(self, terminal):
+        async def check():
+            ctx = _Context()
+            stream = await asf.AgentStreamHandle().start(ctx)
+            port = stream._server.sockets[0].getsockname()[1]
+            reader, writer = await asyncio.open_connection("127.0.0.1", port)
+            try:
+                writer.write(b"POST /api/chat/dispatch HTTP/1.1\r\nContent-Length: 2\r\n\r\n{}")
+                await writer.drain()
+                headers = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 3)
+                assert b"200 OK" in headers and b"text/event-stream" in headers
+                assert await reader.readuntil(b"\n\n") == b": connected\n\n"
+                await stream.emit("session_started", {"sessionId": "incremental"})
+                assert await reader.readuntil(b"\n\n") == asf.sse_frame(
+                    "session_started", {"sessionId": "incremental"}).encode()
+                # A real pending read: the response has not been fulfilled/closed.
+                assert await asyncio.wait_for(reader.readuntil(b"\n\n"), 3) == b": heartbeat\n\n"
+                with pytest.raises(asf.AgentStreamFixtureError):
+                    await stream.emit("session_started", {})
+                await stream.emit("chunk", {"text": "released later"})
+                assert await reader.readuntil(b"\n\n") == asf.sse_frame("chunk", {"text": "released later"}).encode()
+                if terminal == "done":
+                    payload = {"finalResponse": "Finished", "iterationsUsed": 1,
+                               "toolCallsExecuted": 0, "totalTokensUsed": 10}
+                    await stream.end(**payload)
+                    assert await reader.readuntil(b"\n\n") == asf.sse_frame("done", payload).encode()
+                elif terminal == "error":
+                    await stream.fail("deliberate failure")
+                    assert b'"deliberate failure"' in await reader.readuntil(b"\n\n")
+                elif terminal == "disconnect":
+                    await stream.disconnect()
+                else:
+                    await ctx.callbacks[0]()
+                remainder = await asyncio.wait_for(reader.read(), 3)
+                # A heartbeat already in flight at close is allowed, event data is not.
+                assert all(not line or line.startswith(b":") for line in remainder.splitlines())
+            finally:
+                writer.close()
+                await writer.wait_closed()
+                await stream.close()
+            assert not stream._tasks and not stream._writers
+            with pytest.raises(ConnectionRefusedError):
+                await asyncio.open_connection("127.0.0.1", port)
+        asyncio.run(check())

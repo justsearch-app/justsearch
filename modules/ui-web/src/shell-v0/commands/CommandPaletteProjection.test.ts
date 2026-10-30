@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 /**
  * Tempdoc 543 §21.C — palette layers over Action.listActions.
  *
@@ -10,19 +12,23 @@
  *  - origin discriminator is set correctly
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   registerAction,
   __resetActionsForTest,
+  projectOperationsToActions,
+  registerShellActions,
 } from '../substrates/actions/index.js';
 import {
   registerCommand,
   commandLabel,
+  invokeCommandWithResult,
   __resetForTest as __resetCommandsForTest,
 } from './CommandRegistry.js';
 import { searchPaletteEntries } from './CommandPaletteProjection.js';
 import { __resetShellContextForTest } from '../state/shellContextState.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
+import { NAVIGATE_TO_SURFACE_EVENT } from '../controllers/navigateRequest.js';
 import {
   __seedForTest as __seedResourceCatalog,
   __resetForTest as __resetResourceCatalog,
@@ -64,6 +70,36 @@ describe('CommandPaletteProjection (§21.C)', () => {
     });
     const results = searchPaletteEntries('copy');
     expect(results.find((r) => r.entry.id === 'core.action.contextual.copy')).toBeUndefined();
+  });
+
+  it('WP3.8b opens indexing rules in Settings instead of invoking the operation without arguments', async () => {
+    __seedResourceCatalog({ 'ops.set-indexing-rules.label': 'Set indexing rules' });
+    registerShellActions({
+      navigate: () => {}, toggleInspector: () => {}, togglePalette: () => {}, focusComposer: () => {},
+    });
+    projectOperationsToActions([
+      { id: 'core.set-indexing-rules', presentation: { labelKey: 'ops.set-indexing-rules.label' } },
+    ]);
+    const navigation = vi.fn();
+    const operation = vi.fn();
+    document.addEventListener(NAVIGATE_TO_SURFACE_EVENT, navigation);
+    document.addEventListener('jf-invoke-operation', operation);
+    try {
+      const entries = searchPaletteEntries('indexing rules').filter(r => r.entry.origin !== 'intent');
+      expect(entries).toHaveLength(1);
+      expect((await invokeCommandWithResult(entries[0]!.entry.id)).ok).toBe(true);
+      expect(operation).not.toHaveBeenCalled();
+      expect(entries[0]!.entry.label).toBe('Change indexing rules');
+      expect(navigation).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+        detail: { surfaceId: 'core.settings-surface', state: { focusIndexingRule: 'hours' } },
+      }));
+      expect(searchPaletteEntries('').some(r => r.entry.id === 'op.core.set-indexing-rules')).toBe(false);
+      await invokeCommandWithResult('op.core.set-indexing-rules');
+      expect(operation).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener(NAVIGATE_TO_SURFACE_EVENT, navigation);
+      document.removeEventListener('jf-invoke-operation', operation);
+    }
   });
 
   it('back-maps core.action.op.* to legacy op.* id', () => {

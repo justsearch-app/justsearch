@@ -24,6 +24,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from . import ui_fixtures
 from . import ui_measure
 from . import ui_selectors as S
+from . import ui_agent_flows
 
 
 # ---------------------------------------------------------------------------
@@ -1336,6 +1337,20 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     _settings_setup = _view_setup("settings")
 
+    def setup_indexing_rules(surface="settings", narrow=False):
+        async def setup(page):
+            if narrow:
+                await page.set_viewport_size({"width": 600, "height": 400})
+            await _view_setup(surface)(page)
+            if surface == "settings":
+                await page.locator('[data-settings-category="indexing"]').click()
+                await page.locator('#indexing-hours').wait_for(state="visible")
+                await page.locator('#indexing-hours').focus()
+            else:
+                await page.get_by_role("button", name="Change hours", exact=True).first.wait_for(state="visible")
+            await _settle_focus_marks(page)
+        return setup
+
     async def setup_settings_forced_colors(page):
         await _settings_setup(page)
         await page.keyboard.press("Tab")
@@ -2111,6 +2126,14 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              fixtures_variant="sv3-sources", forced_colors="active"),
         Step("sv3-palette-forced-colors", setup=setup_sv3_palette_forced_colors, isolated=True,
              forced_colors="active"),
+        *[Step(f"settings-indexing-{theme}", setup=setup_indexing_rules(), isolated=True,
+               fixtures_variant="indexing-rules", color_scheme="light" if theme == "light" else "dark",
+               forced_colors="active" if theme == "forced" else None)
+          for theme in ("dark", "light", "forced")],
+        Step("settings-indexing-minimum", setup=setup_indexing_rules(narrow=True), isolated=True,
+             fixtures_variant="indexing-rules"),
+        Step("library-indexing-held", setup=setup_indexing_rules("library"), isolated=True,
+             fixtures_variant="indexing-rules"),
         Step("settings-forced-colors", setup=setup_settings_forced_colors, isolated=True,
              forced_colors="active"),
         *[Step(f"sv3-recents-{state}-{width}-{theme}",
@@ -2157,6 +2180,22 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         Step("chat-model-only", setup=setup_chat_model_only, isolated=True, fixtures_variant="no-evidence"),
         Step("chat-structured", setup=setup_chat_structured, isolated=True, fixtures_variant="degraded"),
         Step("chat-budget", setup=setup_chat_budget, isolated=True, fixtures_variant="agent-budget"),
+        Step("sv3-run-activity-steering", setup=ui_agent_flows.setup_run_activity_steering,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-budget", setup=ui_agent_flows.setup_run_budget,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-approval", setup=ui_agent_flows.setup_run_approval,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-approval-failure", setup=ui_agent_flows.setup_run_approval_failure,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-ask-stop-late-response", setup=ui_agent_flows.setup_ask_stop_late_response,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-halt", setup=ui_agent_flows.setup_run_halt,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-halt-failure", setup=ui_agent_flows.setup_run_halt_failure,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-halt-timeout", setup=ui_agent_flows.setup_run_halt_timeout,
+             isolated=True, fixtures_variant="agent-live"),
         Step("legacy-token-plugin", setup=_check_legacy_token_plugin, isolated=True),
 
         # --- Slice 3a.1 Phase 6: Lit shell-v0 visual verification ---
@@ -2324,6 +2363,21 @@ async def _run_isolated_step(
                 _write_trace(step.name, output_dir)
             await ctx.close()
             return r
+        except Exception:
+            # A behavioural setup failure needs evidence too, before browser teardown.
+            import traceback
+            traceback.print_exc()
+            try:
+                await page.screenshot(path=str(output_dir / f"{step.name}.failed.png"))
+                fixture = getattr(ctx, "_jseval_agent_fixture", None)
+                if fixture is not None:
+                    (output_dir / f"{step.name}.requests.json").write_text(json.dumps([
+                        {"method": r.method, "path": r.path, "query": r.query, "body": r.body,
+                         "answered": r.answered.is_set()} for r in fixture.requests
+                    ], indent=2), encoding="utf-8")
+            except Exception:
+                pass  # Diagnostics cannot replace the original failure.
+            raise
         finally:
             await browser.close()
     except AppNotMountedError as e:

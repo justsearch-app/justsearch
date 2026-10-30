@@ -176,7 +176,7 @@
       "elements": [
         {
           "selector": "[data-testid=\"sv3-degradation\"][data-open=\"false\"]",
-          "maxHeightPx": 42
+          "maxHeightPx": 36
         }
       ],
       "requiredSelectors": [
@@ -405,7 +405,7 @@
       "elements": [
         {
           "selector": "[data-testid=\"sv3-degradation\"][data-open=\"false\"]",
-          "maxHeightPx": 42
+          "maxHeightPx": 36
         }
       ],
       "requiredSelectors": [
@@ -509,7 +509,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 371,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -521,7 +521,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         },
         {
           "selector": "[data-testid=\"sv3-composer-headline\"]",
@@ -546,7 +546,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 371,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -558,7 +558,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         },
         {
           "selector": "[data-testid=\"sv3-composer-headline\"]",
@@ -583,7 +583,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 371,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -595,7 +595,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         },
         {
           "selector": "[data-testid=\"sv3-composer-headline\"]",
@@ -620,7 +620,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 371,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -632,7 +632,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         },
         {
           "selector": "[data-testid=\"sv3-composer-headline\"]",
@@ -657,7 +657,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 371,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -669,7 +669,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         },
         {
           "selector": "[data-testid=\"sv3-composer-headline\"]",
@@ -694,7 +694,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 371,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -706,7 +706,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         },
         {
           "selector": "[data-testid=\"sv3-composer-headline\"]",
@@ -731,7 +731,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -743,7 +743,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         }
       ],
       "requiredSelectors": [
@@ -762,7 +762,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -774,7 +774,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         }
       ],
       "requiredSelectors": [
@@ -793,7 +793,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -805,7 +805,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         }
       ],
       "requiredSelectors": [
@@ -824,7 +824,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -836,7 +836,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         }
       ],
       "requiredSelectors": [
@@ -855,7 +855,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -867,7 +867,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         }
       ],
       "requiredSelectors": [
@@ -886,7 +886,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 350,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 770,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -898,7 +898,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32
+          "maxHeightPx": 25
         }
       ],
       "requiredSelectors": [
@@ -917,7 +917,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 291,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -929,7 +929,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         },
         {
@@ -955,7 +955,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 291,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -967,7 +967,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         },
         {
@@ -993,7 +993,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 291,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1005,7 +1005,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         },
         {
@@ -1031,7 +1031,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 291,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1043,7 +1043,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         },
         {
@@ -1069,7 +1069,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 291,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1081,7 +1081,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         },
         {
@@ -1107,7 +1107,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 291,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1119,7 +1119,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         },
         {
@@ -1145,7 +1145,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 75,
           "maxBottomPx": 372,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1157,7 +1157,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 372
         },
         {
@@ -1183,7 +1183,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 75,
           "maxBottomPx": 372,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1195,7 +1195,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 372
         },
         {
@@ -1221,7 +1221,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 75,
           "maxBottomPx": 372,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1233,7 +1233,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 372
         },
         {
@@ -1259,7 +1259,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1271,7 +1271,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         }
       ],
@@ -1291,7 +1291,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1303,7 +1303,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         }
       ],
@@ -1323,7 +1323,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1335,7 +1335,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         }
       ],
@@ -1355,7 +1355,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1367,7 +1367,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         }
       ],
@@ -1387,7 +1387,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1399,7 +1399,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         }
       ],
@@ -1419,7 +1419,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 372,
           "maxBottomPx": 692,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1431,7 +1431,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 692
         }
       ],
@@ -1451,7 +1451,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 128,
           "maxBottomPx": 372,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1463,7 +1463,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 372
         }
       ],
@@ -1483,7 +1483,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 128,
           "maxBottomPx": 372,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1495,7 +1495,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 372
         }
       ],
@@ -1515,7 +1515,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"]",
           "minHeightPx": 70,
-          "maxHeightPx": 400,
+          "maxHeightPx": 128,
           "maxBottomPx": 372,
           "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
         },
@@ -1527,7 +1527,7 @@
         {
           "selector": "[data-testid=\"sv3-recents\"] [role=\"option\"]:last-child",
           "minHeightPx": 24,
-          "maxHeightPx": 32,
+          "maxHeightPx": 25,
           "maxBottomPx": 372
         }
       ],
@@ -1538,6 +1538,81 @@
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]",
         "jf-sv3-composer"
+      ]
+    },
+    {
+      "uiShotStep": "settings-indexing-dark",
+      "requiredSelectors": [
+        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
+        "[data-testid=\"settings-indexing\"] #indexing-hours"
+      ],
+      "elements": [
+        {
+          "selector": "dialog[aria-label=\"Settings\"][open]",
+          "minWidthPx": 540,
+          "maxWidthPx": 1200,
+          "maxHeightPx": 614
+        }
+      ]
+    },
+    {
+      "uiShotStep": "settings-indexing-light",
+      "requiredSelectors": [
+        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
+        "[data-testid=\"settings-indexing\"] #indexing-hours"
+      ],
+      "elements": [
+        {
+          "selector": "dialog[aria-label=\"Settings\"][open]",
+          "minWidthPx": 540,
+          "maxWidthPx": 1200,
+          "maxHeightPx": 614
+        }
+      ]
+    },
+    {
+      "uiShotStep": "settings-indexing-forced",
+      "requiredSelectors": [
+        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
+        "[data-testid=\"settings-indexing\"] #indexing-hours"
+      ],
+      "elements": [
+        {
+          "selector": "dialog[aria-label=\"Settings\"][open]",
+          "minWidthPx": 540,
+          "maxWidthPx": 1200,
+          "maxHeightPx": 614
+        }
+      ]
+    },
+    {
+      "uiShotStep": "settings-indexing-minimum",
+      "requiredSelectors": [
+        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
+        "[data-testid=\"settings-indexing\"] #indexing-hours"
+      ],
+      "elements": [
+        {
+          "selector": "dialog[aria-label=\"Settings\"][open]",
+          "minWidthPx": 540,
+          "maxWidthPx": 1200,
+          "maxHeightPx": 342
+        }
+      ]
+    },
+    {
+      "uiShotStep": "library-indexing-held",
+      "requiredSelectors": [
+        "[data-testid=\"library-indexing-pause\"] jf-indexing-controls"
+      ],
+      "forbiddenVisibleText": [
+        "Work is waiting for Resume."
+      ],
+      "elements": [
+        {
+          "selector": "[data-testid=\"library-indexing-pause\"] jf-indexing-controls",
+          "maxHeightPx": 28
+        }
       ]
     },
     {

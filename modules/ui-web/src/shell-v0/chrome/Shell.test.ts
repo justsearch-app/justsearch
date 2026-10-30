@@ -918,6 +918,26 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
     }
   });
 
+  it.each(['hours', 'battery'] as const)('WP3.8b routes %s to Settings once without replay on Back and Forward', async (control) => {
+    expect('focusIndexingRule' in SettingsWindow.prototype, 'rule focus destination exists').toBe(true);
+    const shell = await renderShell();
+    const win = windowOf(shell);
+    shell.activateSurface('core.library-surface', {}, 'RAIL');
+    await settle();
+    const focus = vi.spyOn(SettingsWindow.prototype, 'focusIndexingRule');
+    try {
+      shell.activateSurface(SETTINGS_ID, { focusIndexingRule: control }, 'BUTTON');
+      await settle();
+      expect(win.open).toBe(true);
+      expect(focus).toHaveBeenCalledExactlyOnceWith(control);
+      expect(window.location.hash).toBe(`#justsearch://surface/${SETTINGS_ID}`);
+      expect(getJournalState().entries.every(entry => !entry.url.includes('focusIndexingRule'))).toBe(true);
+      window.history.back(); await settle(); expect(win.open).toBe(false);
+      window.history.forward(); await settle(); expect(win.open).toBe(true);
+      expect(focus).toHaveBeenCalledTimes(1);
+    } finally { focus.mockRestore(); }
+  });
+
   it('R2 does not focus Reset for a false recovery URL flag', async () => {
     window.history.replaceState(null, '', `/#justsearch://surface/${SETTINGS_ID}?focusSettingsRecovery=false`);
     const focus = vi.spyOn(SettingsWindow.prototype, 'focusSettingsRecovery');

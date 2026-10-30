@@ -72,7 +72,8 @@ public final class ModelRegistryLoader {
           throw new IllegalStateException("Invalid native runtime replacement: " + pkg.id);
         }
         if (pkg.replaces != null
-            && io.justsearch.configuration.NativeTargets.current().targetId().equals(pkg.nativeTarget)) {
+            && io.justsearch.configuration.NativeTargets.currentIfSupported()
+                .map(target -> target.targetId().equals(pkg.nativeTarget)).orElse(false)) {
           if (replacements.put(pkg.replaces, pkg.id) != null) {
             throw new IllegalStateException("Duplicate native replacement: " + pkg.replaces);
           }
