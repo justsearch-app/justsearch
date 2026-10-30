@@ -508,12 +508,16 @@ the check requires an identified predecessor window, Engine readiness, a matchin
 update intent recorded as Cancelled, unchanged indexed data/settings/authored
 records/models, and a renewed update offer. Web Storage and the offer are then
 observed in the harness's own WebDriver session. Success requires
-identified NSIS actions, automatic candidate relaunch, retirement of both old
+identified NSIS actions (focus the exact UIA button, then deliver a space through
+the identity-checked foreground window), automatic candidate relaunch, retirement of both old
 shell and Engine identities, and retained data. A later harness-owned WebDriver
 restart observes persisted Web Storage; it does not certify the preceding
 relaunch's pixels. The updater source checks descriptor/artifact signatures and
-does not require Authenticode or the production signing key. Runtime acceptance
-of unsigned locally built NSIS bytes still requires a real run. SmartScreen or
+does not require Authenticode or the production signing key. The local Windows
+VM run accepted the test-signed descriptor/artifact and unsigned NSIS candidate,
+completed installation and automatic relaunch, and retained the predecessor data.
+This proves the test-pin path; W8 still needs the immutable signed draft bytes.
+SmartScreen or
 Mark-of-the-Web blocking is an environment finding, never a product pass/failure.
 W8 must repeat qualification on the immutable draft NSIS/MCPB/registry bytes and
 provide a compatible predecessor and authenticated mirror/feed for those pins.
