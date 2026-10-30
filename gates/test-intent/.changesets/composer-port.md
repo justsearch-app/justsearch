@@ -6,8 +6,8 @@ author-session: composer-port-builder
 
 # Composer port preservation checks
 
-The current user request supplies CP1b, CP1c, CP1d, CP5, CP8 and CP10 verbatim below.
-The source reference identifies this request without recording private task metadata.
+The owner authorised step 4; the agent chose CP1b, CP1c, CP1d, CP5, CP8 and CP10 under that delegation.
+The sources below distinguish the owner's words from the agent's preservation choices.
 These are additional preservation oracles, not repairs or adaptations of existing oracles.
 The baseline shared clone ran the added checks against unchanged production code.
 The new node-environment composerPort.test.ts is an isolated contract test and is exempt
@@ -30,33 +30,16 @@ from a changeset under the test-intent rules. The ceiling script self-test is to
       "sources": [
         {
           "kind": "owner-words",
-          "location": "task current request",
-          "quote": "structured extraction clears only after accepted completion, under the same condition; failure or Stop keeps the input."
+          "location": "task t-20261029-fs993c request, 2026-10-30",
+          "quote": "proceed with step 4"
         },
         {
-          "kind": "owner-words",
-          "location": "task current request",
-          "quote": "Delegate and steering clear at submission, after the draft write succeeds, as today; no new guard is added (SW-RUN-01, SW-RUN-04)."
-        },
-        {
-          "kind": "owner-words",
-          "location": "task current request",
-          "quote": "confirmed deletion clears only the owning draft under today's condition, including late reconciliation, navigation and another window's storage events."
-        },
-        {
-          "kind": "owner-words",
-          "location": "task current request",
-          "quote": "a failed Ask handoff restores its text only under today's conditions."
-        },
-        {
-          "kind": "owner-words",
-          "location": "task current request",
-          "quote": "several draft writes before first render seed the first composer once, and later updates never overwrite typing; reconnecting a retained view differs from constructing a fresh one as today; lifecycle flushes do not overwrite another window's newer snapshot; focus and caret after assignment as today."
-        },
-        {
-          "kind": "owner-words",
-          "location": "task current request",
-          "quote": "a shared search from another surface updates an eligible Search draft but leaves Ask, Delegate, restored text and open conversations alone, before first render, while away and on return."
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed with step 4",
+          "delegationLocation": "task t-20261029-fs993c request, 2026-10-30",
+          "delegationScope": "Step 4 of the agreed frontend restructuring: move the Search view's areas out one at a time, nothing the user sees changes, under the same safety net of scenario checks",
+          "choice": "The agent pins today's behaviour for CP1b (Structured completion clearing and failure or Stop retention), CP1c (Delegate and steering clearing after successful draft writes), CP1d (owning-draft deletion, reconciliation, navigation and storage events), CP5 (failed Ask handoff restoration), CP8 (first-render seeding, retained versus fresh mounts, snapshot ownership, focus and caret) and CP10 (shared-search updates with draft and conversation isolation) with preservation checks that pass on the base before moving the code behind the port.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/composer-port-preservation.json",
