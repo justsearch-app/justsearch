@@ -18,7 +18,7 @@ import zipfile
 import stat
 from pathlib import PurePosixPath
 
-from runner import (Infrastructure, OwnerValidation, ProductFailure, Unavailable,
+from runner import (Infrastructure, OwnerValidation, ProductFailure, RunStopped, Unavailable,
                     Target as LinuxTarget, Run as SharedRun,
                     WebDriver, digest, wait_for)
 
@@ -1216,20 +1216,24 @@ def installer_witness(run):
 
 
 def invoke_nsis(run, installation, button_id):
-    """Invoke a standard NSIS button through UIA on the witnessed process/window."""
+    """Focus the exact UIA button, then activate it in its witnessed window."""
     window = installation['window']
     run.evidence('J5-installer-window-' + str(time.time_ns()), installation)
     buttons = run.native.buttons(window, button_id)
     if len(buttons) != 1:
         raise Infrastructure('Expected unique NSIS action unavailable')
-    _, module = run.native.automation()
     button = buttons[0]
     label = button.CurrentName
-    invoke = button.GetCurrentPattern(module.UIA_InvokePatternId).QueryInterface(module.IUIAutomationInvokePattern)
-    run.native.element(window) # Recheck exact lifetime and HWND before invocation.
-    invoke.Invoke()
+    button.SetFocus()
+    if not button.CurrentHasKeyboardFocus:
+        raise Infrastructure('NSIS button did not receive keyboard focus')
+    run.native.element(window) # Recheck exact lifetime and HWND before input.
+    # The Win32 UIA Invoke provider returned successfully without advancing
+    # Next/Finish in the real wizard. Space activates the focused native button;
+    # send rechecks process/window identity and foreground before any key.
+    run.native.send(window, '{SPACE}')
     return {'handle':window['handle'], 'pid':window['process']['pid'], 'button':str(button_id),
-            'label':label, 'invoked':True, 'interface':'IUIAutomation'}
+            'label':label, 'invoked':True, 'interface':'IUIAutomation.SetFocus/SendKeys'}
 
 
 def update_prepare(run):
@@ -1349,6 +1353,8 @@ def complete_nsis(run, installation):
     def advance():
         if not run.target.alive([installation['process']]):
             return True
+        if len(actions) >= 10:
+            raise RunStopped('NSIS navigation did not progress within ten identified actions')
         for window in run.native.windows():
             if window['pid'] != installation['process']['pid'] or window['class'] != '#32770':
                 continue
@@ -1361,8 +1367,6 @@ def complete_nsis(run, installation):
             page = dict(installation, window=dict(window, process=installation['process']))
             actions.append(invoke_nsis(run, page, 1))
             run.evidence('J5-nsis-actions', actions)
-            if len(actions) > 10:
-                raise Infrastructure('NSIS navigation did not progress within ten identified actions')
             return False
         return False
     wait_for(advance, 'Identified NSIS wizard completed', seconds=600, interval=1, error=Infrastructure)

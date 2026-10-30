@@ -7,7 +7,7 @@ Windows update: "Windows in-app update via descriptor v2 from a VM-local mirror:
 """
 import unittest
 
-from runner import Infrastructure, ProductFailure
+from runner import Infrastructure, ProductFailure, RunStopped
 import windows
 
 
@@ -672,6 +672,24 @@ class WindowsUpdateAndCrashTests(unittest.TestCase):
             self.assertFalse(result['observation']['oldEngineAlive'])
             self.assertTrue(facts['updated'])
 
+    def test_nsis_uses_focused_button_keyboard_activation_and_refuses_missing_focus(self):
+        run=Mock()
+        run.native.automation.return_value=(Mock(),Mock())
+        window={'handle':200,'process':process(60)}
+        button=Mock(CurrentName='Finish',CurrentHasKeyboardFocus=True)
+        run.native.buttons.return_value=[button]
+        result=windows.invoke_nsis(run,{'window':window},1)
+        button.SetFocus.assert_called_once_with()
+        run.native.element.assert_called_once_with(window)
+        run.native.send.assert_called_once_with(window,'{SPACE}')
+        self.assertEqual(result['interface'],'IUIAutomation.SetFocus/SendKeys')
+        button.GetCurrentPattern.assert_not_called()
+        run.native.send.reset_mock()
+        button.CurrentHasKeyboardFocus=False
+        with self.assertRaisesRegex(Infrastructure,'did not receive keyboard focus'):
+            windows.invoke_nsis(run,{'window':window},1)
+        run.native.send.assert_not_called()
+
     def test_nsis_navigation_requires_identified_allowed_actions(self):
         run=Mock(facts={});run.target.alive.side_effect=[[process(60)],[]]
         run.native.windows.return_value=[{'pid':60,'class':'#32770','handle':200}]
@@ -686,6 +704,19 @@ class WindowsUpdateAndCrashTests(unittest.TestCase):
         run.native.buttons.return_value=[Mock(CurrentName='Unexpected action')]
         with patch.object(windows,'wait_for',once),self.assertRaises(Infrastructure):
             windows.complete_nsis(run,installation)
+
+    def test_nsis_action_limit_stops_polling_before_an_eleventh_input(self):
+        run=Mock()
+        installation={'process':process(60)}
+        run.target.alive.return_value=[process(60)]
+        run.native.windows.return_value=[{'pid':60,'class':'#32770','handle':200}]
+        run.native.buttons.return_value=[Mock(CurrentName='Finish')]
+        with patch.object(windows,'invoke_nsis',return_value={'invoked':True}) as action, \
+             patch.object(windows.time,'sleep'), \
+             patch.object(windows.time,'monotonic',side_effect=[0]*15+[601]), \
+             self.assertRaisesRegex(RunStopped,'ten identified actions'):
+            windows.complete_nsis(run,installation)
+        self.assertEqual(action.call_count,10)
 
     def test_crash_collection_preserves_product_unknown_before_and_jvm_outcomes(self):
         with tempfile.TemporaryDirectory() as temp:
