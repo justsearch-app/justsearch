@@ -20,7 +20,7 @@ import time
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import vm
-from runner import Native, Target, digest, verify_assets, preparation_failure, summarize, full_selection, wait_for, Infrastructure, report_exit_code, attribute_crashes
+from runner import predecessor_preparation, Native, Target, digest, verify_assets, preparation_failure, summarize, full_selection, wait_for, Infrastructure, report_exit_code, attribute_crashes
 from writes import COUNTERS
 
 
@@ -390,7 +390,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         else:
             pins(args, phase)
         vm.wait_free(28800)
-        wait_for(lambda: ports_available([vm.OS['ubuntu']['qmp'], vm.OS['ubuntu']['ssh']]),
+        wait_for(lambda: ports_available([vm.OS['ubuntu']['ssh']]),
                  'Stopped VM ports can be bound for the next overlay', seconds=90,
                  interval=2, error=Infrastructure)
         vm.MEMORY_MIB = args.memory_mib
@@ -468,9 +468,9 @@ def combine(args, out, sources):
     rows = []
     for name, source in sources.items():
         for row in source['journeys']:
-            if name.startswith('predecessor') and row['id'] in ('J1', 'J2', 'J3', 'J4'):
-                continue  # Only predecessor preparation journeys are outside candidate scope.
             row = json.loads(json.dumps(row))
+            if name.startswith('predecessor') and row['id'] in ('J1', 'J2', 'J3', 'J4'):
+                predecessor_preparation(row, source.get('predecessorVersion') or 'unknown (see source evidence)')
             for check in row['checks']:
                 prefix = name + ('/evidence/' if args.session == 'hosted' else '/run/')
                 check['evidence'] = [os.path.normpath(prefix + path) for path in check['evidence']]

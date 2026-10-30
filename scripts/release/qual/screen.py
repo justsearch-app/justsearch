@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host screen and input through QMP only; guests use a US keyboard layout."""
+"""Host screen and input through host-only Unix-socket QMP; guests use a US keyboard layout."""
 import argparse
 import binascii
 import json

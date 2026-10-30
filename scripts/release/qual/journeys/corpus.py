@@ -34,7 +34,9 @@ def generate(root):
         doc.writestr('word/document.xml', '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>The silver pelican inspection is scheduled for Friday.</w:t></w:r></w:p></w:body></w:document>')
     image = Image.new('RGB', (1240, 1754), 'white')
     draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 42)
+    font_path = ('C:/Windows/Fonts/arial.ttf' if __import__('os').name == 'nt'
+                 else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
+    font = ImageFont.truetype(font_path, 42)
     for y, text in [(140, 'HARBOUR INSPECTION'), (260, 'Cobalt marmalade delivery record'),
                     (340, 'The warehouse received twelve crates.'), (420, 'Inspection complete. No damage found.')]:
         draw.text((90, y), text, fill='black', font=font)

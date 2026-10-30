@@ -22,12 +22,19 @@ HERE = Path(__file__).resolve().parent
 STATUSES = ('passed', 'failed-product', 'failed-infrastructure', 'skipped-by-decision', 'unavailable', 'owner-validation')
 
 
-def phase_journeys(phase):
-    return {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'} if phase == 'predecessor' else {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'}
+def phase_journeys(phase, lane=None):
+    selected = {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'} if phase == 'predecessor' else {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'}
+    if lane == 'vm-windows':
+        selected.add('J6') # Also develop retention against the installed candidate.
+    return selected
 
 
 class Infrastructure(Exception):
     """An observed harness, desktop or download failure, not a product verdict."""
+
+
+class RunStopped(Infrastructure):
+    """The run has been stopped; no polling retry can recover it."""
 
 
 class ProductFailure(AssertionError):
@@ -160,6 +167,19 @@ def require_disposable_host():
     raise Infrastructure('Hosted lane requires GITHUB_ACTIONS=true and RUNNER_ENVIRONMENT=github-hosted or the VM guest marker')
 
 
+def predecessor_preparation(row, version):
+    """Keep preparation evidence outside the candidate's journey identity."""
+    row.update(id='predecessor-' + row['id'], scope='predecessor-preparation',
+               predecessorVersion=version)
+    for check in row['checks']:
+        check['originalStatus'] = check['status']
+        check['reason'] = (f"Predecessor {version} preparation {row['id']}/{check['name']} "
+                           f"({check['status']}): " + check.get('reason', ''))
+        if check['status'] == 'failed-product':
+            check['status'] = 'owner-validation'
+    return row
+
+
 def full_selection(journeys, lane, definition=None):
     if definition is None:
         definition = json.loads((HERE / 'journeys.json').read_text())
@@ -177,8 +197,10 @@ def summarize(journeys, full_selection=True):
                 raise ValueError(f"Unknown check status: {check['status']}")
             counts[check['status']] += 1
     pending = [{'journey': j['id'], 'check': c['name'],
+                **({'reason': c['reason'], 'predecessorVersion': j['predecessorVersion']}
+                   if j.get('scope') == 'predecessor-preparation' else {}),
                 **({'evidence': c.get('evidence', [])}
-                   if j['id'] in ('guest-crashes-owner-validation', 'hosted-crashes') else
+                   if j.get('scope') == 'predecessor-preparation' or j['id'] in ('guest-crashes-owner-validation', 'hosted-crashes', 'windows-crashes') else
                    {'screenshots': [p for p in c.get('evidence', []) if p.endswith('.png')]})}
                for j in journeys for c in j['checks'] if c['status'] == 'owner-validation']
     failed = any(counts[s] for s in ('failed-product', 'failed-infrastructure', 'unavailable'))
@@ -219,7 +241,9 @@ def verify_assets(root, names):
     """Hash every selected asset before any archive extraction or execution."""
     root = Path(root).resolve()
     sums = {}
-    for line in (root / 'SHA256SUMS').read_text().splitlines():
+    for line in (root / 'SHA256SUMS').read_text(encoding='utf-8-sig').splitlines():
+        if not line or line.startswith('#'):
+            continue
         match = re.fullmatch(r'([a-fA-F0-9]{64}) [ *](.+)', line)
         if not match:
             raise Infrastructure('Malformed SHA256SUMS line')
@@ -250,6 +274,8 @@ def wait_for(fn, description, seconds=90, interval=1, error=AssertionError):
                 return value
         except TransientAPI as exc:
             product_error = last = exc
+        except RunStopped:
+            raise
         except (OSError, KeyError, ValueError, urllib.error.URLError, Infrastructure) as exc:
             last = exc
         time.sleep(interval)
@@ -451,9 +477,12 @@ class WebDriver:
             raise Infrastructure(f"WebDriver {value['error']}: {value.get('message')}")
         return value
 
-    def start(self, binary):
+    def start(self, binary, *, webview_options=None):
+        options = {'application': binary}
+        if webview_options is not None:
+            options['webviewOptions'] = webview_options
         value = self.call('/session', {'capabilities': {'alwaysMatch':
-            {'tauri:options': {'application': binary}}}})
+            {'tauri:options': options}}})
         self.session = value['sessionId']
 
     def execute(self, script, args=None):
@@ -471,6 +500,9 @@ return all(document,arguments[0]).find(e => {
 
     def click(self, selector, text=None, *, error=Infrastructure):
         element = self.element(selector, text, error=error)
+        return self.click_element(element)
+
+    def click_element(self, element):
         point = self.execute("arguments[0].scrollIntoView({block:'center',inline:'nearest'});const r=arguments[0].getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)}", [element])
         # Resolve the viewport point explicitly: WebKitGTK's element-origin
         # hit test can report an ancestor shadow host for nested components.
@@ -609,6 +641,28 @@ class Run:
         self.binary = None
         self.crash_since_ns = None
 
+    def setup(self):
+        self.target.prepare(self.args.lane, self.run_id)
+        self.crash_since_ns = int(self.target.py('import time;print(time.time_ns())').strip())
+        self.work = self.target.py('import tempfile;from pathlib import Path;p=Path.home()/".cache/justsearch-journeys";p.mkdir(parents=True,exist_ok=True);print(tempfile.mkdtemp(prefix="run-",dir=p))').strip()
+        self.data = self.target.py('import os;from pathlib import Path;print(Path(os.environ.get("XDG_DATA_HOME",str(Path.home()/".local/share")))/"io.justsearch.shell")').strip()
+        if self.args.resume:
+            state = json.loads(self.args.resume.read_text())
+            if state['assets'] != self.facts['assets'] or state['lane'] != self.args.lane or state['phase'] != self.args.phase:
+                raise Infrastructure('Setup checkpoint does not match the selected assets, lane and phase')
+            self.work, self.data, self.binary = (state[k] for k in ('work', 'data', 'binary'))
+            self.facts.update(state['facts'])
+            self.facts['resumedSetup'] = True
+            self.start_ui()
+        else:
+            existing = self.target.py('from pathlib import Path;import sys,json;print(Path(json.loads(sys.argv[1])).exists())', self.data).strip()
+            if existing != 'False':
+                raise Infrastructure('Fresh lane requires a clean app data folder; refusing inherited saved state')
+        self.evidence('environment', {'session': self.target.env.get('XDG_SESSION_TYPE'),
+                     'wayland': bool(self.target.env.get('WAYLAND_DISPLAY')), 'display': self.target.env.get('DISPLAY'),
+                     'os': self.target.run(['cat', '/etc/os-release']).stdout,
+                     'developerJavaPresent': self.target.run(['sh', '-c', 'command -v javac'], check=False).returncode == 0})
+
     def evidence(self, name, value):
         (self.out / (name + '.json')).write_text(json.dumps(redact(value), indent=2) + '\n')
 
@@ -616,6 +670,7 @@ class Run:
         report = {'schemaVersion': 1, 'lane': self.args.lane, 'runId': self.run_id,
                   'scenarios': self.definition['scenarios'], 'assets': self.facts.get('assets', {}),
                   'scope': self.definition.get('scope', {}),
+                  'predecessorVersion': (self.facts.get('predecessorPackage') or self.facts.get('initialPackage', {})).get('version') if getattr(self.args, 'phase', 'candidate') == 'predecessor' else None,
                   'journeys': self.results, **summarize(self.results,
                       full_selection(self.results, self.args.lane, self.definition)),
                   'execution': {'mode': 'development-rerun' if getattr(self.args, 'resume', None) else 'fresh',
@@ -860,7 +915,7 @@ print(json.dumps(rows))
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--lane', choices=['hosted-linux-x11', 'vm-linux-wayland', 'vm-linux-x11'], required=True)
+    parser.add_argument('--lane', choices=['hosted-linux-x11', 'vm-linux-wayland', 'vm-linux-x11', 'hosted-windows', 'vm-windows'], required=True)
     parser.add_argument('--vm', choices=['ubuntu'])
     parser.add_argument('--phase', choices=['candidate', 'predecessor'], default='candidate',
                         help='VM wrapper runs predecessor J5/J6 on a separate fresh overlay')
@@ -871,58 +926,46 @@ def main():
     parser.add_argument('--predecessor', type=Path)
     parser.add_argument('--mirror', type=Path)
     parser.add_argument('--driver', default='tauri-driver')
+    parser.add_argument('--native-driver', default='msedgedriver.exe', help='Windows WebView2-matching driver')
     parser.add_argument('--evidence', required=True, help='new, non-existing directory')
     parser.add_argument('--journeys', nargs='+', help='Run only these journey IDs; no implicit dependencies')
     parser.add_argument('--resume', type=Path, help='Development only: restore a stopped setup checkpoint')
     parser.add_argument('--checkpoint', type=Path, help='Save stopped setup state for the VM wrapper')
     args = parser.parse_args()
-    if bool(args.vm) != args.lane.startswith('vm-'):
+    if args.lane.endswith('windows') and args.vm:
+        parser.error('Windows adapters execute inside the guest; do not pass --vm')
+    if not args.lane.endswith('windows') and bool(args.vm) != args.lane.startswith('vm-'):
         parser.error('VM lanes require --vm; hosted lane runs inside its own Xvfb session')
     sys.modules['runner'] = sys.modules[__name__]
-    from linux import CHECKS
+    if args.lane.endswith('windows'):
+        from windows import Run as PlatformRun, CHECKS
+    else:
+        from linux import CHECKS
+        PlatformRun = Run
     definition = json.loads((HERE / 'journeys.json').read_text())
     if args.journeys and not set(args.journeys) <= {j['id'] for j in definition['journeys']}:
         parser.error('Unknown journey ID')
-    run = Run(args, definition)
+    run = PlatformRun(args, definition)
     try:
         setup_error = None
         try:
             run.facts['assets'] = verify_assets(args.assets, [args.package, args.mcpb])
             run.evidence('journey-source-sha256', {p.name: digest(p) for p in HERE.iterdir()
-                                                   if p.suffix in ('.py', '.json')})
-            run.target.prepare(args.lane, run.run_id)
-            run.crash_since_ns = int(run.target.py('import time;print(time.time_ns())').strip())
-            run.work = run.target.py('import tempfile;from pathlib import Path;p=Path.home()/".cache/justsearch-journeys";p.mkdir(parents=True,exist_ok=True);print(tempfile.mkdtemp(prefix="run-",dir=p))').strip()
-            run.data = run.target.py('import os;from pathlib import Path;print(Path(os.environ.get("XDG_DATA_HOME",str(Path.home()/".local/share")))/"io.justsearch.shell")').strip()
-            if args.resume:
-                state = json.loads(args.resume.read_text())
-                if state['assets'] != run.facts['assets'] or state['lane'] != args.lane or state['phase'] != args.phase:
-                    raise Infrastructure('Setup checkpoint does not match the selected assets, lane and phase')
-                run.work, run.data, run.binary = (state[k] for k in ('work', 'data', 'binary'))
-                run.facts.update(state['facts'])
-                run.facts['resumedSetup'] = True
-                run.start_ui()
-            else:
-                existing = run.target.py('from pathlib import Path;import sys,json;print(Path(json.loads(sys.argv[1])).exists())', run.data).strip()
-                if existing != 'False':
-                    raise Infrastructure('Fresh lane requires a clean app data folder; refusing inherited saved state')
-            run.evidence('environment', {'session': run.target.env.get('XDG_SESSION_TYPE'),
-                         'wayland': bool(run.target.env.get('WAYLAND_DISPLAY')), 'display': run.target.env.get('DISPLAY'),
-                         'os': run.target.run(['cat', '/etc/os-release']).stdout,
-                         'developerJavaPresent': run.target.run(['sh', '-c', 'command -v javac'], check=False).returncode == 0})
+                                                   if p.suffix in ('.py', '.json', '.ps1')})
+            run.setup()
         except Exception as exc:
             setup_error = exc
         for journey in definition['journeys']:
             if args.journeys and journey['id'] not in args.journeys:
                 continue
-            if journey['id'] not in phase_journeys(args.phase) and args.vm and args.lane != 'vm-linux-x11':
+            if journey['id'] not in phase_journeys(args.phase, args.lane) and (args.vm or args.lane == 'vm-windows') and args.lane != 'vm-linux-x11':
                 continue
             row = {'id': journey['id'], 'title': journey['title'], 'scenarioIds': journey['scenarioIds'], 'checks': []}
             run.results.append(row)
             from writes import COUNTERS, difference
             before_writes = None
             try:
-                before_writes = run.target.json(COUNTERS)
+                before_writes = run.write_counters() if args.lane.endswith('windows') else run.target.json(COUNTERS)
             except Exception as exc:
                 row['writeVolume'] = {'unavailable': str(exc)}
             for check in journey['checks']:
@@ -936,7 +979,7 @@ def main():
                     run.check(row, check['id'], lambda c=check: CHECKS[c['id']](run))
             if before_writes is not None:
                 try:
-                    row['writeVolume'] = difference(before_writes, run.target.json(COUNTERS))
+                    row['writeVolume'] = difference(before_writes, run.write_counters() if args.lane.endswith('windows') else run.target.json(COUNTERS))
                 except Exception as exc:
                     row['writeVolume'] = {'unavailable': str(exc)}
             run.save()
@@ -945,7 +988,8 @@ def main():
             run.finish()
         else:
             run.save()
-    if args.checkpoint and not setup_error and run.binary and run.facts.get('folder'):
+    checkpoint_ready = run.facts.get('folder') or (args.lane.endswith('windows') and run.facts.get('installed'))
+    if args.checkpoint and not setup_error and run.binary and checkpoint_ready:
         # finish() has stopped every owned app/driver. Only durable facts cross
         # the disk snapshot; a new process gets a new ownership marker.
         args.checkpoint.write_text(json.dumps({'assets': run.facts['assets'], 'lane': args.lane,

@@ -49,12 +49,26 @@ headless is the default. Stop it with `vm.py stop`. For a brief visible check,
 keep the window open no more than ten seconds while the owner uses the desktop.
 
 Paths and loopback ports are defined in `vm.py`: data at
-`/home/elias/dev/justsearch-qual`, Ubuntu SSH/QMP 22224/44424,
-Windows SSH/QMP 22211/44411. Config, password, SSH private key, per-OS known
+`/home/elias/dev/justsearch-qual`, Ubuntu SSH 22224 and Windows SSH 22211.
+QMP uses `qmp/ubuntu.sock` and `qmp/windows.sock` under that data directory;
+the host-user-owned `qmp/` directory is mode 0700. Config, password, SSH private key, per-OS known
 hosts, installer media and all large files live there, outside Git. `config.json`
 is created with a random local test password (mode 0600); both accounts are
 `qual`. SSH uses that directory's dedicated key and host-key records.
-QMP is unauthenticated and bound to 127.0.0.1 only, as are SSH forwards.
+QMP has no TCP listener. The host-only Unix sockets are not exposed to the
+guest; all screen commands and journey adapters use this transport. SSH forwards
+bind to 127.0.0.1. The retired QMP ports (44424/44411) are still probed for
+ownership safety when an older harness may be running.
+Networking limitation: this host has QEMU 10.2.1 and libslirp 4.9.1.
+QEMU's [user network options](https://www.qemu.org/docs/master/system/qemu-manpage.html)
+and [10.2.1 SLIRP configuration](https://github.com/qemu/qemu/blob/v10.2.1/net/slirp.c)
+do not expose libslirp's `disable_host_loopback` control. Other host loopback
+services remain reachable from the guest through 10.0.2.2. Treat these disposable
+guests as able to contact those services. `restrict=on` is deliberately unused:
+it would cut J3's production internet downloads. Normal internet access and SSH
+forwarding remain enabled. Moving QMP to a Unix socket removes the guest's access
+to the host QEMU control interface despite that networking limitation.
+
 QMP screenshots and keyboard/mouse injection work without guest software.
 `type` supports printable US ASCII, newline and tab; other characters fail
 before typing. `key` accepts QEMU qcodes joined with `+`, plus aliases such as
@@ -119,7 +133,7 @@ Exclusive control locks are reserved for harness state changes.
 
 `start` checks both guests before changing config, disks or firmware: the VM's
 lifetime flock (inherited and retained by QEMU), the running record, connect
-probes on all four ports, visible harness processes, and QEMU's image locking
+probes on SSH and retired QMP ports plus both Unix sockets, visible harness processes, and QEMU's image locking
 on existing overlays/install disks. Unavailable probes count as occupied.
 This protects a VM even when a sandbox hides its process. `status` reports
 `running (owner X, process not visible)` when other signals remain. Run status
@@ -136,7 +150,7 @@ investigating a stale record, run on the host:
 python3 vm.py clear-stale
 ```
 
-This rechecks the lifetime lock, all ports, image locks and visible processes,
+This rechecks the lifetime lock, all ports and Unix sockets, image locks and visible processes,
 then removes only the record if every check is free. It never deletes a disk.
 `wait-free` polls every five seconds and returns zero only when the record and
 all live signals are absent; timeout is nonzero and names the blocking signals.
@@ -167,7 +181,7 @@ A successful preparation intentionally leaves the VM running for its owner;
 use `vm.py stop` with the same token when finished. Keep qualification-only
 visible checks brief while the owner uses the desktop.
 
-HTTPS update mirror (Ubuntu)
+HTTPS update mirror (Ubuntu and Windows)
 ----------------------------
 
 Lay out a folder as a URL tree, for example:
@@ -222,8 +236,8 @@ is never changed.
 Exploring sessions in restricted sandboxes
 ------------------------------------------
 
-Host sessions can use the screen commands directly. On this host a restricted
-Codex sandbox cannot connect to loopback QMP (`EPERM`). A file queue works when
+Host sessions can use the screen commands directly through the Unix socket.
+If a restricted session cannot access that host socket, a file queue works when
 the data directory is writable. Start this foreground broker on the host,
 using the owning session's token, before starting the exploring session:
 
@@ -285,3 +299,15 @@ reconciliation. Test pins and test signing keys were used, with no sandbox/HTTP
 test switch. The harness branch contains no updater product changes. Evidence,
 including exact commands, initial probe failures and corrected checks:
 `/home/elias/dev/justsearch-qual/evidence/w5/acceptance.json`.
+
+Windows journey qualification uses [journeys/vm-windows.py](journeys/README.md#windows-journeys).
+Its guest tooling and interactive task keep developer build tools out of the
+clean install. After that wrapper has provisioned Python and copied the adapter,
+`vm.py mirror windows /path/to/mirror` uses the same HTTPS URL-tree layout as
+Ubuntu. `mirror-windows.py` imports a two-day test CA into the **guest's** machine
+root store, saves exact hosts bytes, maps github.com to guest loopback and runs
+a recorded interactive HTTPS task. `--untrusted` omits trust; `--remove` stops
+only that server's PID/creation/image identity, removes its CA and restores the
+hosts bytes. Concurrent hosts edits cause refusal instead of being overwritten.
+No host trust store or base image is changed. Windows mirror setup is elevated
+inside the disposable guest; the app journeys run with a limited user token.

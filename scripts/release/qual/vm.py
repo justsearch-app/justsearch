@@ -13,6 +13,7 @@ import shlex
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -24,11 +25,11 @@ ROOT = Path('/home/elias/dev/justsearch-qual')
 HERE = Path(__file__).resolve().parent
 OVMF = Path('/usr/share/OVMF')
 OS = {
-    'ubuntu': {'ssh': 22224, 'qmp': 44424, 'size': '64G',
+    'ubuntu': {'ssh': 22224, 'legacy_qmp': 44424, 'size': '64G',
                'iso': 'ubuntu-24.04.5.1-desktop-amd64.iso',
                'url': 'https://releases.ubuntu.com/24.04/ubuntu-24.04.5.1-desktop-amd64.iso',
                'sha256': '4da4a0c9035da8e68a59a838674f403f0a54472c78a83b4fb7f78d03588f85a7'},
-    'windows': {'ssh': 22211, 'qmp': 44411, 'size': '80G', 'iso': 'windows.iso',
+    'windows': {'ssh': 22211, 'legacy_qmp': 44411, 'size': '80G', 'iso': 'windows.iso',
                 'url': 'https://go.microsoft.com/fwlink/?LinkId=2382600&clcid=0x409&country=us&culture=en-us',
                 'sha256': 'bc3f24086ebadc94489066b5ad78089e2cf5c3491e90e790bb81a2b199c10e38'},
 }
@@ -147,6 +148,33 @@ def port_open(port):
         raise RuntimeError(f'Cannot establish whether port {port} is free: {exc}; run on host') from exc
 
 
+def qmp_path(os_name):
+    return ROOT / 'qmp' / (os_name + '.sock')
+
+
+def qmp_open(os_name):
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+            probe.settimeout(.5)
+            probe.connect(str(qmp_path(os_name)))
+        return True
+    except (FileNotFoundError, ConnectionRefusedError):
+        return False
+    except OSError as exc:
+        raise RuntimeError(f'Cannot establish whether {qmp_path(os_name)} is free: {exc}; run on host') from exc
+
+
+def prepare_qmp(os_name):
+    folder = qmp_path(os_name).parent
+    folder.mkdir(mode=0o700, exist_ok=True)
+    info = folder.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+        raise RuntimeError('QMP directory must be a real directory owned by this host user')
+    folder.chmod(0o700)
+    # launch() has already proved both guests free, including Unix endpoints.
+    qmp_path(os_name).unlink(missing_ok=True)
+
+
 def live_reasons(check_lock=True):
     reasons = []
     if check_lock and (ROOT / 'vm.lock').exists():
@@ -156,12 +184,18 @@ def live_reasons(check_lock=True):
             except BlockingIOError:
                 reasons.append('VM lifetime lock held')
     for name, spec in OS.items():
-        for kind in ('qmp', 'ssh'):
+        # Also detect a VM started by an older TCP-QMP harness.
+        for kind in ('legacy_qmp', 'ssh'):
             try:
                 if port_open(spec[kind]):
                     reasons.append(f'{name} {kind} port {spec[kind]} answers')
             except RuntimeError as exc:
                 reasons.append(str(exc))
+        try:
+            if qmp_open(name):
+                reasons.append(f'{name} QMP socket {qmp_path(name)} answers')
+        except RuntimeError as exc:
+            reasons.append(str(exc))
         for filename in ('run.qcow2', 'install.qcow2'):
             disk = ROOT / name / filename
             if disk.exists():
@@ -243,12 +277,20 @@ def wait_free(timeout):
 class QMP:
     def __init__(self, os_name):
         require_owner(os_name)
-        self.sock = socket.create_connection(('127.0.0.1', OS[os_name]['qmp']), timeout=10)
-        self.file = self.sock.makefile('rwb')
-        greeting = json.loads(self.file.readline())
-        if 'QMP' not in greeting:
-            raise RuntimeError('Not a QMP server')
-        self.command('qmp_capabilities')
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            self.sock.settimeout(10)
+            self.sock.connect(str(qmp_path(os_name)))
+            self.file = self.sock.makefile('rwb')
+            greeting = json.loads(self.file.readline())
+            if 'QMP' not in greeting:
+                raise RuntimeError('Not a QMP server')
+            self.command('qmp_capabilities')
+        except BaseException:
+            if hasattr(self, 'file'):
+                self.file.close()
+            self.sock.close()
+            raise
 
     def command(self, name, **arguments):
         self.file.write((json.dumps({'execute': name, 'arguments': arguments}) + '\n').encode())
@@ -281,9 +323,9 @@ def launch(os_name, disk, variables, visible=False, installer=None, lease=None):
     cpus = sorted(os.sched_getaffinity(0))[:8]
     if len(cpus) != 8:
         raise RuntimeError('Eight allowed host threads are required')
-    for port in (OS[os_name]['qmp'], OS[os_name]['ssh']):
-        with socket.socket() as probe:
-            probe.bind(('127.0.0.1', port))
+    prepare_qmp(os_name)
+    with socket.socket() as probe:
+        probe.bind(('127.0.0.1', OS[os_name]['ssh']))
     args = ['taskset', '-c', ','.join(map(str, cpus)), 'qemu-system-x86_64',
             '-name', f'justsearch-qual-{os_name}', '-machine', 'q35,accel=kvm',
             '-cpu', 'host', '-smp', '8', '-m', str(MEMORY_MIB),
@@ -291,7 +333,7 @@ def launch(os_name, disk, variables, visible=False, installer=None, lease=None):
             '-drive', f'if=pflash,format=raw,file={variables}',
             '-drive', f'file={disk},format=qcow2,if=ide',
             '-nic', f"user,model=e1000e,hostfwd=tcp:127.0.0.1:{OS[os_name]['ssh']}-:22",
-            '-qmp', f"tcp:127.0.0.1:{OS[os_name]['qmp']},server=on,wait=off",
+            '-qmp', f"unix:{qmp_path(os_name)},server=on,wait=off",
             '-add-fd', f'fd={lease},set=1,opaque=qual-lifetime-lock',
             '-monitor', 'none', '-serial', f'file:{ROOT}/{os_name}-serial.log',
             '-vga', 'std', '-device', 'qemu-xhci', '-device', 'usb-tablet',
@@ -685,10 +727,11 @@ def prepare_owner(os_name, package=None, corpus=None):
 
 def mirror(os_name, folder=None, remove=False, untrusted=False):
     require_owner(os_name)
-    if os_name != 'ubuntu':
-        raise ValueError('The update mirror currently supports Ubuntu only')
     if remove:
-        guest_root(os_name, 'python3 /home/qual/qual-mirror-guest.py remove')
+        if os_name == 'windows':
+            ssh(os_name, 'C:/Qual/Python/Scripts/python.exe C:/Qual/mirror-windows.py remove', check=True)
+        else:
+            guest_root(os_name, 'python3 /home/qual/qual-mirror-guest.py remove')
         return
     if not folder:
         raise ValueError('mirror requires a folder, or --remove')
@@ -696,20 +739,28 @@ def mirror(os_name, folder=None, remove=False, untrusted=False):
         temp = Path(temp)
         archive_folder(folder, temp / 'files.tar.gz')
         run('openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2',
-            '-subj', '/CN=JustSearch qualification test CA', '-keyout', temp / 'ca.key', '-out', temp / 'ca.crt',
+            '-subj', '/CN=JustSearch qualification test CA',
+            '-addext', 'basicConstraints=critical,CA:TRUE', '-addext', 'keyUsage=critical,keyCertSign,cRLSign', '-keyout', temp / 'ca.key', '-out', temp / 'ca.crt',
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         run('openssl', 'req', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=github.com',
             '-keyout', temp / 'server.key', '-out', temp / 'server.csr',
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        (temp / 'ext.cnf').write_text('subjectAltName=DNS:github.com\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n')
+        (temp / 'ext.cnf').write_text('subjectAltName=DNS:github.com\nbasicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n')
         run('openssl', 'x509', '-req', '-days', '2', '-in', temp / 'server.csr', '-CA', temp / 'ca.crt',
             '-CAkey', temp / 'ca.key', '-CAcreateserial', '-extfile', temp / 'ext.cnf', '-out', temp / 'server.crt',
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        copy_in(os_name, HERE / 'mirror-guest.py', '/home/qual/qual-mirror-guest.py')
-        ssh(os_name, 'mkdir -p /home/qual/qual-mirror-input && chmod 700 /home/qual/qual-mirror-input', check=True)
-        for name in ('ca.crt', 'server.crt', 'server.key', 'files.tar.gz'):
-            copy_in(os_name, temp / name, '/home/qual/qual-mirror-input/' + name)
-        guest_root(os_name, 'python3 /home/qual/qual-mirror-guest.py setup' + (' --untrusted' if untrusted else ''))
+        if os_name == 'windows':
+            ssh(os_name, powershell('New-Item -ItemType Directory -Force C:/Qual/mirror-input | Out-Null'), check=True)
+            copy_in(os_name, HERE / 'mirror-windows.py', 'C:/Qual/mirror-windows.py')
+            for name in ('ca.crt', 'server.crt', 'server.key', 'files.tar.gz'):
+                copy_in(os_name, temp / name, 'C:/Qual/mirror-input/' + name)
+            ssh(os_name, 'C:/Qual/Python/Scripts/python.exe C:/Qual/mirror-windows.py setup' + (' --untrusted' if untrusted else ''), check=True)
+        else:
+            copy_in(os_name, HERE / 'mirror-guest.py', '/home/qual/qual-mirror-guest.py')
+            ssh(os_name, 'mkdir -p /home/qual/qual-mirror-input && chmod 700 /home/qual/qual-mirror-input', check=True)
+            for name in ('ca.crt', 'server.crt', 'server.key', 'files.tar.gz'):
+                copy_in(os_name, temp / name, '/home/qual/qual-mirror-input/' + name)
+            guest_root(os_name, 'python3 /home/qual/qual-mirror-guest.py setup' + (' --untrusted' if untrusted else ''))
         print('HTTPS mirror ready at https://github.com/ (CA ' + ('untrusted' if untrusted else 'in system trust store') + ')')
 
 

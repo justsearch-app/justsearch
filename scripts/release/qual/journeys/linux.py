@@ -40,6 +40,9 @@ def apt(run, *args):
 
 
 def installed_version(run):
+    if getattr(run, 'platform', None) == 'windows':
+        entry = run.installed_version()
+        return entry['version'] if entry else None
     result = run.target.run(['dpkg-query', '-W', '-f=${db:Status-Abbrev}${Version}', 'just-search'], check=False)
     if result.returncode not in (0, 1):
         raise Infrastructure('Installed package status query failed')
@@ -61,14 +64,14 @@ def package_install(run):
     target = run.work + '/' + initial.name
     if initial != candidate:
         run.target.copy(initial, target)
-    run.facts['initialPackage'] = {'name': initial.name, 'sha256': digest(initial)}
+    expected = run.target.run(['dpkg-deb', '-f', target, 'Version']).stdout.strip()
+    run.facts['initialPackage'] = {'name': initial.name, 'sha256': digest(initial), 'version': expected}
     apt(run, 'install', target)
     paths = run.target.run(['dpkg-query', '-L', 'just-search']).stdout.splitlines()
     run.facts['engineWorkingDirectories'] = sorted({str(Path(p).parent) for p in paths if p.endswith('/ui-headless.jar')})
     binaries = [p for p in paths if p.endswith('/JustSearch') and '/bin/' in p]
     assert len(binaries) == 1, 'Package has no unique installed executable'
     run.binary = binaries[0]
-    expected = run.target.run(['dpkg-deb', '-f', target, 'Version']).stdout.strip()
     assert installed_version(run) == expected, 'Installed package version differs from the selected bytes'
     verify = run.target.run(['dpkg', '--verify', 'just-search'], check=False)
     assert verify.returncode == 0 and not verify.stdout.strip(), 'Installed payload differs from dpkg checksums'
@@ -158,11 +161,20 @@ def add_folder(run):
     return roots
 
 
+def fixture_present(run, value, filename=OPEN_FILE):
+    # Windows Engine IDs/filenames use canonical lowercase paths. Linux keeps
+    # its case-sensitive comparison; all callers still inspect app evidence.
+    observed = json.dumps(value)
+    if getattr(run, 'platform', None) == 'windows':
+        observed, filename = observed.casefold(), filename.casefold()
+    return filename in observed
+
+
 def search_api(run, query=QUERY, filename=OPEN_FILE):
     def probe():
         result = run.api('/api/knowledge/search', {'query': query, 'mode': 'text', 'limit': 20})
         run.evidence('search-last', result)
-        return result if filename in json.dumps(result.get('results', [])) else None
+        return result if fixture_present(run, result.get('results', []), filename) else None
     return wait_for(probe, 'Indexed fixture returned: ' + filename, seconds=240)
 
 
@@ -234,6 +246,27 @@ def search_open(run):
     return {'search': result, 'receivingViewerProcess': viewer}
 
 
+def cpu_install_ready(run, status):
+    if status.get('installedFully') is True:
+        return True
+    if getattr(run, 'platform', None) != 'windows':
+        return False
+    # Windows AiInstallStatus intentionally calls CPU chat/CUDA hardware skips
+    # "installed with limitations". Require the complete positive package and
+    # acquisition evidence instead of waiting for that flag to become true.
+    packages = status.get('packages', [])
+    required = {'embedding', 'splade', 'reranker', 'ner', 'citation-scorer'}
+    excluded = {'chat', 'cuda-runtime'}
+    return (status.get('state') == 'completed' and status.get('phase') == 'done'
+            and status.get('repairNeeded') is False
+            and 'retrieval-core' in status.get('readyCapabilities', [])
+            and {p.get('packageId') for p in packages} == required | excluded
+            and len(packages) == len(required | excluded)
+            and all(not p.get('error') and (
+                p.get('state') == 'installed' if p.get('packageId') in required else
+                p.get('state') == 'skipped' and p.get('skipCause') == 'hardware') for p in packages))
+
+
 def install_ai(run):
     run.require('ui')
     run.require('folder')
@@ -273,7 +306,10 @@ def install_ai(run):
     run.evidence('J3-downloaded', status)
     memory_samples = []
     def sample_memory():
-        sample = run.target.json("""
+        if getattr(run, 'platform', None) == 'windows':
+            sample = run.memory_sample()
+        else:
+            sample = run.target.json("""
 import json,time
 from pathlib import Path
 m={k:int(v.split()[0]) for k,v in (line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines()) if k in ('MemTotal','MemAvailable','SwapTotal','SwapFree')}
@@ -303,7 +339,7 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
             if operation.get('state') in ('failed', 'cancelled'):
                 raise ProductFailure('Model activation failed: ' + json.dumps(operation))
         features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
-        return {'install': install, 'runtime': runtime} if install.get('installedFully') is True and all(
+        return {'install': install, 'runtime': runtime} if cpu_install_ready(run, install) and all(
             features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
     active = wait_for(activated, 'Downloaded default CPU search encoders activated', seconds=900, interval=5)
     status = active['install']
@@ -371,7 +407,7 @@ def semantic_search(run):
         trace = result.get('searchTrace', {})
         degradation = trace.get('degradation', {})
         stages = trace.get('stages', [])
-        return result if OPEN_FILE in json.dumps(result.get('results', [])) and trace.get('effectiveMode') == 'VECTOR' and not degradation.get('hybridFallback') and not degradation.get('vectorBlocked') and any(
+        return result if fixture_present(run, result.get('results', [])) and trace.get('effectiveMode') == 'VECTOR' and not degradation.get('hybridFallback') and not degradation.get('vectorBlocked') and any(
             s.get('id') == 'dense-retrieval' and s.get('status') == 'executed' for s in stages) and any(
             s.get('id') == 'cross-encoder' and s.get('status') == 'executed' for s in stages) and not any(
             s.get('id') == 'sparse-retrieval' and s.get('status') == 'executed' for s in stages) else None
@@ -379,6 +415,8 @@ def semantic_search(run):
 
 
 def snapshot(run):
+    if getattr(run, 'platform', None) == 'windows':
+        return run.state_snapshot()
     settings = run.api('/api/settings/v2')
     roots = run.api('/api/indexing/roots')
     # Observe owned authored/settings/model files; never modify saved state to
@@ -437,8 +475,8 @@ def assert_state(run):
     assert before['savedFiles'] == after['savedFiles'], 'Settings, authored records or model bytes changed'
     assert after['savedFiles']['savedViews'], 'No persisted authored bookmark was observed'
     assert before['settings'].get('ui') == after['settings'].get('ui'), 'Persisted UI settings changed'
-    assert run.require('corpus') in json.dumps(after['roots']), 'Watched folder disappeared'
-    assert OPEN_FILE in json.dumps(after['search']['results']), 'Indexed fixture disappeared'
+    assert json.dumps(run.require('corpus')) in json.dumps(after['roots']), 'Watched folder disappeared'
+    assert fixture_present(run, after['search']['results']), 'Indexed fixture disappeared'
     return after
 
 
@@ -497,10 +535,33 @@ return entry ? {label:entry.querySelector('.item-label').textContent.trim(),url:
             error=AssertionError if corroborated else Infrastructure)
 
 
+def require_predecessor_state(run):
+    # A checkpoint can be useful for development after a failed J3. It does
+    # not certify the models/records which J5 promises to preserve.
+    missing = [key for key in ('ai', 'authored', 'bookmark', 'beforeState') if not run.facts.get(key)]
+    before = run.facts.get('beforeState', {}).get('savedFiles', {})
+    models = {p: checksum for p, checksum in before.get('files', {}).items()
+              if Path(p).suffix in ('.onnx', '.gguf', '.safetensors')}
+    if not models:
+        missing.append('prepared model bytes')
+    if not before.get('savedViews') or run.facts.get('bookmark') not in before.get('savedViews', []):
+        missing.append('prepared authored bookmark')
+    if missing:
+        raise Unavailable('Predecessor preparation unavailable: ' + ', '.join(missing))
+    current = snapshot(run)['savedFiles']
+    run.evidence('J5-predecessor-state', {'prepared': before, 'observed': current})
+    if (any(current.get('files', {}).get(p) != checksum for p, checksum in models.items())
+            or current.get('savedViews') != before['savedViews']):
+        raise Unavailable('Predecessor preparation unavailable: prepared models or authored records missing/changed; see J5-predecessor-state.json')
+    return current
+
+
 def update_prepare(run):
+    for key in ('updateOffered', 'updateCancelled'):
+        run.facts.pop(key, None)
     if not run.args.predecessor or not run.args.mirror:
         raise Unavailable('Update requires --predecessor and --mirror with the same test pins')
-    run.require('beforeState')
+    require_predecessor_state(run)
     if run.args.phase != 'predecessor':
         raise Infrastructure('J5 requires its own fresh predecessor overlay')
     predecessor = run.work + '/' + run.args.predecessor.name
@@ -962,7 +1023,7 @@ def mcp(run):
         observations[name] = parsed
         assert not parsed.get('isError'), 'MCP tool returned isError: ' + json.dumps(parsed)
     assert 'justsearch_search' in json.dumps(observations['list']), 'tools/list omits search'
-    assert OPEN_FILE in json.dumps(observations['search']), 'MCP search did not return fixture'
+    assert fixture_present(run, observations['search']), 'MCP search did not return fixture'
     return {'manifest': manifest, 'inspector': '0.21.1', 'node': node, 'observations': observations}
 
 
