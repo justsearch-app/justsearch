@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Draft ownership without a browser, element or event dependency. */
 declare const editToken: unique symbol;
-export type ComposerEditToken = { readonly [editToken]: true };
+type ComposerEditToken = { readonly [editToken]: true };
 
 export interface ComposerCapture {
   readonly port: ComposerPort;
