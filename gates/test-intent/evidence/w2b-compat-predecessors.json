@@ -1,0 +1,109 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T12:44:50.965Z",
+  "revision": "443c0752cf77113b5ee579b2b7c287bfe33bd389",
+  "tree": "d66ac3802f603fa1f849a88783ec95b834b93a3b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::published_baseline_producer_bytes_cover_full_current_register\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 95922
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::published_baseline_producer_bytes_cover_earlier_current_subset\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2178
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::published_baseline_producer_bytes_cover_published_register_including_retirement\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1755
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::published_baseline_producer_bytes_refuse_unreadable_predecessor_format\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1970
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::published_baseline_producer_bytes_cover_full_current_register",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b12cb3958cf3146e35caac068623dda78acbf64dc878bfaddc129d39db767675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::published_baseline_producer_bytes_cover_full_current_register",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::published_baseline_producer_bytes_cover_earlier_current_subset",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b12cb3958cf3146e35caac068623dda78acbf64dc878bfaddc129d39db767675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::published_baseline_producer_bytes_cover_earlier_current_subset",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::published_baseline_producer_bytes_cover_published_register_including_retirement",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b12cb3958cf3146e35caac068623dda78acbf64dc878bfaddc129d39db767675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::published_baseline_producer_bytes_cover_published_register_including_retirement",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::published_baseline_producer_bytes_refuse_unreadable_predecessor_format",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b12cb3958cf3146e35caac068623dda78acbf64dc878bfaddc129d39db767675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::published_baseline_producer_bytes_refuse_unreadable_predecessor_format",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5277de4c688f9b181d49c5a23de12b58e728f7083f00ffc5656c117c8af53528"
+}
