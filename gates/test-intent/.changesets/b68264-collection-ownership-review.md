@@ -204,3 +204,14 @@ parses do not replace the previous snapshot, and are retried rather than served 
   "note": "Verified merge retains both trees without overlapping file edits; 67 targeted cases pass without skips; baseline reproduces K1 and four cache/lock failures; repeated malformed-registry refusal and repair pass before and after; F2 is attributed as a delegated agent choice."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "auditor-1045-codex-2",
+  "verdict": "accept",
+  "digest": "sha256:a2668efed1575163c172308a1d3c2a07ac3907152262b571c9c90e019844bd1c",
+  "note": "I compared the 873a11ad97 fixture and merge-base harness with the candidate, checked the cited warrants and repeated the decision-record conflict search. The retirement/replacement classifications, harness Adaptation, out-of-root Defect pin and snapshot New entries are supported by matching committed evidence, including assertion fail-before and passing candidate runs."
+}
+```

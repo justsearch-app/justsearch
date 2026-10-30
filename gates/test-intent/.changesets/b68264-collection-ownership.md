@@ -104,7 +104,7 @@ collection field and are handled by their existing replay authority.
       ],
       "evidence": "gates/test-intent/evidence/b68264-collection-ownership.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionReconciliationTest.java"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java#forceReadmitsAnExistingServingPathToTheScopedCandidateJournal"
       ]
     },
     {
