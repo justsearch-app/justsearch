@@ -140,3 +140,14 @@ Independent acceptance is left to the verifier; this builder does not author an 
   "note": "Codex verifier-3 (final round) on 9b4bf16f26: PASS S1-S7, S9, S11 (5 real crash-free cycles; earlier rounds 30+10, base 5/5 SIGSEGV); S6 18/18 match base; classifications and disclosures honest. S8/S10 unverified (named limits)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18db9-c2e8-7ed1-9911-bd98d0318ef4",
+  "verdict": "accept",
+  "digest": "sha256:8705adc4aca135fff1b1d7eedf56d9faf42de606aa2a308dc370cbaec0fd9df1",
+  "note": "Codex verifier-4 on 1ba58972e1: lint-only diff (compiled instructions identical), 86 selected tests and fresh PMD pass, classifications and evidence honest, 16 check-source digests match; gate fails only for stale acceptance against the merge base. Behaviour verified by verifier-3 (session 01a18d28) on the pre-lint commit."
+}
+```
