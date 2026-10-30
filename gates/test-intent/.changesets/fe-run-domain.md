@@ -16,7 +16,7 @@ author-session: fe-run-domain
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts"
       ],
       "class": "New",
-      "behaviour": "Preserve run dispatch, activity, decisions, steering outcomes and identity, reattachment, approval, Halt, synchronous first notifications, duplicate terminals, acknowledgement latching, consecutive held gates and reconnect. The owner probes run without mounting components against AgentSessionController's injected HaltBackend transport. The baseline fallback invokes the original view-owned handlers with identical assertions; it is test scaffolding only. Both files pass on 9538356c46 with unchanged production sources. The new file is explicitly covered because existing Ask tests read sibling test sources.",
+      "behaviour": "Preserve run dispatch, activity, decisions, steering outcomes and identity, reattachment, approval, Halt, synchronous first notifications, duplicate terminals, acknowledgement latching, consecutive held gates and reconnect. The owner probes construct Sv3RunDomain directly with a recording fake host, ComposerPort, injected clock and a real AgentSessionController using HaltBackend; no Search element or fallback is loaded. Settlement and terminal record refresh are counted after duplicate notifications. Matching current approval details must prompt and POST before a delayed old lookup is released during a replacement run. The view budget check exhausts one run's automatic allowance and exercises a fresh choice and full allowance on a replacement whose first notification already holds a gate. Targeted production mutations in an isolated shared clone demonstrate assertion failures for each rewritten owner probe, terminal wiring, and the budget count and latch independently; production sources are restored afterward. Both suites pass on bd6c65c202 with unchanged production sources. The new file is explicitly covered because existing Ask tests read sibling test sources.",
       "sources": [
         {
           "kind": "owner-words",
@@ -28,7 +28,7 @@ author-session: fe-run-domain
           "delegationQuote": "proceed with step 4",
           "delegationLocation": "task t-20261029-fs993c request, 2026-10-30",
           "delegationScope": "Step 4 of the agreed frontend restructuring: move the Search view's areas out one at a time, nothing the user sees changes, under the same safety net of scenario checks",
-          "choice": "Pin dispatch notification ordering, terminal idempotence, acknowledgement latching, held-gate reset, reconnect and SW-RUN-01 through SW-RUN-11 against unchanged base behavior, then redirect the moved private update handler without changing its assertions.",
+          "choice": "Pin dispatch notification ordering, counted terminal idempotence, acknowledgement latching, renewed automatic continuation at an immediately held replacement gate, reconnect and SW-RUN-01 through SW-RUN-11. Drive the extracted owner directly; keep component wiring checks in the view suite and prove rewritten assertions detect targeted regressions.",
           "label": "agent choice"
         }
       ],
@@ -36,9 +36,9 @@ author-session: fe-run-domain
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#opens the delegated turn before a synchronous first notification and settles duplicate terminals once",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#keeps acknowledgement latched when the server evidence disappears",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#resets budget choice count and latch after a run ends with its gate still held",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#renews the automatic continuation allowance when a replacement run starts at a held gate",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#reconnects the retained window without another adoption or stopping delegated work",
-        "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-01 opens its turn before dispatch and settles duplicate terminals once",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-01 dispatches the opened turn and settles duplicate terminals once",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-02 projects actual tool activity and leaves an unreported step count unknown",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-03 routes a held budget choice through the issuance seam",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-04 concurrent steering stays on one run and opens no competing turn",
@@ -71,7 +71,7 @@ author-session: fe-run-domain
           "delegationQuote": "proceed with step 4",
           "delegationLocation": "task t-20261029-fs993c request, 2026-10-30",
           "delegationScope": "Step 4 of the agreed frontend restructuring: move the Search view's areas out one at a time, nothing the user sees changes, under the same safety net of scenario checks",
-          "choice": "Pin dispatch notification ordering, terminal idempotence, acknowledgement latching, held-gate reset, reconnect and SW-RUN-01 through SW-RUN-11 against unchanged base behavior, then redirect the moved private update handler without changing its assertions.",
+          "choice": "Pin dispatch notification ordering, counted terminal idempotence, acknowledgement latching, renewed automatic continuation at an immediately held replacement gate, reconnect and SW-RUN-01 through SW-RUN-11. Drive the extracted owner directly; keep component wiring checks in the view suite and prove rewritten assertions detect targeted regressions.",
           "label": "agent choice"
         }
       ]

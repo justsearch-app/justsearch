@@ -1584,7 +1584,12 @@
         {
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
-          "test": "SW-RUN-01 opens its turn before dispatch and settles duplicate terminals once"
+          "test": "SW-RUN-01 dispatches the opened turn and settles duplicate terminals once"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "opens the delegated turn before a synchronous first notification and settles duplicate terminals once"
         }
       ]
     },
@@ -1656,6 +1661,11 @@
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
           "test": "SW-RUN-03 routes a held budget choice through the issuance seam"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "renews the automatic continuation allowance when a replacement run starts at a held gate"
         }
       ]
     },

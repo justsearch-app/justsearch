@@ -3,116 +3,117 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentSessionController } from '../../controllers/AgentSessionController.js';
 import { HaltBackend } from '../../controllers/testing/HaltBackend.js';
 import { setAuthorizationPresenter } from '../../operations/authorizationBroker.js';
-import type { Sv3RunDecision, Sv3StopState } from './Sv3Main.js';
-import type { Sv3RunFeedItem, Sv3RunView } from './sv3-run.js';
-import type { Sv3SessionList } from './sv3-sessions.js';
-import { __resetConversationListForTest } from '../../state/conversationListStore.js';
-import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
-
-let current: AgentSessionController | null = null;
-vi.mock('../../state/agentSessionStore.js', () => ({
-  peekAgentSessionController: () => current,
-  getAgentSessionController: () => current,
-  subscribeAgentSession: () => () => {},
-}));
-vi.mock('../../substrates/effects/index.js', async original => ({
-  ...await original<object>(), recordEffect: vi.fn(() => ({ id: 1 })), markUndoableOperation: vi.fn(),
-}));
-import './SearchV3View.js';
-
-interface Owner {
-  onAgentUpdate(): void;
-  snapshot(): Sv3RunView | null;
-  haltRun(): void;
-  runStopping(): Sv3StopState | null;
-  steerLiveRun(text: string): void;
-  decide(detail: Sv3RunDecision): void;
-  syncRunPresence(): void;
-  unconfirmedSteerNotes: ReadonlyMap<string, readonly Sv3RunFeedItem[]>;
-}
-interface WindowHarness {
-  apiBase: string;
-  sessions: Sv3SessionList;
-  runDomain?: Owner;
-  delegate(text: string, turnAction: boolean): void;
-  onAgentUpdate(): void;
-  projectRun(): Sv3RunView | null;
-  haltRun(): void;
-  runStopping(): Sv3StopState | null;
-  steerLiveRun(text: string): void;
-  onRunDecision(event: CustomEvent<Sv3RunDecision>): void;
-  syncRunPresence(): void;
-  unconfirmedSteerNotes: ReadonlyMap<string, readonly Sv3RunFeedItem[]>;
-}
+import { ComposerPort } from '../../state/composerPort.js';
+import { Sv3RunDomain } from './sv3-run-domain.js';
+import type { Sv3RunView } from './sv3-run.js';
+import {
+  adoptRunSession, latestTurnRef, settleAgentTurn, submitInSession, SV3_SESSIONS_EMPTY,
+  type Sv3SessionList,
+} from './sv3-sessions.js';
 
 let backend: HaltBackend;
 const controllers: AgentSessionController[] = [];
-const views: WindowHarness[] = [];
 const tasks: Promise<unknown>[] = [];
 const flush = async (): Promise<void> => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 
-/** No mounted component or DOM assertions: drive the window owner and its injected real transport.
- * The fallback runs the exact same probes against the original view-owned methods on the base.
- */
+/** The host owns turns; the domain owns run bookkeeping. No Search element or private view seams. */
 function windowOwner() {
-  const view = document.createElement('jf-sv3-window') as unknown as WindowHarness;
-  views.push(view);
-  view.apiBase = 'http://owner.test';
-  // Isolate submission preparation, navigation and record fetching; those stay in the view.
-  Object.defineProperty(view, 'delegateUnavailableReason', { get: () => '' });
-  Object.assign(view, {
-    draftMayIssue: () => true, persistDraft: () => true,
-    claimConversation: () => {}, leaveResultsBySending: () => {},
-    setComposerState: async () => {}, refreshRecord: async () => false,
-  });
-  const owner: Owner = view.runDomain ?? {
-    onAgentUpdate: () => view.onAgentUpdate(), snapshot: () => view.projectRun(),
-    haltRun: () => view.haltRun(), runStopping: () => view.runStopping(),
-    steerLiveRun: text => view.steerLiveRun(text),
-    decide: detail => view.onRunDecision(new CustomEvent('decision', { detail })),
-    syncRunPresence: () => view.syncRunPresence(),
-    get unconfirmedSteerNotes() { return view.unconfirmedSteerNotes; },
+  let sessions: Sv3SessionList = SV3_SESSIONS_EMPTY;
+  const clock = {
+    now: () => 1234,
+    setTimeout: vi.fn((_callback: () => void, _ms: number) => 1),
+    clearTimeout: vi.fn((_timer: number) => {}),
   };
+  const host = {
+    createConversationId: vi.fn(() => 'conversation'),
+    activeConversationId: vi.fn(() => sessions.activeId),
+    showingResults: vi.fn(() => false),
+    hasPreparedHandoff: vi.fn(() => false),
+    connected: vi.fn(() => true),
+    turn: vi.fn<ConstructorParameters<typeof Sv3RunDomain>[0]['turn']>(ref =>
+      sessions.sessions.find(session => session.id === ref.sessionId)?.turns.find(turn => turn.id === ref.turnId)),
+    lastTurn: vi.fn((id: string) => sessions.sessions.find(session => session.id === id)?.turns.at(-1)),
+    adoptRun: vi.fn<ConstructorParameters<typeof Sv3RunDomain>[0]['adoptRun']>((title, now, id, turnId) => {
+      const adopted = adoptRunSession(sessions, title, now, id, turnId);
+      sessions = adopted.list;
+      return adopted.ref;
+    }),
+    ensureConversation: vi.fn(),
+    setEvidence: vi.fn(),
+    settleRun: vi.fn<ConstructorParameters<typeof Sv3RunDomain>[0]['settleRun']>((ref, outcome, calls, now, disposition) => {
+      sessions = settleAgentTurn(sessions, ref, outcome, calls, now, '', disposition);
+    }),
+    applyRecord: vi.fn(),
+    preserveFailedReceipt: vi.fn(),
+    refreshRecord: vi.fn(async (_id: string) => false),
+    announceStop: vi.fn(),
+    persistSteerDraft: vi.fn(() => true),
+    dockComposer: vi.fn(),
+    focusDecision: vi.fn(),
+    requestUpdate: vi.fn(),
+  };
+  let draft = { text: 'Inspect this folder', edit: {} };
+  const source = {
+    read: () => draft,
+    isCurrent: () => true,
+    replace: (text: string) => { draft = { text, edit: {} }; },
+    clear: vi.fn(() => { draft = { text: '', edit: {} }; }),
+  };
+  const composer = new ComposerPort(source);
   let available = true;
-  const ctrl = new AgentSessionController(view.apiBase, () => {
-    current = available ? ctrl : null;
-    owner.onAgentUpdate();
-  }, backend.transport());
+  const ctrl = new AgentSessionController('http://owner.test', () => owner.onAgentUpdate(), backend.transport());
+  const owner = new Sv3RunDomain(host, composer, {
+    peek: () => available ? ctrl : null,
+    get: () => ctrl,
+    discover: async () => null,
+  }, clock);
   controllers.push(ctrl);
-  const use = () => { current = available ? ctrl : null; };
-  const submit = (text = 'Inspect this folder') => { use(); view.delegate(text, true); };
-  const snapshot = () => { use(); return owner.snapshot(); };
-  return { view, owner, ctrl, use, submit, snapshot, absent: () => { available = false; use(); } };
+  const submit = (text = 'Inspect this folder') => {
+    composer.replace(text);
+    sessions = submitInSession(sessions, text, clock.now(), 'agent', host.createConversationId());
+    owner.dispatch(latestTurnRef(sessions)!, text, 'standard');
+  };
+  return { host, owner, ctrl, composer, source, clock, submit,
+    get sessions() { return sessions; },
+    snapshot: () => owner.snapshot(), absent: () => { available = false; } };
 }
 
 async function start() {
   const window = windowOwner(); window.submit(); await flush(); backend.identity(); await flush(); return window;
 }
 const notes = (run: Sv3RunView | null) => run?.feed.items.flatMap(item => item.kind === 'note' ? [[item.label, item.text]] : []) ?? [];
-const lastTurn = (view: WindowHarness) => view.sessions.sessions.at(-1)?.turns.at(-1);
+const lastTurn = (window: ReturnType<typeof windowOwner>) => window.sessions.sessions.at(-1)?.turns.at(-1);
 
 beforeEach(() => {
   backend = new HaltBackend(); sessionStorage.clear(); localStorage.clear();
-  __resetConversationListForTest(); __resetDraftProvidersForTest();
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({})));
 });
 afterEach(async () => {
   for (const ctrl of controllers.splice(0)) ctrl.destroy();
   for (const response of backend.responses) if (!response.settled) response.release();
   for (const observation of backend.observations) observation.close();
-  await Promise.allSettled(tasks.splice(0)); views.splice(0); current = null;
+  await Promise.allSettled(tasks.splice(0));
   setAuthorizationPresenter(null); vi.unstubAllGlobals();
 });
 
 describe('the window run owner against the injected backend', () => {
-  it('SW-RUN-01 opens its turn before dispatch and settles duplicate terminals once', async () => {
-    const window = windowOwner(); window.submit();
-    expect(lastTurn(window.view)?.status).toBe('streaming');
+  it('SW-RUN-01 dispatches the opened turn and settles duplicate terminals once', async () => {
+    const window = windowOwner();
+    const send = vi.spyOn(window.ctrl, 'send');
+    window.submit();
+    expect(lastTurn(window)?.status).toBe('streaming');
+    expect(send).toHaveBeenCalledOnce();
+    expect(window.composer.snapshot().text).toBe('');
+    expect(window.source.clear).toHaveBeenCalledOnce();
+    expect(window.host.dockComposer).toHaveBeenCalledOnce();
     await flush(); backend.identity(); backend.terminal('run-1', 'DONE'); await flush();
-    const turn = lastTurn(window.view);
-    expect(turn?.status).toBe('complete');
+    expect(lastTurn(window)?.status).toBe('complete');
+    expect(window.host.settleRun).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ turnId: lastTurn(window)!.id }), 'complete', 0, window.clock.now(), 'COMPLETED');
+    expect(window.host.refreshRecord).toHaveBeenCalledExactlyOnceWith(window.ctrl.conversationId);
     window.owner.onAgentUpdate(); window.owner.onAgentUpdate();
-    expect(lastTurn(window.view)).toBe(turn);
+    expect(window.host.settleRun).toHaveBeenCalledOnce();
+    expect(window.host.refreshRecord).toHaveBeenCalledOnce();
     expect(backend.observations).toHaveLength(1);
   });
 
@@ -140,7 +141,7 @@ describe('the window run owner against the injected backend', () => {
     window.owner.steerLiveRun('Focus.'); window.owner.steerLiveRun('Focus.'); await flush();
     expect(backend.requests.filter(request => request.path.endsWith('/steer'))).toHaveLength(2);
     expect(backend.observations).toHaveLength(1);
-    expect(window.view.sessions.sessions[0]?.turns).toHaveLength(1);
+    expect(window.sessions.sessions[0]?.turns).toHaveLength(1);
   });
 
   it('SW-RUN-05 applied queued not applied and unconfirmed directions remain distinct', async () => {
@@ -189,30 +190,46 @@ describe('the window run owner against the injected backend', () => {
 
   it('SW-RUN-08 absence creates no run and reload adopts a matching live run once without navigation', async () => {
     const idle = windowOwner(); idle.absent(); idle.owner.syncRunPresence();
-    expect(backend.requests).toHaveLength(0); expect(idle.view.sessions.sessions).toHaveLength(0);
+    expect(backend.requests).toHaveLength(0); expect(idle.sessions.sessions).toHaveLength(0);
     const first = await start(); const conversationId = first.ctrl.conversationId!;
     const reopened = windowOwner(); reopened.ctrl.conversationId = conversationId;
     tasks.push(reopened.ctrl.reattachActiveRunOnLoad()); await flush();
-    backend.identity(); await flush(); reopened.use(); reopened.owner.syncRunPresence(); reopened.owner.syncRunPresence();
-    expect(reopened.view.sessions.activeId).toBeNull();
-    expect(reopened.view.sessions.sessions).toHaveLength(1);
-    expect(reopened.view.sessions.sessions[0]?.id).toBe(conversationId);
-    expect(reopened.view.sessions.sessions[0]?.turns).toHaveLength(1);
+    backend.identity(); await flush(); reopened.owner.syncRunPresence(); reopened.owner.syncRunPresence();
+    expect(reopened.sessions.activeId).toBeNull();
+    expect(reopened.sessions.sessions).toHaveLength(1);
+    expect(reopened.sessions.sessions[0]?.id).toBe(conversationId);
+    expect(reopened.sessions.sessions[0]?.turns).toHaveLength(1);
     const other = windowOwner(); other.ctrl.conversationId = 'other';
     tasks.push(other.ctrl.reattachActiveRunOnLoad()); await flush();
-    expect(other.view.sessions.sessions).toHaveLength(0);
+    expect(other.sessions.sessions).toHaveLength(0);
   });
 
   it('SW-RUN-09 duplicate approval requests share one lookup and stale details cannot prompt a replacement', async () => {
     const window = await start(); backend.holdResponses.add('/api/chat/approval');
     const presenter = vi.fn(async () => ({ approved: true, allowAlways: false })); setAuthorizationPresenter(presenter);
     const pending = { callId: 'c1', toolName: 'core.search', arguments: '{}', risk: 'LOW', gateBehavior: 'inline_confirm' };
+    const detail = { callId: 'c1', operationId: 'core.search', argsSummary: 'Search documents', riskTier: 'LOW', gateBehavior: 'INLINE_CONFIRM' };
     backend.emit('tool_call_pending', pending); backend.emit('tool_call_pending', pending); await flush();
     const lookups = backend.responses.filter(response => response.path === '/api/chat/approval');
     expect(lookups).toHaveLength(1);
     expect(window.snapshot()?.prompts.some(prompt => prompt.kind === 'approval')).toBe(true);
+    lookups[0]!.release(200, detail); await flush();
+    expect(presenter).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ pendingId: 'c1', owningRunId: 'run-1' }));
+    const approvalPosts = () => backend.requests.filter(request => request.path === '/api/chat/approve' && request.init?.method === 'POST');
+    expect(approvalPosts()).toHaveLength(1);
+    presenter.mockClear();
+
+    backend.emit('tool_call_pending', { ...pending, callId: 'c2' });
+    backend.emit('tool_call_pending', { ...pending, callId: 'c2' }); await flush();
+    const stale = backend.responses.filter(response => response.path === '/api/chat/approval').at(-1)!;
+    expect(backend.responses.filter(response => response.path === '/api/chat/approval')).toHaveLength(2);
     backend.terminal('run-1', 'DONE'); await flush();
-    lookups[0]!.release(); await flush(); expect(presenter).not.toHaveBeenCalled();
+    window.submit('Replacement task'); await flush(); backend.identity(); await flush();
+    expect(window.ctrl.sessionId).toBe('run-2');
+    expect(window.snapshot()?.phase).toBe('running');
+    stale.release(200, { ...detail, callId: 'c2' }); await flush();
+    expect(presenter).not.toHaveBeenCalled();
+    expect(approvalPosts()).toHaveLength(1);
   });
 
   it('SW-RUN-10 a failed approval remains an approval error in the owner feed', async () => {
@@ -226,11 +243,11 @@ describe('the window run owner against the injected backend', () => {
     const first = await start(); const observer = windowOwner();
     observer.ctrl.conversationId = first.ctrl.conversationId;
     tasks.push(observer.ctrl.reattachActiveRunOnLoad()); await flush(); backend.identity(); await flush();
-    first.use(); first.owner.haltRun(); first.owner.haltRun(); await flush();
+    first.owner.haltRun(); first.owner.haltRun(); await flush();
     expect(backend.responses).toHaveLength(1); expect(first.owner.runStopping()?.state).toBe('stopping');
     backend.emit('chunk', { text: 'Still arriving' }, 0); backend.emit('chunk', { text: 'Still arriving' }, 1); await flush();
     expect(first.snapshot()?.phase).toBe('running'); expect(observer.snapshot()?.phase).toBe('running');
     backend.responses[0]!.release(); backend.terminal('run-1', 'CANCELLED'); await flush();
-    expect(lastTurn(first.view)?.status).toBe('halted'); expect(lastTurn(observer.view)?.status).toBe('halted');
+    expect(lastTurn(first)?.status).toBe('halted'); expect(lastTurn(observer)?.status).toBe('halted');
   });
 });
