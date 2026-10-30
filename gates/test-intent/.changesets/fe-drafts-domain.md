@@ -74,3 +74,13 @@ No acceptance is recorded. The tests pin the existing saved payload, attachment 
 ## Check durability
 
 `SearchV3View.preparationAck.test.ts` is durable: it checks persisted preparations and companion drafts, exact attachment writes, and the existing live response to readback edits and refused departures through composer events and sessionStorage. The storage hooks and fixed incarnation are test-only fault injection and byte-comparison scaffolding.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18df4-f890-7b83-8101-992eca037b0e",
+  "verdict": "accept",
+  "digest": "sha256:a2cad3e73fbe507aeb3fb0db8ffd26c41defdf7090f20cf9376849b11ad08ec9"
+}
+```
