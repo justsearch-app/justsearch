@@ -58,8 +58,10 @@ export function directiveAvailable(
   switch (directive.kind) {
     case 'initiate':
       return true;
-    case 'interject':
     case 'halt':
+      return ctrl.runInFlight || (ctrl.stopAttempt?.intent === true
+        && ctrl.stopObservationLost && ctrl.terminalOutcome === null);
+    case 'interject':
     case 'raise-budget':
       // These act on the LIVE run; the backend evicts finished sessions.
       return ctrl.runInFlight;

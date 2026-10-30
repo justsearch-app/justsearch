@@ -105,7 +105,7 @@ function main(el: SearchV3View): HTMLElement {
 function text(el: SearchV3View): string { return main(el).shadowRoot!.textContent ?? ''; }
 function answer(el: SearchV3View): string { return [...main(el).shadowRoot!.querySelectorAll('jf-markdown-block')].map((block) => block.shadowRoot?.textContent ?? '').join(' '); }
 function noteCount(el: SearchV3View): number { return text(el).split(STOP).length - 1; }
-async function start(el: SearchV3View): Promise<void> {
+async function start(el: SearchV3View, identity = true): Promise<void> {
   el.tier = 'delegate'; await settle();
   const composer = el.shadowRoot!.querySelector('jf-sv3-composer')!;
   composer.dispatchEvent(new CustomEvent('sv3-composer-submit', { detail: { query: 'Inspect this folder', tier: 'delegate' }, bubbles: true, composed: true }));
@@ -113,8 +113,10 @@ async function start(el: SearchV3View): Promise<void> {
   const ctrl = getAgentSessionController('');
   // The send is owned by the real control-intent seam; the stream is closed in teardown.
   conversationId = ctrl.conversationId!;
-  emit('run_started', { runId: RUN, shapeId: 'core.agent-run', conversationId });
-  emit('session_started', { sessionId: RUN });
+  if (identity) {
+    emit('run_started', { runId: RUN, shapeId: 'core.agent-run', conversationId });
+    emit('session_started', { sessionId: RUN });
+  }
   events = [prompt()]; await settle();
   expect(el.sessions.sessions.flatMap((s) => s.turns)).toHaveLength(1);
 }
@@ -194,6 +196,22 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     clickStop(el); await settle(); expect(deletes()).toHaveLength(2);
     emit('done', { finalResponse: 'Answer continues', disposition: 'COMPLETED' }); close(); await settle();
     expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('complete');
+  });
+
+  it('R1 unidentified lost stream shows an unconfirmed Stop with discovery retry and no halted receipt', async () => {
+    const el = await mount(); await start(el, false);
+    clickStop(el); await settle(); close(); await settle();
+    const ctrl = getAgentSessionController('');
+    expect(ctrl.isStreaming).toBe(false); expect(ctrl.runInFlight).toBe(false);
+    expect(main(el).shadowRoot!.querySelector('[data-testid="sv3-turn-stopping"]')?.textContent).toBe(TURN_STOP_FAILED);
+    expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('streaming');
+    expect(noteCount(el)).toBe(0);
+    const discoveries = (): number => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/api/chat/runs/live')).length;
+    const before = discoveries(); clickStop(el); await settle();
+    expect(discoveries()).toBe(before + 1);
+    expect(ctrl.isStreaming).toBe(false); expect(ctrl.concludedRunId).toBeNull();
+    expect(main(el).shadowRoot!.querySelector('[data-testid="sv3-turn-stopping"]')?.textContent).toBe(TURN_STOP_FAILED);
+    expect(noteCount(el)).toBe(0);
   });
 
   it('S3 S6 no stop response becomes unconfirmed, keeps output and allows one new attempt', async () => {

@@ -1873,7 +1873,7 @@
     },
     {
       "id": "SW-RUN-11",
-      "behavior": "In the live window and other windows already observing the run, Halt reports a stopped run only after the backend confirms that outcome.",
+      "behavior": "In the live window and other windows already observing the run, Halt reports a stopped run only after the backend confirms that outcome. If an accepted stop is followed by completion, today's halted presentation keeps the completed answer and disposition, appearing only after the completion terminal.",
       "kind": "works-today",
       "races": [
         "late-response",

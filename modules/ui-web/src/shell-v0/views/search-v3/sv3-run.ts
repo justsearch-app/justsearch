@@ -93,7 +93,7 @@ export type Sv3RunSource = Pick<
   // been cut. Every CLOSED region is already an ordered `conversation` entry; this is the one item
   // the array cannot hold, and it is the only item that may wear the live affordance.
   | 'reasoning'
-> & Partial<Pick<AgentSessionController, 'concludedRunId' | 'stopAttempt'>>;
+> & Partial<Pick<AgentSessionController, 'concludedRunId' | 'stopAttempt' | 'stopObservationLost' | 'terminalOutcome'>>;
 
 /* ── Axis 1: the session ─────────────────────────────────────────────────────────────────────── */
 
@@ -471,7 +471,9 @@ export function sv3RunSessionStatus(source: Sv3RunSource | null, feed: Sv3RunFee
   // Both flags, not `runInFlight` alone: the controller's first notification of a run arrives from
   // inside `send()` before its abort controller exists, and they clear together in the stream's
   // `finally` (`AgentSessionController.ts:1368-1370` / `:1436-1441`), so the terminal edge stays exact.
-  return source.runInFlight || source.isStreaming ? 'live' : 'settled';
+  // An unidentified lost stream leaves a retryable unconfirmed Stop, never a terminal receipt.
+  return source.runInFlight || source.isStreaming
+    || (source.stopAttempt?.intent && source.stopObservationLost && source.terminalOutcome === null) ? 'live' : 'settled';
 }
 
 /**

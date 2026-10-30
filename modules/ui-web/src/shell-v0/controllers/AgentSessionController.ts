@@ -639,6 +639,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   // True once this stream saw session_started — so a drop is a genuine mid-run drop (a live run to
   // reattach), not an initial POST failure over a stale sessionId. Reset per send.
   private runStartedThisStream = false;
+  // A resumed run can belong to a different conversation than the window is pinned to.
+  private runConversationId: string | null = null;
   // Tempdoc 604 — the agent SSE stream has no liveness signal of its own, so a transport-hung stream
   // (e.g. a worker bounce mid-run) would block the FE silently for the backend's 30-min attach latch.
   // The watchdog resets on every received event (incl. the backend `heartbeat`); if it expires, the
@@ -1027,6 +1029,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       this.runStartedThisStream = true;
     }
     const conversationId = typeof data.conversationId === 'string' ? data.conversationId : '';
+    if (conversationId.length > 0) this.runConversationId = conversationId;
     if (conversationId.length > 0 && !this.conversationId) {
       this.conversationId = conversationId;
     }
@@ -1498,6 +1501,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   onError(payload: unknown): void {
     const data = payload as Record<string, unknown>;
+    if (!this.sessionId) {
+      this.stopAttempt = new StopAttempt();
+      this.stopObservationLost = false;
+    }
     if (typeof data.errorCode === 'string') {
       this.concludedRunId = this.sessionId;
       this.terminalOutcome = data.errorCode === 'CANCELLED' ? 'cancelled' : 'failed';
@@ -1988,6 +1995,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   /** The existing abort handle owns delivery and cleanup; replacing a view does not cancel its backend run. */
   private beginStream(sessionId: string | null = null, preserveApprovals = false): AbortController {
     if (!preserveApprovals) {
+      this.runConversationId = this.conversationId;
+      this.reattachedThisRun = false;
+      this.runStartedThisStream = false;
       this.stopAttempt = new StopAttempt();
       this.stoppedCeremonies = 0;
       this.stopObservationLost = false;
@@ -2093,7 +2103,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     } catch (e) {
       if (this.abortController !== stream) return;
       if (this.stopAttempt.intent && this.terminalOutcome === null) {
-        await this.reconcileStoppingStream(stream);
+        await this.reconcileStoppingStream(stream, e);
         return;
       }
       if ((e as Error).name === 'AbortError') {
@@ -2174,7 +2184,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     } catch (e) {
       if (this.abortController !== stream) return;
       if (this.stopAttempt.intent && this.terminalOutcome === null) {
-        await this.reconcileStoppingStream(stream);
+        await this.reconcileStoppingStream(stream, e);
         return;
       }
       if ((e as Error).name === 'AbortError') {
@@ -2279,7 +2289,14 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.pendingAutoApprovals = [];
     if (this.sessionId) this.stoppedCeremonies += cancelAuthorizationsForRun(this.sessionId);
     this.notify();
-    await this.deliverStop(true);
+    if (!this.sessionId && this.stopObservationLost && !this.abortController) {
+      const stream = new AbortController();
+      this.abortController = stream;
+      try { await this.reconcileStoppingStream(stream); }
+      finally { this.finishStream(stream); }
+    } else {
+      await this.deliverStop(true);
+    }
   }
 
   private async deliverStop(retry = false): Promise<void> {
@@ -2317,29 +2334,53 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.notify();
   }
 
-  private async reconcileStoppingStream(stream: AbortController): Promise<void> {
+  private async reconcileStoppingStream(stream: AbortController, failure?: unknown): Promise<void> {
     const attempt = this.stopAttempt;
-    const runId = this.sessionId;
+    let runId = this.sessionId;
     if (!attempt.intent || this.terminalOutcome !== null) return;
+    // A refused start has no backend run to stop. Keep the existing start-error presentation.
+    if (!runId && typeof (failure as { status?: unknown } | undefined)?.status === 'number') {
+      this.onError({ error: friendlyStreamError(failure) });
+      return;
+    }
     this.stopObservationLost = true;
-    this.notify();
-    if (!runId) return;
     this.commitStreamingText();
-    const run = await this.transport.discover(this.apiBase, this.conversationId);
-    if (this.abortController !== stream || this.stopAttempt !== attempt || this.terminalOutcome !== null) return;
-    if (run?.runId === runId && !this.reattachedThisRun) {
+    this.notify();
+    const conversationId = this.runConversationId ?? this.conversationId;
+    const ownsStream = (): boolean => this.abortController === stream
+      && this.stopAttempt === attempt && this.terminalOutcome === null;
+    let run: LiveRunRow | null = null;
+    try {
+      // Without either address, discovery could choose another window's unrelated run.
+      if (runId || conversationId) run = await this.transport.discover(this.apiBase, conversationId);
+    } catch { /* Discovery failure is not a terminal outcome; still try the addressed record. */ }
+    if (!ownsStream()) return;
+    if (!runId && run?.runId && run.conversationId === conversationId) {
+      runId = run.runId;
+      this.sessionId = runId;
+      this.runConversationId = run.conversationId ?? conversationId;
+      void this.deliverStop();
+    }
+    if (runId && run?.runId === runId && !this.reattachedThisRun) {
       this.reattachedThisRun = true;
       await this.attachToRun(runId);
       return;
     }
+    if (!runId) {
+      // A record's older runs cannot identify a start whose identity never arrived. Leave an
+      // unconfirmed stop with explicit discovery retry, rather than inventing a running stream.
+      this.isStreaming = false;
+      this.notify();
+      return;
+    }
     try {
       const response = await this.transport.request(
-        `${this.apiBase}/api/thread/${encodeURIComponent(this.conversationId ?? runId)}`,
+        `${this.apiBase}/api/thread/${encodeURIComponent(conversationId ?? runId)}`,
       );
-      if (this.abortController !== stream || this.stopAttempt !== attempt || this.terminalOutcome !== null) return;
+      if (!ownsStream()) return;
       if (response.ok) {
         const record: unknown = await response.json();
-        if (this.abortController !== stream || this.stopAttempt !== attempt || this.terminalOutcome !== null) return;
+        if (!ownsStream()) return;
         const lifecycles = typeof record === 'object' && record !== null && 'lifecycles' in record
           && Array.isArray(record.lifecycles) ? record.lifecycles : [];
         const lifecycle: unknown = lifecycles.find((row: unknown) => typeof row === 'object'
@@ -2369,7 +2410,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     } catch (e) {
       if (this.abortController !== stream) return;
       if (this.stopAttempt.intent && this.terminalOutcome === null) {
-        await this.reconcileStoppingStream(stream);
+        await this.reconcileStoppingStream(stream, e);
         return;
       }
       if ((e as Error).name === 'AbortError') {
@@ -2410,7 +2451,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     } catch (e) {
       if (this.abortController !== stream) return;
       if (this.stopAttempt.intent && this.terminalOutcome === null) {
-        await this.reconcileStoppingStream(stream);
+        await this.reconcileStoppingStream(stream, e);
         return;
       }
       if ((e as Error).name === 'AbortError') {
