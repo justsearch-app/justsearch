@@ -2059,10 +2059,12 @@ describe('605 — run identity + conclude-drain', () => {
     vi.mocked(emitEphemeralToast).mockClear();
     globalThis.fetch = mockFetchJson({ ok: true }); // the DELETE
     const drained: string[] = [];
-    setAuthorizationCanceller((runId) => { drained.push(runId); return 1; });
+    setAuthorizationCanceller((runId) => { drained.push(runId); return drained.length === 1 ? 1 : 0; });
     ctrl.sessionId = 'run-halt';
     await ctrl.cancelSession();
     expect(drained).toEqual(['run-halt']);
+    expect(emitEphemeralToast).not.toHaveBeenCalled();
+    ctrl.onError({ error: 'Session cancelled', errorCode: 'CANCELLED' });
     expect(emitEphemeralToast).toHaveBeenCalledTimes(1);
     setAuthorizationCanceller(null);
   });

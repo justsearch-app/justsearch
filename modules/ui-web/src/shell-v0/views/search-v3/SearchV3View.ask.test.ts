@@ -730,6 +730,39 @@ describe('Stop is told to the Engine, so the saved turn says what the live one d
     expect(turn.querySelector('[data-testid="sv3-turn-stopping"]')).toBeNull();
   });
 
+  it('R1 Ask Stop waits beyond the Halt deadline and accepts a late success', async () => {
+    aiOnline();
+    const stream = stubStream();
+    const dispatch = fetchMock.getMockImplementation() as (url: unknown, init: unknown) => unknown;
+    let release!: (response: unknown) => void;
+    fetchMock.mockImplementation((url: unknown, init: unknown) =>
+      /\/api\/chat\/conversations\/[^/]+\/stop$/.test(String(url))
+        ? new Promise((resolve) => { release = resolve; }) : dispatch(url, init));
+    const el = await mount();
+    await ask(el, 'Keep observing this answer');
+    const composer = await region(el, 'jf-sv3-composer');
+    vi.useFakeTimers();
+    try {
+      (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+      await vi.advanceTimersByTimeAsync(15_000);
+      const main = await region(el, 'jf-sv3-main');
+      expect(textIn(turnsOf(main)[0]!, 'sv3-turn-stopping')).toBe(TURN_STOPPING);
+      release({ ok: true, status: 200, json: async () => ({ stopped: true, pending: false }) });
+      await vi.advanceTimersByTimeAsync(1);
+      // A late acceptance still owns the attempt: another click cannot dispatch a second Stop.
+      (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(stops()).toHaveLength(1);
+      expect(textIn(turnsOf(main)[0]!, 'sv3-turn-stopping')).toBe(TURN_STOPPING);
+      stream.emit('error', { error: 'Stopped by the user', errorCode: 'CANCELLED' });
+      stream.end();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(turnsOf(main)[0]!.dataset.status).toBe('halted');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows the finished answer, not "Stopped by you.", when the Stop came after it was saved', async () => {
     aiOnline();
     const stream = stubStream({ status: 200, body: { stopped: false, pending: false } });

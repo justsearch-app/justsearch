@@ -37,7 +37,9 @@ export class HaltBackend {
       request: async (input, init) => {
         const path = new URL(String(input)).pathname;
         this.requests.push({ path, init });
-        const body = path.startsWith('/api/thread/')
+        const body = path === '/api/chat/approval'
+          ? { callId: 'manual', operationId: 'core.search', argsSummary: 'Search documents', riskTier: 'LOW', gateBehavior: 'INLINE_CONFIRM' }
+          : path.startsWith('/api/thread/')
           ? { lifecycles: [...this.runs].map(([sessionId, run]) => ({ sessionId, state: run.state })) } : {};
         if (init?.method === 'DELETE' || this.holdResponses.has(path)) {
           return new Promise<Response>((resolve, reject) => {
@@ -56,7 +58,10 @@ export class HaltBackend {
         await this.observe(runId, options.onEvent, options.signal);
       },
       consume: async (url, _body, dispatch, signal) => {
-        const runId = decodeURIComponent(String(url).split('/runs/')[1]!.split('/')[0]!);
+        const path = new URL(String(url)).pathname;
+        const runId = path.endsWith('/resume') || path.endsWith('/fork') ? `run-${++this.serial}`
+          : decodeURIComponent(path.split('/runs/')[1]!.split('/')[0]!);
+        if (!this.runs.has(runId)) this.runs.set(runId, { state: 'READY_FOR_LLM', conversationId: 'conversation' });
         await this.observe(runId, dispatch, signal);
       },
       discover: async (_base, conversationId) => {

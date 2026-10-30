@@ -2188,6 +2188,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              isolated=True, fixtures_variant="agent-live"),
         Step("sv3-run-approval-failure", setup=ui_agent_flows.setup_run_approval_failure,
              isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-ask-stop-late-response", setup=ui_agent_flows.setup_ask_stop_late_response,
+             isolated=True, fixtures_variant="agent-live"),
         Step("sv3-run-halt", setup=ui_agent_flows.setup_run_halt,
              isolated=True, fixtures_variant="agent-live"),
         Step("sv3-run-halt-failure", setup=ui_agent_flows.setup_run_halt_failure,

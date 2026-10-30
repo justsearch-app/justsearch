@@ -1,6 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
+import '../components/AuthorizationHost.js';
+import type { AuthorizationHost } from '../components/AuthorizationHost.js';
+import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../components/advisory/ephemeralToast.js';
 import { AgentSessionController, type AgentSessionTransport } from './AgentSessionController.js';
 import { HaltBackend } from './testing/HaltBackend.js';
 import { projectSv3RunFeed, projectSv3RunPrompts } from '../views/search-v3/sv3-run.js';
@@ -96,6 +99,55 @@ describe('Halt follows the backend across windows and reloads', () => {
     } else {
       expect(ctrl.terminalOutcome).toBe(state === 'DONE' ? 'completed' : 'cancelled');
       expect(ctrl.isStreaming).toBe(false);
+    }
+  });
+
+  it.each(['resume', 'fork', 'workflow'] as const)('R2 %s reconciles a lost stopping stream and keeps retry available', async (entry) => {
+    const ctrl = window();
+    tasks.push(entry === 'resume' ? ctrl.resumeSession('prior')
+      : entry === 'fork' ? ctrl.forkRun('prior', 'Edited question') : ctrl.runWorkflow('workflow'));
+    await flush(); backend.identity(); await flush();
+    tasks.push(ctrl.cancelSession()); backend.responses[0]!.release(); await flush();
+    backend.observations[0]!.lose(); await flush();
+    expect(backend.discoveries, 'Stopping must reconcile before treating a stream failure as an end').toBe(1);
+    expect(backend.observations).toHaveLength(2);
+    backend.identity(); backend.observations[1]!.lose(); await flush();
+    expect(ctrl.terminalOutcome).toBeNull(); expect(ctrl.concludedRunId).toBeNull();
+    expect(ctrl.isStreaming).toBe(true); expect(ctrl.runInFlight).toBe(true);
+    expect(ctrl.stopObservationLost).toBe(true);
+    tasks.push(ctrl.cancelSession()); await flush(); expect(backend.responses).toHaveLength(2);
+    backend.terminal('run-1', 'CANCELLED', false);
+    ctrl.reconcileRunLifecycle('run-1', 'CANCELLED');
+    expect(ctrl.terminalOutcome).toBe('cancelled'); expect(ctrl.isStreaming).toBe(false);
+  });
+
+  it.each(['refused', 'cancelled-stream', 'cancelled-record'] as const)('R3 an open manual ceremony closes on Halt but the run-ended toast waits for %s', async (outcome) => {
+    const host = document.createElement('jf-authorization-host') as AuthorizationHost;
+    document.body.appendChild(host);
+    const notices: string[] = [];
+    const capture = (event: Event): void => { notices.push((event as CustomEvent<EphemeralToastSpec>).detail.message); };
+    document.addEventListener(EPHEMERAL_TOAST_EVENT, capture);
+    try {
+      const ctrl = await start();
+      backend.emit('tool_call_pending', { callId: 'manual', toolName: 'core.search', arguments: '{}', risk: 'LOW', gateBehavior: 'inline_confirm' });
+      await flush(); await host.updateComplete;
+      expect(host.shadowRoot!.querySelector('[data-testid="authorization-ceremony"]')).not.toBeNull();
+      tasks.push(ctrl.cancelSession()); await flush(); await host.updateComplete;
+      expect(host.shadowRoot!.querySelector('[data-testid="authorization-ceremony"]')).toBeNull();
+      expect(notices.filter((message) => message.includes('because the run ended'))).toEqual([]);
+      backend.responses[0]!.release(outcome === 'refused' ? 409 : 200); await flush();
+      expect(notices.filter((message) => message.includes('because the run ended'))).toEqual([]);
+      if (outcome !== 'refused') {
+        if (outcome === 'cancelled-stream') backend.terminal('run-1', 'CANCELLED');
+        else ctrl.reconcileRunLifecycle('run-1', 'CANCELLED');
+        await flush();
+        expect(notices.filter((message) => message.includes('because the run ended'))).toHaveLength(1);
+        ctrl.reconcileRunLifecycle('run-1', 'CANCELLED'); await flush();
+        expect(notices.filter((message) => message.includes('because the run ended'))).toHaveLength(1);
+      }
+      expect(backend.requests.filter((request) => request.init?.method === 'POST')).toEqual([]);
+    } finally {
+      host.remove(); document.removeEventListener(EPHEMERAL_TOAST_EVENT, capture);
     }
   });
 

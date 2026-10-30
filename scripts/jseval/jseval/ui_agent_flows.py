@@ -290,3 +290,37 @@ async def setup_run_halt_timeout(page):
     await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
     assert len(fixture.matching("DELETE", path)) == 2, fixture.requests
     only_run(fixture)
+
+
+async def setup_ask_stop_late_response(page):
+    """R1: Ask keeps waiting past Halt's deadline and accepts the late response."""
+    page.set_default_timeout(TIMEOUT)
+    await page.emulate_media(reduced_motion="reduce")
+    fixture = fixtures.agent_fixture(page.context)
+    await page.locator(S.CSS_SV3_WINDOW).wait_for(state="visible")
+    await page.get_by_test_id("sv3-composer-tier").click()
+    await page.locator('[data-testid="sv3-composer-tier-option"][data-tier="ask"]').click()
+    await send(page, "Explain the fixture documents")
+    dispatch = await fixture.wait_request("POST", DISPATCH)
+    assert dispatch.body["shapeId"] == "core.rag-ask", dispatch
+    path = f"/api/chat/conversations/{dispatch.body['conversationId']}/stop"
+    release = asyncio.Event()
+    fixture.replies[("POST", path)] = fixtures.FixtureReply(
+        gate=release, body={"stopped": True, "pending": False})
+    await fixture.stream.emit("chunk", {"text": "The answer keeps arriving."})
+    await page.get_by_test_id("sv3-composer-stop").click()
+    request = await fixture.wait_request("POST", path)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await asyncio.sleep(15)
+    assert not request.answered.is_set()
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    release.set()
+    await asyncio.wait_for(request.answered.wait(), TIMEOUT / 1000)
+    await page.get_by_test_id("sv3-composer-stop").click()
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await fixture.stream.emit("error", {"error": "Stopped by the user", "errorCode": "CANCELLED"})
+    # Ask's consumeShapeStream reports the terminal when the response reaches EOF;
+    # unlike the agent controller, it does not settle inside the event callback.
+    await fixture.stream.disconnect()
+    await expect(page.get_by_test_id("sv3-turn")).to_have_attribute("data-status", "halted", timeout=TIMEOUT)
+    assert len(fixture.matching("POST", path)) == 1, fixture.requests

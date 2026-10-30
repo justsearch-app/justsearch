@@ -24,7 +24,7 @@ describe('shared Ask Stop and agent Halt delivery vocabulary', () => {
     vi.useFakeTimers();
     const stop = new StopAttempt();
     let late!: (response: { ok: boolean }) => void;
-    const first = stop.deliver(() => new Promise((resolve) => { late = resolve; }));
+    const first = stop.deliver(() => new Promise((resolve) => { late = resolve; }), STOP_RESPONSE_WAIT_MS);
     await vi.advanceTimersByTimeAsync(STOP_RESPONSE_WAIT_MS); await first;
     expect(stop.outcome).toBe('unknown');
     await stop.deliver(async () => ({ ok: false }));

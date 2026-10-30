@@ -65,7 +65,7 @@ import { requestAuthorization, cancelAuthorizationsForRun } from '../operations/
 import { recordEffect, markUndoableOperation } from '../substrates/effects/index.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
 import type { Effect } from '../substrates/effect.js';
-import { StopAttempt, type RunTerminalOutcome } from '../state/stopAttempt.js';
+import { StopAttempt, STOP_RESPONSE_WAIT_MS, type RunTerminalOutcome } from '../state/stopAttempt.js';
 
 export interface AgentSessionTransport {
   request: typeof authorizedFetch;
@@ -445,6 +445,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   private lastStreamedAnswer = '';
   /** Invalidates private approval reads when this controller concludes a run. */
   private approvalLookupRevision = 0;
+  /** Ceremonies closed by Halt, awaiting a confirmed run end before announcing why. */
+  private stoppedCeremonies = 0;
   stopObservationLost = false;
   stopAttempt = new StopAttempt();
   terminalOutcome: RunTerminalOutcome | null = null;
@@ -842,6 +844,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   destroy(): void {
     this.stopAttempt = new StopAttempt();
+    this.stoppedCeremonies = 0;
     this.approvalLookupRevision++;
     this.stopPolling();
     if (this.sessionId) cancelAuthorizationsForRun(this.sessionId);
@@ -934,6 +937,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   /** Clears the run-observable state (NOT the roster/tools) so a replay seek re-applies from scratch. */
   private resetRunState(): void {
     this.stopAttempt = new StopAttempt();
+    this.stoppedCeremonies = 0;
     this.stopObservationLost = false;
     this.terminalOutcome = null;
     this.concludedRunId = null;
@@ -1985,6 +1989,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   private beginStream(sessionId: string | null = null, preserveApprovals = false): AbortController {
     if (!preserveApprovals) {
       this.stopAttempt = new StopAttempt();
+      this.stoppedCeremonies = 0;
       this.stopObservationLost = false;
       this.terminalOutcome = null;
       this.approvalLookupRevision++;
@@ -2168,6 +2173,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       });
     } catch (e) {
       if (this.abortController !== stream) return;
+      if (this.stopAttempt.intent && this.terminalOutcome === null) {
+        await this.reconcileStoppingStream(stream);
+        return;
+      }
       if ((e as Error).name === 'AbortError') {
         this.commitStreamingText();
         return;
@@ -2245,7 +2254,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.approvalLookupRevision++;
     this.pendingAutoApprovals = [];
     if (!runId) return;
-    const denied = cancelAuthorizationsForRun(runId);
+    const deferred = this.terminalOutcome !== null ? this.stoppedCeremonies : 0;
+    if (this.terminalOutcome !== null) this.stoppedCeremonies = 0;
+    const denied = cancelAuthorizationsForRun(runId) + deferred;
     if (denied > 0) {
       emitEphemeralToast({
         message:
@@ -2264,7 +2275,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.budgetGate = null;
     this.contextGate = null;
     this.runPark = null;
-    this.concludeRunCeremonies(this.sessionId);
+    this.approvalLookupRevision++;
+    this.pendingAutoApprovals = [];
+    if (this.sessionId) this.stoppedCeremonies += cancelAuthorizationsForRun(this.sessionId);
     this.notify();
     await this.deliverStop(true);
   }
@@ -2277,7 +2290,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     const delivery = attempt.deliver((signal) => this.transport.request(
       `${this.apiBase}/api/chat/sessions/${encodeURIComponent(runId)}`,
       { method: 'DELETE', signal },
-    ));
+    ), STOP_RESPONSE_WAIT_MS);
     this.notify();
     await delivery;
     if (this.stopAttempt === attempt) this.notify();
@@ -2355,6 +2368,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       );
     } catch (e) {
       if (this.abortController !== stream) return;
+      if (this.stopAttempt.intent && this.terminalOutcome === null) {
+        await this.reconcileStoppingStream(stream);
+        return;
+      }
       if ((e as Error).name === 'AbortError') {
         this.commitStreamingText();
         return;
@@ -2392,6 +2409,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       );
     } catch (e) {
       if (this.abortController !== stream) return;
+      if (this.stopAttempt.intent && this.terminalOutcome === null) {
+        await this.reconcileStoppingStream(stream);
+        return;
+      }
       if ((e as Error).name === 'AbortError') {
         this.commitStreamingText();
         return;

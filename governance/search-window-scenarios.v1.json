@@ -686,6 +686,16 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "R1 Ask Stop waits beyond the Halt deadline and accepts a late success"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-ask-stop-late-response",
+          "observes": "Ask Stop keeps Stopping… while its response is held for fifteen seconds, accepts the late success without a second request, and waits for CANCELLED."
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
           "test": "says \"Stopping…\" until the Engine ends the turn, and keeps every word it sent before that"
         },
         {
@@ -1863,11 +1873,10 @@
     },
     {
       "id": "SW-RUN-11",
-      "behavior": "Halt reports a stopped run only after the backend confirms that outcome.",
+      "behavior": "In the live window and other windows already observing the run, Halt reports a stopped run only after the backend confirms that outcome.",
       "kind": "works-today",
       "races": [
         "late-response",
-        "reload",
         "second-conversation-or-tab"
       ],
       "observations": [

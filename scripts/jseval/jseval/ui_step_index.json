@@ -1,4 +1,5 @@
 {
+  "shell-v0/state/stopAttempt.ts": ["sv3-ask-stop-late-response", "sv3-run-halt", "sv3-run-halt-failure", "sv3-run-halt-timeout"],
   "shell-v0/controllers/AgentSessionController.ts": ["sv3-run-activity-steering", "sv3-run-budget", "sv3-run-approval", "sv3-run-approval-failure", "sv3-run-halt", "sv3-run-halt-failure", "sv3-run-halt-timeout"],
   "shell-v0/components/EngineRecovery.ts": ["engine-recovery"],
   "boot/desktopRecovery.ts": ["engine-recovery"],
@@ -55,7 +56,7 @@
     "qa-response"
   ],
   "shell-v0/views/search-v3/SearchV3View.ts": [
-    "sv3-run-activity-steering", "sv3-run-budget", "sv3-run-approval", "sv3-run-approval-failure", "sv3-run-halt", "sv3-run-halt-failure", "sv3-run-halt-timeout",
+    "sv3-ask-stop-late-response", "sv3-run-activity-steering", "sv3-run-budget", "sv3-run-approval", "sv3-run-approval-failure", "sv3-run-halt", "sv3-run-halt-failure", "sv3-run-halt-timeout",
     "sv3-filters-hero-normal-dark", "sv3-filters-hero-normal-light", "sv3-filters-hero-normal-forced", "sv3-filters-hero-narrow-dark", "sv3-filters-hero-narrow-light", "sv3-filters-hero-narrow-forced", "sv3-filters-hero-1280x720-dark", "sv3-filters-hero-1280x720-light", "sv3-filters-hero-1280x720-forced", "sv3-filters-hero-600x400-dark", "sv3-filters-hero-600x400-light", "sv3-filters-hero-600x400-forced", "sv3-filters-docked-normal-dark", "sv3-filters-docked-normal-light", "sv3-filters-docked-normal-forced", "sv3-filters-docked-narrow-dark", "sv3-filters-docked-narrow-light", "sv3-filters-docked-narrow-forced", "sv3-filters-docked-1280x720-dark", "sv3-filters-docked-1280x720-light", "sv3-filters-docked-1280x720-forced", "sv3-filters-docked-600x400-dark", "sv3-filters-docked-600x400-light", "sv3-filters-docked-600x400-forced",
     "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion",
     "sv3-search-results", "chat-chip-yield", "chat-proportion",
