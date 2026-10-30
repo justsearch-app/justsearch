@@ -1,0 +1,54 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T10:39:51.753Z",
+  "revision": "d2ea5713260ed961d03c9d527d85f887100b58bc",
+  "tree": "dc363659c0df38f72a334675cb2255bfbf05d6b0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2124222-1793356790088.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1664
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c5e74b982227e3c27842f68b819aeba89a9e21f230b5e62f7514b08e05446b17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "composer element binding CP4 a replacement element with equal text and draftVersion makes the old capture stale",
+          "status": "passed"
+        },
+        {
+          "name": "composer element binding CP4 reconnecting the same unedited element reuses its port and restores capture validity",
+          "status": "passed"
+        },
+        {
+          "name": "composer element binding CP8 a pre-render capture can clear only as a no-op on the pending seed and becomes stale on first render",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5a4645849127920a154219ac3002c6b247f1aa25bf44cb5498e228c8d956523c"
+}

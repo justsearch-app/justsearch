@@ -848,6 +848,28 @@ describe('the optimistic handoff yields to server truth exactly once', () => {
 });
 
 describe('a mid-run submit JOINS the live turn instead of starting a second one', () => {
+  it.each(['Delegate', 'steering'])('CP1c %s clears at submission only after the draft write succeeds', async action => {
+    aiOnline(); const el = await mount();
+    if (action === 'steering') await delegateWithCalls(el, 'initial run', []);
+    ctrl.send.mockClear(); ctrl.steer.mockClear();
+    const input = await type(el, 'submitted direction');
+    const storage = sessionStorage, original = storage.setItem;
+    const descriptor = Object.getOwnPropertyDescriptor(storage, 'setItem')
+      ?? { configurable: true, writable: true, enumerable: false, value: original };
+    let writes = 0;
+    Object.defineProperty(storage, 'setItem', { ...descriptor, value: (key: string, value: string) => {
+      if (key.startsWith('justsearch.draft.attachment.')) { writes += 1; throw new DOMException('write refused', 'QuotaExceededError'); }
+      original(key, value);
+    } });
+    try { await press(el, { ctrlKey: action === 'Delegate' }); }
+    finally { Object.defineProperty(storage, 'setItem', descriptor); }
+    expect(writes).toBeGreaterThan(0); expect(input.value).toBe('submitted direction');
+    expect(ctrl.send).not.toHaveBeenCalled(); expect(ctrl.steer).not.toHaveBeenCalled();
+    await press(el, { ctrlKey: action === 'Delegate' });
+    expect(input.value).toBe('');
+    expect(action === 'Delegate' ? ctrl.send : ctrl.steer).toHaveBeenCalledTimes(1);
+  });
+
   it('steers through the seam, and starts no competing run on either key', async () => {
     aiOnline();
     const el = await mount();
