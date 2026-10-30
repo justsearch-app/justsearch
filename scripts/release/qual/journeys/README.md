@@ -6,7 +6,8 @@ as a release gate; an unavailable check never certifies a release.
 
 `journeys.json` is the journey definition and applicability matrix. `runner.py`
 executes it against an **installed** package. `linux.py` implements J1–J8;
-`windows.py` implements Windows as described below; GPU and J9 remain outside this assignment.
+`windows.py` implements Windows as described below; `gpu.py` adds the private
+GPU host lane and conditional J9 to the same runner.
 The scenario wording is copied verbatim into every summary and checked by tests.
 This suite changes no product code and enables no application test-build feature.
 
@@ -182,6 +183,344 @@ Do not set `JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE`. `mirror-guest.py` provides
 guest-only HTTPS trust and production-URL mapping; the updater still uses the
 normal platform TLS verifier, descriptor v2, PolicyKit and apt. No production
 private signing key is needed or used for these tests.
+
+## GPU host (Ubuntu, supported NVIDIA GPU)
+
+W4c development status: full GPU qualification remains unproven. Round eight
+passed fresh J1–J3 on the development mirror candidate and passed J4 in kept-state
+recovery. Its J9 stopped at 51.8 minutes on one runtime CPU report. That sample
+is now an observation: the Engine logged a vanished Lucene temporary file during
+its status walk, and real worker fallback was not established. No product code
+was changed. Native crash collection remains unproven. Round nine is a development
+continuation of the same candidate with fresh private downloads, J1/J3 and one
+60-minute J9; it does not repeat or claim fresh J2/J4 qualification. Evidence is
+under W4c round eight and round nine.
+Round nine passed fresh J1/J3, then the owner-memory guard stopped the only
+started J9 after 9.1 minutes of sampled evidence (MemAvailable 11.80 GiB).
+The built-in resource retry reached its installation before the common device
+write upper bound stopped it at 29,750,976,512 bytes; no second soak started.
+A harness PID-correlation defect initially derived zero worker GPU memory:
+`nvidia-smi` inside the sandbox already returned namespace PIDs. Its raw samples
+all retained 2330 MiB for the Engine and 16 CUDA libraries. The helper was fixed;
+separate corrected evidence reclassifies those same samples without changing
+original reports. No runtime CPU mismatch or ZERO stage advancement warning was
+observed in this short soak. Both private roots and all recorded processes were
+removed; owner metadata and sentinel were unchanged. The required 60-minute
+soak remains unverified; the continuation failed as infrastructure.
+
+Round seven's Install AI click produced no consent dialog within 30 seconds,
+although it worked in round six. This remains unexplained; no product claim is
+made and it is not investigated on this lane.
+
+Use `gpu-host.py` on the owner host; **never use hosted.py, apt install or the
+VM wrapper here**. Prerequisites already on PATH: Python 3 with Pillow, Xvfb,
+xauth, D-Bus, Openbox, xdotool, scrot, taskset, curl, Tesseract, nvidia-smi,
+WebKitWebDriver matching the host WebKitGTK, and tauri-driver 2.0.4. The host
+command installs nothing. Bubblewrap (`bwrap`) must already be installed. Tools may instead be extracted into a private scratch
+directory from distro `.deb` files using `apt download` and `dpkg-deb -x`.
+Keep their loader paths inside individual tool wrappers; do not export
+LD_LIBRARY_PATH into the candidate. An extracted Openbox needs its own theme
+data through its wrapper's XDG_DATA_DIRS; an extracted scrot may need its own
+IMLIB2_LOADER_PATH. The host's GPU and CUDA installation are never changed.
+
+Generate the original mixed-format corpus **once**, then reuse it. Its manifest
+checks every byte on reuse; an interrupted or modified corpus is an error, not
+silently regenerated. There are 6000 long documents (400 sections each) in text,
+Markdown, HTML, CSV, email and DOCX, plus the existing eight small fixtures,
+including the image-only PDF. Total size is about 541 MiB. ZIP timestamps and
+PDF metadata are fixed. Large pack inputs are hardlinked; production model
+downloads start in empty private state, never in the owner's model cache.
+
+```sh
+python3 scripts/release/qual/journeys/corpus.py --soak \
+  /path/to/reusable-soak-corpus > /path/to/soak-corpus-manifest.json
+python3 scripts/release/qual/journeys/gpu-host.py \
+  --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+  --source /path/to/exact-tagged-source --last-release v0.3.0 \
+  --soak-corpus /path/to/reusable-soak-corpus \
+  --driver /path/to/tauri-driver-2.0.4 --evidence /path/to/new-gpu-evidence
+```
+
+This uses the draft `.deb` and SHA256SUMS. No MCPB is needed for this lane.
+The candidate's AI registry and URLs are used **unchanged**. `--source` must be
+the source that produced that candidate. For the round-nine development continuation, add `--journeys J1 J3 J9`;
+J3 adds the small corpus through the production API as a prerequisite, without
+a J2 result. Installation still uses fresh private downloads, production
+activation and the acknowledged Start AI control.
+For a development isolation check without AI installation or GPU work, use
+`--journeys J1 J2 --write-budget-bytes 20000000000`; the summary marks this
+subset as development evidence.
+The summary records its commit and the
+last release tag (default: nearest reachable stable `vX.Y.Z` tag at an earlier
+source commit; all tags pointing at the candidate itself are excluded). If a
+previous release cannot be established, preparation fails as infrastructure;
+`--last-release` supplies an explicit local version tag for shallow sources.
+J9's relevance decision diffs that tag against the source commit. Named owners:
+every `modules/*/src/main/` production source set derived from the module layout
+(including indexing, adapters-lucene and reranker), `modules/shell/src-tauri/src/`,
+`modules/ui-web/src/`, module Gradle build files, `build-logic/`,
+`gradle/libs.versions.toml`, and the Linux pack producer/assembler/registry helper
+and input manifest in `scripts/ai/`. This is conservative: configuration and
+Engine lifecycle changes can affect inference even without an encoder change.
+Documentation, harness-only and test-only changes do not trigger J9.
+Uncommitted production changes, a missing source/tag or a failed diff cannot
+produce a skip or pass. The reason and relevant changed paths appear in
+`soakDecision` and `J9-relevance.json`. An irrelevant J9 is `skipped-by-decision`.
+
+The external wrapper runs the entire lane, including Xvfb, the session bus,
+pack mirror and all candidate processes, inside bubblewrap. A private empty
+read-only directory hides the passwd-derived home; only the source worktree,
+its Git metadata, candidate assets, packs, corpus and individual harness tool files
+are bound back at their original paths, read-only. The extracted candidate is
+also read-only. Private work/state (directly under `/home/elias/dev/justsearch-qual/`) and evidence are writable. `/tmp`,
+`/run/user/<uid>` and the PID namespace (with a matching `/proc`) are private;
+network and GPU devices are shared. Tool parent directories are never restored
+implicitly. For extracted wrappers, repeat `--tool-resource /exact/path` for
+each required executable, library or specific data directory. These resources
+are read-only too. Every input, resource and writable binding is refused if it
+is, contains or is inside an owner JustSearch state directory, or exposes the
+owner home root; symlink targets are checked as well.
+Before and after the session, an internal
+assertion checks that home contains only these explicit bindings. The sandbox
+root filesystem is read-only. Writable mounts are limited to private state,
+evidence, `/tmp`, `/run/user/<uid>`, the private home within state and `/dev` for
+the GPU. The remainder of `/run` is hidden by an empty read-only mount, except
+`/run/dbus`: this system service endpoint holds no owner JustSearch data.
+Product Rust/Java sources contain no explicit system-bus request. The shell
+uses GTK/WebKit through Tauri (`modules/shell/src-tauri/Cargo.toml`); its locked
+Linux single-instance, notification and Tao portal implementations use the
+private session bus. That bus uses a `session.conf` generated in private state
+and copied into the attempt evidence, with AppArmor mediation disabled for
+this private bus only. It uses EXTERNAL authentication and the normal session
+service directories, without importing host bus policy. The host's default
+session configuration fails its AppArmor policy query with the read-only root;
+the private configuration permits activation-environment updates without any
+additional writable host path. The existing read-only `/run/dbus` binding is
+retained; J1/J2 with it hidden remain unverified. No other host service socket
+is restored. The sandbox does not guard against processes of the same user on
+the host: one can still reach the private bus through `/proc/<pid>/root`, as it
+could trace the lane's processes. The sandbox keeps the lane away from the
+owner's data and session, not the host user away from the lane.
+The owner's home
+remains hidden and only explicit lane inputs are restored there.
+
+Private HOME and XDG roots and environment scrubbing remain in place.
+`JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR` explicitly names the private cache and is
+recorded in environment evidence. The `.deb` is extracted without installing,
+retaining `usr/bin/JustSearch` beside `usr/lib/<package>/resources/headless`.
+A curated PATH exposes OS/harness tools without a developer JDK. Ports for the
+API and both WebDriver endpoints are private. CPU affinity and native pools
+are capped at eight. The external 30-second resource guard uses host PID/start
+identities descended from its own bubblewrap process; product ownership and
+CUDA map probes run only inside the private PID namespace. Unreadable unproven
+process entries are skipped by diagnostic enumeration. The runner still requires readable exact product identities for its behavior checks.
+
+Before launch, require MemAvailable >=14 GiB and no outside process using >1 GiB
+of GPU memory. Every 30 seconds, including blocking installation and chat work,
+require MemAvailable >=12 GiB and the same outside-GPU limit. The NVIDIA XML
+probe includes graphics as well as compute processes. Unknown measurements fail
+as infrastructure. A threshold violation stops only the lane's recorded PID/start
+identities, records `failed-infrastructure` with the exact reason
+`interrupted: GPU or memory needed by the owner`, waits up to two hours (checks
+every five minutes) and allows one fresh retry. Attempt reports are preserved.
+A development invocation starts J9 at most once, even across that retry; a
+previously started soak becomes unavailable instead of silently running again.
+The private session has a three-hour failure/stall deadline. Processes, private
+state, mirror, display and bus are removed on every outcome.
+
+J1 launches the extracted packaged window in the harness's own WebDriver;
+mapped-window/process identity, production Engine readiness and mounted DOM
+are the evidence. J2 adds the small corpus through the production folder API,
+indexes and searches; system picker and open-result are covered in the VMs.
+On gpu-linux, J3 sends the same production request as BrainSurface.confirmInstall's
+**Accept and download** action: `POST /api/operations/core.start-ai-install/invoke`
+with `{"args":{"acceptTerms":true}}`. The request and response are recorded;
+completion is observed through `/api/ai/install/status`. This lane does not drive
+the Install AI consent dialog; the CPU VMs qualify that UI flow. Downloaded models
+are activated through the existing UI activation consent. Preview must select GPU_FULL and include chat and `cuda-runtime-linux`; installed
+readiness must agree and must not install the Windows native runtime. The separate
+**Start AI** control then sets chat intent; the observed runtime must become
+healthy with a realized model before a chat request. Embedding
+and SPLADE must report **observed** CUDA execution without GPU fallback.
+The production RAG chat request goes through the shell's own authenticated
+origin; a completed answer must name the fixture's turquoise telescope and cite
+the inspection message. The selected llama-server must be the installed cuda12
+variant and its logs must report actual layer offload. `/proc/<pid>/maps` from
+the live, run-owned Engine and llama-server must both contain CUDA libraries;
+every CUDA/cuDNN library's canonical path must be inside this candidate's
+installed pack. OS `libcuda`/`libnvidia` driver libraries are the explicit
+exception. Host `/etc/ld.so.conf.d/000-ort-cuda12.conf` paths, symlink escapes and
+deleted mappings fail. J4 reuses the shared UI-authored bookmark/theme, Web
+Storage, folder/index and model-hash persistence checks, then repeats GPU chat
+and library ownership after restart. J5–J8 are inapplicable here.
+
+J9 observes the real Engine for **at least 3600 seconds**, with a mixed long
+corpus added through the production API. Every 30 seconds it records indexing
+and enrichment counters, Engine PID/instance, heap used/max and runtime CUDA
+providers, the worker's `nvidia-smi` compute-app memory and its CUDA library
+maps. The query runs inside the lane and reports namespace PIDs, matched to the
+worker’s exact live process identity. A CPU report fails as product fallback only on two consecutive
+samples at least 30 seconds apart, with both worker compute memory and CUDA
+library maps absent in both. A mismatching sample remains an observation,
+including Engine JSON log lines within ±5 seconds; it is not a passed GPU check.
+`soak` in the summary names these observations and counts confirmed GPU checks.
+It also reports the count and first/last time of BackfillScheduler's
+`ZERO stage advancement` warning without failing on that warning. The summary's
+`deviceWriteUpperBound` reports the whole-device write delta including unrelated
+host IO. The pre-soak indexed count is recorded before adding the long corpus
+to this private index. At least 1% of its long documents (60 of 6000) must enter
+the index within the first 600 seconds; an idle app with no pending work cannot
+pass. The corpus path, baseline, minimum, observed count and observation time
+are retained in `corpusIngestion`. Indexing must advance within 600 seconds while it has work. The direct
+queue signal is `worker.core.pendingJobs`; the tracker also includes in-flight
+`pendingVduCount`, `writerQueueDepth`, `writerPendingDocs`, migration
+`pendingJobsCount`/`processingJobsCount` and a running `migrationEnumerator`.
+Each enabled enrichment stage with pending work (document embedding, chunk
+embedding, document SPLADE, chunk SPLADE and NER) gets its own 600-second window
+only once those indexing counters are zero and enumeration is stopped. Production
+defers enrichment during indexing; resumed indexing resets enrichment windows.
+An advancing stage cannot mask a stalled one. An eligible stage with no advance
+for over 600 seconds fails J9 as product, naming the stage, completed and pending
+counts, when indexing went idle and its last advance relative to soak start.
+Disabled stages and stages without pending work are exempt; new pending work
+starts its own window even if indexing was already idle.
+An unexpected Engine restart fails; completion of the corpus is not required. The memory guard is the
+packaged Engine's reported maximum heap (`-Xmx2g`): used heap must remain below
+it; the independent host MemAvailable guard protects native allocations and the
+owner. This does not claim a native/RSS leak test.
+
+`resources.json`, exact session process identities and their private display/bus
+record enforce isolation. Before and after the run, the external wrapper records
+only names, mtimes, sizes and modes for the owner’s `~/.justsearch`,
+`~/.local/share/io.justsearch*`, `~/.config/io.justsearch*` and
+`~/.cache/io.justsearch*`, including each root directory’s own mtime. The first
+snapshot precedes all lane setup and the second follows cleanup. No file contents
+or symlink targets are read, and no sentinel is created in owner state. Any
+metadata difference fails isolation. The structural sandbox proof records before
+the candidate starts that the owner home is hidden by the explicit private mounts.
+Before the runner starts, `sandbox.json` records DISPLAY naming the lane's Xvfb,
+`/tmp/.X11-unix` containing only its socket, the lane's actual D-Bus socket,
+and no owner Wayland, bus or Pulse sockets under the private `/run/user/<uid>`.
+Unreadable diagnostic `/proc` entries cannot fail this structural proof. New JVM
+crash logs are collected only from private state and extracted resources. Native
+coredumps use the shared attribution rules without sudo. Executables under the
+lane's private state, including downloaded llama-server runtimes, are product
+executables. Crash evidence retains host PID, namespace PIDs and start ticks
+when supplied by the journal. SIGTERM and SIGINT run the same process/state
+cleanup, owner metadata comparison and final write accounting as other
+interruptions. Before removing private state, the host subreaper stops every
+descendant, including extraction tools started before the sandbox: SIGTERM,
+up to 10 seconds to exit, then SIGKILL and an exit/reap barrier. The tree is
+rescanned during shutdown to include newly forked and adopted descendants.
+A process that still cannot exit fails cleanup and retains state. State removal
+is retried once after the barrier; failures report the remaining paths in
+`private-state-cleanup.json` and the summary. `host-process-stop.json` records
+the shutdown identities and signals. As with hosted Linux,
+native crash collection is currently unproven and always adds an
+`owner-validation` row; even otherwise passing results are therefore
+`passed-pending-owner-validation` (exit 2). A crash or unavailable check still
+fails the lane. Screenshots are triage only. Every attempt retains per-journey
+write observations. Before extracting or launching anything, the host command
+enters a transient user scope with `systemd-run --user --scope
+--slice=agents.slice --property=IOAccounting=yes`. If already inside a dedicated
+scope under `agents.slice`, it reuses that scope (also from a child cgroup).
+Launch each independent run in its own scope; an existing scope must belong
+only to that invocation.
+
+The top-level `write-volume.json`, summary `writeBackstop`, live guard and
+per-journey observations prefer that scope's `io.stat`: sum `wbytes` across
+reported devices and subtract the same invocation's starting value. The kernel
+already includes all descendants; child files are not summed again. Sibling
+scopes and unrelated sessions are excluded. Buffered writeback follows kernel
+inode/cgroup ownership attribution, so shared inodes may be charged to a different
+cgroup than the last writer. Read-only hardlinked packs do not imply lane writes.
+This measures attributed block I/O, not application write-call bytes or root size.
+When used, this measurement also appears as `scopeWrites` in the summary.
+
+Missing `io.stat` never prevents setup. If the scope has no I/O controller,
+the invocation instead uses the private-root device's `/proc/diskstats`
+sectors-written delta times 512. `measurementKind: device-upper-bound` and
+`fallbackReason` identify this fallback: it includes unrelated host I/O and is
+an upper bound, not a precise lane budget. This host has no user-scope I/O
+controller; no host configuration change is needed. The summary's
+`deviceWriteUpperBound` always records the device delta as informational evidence.
+It serves as the runaway backstop only in fallback mode.
+
+No global sync is issued. Pending writeback, final evidence writes and later
+scope shutdown fall outside the final sample. The scope remains alive through
+cleanup and sampling; development recovery starts a fresh baseline.
+`private-root-size.json` records `du -s -B1` before removal (allocated size,
+not cumulative writes). The guard is a runaway backstop, sampled every second
+with 512 MB reserved for cleanup. Its release default is 60 GB: a fresh GPU
+install plus soak writes about 25 GB of its own. `--write-budget-bytes`
+overrides the cap; the small acceptance checks use 20 GB.
+
+After downloads and activation, the lane saves a private development checkpoint.
+A later infrastructure failure retains that root with all processes stopped;
+a product failure, resource/budget interruption or completed lane removes it.
+After diagnosing a plain harness failure, continue **only** the remaining
+J3 checks, J4 and J9 using the same package/tools and a new evidence directory:
+
+```sh
+python3 scripts/release/qual/journeys/gpu-host.py \
+  <same assets, package, source, corpus, driver and mirror arguments> \
+  --development-resume-root /home/elias/dev/justsearch-qual/w4c-gpu-<id> \
+  --journeys J3 J4 J9 --evidence /path/to/new-development-evidence
+```
+
+This skips all downloads/activation, restores only the kept lane's facts and
+saved state, and labels the result `development-rerun`, never fresh release
+qualification. The original failed report remains unchanged. Recovery is a new
+invocation: its write backstop starts a fresh baseline. Completed UI-authored
+facts are checkpointed and verified against their saved-state snapshot on
+recovery; the already-bookmarked view is not authored a second time. The empty
+sandbox-home mount placeholders are rebuilt for the new evidence path. Exited
+zombie processes are excluded before environment reads and final live-process
+checks; unreadable known live processes still fail as infrastructure. Remove any retained
+root after the development repair sequence ends. Start AI
+must be invoked and its chat intent acknowledged before chat startup failures
+can be classified as product failures.
+
+### Development candidate and loopback packs
+
+The currently shipped registry has no Linux GPU pack entry. This explicit
+development path uses the pack files in
+`/home/elias/dev/justsearch-qual/w6b-packs/` without publishing anything:
+
+```sh
+# Supported Linux producer stages, through the host's Gradle slot. The empty
+# Tauri hook avoids invoking Gradle a second time outside that slot.
+npm ci --prefix modules/shell --audit=false
+npm ci --prefix modules/ui-web --audit=false
+npm --prefix modules/ui-web run build
+js-gradle-slot ./gradlew -PskipWebBuild=true :modules:ui:bundleSidecar
+npm --prefix modules/shell run tauri -- build \
+  --config src-tauri/tauri.linux.conf.json \
+  --config '{"build":{"beforeBuildCommand":""}}' --ci
+python3 scripts/release/qual/journeys/gpu-candidate.py \
+  --package modules/shell/src-tauri/target/release/bundle/deb/JustSearch_0.3.0_amd64.deb \
+  --packs /home/elias/dev/justsearch-qual/w6b-packs --output /path/to/new-test-assets
+python3 scripts/release/qual/journeys/gpu-host.py \
+  --assets /path/to/new-test-assets --package JustSearch_0.3.0_amd64.deb \
+  --source "$PWD" --soak-corpus /path/to/reusable-soak-corpus \
+  --development-pack-mirror /home/elias/dev/justsearch-qual/w6b-packs \
+  --driver /path/to/tauri-driver-2.0.4 --evidence /path/to/new-test-evidence
+```
+
+The candidate helper changes only the registry in a disposable extracted copy
+and repacks a new `.deb`, with its own SHA256SUMS and explicit development
+provenance. It reuses `update-linux-gpu-registry.py` for native-target/replacement
+semantics. The original package and source are unchanged. The tested `.deb`
+itself contains the loopback registry pins; no journey changes extracted bytes.
+The development option hardlinks pack ZIPs into an otherwise empty mirror root,
+serves only 127.0.0.1, verifies names/sizes/hashes/URLs against those embedded pins,
+and stops the server afterward. The default mirror port is 8769; pass the same
+`--mirror-port` to the candidate helper and `--development-mirror-port` to the
+host command to change it. Development mirror URLs without the explicit option
+are rejected. Every such summary says `execution.releaseQualification: false`.
+Only an immutable draft with its own production registry/URLs qualifies a
+release. Local host builds are development evidence, not an Ubuntu 24.04 ABI
+qualification. Explicit `--journeys` subsets likewise never qualify a release.
 
 ## What is asserted
 
