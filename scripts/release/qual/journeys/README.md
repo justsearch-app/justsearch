@@ -464,6 +464,13 @@ guest evidence directory, since stopped checkpoints retain previous evidence.
 Use `--session hosted` without predecessor/mirror arguments for a local hosted
 equivalent in a fresh Windows VM. This executes `windows-hosted.py`, the same
 entry point as Actions. Prepare its tools snapshot with that same session first.
+The local hosted-equivalent rehearsal remains unqualified: an elevated interactive
+run installed the candidate and opened its normal window with a ready Engine,
+but creating the harness's WebDriver session timed out with a matching driver.
+The session failure is infrastructure; dependent journeys remain unavailable.
+The same candidate completed the VM lane in its limited interactive context.
+The cause of the hosted timeout is unresolved; the actual GitHub workflow has
+only been read, parsed and policy-checked here, never dispatched.
 To continue from an installed checkpoint, supply `--mode rerun --snapshot
 /path/to/new-j1-evidence/selected/snapshot --journeys J2`. Each development
 rerun selects one journey, restores its prerequisite checkpoint and seals the
