@@ -111,6 +111,129 @@ class GpuTests(unittest.TestCase):
         self.assertFalse(gpu.soak_relevant(['docs/how-to/a.md', 'scripts/release/qual/journeys/gpu.py']))
         self.assertFalse(gpu.soak_relevant(['scripts/ai/test_update_linux_gpu_registry.py', 'modules/worker-core/src/test/java/X.java']))
 
+    def gpu_soak_sample(self, seconds, provider='cuda', memory=4000, libraries=('/pack/libcudnn.so.9',)):
+        return {'seconds': seconds, 'epochSeconds': 1000 + seconds,
+                'runtime': {'onnxFeatures': [{'id': name, 'modelActive': True,
+                    'executionProvider': provider, 'gpuFallback': provider == 'cpu'}
+                    for name in ('embed', 'splade')]},
+                'workerCuda': {'computeMemoryMiB': memory, 'libraries': list(libraries)}}
+
+    def test_single_cpu_runtime_sample_with_cuda_worker_is_observation(self):
+        tracker = gpu.SoakGpu()
+        tracker.observe(self.gpu_soak_sample(0))
+        mismatch = self.gpu_soak_sample(30, 'cpu')
+        tracker.observe(mismatch)
+        tracker.observe(self.gpu_soak_sample(60))
+        self.assertEqual(tracker.observations, [mismatch])
+        self.assertEqual(tracker.confirmed_checks, 2)
+
+    def test_persistent_fallback_needs_30_seconds_and_both_worker_signals_absent(self):
+        tracker = gpu.SoakGpu()
+        tracker.observe(self.gpu_soak_sample(0, 'cpu', 0, ()))
+        tracker.observe(self.gpu_soak_sample(29, 'cpu', 0, ()))
+        with self.assertRaisesRegex(runner.ProductFailure, 'Persistent CPU fallback'):
+            tracker.observe(self.gpu_soak_sample(59, 'cpu', 0, ()))
+        for memory, libraries in ((4000, ()), (0, ('/pack/libcudnn.so.9',)), (4000, ('/pack/libcudnn.so.9',))):
+            tracker = gpu.SoakGpu()
+            tracker.observe(self.gpu_soak_sample(0, 'cpu', memory, libraries))
+            tracker.observe(self.gpu_soak_sample(30, 'cpu', memory, libraries))
+            self.assertEqual(tracker.confirmed_checks, 0)
+            self.assertEqual(len(tracker.observations), 2)
+
+    def test_gpu_sample_between_cpu_reports_breaks_consecutive_fallback(self):
+        tracker = gpu.SoakGpu()
+        tracker.observe(self.gpu_soak_sample(0, 'cpu', 0, ()))
+        tracker.observe(self.gpu_soak_sample(30))
+        tracker.observe(self.gpu_soak_sample(60, 'cpu', 0, ()))
+        self.assertEqual(tracker.confirmed_checks, 1)
+
+    def test_soak_diagnostics_logs_include_5_second_context_and_warning_times(self):
+        import gzip
+        rows = [{'@timestamp': f'1970-01-01T00:16:{second:02d}+00:00',
+                 'message': message, 'level': level, 'logger_name': 'BackfillScheduler'}
+                for second, message, level in ((39, 'outside', 'ERROR'), (40, 'Failed to get index status', 'ERROR'),
+                    (45, 'Combined enrichment backfill hit its 5000ms cycle budget with ZERO stage advancement', 'WARN'),
+                    (50, 'inside', 'INFO'), (51, 'outside', 'ERROR'))]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, 'engine.log')
+            path.write_text('\n'.join(json.dumps(r) for r in rows[2:]) + '\nnot JSON\n')
+            with gzip.open(path.with_name('engine.1970-01-01.0.log.gz'), 'wt') as stream:
+                stream.write('\n'.join(json.dumps(r) for r in rows[:2]))
+            result = gpu.soak_logs(path, 1000, 1050, [self.gpu_soak_sample(5, 'cpu')])
+        self.assertEqual(result['zeroStageAdvancement'], {'count': 1,
+            'firstTime': rows[2]['@timestamp'], 'lastTime': rows[2]['@timestamp']})
+        self.assertEqual(result['runtimeMismatchObservations'][0]['engineLogWithin5Seconds'], rows[1:4])
+
+    def test_worker_cuda_uses_query_namespace_pid_and_captures_memory_and_maps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pid = os.getpid()
+            ticks = Path(f'/proc/{pid}/stat').read_text().rsplit(') ', 1)[1].split()[19]
+            run = Mock(data=str(root))
+            run.target.owned.return_value = [{'pid': pid, 'ticks': ticks}]
+            run.target.alive.return_value = True
+            with patch.object(gpu.subprocess, 'check_output', return_value=f'{pid}, 4096\n999999, 8000\n'):
+                result = gpu.worker_cuda(run, pid)
+            self.assertEqual(result['computeMemoryMiB'], 4096)
+            self.assertEqual(result['maps'], Path(f'/proc/{pid}/maps').read_text())
+            self.assertEqual(gpu.compute_memory('', pid), 0)
+            self.assertEqual(gpu.compute_memory('999999, 8000\n', pid), 0)
+            with self.assertRaises(runner.Infrastructure):
+                gpu.compute_memory(f'{pid}, [N/A]', pid)
+
+    def test_selected_j1_j3_j9_adds_small_corpus_prerequisite_without_j2_claim(self):
+        run = Mock(facts={}, args=types.SimpleNamespace(resume=None, journeys=['J1', 'J3', 'J9']))
+        def add_folder(run):
+            run.facts['folder'] = ['small-corpus']
+            return run.facts['folder']
+        with patch.object(gpu.linux, 'add_folder_api', side_effect=add_folder) as add, patch.object(gpu, 'require_gpu_plan', side_effect=runner.Infrastructure('stop before download')):
+            with self.assertRaisesRegex(runner.Infrastructure, 'stop before download'):
+                gpu.gpu_install(run)
+        add.assert_called_once_with(run)
+        run.evidence.assert_any_call('J3-small-corpus-prerequisite', ['small-corpus'])
+
+    def test_soak_retains_single_runtime_mismatch_and_probes_worker_each_sample(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'runtime').mkdir()
+            (root / 'runtime/manifest.json').write_text(json.dumps({'pid': 123, 'instanceId': 'engine'}))
+            (root / 'logs').mkdir()
+            log = {'@timestamp': '1970-01-01T00:16:40+00:00', 'message': 'Failed to get index status',
+                   'level': 'ERROR', 'logger_name': 'Engine'}
+            (root / 'logs/engine.log').write_text(json.dumps(log))
+            run = Mock(args=types.SimpleNamespace(soak_corpus=root), data=tmp, out=root,
+                       facts={}, run_id='regression')
+            run.require.side_effect = lambda name: {'run': True} if name == 'soakDecision' else True
+            calls = {'status': 0, 'runtime': 0}
+            def api(path, body=None):
+                if path == '/api/status':
+                    calls['status'] += 1
+                    return {'worker': {'core': {'indexedDocuments': calls['status']}},
+                            'memoryUsedBytes': 100, 'memoryMaxBytes': 200}
+                if path == '/api/ai/runtime/status':
+                    calls['runtime'] += 1
+                    return self.gpu_soak_sample(0, 'cpu' if calls['runtime'] == 1 else 'cuda')['runtime']
+                return {}
+            run.api.side_effect = api
+            clock = [0]
+            def sleep(seconds):
+                clock[0] = 3600
+            with patch.dict(os.environ, QUAL_GPU_SOAK_MARKER=str(root / 'soak-marker')), \
+                    patch('corpus.verify_soak', return_value={}), \
+                    patch.object(gpu.time, 'monotonic', side_effect=lambda: clock[0]), \
+                    patch.object(gpu.time, 'time', side_effect=lambda: 1000 + clock[0]), \
+                    patch.object(gpu.time, 'sleep', side_effect=sleep), \
+                    patch.object(gpu, 'worker_cuda', create=True, side_effect=lambda *args: {
+                        'maps': 'raw maps', 'computeMemoryMiB': 2330, 'libraries': ['/pack/libcudnn.so.9']}) as worker:
+                result = gpu.soak(run)
+            self.assertEqual(result['seconds'], 3600)
+            self.assertEqual(worker.call_count, 2)
+            self.assertEqual(calls['runtime'], 2)
+            self.assertEqual(run.facts['soak']['gpuObservationCount'], 1)
+            self.assertEqual(run.facts['soak']['confirmedGpuChecks'], 1)
+            self.assertEqual(run.facts['soak']['runtimeMismatchObservations'][0]['engineLogWithin5Seconds'], [log])
+            self.assertEqual(len(list(root.glob('J9-worker-maps-*.txt'))), 2)
+
     def test_soak_no_gap_over_ten_minutes_and_memory_guard(self):
         progress = gpu.SoakProgress(0)
         progress.observe(0, 1, 100, 200, 'boot-one')

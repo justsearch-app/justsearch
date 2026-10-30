@@ -187,20 +187,26 @@ private signing key is needed or used for these tests.
 ## GPU host (Ubuntu, supported NVIDIA GPU)
 
 W4c development status: full GPU qualification remains unproven. Round eight
-narrows gpu-linux J3 to production API installation; UI install and consent are
-already qualified on CPU in the VMs. Fresh J1/J2/J3 passed, including GPU chat
-with sources and positive Engine/llama-server pack library ownership. J4 hit a
-harness zombie-environment enumeration error. Development recovery reused the
-activated state without downloads; repairs also rebuilt empty mount placeholders
-and preserved completed authored-state facts. J4 then passed, including GPU chat
-after restart. The single J9 soak stopped after 3105 seconds (51.8 minutes): the
-production runtime API reported embedding on CPU with GPU fallback. It is a
-failed-product observation, with no cause established or product fix attempted;
-the required 60-minute soak did not pass. The final device-write upper bound
-was 27,437,752,320 bytes; private-root final allocation was 21,645,885,440 bytes.
-Processes and private state were removed; owner metadata and sentinels were
-unchanged. Native crash collection remains unproven. Evidence and assessment
-are under W4c round eight. Tested changes remain a development candidate.
+passed fresh J1–J3 on the development mirror candidate and passed J4 in kept-state
+recovery. Its J9 stopped at 51.8 minutes on one runtime CPU report. That sample
+is now an observation: the Engine logged a vanished Lucene temporary file during
+its status walk, and real worker fallback was not established. No product code
+was changed. Native crash collection remains unproven. Round nine is a development
+continuation of the same candidate with fresh private downloads, J1/J3 and one
+60-minute J9; it does not repeat or claim fresh J2/J4 qualification. Evidence is
+under W4c round eight and round nine.
+Round nine passed fresh J1/J3, then the owner-memory guard stopped the only
+started J9 after 9.1 minutes of sampled evidence (MemAvailable 11.80 GiB).
+The built-in resource retry reached its installation before the common device
+write upper bound stopped it at 29,750,976,512 bytes; no second soak started.
+A harness PID-correlation defect initially derived zero worker GPU memory:
+`nvidia-smi` inside the sandbox already returned namespace PIDs. Its raw samples
+all retained 2330 MiB for the Engine and 16 CUDA libraries. The helper was fixed;
+separate corrected evidence reclassifies those same samples without changing
+original reports. No runtime CPU mismatch or ZERO stage advancement warning was
+observed in this short soak. Both private roots and all recorded processes were
+removed; owner metadata and sentinel were unchanged. The required 60-minute
+soak remains unverified; the continuation failed as infrastructure.
 
 Round seven's Install AI click produced no consent dialog within 30 seconds,
 although it worked in round six. This remains unexplained; no product claim is
@@ -237,7 +243,11 @@ python3 scripts/release/qual/journeys/gpu-host.py \
 
 This uses the draft `.deb` and SHA256SUMS. No MCPB is needed for this lane.
 The candidate's AI registry and URLs are used **unchanged**. `--source` must be
-the source that produced that candidate. The summary records its commit and the
+the source that produced that candidate. For the round-nine development continuation, add `--journeys J1 J3 J9`;
+J3 adds the small corpus through the production API as a prerequisite, without
+a J2 result. Installation still uses fresh private downloads, production
+activation and the acknowledged Start AI control.
+The summary records its commit and the
 last release tag (default: latest reachable `v[0-9]*` tag via `git describe`).
 J9's relevance decision diffs that tag against the source commit. Named owners:
 `modules/{worker-core,worker-services,indexer-worker,app-engine,app-inference,ai-backend,ort-common,gpu-bridge,app-services,configuration,ui,core}/src/main/`,
@@ -316,7 +326,17 @@ and library ownership after restart. J5–J8 are inapplicable here.
 J9 observes the real Engine for **at least 3600 seconds**, with a mixed long
 corpus added through the production API. Every 30 seconds it records indexing
 and enrichment counters, Engine PID/instance, heap used/max and runtime CUDA
-providers. No progress gap may exceed 600 seconds. An unexpected Engine restart
+providers, the worker's `nvidia-smi` compute-app memory and its CUDA library
+maps. The query runs inside the lane and reports namespace PIDs, matched to the
+worker’s exact live process identity. A CPU report fails as product fallback only on two consecutive
+samples at least 30 seconds apart, with both worker compute memory and CUDA
+library maps absent in both. A mismatching sample remains an observation,
+including Engine JSON log lines within ±5 seconds; it is not a passed GPU check.
+`soak` in the summary names these observations and counts confirmed GPU checks.
+It also reports the count and first/last time of BackfillScheduler's
+`ZERO stage advancement` warning without failing on that warning. The summary's
+`deviceWriteUpperBound` reports the whole-device write delta including unrelated
+host IO. No progress gap may exceed 600 seconds. An unexpected Engine restart
 fails; completion of the corpus is not required. The memory guard is the
 packaged Engine's reported maximum heap (`-Xmx2g`): used heap must remain below
 it; the independent host MemAvailable guard protects native allocations and the

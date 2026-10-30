@@ -566,6 +566,9 @@ def main():
             'writtenBytes': final_bytes - args.write_start['startBytes'], 'budgetBytes': BUDGET,
             'measurement': 'Private-root mount device /proc/diskstats sectors written delta * 512; same baseline as live guard',
             'limit': 'Upper bound includes unrelated host IO on this device. No global sync; pending writeback and final accounting-file write are outside the sample.'})
+        if report:
+            report['deviceWriteUpperBound'] = json.loads((out / 'write-volume.json').read_text())
+            save(out / 'summary.json', report)
     return runner.report_exit_code(report)
 
 

@@ -1,5 +1,7 @@
 """GPU host adapter for runner.py. No installation, developer runtime or product hooks."""
 import json
+import datetime
+import gzip
 import ipaddress
 import os
 from pathlib import Path
@@ -230,6 +232,91 @@ def require_gpu_encoders(runtime):
             raise ProductFailure('Encoder is not executing on CUDA: ' + name + ': ' + json.dumps(feature))
 
 
+class SoakGpu:
+    def __init__(self):
+        self.previous = None
+        self.observations = []
+        self.confirmed_checks = 0
+
+    def observe(self, sample):
+        features = {f['id']: f for f in sample['runtime'].get('onnxFeatures', [])}
+        cpu = {name for name in ('embed', 'splade')
+               if features.get(name, {}).get('executionProvider') == 'cpu'}
+        try:
+            require_gpu_encoders(sample['runtime'])
+            matched = True
+        except ProductFailure:
+            matched = False
+        worker = sample['workerCuda']
+        active = worker['computeMemoryMiB'] > 0 and bool(worker['libraries'])
+        if not matched or not active:
+            self.observations.append(sample)
+        else:
+            self.confirmed_checks += 1
+        previous = self.previous
+        self.previous = sample
+        if previous and sample['seconds'] - previous['seconds'] >= 30:
+            prior_cpu = {f['id'] for f in previous['runtime'].get('onnxFeatures', [])
+                         if f.get('executionProvider') == 'cpu'}
+            if (cpu & prior_cpu and worker['computeMemoryMiB'] == 0 and not worker['libraries']
+                    and previous['workerCuda']['computeMemoryMiB'] == 0
+                    and not previous['workerCuda']['libraries']):
+                raise ProductFailure('Persistent CPU fallback: consecutive runtime samples >=30 s apart and worker has neither compute-app memory nor CUDA library maps')
+
+
+def compute_memory(raw, pid):
+    # nvidia-smi runs inside the lane's PID namespace and reports those PIDs.
+    memory = 0
+    for line in raw.splitlines():
+        fields = line.split(',')
+        if len(fields) != 2 or not all(value.strip().isdigit() for value in fields):
+            raise Infrastructure('J9 compute-app memory unavailable: ' + raw)
+        if int(fields[0]) == pid:
+            memory += int(fields[1])
+    return memory
+
+
+def worker_cuda(run, pid):
+    rows = [p for p in run.target.owned() if p['pid'] == pid]
+    if len(rows) != 1 or not run.target.alive(rows):
+        raise Infrastructure('J9 worker identity unavailable for CUDA evidence')
+    row = rows[0]
+    raw = subprocess.check_output(['nvidia-smi', '--query-compute-apps=pid,used_gpu_memory',
+                                   '--format=csv,noheader,nounits'], text=True, timeout=10)
+    memory = compute_memory(raw, pid)
+    maps = Path('/proc', str(pid), 'maps').read_text()
+    pack = Path(run.data, 'native-bin/llama-server/variants/cuda12')
+    libraries = cuda_libraries(maps, pack)
+    if not run.target.alive(rows):
+        raise Infrastructure('J9 worker changed during CUDA probe')
+    return {'identity': row, 'computeAppsRaw': raw,
+            'computeMemoryMiB': memory, 'libraries': libraries, 'maps': maps}
+
+
+def soak_logs(path, started, ended, observations):
+    warnings, contexts = [], [[] for _ in observations]
+    logs = [*sorted(path.parent.glob('engine.*.log.gz')), path]
+    lines = []
+    for log in logs:
+        content = gzip.open(log, 'rt', errors='replace').read() if log.suffix == '.gz' else log.read_text(errors='replace')
+        lines.extend(content.splitlines())
+    for line in lines:
+        try:
+            row = json.loads(line)
+            stamp = datetime.datetime.fromisoformat(row['@timestamp']).timestamp()
+        except (ValueError, KeyError, TypeError):
+            continue
+        if started <= stamp <= ended and row.get('level') == 'WARN' and 'BackfillScheduler' in row.get('logger_name', '') and 'ZERO stage advancement' in row.get('message', ''):
+            warnings.append(row['@timestamp'])
+        for observation, context in zip(observations, contexts):
+            if abs(stamp - observation['epochSeconds']) <= 5:
+                context.append(row)
+    return {'zeroStageAdvancement': {'count': len(warnings),
+                'firstTime': min(warnings) if warnings else None, 'lastTime': max(warnings) if warnings else None},
+            'runtimeMismatchObservations': [{**sample, 'engineLogWithin5Seconds': context}
+                                           for sample, context in zip(observations, contexts)]}
+
+
 def require_registry_urls(registry, development=False):
     def visit(value):
         if isinstance(value, dict):
@@ -322,7 +409,11 @@ class Run(runner.Run):
             getattr(self.args, 'development_pack_mirror', None) or getattr(self.args, 'journeys', None)
             or getattr(self.args, 'resume', None))
         report['execution']['developmentPackMirror'] = str(self.args.development_pack_mirror) if getattr(self.args, 'development_pack_mirror', None) else None
+        if getattr(self.args, 'journeys', None) == ['J1', 'J3', 'J9']:
+            report['execution'].update(mode='development-continuation', freshPrivateState=not bool(self.args.resume))
         report['soakDecision'] = self.facts.get('soakDecision', {'run': None, 'reason': 'setup did not determine relevance'})
+        if 'soak' in self.facts:
+            report['soak'] = self.facts['soak']
         self.evidence('summary', report)
         return report
 
@@ -441,6 +532,9 @@ def gpu_install(run):
         run.require('gpuInstalled')
         return gpu_installed_checks(run)
     run.require('ui')
+    if (getattr(run.args, 'journeys', None) == ['J1', 'J3', 'J9']
+            and 'folder' not in run.facts):
+        run.evidence('J3-small-corpus-prerequisite', linux.add_folder_api(run))
     run.require('folder')
     run.nav('AI Brain')
     preview = run.api('/api/ai/install/plan-preview')
@@ -667,29 +761,45 @@ def soak(run):
     root = str(run.args.soak_corpus.resolve())
     run.api('/api/indexing/roots', {'path': root, 'collection': 'default'})
     tracker = SoakProgress(time.monotonic())
+    gpu_tracker = SoakGpu()
+    started_epoch = time.time()
     samples = []
-    while True:
-        status = run.api('/api/status')
-        manifest = json.loads(Path(run.data, 'runtime/manifest.json').read_text())
-        core = status.get('worker', {}).get('core', {})
-        enrichment = status.get('worker', {}).get('enrichment', {})
-        required = ('indexedDocuments',)
-        if any(type(core.get(key)) is not int for key in required):
-            raise Infrastructure('J9 progress counters unavailable')
-        progress = core['indexedDocuments'] + sum(enrichment.get(key, 0) for key in
-            ('embeddingCompletedCount', 'spladeCompletedCount', 'completedNerCount'))
-        sample = {'seconds': time.monotonic() - tracker.started, 'status': status,
-                  'identity': [manifest['pid'], manifest['instanceId']], 'progress': progress}
-        samples.append(sample)
-        run.evidence('J9-observations', samples)
-        tracker.observe(time.monotonic(), progress, status.get('memoryUsedBytes', 0),
-                        status.get('memoryMaxBytes', 0), sample['identity'])
-        # An active CUDA embedding session must be observed throughout the soak;
-        # CPU fallback cannot turn a long CPU run into GPU evidence.
-        require_gpu_encoders(run.api('/api/ai/runtime/status'))
-        if time.monotonic() - tracker.started >= 3600:
-            return tracker.complete(time.monotonic())
-        time.sleep(30)
+    try:
+        while True:
+            status = run.api('/api/status')
+            manifest = json.loads(Path(run.data, 'runtime/manifest.json').read_text())
+            core = status.get('worker', {}).get('core', {})
+            enrichment = status.get('worker', {}).get('enrichment', {})
+            if type(core.get('indexedDocuments')) is not int:
+                raise Infrastructure('J9 progress counters unavailable')
+            progress = core['indexedDocuments'] + sum(enrichment.get(key, 0) for key in
+                ('embeddingCompletedCount', 'spladeCompletedCount', 'completedNerCount'))
+            runtime = run.api('/api/ai/runtime/status')
+            epoch = time.time()
+            worker = worker_cuda(run, manifest['pid'])
+            maps_file = f'J9-worker-maps-{len(samples):03d}.txt'
+            (run.out / maps_file).write_text(worker.pop('maps'))
+            worker['mapsEvidence'] = maps_file
+            sample = {'seconds': time.monotonic() - tracker.started, 'epochSeconds': epoch,
+                      'status': status, 'runtime': runtime, 'workerCuda': worker,
+                      'identity': [manifest['pid'], manifest['instanceId']], 'progress': progress}
+            samples.append(sample)
+            run.evidence('J9-observations', samples)
+            tracker.observe(time.monotonic(), progress, status.get('memoryUsedBytes', 0),
+                            status.get('memoryMaxBytes', 0), sample['identity'])
+            gpu_tracker.observe(sample)
+            if time.monotonic() - tracker.started >= 3600:
+                return tracker.complete(time.monotonic())
+            time.sleep(30)
+    finally:
+        diagnostics = soak_logs(Path(run.data, 'logs/engine.log'), started_epoch, time.time(),
+                                gpu_tracker.observations)
+        diagnostics.update(confirmedGpuChecks=gpu_tracker.confirmed_checks,
+                           gpuObservationCount=len(gpu_tracker.observations),
+                           observationMeaning='Runtime/worker mismatches are observations, not passed GPU checks; fallback requires consecutive CPU samples >=30s apart and absent worker compute memory and CUDA maps in both samples')
+        run.facts['soak'] = diagnostics
+        run.evidence('J9-gpu-and-backfill-summary', diagnostics)
+
 
 
 CHECKS = {**linux.CHECKS, 'install': extract_package, 'first-run': first_run, 'author-state': author_state,
