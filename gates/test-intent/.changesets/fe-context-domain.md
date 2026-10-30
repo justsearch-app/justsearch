@@ -81,3 +81,13 @@ author-session: fe-context-domain
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "qswwvt36",
+  "verdict": "accept",
+  "digest": "sha256:f36a2c09964cc54467ca2d2af23dfdbb17b93b38f09ef111059871ae8e1bd5d1"
+}
+```
