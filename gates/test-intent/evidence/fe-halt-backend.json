@@ -1,0 +1,190 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T06:59:23.631Z",
+  "revision": "5b180829e57aa1f1a365c184498039346956424a",
+  "tree": "affc6a794a1cd8b11447f2dc753eb92ead22b34c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/controllers/AgentSessionController.halt.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/aggrdss_/tmp/test-intent-vitest-4-1793343549148.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1165
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S1 keeps observation, prose, reasoning, tools and evidence until CANCELLED",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27b644e286e7ec34842514dfb94eb1e2bc98219894bfea292981b7f821d4ff12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads S1 keeps observation, prose, reasoning, tools and evidence until CANCELLED",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S3 S6 refused is unconfirmed and permits exactly one explicit retry",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27b644e286e7ec34842514dfb94eb1e2bc98219894bfea292981b7f821d4ff12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads S3 S6 refused is unconfirmed and permits exactly one explicit retry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S3 S6 network is unconfirmed and permits exactly one explicit retry",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27b644e286e7ec34842514dfb94eb1e2bc98219894bfea292981b7f821d4ff12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads S3 S6 network is unconfirmed and permits exactly one explicit retry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S3 S6 no-answer is unconfirmed and permits exactly one explicit retry",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27b644e286e7ec34842514dfb94eb1e2bc98219894bfea292981b7f821d4ff12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads S3 S6 no-answer is unconfirmed and permits exactly one explicit retry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S4 lost stream reconciles CANCELLED from discovery and record",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27b644e286e7ec34842514dfb94eb1e2bc98219894bfea292981b7f821d4ff12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads S4 lost stream reconciles CANCELLED from discovery and record",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S4 lost stream reconciles DONE from discovery and record",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27b644e286e7ec34842514dfb94eb1e2bc98219894bfea292981b7f821d4ff12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads S4 lost stream reconciles DONE from discovery and record",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S4 lost stream reconciles READY_FOR_LLM from discovery and record",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:27b644e286e7ec34842514dfb94eb1e2bc98219894bfea292981b7f821d4ff12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads S4 lost stream reconciles READY_FOR_LLM from discovery and record",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f956fc3f9e",
+    "revision": "f956fc3f9e724af19850fb69e3e336a188003519",
+    "overlays": [
+      "modules/ui-web/src/shell-v0/controllers/testing/HaltBackend.ts",
+      "modules/ui-web/src/shell-v0/state/stopAttempt.ts"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/controllers/AgentSessionController.halt.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/aggrdss_/tmp/test-intent-vitest-4-1793343552107.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 11096,
+        "output": "JSON report written to /home/elias/.cache/am/aggrdss_/tmp/test-intent-vitest-4-1793343552107.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S1 keeps observation, prose, reasoning, tools and evidence until CANCELLED",
+        "classification": "assertion",
+        "detail": "Halt follows the backend across windows and reloads S1 keeps observation, prose, reasoning, tools and evidence until CANCELLED:  AssertionError: Stop must keep observing before the terminal: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/aggrdss_/tmp/test-intent-before-kfo5Zm/modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts:51:78\n    at processTicksAndRejections (node:i"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S3 S6 refused is unconfirmed and permits exactly one explicit retry",
+        "classification": "assertion",
+        "detail": "Halt follows the backend across windows and reloads S3 S6 refused is unconfirmed and permits exactly one explicit retry:  AssertionError: expected [ { …(6) }, { …(6) } ] to have a length of 1 but got 2\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/aggrdss_/tmp/test-intent-before-kfo5Zm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/aggrd"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S3 S6 network is unconfirmed and permits exactly one explicit retry",
+        "classification": "assertion",
+        "detail": "Halt follows the backend across windows and reloads S3 S6 network is unconfirmed and permits exactly one explicit retry:  AssertionError: expected [ { …(6) }, { …(6) } ] to have a length of 1 but got 2\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/aggrdss_/tmp/test-intent-before-kfo5Zm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/aggrd"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S3 S6 no-answer is unconfirmed and permits exactly one explicit retry",
+        "classification": "assertion",
+        "detail": "Halt follows the backend across windows and reloads S3 S6 no-answer is unconfirmed and permits exactly one explicit retry:  AssertionError: expected [ { …(6) }, { …(6) } ] to have a length of 1 but got 2\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/aggrdss_/tmp/test-intent-before-kfo5Zm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/aggrd"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S4 lost stream reconciles CANCELLED from discovery and record",
+        "classification": "assertion",
+        "detail": "Halt follows the backend across windows and reloads S4 lost stream reconciles CANCELLED from discovery and record:  AssertionError: A lost stopping stream must reconcile with the backend: expected 0 to be greater than 0\n    at /home/elias/.cache/am/aggrdss_/tmp/test-intent-before-kfo5Zm/modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts:95:91\n    at file:///home/elias/.cache/am/aggrdss_/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S4 lost stream reconciles DONE from discovery and record",
+        "classification": "assertion",
+        "detail": "Halt follows the backend across windows and reloads S4 lost stream reconciles DONE from discovery and record:  AssertionError: A lost stopping stream must reconcile with the backend: expected 0 to be greater than 0\n    at /home/elias/.cache/am/aggrdss_/tmp/test-intent-before-kfo5Zm/modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts:95:91\n    at file:///home/elias/.cache/am/aggrdss_/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S4 lost stream reconciles READY_FOR_LLM from discovery and record",
+        "classification": "assertion",
+        "detail": "Halt follows the backend across windows and reloads S4 lost stream reconciles READY_FOR_LLM from discovery and record:  AssertionError: A lost stopping stream must reconcile with the backend: expected 0 to be greater than 0\n    at /home/elias/.cache/am/aggrdss_/tmp/test-intent-before-kfo5Zm/modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts:95:91\n    at file:///home/elias/.cache/am/aggrdss_/t"
+      }
+    ]
+  },
+  "digest": "sha256:23010ff217488b6bb6722d25b4b8765be7c3c0efbaa13ff93d9dd0aa7e4d1e02"
+}

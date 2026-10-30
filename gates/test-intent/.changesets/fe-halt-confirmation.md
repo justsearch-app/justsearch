@@ -465,6 +465,82 @@ the two script-produced evidence artifacts below. No acceptance record is author
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#a lost answer rejects rather than reporting an HTTP refusal"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/controllers/testing/HaltBackend.ts"
+      ],
+      "class": "New",
+      "behaviour": "New test infrastructure for the approved stopping-until-backend-confirmation repair: one in-memory backend supplies independent per-window transports and controllable response/stream delivery. The named checks use its held DELETE replies, refusal, network failure and unanswered response, emitted reasoning/text/tool frames, stream loss, discovery and saved lifecycle records to assert continued observation until CANCELLED, unconfirmed retryable Stop after delivery failure, and CANCELLED/DONE/nonterminal reconciliation without inventing confirmation. The helper is imported only by AgentSessionController.halt.test.ts; its backend records are test-owned memory, with no application storage or live service.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "proceed accordingly",
+          "location": "task t-20261029-fs993c request, 2026-10-29"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Step 3 is a natural test of the idea. It applies the shared vocabulary to agent runs, which is exactly where the Stop bug sits. Fixing the bug becomes the first real proof of the approach",
+          "location": "task t-20261029-fs993c request, 2026-10-29"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Nothing changes what you see in the app, except the Stop fix: a halted run would then show 'stopping' until the backend confirms.",
+          "location": "task t-20261029-fs993c request, 2026-10-29"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a new task register accordingly. then proceed autonomously with investigating and designing the work",
+          "delegationLocation": "task t-20261029-fs993c request (earlier delegation)",
+          "delegationScope": "Investigate and design the shared Stop vocabulary and agent-run Halt repair in step 3, under the subsequently approved recommendation. Preserve established obligations except the premature Halt conclusion explicitly changed by the owner.",
+          "choice": "Represent the requested stopping-until-backend-confirmation behavior in controller state as well as the view: defer conclusion and the run-ended notice to the actual terminal, retaining immediate authorization cleanup, partial output and one eventual notice.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fe-halt-backend.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S1 keeps observation, prose, reasoning, tools and evidence until CANCELLED",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S3 S6 refused is unconfirmed and permits exactly one explicit retry",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S3 S6 network is unconfirmed and permits exactly one explicit retry",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S3 S6 no-answer is unconfirmed and permits exactly one explicit retry",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S4 lost stream reconciles CANCELLED from discovery and record",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S4 lost stream reconciles DONE from discovery and record",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#S4 lost stream reconciles READY_FOR_LLM from discovery and record"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "gates/test-intent/test-support-paths.v1.json"
+      ],
+      "class": "Structural rule kept",
+      "rule": "Every frontend src file imported only by tests is registered and remains subject to the test-intent gate, as required by docs/reference/testing/test-intent.md (Test-only frontend helpers).",
+      "whySurvives": "Register HaltBackend.ts, the only helper missing from the static import scan on this branch. All existing paths remain. The registry predicate and import scanner are unchanged; adding this test-only helper tightens coverage, and the existing registry unit check must pass. This registry addition is explicitly required by the repair assignment.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "proceed accordingly",
+          "location": "task t-20261029-fs993c request, 2026-10-29"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Step 3 is a natural test of the idea. It applies the shared vocabulary to agent runs, which is exactly where the Stop bug sits. Fixing the bug becomes the first real proof of the approach",
+          "location": "task t-20261029-fs993c request, 2026-10-29"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Nothing changes what you see in the app, except the Stop fix: a halted run would then show 'stopping' until the backend confirms.",
+          "location": "task t-20261029-fs993c request, 2026-10-29"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a new task register accordingly. then proceed autonomously with investigating and designing the work",
+          "delegationLocation": "task t-20261029-fs993c request (earlier delegation)",
+          "delegationScope": "Investigate and design the shared Stop vocabulary and agent-run Halt repair in step 3, under the subsequently approved recommendation. Preserve established obligations except the premature Halt conclusion explicitly changed by the owner.",
+          "choice": "Represent the requested stopping-until-backend-confirmation behavior in controller state as well as the view: defer conclusion and the run-ended notice to the actual terminal, retaining immediate authorization cleanup, partial output and one eventual notice.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }
