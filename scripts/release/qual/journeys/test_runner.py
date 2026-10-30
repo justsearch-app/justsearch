@@ -132,6 +132,9 @@ class RunnerTests(unittest.TestCase):
         }
         definition = json.loads(Path(__file__).with_name('journeys.json').read_text())
         expected['S-Windows-update'] = 'Windows in-app update via descriptor v2 from a VM-local mirror: success relaunches the new version with data kept; a cancelled elevation or failed install resumes the old version and re-offers'
+        expected['S12'] = 'Linux with a supported NVIDIA GPU: Install AI fetches Linux GPU packs and chat answers with sources on the GPU; preview, install and readiness agree on what the plan includes (isIncludedByPlan native-target gate) (does not block the release)'
+        expected['S14'] = 'Soak J9: 60 min on the GPU with long documents, steady progress, no crash loop, memory under its guard; only when indexing/enrichment/inference changed'
+        expected['Isolation'] = "The lane never reads or changes the owner's own JustSearch data, settings, running instance or desktop session; its processes, ports and state are private and removed after the run (prove with a sentinel in the owner's real data folder and a check that no owner-visible window appeared)"
         self.assertEqual(definition['scenarios'], expected)
 
     def test_preparation_failure_retains_unavailable_checks(self):

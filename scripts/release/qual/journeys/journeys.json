@@ -6,7 +6,10 @@
     "S8": "Linux in-app update via descriptor v2 and pkexec apt-get: success relaunches the new version; cancelled prompt, lock timeout or failure resumes the old Engine and re-offers the update",
     "S21": "The MCP bridge's manifest and registry entry carry the app's version, the release URL and checksum, declare Linux and Windows, and the bridge works on both (J8)",
     "S22": "Journeys run on clean installs without a developer JDK, models or inherited runtime paths; a missing download, skipped or unavailable check is reported as such, never as a pass",
-    "S-Windows-update": "Windows in-app update via descriptor v2 from a VM-local mirror: success relaunches the new version with data kept; a cancelled elevation or failed install resumes the old version and re-offers"
+    "S-Windows-update": "Windows in-app update via descriptor v2 from a VM-local mirror: success relaunches the new version with data kept; a cancelled elevation or failed install resumes the old version and re-offers",
+    "S12": "Linux with a supported NVIDIA GPU: Install AI fetches Linux GPU packs and chat answers with sources on the GPU; preview, install and readiness agree on what the plan includes (isIncludedByPlan native-target gate) (does not block the release)",
+    "S14": "Soak J9: 60 min on the GPU with long documents, steady progress, no crash loop, memory under its guard; only when indexing/enrichment/inference changed",
+    "Isolation": "The lane never reads or changes the owner's own JustSearch data, settings, running instance or desktop session; its processes, ports and state are private and removed after the run (prove with a sentinel in the owner's real data folder and a check that no owner-visible window appeared)"
   },
   "scope": {
     "implemented": [
@@ -14,12 +17,10 @@
       "vm-linux-wayland",
       "vm-linux-x11",
       "vm-windows",
-      "hosted-windows"
+      "hosted-windows",
+      "gpu-linux"
     ],
-    "unavailable": {
-      "gpu-linux": "GPU lane and J9 soak are a later assignment",
-      "J9": "Soak is outside W4a"
-    },
+    "unavailable": {},
     "skippedByDecision": {
       "windows-gpu": "Owner decision: skip GPU tests on Windows"
     }
@@ -41,9 +42,10 @@
             "vm-linux-wayland",
             "vm-linux-x11",
             "hosted-windows",
-            "vm-windows"
+            "vm-windows",
+            "gpu-linux"
           ],
-          "applicability": "Linux; Windows hosted and VM use NSIS, UI Automation and the production API"
+          "applicability": "Linux; Windows hosted and VM use NSIS, UI Automation and the production API; GPU host extracts exact .deb without installing"
         },
         {
           "id": "first-run",
@@ -52,7 +54,8 @@
             "vm-linux-wayland",
             "vm-linux-x11",
             "hosted-windows",
-            "vm-windows"
+            "vm-windows",
+            "gpu-linux"
           ],
           "applicability": "Linux; Windows hosted and VM use NSIS, UI Automation and the production API"
         }
@@ -79,7 +82,8 @@
         {
           "id": "folder-api",
           "lanes": [
-            "hosted-linux-x11"
+            "hosted-linux-x11",
+            "gpu-linux"
           ],
           "applicability": "Round-two decision: hosted folder addition uses the production HTTP API; VM exercises the native picker"
         },
@@ -92,6 +96,13 @@
             "vm-windows"
           ],
           "applicability": "Linux default viewer; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        },
+        {
+          "id": "gpu-search",
+          "lanes": [
+            "gpu-linux"
+          ],
+          "applicability": "GPU host: production index/search; open-result is covered in VMs"
         }
       ]
     },
@@ -101,7 +112,8 @@
       "scenarioIds": [
         "S3",
         "S7",
-        "S22"
+        "S22",
+        "S12"
       ],
       "checks": [
         {
@@ -113,6 +125,13 @@
             "vm-windows"
           ],
           "applicability": "CPU: search only; chat unavailable; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        },
+        {
+          "id": "gpu-ai",
+          "lanes": [
+            "gpu-linux"
+          ],
+          "applicability": "Supported Linux NVIDIA GPU: GPU_FULL defaults, chat with sources, actual CUDA providers and pack-owned mapped libraries"
         }
       ]
     },
@@ -131,7 +150,8 @@
             "hosted-linux-x11",
             "vm-linux-wayland",
             "hosted-windows",
-            "vm-windows"
+            "vm-windows",
+            "gpu-linux"
           ],
           "applicability": "Linux; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
         },
@@ -141,7 +161,8 @@
             "hosted-linux-x11",
             "vm-linux-wayland",
             "hosted-windows",
-            "vm-windows"
+            "vm-windows",
+            "gpu-linux"
           ],
           "applicability": "Linux; WebDriver restart DOM and stored bookmark; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
         }
@@ -297,6 +318,24 @@
             "vm-windows"
           ],
           "applicability": "Installed Linux app and exact release bridge; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+        }
+      ]
+    },
+    {
+      "id": "J9",
+      "title": "60-minute GPU indexing and enrichment soak",
+      "scenarioIds": [
+        "S3",
+        "S14",
+        "S22"
+      ],
+      "checks": [
+        {
+          "id": "soak",
+          "lanes": [
+            "gpu-linux"
+          ],
+          "applicability": "GPU host only; skipped by decision when no named indexing/enrichment/inference owner changed since last release"
         }
       ]
     }

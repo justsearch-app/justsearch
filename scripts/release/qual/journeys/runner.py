@@ -53,7 +53,13 @@ class Unavailable(Exception):
     """A prerequisite did not complete; the dependent check was not executed."""
 
 
+class SkippedByDecision(Exception):
+    """An applicable conditional check was deliberately not required."""
+
+
 def classify(exc):
+    if isinstance(exc, SkippedByDecision):
+        return 'skipped-by-decision'
     if isinstance(exc, Unavailable):
         return 'unavailable'
     return 'failed-product' if isinstance(exc, AssertionError) else 'failed-infrastructure'
@@ -200,7 +206,7 @@ def summarize(journeys, full_selection=True):
                 **({'reason': c['reason'], 'predecessorVersion': j['predecessorVersion']}
                    if j.get('scope') == 'predecessor-preparation' else {}),
                 **({'evidence': c.get('evidence', [])}
-                   if j.get('scope') == 'predecessor-preparation' or j['id'] in ('guest-crashes-owner-validation', 'hosted-crashes', 'windows-crashes') else
+                   if j.get('scope') == 'predecessor-preparation' or j['id'] in ('guest-crashes-owner-validation', 'hosted-crashes', 'windows-crashes', 'gpu-host') else
                    {'screenshots': [p for p in c.get('evidence', []) if p.endswith('.png')]})}
                for j in journeys for c in j['checks'] if c['status'] == 'owner-validation']
     failed = any(counts[s] for s in ('failed-product', 'failed-infrastructure', 'unavailable'))
@@ -691,6 +697,8 @@ class Run:
                 self.evidence(journey['id'] + '-' + name, value)
         except OwnerValidation as exc:
             row.update(status='owner-validation', reason=str(exc))
+        except SkippedByDecision as exc:
+            row.update(status='skipped-by-decision', reason=str(exc))
         except Exception as exc:
             row.update(status=classify(exc), reason=str(exc))
             (self.out / f"{journey['id']}-{name}.error.txt").write_text(traceback.format_exc())
@@ -757,9 +765,10 @@ except TimeoutError as exc:
         self.stop_app()
         self.target.app_binary = self.binary
         driver = self.args.driver
-        self.desktop_spawn([driver, '--port', '4444', '--native-port', '4445'], self.work + '/driver.log')
-        self.wd = WebDriver(self.target, 4444)
-        wait_for(lambda: self.target.http(4444, '/status'), 'tauri-driver ready', seconds=20, error=Infrastructure)
+        port, native_port = self.facts.get('driverPorts', (4444, 4445))
+        self.desktop_spawn([driver, '--port', str(port), '--native-port', str(native_port)], self.work + '/driver.log')
+        self.wd = WebDriver(self.target, port)
+        wait_for(lambda: self.target.http(port, '/status'), 'tauri-driver ready', seconds=20, error=Infrastructure)
         self.wd.start(self.binary)
         self.observe_window('automation')
         self.ready()
@@ -915,7 +924,7 @@ print(json.dumps(rows))
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--lane', choices=['hosted-linux-x11', 'vm-linux-wayland', 'vm-linux-x11', 'hosted-windows', 'vm-windows'], required=True)
+    parser.add_argument('--lane', choices=['hosted-linux-x11', 'vm-linux-wayland', 'vm-linux-x11', 'hosted-windows', 'vm-windows', 'gpu-linux'], required=True)
     parser.add_argument('--vm', choices=['ubuntu'])
     parser.add_argument('--phase', choices=['candidate', 'predecessor'], default='candidate',
                         help='VM wrapper runs predecessor J5/J6 on a separate fresh overlay')
@@ -931,13 +940,23 @@ def main():
     parser.add_argument('--journeys', nargs='+', help='Run only these journey IDs; no implicit dependencies')
     parser.add_argument('--resume', type=Path, help='Development only: restore a stopped setup checkpoint')
     parser.add_argument('--checkpoint', type=Path, help='Save stopped setup state for the VM wrapper')
+    parser.add_argument('--source', type=Path, help='GPU: candidate source checkout, for the J9 release diff')
+    parser.add_argument('--last-release', help='GPU: last release tag (default: latest reachable version tag)')
+    parser.add_argument('--soak-corpus', type=Path, help='GPU: reusable, generated soak corpus directory')
+    parser.add_argument('--development-pack-mirror', type=Path,
+                        help='GPU development only: loopback pack mirror; never release qualification')
+    parser.add_argument('--development-mirror-port', type=int, default=8769)
     args = parser.parse_args()
     if args.lane.endswith('windows') and args.vm:
         parser.error('Windows adapters execute inside the guest; do not pass --vm')
+    if args.lane == 'gpu-linux' and (args.resume or args.checkpoint or args.predecessor or args.mirror or args.phase != 'candidate'):
+        parser.error('GPU lane accepts fresh extracted candidates only; use gpu-host.py')
     if not args.lane.endswith('windows') and bool(args.vm) != args.lane.startswith('vm-'):
         parser.error('VM lanes require --vm; hosted lane runs inside its own Xvfb session')
     sys.modules['runner'] = sys.modules[__name__]
-    if args.lane.endswith('windows'):
+    if args.lane == 'gpu-linux':
+        from gpu import Run as PlatformRun, CHECKS
+    elif args.lane.endswith('windows'):
         from windows import Run as PlatformRun, CHECKS
     else:
         from linux import CHECKS
@@ -946,10 +965,17 @@ def main():
     if args.journeys and not set(args.journeys) <= {j['id'] for j in definition['journeys']}:
         parser.error('Unknown journey ID')
     run = PlatformRun(args, definition)
+    if args.lane == 'gpu-linux':
+        import signal
+        def interrupted(signum, frame):
+            run.interrupted = True
+            reason = Path(os.environ['QUAL_GPU_ROOT']) / 'stop-reason'
+            raise RunStopped(reason.read_text() if reason.exists() else 'GPU lane supervisor interrupted the session')
+        signal.signal(signal.SIGTERM, interrupted)
     try:
         setup_error = None
         try:
-            run.facts['assets'] = verify_assets(args.assets, [args.package, args.mcpb])
+            run.facts['assets'] = verify_assets(args.assets, [args.package] if args.lane == 'gpu-linux' else [args.package, args.mcpb])
             run.evidence('journey-source-sha256', {p.name: digest(p) for p in HERE.iterdir()
                                                    if p.suffix in ('.py', '.json', '.ps1')})
             run.setup()
@@ -965,7 +991,7 @@ def main():
             from writes import COUNTERS, difference
             before_writes = None
             try:
-                before_writes = run.write_counters() if args.lane.endswith('windows') else run.target.json(COUNTERS)
+                before_writes = run.write_counters() if args.lane.endswith('windows') or args.lane == 'gpu-linux' else run.target.json(COUNTERS)
             except Exception as exc:
                 row['writeVolume'] = {'unavailable': str(exc)}
             for check in journey['checks']:
@@ -979,7 +1005,7 @@ def main():
                     run.check(row, check['id'], lambda c=check: CHECKS[c['id']](run))
             if before_writes is not None:
                 try:
-                    row['writeVolume'] = difference(before_writes, run.write_counters() if args.lane.endswith('windows') else run.target.json(COUNTERS))
+                    row['writeVolume'] = difference(before_writes, run.write_counters() if args.lane.endswith('windows') or args.lane == 'gpu-linux' else run.target.json(COUNTERS))
                 except Exception as exc:
                     row['writeVolume'] = {'unavailable': str(exc)}
             run.save()
