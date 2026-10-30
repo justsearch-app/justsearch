@@ -166,6 +166,44 @@ class GpuTests(unittest.TestCase):
         with self.assertRaises(runner.ProductFailure):
             gpu.require_gpu_install(dict(status, packages=status['packages'] + [{'packageId': 'cuda-runtime', 'state': 'installed'}]))
 
+    def test_gpu_install_uses_confirm_install_request_and_production_status(self):
+        preview = {'downloadProfile': 'GPU_FULL', 'components': [
+            {'id': x, 'state': 'to-download'} for x in ('chat', 'cuda-runtime-linux')]}
+        installed = {'state': 'completed', 'installedFully': True, 'packages': [
+            {'packageId': x, 'state': 'installed'} for x in ('chat', 'cuda-runtime-linux')]}
+        run = Mock(facts={}, args=types.SimpleNamespace(resume=None))
+        responses = {'/api/ai/install/plan-preview': preview, '/api/ai/install/manifest': {},
+                     '/api/operations/core.start-ai-install/invoke': {'success': True},
+                     '/api/ai/install/status': installed, '/api/ai/runtime/status': {}}
+        run.api.side_effect = lambda path, body=None: responses[path]
+        run.wd.execute.return_value = []
+        with patch.object(gpu.linux, 'activate_downloaded') as activate, \
+                patch.object(gpu, 'gpu_installed_checks', return_value={'chat': 'checked'}) as remaining:
+            self.assertEqual(gpu.gpu_install(run), {'chat': 'checked'})
+        run.api.assert_any_call('/api/operations/core.start-ai-install/invoke', {'args': {'acceptTerms': True}})
+        run.api.assert_any_call('/api/ai/install/status')
+        run.evidence.assert_any_call('J3-install-response', {'success': True})
+        request = next(c.args[1] for c in run.evidence.call_args_list if c.args[0] == 'J3-install-request')
+        self.assertEqual(request['method'], 'POST')
+        self.assertEqual(request['body'], {'args': {'acceptTerms': True}})
+        run.wd.click.assert_not_called()
+        activate.assert_called_once_with(run)
+        remaining.assert_called_once_with(run, preview)
+        self.assertEqual(run.facts['gpuInstalled'], installed)
+        run.activation_checkpoint.assert_called_once_with()
+
+    def test_gpu_install_rejection_never_waits_for_download_or_activates(self):
+        run = Mock(facts={}, args=types.SimpleNamespace(resume=None))
+        run.api.side_effect = lambda path, body=None: (
+            {'success': False, 'message': 'rejected'} if path.endswith('/invoke')
+            else {'state': 'failed'} if path.endswith('/status') else {})
+        with patch.object(gpu, 'require_gpu_plan'), patch.object(gpu.linux, 'activate_downloaded') as activate:
+            with self.assertRaisesRegex(runner.ProductFailure, 'install operation rejected'):
+                gpu.gpu_install(run)
+        self.assertEqual(run.api.call_count, 3)
+        activate.assert_not_called()
+        run.evidence.assert_any_call('J3-install-response', {'success': False, 'message': 'rejected'})
+
     def test_backend_requires_observed_cuda(self):
         runtime = {'onnxFeatures': [{'id': x, 'modelActive': True, 'executionProvider': 'cuda', 'gpuFallback': False} for x in ('embed', 'splade')]}
         gpu.require_gpu_encoders(runtime)
@@ -242,6 +280,29 @@ class GpuTests(unittest.TestCase):
         gpu.require_registry_urls({'packages': [{'variants': [{'downloadUrl': 'https://example.invalid/draft/pack.zip'}]}]})
         with self.assertRaises(runner.Infrastructure):
             gpu.require_registry_urls({'downloadUrl': 'https://example.invalid/TEST-ONLY-pack.zip'})
+
+    def test_gpu_authored_state_is_checkpointed(self):
+        run = Mock(facts={}, args=types.SimpleNamespace(resume=None))
+        with patch.object(gpu.linux, 'author_state', return_value={'saved': True}) as author:
+            self.assertEqual(gpu.author_state(run), {'saved': True})
+            author.assert_called_once_with(run)
+        run.activation_checkpoint.assert_called_once_with()
+
+    def test_gpu_recovery_preserves_previously_authored_state(self):
+        bookmark = {'label': 'Library', 'surfaceId': 'core.library-surface'}
+        run = Mock(facts={'authored': True, 'bookmark': bookmark},
+                   args=types.SimpleNamespace(resume=Path('/private/activated-checkpoint.json')))
+        run.require.side_effect = lambda key: run.facts.get(key)
+        with patch.object(gpu.linux, 'author_state') as author, \
+                patch.object(gpu.linux, 'assert_state', return_value={'retained': True}) as preserved, \
+                patch.object(gpu.linux, 'stored_bookmarks', return_value=[bookmark]) as stored:
+            self.assertEqual(gpu.author_state(run), {'retained': True})
+            preserved.assert_called_once_with(run)
+            author.assert_not_called()
+            stored.return_value = []
+            with self.assertRaisesRegex(runner.ProductFailure, 'Previously authored bookmark missing'):
+                gpu.author_state(run)
+        run.wd.click.assert_not_called()
 
     def test_missing_ai_keeps_authored_state_restart_and_soak_unavailable(self):
         run = Mock()

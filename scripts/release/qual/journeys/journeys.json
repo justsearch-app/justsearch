@@ -108,7 +108,7 @@
     },
     {
       "id": "J3",
-      "title": "Default production AI installation and activation on CPU",
+      "title": "Default production AI installation and activation",
       "scenarioIds": [
         "S3",
         "S7",
@@ -131,7 +131,7 @@
           "lanes": [
             "gpu-linux"
           ],
-          "applicability": "Supported Linux NVIDIA GPU: GPU_FULL defaults, chat with sources, actual CUDA providers and pack-owned mapped libraries"
+          "applicability": "Supported Linux NVIDIA GPU: installation through the production API request sent by Accept and download; UI install/consent qualified in CPU VMs; GPU_FULL defaults, UI activation and Start AI, chat with sources, actual CUDA providers and pack-owned mapped libraries"
         }
       ]
     },

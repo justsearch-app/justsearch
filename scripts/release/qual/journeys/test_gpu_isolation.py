@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import types
 import unittest
 from unittest.mock import patch
@@ -181,6 +182,61 @@ Path.read_bytes=lambda self: (_ for _ in ()).throw(PermissionError('denied'))
                 target.app_processes[(42, '99')] = {'pid': 42, 'ticks': '99'}
                 with self.assertRaisesRegex(runner.Infrastructure, 'Cannot read owned process 42'):
                     target.owned()
+
+    def test_owned_probe_skips_real_exited_child_before_reading_environment(self):
+        child = subprocess.Popen(['/bin/true'])
+        try:
+            path = Path('/proc', str(child.pid), 'environ')
+            deadline = time.monotonic() + 5
+            while True:
+                fields = path.with_name('stat').read_text().rsplit(') ', 1)[1].split()
+                if fields[0] == 'Z':
+                    break
+                self.assertLess(time.monotonic(), deadline, 'Child did not exit')
+                time.sleep(.01)
+            target = runner.Target()
+            target.env['QUAL_JOURNEY_RUN'] = 'unit'
+            target.app_processes[(child.pid, fields[19])] = {'pid': child.pid, 'ticks': fields[19]}
+            def execute(source, value, **kwargs):
+                prefix = f'from pathlib import Path\nPath.glob=lambda self,pattern:[Path({str(path)!r})]\n'
+                return json.loads(target.run([sys.executable, '-c', prefix + source, json.dumps(value)],
+                                             desktop=False).stdout)
+            with patch.object(target, 'json', side_effect=execute):
+                self.assertEqual(target.owned(), [])
+        finally:
+            child.wait(timeout=5)
+
+    def test_external_guard_excludes_real_zombie_from_remaining_processes(self):
+        child = subprocess.Popen(['/bin/true'])
+        try:
+            path = Path('/proc', str(child.pid), 'stat')
+            deadline = time.monotonic() + 5
+            while True:
+                fields = path.read_text().rsplit(') ', 1)[1].split()
+                if fields[0] == 'Z':
+                    break
+                self.assertLess(time.monotonic(), deadline, 'Child did not exit')
+                time.sleep(.01)
+            self.assertEqual(host.descendants((child.pid, fields[19]), {}), [])
+        finally:
+            child.wait(timeout=5)
+
+    def test_recovery_rebuilds_empty_mount_placeholders_for_current_evidence(self):
+        with tempfile.TemporaryDirectory(prefix='w4c-mount-unit-') as tmp:
+            root = Path(tmp) / 'private'
+            home = Path(tmp) / 'owner'
+            root.mkdir()
+            (root / 'downloaded-model').write_text('retained')
+            with patch.object(host.pwd, 'getpwuid', return_value=types.SimpleNamespace(pw_dir=str(home))):
+                # Bindings under home create placeholders; they never expose contents.
+                evidence = home / 'first'
+                later = home / 'later'
+                host.sandbox_command(root, evidence, [], ['/bin/true'])
+                self.assertTrue((root / 'empty-home/first').exists())
+                host.sandbox_command(root, later, [], ['/bin/true'])
+                self.assertFalse((root / 'empty-home/first').exists())
+                self.assertTrue(host.assert_home_bindings(root / 'empty-home', [root / 'empty-home/later']))
+                self.assertEqual((root / 'downloaded-model').read_text(), 'retained')
 
     def test_bubblewrap_hides_owner_home_tmp_runtime_and_foreign_processes(self):
         with tempfile.TemporaryDirectory(prefix='w4c-sandbox-unit-') as tmp:

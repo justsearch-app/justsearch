@@ -400,6 +400,7 @@ for path in Path('/proc').glob('[0-9]*/environ'):
  try:
   stat=path.with_name('stat').read_text().rsplit(') ',1)[1].split()
   identity=(int(path.parent.name),stat[19])
+  if stat[0] == 'Z':continue
   if marker in path.read_bytes().split(b'\\0'):
    rows.append({'pid':int(path.parent.name),'ticks':path.with_name('stat').read_text().split(') ',1)[1].split()[19],
                 'exe':str(path.with_name('exe').resolve()),

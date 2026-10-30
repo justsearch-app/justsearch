@@ -122,6 +122,10 @@ def assert_home_bindings(home, bindings):
 
 def sandbox_command(root, evidence, readonly, command):
     home = Path(pwd.getpwuid(os.getuid()).pw_dir)
+    # Recovery uses a new evidence directory. Retire only the old empty mount
+    # placeholders, so the sealed home describes this invocation's bindings.
+    if (root / 'empty-home').exists():
+        shutil.rmtree(root / 'empty-home')
     # Mount destinations must exist before the otherwise empty home is sealed.
     for path in [root, evidence, *readonly]:
         path = Path(path)
@@ -151,6 +155,8 @@ def descendants(root_identity, known):
         try:
             text = path.read_text()
             fields = text.rsplit(') ', 1)[1].split()
+            if fields[0] == 'Z':
+                continue
             rows.append({'pid': int(path.parent.name), 'ppid': int(fields[1]), 'ticks': fields[19],
                          'comm': text.split('(', 1)[1].rsplit(')', 1)[0]})
         except (OSError, IndexError, ValueError):

@@ -447,8 +447,16 @@ def gpu_install(run):
     run.evidence('J3-default-plan', preview)
     run.evidence('J3-production-manifest', run.api('/api/ai/install/manifest'))
     require_gpu_plan(preview)
-    run.wd.click('button[aria-label="Install AI"]')
-    run.wd.click('button[aria-label="Accept and download"]')
+    # BrainSurface.confirmInstall -> OperationClient.invoke (MEDIUM risk).
+    # UI installation/consent is qualified in the CPU VMs; this lane covers GPU use.
+    request = {'method': 'POST', 'endpoint': '/api/operations/core.start-ai-install/invoke',
+               'body': {'args': {'acceptTerms': True}},
+               'source': 'modules/ui-web/src/shell-v0/views/BrainSurface.ts confirmInstall'}
+    run.evidence('J3-install-request', request)
+    response = run.api(request['endpoint'], request['body'])
+    run.evidence('J3-install-response', response)
+    if response.get('success') is not True:
+        raise ProductFailure('GPU AI install operation rejected: ' + json.dumps(response))
     samples = []
     def settled():
         status = run.api('/api/ai/install/status')
@@ -617,7 +625,18 @@ def restart(run):
 
 def author_state(run):
     run.require('ai')
-    return linux.author_state(run)
+    if run.args.resume and run.facts.get('authored'):
+        # A development recovery must preserve the already-authored record,
+        # rather than trying to press a bookmark control that is now a toggle.
+        state = linux.assert_state(run)
+        if run.require('bookmark') not in linux.stored_bookmarks(run):
+            raise ProductFailure('Previously authored bookmark missing from Web Storage on recovery')
+        run.evidence('J4-restored-authored-state', {'checkpoint': str(run.args.resume),
+                                                  'bookmark': run.facts['bookmark']})
+        return state
+    state = linux.author_state(run)
+    run.activation_checkpoint()
+    return state
 
 
 def search(run):

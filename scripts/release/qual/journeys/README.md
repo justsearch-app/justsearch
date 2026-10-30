@@ -186,21 +186,25 @@ private signing key is needed or used for these tests.
 
 ## GPU host (Ubuntu, supported NVIDIA GPU)
 
-W4c development status: full GPU qualification remains unproven. Round seven
-replaces inconsistent process IO sums with the private-root mount device's
-`/proc/diskstats` counter and records structural desktop proof before launch.
-Round seven passed J1/J2 but stopped after candidate launch when the harness
-could not observe the Accept and download control after Install AI. No downloads
-started, and no second run was attempted: the cause is not established as a
-plain harness defect. J3 completion, J4 and J9 remain unverified. The device
-upper bound was 703,193,088 bytes; private-root final allocation before removal
-was 3,084,451,840 bytes. Pre-launch structural desktop proof passed and survived
-shutdown. Owner metadata/sentinel were unchanged. Raw cleanup reported unreadable
-known process environments and transient remaining bubblewrap identity; a later
-identity check found no remaining lane process, root or sentinel. Recovery from
-activated state has unit coverage but was not exercised on this run. The journey
-suite passed 319 tests with three existing skips. Evidence and assessment are
-under W4c round seven.
+W4c development status: full GPU qualification remains unproven. Round eight
+narrows gpu-linux J3 to production API installation; UI install and consent are
+already qualified on CPU in the VMs. Fresh J1/J2/J3 passed, including GPU chat
+with sources and positive Engine/llama-server pack library ownership. J4 hit a
+harness zombie-environment enumeration error. Development recovery reused the
+activated state without downloads; repairs also rebuilt empty mount placeholders
+and preserved completed authored-state facts. J4 then passed, including GPU chat
+after restart. The single J9 soak stopped after 3105 seconds (51.8 minutes): the
+production runtime API reported embedding on CPU with GPU fallback. It is a
+failed-product observation, with no cause established or product fix attempted;
+the required 60-minute soak did not pass. The final device-write upper bound
+was 27,437,752,320 bytes; private-root final allocation was 21,645,885,440 bytes.
+Processes and private state were removed; owner metadata and sentinels were
+unchanged. Native crash collection remains unproven. Evidence and assessment
+are under W4c round eight. Tested changes remain a development candidate.
+
+Round seven's Install AI click produced no consent dialog within 30 seconds,
+although it worked in round six. This remains unexplained; no product claim is
+made and it is not investigated on this lane.
 
 Use `gpu-host.py` on the owner host; **never use hosted.py, apt install or the
 VM wrapper here**. Prerequisites already on PATH: Python 3 with Pillow, Xvfb,
@@ -287,8 +291,12 @@ J1 launches the extracted packaged window in the harness's own WebDriver;
 mapped-window/process identity, production Engine readiness and mounted DOM
 are the evidence. J2 adds the small corpus through the production folder API,
 indexes and searches; system picker and open-result are covered in the VMs.
-J3 uses the real default Install AI controls and activation consent. Preview
-must select GPU_FULL and include chat and `cuda-runtime-linux`; installed
+On gpu-linux, J3 sends the same production request as BrainSurface.confirmInstall's
+**Accept and download** action: `POST /api/operations/core.start-ai-install/invoke`
+with `{"args":{"acceptTerms":true}}`. The request and response are recorded;
+completion is observed through `/api/ai/install/status`. This lane does not drive
+the Install AI consent dialog; the CPU VMs qualify that UI flow. Downloaded models
+are activated through the existing UI activation consent. Preview must select GPU_FULL and include chat and `cuda-runtime-linux`; installed
 readiness must agree and must not install the Windows native runtime. The separate
 **Start AI** control then sets chat intent; the observed runtime must become
 healthy with a realized model before a chat request. Embedding
@@ -356,7 +364,12 @@ python3 scripts/release/qual/journeys/gpu-host.py \
 This skips all downloads/activation, restores only the kept lane's facts and
 saved state, and labels the result `development-rerun`, never fresh release
 qualification. The original failed report remains unchanged. The write budget
-retains its original device baseline across recovery. Remove any retained
+retains its original device baseline across recovery. Completed UI-authored
+facts are checkpointed and verified against their saved-state snapshot on
+recovery; the already-bookmarked view is not authored a second time. The empty
+sandbox-home mount placeholders are rebuilt for the new evidence path. Exited
+zombie processes are excluded before environment reads and final live-process
+checks; unreadable known live processes still fail as infrastructure. Remove any retained
 root after the development repair sequence ends. Start AI
 must be invoked and its chat intent acknowledged before chat startup failures
 can be classified as product failures.
