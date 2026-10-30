@@ -21,7 +21,16 @@ import gpu
 import runner
 
 PRIVATE_ROOTS = Path('/home/elias/dev/justsearch-qual')
-BUDGET = 30_000_000_000
+BUDGET = 60_000_000_000
+
+
+def accounting_scope():
+    scope = gpu.cgroup_scope()
+    if scope is None:
+        os.execvp('systemd-run', ['systemd-run', '--user', '--scope', '--slice=agents.slice',
+                                '--property=IOAccounting=yes', sys.executable,
+                                str(Path(__file__).resolve()), *sys.argv[1:]])
+    return scope
 
 
 def mount_device(root):
@@ -173,8 +182,8 @@ def sandbox_command(root, evidence, readonly, command):
             '--tmpfs', '/tmp', '--tmpfs', '/run/user/' + str(os.getuid()),
             '--dev-bind', '/dev', '/dev', '--proc', '/proc',
             '--bind', str(root), str(root), '--bind', str(evidence), str(evidence)]
-    # WebKit's AppArmor policy probe uses the system bus. This system service
-    # endpoint holds no owner JustSearch data; all other /run sockets are hidden.
+    # On this host session D-Bus's AppArmor policy query fails before product
+    # launch without this endpoint. No direct product system-bus API was found.
     if Path('/run/dbus').is_dir():
         args += ['--ro-bind', '/run/dbus', '/run/dbus']
     for path in dict.fromkeys(map(Path, readonly)):
@@ -211,6 +220,7 @@ def sandbox_session(forwarded):
     proof = {'homeBindings': bindings, 'homeContainsOnlyBindings': assert_home_bindings(home, bindings),
              'pidNamespace': os.readlink('/proc/self/ns/pid'),
              'hostRootReadOnly': bool(os.statvfs('/').f_flag & os.ST_RDONLY),
+             'systemBusHidden': not any(Path('/run/dbus').iterdir()),
              'candidateReadOnly': bool(os.statvfs(root / 'work/package').f_flag & os.ST_RDONLY)}
     save(out / 'sandbox.json', proof)
     if not proof['candidateReadOnly'] or not proof['hostRootReadOnly']:
@@ -238,7 +248,7 @@ def sandbox_session(forwarded):
                     try:
                         if b'runner.py' in Path('/proc', str(row['pid']), 'cmdline').read_bytes() and runner.Target().alive([row]):
                             os.kill(row['pid'], signal.SIGTERM)
-                    except ProcessLookupError:
+                    except (FileNotFoundError, ProcessLookupError):
                         pass
                 runner.Target().stop([r for r in rows() if Path(r['exe']).name in ('JustSearch', 'java', 'llama-server')])
                 break
@@ -360,7 +370,8 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
         save(root / 'write-start.json', args.write_start)
         env = gpu.private_environment(os.environ, root, marker, resume=bool(args.development_resume_root))
         env.update(QUAL_GPU_ROOT=str(root), QUAL_GPU_EVIDENCE=str(evidence),
-                   QUAL_GPU_SOAK_MARKER=str(soak_marker), QUAL_GPU_BLOCK_DEVICE=args.write_start['device'])
+                   QUAL_GPU_SOAK_MARKER=str(soak_marker), QUAL_GPU_CGROUP=args.write_start['scope'] or '',
+                   QUAL_GPU_BLOCK_DEVICE=args.write_start['device'])
         if args.development_resume_root:
             forwarded = [*forwarded, '--resume', str(root / 'activated-checkpoint.json')]
         for name in ('Xvfb', 'xvfb-run', 'dbus-run-session', 'openbox', 'taskset', 'xdotool', 'scrot', 'WebKitWebDriver'):
@@ -422,9 +433,9 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
                     rows = descendants(child_identity, process_rows)
                     for row in rows:
                         process_rows[(row['pid'], row['ticks'])] = row
-                    current_writes = gpu.device_writes(args.write_start['device']) - args.write_start['startBytes']
+                    current_writes = gpu.write_counter(args.write_start['scope'], args.write_start['device']) - args.write_start['startBytes']
                     if current_writes >= args.write_budget_bytes - 512_000_000:
-                        failure = f'Device write upper bound approached ({args.write_budget_bytes} bytes; 512 MB reserved for cleanup)'
+                        failure = f'Lane write backstop approached ({args.write_budget_bytes} bytes; 512 MB reserved for cleanup)'
                         save(evidence / 'write-budget-stop.json', {'observedBytes': current_writes, 'budgetBytes': args.write_budget_bytes})
                         break
                     if time.monotonic() >= next_check:
@@ -523,23 +534,41 @@ def main():
     parser.add_argument('--development-mirror-port', type=int, default=8769)
     parser.add_argument('--journeys', nargs='+')
     parser.add_argument('--write-budget-bytes', type=int, default=BUDGET,
-                        help='Whole-device write upper bound; at most 30 GB, with 512 MB reserved for cleanup')
+                        help='Runaway write backstop: scope io.stat or device upper bound; default 60 GB, 512 MB reserved for cleanup')
     parser.add_argument('--development-resume-root', type=Path,
                         help='Development only: retained activated private root; no downloads are repeated')
     args, forwarded = parser.parse_known_args()
-    if not 512_000_000 < args.write_budget_bytes <= BUDGET:
-        parser.error('--write-budget-bytes must exceed the 512 MB cleanup reserve and be at most 30 GB')
+    if args.write_budget_bytes <= 512_000_000:
+        parser.error('--write-budget-bytes must exceed the 512 MB cleanup reserve')
     if not 1 <= args.development_mirror_port <= 65535:
         parser.error('--development-mirror-port must be a TCP port in 1..65535')
+    try:
+        scope = accounting_scope()
+    except runner.Infrastructure as exc:
+        print(str(exc), file=sys.stderr)
+        out = args.evidence.resolve()
+        out.mkdir(parents=True, exist_ok=False)
+        save(out / 'summary.json', runner.preparation_failure('gpu-linux', str(exc)))
+        save(out / 'write-volume.json', {'status': 'unavailable', 'reason': str(exc),
+                                        'budgetBytes': args.write_budget_bytes})
+        return 1
     out = args.evidence.resolve()
     out.mkdir(parents=True, exist_ok=False)
     if args.development_resume_root:
-        args.write_start = json.loads((args.development_resume_root / 'write-start.json').read_text())
         if not args.journeys or set(args.journeys) != {'J3', 'J4', 'J9'}:
             parser.error('Development recovery requires --journeys J3 J4 J9')
-    else:
-        device = mount_device(PRIVATE_ROOTS)
-        args.write_start = {'device': device, 'startBytes': gpu.device_writes(device)}
+    # Recovery is a new invocation in a new scope, never an old scope baseline.
+    device = mount_device(PRIVATE_ROOTS)
+    fallback = None
+    if not (scope / 'io.stat').exists():
+        fallback = 'Scope io.stat missing; using private-root device upper bound including unrelated host IO'
+        scope = None
+    device_start = gpu.device_writes(device)
+    args.write_start = {'scope': str(scope) if scope else None,
+                        'measurementKind': 'scope' if scope else 'device-upper-bound',
+                        'fallbackReason': fallback,
+                        'startBytes': gpu.cgroup_writes(scope) if scope else device_start,
+                        'device': device, 'deviceStartBytes': device_start}
     save(out / 'write-start.json', args.write_start)
     args.assets = args.assets.resolve()
     args.source = args.source.resolve()
@@ -600,13 +629,22 @@ def main():
                 'status': json.loads((directory / 'summary.json').read_text())['status']}
                 for directory in sorted(out.glob('attempt-*')) if (directory / 'summary.json').exists()]
             save(out / 'summary.json', report)
-        final_bytes = gpu.device_writes(args.write_start['device'])
+        final_bytes = gpu.write_counter(scope, device)
         save(out / 'write-volume.json', {**args.write_start, 'endBytes': final_bytes,
             'writtenBytes': final_bytes - args.write_start['startBytes'], 'budgetBytes': args.write_budget_bytes,
-            'measurement': 'Private-root mount device /proc/diskstats sectors written delta * 512; same baseline as live guard',
-            'limit': 'Upper bound includes unrelated host IO on this device. No global sync; pending writeback and final accounting-file write are outside the sample.'})
+            'measurement': ('Lane scope io.stat wbytes summed across devices; hierarchical, all descendants included'
+                            if scope else 'Private-root device diskstats sectors-written delta * 512; upper bound'),
+            'limit': (('Excludes sibling scopes and other sessions. Kernel attributes buffered writeback to inode cgroup ownership, not necessarily the last writer; shared inodes can be charged elsewhere. '
+                       if scope else 'Includes unrelated host IO; runaway backstop, not a precise lane budget. ')
+                      + 'No global sync; pending writeback, final evidence writes and scope shutdown after this sample are excluded.')})
         if report:
-            report['deviceWriteUpperBound'] = json.loads((out / 'write-volume.json').read_text())
+            report['writeBackstop'] = json.loads((out / 'write-volume.json').read_text())
+            if scope:
+                report['scopeWrites'] = report['writeBackstop']
+            report['deviceWriteUpperBound'] = {'device': device,
+                'writtenBytes': gpu.device_writes(device) - args.write_start['deviceStartBytes'],
+                'informationalOnly': True, 'usedByRunawayBackstop': scope is None,
+                'limit': 'Includes unrelated host IO; used as runaway backstop only when scope io.stat is missing'}
             save(out / 'summary.json', report)
     return runner.report_exit_code(report)
 
@@ -621,7 +659,7 @@ def interrupted(signum, frame):
 if __name__ == '__main__':
     if '--session' in sys.argv or '--sandbox' in sys.argv:
         sys.exit(main())
-    # Adopt orphaned grandchildren for cleanup; write accounting uses diskstats.
+    # Adopt orphaned grandchildren for cleanup; counters cover the full invocation.
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(36, 1, 0, 0, 0):  # PR_SET_CHILD_SUBREAPER
         raise OSError(ctypes.get_errno(), 'Cannot enable lane child subreaper')

@@ -176,6 +176,8 @@ class OwnerMetadataTests(unittest.TestCase):
         with patch.object(sys, 'argv', argv), patch.object(Path, 'home', return_value=home), \
                 patch.dict(os.environ, XDG_DATA_HOME=str(home / '.local/share')), \
                 patch.object(host, 'mount_device', return_value='unit'), \
+                patch.object(host, 'accounting_scope', return_value=out.parent / 'unit.scope'), \
+                patch.object(gpu, 'cgroup_writes', return_value=0), \
                 patch.object(gpu, 'device_writes', return_value=0), \
                 patch.object(host, 'run_attempt', side_effect=attempt):
             host.main()

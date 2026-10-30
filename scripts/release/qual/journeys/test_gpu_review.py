@@ -62,7 +62,7 @@ class ReviewTests(unittest.TestCase):
             def sandbox(root, evidence, readonly, command):
                 captured.extend(readonly)
                 raise runner.Infrastructure('fixture stopped before launch')
-            args = types.SimpleNamespace(development_resume_root=None, write_start={'device': 'fixture', 'startBytes': 0}, driver=str(driver),
+            args = types.SimpleNamespace(development_resume_root=None, write_start={'scope': '/fixture.scope', 'device': 'fixture', 'startBytes': 0}, driver=str(driver),
                 development_pack_mirror=None, source=home / 'source', assets=home / 'assets',
                 package='fixture.deb', soak_corpus=home / 'corpus', tool_resource=[], journeys=['J1'],
                 development_mirror_port=8769, write_budget_bytes=2000000000)
@@ -177,6 +177,24 @@ class ReviewTests(unittest.TestCase):
             row = json.loads((out / 'gpu-crashes.json').read_text())[0]
             self.assertEqual(row['fields']['Pid'], '50123')
             self.assertEqual(row['crashIdentity'], {'hostPid': 50123, 'namespacePids': [50123, 123], 'ticks': '9988'})
+
+    def test_sigterm_cleanup_ignores_process_vanishing_before_cmdline_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out = root / 'evidence'
+            out.mkdir()
+            (root / 'bindings.json').write_text('[]')
+            (root / 'stop-reason').write_text('Interrupted by SIGTERM')
+            vanished = {'pid': 2**30, 'ticks': '1'}
+            child = Mock(poll=Mock(return_value=None), wait=Mock(return_value=0))
+            with patch.dict(os.environ, QUAL_GPU_ROOT=tmp, QUAL_GPU_EVIDENCE=str(out), QUAL_GPU_SESSION='fixture'), \
+                    patch.object(host, 'assert_home_bindings', return_value=True), \
+                    patch.object(host.os, 'statvfs', return_value=types.SimpleNamespace(f_flag=os.ST_RDONLY)), \
+                    patch.object(host, 'processes', side_effect=[[vanished], [vanished], [], [], [], []]), \
+                    patch.object(host.subprocess, 'Popen', return_value=child), \
+                    patch.object(runner.Target, 'stop'):
+                self.assertEqual(host.sandbox_session([]), 0)
+            self.assertEqual(json.loads((out / 'sandbox.json').read_text())['processesRemaining'], [])
 
     def test_sigterm_entrypoint_runs_cleanup_and_accounting(self):
         # Execute the actual entrypoint with only main replaced by a waiting

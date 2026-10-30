@@ -248,7 +248,7 @@ J3 adds the small corpus through the production API as a prerequisite, without
 a J2 result. Installation still uses fresh private downloads, production
 activation and the acknowledged Start AI control.
 For a development isolation check without AI installation or GPU work, use
-`--journeys J1 J2 --write-budget-bytes 2000000000`; the summary marks this
+`--journeys J1 J2 --write-budget-bytes 20000000000`; the summary marks this
 subset as development evidence.
 The summary records its commit and the
 last release tag (default: nearest reachable stable `vX.Y.Z` tag at an earlier
@@ -285,10 +285,16 @@ assertion checks that home contains only these explicit bindings. The sandbox
 root filesystem is read-only. Writable mounts are limited to private state,
 evidence, `/tmp`, `/run/user/<uid>`, the private home within state and `/dev` for
 the GPU. The remainder of `/run` is hidden by an empty read-only mount, except
-`/run/dbus`: its system service endpoint holds no owner JustSearch data.
-The shell uses GTK/WebKit through Tauri (`modules/shell/src-tauri/Cargo.toml`);
-its D-Bus session daemon's AppArmor policy probe needs the system bus on this
-host. No other host service socket is needed or restored. The owner's home
+`/run/dbus`: this system service endpoint holds no owner JustSearch data.
+Product Rust/Java sources contain no explicit system-bus request. The shell
+uses GTK/WebKit through Tauri (`modules/shell/src-tauri/Cargo.toml`); its locked
+Linux single-instance, notification and Tao portal implementations use the
+private session bus. A real bus-hidden J1/J2 attempt on this host stopped before
+candidate launch: `dbus-update-activation-environment` reported
+`Failed to query AppArmor policy: Read-only file system`. J1/J2 without the
+system bus remain unverified; the endpoint stays reachable for this host's
+session D-Bus policy query. No other host service socket is restored.
+The owner's home
 remains hidden and only explicit lane inputs are restored there.
 
 Private HOME and XDG roots and environment scrubbing remain in place.
@@ -394,21 +400,46 @@ coredumps use the shared attribution rules without sudo. Executables under the
 lane's private state, including downloaded llama-server runtimes, are product
 executables. Crash evidence retains host PID, namespace PIDs and start ticks
 when supplied by the journal. SIGTERM and SIGINT run the same process/state
-cleanup, owner metadata comparison and final device-write accounting as other
+cleanup, owner metadata comparison and final write accounting as other
 interruptions. As with hosted Linux,
 native crash collection is currently unproven and always adds an
 `owner-validation` row; even otherwise passing results are therefore
 `passed-pending-owner-validation` (exit 2). A crash or unavailable check still
 fails the lane. Screenshots are triage only. Every attempt retains per-journey
-write observations. The top-level `write-volume.json` and live guard use the
-same baseline: resolve the private-root mount's major/minor device with
-`findmnt`, then take the delta of sectors written in `/proc/diskstats`, times
-512 bytes. This is an **upper bound including unrelated host IO** on that
-device, not attribution to lane processes. No global sync is issued; pending
-writeback and the final accounting-file write are outside the final sample.
-`private-root-size.json` records `du -s -B1` before state removal (allocated
-size, not cumulative writes). The guard samples every second and reserves
-512 MB for cleanup. `--write-budget-bytes` can lower its default 30 GB limit.
+write observations. Before extracting or launching anything, the host command
+enters a transient user scope with `systemd-run --user --scope
+--slice=agents.slice --property=IOAccounting=yes`. If already inside a dedicated
+scope under `agents.slice`, it reuses that scope (also from a child cgroup).
+Launch each independent run in its own scope; an existing scope must belong
+only to that invocation.
+
+The top-level `write-volume.json`, summary `writeBackstop`, live guard and
+per-journey observations prefer that scope's `io.stat`: sum `wbytes` across
+reported devices and subtract the same invocation's starting value. The kernel
+already includes all descendants; child files are not summed again. Sibling
+scopes and unrelated sessions are excluded. Buffered writeback follows kernel
+inode/cgroup ownership attribution, so shared inodes may be charged to a different
+cgroup than the last writer. Read-only hardlinked packs do not imply lane writes.
+This measures attributed block I/O, not application write-call bytes or root size.
+When used, this measurement also appears as `scopeWrites` in the summary.
+
+Missing `io.stat` never prevents setup. If the scope has no I/O controller,
+the invocation instead uses the private-root device's `/proc/diskstats`
+sectors-written delta times 512. `measurementKind: device-upper-bound` and
+`fallbackReason` identify this fallback: it includes unrelated host I/O and is
+an upper bound, not a precise lane budget. This host has no user-scope I/O
+controller; no host configuration change is needed. The summary's
+`deviceWriteUpperBound` always records the device delta as informational evidence.
+It serves as the runaway backstop only in fallback mode.
+
+No global sync is issued. Pending writeback, final evidence writes and later
+scope shutdown fall outside the final sample. The scope remains alive through
+cleanup and sampling; development recovery starts a fresh baseline.
+`private-root-size.json` records `du -s -B1` before removal (allocated size,
+not cumulative writes). The guard is a runaway backstop, sampled every second
+with 512 MB reserved for cleanup. Its release default is 60 GB: a fresh GPU
+install plus soak writes about 25 GB of its own. `--write-budget-bytes`
+overrides the cap; the small acceptance checks use 20 GB.
 
 After downloads and activation, the lane saves a private development checkpoint.
 A later infrastructure failure retains that root with all processes stopped;

@@ -139,6 +139,37 @@ def device_writes(device, diskstats=Path('/proc/diskstats')):
     raise Infrastructure('Private-root block device missing from diskstats: ' + device)
 
 
+def cgroup_scope(proc=Path('/proc/self/cgroup'), root=Path('/sys/fs/cgroup')):
+    """Reuse a transient agents scope, including when called from a subgroup."""
+    for line in proc.read_text().splitlines():
+        if line.startswith('0::/'):
+            path = Path(line[3:])
+            for scope in (path, *path.parents):
+                if scope.name.endswith('.scope') and scope.parent.name == 'agents.slice':
+                    return root / scope.relative_to('/')
+    return None
+
+
+def cgroup_writes(scope):
+    """io.stat is already hierarchical; summing child files double counts."""
+    try:
+        total = 0
+        for line in (Path(scope) / 'io.stat').read_text().splitlines():
+            fields = dict(item.split('=', 1) for item in line.split()[1:])
+            value = int(fields['wbytes'])
+            if value < 0:
+                raise ValueError('negative wbytes')
+            total += value
+        return total
+    except (OSError, ValueError, KeyError) as exc:
+        raise Infrastructure(f'Cannot account lane writes from {scope}/io.stat; '
+                             'the host must enable and delegate the cgroup I/O controller: ' + str(exc)) from exc
+
+
+def write_counter(scope, device):
+    return cgroup_writes(scope) if scope else device_writes(device)
+
+
 def soak_relevant(paths):
     return any(any(fnmatch.fnmatchcase(p, prefix + '*') for prefix in SOAK_PATHS) or (p.startswith('modules/') and
                p.endswith(('/build.gradle.kts', '/build.gradle'))) for p in paths)
@@ -537,10 +568,12 @@ class Run(runner.Run):
             raise ProductFailure('Bundled JVM crash: ' + json.dumps(rows))
 
     def write_counters(self):
-        device = os.environ['QUAL_GPU_BLOCK_DEVICE']
-        value = device_writes(device)
-        return {'devices': {device: value}, 'writtenBytes': value, 'swapWrittenBytes': None,
-                'source': 'Private-root mount device /proc/diskstats sectors written * 512; includes unrelated host IO (upper bound); no host sync',
+        scope = os.environ.get('QUAL_GPU_CGROUP')
+        device = os.environ['QUAL_GPU_BLOCK_DEVICE'] if not scope else None
+        value = write_counter(scope, device)
+        return {'devices': {scope or device: value}, 'writtenBytes': value, 'swapWrittenBytes': None,
+                'source': ('Lane scope io.stat wbytes, all devices and descendants; kernel writeback attribution; no global sync'
+                           if scope else 'Private-root device diskstats upper bound; includes unrelated host IO; no global sync'),
                 'swapMeasurement': 'separate swap attribution unavailable'}
 
 
