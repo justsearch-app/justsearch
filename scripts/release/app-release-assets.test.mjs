@@ -146,7 +146,8 @@ test('compatibility baseline preserves the frozen strategy while version 4 reads
     artifactPublicKey: TAURI_PUBLIC_KEY,
     metadataKeyId: 'metadata-2026-01',
   });
-  assert.deepEqual(descriptor.targets['windows-x86_64'].compatibility.map((row) => row.ownerId), ['preferences']);
+  assert.deepEqual(descriptor.targets['windows-x86_64'].compatibility.map((row) => row.ownerId),
+    ['preferences', 'operations-db']);
   assert.equal(descriptor.targets['windows-x86_64'].compatibility[0].formatVersion, 4);
   assert.deepEqual(descriptor.targets['windows-x86_64'].compatibility[0].readableSourceVersions, [0, 1, 2, 3, 4]);
   assert.equal(descriptor.targets['windows-x86_64'].compatibility[0].reconciliationStrategy,
@@ -179,10 +180,10 @@ test('signed release inherits an exact retired predecessor owner without activat
     compatibilityBaselinePath,
   );
   assert.deepEqual(compatibility.map(row => row.ownerId), [
-    'preferences', 'worker-config-snapshot',
+    'preferences', 'future-active-store', 'worker-config-snapshot',
   ]);
-  assert.deepEqual(compatibility[1].readableSourceVersions, [0]);
-  assert.equal(compatibility[1].reconciliationStrategy, RETIRED_SNAPSHOT.reconciliation);
+  assert.deepEqual(compatibility[2].readableSourceVersions, [0]);
+  assert.equal(compatibility[2].reconciliationStrategy, RETIRED_SNAPSHOT.reconciliation);
 
   const { descriptor } = await buildReleaseAssets({
     ...f,
@@ -195,7 +196,7 @@ test('signed release inherits an exact retired predecessor owner without activat
     metadataKeyId: 'metadata-2026-01',
   });
   assert.deepEqual(descriptor.targets['windows-x86_64'].compatibility.map(row => row.ownerId), [
-    'preferences', 'worker-config-snapshot',
+    'preferences', 'future-active-store', 'worker-config-snapshot',
   ]);
   await verifyReleaseAssets({ ...f, compatibilityBaselinePath, releaseDir: f.outDir });
 });

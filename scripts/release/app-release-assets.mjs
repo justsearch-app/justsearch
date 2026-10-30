@@ -42,7 +42,7 @@ export async function loadReleaseCompatibility(compatibilityRegisterPath, compat
       `compatibility register is not release-ready: ${register.knownCompatibilityGaps.join(', ')}`,
     );
   }
-  let compatibility = (register.durableStores ?? []).map((store) => {
+  const compatibility = (register.durableStores ?? []).map((store) => {
     if (store.status !== 'READY') {
       throw new Error(`durable store ${store.id} is not READY`);
     }
@@ -96,7 +96,7 @@ export async function loadReleaseCompatibility(compatibilityRegisterPath, compat
       throw new Error('compatibility baseline must contain its installed durable stores');
     }
     const seen = new Set();
-    compatibility = baseline.durableStores.map((store) => {
+    baseline.durableStores.forEach((store) => {
       requireNonBlank('compatibility baseline store id', store.id);
       if (seen.has(store.id)) {
         throw new Error(`compatibility baseline repeats durable store ${store.id}`);
@@ -126,7 +126,8 @@ export async function loadReleaseCompatibility(compatibilityRegisterPath, compat
           || !current.readableSourceVersions.includes(store.currentVersion)) {
         throw new Error(`compatibility baseline store ${store.id} has an unreadable source version`);
       }
-      return current;
+      // Cover unpublished current-era predecessors too; baseline-only stores remain retired.
+      if (!currentById.has(store.id)) compatibility.push(current);
     });
   }
 

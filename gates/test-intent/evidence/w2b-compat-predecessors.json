@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T12:58:11.532Z",
+  "revision": "51799a37d8e3ca39ffbb8c0391efd610df541296",
+  "tree": "c895b563726292dae79c9da9533d8f45540c9850",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::published_baseline_producer_bytes_cover_published_register_including_retirement\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17530
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::v2_tests::published_baseline_producer_bytes_refuse_unreadable_predecessor_format\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2801
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::published_baseline_producer_bytes_cover_published_register_including_retirement",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:26ce9aa60ff3e8c8f71d69a0c0236d31be676e503409bae01acf170550befad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::published_baseline_producer_bytes_cover_published_register_including_retirement",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_v2_tests.rs#updater::v2_tests::published_baseline_producer_bytes_refuse_unreadable_predecessor_format",
+      "file": "modules/shell/src-tauri/src/updater_v2_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:26ce9aa60ff3e8c8f71d69a0c0236d31be676e503409bae01acf170550befad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::v2_tests::published_baseline_producer_bytes_refuse_unreadable_predecessor_format",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:97c0960f4e9168ebcac7e07769041edf42d59949291557979cf738abd1080336"
+}

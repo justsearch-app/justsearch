@@ -1,6 +1,10 @@
 use super::*;
 
 fn fixture() -> tempfile::TempDir {
+    fixture_with_baseline(false)
+}
+
+fn fixture_with_baseline(published: bool) -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     let script = std::env::var_os("JUSTSEARCH_TEST_FIXTURE_SCRIPT")
         .map(PathBuf::from)
@@ -14,6 +18,7 @@ fn fixture() -> tempfile::TempDir {
     let result = std::process::Command::new("node")
         .arg(script)
         .arg(root.path())
+        .args(if published { vec!["published"] } else { vec![] })
         .output()
         .unwrap();
     assert!(
@@ -22,6 +27,73 @@ fn fixture() -> tempfile::TempDir {
         String::from_utf8_lossy(&result.stderr)
     );
     root
+}
+
+#[test]
+fn published_baseline_producer_bytes_cover_full_current_register() {
+    let root = fixture_with_baseline(true);
+    let bytes = fs::read(root.path().join("release.v2.json")).unwrap();
+    for target in ["windows-x86_64", "linux-x86_64"] {
+        let descriptor = parse_descriptor(&bytes, target).unwrap();
+        let result = validate_store_compatibility(&descriptor);
+        assert!(result.is_ok(), "assertion failed: {target}: {result:?}");
+    }
+}
+
+#[test]
+fn published_baseline_producer_bytes_cover_earlier_current_subset() {
+    let root = fixture_with_baseline(true);
+    let bytes = fs::read(root.path().join("release.v2.json")).unwrap();
+    for target in ["windows-x86_64", "linux-x86_64"] {
+        let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
+        // A synthetic earlier register still owns a store added after the published baseline.
+        local
+            .durable_stores
+            .retain(|store| store.id == "data-version-marker");
+        assert_eq!(local.durable_stores.len(), 1);
+        let descriptor = parse_descriptor(&bytes, target).unwrap();
+        let result = validate_store_compatibility_against(local, &descriptor);
+        assert!(result.is_ok(), "assertion failed: {target}: {result:?}");
+    }
+}
+
+#[test]
+fn published_baseline_producer_bytes_cover_published_register_including_retirement() {
+    let root = fixture_with_baseline(true);
+    let bytes = fs::read(root.path().join("release.v2.json")).unwrap();
+    for target in ["windows-x86_64", "linux-x86_64"] {
+        let local: LocalStoreRegister =
+            serde_json::from_slice(&fs::read(root.path().join("predecessor.json")).unwrap())
+                .unwrap();
+        assert_eq!(local.durable_stores.len(), 42);
+        assert!(local
+            .durable_stores
+            .iter()
+            .any(|store| store.id == "worker-config-snapshot"));
+        let descriptor = parse_descriptor(&bytes, target).unwrap();
+        validate_store_compatibility_against(local, &descriptor).unwrap();
+    }
+}
+
+#[test]
+fn published_baseline_producer_bytes_refuse_unreadable_predecessor_format() {
+    let root = fixture_with_baseline(true);
+    let bytes = fs::read(root.path().join("release.v2.json")).unwrap();
+    for target in ["windows-x86_64", "linux-x86_64"] {
+        let mut local: LocalStoreRegister =
+            serde_json::from_slice(&fs::read(root.path().join("predecessor.json")).unwrap())
+                .unwrap();
+        let descriptor = parse_descriptor(&bytes, target).unwrap();
+        let store = &mut local.durable_stores[0];
+        let row = descriptor
+            .compatibility
+            .iter()
+            .find(|row| row.owner_id == store.id)
+            .unwrap();
+        store.current_version = row.readable_source_versions.iter().max().unwrap() + 1;
+        let error = validate_store_compatibility_against(local, &descriptor).unwrap_err();
+        assert!(error.contains("cannot read durable store"), "{error}");
+    }
 }
 
 #[test]
