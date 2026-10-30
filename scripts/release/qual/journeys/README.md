@@ -174,6 +174,8 @@ unlike qcow2 allocated size. Shutdown writes are outside the measured interval;
 unavailable measurements are explicit. Use one driver at a time and reuse
 setup snapshots for infrastructure reruns instead of redoing full sets.
 
+For release qualification, use the production predecessor and unchanged draft mirror in [Cut a JustSearch release](../../../../docs/how-to/cut-a-release.md#3-qualify-the-drafts-exact-bytes-without-rebuilding); the local test-build procedure below is **development-only**.
+
 For local test builds, build the predecessor from the candidate's **parent** in
 a shared clone inside `$TMPDIR`, with a separate build directory. Use the same
 generated test metadata root pins for both packages; give the candidate a newer

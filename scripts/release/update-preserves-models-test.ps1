@@ -6,11 +6,11 @@
   then uninstalls -- asserting the seeded bytes survive both halves.
 
   *** DO NOT RUN THIS SCRIPT ON A MACHINE WITH A JUSTSEARCH INSTALL YOU CARE ABOUT. ***
-  Like scripts/release/sandbox-guest-silent-test.ps1, every lookup here (install dir, the HKCU
+  Every lookup here (install dir, the HKCU
   Uninstall key, the resolved UninstallString) is host-global rather than scoped to the
   installers this script staged. It will locate whatever product named "JustSearch" the machine
-  has registered and silently run ITS uninstaller. That script's header records a real incident
-  where exactly this removed a live `F:\JustSearch-test` install during host-side validation.
+  has registered and silently run ITS uninstaller. A prior host-side validation removed a
+  live `F:\JustSearch-test` install this way.
   A hard guard below therefore refuses to run outside GitHub Actions, with no override switch --
   syntax-check host-side with the AST parser instead of executing.
 
@@ -38,8 +38,7 @@
       JUSTSEARCH_DATA_DIR is unset (modules/shell/src-tauri/src/platform_paths.rs:57-70), and
       ResolvedPathResolver.java:66 puts models at <dataDir>/models. That is ALSO the NSIS
       currentUser $INSTDIR (tauri.conf.json bundle.windows.nsis.installMode = "currentUser";
-      tauri-bundler's `StrCpy $INSTDIR "$LOCALAPPDATA\${PRODUCTNAME}"`, cited at
-      scripts/release/sandbox-guest-silent-test.ps1:35-38). Install tree and contract-default
+      tauri-bundler's `StrCpy $INSTDIR "$LOCALAPPDATA\${PRODUCTNAME}"`). Install tree and contract-default
       data dir therefore COLLIDE. Anything seeded there sits inside the directory the
       uninstaller owns, so its removal is not necessarily a defect -- but it has never been
       measured, so this lane records the outcome instead of assuming it.
@@ -110,7 +109,7 @@ function Stop-FixtureProcess($Process) {
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# HARD GUARD (no override switch, mirroring sandbox-guest-silent-test.ps1's stance): this script
+# HARD GUARD (no override switch, host-global installation lookups): this script
 # silently uninstalls the machine's registered JustSearch. There is no legitimate host-side use.
 if ($env:GITHUB_ACTIONS -ne "true") {
   Write-Error ("REFUSING TO RUN: GITHUB_ACTIONS is not 'true'. This lane installs and then " +

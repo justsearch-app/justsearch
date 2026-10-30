@@ -45,7 +45,7 @@ halves share objects.
 - [Testing Strategy](explanation/09-testing-strategy.md): The 4-tier Test Pyramid, Chaos testing, and AI Judge.
 - [UI/UX Design System](explanation/10-ui-ux-design.md): The 5-zone layout, interaction model, and design pillars.
 - [Index Schema Migration (Blue/Green)](explanation/11-index-schema-migration.md): Blue/green migration mechanics and safety guarantees.
-- [Desktop Installer + Sandbox Setup (How it works today)](explanation/12-desktop-installer-and-sandbox-setup.md): NSIS installer, Tauri boot sequence, sandbox harness scripts.
+- [Desktop installer and boot sequence](explanation/12-desktop-installer-and-sandbox-setup.md): NSIS installer, Tauri boot sequence, and clean release qualification.
 - [AI Setup + Verification (Current State)](explanation/13-ai-setup-and-verification.md): Current v1 setup, installer bundling, and verification workflows.
 - [Adapters-Lucene Deep Dive](explanation/18-adapters-lucene-deep-dive.md): HNSW search, SPLADE learned sparse retrieval, hybrid fusion, commit metadata system.
 - [Module Architecture & Dependency Governance](explanation/19-module-architecture.md): The Engine's three rings, composition root, Gradle modules, ports, and dependency enforcement.
@@ -62,6 +62,7 @@ halves share objects.
 
 ### How-To (Specific Tasks)
 - [Capture UI Evidence](how-to/capture-ui-evidence.md): Screenshot capture for UI verification and agent visual feedback.
+- [Cut a JustSearch release](how-to/cut-a-release.md): Prepare one immutable Windows/Linux draft, qualify its bytes, and publish after the owner's final validation.
 - [Developing the UI](how-to/develop-ui.md): Layout work without a backend, deterministic fixture captures, real backend development, and frontend verification.
 - [Summon JustSearch from the desktop](how-to/global-search-shortcut.md): Use the global shortcut or --focus-search to bring JustSearch forward and focus the default search bar.
 - [Interpret `jseval bisect` Output (LR5-d)](how-to/interpret-bisect-output.md): Reading the manifest-hash bisection report — single-axis, multi-axis, MULTI_AXIS_INTERACTION, no-cached-run, and identical-cohort paths.

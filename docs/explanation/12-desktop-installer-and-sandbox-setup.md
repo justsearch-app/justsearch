@@ -1,11 +1,11 @@
 ---
-title: Desktop Installer + Sandbox Setup (How it works today)
+title: Desktop installer and boot sequence
 type: explanation
 status: stable
-description: "NSIS installer, Tauri boot sequence, sandbox harness scripts."
+description: "NSIS installer, Tauri boot sequence, and clean release qualification."
 ---
 
-# Desktop Installer + Sandbox Setup (How it works today)
+# Desktop installer and boot sequence
 
 This document is a **purely descriptive** explanation of the current Windows desktop setup:
 
@@ -13,7 +13,7 @@ This document is a **purely descriptive** explanation of the current Windows des
 - how the **Tauri shell** boots the app,
 - how the **Java headless backend** starts and composes the index half in-process,
 - how the **UI discovers and connects** to the local API,
-- what the **Windows Sandbox harness scripts** do during Phase 3 verification,
+- how clean-machine release qualification is run,
 - where to find the **artifacts and logs**.
 
 It intentionally does **not** propose fixes or future improvements.
@@ -348,62 +348,12 @@ The NSIS installer uses pre-install and pre-uninstall hooks to best-effort termi
 
 See: `modules/shell/src-tauri/nsis/installer-hooks.nsh`
 
-## 8. Windows Sandbox harness (Phase 3) — what the scripts do today
+## 8. Clean release qualification
 
-### 8.1 Host-side launcher (staging + .wsb generation)
-
-Script: `scripts/sandbox/sandbox-launch.py`
-
-Current behavior:
-- Stages the newest NSIS installer, project docs, sandbox `CLAUDE.md`, and a sanitized `.claude/` config into `tmp/sandbox/share/`.
-- Generates a `.wsb` file with **16 GB RAM** allocation that maps `tmp/sandbox/share/` to `Desktop\JustSearchTest` inside the sandbox and (optionally) maps the host `models/` directory to `Desktop\JustSearchModels`.
-- LogonCommand opens an Explorer window at the mapped folder. Nothing else runs automatically — Git, one agent harness (Claude Code or Codex), and JustSearch are installed manually by the user inside the sandbox (see `scripts/sandbox/sandbox-CLAUDE.md` "Setup (manual)" for the exact commands). The launcher stages entry points for both harnesses: the charter as `CLAUDE.md` and `AGENTS.md`, a sanitized `.claude/`, and a generated credential-free `.codex/config.toml` + `.agents/skills/start/` (tempdoc 939). Graders are harness-agnostic — they only read the evidence files.
-- Drop any host-pre-staged installers (e.g. Git for Windows) into `tmp/sandbox/share/tools/` before launch; they appear inside the sandbox at `Desktop\JustSearchTest\tools\`.
-- `--upgrade-from <installer>` stages the exact previous published installer
-  for an installer-over-release arrival test.
-- `--in-app-updater-assets <dir> --metadata-public-key <pem>` adds an
-  authenticated loopback release set and recovery-evidence helpers. This mode
-  also requires an updater-capable `--upgrade-from` source build compiled with
-  `JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE=1`; production binaries reject runtime
-  trust overrides and non-HTTPS endpoints by design.
-
-  Build that candidate with the `Build Installer` workflow's `sandboxTestMode`
-  input (`candidateVersion` produces the source/target pair an N→N+1 round
-  needs). The workflow refuses that input on a `v*` tag: a published binary
-  honouring runtime trust overrides would hand the update channel to anything
-  able to set an environment variable.
-
-  Inside the sandbox, `start-in-app-update-test.ps1 -Autorun` drives check and
-  install with no operator input, so the apply machinery — prepare, freeze,
-  witnessed shutdown, installer launch, restart reconciliation — is qualified
-  unattended. The verdict appears as `autorunVerdict` in
-  `collect-updater-evidence.ps1` output, written by the **second** boot, because
-  a successful apply exits the process that started it.
-
-  `-Autorun` does not replace the operator round. That the user is asked before
-  anything is applied, and that the apply machinery is correct, fail
-  independently; run both.
-
-In addition, `scripts/ci/package-installer-win.ps1` keeps the Sandbox share “fresh” by staging the newest installer under a
-stable alias plus a unique alias:
-
-- `JustSearch-LATEST-setup.exe` (best-effort stable alias; may be locked while Sandbox is running)
-- `JustSearch-LATEST-setup-<timestamp>.exe` (always written)
-- `latest-installer.txt` (records which alias file should be used)
-
-Important:
-- The memory cap only applies when launching Sandbox via the generated `.wsb` file.
-- Launching Windows Sandbox from the Start Menu ignores these settings and will use the default memory behavior (often ~4 GB).
-- **GPU note:** Windows Sandbox passes through the GPU for DirectX/vGPU rendering but does **not** expose the CUDA runtime. All ONNX inference and LLM inference runs **CPU-only** in sandbox. To enable GPU, both CUDA runtime DLLs and ORT CUDA DLLs must be staged from the host.
-- **Model pre-staging:** `JUSTSEARCH_MODELS_DIR` env var can point to host models mapped into the sandbox, eliminating the 8.5 GB “Install AI” download.
-- **Correct main class:** `io.justsearch.ui.HeadlessApp` (not `io.justsearch.ui.headless.HeadlessApp`).
-
-The Sandbox is used as a clean, ephemeral environment to validate:
-- install/uninstall behavior,
-- first-run boot,
-- UI ↔ backend connection,
-- (optionally) BYO AI enablement.
-
-### 8.2 Operational caveats
-
-- **Retired Worker configuration snapshot:** The one-Engine runtime no longer reads or writes `runtime/worker-config-snapshot.json`. A file left by an older release is inert; it is not a reason to clear user data or invalidate current Engine configuration. The former stale-path failure (374 G26) belonged to the removed Worker launch path.
+The Windows Sandbox release harness has been retired. The
+[release how-to](../how-to/cut-a-release.md) is the current procedure:
+qualify the immutable draft on hosted runners, clean Windows 11 and Ubuntu
+24.04 VMs, and the private Linux GPU lane. See the
+[VM harness](../../scripts/release/qual/README.md) and
+[journey suite](../../scripts/release/qual/journeys/README.md) for commands
+and the limitations of each lane.

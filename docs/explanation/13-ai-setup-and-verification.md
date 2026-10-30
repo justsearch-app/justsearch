@@ -168,15 +168,11 @@ What it proves:
 
 ### 5.2 Phase 3 (clean machine UI validation)
 
-Windows Sandbox harness:
-
-- Harness: `scripts/sandbox/sandbox-launch.py` (launches Windows Sandbox and drives the offline-installer validation)
-
-What it proves:
-
-- Real install UX works on a clean machine (WebView2, first boot).
-- In-app “Install AI” works (consent → download → verify).
-- Q&A and embeddings work end-to-end.
+Use the [release how-to](../how-to/cut-a-release.md) and its linked
+[clean VM journey suite](../../scripts/release/qual/journeys/README.md).
+Record actual install, launch, Install AI, search and chat observations against
+the draft's bytes. Experimental or unavailable journey coverage is not a pass.
+Windows GPU chat is skipped by the owner's decision.
 
 ### 5.3 v3 verification (GPU Booster Pack + activation)
 

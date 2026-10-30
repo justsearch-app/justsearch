@@ -16,20 +16,9 @@
  *    tauri.conf.json correct while the built binary still requests
  *    elevation (e.g. via modules/shell/src-tauri/nsis/installer-hooks.nsh).
  *
- * Why this exists: a Sandbox round's in-round UAC observation is
- * operator-only, once-per-round, and unreliable when the round's own
- * terminal is already elevated (no UAC prompt can appear at all in that
- * case, regardless of what the installer requests — see
- * sandbox-CLAUDE.md phase 1 and collect-evidence.ps1's elevation
- * self-check). This script instead verifies the facts mechanically, on
- * every CI run / on demand, independent of any sandbox's elevation state.
- *
- * SCOPE — do not oversell this: it proves ONLY that the installer does not
- * request elevation. It says NOTHING about unsigned-publisher warnings or
- * SmartScreen — those depend on code signing (deferred by owner budget, see
- * the comment at scripts/sandbox/sandbox-launch.py's generate_wsb, ~line
- * 507-517) and remain the Sandbox's job to observe whenever elevation
- * posture allows it.
+ * This mechanical check is independent of a test machine's elevation state.
+ * It proves only that the installer does not request elevation; publisher
+ * warnings and SmartScreen still need observation on a clean Windows VM.
  *
  * ARTIFACT READ METHOD — byte-scan, not a PE/resource parser:
  * The requestedExecutionLevel lives in an RT_MANIFEST resource (plain XML)
@@ -68,8 +57,7 @@ const EXPECTED_EXECUTION_LEVEL = 'asInvoker';
 
 // Conventional locations a built NSIS installer can land, in discovery-preference
 // order. See scripts/ci/build-release-assets.ps1 / package-installer-win.ps1
-// (default -OutDir "dist/installer") and scripts/sandbox/sandbox-launch.py's
-// comment on dist/installer/windows-installer/ as the CI-artifact-download layout.
+// (default -OutDir "dist/installer"); nested paths also cover CI artifact downloads.
 const CONVENTIONAL_INSTALLER_GLOBS = [
   ['dist', 'installer'],
   ['dist', 'installer', 'windows-installer'],

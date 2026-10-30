@@ -184,6 +184,8 @@ visible checks brief while the owner uses the desktop.
 HTTPS update mirror (Ubuntu and Windows)
 ----------------------------
 
+The test-key/build procedure below is **development-only**; for release qualification, use the unchanged production assets and predecessor in [Cut a JustSearch release](../../../docs/how-to/cut-a-release.md#3-qualify-the-drafts-exact-bytes-without-rebuilding).
+
 Lay out a folder as a URL tree, for example:
 
 ```

@@ -63,7 +63,7 @@ jobs:
           HAS_METADATA_KEY: ${{ secrets.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM != '' }}
         run: |
           node scripts/release/release-candidate.mjs admit
-          node scripts/ci/sync-version.mjs --require-release-semver --what-if
+          node scripts/ci/sync-version.mjs --require-release-semver --check
           node scripts/ci/check-mcpb-consistency.mjs --release-version "${GITHUB_REF_NAME#v}"
       - name: Reuse original predecessor context on same-run retry
         id: context

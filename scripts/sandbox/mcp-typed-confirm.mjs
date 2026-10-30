@@ -1,21 +1,12 @@
 #!/usr/bin/env node
 /**
  * Drives the shipped MCPB stdio bridge to exercise the TYPED_CONFIRM
- * mutating-tool procedure for `cohort:mcp` (tempdoc 728-followup, D2).
+ * mutating-tool procedure. Retained as a protocol/discovery test client;
+ * the Windows Sandbox release harness has been retired.
  *
- * The MCP Inspector CLI's `--tool-arg` string-coerces every value and cannot
- * express `justsearch_ingest`'s `paths: string[]` argument -- the procedure
- * `governance/sandbox-coverage.v1.json` used to mandate is unfollowable as
- * written (verified in a real round: round3-tools/mcp-call.js was a
- * hand-rolled workaround for exactly this).
- *
- * Instead of promoting a second, divergent HTTP client, this script spawns
- * the REAL shipped MCPB stdio bridge (`index.js`, a verbatim copy of
- * packaging/mcpb/server/index.js, staged next to this script by
- * sandbox-launch.py) as a child process and speaks newline-delimited
- * JSON-RPC to its stdin/stdout -- exactly how a real MCP host (e.g. Claude
- * Desktop) drives it. That means this round validates the actual artifact
- * JustSearch ships in the MCPB package, not a parallel bespoke client.
+ * The MCP Inspector CLI string-coerces --tool-arg values and cannot express
+ * justsearch_ingest's paths array. This client instead speaks JSON-RPC over
+ * the shipped bridge's stdin/stdout. Supply its location with --bridge.
  *
  * Sequence driven: initialize -> notifications/initialized ->
  * tools/call justsearch_ingest(paths: [<target>]).
@@ -285,7 +276,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   if (!fs.existsSync(args.bridge)) {
-    log(`Bridge not found at ${args.bridge} -- was mcp-client/ staged correctly by sandbox-launch.py?`);
+    log(`Bridge not found at ${args.bridge} -- supply the shipped MCPB bridge with --bridge.`);
     process.exit(2);
   }
 
