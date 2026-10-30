@@ -71,3 +71,14 @@ unreadable-format preservation checks have separate script-generated passing evi
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-w2b-accept-2",
+  "verdict": "accept",
+  "digest": "sha256:050f71f4ebdedb222096def024bc772d8cc581f589acbd4bb211e5707b81cab9",
+  "note": "Accept: all four tests encode the agreed predecessor compatibility intent; repaired assertions fail before on missing data-version-marker, preservation evidence is valid, and the default fixture is unchanged."
+}
+```
