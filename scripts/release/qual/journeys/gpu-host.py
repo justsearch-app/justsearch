@@ -115,6 +115,7 @@ def owner_metadata(home):
 
 
 def assert_home_bindings(home, bindings):
+    validate_bindings(home, bindings)
     bindings = {Path(p) for p in bindings if Path(p).is_relative_to(home)}
     def visit(path):
         if path in bindings:
@@ -127,8 +128,26 @@ def assert_home_bindings(home, bindings):
     return True
 
 
+def validate_bindings(home, bindings):
+    """Reject owner-state overlaps lexically and through symlinks, without a scan."""
+    for binding in bindings:
+        for path in (Path(binding).absolute(), Path(binding).resolve()):
+            if home.is_relative_to(path):
+                raise runner.Infrastructure('Binding exposes owner home: ' + str(binding))
+            if not path.is_relative_to(home):
+                continue
+            relative = path.relative_to(home)
+            if relative.parts[0] == '.justsearch':
+                raise runner.Infrastructure('Binding overlaps owner state: ' + str(binding))
+            for parent in (Path('.local/share'), Path('.config'), Path('.cache')):
+                if parent.is_relative_to(relative) or (relative.is_relative_to(parent)
+                        and relative.parts[len(parent.parts)].startswith('io.justsearch')):
+                    raise runner.Infrastructure('Binding overlaps owner state: ' + str(binding))
+
+
 def sandbox_command(root, evidence, readonly, command):
     home = Path(pwd.getpwuid(os.getuid()).pw_dir)
+    validate_bindings(home, [root, evidence, *readonly])
     # Recovery uses a new evidence directory. Retire only the old empty mount
     # placeholders, so the sealed home describes this invocation's bindings.
     if (root / 'empty-home').exists():
@@ -145,11 +164,19 @@ def sandbox_command(root, evidence, readonly, command):
                 target.touch()
     # Hide passwd-derived user.home as well as HOME, all desktop sockets and
     # the host /proc view. Only explicit lane inputs are restored read-only.
+    empty_run = root / 'empty-run'
+    (empty_run / 'user' / str(os.getuid())).mkdir(parents=True, exist_ok=True)
+    (empty_run / 'dbus').mkdir(exist_ok=True)
     args = ['/usr/bin/bwrap', '--die-with-parent', '--unshare-pid',
-            '--dev-bind', '/', '/', '--ro-bind', str(root / 'empty-home'), str(home),
+            '--ro-bind', '/', '/', '--ro-bind', str(root / 'empty-home'), str(home),
+            '--ro-bind', str(empty_run), '/run',
             '--tmpfs', '/tmp', '--tmpfs', '/run/user/' + str(os.getuid()),
             '--dev-bind', '/dev', '/dev', '--proc', '/proc',
             '--bind', str(root), str(root), '--bind', str(evidence), str(evidence)]
+    # WebKit's AppArmor policy probe uses the system bus. This system service
+    # endpoint holds no owner JustSearch data; all other /run sockets are hidden.
+    if Path('/run/dbus').is_dir():
+        args += ['--ro-bind', '/run/dbus', '/run/dbus']
     for path in dict.fromkeys(map(Path, readonly)):
         args += ['--ro-bind', str(path), str(path)]
     return args + ['--chdir', str(runner.HERE.parents[3]), '--', *command]
@@ -183,10 +210,11 @@ def sandbox_session(forwarded):
     home = Path(pwd.getpwuid(os.getuid()).pw_dir)
     proof = {'homeBindings': bindings, 'homeContainsOnlyBindings': assert_home_bindings(home, bindings),
              'pidNamespace': os.readlink('/proc/self/ns/pid'),
+             'hostRootReadOnly': bool(os.statvfs('/').f_flag & os.ST_RDONLY),
              'candidateReadOnly': bool(os.statvfs(root / 'work/package').f_flag & os.ST_RDONLY)}
     save(out / 'sandbox.json', proof)
-    if not proof['candidateReadOnly']:
-        raise runner.Infrastructure('Extracted candidate is writable')
+    if not proof['candidateReadOnly'] or not proof['hostRootReadOnly']:
+        raise runner.Infrastructure('Host root or extracted candidate is writable')
     marker = os.environ['QUAL_GPU_SESSION']
     observed = {}
     mirror = None
@@ -242,7 +270,8 @@ def add_check(report, name, status, reason, evidence):
 
 def collect_crashes(out, since):
     report = json.loads((out / 'summary.json').read_text())
-    installed = [str(p) for p in Path(os.environ['QUAL_GPU_ROOT'], 'work/package').rglob('*') if p.is_file()]
+    private = Path(os.environ['QUAL_GPU_ROOT']).resolve()
+    installed = [str(p) for p in (private / 'work/package').rglob('*') if p.is_file()]
     try:
         proc = subprocess.run(['coredumpctl', '--json=short', '--no-pager', '--since', since, 'list'],
                               capture_output=True, text=True, timeout=30)
@@ -251,11 +280,23 @@ def collect_crashes(out, since):
             raise runner.Infrastructure('coredumpctl collection failed: ' + proc.stderr)
         entries = json.loads(proc.stdout) if proc.stdout.strip() else []
         rows = [{'fields': {key: str(entry.get(journal, entry.get(short, ''))) for key, journal, short in (
-            ('ExecutablePath', 'COREDUMP_EXE', 'exe'), ('Signal', 'COREDUMP_SIGNAL', 'sig'),
+            ('ExecutablePath', 'COREDUMP_EXE', 'exe'), ('Pid', 'COREDUMP_PID', 'pid'), ('Signal', 'COREDUMP_SIGNAL', 'sig'),
             ('Package', 'COREDUMP_PACKAGE_NAME', 'package'), ('Date', 'COREDUMP_TIMESTAMP', 'time'),
             ('ProcStatus', 'COREDUMP_PROC_STATUS', 'status'), ('ProcStat', 'COREDUMP_PROC_STAT', 'stat'))}} for entry in entries]
         observed = out / 'app-processes.json'
         runner.attribute_crashes(rows, set(installed), json.loads(observed.read_text()) if observed.exists() else [])
+        for row in rows:
+            fields = row['fields']
+            status = dict(line.split(':', 1) for line in fields['ProcStatus'].splitlines() if ':' in line)
+            pids = [int(pid) for pid in status.get('NSpid', '').split()]
+            stat_fields = fields['ProcStat'].rsplit(') ', 1)[-1].split()
+            row['crashIdentity'] = {'hostPid': int(fields['Pid']) if fields['Pid'] else None,
+                'namespacePids': pids, 'ticks': stat_fields[19] if len(stat_fields) > 19 else None}
+            exe = fields['ExecutablePath'].removesuffix(' (deleted)')
+            # Downloaded runtimes are product executables too, including an
+            # executable already removed by crash recovery before collection.
+            if exe and Path(exe).is_absolute() and Path(exe).resolve().is_relative_to(private):
+                row['attribution'] = 'product'
         save(out / 'gpu-crashes.json', rows)
         for attribution, status in (('product', 'failed-product'), ('unattributed', 'owner-validation')):
             found = [row for row in rows if row['attribution'] == attribution]
@@ -358,15 +399,14 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
             # A linked worktree needs its Git common directory for the J9 diff.
             common = subprocess.check_output(['git', '-C', str(args.source), 'rev-parse', '--git-common-dir'], text=True).strip()
             readonly.append((args.source / common).resolve())
-            # Preserve extracted harness tool wrappers and their adjacent data;
-            # also restore resolved symlink targets such as tauri-driver.
+            # Tool files never imply permission to expose their parent directory.
+            # Extracted wrappers declare only the extra resources they need.
             for link in (root / 'bin').iterdir():
                 executable = Path(os.readlink(link))
                 if str(executable).startswith(('/home/', '/tmp/')):
-                    readonly.append(executable.parent.parent if executable.parent.name == 'bin' else executable.parent)
-                    readonly.append(executable.resolve())
+                    readonly += [executable, executable.resolve()]
             driver_path = Path(shutil.which(args.driver, path=env['PATH']) or args.driver).absolute()
-            readonly += [driver_path.parent, driver_path.resolve()]
+            readonly += [driver_path, driver_path.resolve(), *args.tool_resource]
             readonly = list(dict.fromkeys(p.absolute() for p in readonly if p is not None))
             save(root / 'bindings.json', list(map(str, [*readonly, root, evidence.parent])))
             env.update(QUAL_GPU_EXTRACTED=str(package), QUAL_GPU_MIRROR_PORT=str(args.development_mirror_port))
@@ -437,7 +477,7 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
         sandbox_proof['privatePidNamespace'] = bool(sandbox_proof.get('pidNamespace')) and sandbox_proof['pidNamespace'] != sandbox_proof['outsidePidNamespace']
         save(sandbox_file, sandbox_proof)
         isolated = sandbox_proof.get('desktop', {}).get('ownerSocketsAbsent', False)
-        isolated = isolated and all(sandbox_proof.get(k) for k in ('homeContainsOnlyBindings', 'homeContainsOnlyBindingsAfter', 'candidateReadOnly'))
+        isolated = isolated and all(sandbox_proof.get(k) for k in ('homeContainsOnlyBindings', 'homeContainsOnlyBindingsAfter', 'candidateReadOnly', 'hostRootReadOnly'))
         isolated = isolated and sandbox_proof['privatePidNamespace'] and not sandbox_proof.get('processesRemaining', ['unproven'])
         save(evidence / 'isolation.json', {'privateRoot': str(root), 'processesRemaining': remaining,
              'ownerVisibleWindowExcluded': isolated, 'desktop': sandbox_proof.get('desktop'),
@@ -477,6 +517,8 @@ def main():
     parser.add_argument('--source', required=True, type=Path)
     parser.add_argument('--soak-corpus', required=True, type=Path)
     parser.add_argument('--driver', default='tauri-driver')
+    parser.add_argument('--tool-resource', type=Path, action='append', default=[],
+                        help='Exact extra read-only file/data directory needed by an extracted harness tool; repeat as needed')
     parser.add_argument('--development-pack-mirror', type=Path)
     parser.add_argument('--development-mirror-port', type=int, default=8769)
     parser.add_argument('--journeys', nargs='+')
@@ -569,6 +611,13 @@ def main():
     return runner.report_exit_code(report)
 
 
+def interrupted(signum, frame):
+    # Ignore repeat interrupts while the ordinary BaseException cleanup unwinds.
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, signal.SIG_IGN)
+    raise KeyboardInterrupt('Interrupted by ' + signal.Signals(signum).name)
+
+
 if __name__ == '__main__':
     if '--session' in sys.argv or '--sandbox' in sys.argv:
         sys.exit(main())
@@ -576,6 +625,8 @@ if __name__ == '__main__':
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(36, 1, 0, 0, 0):  # PR_SET_CHILD_SUBREAPER
         raise OSError(ctypes.get_errno(), 'Cannot enable lane child subreaper')
+    signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGINT, interrupted)
     result = main()
     while True:
         try:

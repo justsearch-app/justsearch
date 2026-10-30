@@ -1,6 +1,7 @@
 """GPU host adapter for runner.py. No installation, developer runtime or product hooks."""
 import json
 import datetime
+import fnmatch
 import gzip
 import ipaddress
 import os
@@ -19,15 +20,11 @@ from runner import Infrastructure, ProductFailure, RunStopped, Unavailable, wait
 
 GIB = 1024 ** 3
 INTERRUPTED = 'interrupted: GPU or memory needed by the owner'
-# Conservative named production owners: JVM/index lifecycle and configuration also
-# affect inference/enrichment. Harness, documentation and tests alone do not.
+# Module layout: all JVM production main source sets are conservative owners,
+# including their indexing/enrichment/inference dependencies. Cover new modules
+# automatically rather than maintaining an incomplete list of names.
 SOAK_PATHS = (
-    'modules/worker-core/src/main/', 'modules/worker-services/src/main/',
-    'modules/indexer-worker/src/main/', 'modules/app-engine/src/main/',
-    'modules/app-inference/src/main/', 'modules/ai-backend/src/main/',
-    'modules/ort-common/src/main/', 'modules/gpu-bridge/src/main/',
-    'modules/app-services/src/main/', 'modules/configuration/src/main/',
-    'modules/ui/src/main/', 'modules/core/src/main/', 'modules/shell/src-tauri/src/',
+    'modules/*/src/main/', 'modules/shell/src-tauri/src/', 'modules/ui-web/src/',
     'build-logic/', 'gradle/libs.versions.toml', 'scripts/ai/build-linux-gpu-packs.py',
     'scripts/ai/assemble-linux-gpu-packs.py', 'scripts/ai/update-linux-gpu-registry.py',
     'scripts/ai/linux-gpu-inputs.v1.json',
@@ -143,7 +140,7 @@ def device_writes(device, diskstats=Path('/proc/diskstats')):
 
 
 def soak_relevant(paths):
-    return any(p.startswith(SOAK_PATHS) or (p.startswith('modules/') and
+    return any(any(fnmatch.fnmatchcase(p, prefix + '*') for prefix in SOAK_PATHS) or (p.startswith('modules/') and
                p.endswith(('/build.gradle.kts', '/build.gradle'))) for p in paths)
 
 
@@ -156,7 +153,17 @@ def soak_decision(source, last_release=None):
             raise Infrastructure('J9 release diff unavailable: ' + result.stderr)
         return result.stdout.strip()
     candidate = git('rev-parse', 'HEAD')
-    tag = last_release or git('describe', '--tags', '--match', 'v[0-9]*', '--abbrev=0', candidate)
+    tag = last_release
+    if not tag:
+        # Annotated tags and lightweight aliases can all point at this source.
+        # None is a previous release, even when git describe prefers one.
+        previous = [name for name in git('tag', '--merged', candidate).splitlines()
+                    if re.fullmatch(r'v\d+\.\d+\.\d+', name)
+                    and git('rev-parse', name + '^{commit}') != candidate]
+        if not previous:
+            raise Infrastructure('Previous released version cannot be established; provide --last-release explicitly')
+        tag = git('describe', '--tags', '--abbrev=0',
+                  *(arg for name in previous for arg in ('--match', name)), candidate)
     if not re.fullmatch(r'v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?', tag):
         raise Infrastructure('--last-release must be a version release tag')
     if tag not in git('tag', '--list', tag).splitlines():
@@ -257,6 +264,25 @@ class SoakProgress:
         return {'seconds': now - self.started, 'samples': self.samples,
                 'progressStages': self.stages, 'engineIdentity': self.identity,
                 'memoryGuard': 'Production /api/status memoryUsedBytes < memoryMaxBytes (-Xmx2g)'}
+
+
+class SoakIngestion:
+    """The private index must ingest a minimum share after adding this corpus."""
+    def __init__(self, started, before, count, path):
+        if type(before) is not int or before < 0 or type(count) is not int or count <= 0:
+            raise Infrastructure('J9 corpus ingestion baseline/count unavailable')
+        self.started = started
+        self.proof = {'corpusPath': path, 'preSoakIndexedDocuments': before,
+                      'minimumNewDocuments': (count + 99) // 100,  # 1% of long documents.
+                      'indexedDocuments': before, 'observedAtSeconds': None}
+
+    def observe(self, now, indexed):
+        self.proof['indexedDocuments'] = indexed
+        if self.proof['observedAtSeconds'] is None:
+            if now - self.started > 600:
+                raise ProductFailure('No minimum ingestion of long corpus within 10 minutes: ' + json.dumps(self.proof))
+            if indexed - self.proof['preSoakIndexedDocuments'] >= self.proof['minimumNewDocuments']:
+                self.proof['observedAtSeconds'] = now - self.started
 
 
 def require_gpu_plan(preview):
@@ -815,8 +841,10 @@ def soak(run):
     except FileExistsError:
         raise Unavailable('J9 already started in this development round; no second soak')
     root = str(run.args.soak_corpus.resolve())
-    run.api('/api/indexing/roots', {'path': root, 'collection': 'default'})
+    baseline = progress_stages(run.api('/api/status'))['indexing']['completed']
     tracker = SoakProgress(time.monotonic())
+    ingestion = SoakIngestion(tracker.started, baseline, manifest['longDocuments'], root)
+    run.api('/api/indexing/roots', {'path': root, 'collection': 'default'})
     gpu_tracker = SoakGpu()
     started_epoch = time.time()
     samples = []
@@ -836,16 +864,17 @@ def soak(run):
                       'identity': [manifest['pid'], manifest['instanceId']], 'progressStages': stages}
             samples.append(sample)
             run.evidence('J9-observations', samples)
+            ingestion.observe(tracker.started + sample['seconds'], stages['indexing']['completed'])
             tracker.observe(tracker.started + sample['seconds'], stages, status.get('memoryUsedBytes', 0),
                             status.get('memoryMaxBytes', 0), sample['identity'])
             gpu_tracker.observe(sample)
             if time.monotonic() - tracker.started >= 3600:
-                return tracker.complete(time.monotonic())
+                return {**tracker.complete(time.monotonic()), 'corpusIngestion': ingestion.proof}
             time.sleep(30)
     finally:
         diagnostics = soak_logs(Path(run.data, 'logs/engine.log'), started_epoch, time.time(),
                                 gpu_tracker.observations)
-        diagnostics.update(progressStages=tracker.stages, confirmedGpuChecks=gpu_tracker.confirmed_checks,
+        diagnostics.update(progressStages=tracker.stages, corpusIngestion=ingestion.proof, confirmedGpuChecks=gpu_tracker.confirmed_checks,
                            gpuObservationCount=len(gpu_tracker.observations),
                            observationMeaning='Runtime/worker mismatches are observations, not passed GPU checks; fallback requires consecutive CPU samples >=30s apart and absent worker compute memory and CUDA maps in both samples')
         run.facts['soak'] = diagnostics

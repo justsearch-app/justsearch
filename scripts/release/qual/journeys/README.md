@@ -251,10 +251,14 @@ For a development isolation check without AI installation or GPU work, use
 `--journeys J1 J2 --write-budget-bytes 2000000000`; the summary marks this
 subset as development evidence.
 The summary records its commit and the
-last release tag (default: latest reachable `v[0-9]*` tag via `git describe`).
+last release tag (default: nearest reachable stable `vX.Y.Z` tag at an earlier
+source commit; all tags pointing at the candidate itself are excluded). If a
+previous release cannot be established, preparation fails as infrastructure;
+`--last-release` supplies an explicit local version tag for shallow sources.
 J9's relevance decision diffs that tag against the source commit. Named owners:
-`modules/{worker-core,worker-services,indexer-worker,app-engine,app-inference,ai-backend,ort-common,gpu-bridge,app-services,configuration,ui,core}/src/main/`,
-`modules/shell/src-tauri/src/`, module Gradle build files, `build-logic/`,
+every `modules/*/src/main/` production source set derived from the module layout
+(including indexing, adapters-lucene and reranker), `modules/shell/src-tauri/src/`,
+`modules/ui-web/src/`, module Gradle build files, `build-logic/`,
 `gradle/libs.versions.toml`, and the Linux pack producer/assembler/registry helper
 and input manifest in `scripts/ai/`. This is conservative: configuration and
 Engine lifecycle changes can affect inference even without an encoder change.
@@ -266,15 +270,26 @@ produce a skip or pass. The reason and relevant changed paths appear in
 The external wrapper runs the entire lane, including Xvfb, the session bus,
 pack mirror and all candidate processes, inside bubblewrap. A private empty
 read-only directory hides the passwd-derived home; only the source worktree,
-its Git metadata, candidate assets, packs, corpus and extracted harness tools
+its Git metadata, candidate assets, packs, corpus and individual harness tool files
 are bound back at their original paths, read-only. The extracted candidate is
 also read-only. Private work/state (directly under `/home/elias/dev/justsearch-qual/`) and evidence are writable. `/tmp`,
 `/run/user/<uid>` and the PID namespace (with a matching `/proc`) are private;
-network and GPU devices are shared. Before and after the session, an internal
+network and GPU devices are shared. Tool parent directories are never restored
+implicitly. For extracted wrappers, repeat `--tool-resource /exact/path` for
+each required executable, library or specific data directory. These resources
+are read-only too. Every input, resource and writable binding is refused if it
+is, contains or is inside an owner JustSearch state directory, or exposes the
+owner home root; symlink targets are checked as well.
+Before and after the session, an internal
 assertion checks that home contains only these explicit bindings. The sandbox
-root filesystem retains the host mount semantics for OS interfaces (including
-AppArmor D-Bus policy queries); the owner home remains hidden and only explicit
-lane inputs are restored there.
+root filesystem is read-only. Writable mounts are limited to private state,
+evidence, `/tmp`, `/run/user/<uid>`, the private home within state and `/dev` for
+the GPU. The remainder of `/run` is hidden by an empty read-only mount, except
+`/run/dbus`: its system service endpoint holds no owner JustSearch data.
+The shell uses GTK/WebKit through Tauri (`modules/shell/src-tauri/Cargo.toml`);
+its D-Bus session daemon's AppArmor policy probe needs the system bus on this
+host. No other host service socket is needed or restored. The owner's home
+remains hidden and only explicit lane inputs are restored there.
 
 Private HOME and XDG roots and environment scrubbing remain in place.
 `JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR` explicitly names the private cache and is
@@ -339,7 +354,11 @@ including Engine JSON log lines within ±5 seconds; it is not a passed GPU check
 It also reports the count and first/last time of BackfillScheduler's
 `ZERO stage advancement` warning without failing on that warning. The summary's
 `deviceWriteUpperBound` reports the whole-device write delta including unrelated
-host IO. Indexing must advance within 600 seconds while it has work. The direct
+host IO. The pre-soak indexed count is recorded before adding the long corpus
+to this private index. At least 1% of its long documents (60 of 6000) must enter
+the index within the first 600 seconds; an idle app with no pending work cannot
+pass. The corpus path, baseline, minimum, observed count and observation time
+are retained in `corpusIngestion`. Indexing must advance within 600 seconds while it has work. The direct
 queue signal is `worker.core.pendingJobs`; the tracker also includes in-flight
 `pendingVduCount`, `writerQueueDepth`, `writerPendingDocs`, migration
 `pendingJobsCount`/`processingJobsCount` and a running `migrationEnumerator`.
@@ -371,7 +390,12 @@ Before the runner starts, `sandbox.json` records DISPLAY naming the lane's Xvfb,
 and no owner Wayland, bus or Pulse sockets under the private `/run/user/<uid>`.
 Unreadable diagnostic `/proc` entries cannot fail this structural proof. New JVM
 crash logs are collected only from private state and extracted resources. Native
-coredumps use the shared attribution rules without sudo. As with hosted Linux,
+coredumps use the shared attribution rules without sudo. Executables under the
+lane's private state, including downloaded llama-server runtimes, are product
+executables. Crash evidence retains host PID, namespace PIDs and start ticks
+when supplied by the journal. SIGTERM and SIGINT run the same process/state
+cleanup, owner metadata comparison and final device-write accounting as other
+interruptions. As with hosted Linux,
 native crash collection is currently unproven and always adds an
 `owner-validation` row; even otherwise passing results are therefore
 `passed-pending-owner-validation` (exit 2). A crash or unavailable check still

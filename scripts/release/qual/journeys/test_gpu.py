@@ -209,7 +209,7 @@ class GpuTests(unittest.TestCase):
             def api(path, body=None):
                 if path == '/api/status':
                     calls['status'] += 1
-                    return {**progress_status(calls['status'], 0),
+                    return {**progress_status(1 if calls['status'] == 1 else 101, 0),
                             'memoryUsedBytes': 100, 'memoryMaxBytes': 200}
                 if path == '/api/ai/runtime/status':
                     calls['runtime'] += 1
@@ -220,7 +220,7 @@ class GpuTests(unittest.TestCase):
             def sleep(seconds):
                 clock[0] = 3600
             with patch.dict(os.environ, QUAL_GPU_SOAK_MARKER=str(root / 'soak-marker')), \
-                    patch('corpus.verify_soak', return_value={}), \
+                    patch('corpus.verify_soak', return_value={'longDocuments': 6000}), \
                     patch.object(gpu.time, 'monotonic', side_effect=lambda: clock[0]), \
                     patch.object(gpu.time, 'time', side_effect=lambda: 1000 + clock[0]), \
                     patch.object(gpu.time, 'sleep', side_effect=sleep), \
