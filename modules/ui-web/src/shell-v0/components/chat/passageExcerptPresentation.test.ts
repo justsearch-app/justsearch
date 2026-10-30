@@ -82,4 +82,11 @@ describe('Search citation excerpt presentation', () => {
     expect(panel.shadowRoot!.querySelector('.source .sentence')?.textContent).toContain('Never delete the original invoices');
     expect(hover.shadowRoot!.querySelector('.excerpt')?.textContent).toBe(excerpt);
   });
+
+  it('B2 keeps a URL between two leading horizontal rules', async () => {
+    const excerpt = '---\nhttps://example.com/desktop-recovery\n---\nOpen the desktop folder today.';
+    const { panel, hover } = await sourceViews(excerpt);
+    expect(panel.shadowRoot!.querySelector('.source .sentence')?.textContent).toContain('https://example.com/desktop-recovery');
+    expect(hover.shadowRoot!.querySelector('.excerpt')?.textContent).toBe(excerpt);
+  });
 });

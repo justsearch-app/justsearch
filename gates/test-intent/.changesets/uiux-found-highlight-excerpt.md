@@ -9,6 +9,8 @@ author-session: found-builder-2-20261030
 
 Round 2 (orchestrator repair after verifier-1): the source card now removes front matter before the card shortens the passage, and only metadata-shaped lines (key: value, indented continuations, list items) between the leading delimiters count as front matter, so ordinary Markdown between two horizontal rules stays visible. Two checks were added: a long closed header (repaired) and horizontal rules around ordinary Markdown (preservation: passes on the base, failed on the round-1 candidate).
 
+Round 3 (orchestrator, after verifier-2): a metadata key needs a space, tab or line end after its colon, so a URL between two rules stays visible (added preservation check). B1 is narrowed: front matter containing `#` comment lines is shown as on main (named limit).
+
 These are agent-adopted scenarios from the bounded builder brief, recorded as delegated choices;
 they are not owner-agreed scenarios. All tests are new, isolated files. Existing expectations and
 test selection are untouched. Repaired checks fail by assertion on 7959b712fd; preservation checks
@@ -122,7 +124,8 @@ The unchanged full suite provides narrower regression coverage; no live-system c
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 preserves empty, unclosed, non-leading and front-matter-only passages verbatim",
         "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps original evidence, verification, citation identity and character anchors",
-        "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps ordinary Markdown between two leading horizontal rules"
+        "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps ordinary Markdown between two leading horizontal rules",
+        "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps a URL between two leading horizontal rules"
       ]
     }
   ]

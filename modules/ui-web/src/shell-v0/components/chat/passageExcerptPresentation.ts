@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-/** A metadata line: `key: value`, an indented continuation, or a YAML list item. */
-const METADATA_LINE = /^(?:[A-Za-z_][\w-]*\s*:|[ \t]+\S|-[ \t])/;
+/**
+ * A metadata line: `key: value` (a colon then space or line end, so `https://…` is not one), an
+ * indented continuation, or a YAML list item. Blocks with `#` comment lines are left as written.
+ */
+const METADATA_LINE = /^(?:[A-Za-z_][\w-]*[ \t]*:(?:[ \t]|\r?$)|[ \t]+\S|-[ \t])/;
 
 /** Display only: citation events and document anchors retain the original passage. */
 export function displayPassageExcerpt(passage: string): string {
