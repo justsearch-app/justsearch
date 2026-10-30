@@ -1307,6 +1307,8 @@ public class HeadlessApp {
     // every child (nvidia-smi from resolveConfig included) ends with this Engine however it ends.
     // Must stay the first statement (EngineContainmentArchTest). Never throws.
     final EngineContainment containment = EngineContainment.installAtBoot();
+    final var signalStop = new io.justsearch.app.engine.EngineSignalStop();
+    signalStop.install();
     // Spec F §3.5: register for suspend and resume right after containment, so the consumers that
     // re-arm their timers on resume can subscribe from the start. Never throws.
     final io.justsearch.app.api.runtime.power.SystemPowerEvents powerEvents =
@@ -1387,6 +1389,7 @@ public class HeadlessApp {
           bootDataDir);
       operations = openOperationsForStartup(bootDataDir.resolve("operations.db"), operationsCleanupOwner);
       // Phase 0: resolve config (tempdoc 502 §3.3)
+      if (!signalStop.beginNativeInitialization()) return;
       ConfigPhaseResult configPhase = resolveConfig(operations);
       settingsStore = configPhase.settingsStore();
       configStore = configPhase.configStore();
@@ -1768,16 +1771,6 @@ public class HeadlessApp {
       final HeadShutdownCoordinator shutdownCoordinator =
           new HeadShutdownCoordinator(shutdownSequence);
 
-      // Item B3's watcher, started here because this is after the API front is up. It consumes the
-      // request written by the owning supervisor. Prepared upgrades dispatch locally.
-      startShutdownRequestWatcher(
-          engineRoot.executors(),
-          runtimeDir,
-          shutdownRequestAcceptance(),
-          shutdownRequestDispatcher(shutdownSequence),
-          io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS,
-          shutdownRequestWatcherRef::set);
-
       Runtime.getRuntime()
           .addShutdownHook(
               new Thread(
@@ -1791,6 +1784,17 @@ public class HeadlessApp {
                     latch.countDown();
                   },
                    "justsearch-headless-shutdown"));
+      signalStop.publish(shutdownSequence);
+      // Item B3's watcher, started here because this is after the API front is up. It consumes the
+      // request written by the owning supervisor. Prepared upgrades dispatch locally.
+      startShutdownRequestWatcher(
+          engineRoot.executors(),
+          runtimeDir,
+          shutdownRequestAcceptance(),
+          shutdownRequestDispatcher(shutdownSequence),
+          io.justsearch.app.engine.ShutdownRequestWatcher.DEFAULT_POLL_INTERVAL_MS,
+          shutdownRequestWatcherRef::set);
+
       terminalWriterShutdown.complete(shutdownSequence);
       // Expose local shutdown only after the watcher and JVM hook are owned by the sequence.
       upgradeShutdownBridge.install(shutdownSequence::runAndExitWithReceipt);
@@ -1798,6 +1802,7 @@ public class HeadlessApp {
           (io.justsearch.ui.api.LifecycleShutdownAction) request ->
               shutdownCoordinator.shutdownAndExit(lifecycleQuitBudget(request, selfIncarnation)));
 
+      signalStop.ready();
       latch.await();
       // The sole latch release happens after the memoized ordered sequence returns. Its owners may
       // include the process component registry, so the fatal-start fallback must not re-enter them.
@@ -1805,6 +1810,7 @@ public class HeadlessApp {
       log.info("HeadlessApp stopped.");
 
     } catch (Exception e) {
+      signalStop.bootFailed();
       terminalWriterShutdown.completeExceptionally(e);
       log.error("Fatal error in HeadlessApp", e);
       // The data-directory logger may itself be inaccessible during bootstrap contention.
