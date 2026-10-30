@@ -24,6 +24,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import psutil
+
 from . import agent_spawn_register
 from . import ui_check
 from . import ui_selectors as S
@@ -301,7 +303,7 @@ def _is_server_alive(info: dict) -> bool:
     # Check if port responds (most reliable cross-platform check)
     import urllib.request
     try:
-        urllib.request.urlopen(f"http://localhost:{port}", timeout=2)
+        urllib.request.urlopen(f"http://127.0.0.1:{port}", timeout=2)
     except Exception:
         return False
     # PROVENANCE, part 2 (tempdoc 814 §D8.4 / §R.2): the recorded `provenance.head` is written at
@@ -365,6 +367,18 @@ class ServeStartError(Exception):
     capture surfaces this as 'cannot serve: <reason>'."""
 
 
+def _pid_listens_on_port(pid: int, port: int) -> bool:
+    """Prove the responder is our child, even while a strict-port refusal is pending."""
+    try:
+        process = psutil.Process(pid)
+        # net_connections was named connections in psutil 5.9 (our minimum).
+        connections = getattr(process, "net_connections", process.connections)
+        return any(c.status == psutil.CONN_LISTEN and c.laddr.port == port
+                   for c in connections(kind="inet"))
+    except (psutil.Error, OSError):
+        return False
+
+
 def _start_vite_server() -> str:
     """Start (or reuse) a worktree Vite server. Returns the URL, or raises ServeStartError."""
     ui_web = _find_ui_web_dir()
@@ -376,7 +390,7 @@ def _start_vite_server() -> str:
         try:
             info = json.loads(_SERVER_INFO_PATH.read_text())
             if _is_server_alive(info):
-                url = f"http://localhost:{info['port']}"
+                url = f"http://127.0.0.1:{info['port']}"
                 log.debug("Reusing existing Vite server at %s (pid %s)", url, info["pid"])
                 _renew_agent_spawn_lease(info)
                 return url
@@ -400,76 +414,93 @@ def _start_vite_server() -> str:
             f"FE deps missing/incomplete in {ui_web / 'node_modules'} (no runnable vite) — "
             "run `node scripts/dev/prepare-worktree.cjs` (or `npm ci` in modules/ui-web)")
 
-    # FREE-PORT scan (no hardcoded port → no cross-worktree collision, 615 §28 U6).
-    port = _pick_free_port()
-    log.debug("Starting Vite dev server from %s on port %d", ui_web, port)
-
-    # Launch via `node <vite-entry>` (615 §30): a detached `.cmd` shim (`npx.cmd`/`npm.cmd`) dies
-    # immediately on Windows; `node.exe` detaches cleanly with captured stderr. NEUTRAL vite — no
-    # `--mode mock` / `VITE_MSW` (615 §28 U2 — no FE consumer; data is the route-mock's concern).
-    cmd = [node, str(vite_entry), "--port", str(port), "--strictPort"]
-
-    # stderr CAPTURED to a file (never DEVNULL) so a boot/compile failure has a legible
-    # reason the ui_check readiness gate can tail on a mount timeout (615 §27 "fail loud").
-    _SERVER_INFO_PATH.parent.mkdir(parents=True, exist_ok=True)
-    stderr_log = _SERVER_INFO_PATH.parent / f"ui-shot-vite-{port}.log"
-    err_fh = open(stderr_log, "w", encoding="utf-8")
-
-    proc = subprocess.Popen(
-        cmd,
-        cwd=str(ui_web),
-        env={**os.environ},
-        stdout=subprocess.DEVNULL,
-        stderr=err_fh,
-        # Detach so it survives the parent process (615 §28 U1 — detached + captured stderr).
-        creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
-        if os.name == "nt" else 0,
-        start_new_session=os.name != "nt",
-    )
-
-    # Wait for server to be ready to ACCEPT CONNECTIONS (HTTP-200). NOTE: this is process
-    # liveness, NOT app-mounted readiness — the mount gate is ui_check._await_app_ready
-    # (615 §28 U4a: HTTP-200 returns in ~1s, a real mount needs up to 15s).
+    # Keep retries inside the original free-port range, including scan/spawn races.
     import urllib.request
-    url = f"http://localhost:{port}"
-    # 60s: cold Vite start (~36s, §12) can exceed 15s under contention (a 2nd Vite running).
-    # Subsequent calls reuse via the server-info, so this one-time ceiling is acceptable.
-    deadline = time.monotonic() + 60
-    while time.monotonic() < deadline:
+    next_port = _VITE_PORT_START
+    port_limit = _VITE_PORT_START + 50
+    last_failure = ""
+    _SERVER_INFO_PATH.parent.mkdir(parents=True, exist_ok=True)
+    while next_port < port_limit:
         try:
-            urllib.request.urlopen(url, timeout=1)
+            port = _pick_free_port(next_port)
+        except RuntimeError as exc:
+            last_failure = last_failure or str(exc)
             break
-        except Exception:
-            time.sleep(0.3)
-    else:
-        tail = _tail_file(stderr_log, 800)
-        proc.kill()
-        err_fh.close()
-        # 615 §31: the pre-flight only catches an ABSENT vite, not an INCOMPLETE install
-        # (deps missing while bin present — the real §29 state). node then fails at runtime
-        # with a module-resolution error; detect it here and NAME the remedy so the incomplete
-        # case is as actionable as the absent case.
-        remedy = ""
-        if any(m in tail for m in ("ERR_MODULE_NOT_FOUND", "Cannot find module", "Cannot find package")):
-            remedy = " → FE deps look incomplete; run `node scripts/dev/prepare-worktree.cjs` (or `npm ci`)"
-        raise ServeStartError(
-            f"Vite did not accept connections on :{port} within 60s"
-            + (f"; stderr tail: {tail}" if tail else "; no stderr captured")
-            + remedy)
+        if port >= port_limit:
+            break
+        next_port = port + 1
+        log.debug("Starting Vite dev server from %s on port %d", ui_web, port)
+        # Direct node launch detaches safely on Windows. Keep Vite neutral and
+        # strict-port: fixture data belongs to the browser route mock.
+        cmd = [node, str(vite_entry), "--port", str(port), "--strictPort"]
+        stderr_log = _SERVER_INFO_PATH.parent / f"ui-shot-vite-{port}.log"
+        with open(stderr_log, "w", encoding="utf-8") as err_fh:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(ui_web),
+                env={**os.environ},
+                stdout=subprocess.DEVNULL,
+                stderr=err_fh,
+                creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+                if os.name == "nt" else 0,
+                start_new_session=os.name != "nt",
+            )
+            # Probe and navigate the address Vite binds, never localhost's
+            # potentially different address family (and a foreign responder).
+            url = f"http://127.0.0.1:{port}"
+            # Cold Vite starts can take 36s under contention. HTTP readiness is
+            # separate from the browser's app-mounted readiness gate.
+            deadline = time.monotonic() + 60
+            ready = False
+            while time.monotonic() < deadline:
+                if proc.poll() is not None:
+                    break
+                if _pid_listens_on_port(proc.pid, port):
+                    try:
+                        with urllib.request.urlopen(url, timeout=1):
+                            pass
+                        ready = proc.poll() is None and _pid_listens_on_port(proc.pid, port)
+                        if ready:
+                            break
+                    except Exception:
+                        pass
+                time.sleep(0.3)
+            if not ready:
+                exited = proc.poll() is not None
+                if not exited:
+                    proc.kill()
+                proc.wait()
 
-    # Save server info (+ stderr_log + provenance — the contract's reason channel + provenance).
-    info = {
-        "pid": proc.pid,
-        "port": port,
-        "root": str(ui_web.resolve()),
-        "stderr_log": str(stderr_log),
-        "provenance": _git_provenance(ui_web),
-        "started_at": time.time(),
-    }
-    _SERVER_INFO_PATH.write_text(json.dumps(info, indent=2))
-    _register_agent_spawn(proc, port, ui_web)
-    log.debug("Vite server started (pid %d, port %d, stderr %s)", proc.pid, port, stderr_log)
-    return url
+        if not ready:
+            tail = _tail_file(stderr_log, 800)
+            remedy = ""
+            if any(m in tail for m in ("ERR_MODULE_NOT_FOUND", "Cannot find module", "Cannot find package")):
+                remedy = " → FE deps look incomplete; run `node scripts/dev/prepare-worktree.cjs` (or `npm ci`)"
+            last_failure = (
+                f"Vite exited with code {proc.returncode} on :{port}" if exited else
+                f"Vite did not accept connections from its own process on :{port} within 60s"
+            ) + (f"; stderr tail: {tail}" if tail else "; no stderr captured") + remedy
+            if (f"port {port} is already in use" in tail.lower()
+                    or _port_in_use(port, "127.0.0.1")):
+                log.debug("%s; trying the next free port", last_failure)
+                continue
+            raise ServeStartError(last_failure)
+
+        info = {
+            "pid": proc.pid,
+            "port": port,
+            "root": str(ui_web.resolve()),
+            "stderr_log": str(stderr_log),
+            "provenance": _git_provenance(ui_web),
+            "started_at": time.time(),
+        }
+        _SERVER_INFO_PATH.write_text(json.dumps(info, indent=2))
+        _register_agent_spawn(proc, port, ui_web)
+        log.debug("Vite server started (pid %d, port %d, stderr %s)", proc.pid, port, stderr_log)
+        return url
+
+    raise ServeStartError(
+        f"Vite could not start in ports {_VITE_PORT_START}..{port_limit - 1}; {last_failure}")
 
 
 def _tail_file(path: Path, n_chars: int = 800) -> str:
@@ -501,7 +532,7 @@ def _resolve_ui_url(ui_url: str) -> str:
             info = json.loads(_SERVER_INFO_PATH.read_text())
             if _is_server_alive(info):
                 _renew_agent_spawn_lease(info)
-                return f"http://localhost:{info['port']}"
+                return f"http://127.0.0.1:{info['port']}"
         except Exception:
             pass
 

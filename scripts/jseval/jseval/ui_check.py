@@ -24,6 +24,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from . import ui_fixtures
 from . import ui_measure
 from . import ui_selectors as S
+from . import ui_agent_flows
 
 
 # ---------------------------------------------------------------------------
@@ -2179,6 +2180,16 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         Step("chat-model-only", setup=setup_chat_model_only, isolated=True, fixtures_variant="no-evidence"),
         Step("chat-structured", setup=setup_chat_structured, isolated=True, fixtures_variant="degraded"),
         Step("chat-budget", setup=setup_chat_budget, isolated=True, fixtures_variant="agent-budget"),
+        Step("sv3-run-activity-steering", setup=ui_agent_flows.setup_run_activity_steering,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-budget", setup=ui_agent_flows.setup_run_budget,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-approval", setup=ui_agent_flows.setup_run_approval,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-approval-failure", setup=ui_agent_flows.setup_run_approval_failure,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-halt", setup=ui_agent_flows.setup_run_halt,
+             isolated=True, fixtures_variant="agent-live"),
         Step("legacy-token-plugin", setup=_check_legacy_token_plugin, isolated=True),
 
         # --- Slice 3a.1 Phase 6: Lit shell-v0 visual verification ---
@@ -2346,6 +2357,21 @@ async def _run_isolated_step(
                 _write_trace(step.name, output_dir)
             await ctx.close()
             return r
+        except Exception:
+            # A behavioural setup failure needs evidence too, before browser teardown.
+            import traceback
+            traceback.print_exc()
+            try:
+                await page.screenshot(path=str(output_dir / f"{step.name}.failed.png"))
+                fixture = getattr(ctx, "_jseval_agent_fixture", None)
+                if fixture is not None:
+                    (output_dir / f"{step.name}.requests.json").write_text(json.dumps([
+                        {"method": r.method, "path": r.path, "query": r.query, "body": r.body,
+                         "answered": r.answered.is_set()} for r in fixture.requests
+                    ], indent=2), encoding="utf-8")
+            except Exception:
+                pass  # Diagnostics cannot replace the original failure.
+            raise
         finally:
             await browser.close()
     except AppNotMountedError as e:

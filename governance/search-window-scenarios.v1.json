@@ -1549,14 +1549,14 @@
           "test": "states the tool calls and steps this run has ACTUALLY made, mid-run"
         },
         {
-          "layer": "real-ui-fixture",
-          "binding": null,
-          "reason": "The chat-activity-rail-open step restores a completed run; it does not observe live activity or tool calls."
-        },
-        {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
           "test": "OMITS the step count entirely when nothing has reported one"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-activity-steering",
+          "observes": "Live reasoning and pending, executing, completed tool status; one actual tool call; absent step count omitted and reported count shown."
         }
       ]
     },
@@ -1572,10 +1572,6 @@
           "test": "dispatches NOTHING when the reader types and sends while a decision is held"
         },
         {
-          "layer": "real-ui-fixture",
-          "step": "chat-budget"
-        },
-        {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
           "test": "holds Answer in the SLOT while a typed prompt is held — over the LIVE run below it"
@@ -1589,6 +1585,16 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.controls.test.ts",
           "test": "resolves the context gate through the primitive"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-budget",
+          "observes": "A held budget decision blocks ordinary Enter and Ctrl+Enter; the dedicated finalize control posts the decision for that run."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "This flow observes the budget decision only; approval and context decision controls are not bound by this observation."
         }
       ]
     },
@@ -1607,6 +1613,11 @@
           "layer": "live-backend",
           "binding": null,
           "reason": "No live backend test is bound for this scenario."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-activity-steering",
+          "observes": "Enter and Ctrl+Enter during the run each send one steering POST with a clientRequestId to that run, without competing dispatch."
         }
       ]
     },
@@ -1630,6 +1641,11 @@
           "layer": "live-backend",
           "binding": null,
           "reason": "No live backend test is bound for this scenario."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-activity-steering",
+          "observes": "Applied, queued, not-applied reports and an unconfirmed send have distinct visible labels/notices."
         }
       ]
     },
@@ -1682,6 +1698,11 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
           "test": "shows the note on the settled turn, through a later run, until its own report removes it"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-activity-steering",
+          "observes": "The uncertain notice survives another client’s same-text report and later activity, then clears on its own request’s report."
         }
       ]
     },
@@ -1738,11 +1759,6 @@
           "reason": "No view test is bound for this scenario."
         },
         {
-          "layer": "real-ui-fixture",
-          "binding": null,
-          "reason": "No real UI fixture step is bound for this scenario."
-        },
-        {
           "layer": "live-backend",
           "binding": null,
           "reason": "No live backend test is bound for this scenario."
@@ -1756,6 +1772,16 @@
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
           "test": "ignores a lookup that arrives after %s"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-approval",
+          "observes": "Re-emitting the same pending approval opens one ceremony and one live-detail lookup; one answer permits continued activity."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The replay flow does not observe stale requests against a replacement run."
         }
       ]
     },
@@ -1771,11 +1797,6 @@
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
           "test": "approveCall surfaces an error when the POST is not ok (no silent stuck-PENDING)"
-        },
-        {
-          "layer": "real-ui-fixture",
-          "binding": null,
-          "reason": "No real UI fixture step is bound for this scenario."
         },
         {
           "layer": "live-backend",
@@ -1796,6 +1817,16 @@
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
           "test": "cancelSession drains the halted run"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-approval-failure",
+          "observes": "A non-success approval answer POST visibly says the action was not approved."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "Unavailable approval details and cancellation of pending approvals when a run ends are not observed by this failed-answer flow."
         }
       ]
     },
@@ -1846,6 +1877,16 @@
           "layer": "live-backend",
           "binding": null,
           "reason": "No live check binds this guarantee; a lost Halt request can leave the backend running."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-halt",
+          "observes": "Preservation only: Halt sends one DELETE for the run; after a delayed successful reply the receipt reports the halted outcome."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "The clause \"only after the backend confirms\" remains unbound: the preservation flow makes no assertion before the DELETE reply; today Halt can conclude locally before that reply."
         }
       ]
     },
