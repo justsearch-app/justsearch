@@ -1583,18 +1583,6 @@ export async function deleteConversationWithCascade(
   } catch { return { ok: false, error: 'The delete response was not received.' }; }
 }
 
-export function exportConversationMarkdown(
-  thread: Array<{ role: string; content: string }>,
-  title?: string | null,
-): string {
-  const lines: string[] = [];
-  if (title) lines.push(`# ${title}`, '');
-  for (const m of thread) {
-    lines.push(`**${m.role === 'user' ? 'User' : 'Assistant'}**: ${m.content}`, '');
-  }
-  return lines.join('\n');
-}
-
 export function __resetConversationListForTest(): void {
   stopListProfileWatch?.();
   stopListProfileWatch = null;

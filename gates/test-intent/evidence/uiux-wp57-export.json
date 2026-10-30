@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T09:40:27.514Z",
+  "revision": "7959b712fd0f30b76c1fb007e1556e74f7e335c2",
+  "tree": "1ecbfd6607aa95093c36a68bcd221a45b5b3c53f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/uck2fh1n/tmp/test-intent-vitest-19-1793353222631.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4882
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts#replaces the Markdown-only palette action with the conversation export control",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bd3254c59227abd5a3e0e2a03f776e30a2d909d45b2d36f7edafd5ef233c9fdd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an answer can be copied and a conversation exported, through the shared utilities replaces the Markdown-only palette action with the conversation export control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts#offers no conversation export trigger without a claimed conversation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bd3254c59227abd5a3e0e2a03f776e30a2d909d45b2d36f7edafd5ef233c9fdd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an answer can be copied and a conversation exported, through the shared utilities offers no conversation export trigger without a claimed conversation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d4d815edc3cef1aeb8a221c865a48ec1714be9cb1d4f2cfcef15540059dc669e"
+}

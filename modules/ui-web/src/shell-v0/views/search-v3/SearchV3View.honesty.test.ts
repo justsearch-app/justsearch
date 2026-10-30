@@ -27,7 +27,6 @@ import { reasonFor } from '../../state/readinessNotice.js';
 import { __resetUiModeForTest, setUiMode } from '../../state/uiModeState.js';
 import { answerFrameLabel } from '../../components/chat/evidenceProjection.js';
 import { claimsToCitations } from '../../components/chat/citationResolve.js';
-import { exportConversationMarkdown } from '../../state/conversationListStore.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
@@ -39,7 +38,6 @@ import {
   CORPUS_REMEDY_TARGET,
   HISTORY_LOCKED_REFUSED,
   REWRITE_NOTE_LABEL,
-  SV3_COMMAND_EXPORT_MARKDOWN,
   TURN_COPY_DONE,
   TURN_COPY_LABEL,
 } from './fixtures.js';
@@ -874,47 +872,25 @@ describe('an answer can be copied and a conversation exported, through the share
     expect(q(main, 'sv3-turn-copy')).toBeNull();
   });
 
-  it('exports the conversation as the SHARED serialisation, from the palette', async () => {
+  it('replaces the Markdown-only palette action with the conversation export control', async () => {
     feed();
     const stream = stubStream();
     const el = await mount();
     await askGrounded(el, stream, 'It expired.');
-    clipboard.mockClear();
-
+    const sidebar = await region(el, 'jf-sv3-sidebar');
+    const row = sidebar.shadowRoot!.querySelector('jf-sv3-session-row')!;
+    await row.updateComplete;
+    expect(row.shadowRoot!.querySelector('[data-testid="sv3-session-row-export"]')).not.toBeNull();
     const palette = await region(el, 'jf-sv3-palette');
-    palette.dispatchEvent(
-      new CustomEvent('sv3-palette-run', {
-        detail: { id: SV3_COMMAND_EXPORT_MARKDOWN },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-    await settle(el);
-
-    const session = el.sessions.sessions[0];
-    expect(clipboard).toHaveBeenCalledWith(
-      exportConversationMarkdown(
-        [
-          { role: 'user', content: 'why did the renewal fail?' },
-          { role: 'assistant', content: 'It expired.' },
-        ],
-        session?.title ?? null,
-      ),
-    );
+    expect(palette.shadowRoot!.textContent).not.toContain('Copy this conversation as Markdown');
+    expect(clipboard).not.toHaveBeenCalled();
   });
 
-  it('exports nothing when there is no claimed conversation', async () => {
+  it('offers no conversation export trigger without a claimed conversation', async () => {
     feed();
     const el = await mount();
-    const palette = await region(el, 'jf-sv3-palette');
-    palette.dispatchEvent(
-      new CustomEvent('sv3-palette-run', {
-        detail: { id: SV3_COMMAND_EXPORT_MARKDOWN },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-    await settle(el);
+    const sidebar = await region(el, 'jf-sv3-sidebar');
+    expect(sidebar.shadowRoot!.querySelector('jf-sv3-session-row')).toBeNull();
     expect(clipboard).not.toHaveBeenCalled();
   });
 });

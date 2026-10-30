@@ -64,6 +64,7 @@ halves share objects.
 - [Capture UI Evidence](how-to/capture-ui-evidence.md): Screenshot capture for UI verification and agent visual feedback.
 - [Cut a JustSearch release](how-to/cut-a-release.md): Prepare one immutable Windows/Linux draft, qualify its bytes, and publish after the owner's final validation.
 - [Developing the UI](how-to/develop-ui.md): Layout work without a backend, deterministic fixture captures, real backend development, and frontend verification.
+- [Export a conversation](how-to/export-conversation.md): Copy or download a conversation as Markdown or versioned JSON, with answer sources and outcome labels.
 - [Summon JustSearch from the desktop](how-to/global-search-shortcut.md): Use the global shortcut or --focus-search to bring JustSearch forward and focus the default search bar.
 - [Interpret `jseval bisect` Output (LR5-d)](how-to/interpret-bisect-output.md): Reading the manifest-hash bisection report — single-axis, multi-axis, MULTI_AXIS_INTERACTION, no-cached-run, and identical-cohort paths.
 - [Manage local data](how-to/manage-local-data.md): Forget indexed files or folders, review unfinished removals, and understand which local copies remain.

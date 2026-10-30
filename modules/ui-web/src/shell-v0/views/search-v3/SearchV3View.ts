@@ -220,7 +220,6 @@ import {
   createConversationId,
   deleteConversationWithCascade,
   editContextFloorSummary,
-  exportConversationMarkdown,
   generateConversationTitle,
   getConversationListState,
   loadConversations,
@@ -253,7 +252,7 @@ import type { InspectorView } from '../../components/ContextInspectorPane.js';
 // keyboard model and a second dismiss rule for the same gesture.
 import { openContextMenu } from '../../components/ContextMenu.js';
 // The shared clipboard util — the export's destination, the same one the shipped window uses.
-import { copyToClipboard } from '../../utils/clipboardCopy.js';
+import './Sv3ConversationExport.js';
 // Tempdoc 857 PR-A's shared "is the reader typing?" pair — read here for the one question the focus
 // authority has to answer before it moves a caret: is focus already somewhere the reader put it?
 import { deepActiveElement, isTypingTarget } from '../../utils/keyboardHandler.js';
@@ -341,7 +340,6 @@ import {
   CONTEXT_RESTORE_FAILED,
   CONTEXT_SUMMARY_FAILED,
   PANE_LABEL,
-  SV3_COMMAND_EXPORT_MARKDOWN,
   SV3_COMMAND_SEARCH,
   SV3_DRAFT_KEY,
   SV3_RESULT_NO_DOCUMENT,
@@ -4788,28 +4786,11 @@ export class SearchV3View extends JfElement {
     await generateConversationTitle(sessionId, turn.question, turn.answer);
   }
 
-  /**
-   * A10 — the conversation as Markdown, on the clipboard. Both halves are the product's:
-   * `exportConversationMarkdown` is the ONE serialisation (the shipped window's export writes the
-   * same bytes) and `copyToClipboard` is the ONE write. It lives in the PALETTE rather than in a
-   * per-conversation control, which is the spec's economy for a real capability with no resting
-   * chrome to spend on it.
-   */
+  /** Pin the session before the export's independent reads can yield to navigation. */
   private exportActiveConversation(): void {
-    const active = this.sessions.activeId;
-    const session = active === null ? null : sessionById(this.sessions, active);
-    if (session === null || session.turns.length === 0) return;
-    // A turn that has not settled is NOT exported as an answer: whatever is on screen mid-stream is a
-    // fragment, and a markdown file that recorded it as the assistant's reply would be a record of
-    // something that never finished being said.
-    const thread = session.turns
-      .filter((turn) => turn.status !== 'streaming')
-      .flatMap((turn) => [
-        { role: 'user', content: turn.question },
-        { role: 'assistant', content: turn.answer },
-      ]);
-    if (thread.length === 0) return;
-    void copyToClipboard(exportConversationMarkdown(thread, session.title));
+    const session = this.activeSession;
+    if (session === null) return;
+    void this.shadowRoot?.querySelector('jf-sv3-conversation-export')?.open(session, this.apiBase);
   }
 
   /* ── The delegate tier (tempdoc 822 Phase F2) ─────────────────────────────────────────────── */
@@ -4917,7 +4898,6 @@ export class SearchV3View extends JfElement {
       void this.focusComposer();
       return;
     }
-    if (id === SV3_COMMAND_EXPORT_MARKDOWN) this.exportActiveConversation();
     if (id === 'cmd-memory') requestSurfaceNavigation('core.memory-surface');
   }
 
@@ -5352,12 +5332,14 @@ export class SearchV3View extends JfElement {
         aria-label="Close the sidebar"
         @click=${this.dismissSidebarSheet}
       ></button>` : nothing}
+      <jf-sv3-conversation-export .locked=${this.historyLocked}></jf-sv3-conversation-export>
       <jf-sv3-sidebar
         .groups=${sessionGroups}
         .renamingId=${this.renamingId}
         ?collapsed=${this.sidebarCollapsed}
         data-testid="sv3-sidebar"
         @sv3-session-select=${this.onSessionSelect}
+        @sv3-session-export=${this.exportActiveConversation}
         @sv3-session-pin=${this.onSessionPin}
         @sv3-session-remove=${this.onSessionRemove}
         @sv3-session-new=${this.onSessionNew}

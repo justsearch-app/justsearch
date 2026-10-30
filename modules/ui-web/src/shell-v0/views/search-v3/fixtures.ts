@@ -157,9 +157,6 @@ export interface Sv3Command {
  */
 export const SV3_COMMAND_SEARCH = 'cmd-everything';
 
-/** The palette's export command (tempdoc 822 Phase F7; inventory A10). Named for the same reason. */
-export const SV3_COMMAND_EXPORT_MARKDOWN = 'cmd-export-markdown';
-
 export interface Sv3CommandGroup {
   readonly id: string;
   readonly label: string;
@@ -187,11 +184,6 @@ export const COMMAND_GROUPS: readonly Sv3CommandGroup[] = [
     id: 'cg-workspace',
     label: 'Workspace',
     commands: [
-      /* Live (tempdoc 822 Phase F7, inventory A10). Export is a real capability with no resting
-         chrome to spend on it, which is what the palette is FOR in the spec's economy — the
-         alternative was a per-conversation overflow this window does not have. Handled in
-         `SearchV3View.onPaletteRun`. */
-      { id: SV3_COMMAND_EXPORT_MARKDOWN, label: 'Copy this conversation as Markdown' },
       { id: 'cmd-memory', label: 'Open Memory' },
       { id: 'cmd-folders', label: 'Manage indexed folders' },
       { id: 'cmd-reindex', label: 'Reindex this folder' },
