@@ -160,3 +160,25 @@ collection field and are handled by their existing replay authority.
   "note": "R1 restart/cutover, deletion boundaries, snapshot refresh, C1-C7 and merge checks pass; all 96 full-suite failures match baseline."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-b68264-codex-r7",
+  "verdict": "accept",
+  "digest": "sha256:6c38ffa4d02cc00d9e1446306c6f861f30e3d852860f64f32ad45fd1c634de68",
+  "note": "Correctly separates Obsolete retirement from the New matching-label scenario; evidence names the exact fixture. Delegation attribution matches the supplied quotation; evidence hashes match current tests and pass the official validator. (Recorded by the orchestrator: the verifier sandbox refuses the gate's git subprocess, spawnSync git EPERM.)"
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "auditor-1045-codex-3",
+  "verdict": "accept",
+  "digest": "sha256:6c38ffa4d02cc00d9e1446306c6f861f30e3d852860f64f32ad45fd1c634de68",
+  "note": "Reviewed the before-state tests and cited intent before the candidate diff, repeated the decision-record conflict search, and checked all five entries against their warrants and digest-matching execution evidence. Obsolete + New correctly records the changed matching-label precondition; the replacement forced-admission check passes before and after, and the three Defect pins have relevant assertion failures before and passing candidate evidence."
+}
+```
