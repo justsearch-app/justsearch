@@ -2190,6 +2190,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              isolated=True, fixtures_variant="agent-live"),
         Step("sv3-run-halt", setup=ui_agent_flows.setup_run_halt,
              isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-halt-failure", setup=ui_agent_flows.setup_run_halt_failure,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-halt-timeout", setup=ui_agent_flows.setup_run_halt_timeout,
+             isolated=True, fixtures_variant="agent-live"),
         Step("legacy-token-plugin", setup=_check_legacy_token_plugin, isolated=True),
 
         # --- Slice 3a.1 Phase 6: Lit shell-v0 visual verification ---

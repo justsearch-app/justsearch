@@ -897,7 +897,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/ci/ui-run-flows
-          for step in sv3-run-activity-steering sv3-run-budget sv3-run-approval sv3-run-approval-failure sv3-run-halt; do
+          for step in sv3-run-activity-steering sv3-run-budget sv3-run-approval sv3-run-approval-failure sv3-run-halt sv3-run-halt-failure sv3-run-halt-timeout; do
             python -m jseval ui-shot "$step" --fixtures --no-demo --output-dir build/ci/ui-run-flows 2>&1 \
               | tee "build/ci/ui-run-flows/$step.log"
           done

@@ -224,7 +224,7 @@ async def setup_run_approval_failure(page):
 
 
 async def setup_run_halt(page):
-    """F4 preservation: one DELETE, delayed success, stopped after its answer only."""
+    """F4: accepted DELETE keeps stopping until the CANCELLED terminal."""
     fixture = await start(page)
     await activity(fixture, page, "Running until Halt.")
     path = f"/api/chat/sessions/{fixture.session_id}"
@@ -233,10 +233,60 @@ async def setup_run_halt(page):
     await page.get_by_test_id("sv3-composer-stop").click()
     request = await fixture.wait_request("DELETE", path)
     assert not request.answered.is_set()
-    # No assertion about the UI before the answer: backend confirmation is a known gap.
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
     release.set()
     await asyncio.wait_for(request.answered.wait(), TIMEOUT / 1000)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    await activity(fixture, page, "Output still arrives while stopping.")
+    await fixture.stream.emit("error", {"error": "Session cancelled", "errorCode": "CANCELLED"})
     await expect(page.get_by_test_id("sv3-run-receipt")).to_have_attribute("data-outcome", "halted", timeout=TIMEOUT)
     await expect(page.get_by_test_id("sv3-run-feed")).to_have_count(0)
     assert len(fixture.matching("DELETE", path)) == 1, fixture.requests
+    only_run(fixture)
+
+
+async def setup_run_halt_failure(page):
+    """S3: DELETE refusal keeps observing and permits one explicit retry."""
+    fixture = await start(page)
+    await activity(fixture, page, "Running until Halt is refused.")
+    path = f"/api/chat/sessions/{fixture.session_id}"
+    fixture.replies[("DELETE", path)] = fixtures.FixtureReply(status=409)
+    await page.get_by_test_id("sv3-composer-stop").click()
+    request = await fixture.wait_request("DELETE", path)
+    await asyncio.wait_for(request.answered.wait(), TIMEOUT / 1000)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text(
+        "Could not stop this answer — it goes on. Press Stop to try again.")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    await activity(fixture, page, "The answer continues after the refused Stop.")
+    release = asyncio.Event()
+    fixture.replies[("DELETE", path)] = fixtures.FixtureReply(gate=release)
+    await page.get_by_test_id("sv3-composer-stop").click()
+    await fixture.wait_request("DELETE", path, count=2)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    assert len(fixture.matching("DELETE", path)) == 2, fixture.requests
+    only_run(fixture)
+
+
+async def setup_run_halt_timeout(page):
+    """S3 S6: an unanswered DELETE becomes unconfirmed and permits one retry."""
+    fixture = await start(page)
+    await activity(fixture, page, "Running while Stop gets no answer.")
+    path = f"/api/chat/sessions/{fixture.session_id}"
+    release = asyncio.Event()
+    fixture.replies[("DELETE", path)] = fixtures.FixtureReply(gate=release)
+    await page.get_by_test_id("sv3-composer-stop").click()
+    await fixture.wait_request("DELETE", path)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text(
+        "Could not stop this answer — it goes on. Press Stop to try again.", timeout=15_000)
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    await activity(fixture, page, "Output continues after the unanswered Stop.")
+    await page.get_by_test_id("sv3-composer-stop").click()
+    await fixture.wait_request("DELETE", path, count=2)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    assert len(fixture.matching("DELETE", path)) == 2, fixture.requests
     only_run(fixture)

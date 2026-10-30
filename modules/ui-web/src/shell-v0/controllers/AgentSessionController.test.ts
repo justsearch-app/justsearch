@@ -1525,6 +1525,9 @@ describe('AgentSessionController interaction methods', () => {
     const fetchSpy = mockFetchJson({});
     globalThis.fetch = fetchSpy;
     await ctrl.cancelSession();
+    expect(ctrl.isStreaming).toBe(true);
+    expect(ctrl.concludedRunId).toBeNull();
+    ctrl.onError({ error: 'Session cancelled', errorCode: 'CANCELLED' });
     expect(ctrl.isStreaming).toBe(false);
     const committed = ctrl.conversation.find(e => e.type === 'assistant-text');
     expect(committed?.content).toBe('partial');

@@ -93,7 +93,7 @@ export type Sv3RunSource = Pick<
   // been cut. Every CLOSED region is already an ordered `conversation` entry; this is the one item
   // the array cannot hold, and it is the only item that may wear the live affordance.
   | 'reasoning'
-> & Partial<Pick<AgentSessionController, 'concludedRunId'>>;
+> & Partial<Pick<AgentSessionController, 'concludedRunId' | 'stopAttempt'>>;
 
 /* ── Axis 1: the session ─────────────────────────────────────────────────────────────────────── */
 
@@ -321,6 +321,11 @@ export function projectSv3RunFeed(source: Sv3RunSource, from: number): Sv3RunFee
     });
   }
 
+  // Halt keeps consuming the final prose rather than dropping its still-buffered suffix.
+  if (source.stopAttempt?.intent && source.streamingText !== '') {
+    items.push({ kind: 'text', id: 'run-stopping-text', text: source.streamingText });
+  }
+
   return {
     items,
     toolCallCount: items.reduce((n, item) => (item.kind === 'tool' ? n + 1 : n), 0),
@@ -388,6 +393,7 @@ export function projectSv3RunPrompts(
     now: 0,
   },
 ): readonly Sv3RunPrompt[] {
+  if (source.stopAttempt?.intent) return [];
   const prompts: Sv3RunPrompt[] = [];
   const budget = source.budgetGate;
   if (budget) {
@@ -450,7 +456,7 @@ export function sv3RunSessionStatus(source: Sv3RunSource | null, feed: Sv3RunFee
   if (source === null) return 'absent';
   // Explicit conclusion ends old gate/approval frames; transport failure alone does not.
   if (source.concludedRunId != null && source.concludedRunId === source.sessionId
-    && !source.runInFlight && !source.isStreaming) return 'settled';
+    && !source.isStreaming) return 'settled';
   // Tempdoc 834 §6.2 — `runPark` is the fourth way the same fact arrives, and the only one that
   // survives a reattach whose announcing frame the ring evicted. Without it a parked run that this
   // tab did not watch park would read as `live`, i.e. as silently idle: streaming, saying nothing.

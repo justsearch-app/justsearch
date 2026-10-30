@@ -281,6 +281,7 @@ import {
   subscribeAgentSession,
 } from '../../state/agentSessionStore.js';
 import type { AgentSessionController } from '../../controllers/AgentSessionController.js';
+import { StopAttempt } from '../../state/stopAttempt.js';
 import {
   directiveAvailable,
   dispatchRunControl,
@@ -2412,6 +2413,22 @@ export class SearchV3View extends JfElement {
     this.recordReads.delete(conversationId);
     if (this.sessions.activeId === conversationId) this.recordNotice = failed;
     if (!failed) {
+      const ctrl = this.agentController();
+      if (ctrl?.stopAttempt?.intent && ctrl.conversationId === conversationId) {
+        const lifecycle = record.lifecycles.find((row) => row.sessionId === ctrl.sessionId);
+        if (lifecycle) ctrl.reconcileRunLifecycle(lifecycle.sessionId, lifecycle.state);
+      }
+      // Navigation detaches the local handle. Its addressed turn still follows its record.
+      for (const { local, runId } of this.pendingRunRecords.values()) {
+        if (local.sessionId !== conversationId || this.run === local) continue;
+        const state = record.lifecycles.find((row) => row.sessionId === runId)?.state;
+        if (state !== 'CANCELLED' && state !== 'DONE' && state !== 'ERROR') continue;
+        const turn = sessionById(this.sessions, conversationId)?.turns.find((t) => t.id === local.turnId);
+        if (turn?.status !== 'streaming') continue;
+        this.sessions = settleAgentTurn(this.sessions, local,
+          state === 'CANCELLED' ? 'halted' : state === 'DONE' ? 'complete' : 'failed',
+          turn.toolCalls, Date.now(), '', turn.disposition);
+      }
       this.sessions = applySv3Record(
         this.sessions,
         conversationId,
@@ -4656,20 +4673,19 @@ export class SearchV3View extends JfElement {
     // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
     const dispatchId = crypto.randomUUID();
     const reasoning = new ReasoningController(() => this.requestUpdate());
-    let stopAsked = false;
+    const stopAttempt = new StopAttempt();
     const stop = (): void => {
-      if (stopAsked) return;
-      stopAsked = true;
+      if (stopAttempt.pending || stopAttempt.outcome === 'accepted') return;
+      stopAttempt.latch();
       this.revokeHumanTask();
       this.saveRecovery();
       const ask = this.liveAsks.get(ref.sessionId);
       if (ask === undefined) return;
       ask.stopping = { turnId: ref.turnId, state: 'stopping' };
       this.syncActiveAsk();
-      void sv3StopAsk(this.apiBase, ref.sessionId, dispatchId).then((taken) => {
-        if (taken || this.liveAsks.get(ref.sessionId)?.abort !== abort) return;
+      void stopAttempt.deliver((signal) => sv3StopAsk(this.apiBase, ref.sessionId, dispatchId, signal)).then(() => {
+        if (stopAttempt.outcome === 'accepted' || this.liveAsks.get(ref.sessionId)?.abort !== abort) return;
         // Refused or unanswered: the answer goes on, and Stop can be pressed again.
-        stopAsked = false;
         ask.stopping = { turnId: ref.turnId, state: 'failed' };
         this.syncActiveAsk();
       });
@@ -5069,16 +5085,22 @@ export class SearchV3View extends JfElement {
     void dispatchRunControl(ctrl, { kind: 'interject', text });
   }
 
-  /**
-   * The reader's stop. Recorded FIRST and dispatched second, because the record of the decision is
-   * what makes `halted` an honest receipt outcome — and because a stop pressed before the stream
-   * opened cannot be delivered yet (the seam's predicate refuses a halt on a run with no abort handle
-   * yet). Remembering it means the next update delivers it, instead of the decision being dropped.
-   */
+  /** Ask and Halt share the same pending and unconfirmed presentation. */
+  private runStopping(): Sv3StopState | null {
+    const ctrl = this.agentController();
+    const local = this.run;
+    if (!ctrl?.stopAttempt?.intent || ctrl.terminalOutcome !== null || local === null
+        || local.sessionId !== this.sessions.activeId) return null;
+    return { turnId: local.turnId, state: ctrl.stopAttempt.outcome === 'refused'
+      || ctrl.stopAttempt.outcome === 'unknown' || ctrl.stopObservationLost ? 'failed' : 'stopping' };
+  }
+
+  /** Latch before dispatch; the controller keeps observing until the backend ends this run. */
   private haltRun(): void {
     const local = this.run;
     if (local === null) return;
     local.haltRequested = true;
+    local.haltDispatched = false;
     this.deliverHalt();
     this.requestUpdate();
   }
@@ -5087,10 +5109,10 @@ export class SearchV3View extends JfElement {
     const ctrl = this.agentController();
     const local = this.run;
     if (ctrl === null || local === null || local.haltDispatched) return;
+    local.haltDispatched = true;
     void dispatchRunControl(ctrl, { kind: 'halt' }).then((result) => {
-      // Only an ACCEPTED halt closes the door; a lifecycle refusal leaves the request pending so the
-      // next update can try again, and does so without a retry storm.
-      if ((result as RunControlRefusal | undefined)?.refused !== true) local.haltDispatched = true;
+      // A lifecycle refusal may be retried by the next update. HTTP failures require another press.
+      if ((result as RunControlRefusal | undefined)?.refused === true) local.haltDispatched = false;
     });
   }
 
@@ -5194,6 +5216,13 @@ export class SearchV3View extends JfElement {
       // A run this window is already rendering is a run it must never ALSO adopt as presence — the
       // id is only knowable once the server names it, which is here rather than at dispatch.
       if (ctrl.sessionId !== null) this.adoptedRunIds.add(ctrl.sessionId);
+      if (ctrl.stopAttempt?.intent && !local.haltRequested) local.haltRequested = true;
+      if (local.haltRequested && ctrl.sessionId !== null && ctrl.terminalOutcome === null) {
+        if (!this.pendingRunRecords.has(local.turnId)) {
+          this.pendingRunRecords.set(local.turnId, { local, runId: ctrl.sessionId });
+          void this.refreshRecord(local.sessionId);
+        }
+      }
       const feed = projectSv3RunFeed(ctrl, local.entryStart);
       this.keepUnconfirmedSteerNotes(local.turnId, sv3UnconfirmedSteerNotes(ctrl, local.entryStart, feed));
       const status = sv3RunSessionStatus(ctrl, feed);
@@ -5233,6 +5262,7 @@ export class SearchV3View extends JfElement {
    * gate stays held until the raise lands, so without it one gate would fire a raise per frame.
    */
   private maybeAutoContinue(ctrl: AgentSessionController, local: Sv3RunLocal): void {
+    if (ctrl.stopAttempt?.intent) return;
     if (ctrl.budgetGate === null) {
       // The gate cleared — re-arm for the NEXT one.
       this.budgetGateHandled = false;
@@ -5335,7 +5365,9 @@ export class SearchV3View extends JfElement {
     this.sessions = settleAgentTurn(
       this.sessions,
       { sessionId: local.sessionId, turnId: local.turnId },
-      sv3RunOutcome(feed, local.haltRequested),
+      sv3RunOutcome(feed, ctrl?.terminalOutcome === 'cancelled'
+        || (ctrl?.terminalOutcome === 'completed' && local.haltRequested && ctrl.stopAttempt.outcome === 'accepted' && ctrl.answerEvidenceRunId === ctrl.sessionId)
+        || (local.haltRequested && ctrl?.stopAttempt?.intent !== true)),
       feed.toolCallCount,
       Date.now(),
       '',
@@ -6005,7 +6037,7 @@ export class SearchV3View extends JfElement {
           .continuationVersions=${this.continuationVersions()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
-          .stopping=${this.askStopping}
+          .stopping=${this.askStopping ?? this.runStopping()}
           .checkingTurnId=${this.askCheckingTurnId}
           data-testid="sv3-main"
         ></jf-sv3-main>
