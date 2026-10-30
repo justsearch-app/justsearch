@@ -5,9 +5,9 @@ author-role: builder
 author-session: fe-drafts-domain
 ---
 
-# Draft owner extraction: preparation readback preservation
+# Draft owner extraction: saved preparation and readback preservation
 
-No acceptance is recorded. The tests pin the existing behavior during preparation readback; this extraction adds no production behavior.
+No acceptance is recorded. The tests pin the existing saved payload, attachment write count and bytes during ordinary preparation changes and preparation readback; this extraction adds no production behavior. An independent verifier must record fresh acceptance for the updated evidence.
 
 ```json
 {
@@ -44,7 +44,7 @@ No acceptance is recorded. The tests pin the existing behavior during preparatio
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.preparationAck.test.ts"
       ],
       "class": "New",
-      "behaviour": "Preserve tier, schema, card scope and scope-clear mutations at synchronous attachment readback. A reentrant composer edit keeps the newer text, refuses the pending preparation change and shows the recovery warning. A conversation move from another surface is refused with the departure notice: the view keeps its original place and original A draft, and the pending preparation applies there (delegate tier, array schema, replacement.txt scope or empty scope). Neither path dispatches a task. All eight cases pass on f9730e4010 and the extracted candidate; removing the owner's post-readback freshness guards makes each edit case fail. The new file is also listed explicitly because the existing Ask source-walk test reads its folder.",
+      "behaviour": "Preserve tier, schema, card scope and scope-clear mutations at synchronous attachment readback. A reentrant composer edit keeps the newer text, refuses the pending preparation change and shows the recovery warning. A conversation move from another surface is refused with the departure notice: the view keeps its original place and original A draft, and the pending preparation applies there (delegate tier, array schema, replacement.txt scope or empty scope). Neither path dispatches a task. Each readback case also retains companion C and asserts the complete saved payload: original A with the requested preparation, followed by C with its original Search preparation. One ordinary Delegate preparation change and all eight readback cases assert exactly one attachment write with the baseline bytes (only the opaque incarnation is fixed by the test). All nine cases pass on f9730e4010 and the extracted candidate. A duplicate saveSessionAttachment mutation fails all nine cases with two writes instead of one; replacing the acknowledged preparation with Search fails the saved-payload assertions. Removing the owner's post-readback freshness guards was previously shown to fail each edit case. The new file is also listed explicitly because the existing Ask source-walk test reads its folder.",
       "sources": [
         {
           "kind": "owner-words",
@@ -70,3 +70,7 @@ No acceptance is recorded. The tests pin the existing behavior during preparatio
 ```
 
 ## Acceptance records
+
+## Check durability
+
+`SearchV3View.preparationAck.test.ts` is durable: it checks persisted preparations and companion drafts, exact attachment writes, and the existing live response to readback edits and refused departures through composer events and sessionStorage. The storage hooks and fixed incarnation are test-only fault injection and byte-comparison scaffolding.

@@ -123,50 +123,58 @@ export class Sv3DraftDomain {
   mountHasIncoming = false;
 
   /** A refused send outlives context recovery: the reader may have typed a different draft. */
-  humanTask: HumanTask | null = null;
+  private humanTaskValue: HumanTask | null = null;
+  get humanTask(): HumanTask | null { return this.humanTaskValue; }
 
-  humanEpoch = 0;
+  private humanEpoch = 0;
 
-  recoveryOpened = false;
+  private recoveryOpenedValue = false;
+  get recoveryOpened(): boolean { return this.recoveryOpenedValue; }
 
-  recoveryDrafts: Sv3Recovery['drafts'] = [];
+  private recoveryDraftsValue: Sv3Recovery['drafts'] = [];
+  get recoveryDrafts(): readonly Sv3RecoveryDraft[] { return this.recoveryDraftsValue; }
 
   recoveryError = '';
 
-  refusedHandoff: { text: string; files: number } | null = null;
+  private refusedHandoffValue: { text: string; files: number } | null = null;
+  get refusedHandoff(): { text: string; files: number } | null { return this.refusedHandoffValue; }
 
   /** A later accepted navigation leaves this refusal, rather than retrying it elsewhere. */
   retireRefusedHandoff(): boolean {
     if (this.refusedHandoff === null) return false;
     if (this.host.peekHandoff()?.refused) this.host.takeHandoff();
-    this.refusedHandoff = null;
+    this.refusedHandoffValue = null;
     this.recoveryError = '';
     return true;
   }
 
   /** Diagnostic phase of the synchronous session write, never issuance authority. */
-  recoveryWriteUnconfirmed = false;
+  private recoveryWriteUnconfirmed = false;
 
   /** Address/store moved, but this view could not safely leave its retained work. */
   departureBlocked = false;
 
-  humanLoad: AbortController | null = null;
+  private humanLoadValue: AbortController | null = null;
+  get humanLoad(): AbortController | null { return this.humanLoadValue; }
 
-  humanRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private humanRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   assigningHumanDraft = false;
 
-  draftReview = false;
+  private draftReviewValue = false;
+  get draftReview(): boolean { return this.draftReviewValue; }
 
   /** Separately known saved settings; equality with the raw string never binds their owner. */
-  draftProposal: Sv3Preparation | null = null;
+  private draftProposalValue: Sv3Preparation | null = null;
+  get draftProposal(): Sv3Preparation | null { return this.draftProposalValue; }
 
-  reviewConfigured = false;
+  private reviewConfigured = false;
 
-  preparationRevision = 0;
+  private preparationRevision = 0;
 
   /** HO9 retires one-shot context, but its unchanged text is not an all-files choice. */
-  retiredHandoffText: string | null = null;
+  private retiredHandoffTextValue: string | null = null;
+  get retiredHandoffText(): string | null { return this.retiredHandoffTextValue; }
 
   get retiredHandoffNotice(): string {
     return this.retiredHandoffText === null ? ''
@@ -175,13 +183,13 @@ export class Sv3DraftDomain {
 
   clearRetiredHandoff(): void {
     if (this.retiredHandoffText === null) return;
-    this.retiredHandoffText = null;
+    this.retiredHandoffTextValue = null;
     this.host.requestUpdate();
   }
 
   markDraftReview(proposal: Sv3Preparation | null = null): void {
-    this.draftReview = true;
-    this.draftProposal = proposal;
+    this.draftReviewValue = true;
+    this.draftProposalValue = proposal;
     this.reviewConfigured = false;
     this.preparationRevision += 1;
     this.host.requestUpdate();
@@ -248,7 +256,7 @@ export class Sv3DraftDomain {
     if (preparation.kind === 'model') this.preparedHandoff = { shapeId: SV3_MODEL_SHAPE_ID, selection: null };
     if ('scope' in preparation) {
       if (preparation.scope.kind === 'files') this.search.prepare({ paths: [...preparation.scope.paths] });
-      if (preparation.kind === 'structured') this.schemaDraft = preparation.schema;
+      if (preparation.kind === 'structured') this.schemaDraftValue = preparation.schema;
       else this.preparedHandoff = { shapeId: preparation.kind === 'summarize' ? 'core.summarize' : SV3_ASK_SHAPE_ID,
         selection: preparation.scope.kind === 'files'
           ? { kind: 'result-set', items: preparation.scope.paths.map(id => ({ id, kind: 'doc' as const })) } : null };
@@ -287,7 +295,7 @@ export class Sv3DraftDomain {
       this.recoveryError = 'The draft or its settings changed while recovery was being saved. Current text is kept; review again.';
       this.host.requestUpdate(); return false;
     }
-    this.recoveryDrafts = payload.drafts.slice(1);
+    this.recoveryDraftsValue = payload.drafts.slice(1);
     return true;
   }
 
@@ -305,14 +313,14 @@ export class Sv3DraftDomain {
     this.revokeHumanTask();
     this.clearRetiredHandoff();
     this.applyPreparation(preparation);
-    this.draftReview = false;
-    this.draftProposal = null;
+    this.draftReviewValue = false;
+    this.draftProposalValue = null;
     this.reviewConfigured = false;
     this.recoveryError = '';
     this.host.requestUpdate();
   }
 
-  acknowledgePreparation(preparation: Sv3Preparation): boolean {
+  private acknowledgePreparation(preparation: Sv3Preparation): boolean {
     const draft = this.composer.snapshot();
     const revision = this.preparationRevision;
     const place = this.humanPlace();
@@ -321,10 +329,10 @@ export class Sv3DraftDomain {
       && this.preparationRevision === revision && this.humanPlace() === place;
   }
 
-  configureDraft(): void {
+  private configureDraft(): void {
     this.clearRetiredHandoff();
     this.preparationRevision += 1;
-    if (this.draftReview) { this.reviewConfigured = true; this.draftProposal = this.livePreparation(); }
+    if (this.draftReview) { this.reviewConfigured = true; this.draftProposalValue = this.livePreparation(); }
     this.host.requestUpdate();
   }
 
@@ -362,7 +370,7 @@ export class Sv3DraftDomain {
       ? text.replaceAll(`\n\nRanking trace:\n${selection.summary}`, '') : text;
   }
 
-  recoveryPayload(task = this.humanTask): Sv3Recovery {
+  private recoveryPayload(task = this.humanTask): Sv3Recovery {
     const place = this.humanPlace();
     const drafts: Sv3RecoveryDraft[] = [{ place,
       text: this.recoveryText(this.composer.read(), task?.selection ?? this.preparedHandoff?.selection),
@@ -382,7 +390,7 @@ export class Sv3DraftDomain {
     return { version: 2, task: task?.saved ?? null, drafts };
   }
 
-  saveRecoveryPayload(payload: Sv3Recovery): boolean {
+  private saveRecoveryPayload(payload: Sv3Recovery): boolean {
     this.recoveryWriteUnconfirmed = false;
     // The live payload keeps the current composer first, even when it is empty.
     // Returning to that place needs no third persisted slot beside two retained inputs.
@@ -420,13 +428,13 @@ export class Sv3DraftDomain {
     if (!this.recoveryOpened) return false;
     const payload = this.recoveryPayload(task);
     if (!this.saveRecoveryPayload(payload)) return false;
-    this.recoveryDrafts = payload.drafts.slice(1);
+    this.recoveryDraftsValue = payload.drafts.slice(1);
     return true;
   }
 
-  openRecovery(): void {
+  private openRecovery(): void {
     if (this.recoveryOpened) return;
-    this.recoveryOpened = true;
+    this.recoveryOpenedValue = true;
     const supported = ['core.rag-ask', 'core.free-chat', 'core.extract', 'core.summarize'];
     const owner = this.host.shapeId() && supported.includes(this.host.shapeId()!) ? this.host.shapeId() : 'main';
     const payload = this.draftPersistence.openSessionAttachment(`search-v3.${owner}`, isSv3Recovery,
@@ -435,7 +443,7 @@ export class Sv3DraftDomain {
         this.host.requestUpdate();
       });
     if (!isSv3Recovery(payload)) return;
-    this.recoveryDrafts = payload.drafts.slice(1);
+    this.recoveryDraftsValue = payload.drafts.slice(1);
     for (const draft of payload.drafts) {
       if (draft.place !== null && draft.place !== this.humanPlace()) this.placeDrafts.set(draft.place,
         { text: draft.text, preparation: draft.preparation ?? null, review: true });
@@ -455,13 +463,13 @@ export class Sv3DraftDomain {
       // A typed snapshot remains a separate proposal even when an old raw writer returned
       // to identical bytes. Only a person's review can apply it to the current text.
       if (this.draftHasInputs(current) && (hadRaw && current.preparation != null || current.text !== this.composer.read() || this.mountHasIncoming)
-        && !this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDrafts.push(current);
+        && !this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDraftsValue.push(current);
     } else if (current !== undefined && this.draftHasInputs(current)) {
-      if (!this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDrafts.push(current);
+      if (!this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDraftsValue.push(current);
       if (!this.mountHasIncoming && this.composer.read().trim()) this.markDraftReview(current.preparation ?? null);
     }
     if (payload.task !== null) {
-      this.humanTask = {
+      this.humanTaskValue = {
         saved: payload.task, question: '', scope: null, scopeOwner: null, filters: {}, selection: null,
         draft: this.composer.snapshot(), epoch: this.humanEpoch, ownsComposer: false, revoked: true, abandoned: true,
         restored: true, context: null, refusal: null, retryAt: 0,
@@ -486,7 +494,7 @@ export class Sv3DraftDomain {
       this.humanTask.abandoned ||= abandonInitial;
     }
     this.humanLoad?.abort();
-    this.humanLoad = null;
+    this.humanLoadValue = null;
     if (this.humanRetryTimer !== null) clearTimeout(this.humanRetryTimer);
     this.humanRetryTimer = null;
     this.host.requestUpdate();
@@ -527,7 +535,7 @@ export class Sv3DraftDomain {
     };
     // Reserve before context waits or forks. A failed ACK never sacrifices live input or old bytes.
     if (!this.saveRecovery(task)) return null;
-    this.humanTask = task;
+    this.humanTaskValue = task;
     // A reserved submission retains its input independently of its conversation's lifetime.
     if (ownsComposer) { this.host.releaseDraftOwnership(); }
     this.recoveryError = '';
@@ -541,8 +549,8 @@ export class Sv3DraftDomain {
     const payload = this.recoveryPayload(task);
     payload.task = null;
     if (!this.saveRecoveryPayload(payload)) { task.revoked = true; return; }
-    this.recoveryDrafts = payload.drafts.slice(1);
-    this.humanTask = null;
+    this.recoveryDraftsValue = payload.drafts.slice(1);
+    this.humanTaskValue = null;
     this.recoveryError = '';
     this.host.requestUpdate();
   }
@@ -563,7 +571,7 @@ export class Sv3DraftDomain {
     const payload = this.recoveryPayload();
     payload.drafts = payload.drafts.filter((d, index) => index === 0 || !this.sameDraft(d, draft));
     if (!this.saveRecoveryPayload(payload)) return;
-    this.recoveryDrafts = payload.drafts.slice(1);
+    this.recoveryDraftsValue = payload.drafts.slice(1);
     const saved = draft.place === null ? undefined : this.placeDrafts.get(draft.place);
     if (saved && this.sameDraft({ place: draft.place, ...saved }, draft)) this.placeDrafts.delete(draft.place!);
     this.recoveryError = '';
@@ -593,7 +601,7 @@ export class Sv3DraftDomain {
       || task.saved.delivery !== 'unaccepted' || task.refusal === null
       || (force ? task.refusal.forceAllowed !== true : Date.now() < task.retryAt)) return;
     const operation = new AbortController();
-    this.humanLoad = operation;
+    this.humanLoadValue = operation;
     this.host.requestUpdate();
     try {
       if (force) {
@@ -624,7 +632,7 @@ export class Sv3DraftDomain {
     } catch {
       if (!operation.signal.aborted) this.recoveryError = 'Chat could not be loaded. The question is retained.';
     } finally {
-      if (this.humanLoad === operation) this.humanLoad = null;
+      if (this.humanLoad === operation) this.humanLoadValue = null;
       this.host.requestUpdate();
     }
   }
@@ -639,7 +647,7 @@ export class Sv3DraftDomain {
    * WP1.1 S1.13 — each place's own unsent draft: a conversation's follow-up, or the result list's
    * query. Window-local, like the result list itself; the one persisted draft is still the composer's.
    */
-  readonly placeDrafts = new Map<string, { text: string; preparation: Sv3Preparation | null; review: boolean }>();
+  private readonly placeDrafts = new Map<string, { text: string; preparation: Sv3Preparation | null; review: boolean }>();
 
   rememberPlace(place: string, text: string): void {
     this.placeDrafts.set(place, { text, preparation: this.currentPreparation(), review: this.draftReview || this.retiredHandoffText !== null });
@@ -655,7 +663,7 @@ export class Sv3DraftDomain {
    * WP1.1 — the mode the result list was left in, so going back to it restores an Ask or Delegate
    * draft written there as that, rather than as a query it never was.
    */
-  resultsTier: Sv3ComposerTier = 'search';
+  private resultsTier: Sv3ComposerTier = 'search';
 
   /* ── The conversation record (tempdoc 822 Phase F6) ───────────────────────────────────────── */
 
@@ -748,7 +756,7 @@ export class Sv3DraftDomain {
     this.host.startNewSession();
     this.search.show();
     if (saved?.review) { this.markDraftReview(preparation); this.reviewConfigured = true; }
-    else { this.draftReview = false; this.draftProposal = null; this.reviewConfigured = false; this.applyPreparation(preparation); }
+    else { this.draftReviewValue = false; this.draftProposalValue = null; this.reviewConfigured = false; this.applyPreparation(preparation); }
     this.host.writeDraft(text);
     void this.host.setComposerState('docked');
     return true;
@@ -788,7 +796,7 @@ export class Sv3DraftDomain {
       this.markDraftReview(preparation);
       this.reviewConfigured = preparation !== null;
     } else {
-      this.draftReview = false; this.draftProposal = null; this.reviewConfigured = false;
+      this.draftReviewValue = false; this.draftProposalValue = null; this.reviewConfigured = false;
       if (preparation !== null) this.applyPreparation(preparation);
       this.askInConversation();
     }
@@ -868,7 +876,7 @@ export class Sv3DraftDomain {
     }
   }
 
-  receiveHandoff = (): boolean => {
+  readonly receiveHandoff = (): boolean => {
     if (this.host.shapeId()) return false;
     const incoming = this.host.peekHandoff();
     if (incoming === null) {
@@ -954,7 +962,7 @@ export class Sv3DraftDomain {
       : undefined;
     if (!this.persistDraft({ place: null, text: this.recoveryText(query, selection), preparation }, true, leaving)) {
       incoming.refused = true;
-      this.refusedHandoff = { text: query, files: paths.length };
+      this.refusedHandoffValue = { text: query, files: paths.length };
       this.host.requestUpdate();
       return true;
     }
@@ -988,8 +996,8 @@ export class Sv3DraftDomain {
     this.handoffNotice = notice; this.handoffBlocked = blocked;
     this.tier = tier; this.tierFollowsPlace = false;
     if (paths.length > 0 && shape !== 'core.workflow-run') this.search.prepare({ paths });
-    this.draftReview = review || blocked;
-    this.draftProposal = this.draftReview ? preparation : null;
+    this.draftReviewValue = review || blocked;
+    this.draftProposalValue = this.draftReview ? preparation : null;
     this.reviewConfigured = this.draftReview;
     this.host.writeDraft(query);
     this.saveRecovery();
@@ -1003,7 +1011,8 @@ export class Sv3DraftDomain {
     return true;
   };
 
-  schemaDraft = '';
+  private schemaDraftValue = '';
+  get schemaDraft(): string { return this.schemaDraftValue; }
 
   /**
    * The STATE half of a new session, without the focus move — the form a DISCARD reaches it in.
@@ -1099,9 +1108,9 @@ export class Sv3DraftDomain {
     if (this.tierFollowsPlace) this.tier = SV3_TIER_DEFAULT;
     this.tierFollowsPlace = false;
     if (clearDraft) {
-      this.draftReview = false; this.draftProposal = null; this.reviewConfigured = false;
+      this.draftReviewValue = false; this.draftProposalValue = null; this.reviewConfigured = false;
       this.recoveryError = '';
-      this.schemaDraft = ''; this.preparationRevision += 1;
+      this.schemaDraftValue = ''; this.preparationRevision += 1;
       this.host.writeDraft('');
     } else if (preparation !== null && !this.draftReview) this.applyPreparation(preparation);
     void this.host.setComposerState('hero');
@@ -1171,9 +1180,9 @@ export class Sv3DraftDomain {
       this.placeDrafts.set(place, { ...draft, preparation, review: draft.review || reselect });
     }
     for (const [place, scope] of this.placeScopes) this.placeScopes.set(place, pruneScope(scope));
-    this.recoveryDrafts = this.recoveryDrafts.map(draft => ({ ...draft, preparation: prunePreparation(draft.preparation ?? null) }))
+    this.recoveryDraftsValue = this.recoveryDrafts.map(draft => ({ ...draft, preparation: prunePreparation(draft.preparation ?? null) }))
       .filter((draft, index, drafts) => drafts.findIndex(other => this.sameDraft(draft, other)) === index);
-    this.draftProposal = prunePreparation(this.draftProposal);
+    this.draftProposalValue = prunePreparation(this.draftProposal);
     if (this.preparedHandoff !== null) {
       const selection = pruneSelection(this.preparedHandoff.selection);
       if (selection !== this.preparedHandoff.selection) {
@@ -1210,8 +1219,8 @@ export class Sv3DraftDomain {
       if (!this.host.connected() && this.preparedHandoff !== null) {
         if (this.composer.read() !== '' && (this.search.pendingScope !== null || this.handoffBlocked
           || this.preparedHandoff.shapeId !== null && this.preparedHandoff.shapeId !== SV3_ASK_SHAPE_ID)) {
-          this.retiredHandoffText = this.composer.read();
-          this.draftReview = false; this.draftProposal = null; this.reviewConfigured = false;
+          this.retiredHandoffTextValue = this.composer.read();
+          this.draftReviewValue = false; this.draftProposalValue = null; this.reviewConfigured = false;
         }
         this.preparedHandoff = null;
         this.handoffNotice = ''; this.handoffBlocked = false;
@@ -1223,7 +1232,7 @@ export class Sv3DraftDomain {
           this.revokeHumanTask();
           if (!this.acknowledgePreparation({ kind: 'structured', schema: text,
             scope: this.search.pendingScope === null ? { kind: 'typed' } : { kind: 'files', paths: [...this.search.pendingScope.paths] } })) { this.host.requestUpdate(); return; }
-          this.schemaDraft = text;
+          this.schemaDraftValue = text;
           this.configureDraft();
           this.host.requestUpdate();
   }

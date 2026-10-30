@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-10-30T17:10:46.116Z",
-  "revision": "f9730e4010f1abd72a4fe6dc8a0b5a2d6f3a8870",
-  "tree": "bb6e6d02982a40482efc5b091fc4bbd39e48f3e0",
+  "createdAt": "2026-10-30T17:54:22.467Z",
+  "revision": "01c9911ff4b2d684baccc104ee7b6eb55c876f05",
+  "tree": "60cca7e34fe200d926af925df60175e70b02d275",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.preparationAck.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/fe-drafts-domain/tmp/ui-checks/scratch/test-intent-vitest-5-1793380240720.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.preparationAck.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nty4ivaj/tmp/test-intent-vitest-3-1793382857055.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 5394
+      "durationMs": 5409
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.preparationAck.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.preparationAck.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:d19bc1337ead78a7e017e049ee5bec84a0c380b7f3c4c003f21b1a6b9aa433f1",
+      "contentDigest": "sha256:79f97a0aa73b4eeccf78b237c6b1ecce61197b05411264d922cc1bde9fc7f199",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -64,6 +64,10 @@
         },
         {
           "name": "'scope clear' attachment readback: edits reject preparation; refused departures keep their place and apply preparation ('place')",
+          "status": "passed"
+        },
+        {
+          "name": "an ordinary preparation change writes exactly one attachment with the current and companion drafts",
           "status": "passed"
         }
       ]
@@ -404,5 +408,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:cb0c5f6b4111f913f6e276b081da0ccc7fec564ef2e5bbaa9cd0b976d284dd63"
+  "digest": "sha256:0fec470093b4953ee70e3b25adf6548f5017445587d711893e339e3da677bab1"
 }
