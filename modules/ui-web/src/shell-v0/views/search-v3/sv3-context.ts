@@ -11,7 +11,7 @@
  * What lives here is everything that can be decided without a DOM or a fetch: which turn a floor
  * names, which turns are consequently out of context, which are excluded, what a turn's menu may
  * offer, and the whole-prompt projection the shared context inspector renders. The window
- * ({@link SearchV3View}) owns the writes and the reload; the regions render what this returns.
+ * delegates writes and reloads to {@link Sv3ContextDomain}; the regions render what this returns.
  *
  * TWO LAWS THIS MODULE ENFORCES, both inherited from 852 S1:
  *

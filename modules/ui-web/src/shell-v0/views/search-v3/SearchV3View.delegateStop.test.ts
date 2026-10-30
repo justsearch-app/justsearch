@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
+import type { Sv3ContextDomain } from './sv3-context-domain.js';
 import { getAgentSessionController, __resetAgentSessionStore } from '../../state/agentSessionStore.js';
 import { __resetConversationListForTest, restoreActiveConversation } from '../../state/conversationListStore.js';
 import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
@@ -15,6 +16,8 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 
 const STOP = 'You stopped this run';
 const RUN = 'run-1';
+const contextOf = (view: SearchV3View): Sv3ContextDomain =>
+  (view as unknown as { contextDomain: Sv3ContextDomain }).contextDomain;
 let events: unknown[];
 let threadReads: number;
 let threadAddresses: string[];
@@ -438,7 +441,7 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     const el = await mount(); await start(el);
     const input = el.shadowRoot!.querySelector('jf-sv3-composer')!.shadowRoot!.querySelector<HTMLTextAreaElement>('textarea')!;
     input.focus(); clickStop(el); await settle();
-    expect(threadReads).toBeGreaterThan(0); expect(el.recordNotice).toBe(false); expect(noteCount(el)).toBe(0);
+    expect(threadReads).toBeGreaterThan(0); expect(contextOf(el).recordNotice).toBe(false); expect(noteCount(el)).toBe(0);
     await saveStop();
     // The server has saved Stop, but its HTTP response is still held. Polling must follow truth.
     await expect.poll(() => noteCount(el), { timeout: 1800 }).toBe(1);
@@ -621,10 +624,10 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     const el = await mount(); await start(el);
     threadFailure = true;
     getAgentSessionController('').onAttachNotLive({}); close(); await settle();
-    expect(noteCount(el)).toBe(0); expect(el.recordNotice).toBe(true);
+    expect(noteCount(el)).toBe(0); expect(contextOf(el).recordNotice).toBe(true);
     threadFailure = false; await saveStop();
     await expect.poll(() => noteCount(el), { timeout: 1800 }).toBe(1);
-    expect(el.recordNotice).toBe(false);
+    expect(contextOf(el).recordNotice).toBe(false);
   });
 
   it('DS5 DS7 cold attach keeps the named conversation and its already loaded record turn', async () => {

@@ -76,6 +76,7 @@ import {
 import { EPHEMERAL_TOAST_EVENT } from '../../components/advisory/ephemeralToast.js';
 import {
   CONTEXT_COMPACT_FAILED,
+  CONTEXT_EXCLUDE_FAILED,
   CONTEXT_FLOOR_COMPACTED,
   CONTEXT_FLOOR_FAILED,
   CONTEXT_FLOOR_RESET,
@@ -913,6 +914,27 @@ describe('a turn the endpoints cannot address offers NO context affordance', () 
 /* ── The meter and the inspector ─────────────────────────────────────────────────────────────── */
 
 describe('how full the context is, and what is in it', () => {
+  it('keeps the previous occupancy when a later terminal omits usage and redraws against the current runtime window', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    await ask(el, 'Measured question');
+    stream.emit('done', { promptTokens: 2048 });
+    stream.end();
+    await settle(el);
+    await ask(el, 'Unmeasured question');
+    stream.emit('done', {});
+    stream.end();
+    await settle(el);
+    const bar = await region(el, 'jf-sv3-context-bar');
+    expect(bar.shadowRoot?.querySelector('[data-testid="sv3-context-meter"]')?.textContent).toContain('2048 / 4096');
+    __feedForTest({ inference: { mode: 'online', available: true, llmContextTokens: 8192 } as never });
+    await settle(el);
+    await bar.updateComplete;
+    expect(bar.shadowRoot?.querySelector('[data-testid="sv3-context-meter"]')?.textContent).toContain('2048 / 8192');
+    expect(bar.shadowRoot?.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('25');
+  });
+
   it('renders no meter until a turn has reported an occupancy', async () => {
     twoTurnConversation();
     const el = await mount();
@@ -1037,6 +1059,69 @@ describe('how full the context is, and what is in it', () => {
     expect(texts).toContain('and the second one?');
     expect(view?.totalTokens).toBe(1024);
     expect(view?.windowTokens).toBe(4096);
+  });
+});
+
+describe('record and history transport preservation', () => {
+  it('uses the current API base and encoded conversation ID for initial and later record and history reads', async () => {
+    const id = 'saved /?% conversation';
+    twoTurnConversation(id);
+    const el = await mount();
+    el.apiBase = 'https://first.example';
+    await settle(el);
+    await openTheOnlyConversation(el);
+    const encoded = encodeURIComponent(id);
+    const urls = (): string[] => fetchMock.mock.calls.map(call => String(call[0]));
+    expect(urls()).toContain(`https://first.example/api/thread/${encoded}`);
+    expect(urls()).toContain(`https://first.example/api/chat/conversations/${encoded}/history`);
+    el.apiBase = 'https://later.example';
+    await settle(el);
+    const { restoreActiveConversation } = await import('../../state/conversationListStore.js');
+    restoreActiveConversation(null);
+    restoreActiveConversation(id);
+    await settle(el);
+    expect(urls()).toContain(`https://later.example/api/thread/${encoded}`);
+    expect(urls()).toContain(`https://later.example/api/chat/conversations/${encoded}/history`);
+    contextAction(el, 'floor', 1);
+    await settle(el);
+    expect(urls()).toContain(`https://later.example/api/chat/conversations/${encoded}/context-floor`);
+    expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(3));
+  });
+
+  it.each([404, 500, 423])('keeps history HTTP %s empty, uncertain or locked respectively', async status => {
+    twoTurnConversation();
+    const el = await mount();
+    const serve = fetchMock.getMockImplementation() as (url: unknown, init: unknown) => Promise<unknown>;
+    fetchMock.mockImplementation((url: unknown, init: unknown) => String(url).endsWith('/history')
+      ? Promise.resolve({ ok: false, status, json: async () => ({}) }) : serve(url, init));
+    await openTheOnlyConversation(el);
+    if (status === 404) {
+      expect(el.sessions.sessions[0]?.history).not.toBeNull();
+      const history = el.sessions.sessions[0]!.history!;
+      expect(history.contextFloor).toBeUndefined();
+      expect(history.contextFloorSummary).toBeUndefined();
+      expect(history.excludedMessageIds ?? []).toEqual([]);
+      expect(history.excludedSourceIds ?? []).toEqual([]);
+      expect(history.messageIds).toEqual([]);
+      expect(await contextNotice(el)).toBe('');
+      expect((await region(el, 'jf-sv3-main')).shadowRoot?.querySelector('[data-testid="sv3-history-locked"]')).toBeNull();
+      expect(await nextContext(el)).toEqual([
+        { role: 'user', content: 'why did the renewal fail?' },
+        { role: 'assistant', content: 'The lock held.' },
+        { role: 'user', content: 'and the second one?' },
+        { role: 'assistant', content: 'The same lock.' },
+      ]);
+      expect(backend.dispatches).toHaveLength(1);
+    } else if (status === 500) {
+      expect(el.sessions.sessions[0]?.history).toBeNull();
+      expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+      expect((await region(el, 'jf-sv3-main')).shadowRoot?.querySelector('[data-testid="sv3-history-locked"]')).toBeNull();
+      expect(el.historyLocked).toBe(false);
+    } else {
+      await ask(el, 'Can this locked conversation answer?');
+      expect(backend.dispatches).toHaveLength(0);
+      expect((await region(el, 'jf-sv3-main')).shadowRoot?.querySelector('[data-testid="sv3-history-locked"]')).not.toBeNull();
+    }
   });
 });
 
@@ -1571,6 +1656,105 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
     expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(0));
   });
 
+  it('still attempts the answer exclusion after a refused question and displays the saved partial result', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    backend.refuseExcludeIds.add(storedId(0));
+    const seen = toasts();
+    contextAction(el, 'exclude', 0);
+    await settle(el);
+    expect(backend.writes.map(write => write.path)).toEqual([`exclude:${storedId(0)}`, `exclude:${storedId(1)}`]);
+    expect(el.sessions.sessions[0]?.history?.excludedMessageIds).toEqual([storedId(1)]);
+    expect(seen).toContain(CONTEXT_EXCLUDE_FAILED);
+    expect(await nextContext(el)).toEqual([
+      { role: 'user', content: 'why did the renewal fail?' },
+      { role: 'user', content: 'and the second one?' },
+      { role: 'assistant', content: 'The same lock.' },
+    ]);
+  });
+
+  it('keeps Exclude Restore Include in selection order through an overlapping open read and final confirmation', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(3);
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const release = holdWriteResponse(`/messages/${storedId(0)}/exclude`);
+    contextAction(el, 'exclude', 0);
+    await settle(el);
+    contextAction(el, 'restore');
+    contextAction(el, 'include', 0);
+    // A second window's store notification reopens this conversation during the write queue.
+    const { restoreActiveConversation } = await import('../../state/conversationListStore.js');
+    restoreActiveConversation(null);
+    restoreActiveConversation('uc-ctx');
+    await settle(el);
+    expect(backend.writes).toHaveLength(1);
+    backend.holdHistoryFor.add('uc-ctx');
+    release();
+    await settle(el);
+    try {
+      await ask(el, 'Wait for all three actions');
+      expect(backend.dispatches).toHaveLength(0);
+      expect(backend.writes).toHaveLength(2);
+    } finally {
+      backend.holdHistoryFor.add('uc-ctx');
+      backend.heldHistories.get('uc-ctx')?.();
+      await settle(el);
+    }
+    expect(backend.dispatches).toHaveLength(0);
+    expect(backend.writes).toHaveLength(3);
+    backend.holdHistoryFor.add('uc-ctx');
+    backend.heldHistories.get('uc-ctx')?.();
+    await settle(el);
+    expect(backend.dispatches).toHaveLength(0);
+    expect(backend.writes.map(write => [write.method, write.path, write.body.excluded])).toEqual([
+      ['POST', `exclude:${storedId(0)}`, true],
+      ['POST', `exclude:${storedId(1)}`, true],
+      ['DELETE', 'context-floor', undefined],
+      ['POST', `exclude:${storedId(0)}`, false],
+      ['POST', `exclude:${storedId(1)}`, false],
+    ]);
+    backend.heldHistories.get('uc-ctx')?.();
+    await settle(el);
+    expect(el.sessions.sessions[0]?.history?.contextFloor).toBeUndefined();
+    expect(el.sessions.sessions[0]?.history?.excludedMessageIds).toEqual([]);
+    expect(backend.dispatches).toHaveLength(1);
+    expect(backend.dispatches[0]?.question).toBe('Wait for all three actions');
+    expect(backend.dispatches[0]?.context).toHaveLength(4);
+    stream.emit('done', {});
+    stream.end();
+    await settle(el);
+  });
+
+  it('keeps uncertainty through an overlapping open read until the pending write confirms its own result', async () => {
+    twoTurnConversation();
+    backend.failHistoryFor.add('uc-ctx');
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+    backend.failHistoryFor.clear();
+    const release = holdWriteResponse(`/messages/${storedId(0)}/exclude`);
+    try {
+      contextAction(el, 'exclude', 0);
+      await settle(el);
+      expect(backend.writes).toHaveLength(1);
+      const reads = backend.historyReads.length;
+      const { restoreActiveConversation } = await import('../../state/conversationListStore.js');
+      restoreActiveConversation(null);
+      restoreActiveConversation('uc-ctx');
+      await settle(el);
+      expect(backend.historyReads).toHaveLength(reads + 1);
+      expect(el.sessions.sessions[0]?.history?.excludedMessageIds).toEqual([storedId(0)]);
+      expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+    } finally {
+      release();
+      await settle(el);
+    }
+    expect(el.sessions.sessions[0]?.history?.excludedMessageIds).toEqual([storedId(0), storedId(1)]);
+    expect(await contextNotice(el)).toBe('');
+  });
+
   it.each([
     { race: 'R1', first: 'restore', second: 'floor', tail: '/context-floor', method: 'DELETE', phase: 'response' },
     { race: 'R4', first: 'restore', second: 'exclude', tail: '/context-floor', method: 'DELETE', phase: 'request' },
@@ -1927,6 +2111,52 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
       await vi.advanceTimersByTimeAsync(60000);
       expect(backend.historyReads).toHaveLength(final);
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('caps uncertain-history retries at thirty seconds and online resets the cadence without duplicate listeners', async () => {
+    twoTurnConversation();
+    const added = vi.spyOn(window, 'addEventListener');
+    const removed = vi.spyOn(window, 'removeEventListener');
+    const el = await mount();
+    const onlineListener = added.mock.calls.find(([type]) => type === 'online')?.[1];
+    expect(onlineListener).toEqual(expect.any(Function));
+    await openTheOnlyConversation(el);
+    vi.useFakeTimers();
+    try {
+      backend.failHistoryFor.add('uc-ctx');
+      contextAction(el, 'restore');
+      await settle(el);
+      for (const delay of [1000, 2000, 4000, 8000, 16000, 30000, 30000]) {
+        const reads = backend.historyReads.length;
+        await vi.advanceTimersByTimeAsync(delay - 1);
+        expect(backend.historyReads).toHaveLength(reads);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(backend.historyReads).toHaveLength(reads + 1);
+      }
+      const beforeOnline = backend.historyReads.length;
+      window.dispatchEvent(new Event('online'));
+      await settle(el);
+      expect(backend.historyReads).toHaveLength(beforeOnline + 1);
+      await vi.advanceTimersByTimeAsync(999);
+      expect(backend.historyReads).toHaveLength(beforeOnline + 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(backend.historyReads).toHaveLength(beforeOnline + 2);
+      el.remove();
+      expect(removed).toHaveBeenCalledWith('online', onlineListener);
+      const detached = backend.historyReads.length;
+      window.dispatchEvent(new Event('online'));
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(backend.historyReads).toHaveLength(detached);
+      document.body.append(el);
+      await settle(el);
+      const reattached = backend.historyReads.length;
+      window.dispatchEvent(new Event('online'));
+      await settle(el);
+      expect(backend.historyReads).toHaveLength(reattached + 1);
+    } finally {
+      el.remove();
       vi.useRealTimers();
     }
   });

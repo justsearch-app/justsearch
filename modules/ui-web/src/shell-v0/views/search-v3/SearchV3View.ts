@@ -50,6 +50,8 @@ import { subscribeProfiles, getActiveProfileId as getWorkspaceProfileId } from '
 import type { Sv3RecentItem } from './Sv3Composer.js';
 import { Sv3RunDomain } from './sv3-run-domain.js';
 import { Sv3RunController } from './sv3-run-controller.js';
+import { Sv3ContextDomain } from './sv3-context-domain.js';
+import { Sv3ContextController } from './sv3-context-controller.js';
 import { Sv3ComposerPort } from './Sv3ComposerPort.js';
 import type { ComposerCapture } from '../../state/composerPort.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
@@ -150,26 +152,20 @@ import {
   SV3_SESSIONS_EMPTY,
   type Sv3RunGate,
   type Sv3Session,
-  type Sv3SessionHistory,
   type Sv3SessionList,
 } from './sv3-sessions.js';
 // The effective-context set (tempdoc 610, ported by 852 S2) — the pure half. The WRITES are the five
 // shared store functions below; this module decides what each turn's frame and menu are, and what
 // the shared inspector renders.
 import {
-  projectSv3ContextInspector,
-  projectSv3TurnContexts,
   sv3ContextMenuItems,
-  sv3ExcludedMessageIds,
   sv3ExcludedTurnCount,
   sv3FloorUnseen,
-  sv3FollowUpContext,
-  sv3TurnContextFor,
+  type sv3FollowUpContext,
   sv3UnseenExcludedIds,
   type Sv3ContextAction,
   type Sv3ContextActionId,
   type Sv3ContextMenuRequest,
-  type Sv3TurnContext,
 } from './sv3-context.js';
 // Branch / edit / retry and the version pager (slice 513 + 610 Phase A/B, ported by 852 S3) — the
 // pure half. All three are ONE backend act (`branchConversation`); this module decides which message
@@ -227,7 +223,6 @@ import {
   siblingSessionsAt,
   restoreActiveConversation,
   resumeConversation,
-  type ResumedConversation,
   setActiveConversation,
   setContextFloor,
   setConversationApiBase,
@@ -247,7 +242,6 @@ import {
   setContextInspectorView,
   toggleContextInspector,
 } from '../../state/contextInspectorDrawer.js';
-import type { InspectorView } from '../../components/ContextInspectorPane.js';
 // The product's ONE overflow-menu primitive (slice 458). A window-local menu would be a second
 // keyboard model and a second dismiss rule for the same gesture.
 import { openContextMenu } from '../../components/ContextMenu.js';
@@ -332,13 +326,6 @@ import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js
 import {
   BRANCH_FAILED,
   BRANCH_RERUN_BUSY,
-  CONTEXT_COMPACT_FAILED,
-  CONTEXT_EXCLUDE_FAILED,
-  CONTEXT_FLOOR_FAILED,
-  CONTEXT_INCLUDE_ALL_FAILED,
-  CONTEXT_INCLUDE_FAILED,
-  CONTEXT_RESTORE_FAILED,
-  CONTEXT_SUMMARY_FAILED,
   PANE_LABEL,
   SV3_COMMAND_SEARCH,
   SV3_DRAFT_KEY,
@@ -415,19 +402,6 @@ const openControlMenuInPath = (event: KeyboardEvent): boolean =>
     // through to the window would take the composer back to hero with it.
     return el.effortMenuOpen === true || el.tierMenuOpen === true;
   });
-
-/** What a `/history` read says about the conversation's context and lineage, as the window keeps it. */
-const sv3HistoryOf = (history: ResumedConversation): Sv3SessionHistory => ({
-  parentSessionId: history.parentSessionId,
-  branchPointMessageId: history.branchPointMessageId,
-  parentFirstUserMessage: history.parentFirstUserMessage,
-  contextFloor: history.contextFloor,
-  contextFloorSummary: history.contextFloorSummary,
-  excludedMessageIds: history.excludedMessageIds,
-  excludedSourceIds: history.excludedSourceIds,
-  messageIds: history.messages.flatMap((m) => (typeof m.id === 'string' ? [m.id] : [])),
-  locked: history.locked,
-});
 
 interface HumanTask {
   saved: Sv3RecoveryTask;
@@ -831,7 +805,6 @@ export class SearchV3View extends JfElement {
     paneWidthPx: { state: true },
     paneOverlay: { type: Boolean, reflect: true, attribute: 'pane-overlay' },
     renamingId: { state: true },
-    recordNotice: { state: true },
     historyLocked: { state: true },
     recentSearches: { state: true },
     recentClearTime: { state: true },
@@ -839,7 +812,6 @@ export class SearchV3View extends JfElement {
     lockedRefusal: { state: true },
     effort: { state: true },
     tier: { state: true },
-    compacting: { state: true },
     conversations: { state: true },
     initialNavigationPending: { type: Boolean, attribute: false },
   };
@@ -934,12 +906,6 @@ export class SearchV3View extends JfElement {
   /** The session whose title is being edited, or null. */
   declare renamingId: string | null;
   /**
-   * The claimed conversation's canonical record could not be read (tempdoc 822 Phase F6; inventory
-   * D2 / tempdoc 727 F-8). Distinct from "the conversation is empty": a failed refresh leaves the
-   * live state on screen by `fetchUnifiedThread`'s contract, and this is what stops that being silent.
-   */
-  declare recordNotice: boolean;
-  /**
    * The conversation store is encrypted and locked (tempdoc 629; inventory E4/E5). Derived from EVERY
    * observed-state snapshot rather than written once from a 423, which is the half tempdoc 734 had to
    * add later: before it, a lock taken elsewhere — an idle auto-lock, another tab — left the
@@ -971,12 +937,6 @@ export class SearchV3View extends JfElement {
    * `onComposerSubmit`, which is the one place a send becomes a run.
    */
   declare tier: Sv3ComposerTier;
-  /**
-   * A compaction is in flight (tempdoc 610 Phase D). WINDOW-level because it is one LLM call and the
-   * menu that starts it must not offer a second while the first is running — the reference window's
-   * own guard (`views/UnifiedChatView.ts:1658-1673`).
-   */
-  declare compacting: boolean;
   /** Recent sidebar rows, retained for row actions. Complete fork reads never enlarge this list. */
   declare conversations: readonly Conversation[];
 
@@ -1039,13 +999,6 @@ export class SearchV3View extends JfElement {
   }
 
   private convListUnsubscribe: (() => void) | null = null;
-  /** The in-flight record fetch, so a claim that supersedes another cannot land out of order. */
-  private readonly recordReads = new Map<string, AbortController>();
-  /** Reads are ordered within each conversation without cancelling another conversation's read. */
-  private historyReads = new Map<string, AbortController>();
-  /** A write includes its response AND saved-history refresh; later controls queue behind it. */
-  private contextWrites = new Map<string, Promise<void>>();
-  private contextNotices = new Map<string, string>();
   /** A refused send outlives context recovery: the reader may have typed a different draft. */
   private humanTask: HumanTask | null = null;
   private humanEpoch = 0;
@@ -1466,8 +1419,8 @@ export class SearchV3View extends JfElement {
       const task = this.humanTask;
       this.retireHumanTask(task);
       if (this.humanTask === null) {
-        if (task.saved.place !== null) this.refusedQuestions.delete(task.saved.place);
-        if (task.saved.target !== null) this.refusedQuestions.delete(task.saved.target);
+        if (task.saved.place !== null) this.contextDomain.clearRefusedQuestion(task.saved.place);
+        if (task.saved.target !== null) this.contextDomain.clearRefusedQuestion(task.saved.target);
       }
     }
   }
@@ -1526,8 +1479,8 @@ export class SearchV3View extends JfElement {
       const session = task.saved.target === null ? null : sessionById(this.sessions, task.saved.target);
       const context = task.saved.shape === SV3_MODEL_SHAPE_ID || session === null ? []
         : session.history === null && task.saved.place === null && session.turns.length === 0 ? []
-        : session.history === null ? null : sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);
-      if (reason || (task.saved.target !== null && this.contextWrites.has(task.saved.target))
+        : this.contextDomain.followUpContextOf(session.id);
+      if (reason || (task.saved.target !== null && this.contextDomain.hasPendingWrite(task.saved.target))
         || JSON.stringify(context) !== JSON.stringify(task.context)) {
         task.revoked = true;
         this.recoveryError = reason || 'Saved context changed. Review the retained question before a new submission.';
@@ -1596,11 +1549,32 @@ export class SearchV3View extends JfElement {
     </div>`;
   }
 
-  private refusedQuestions = new Map<string, string>();
-  private contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
-  private contextRetryDelay = 1000;
   private contextAskPending = new Set<string>();
   private readonly composerDraft = new Sv3ComposerPort(() => this.composer);
+
+  private readonly contextDomain: Sv3ContextDomain = new Sv3ContextDomain({
+    activeConversationId: () => this.sessions.activeId,
+    session: id => sessionById(this.sessions, id),
+    connected: () => this.isConnected,
+    applyHistory: (id, history) => { this.sessions = applySv3History(this.sessions, id, history); },
+    setContextUsage: (id, usage) => { this.sessions = setSessionContextUsage(this.sessions, id, usage); },
+    contextWindow: () => this.aiSnapshot?.runtime.contextWindow ?? null,
+    recordReadWait: id => this.runDomain.recordReadWait(id),
+    recordArrival: (id, record) => this.runDomain.recordArrival(id, record),
+    scheduleRecordRetry: () => this.runDomain.scheduleRecordRetry(),
+    clearRecordRetry: () => this.runDomain.clearRecordRetry(),
+    retryRecords: () => this.runDomain.retryRecords(),
+    noteRefusedWhileLocked: () => this.noteRefusedWhileLocked(),
+    revokeHumanTask: () => this.revokeHumanTask(),
+    openContextInspector: () => this.openContextInspector(),
+    announceWarning: message => emitEphemeralToast({ message, severity: 'warning' }),
+    requestUpdate: () => this.requestUpdate(),
+  }, {
+    fetchRecord: (id, signal, onFailure) => fetchUnifiedThread(this.apiBase, id, signal, onFailure),
+    readHistory: id => resumeConversation(id, SV3_ASK_SHAPE_ID, { claim: false }),
+    setContextFloor, clearContextFloor, compactContext, editContextFloorSummary, setMessageExcluded,
+  });
+  private readonly contextController = new Sv3ContextController(this, this.contextDomain);
 
   private readonly runDomain = new Sv3RunDomain({
     createConversationId: () => createConversationId(),
@@ -1632,7 +1606,7 @@ export class SearchV3View extends JfElement {
         session.id !== ref.sessionId ? session : { ...session, turns: session.turns.map(turn =>
           turn.id !== ref.turnId ? turn : { ...turn, status: 'failed', detail }) }) };
     },
-    refreshRecord: id => this.refreshRecord(id),
+    refreshRecord: id => this.contextDomain.refreshRecord(id),
     announceStop: message => emitEphemeralToast({ message }),
     persistSteerDraft: () => this.persistDraft({ place: this.humanPlace(), text: '', preparation: this.currentPreparation() }),
     dockComposer: () => { void this.setComposerState('docked'); },
@@ -1747,7 +1721,7 @@ export class SearchV3View extends JfElement {
     this.paneWidthPx = SV3_PANE_DEFAULT_PX;
     this.paneOverlay = false;
     this.renamingId = null;
-    this.recordNotice = false;
+    this.contextDomain.recordNotice = false;
     this.historyLocked = false;
     this.recentSearches = [];
     this.recentClearTime = -Infinity;
@@ -1755,7 +1729,6 @@ export class SearchV3View extends JfElement {
     this.lockedRefusal = false;
     this.effort = SV3_EFFORT_DEFAULT;
     this.tier = SV3_TIER_DEFAULT;
-    this.compacting = false;
     this.conversations = [];
     // Constructed HERE rather than on connect: a Lit controller added before connection still gets
     // its `hostConnected`, and adding it inside `connectedCallback` would add a second one on every
@@ -1791,7 +1764,7 @@ export class SearchV3View extends JfElement {
       const reconnected = this.aiSnapshot?.connection.reachable === false && snapshot.connection.reachable;
       this.aiSnapshot = snapshot;
       this.applyLockState(snapshot);
-      if (reconnected) this.retryContextOnReconnect();
+      if (reconnected) this.contextDomain.retryContextOnReconnect();
     });
     // Inventory E3 — the app-wide Simple/Detailed authority. Nothing is COPIED into this element:
     // every render site reads `isAdvancedMode()` live, so the subscription's only job is to ask for
@@ -1890,8 +1863,7 @@ export class SearchV3View extends JfElement {
     // every other entry path below, not a second focus mechanism — its refusal set (renaming,
     // palette open, already typing elsewhere) applies here exactly as it does on mount.
     window.addEventListener('jf-focus-composer', this.onFocusComposerEvent);
-    window.addEventListener('online', this.retryContextOnReconnect);
-    this.retryContextOnReconnect();
+    this.contextController.connect();
     // Tempdoc 864 Layer 1(a) — ARRIVING AT THIS WINDOW PUTS THE READER IN THE COMPOSER. Activation is
     // an entry path like the other two ({@link onSessionSelect}, {@link onSessionNew}), and it is the
     // one that covers both a fresh hero and the restored record `restoreLastViewed` just claimed:
@@ -1971,15 +1943,7 @@ export class SearchV3View extends JfElement {
     this.convListUnsubscribe?.();
     this.convListUnsubscribe = null;
     this.clearForkReads();
-    for (const read of this.recordReads.values()) read.abort();
-    this.recordReads.clear();
-    this.runDomain.clearRecordRetry();
-    for (const [id, read] of this.historyReads) {
-      this.markContextUnconfirmed(id);
-      read.abort();
-    }
-    this.historyReads.clear();
-    this.clearContextRetry();
+    this.contextDomain.disconnect();
     this.aiUnsubscribe?.();
     this.aiUnsubscribe = null;
     this.uiModeUnsubscribe?.();
@@ -2004,7 +1968,6 @@ export class SearchV3View extends JfElement {
     this.removeEventListener('focusout', this.onHostFocusOut);
     window.removeEventListener('jf-focus-composer', this.onFocusComposerEvent);
     window.removeEventListener('sv3-handoff', this.receiveHandoff);
-    window.removeEventListener('online', this.retryContextOnReconnect);
     // Tempdoc 864 PR E — LAST, so a re-parent is recorded however the teardown above went. See
     // {@link movedRatherThanEntered}.
     this.markPossibleMove();
@@ -2208,7 +2171,7 @@ export class SearchV3View extends JfElement {
     // Tempdoc 610 §K — keep the OPEN inspector current. Its subject is "what the last turn sent", so
     // a new turn, a moved floor or a hidden turn changes it; a drawer left showing the previous
     // answer's prompt would be the stalest possible answer to the one question it exists to answer.
-    if (isContextInspectorOpen()) setContextInspectorView(this.buildContextInspectorView());
+    if (isContextInspectorOpen()) setContextInspectorView(this.contextDomain.buildContextInspectorView());
   }
 
   /* ── The conversation record (tempdoc 822 Phase F6) ───────────────────────────────────────── */
@@ -2257,8 +2220,8 @@ export class SearchV3View extends JfElement {
     // address behind the one the reader is on, and Back would look broken on the very first press.
     restoreActiveConversation(id);
     void this.setComposerState('docked');
-    void this.refreshRecord(id);
-    void this.refreshHistory(id);
+    void this.contextDomain.refreshRecord(id);
+    void this.contextDomain.refreshHistory(id);
   }
 
   /**
@@ -2327,11 +2290,11 @@ export class SearchV3View extends JfElement {
     // The tab is reading this conversation now, so a reload must land on it — the pointer follows
     // the address rather than competing with it.
     setLastViewedConversation(storeActiveId);
-    this.recordNotice = false;
+    this.contextDomain.recordNotice = false;
     this.closePane();
     void this.setComposerState('docked');
-    void this.refreshRecord(storeActiveId);
-    void this.refreshHistory(storeActiveId);
+    void this.contextDomain.refreshRecord(storeActiveId);
+    void this.contextDomain.refreshHistory(storeActiveId);
   }
 
   private revealRecoveryOutcome(): void {
@@ -2350,134 +2313,12 @@ export class SearchV3View extends JfElement {
     this.revealRecoveryOutcome();
   }
 
-  /**
-   * D1 — project the conversation from its canonical record. The window is not the authority: the
-   * turns it renders for a settled conversation are `GET /api/thread/{id}` projected through the two
-   * SHARED authorities, so a run's history outlives the controller that produced it and survives a
-   * reload the controller singleton does not.
-   *
-   * D2 (tempdoc 727 F-8) — a failed fetch returns EMPTY by contract precisely so it cannot wipe the
-   * caller's live state, which is right and was also completely silent. `onFailure` is the out-of-band
-   * signal; the notice is raised and the merge is SKIPPED, so a failure never re-renders the thread.
-   */
-  private async refreshRecord(conversationId: string): Promise<boolean> {
-    if (!this.isConnected) return false;
-    this.recordReads.get(conversationId)?.abort();
-    const abort = new AbortController();
-    this.recordReads.set(conversationId, abort);
-    let failed = false;
-    const wait = this.runDomain.recordReadWait(conversationId);
-    const timer = wait === undefined ? undefined : setTimeout(() => abort.abort(), wait);
-    const record = await fetchUnifiedThread(this.apiBase, conversationId, abort.signal, () => {
-      failed = true;
-    }).finally(() => clearTimeout(timer));
-    // Reads supersede only their own conversation; a pending Stop can settle after navigation.
-    if (abort.signal.aborted) return false;
-    this.recordReads.delete(conversationId);
-    if (this.sessions.activeId === conversationId) this.recordNotice = failed;
-    if (!failed) {
-      this.runDomain.recordArrival(conversationId, record);
-    }
-    this.runDomain.scheduleRecordRetry();
-    return !failed;
-  }
-
-  /**
-   * Read saved context without claiming the shared pointer. A later read of this conversation
-   * supersedes an earlier one. Writes may refresh their own session after navigation; ordinary
-   * opens only apply to the active session. Failed reads never invent a floor or exclusions.
-   */
-  private async refreshHistory(conversationId: string, forWrite = false): Promise<boolean> {
-    if (!this.isConnected || (!forWrite && this.sessions.activeId !== conversationId)) return false;
-    this.historyReads.get(conversationId)?.abort();
-    const abort = new AbortController();
-    this.historyReads.set(conversationId, abort);
-    const history = await resumeConversation(conversationId, SV3_ASK_SHAPE_ID, { claim: false });
-    if (abort.signal.aborted) return false;
-    this.historyReads.delete(conversationId);
-    if (history.locked === true && this.sessions.activeId === conversationId) this.noteRefusedWhileLocked();
-    const landed = (forWrite || this.sessions.activeId === conversationId)
-      && history.failed !== true && history.locked !== true;
-    if (landed) {
-      this.sessions = applySv3History(this.sessions, conversationId, sv3HistoryOf(history));
-      // A read during a pending write cannot confirm that write's eventual result.
-      if (!this.contextWrites.has(conversationId)) this.confirmContext(conversationId);
-    } else {
-      this.markContextUnconfirmed(conversationId);
-    }
-    this.scheduleContextRetry();
-    return landed;
-  }
-
-  private markContextUnconfirmed(sessionId: string): void {
-    this.contextNotices.set(sessionId, 'Saved context could not be confirmed. Retrying…');
-    this.requestUpdate();
-  }
-
-  private contextNotice(sessionId: string): string {
-    const context = this.contextNotices.get(sessionId)
-      ?? (this.contextWrites.has(sessionId) ? 'Saving context… Later changes will follow in order.' : '');
-    const question = this.refusedQuestions.get(sessionId);
-    // Keep the exact submitted text selectable even after a retry confirms context. Never replace
-    // newer input to recover it; the reader can copy these words back when ready to try again.
-    return [context, question === undefined ? ''
-      : `Question not sent. Unsent question (copy to reuse): “${question}”`]
-      .filter(Boolean).join(' ');
-  }
-
-  private confirmContext(sessionId: string): void {
-    this.contextNotices.delete(sessionId);
-    this.contextRetryDelay = 1000;
-    this.clearContextRetry();
-    this.requestUpdate();
-    this.scheduleContextRetry();
-  }
-
-  private clearContextRetry(): void {
-    if (this.contextRetryTimer !== null) clearTimeout(this.contextRetryTimer);
-    this.contextRetryTimer = null;
-  }
-
-  /** Only the shown conversation needs background retries; opening another reads it afresh. */
-  private scheduleContextRetry(): void {
-    const id = this.sessions.activeId;
-    if (this.contextRetryTimer !== null || !this.isConnected || id === null
-      || !this.contextNotices.has(id) || this.contextWrites.has(id)) return;
-    this.contextRetryTimer = setTimeout(() => {
-      this.contextRetryTimer = null;
-      this.contextRetryDelay = Math.min(this.contextRetryDelay * 2, 30000);
-      if (this.sessions.activeId === id && !this.contextWrites.has(id)) void this.refreshHistory(id);
-      else this.scheduleContextRetry();
-    }, this.contextRetryDelay);
-  }
-
-  private retryContextOnReconnect = (): void => {
-    this.runDomain.retryRecords();
-    this.clearContextRetry();
-    this.contextRetryDelay = 1000;
-    const id = this.sessions.activeId;
-    if (id !== null && this.contextNotices.has(id) && !this.contextWrites.has(id)) {
-      void this.refreshHistory(id);
-    }
-  };
-
   /* ── The effective context (tempdoc 610, ported by 852 S2) ────────────────────────────────── */
 
   /** The claimed conversation, or null when nothing is claimed. */
   private get activeSession(): Sv3Session | null {
     const id = this.sessions.activeId;
     return id === null ? null : sessionById(this.sessions, id);
-  }
-
-  /**
-   * What the effective context does with each turn on screen. Computed ONCE per render and handed to
-   * both consumers (the transcript's frames, the bar's aggregate) plus every act below, so what the
-   * window renders and what it writes are derived from one reading of one record.
-   */
-  private turnContexts(): readonly Sv3TurnContext[] {
-    const session = this.activeSession;
-    if (session === null) return [];
-    return projectSv3TurnContexts(session.turns, session.history);
   }
 
   /**
@@ -2489,9 +2330,9 @@ export class SearchV3View extends JfElement {
     const detail = (event as CustomEvent<Sv3ContextMenuRequest>).detail;
     const session = this.activeSession;
     if (detail === undefined || session === null) return;
-    const contexts = this.turnContexts();
+    const contexts = this.contextDomain.turnContexts();
     const items = sv3ContextMenuItems(contexts, detail.turnId, {
-      compacting: this.compacting,
+      compacting: this.contextDomain.compacting,
       streaming: this.streaming,
       contextFloor: session.history?.contextFloor ?? null,
       hasSummary: (session.history?.contextFloorSummary ?? null) !== null,
@@ -2542,150 +2383,7 @@ export class SearchV3View extends JfElement {
       await this.runBranchAction({ action: chosen, turnId: detail.turnId });
       return;
     }
-    await this.runContextAction({ action: chosen as Sv3ContextActionId, turnId: detail.turnId });
-  }
-
-  private onContextAction(event: Event): void {
-    const detail = (event as CustomEvent<Sv3ContextAction>).detail;
-    if (detail === undefined) return;
-    void this.runContextAction(detail);
-  }
-
-  /** Keep controls usable: capture their targets now, then send each act in selection order. */
-  private runContextAction(detail: Sv3ContextAction): Promise<void> {
-    const session = this.activeSession;
-    if (session === null) return Promise.resolve();
-    if (detail.action === 'inspect') {
-      this.openContextInspector();
-      return Promise.resolve();
-    }
-    this.revokeHumanTask();
-    const turn = detail.turnId === undefined ? null : sv3TurnContextFor(this.turnContexts(), detail.turnId);
-    const previous = this.contextWrites.get(session.id) ?? Promise.resolve();
-    const pending = previous.then(() => this.writeContext(session.id, detail, turn)).finally(() => {
-      if (this.contextWrites.get(session.id) === pending) this.contextWrites.delete(session.id);
-      this.requestUpdate();
-      this.scheduleContextRetry();
-    });
-    this.contextWrites.set(session.id, pending);
-    this.clearContextRetry();
-    this.requestUpdate();
-    return pending;
-  }
-
-  private async writeContext(
-    sessionId: string,
-    detail: Sv3ContextAction,
-    turn: Sv3TurnContext | null,
-  ): Promise<void> {
-    switch (detail.action) {
-      case 'floor': {
-        const messageId = turn?.floorMessageId ?? null;
-        if (messageId === null) return;
-        await this.settleContextWrite(sessionId, await setContextFloor(sessionId, messageId), CONTEXT_FLOOR_FAILED);
-        return;
-      }
-      case 'restore':
-        await this.settleContextWrite(sessionId, await clearContextFloor(sessionId), CONTEXT_RESTORE_FAILED);
-        return;
-      case 'compact': {
-        const messageId = turn?.floorMessageId ?? null;
-        if (messageId === null) return;
-        this.compacting = true;
-        try {
-          const summary = await compactContext(sessionId, messageId);
-          await this.settleContextWrite(sessionId, summary !== null, CONTEXT_COMPACT_FAILED);
-        } finally {
-          this.compacting = false;
-        }
-        return;
-      }
-      case 'summary':
-        if (detail.text === undefined) return;
-        await this.settleContextWrite(sessionId, await editContextFloorSummary(sessionId, detail.text), CONTEXT_SUMMARY_FAILED);
-        return;
-      case 'exclude':
-      case 'include': {
-        const ids = turn?.messageIds ?? [];
-        if (ids.length === 0) return;
-        const excluded = detail.action === 'exclude';
-        const landed = await this.excludeInTurn(sessionId, ids, excluded);
-        await this.settleContextWrite(sessionId, landed.length === ids.length,
-          excluded ? CONTEXT_EXCLUDE_FAILED : CONTEXT_INCLUDE_FAILED);
-        return;
-      }
-      case 'include-all': {
-        // Derive the WHOLE saved ledger when this queued action runs, including prior exclusions.
-        // If the previous refresh failed we must read it first, rather than omit unknown ids.
-        if (this.contextNotices.has(sessionId)) {
-          if (!await this.refreshHistory(sessionId, true)) {
-            emitEphemeralToast({ message: CONTEXT_INCLUDE_ALL_FAILED, severity: 'warning' });
-            return;
-          }
-          this.confirmContext(sessionId);
-        }
-        const ids = sv3ExcludedMessageIds(sessionById(this.sessions, sessionId)?.history ?? null);
-        if (ids.length === 0) return;
-        const landed = await this.excludeInTurn(sessionId, ids, false);
-        await this.settleContextWrite(sessionId, landed.length === ids.length, CONTEXT_INCLUDE_ALL_FAILED);
-        return;
-      }
-      default:
-        return;
-    }
-  }
-
-  /**
-   * Several exclusion toggles, ONE AT A TIME — never `Promise.all`.
-   *
-   * The endpoint's write is read-modify-write over a SHARED document and the store takes no lock:
-   * `FileConversationStore.toggleStringInMeta` reads `meta.json`, adds or removes the id, and calls
-   * `writeMetaAtomic` (`:503-527`). The write is atomic per file; the SEQUENCE is not, and each POST
-   * is served on its own HTTP thread. Two toggles in flight together therefore race on one snapshot,
-   * and the loser's id is silently dropped.
-   *
-   * What that costs here is specific and invisible: a turn's two ids go out together, one lands, and
-   * the turn is left HALF excluded — the prompt carries a question whose answer was dropped, while
-   * the transcript dims the turn either way (`hasExcluded` is true on one id as on two). Serializing
-   * removes the race rather than detecting it afterwards, and it is what the shipped window already
-   * does (`views/UnifiedChatView.ts:1767-1776`, a sequential `for`-await).
-   *
-   * Returns the successful ids to report partial refusal; only a saved-history read confirms state.
-   */
-  private async excludeInTurn(
-    sessionId: string,
-    ids: readonly string[],
-    excluded: boolean,
-  ): Promise<readonly string[]> {
-    const landed: string[] = [];
-    for (const id of ids) {
-      if (await setMessageExcluded(sessionId, id, excluded)) landed.push(id);
-    }
-    return landed;
-  }
-
-  /** A write's response alone cannot confirm saved context, including a lost or partial response. */
-  private async settleContextWrite(sessionId: string, ok: boolean, failure: string): Promise<void> {
-    if (await this.refreshHistory(sessionId, true)) {
-      this.confirmContext(sessionId);
-    } else {
-      this.markContextUnconfirmed(sessionId);
-    }
-    if (!ok) emitEphemeralToast({ message: failure, severity: 'warning' });
-  }
-
-  /** Wait for queued actions, then confirm uncertainty before a question can consume this state. */
-  private async confirmContextForAsk(sessionId: string): Promise<boolean> {
-    while (this.contextWrites.has(sessionId)) await this.contextWrites.get(sessionId);
-    if (!this.contextNotices.has(sessionId) && !this.historyReads.has(sessionId)
-      && sessionById(this.sessions, sessionId)?.history != null) return true;
-    const read = await this.refreshHistory(sessionId);
-    // A control used during that read must also settle before this question is sent.
-    if (this.contextWrites.has(sessionId)) return this.confirmContextForAsk(sessionId);
-    if (read) return true;
-    this.markContextUnconfirmed(sessionId);
-    this.scheduleContextRetry();
-    return false;
+    await this.contextDomain.runContextAction({ action: chosen as Sv3ContextActionId, turnId: detail.turnId });
   }
 
   /* ── Branch, edit / retry and the version pager (852 S3) ──────────────────────────────────── */
@@ -3028,7 +2726,7 @@ export class SearchV3View extends JfElement {
       this.saveRecovery(task);
     }
     this.claimConversation(id);
-    this.recordNotice = false;
+    this.contextDomain.recordNotice = false;
     // The same rule `onSessionSelect` applies: an edit in another row is DROPPED rather than
     // committed, because navigating away must not write text the reader walked away from.
     this.renamingId = null;
@@ -3038,7 +2736,7 @@ export class SearchV3View extends JfElement {
     // directly here keeps the two sites' close logic identical rather than relying on caller proofs).
     if (prevId !== id) this.closePane();
     void this.setComposerState('docked');
-    await Promise.all([this.refreshRecord(id), this.refreshHistory(id), loadConversations()]);
+    await Promise.all([this.contextDomain.refreshRecord(id), this.contextDomain.refreshHistory(id), loadConversations()]);
     return true;
   }
 
@@ -3059,19 +2757,8 @@ export class SearchV3View extends JfElement {
    * is re-pushed on every update while the drawer is open so a new turn does not leave it stale.
    */
   private openContextInspector(): void {
-    setContextInspectorView(this.buildContextInspectorView());
+    setContextInspectorView(this.contextDomain.buildContextInspectorView());
     toggleContextInspector();
-  }
-
-  private buildContextInspectorView(): InspectorView {
-    const session = this.activeSession;
-    return projectSv3ContextInspector(
-      session?.turns ?? [],
-      this.turnContexts(),
-      session?.history ?? null,
-      session?.contextUsage ?? null,
-      this.aiSnapshot?.runtime.contextWindow ?? null,
-    );
   }
 
   /**
@@ -3811,7 +3498,7 @@ export class SearchV3View extends JfElement {
         clearLastViewedConversation();
       }
       this.renamingId = null;
-      this.recordNotice = false;
+      this.contextDomain.recordNotice = false;
       // A cited document belonged to the conversation's answer, not to this list.
       this.closePane();
       this.search.show();
@@ -3839,7 +3526,7 @@ export class SearchV3View extends JfElement {
     this.retireRefusedHandoff();
     const leaving = this.sessions.activeId;
     if (leaving !== null) this.rememberPlace(leaving, this.currentDraft());
-    this.renamingId = null; this.recordNotice = false; this.closePane();
+    this.renamingId = null; this.contextDomain.recordNotice = false; this.closePane();
     this.sessions = startNewSession(this.sessions);
     this.search.show();
     if (saved?.review) { this.markDraftReview(preparation); this.reviewConfigured = true; }
@@ -4167,7 +3854,7 @@ export class SearchV3View extends JfElement {
   /** The model uses the shared model gate, plus the conversation's write lock. No document gate. */
   private get modelAnswerUnavailableReason(): string {
     const id = this.sessions.activeId;
-    if (id !== null && this.contextWrites.has(id)) return this.contextNotice(id);
+    if (id !== null && this.contextDomain.hasPendingWrite(id)) return this.contextDomain.contextNotice(id);
     if (this.historyLocked) return reasonFor('conversations.locked').wording;
     return this.humanUnavailable(SV3_MODEL_SHAPE_ID);
   }
@@ -4223,17 +3910,6 @@ export class SearchV3View extends JfElement {
   private get delegateUnavailableReason(): string {
     const availability = projectAvailability('agent', this.aiSnapshot);
     return availability.kind === 'unavailable' ? availability.reason : '';
-  }
-
-  /** Resolve saved context before opening a turn. Null refuses; [] means confirmed empty context. */
-  private async followUpContext(
-    sessionId: string,
-  ): Promise<ReturnType<typeof sv3FollowUpContext> | null> {
-    if (!await this.confirmContextForAsk(sessionId)
-      || !this.isConnected || this.sessions.activeId !== sessionId) return null;
-    const session = sessionById(this.sessions, sessionId);
-    if (session?.history == null) return null;
-    return sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);
   }
 
   private preparedHandoff: { shapeId: ShapeId | 'core.summarize' | null; selection: SelectionPayload | null } | null = null;
@@ -4451,14 +4127,14 @@ export class SearchV3View extends JfElement {
     if (sessionId !== null && !modelAnswer) {
       this.contextAskPending.add(sessionId);
       try {
-        const resolved = await this.followUpContext(sessionId);
+        const resolved = await this.contextDomain.followUpContext(sessionId);
         if (resolved === null || !this.isConnected || this.sessions.activeId !== sessionId) {
-          this.refusedQuestions.set(sessionId, question);
+          this.contextDomain.refuseQuestion(sessionId, question);
           this.requestUpdate();
           return;
         }
         context = resolved;
-        this.refusedQuestions.delete(sessionId);
+        this.contextDomain.clearRefusedQuestion(sessionId);
       } finally {
         this.contextAskPending.delete(sessionId);
       }
@@ -4646,9 +4322,7 @@ export class SearchV3View extends JfElement {
           // Tempdoc 610 §E.4 — the occupancy this turn reported, recorded on the CONVERSATION that
           // spent it (a terminal that reported none leaves the previous reading standing rather than
           // replacing it with a zero the backend never sent).
-          if (usage !== null) {
-            this.sessions = setSessionContextUsage(this.sessions, ref.sessionId, usage);
-          }
+          this.contextDomain.recordUsage(ref.sessionId, usage);
           // The answer has arrived, so the thinking that preceded it is over — the shipped window
           // ends it on the first content chunk; ending it at the terminal is the same edge for a
           // window whose transcript renders the block beside the answer rather than instead of it.
@@ -4656,7 +4330,7 @@ export class SearchV3View extends JfElement {
           // The record now holds this turn; the store now holds the conversation. Both refreshed so
           // a reload projects exactly what is on screen (inventory A1 + D1).
           void loadConversations();
-          void this.refreshRecord(ref.sessionId);
+          void this.contextDomain.refreshRecord(ref.sessionId);
           void this.maybeGenerateTitle(ref.sessionId);
         },
         // The lock's refusal is worded by the ONE reason vocabulary, not re-phrased here.
@@ -4674,7 +4348,7 @@ export class SearchV3View extends JfElement {
           // Saved as stopped: the record gives the turn its store ids (so it can be retried,
           // edited or branched) and the list its conversation, as after a finished answer.
           void loadConversations();
-          void this.refreshRecord(ref.sessionId);
+          void this.contextDomain.refreshRecord(ref.sessionId);
         },
         onLeft: () => { task.revoked = true; this.saveRecovery(task); settle('left'); },
         onFailed: (message, code, refusal) => {
@@ -4697,7 +4371,7 @@ export class SearchV3View extends JfElement {
           const noEvidence = !restricted && shapeId === SV3_ASK_SHAPE_ID && code === 'NO_CONTENT' && scope === null;
           settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
           void loadConversations();
-          void this.refreshRecord(ref.sessionId);
+          void this.contextDomain.refreshRecord(ref.sessionId);
           if (handoff !== null && this.sessions.activeId === ref.sessionId && task.ownsComposer && sentDraft.port.isCurrent(sentDraft)) {
             this.preparedHandoff = handoff;
             this.search.prepare(scope);
@@ -4940,8 +4614,8 @@ export class SearchV3View extends JfElement {
     if (prevId !== id) this.closePane();
     // The RECORD is what the reader is being shown, so it is fetched on the claim rather than trusted
     // from whatever this window happened to still hold (inventory D1).
-    void this.refreshRecord(id);
-    void this.refreshHistory(id);
+    void this.contextDomain.refreshRecord(id);
+    void this.contextDomain.refreshHistory(id);
     void this.setComposerState('docked');
     // Tempdoc 864 Layer 1(a) — a claim leaves the reader at a ready composer, so the caret goes there.
     // This is also what takes focus OFF the row button the click parked it on: that control swaps the
@@ -5117,8 +4791,7 @@ export class SearchV3View extends JfElement {
       }
       this.placeScopes.delete(gone);
       this.placeTiers.delete(gone);
-      this.recordReads.get(gone)?.abort();
-      this.recordReads.delete(gone);
+      this.contextDomain.forgetConversation(gone);
       this.runDomain.forgetConversation(gone);
       if (this.sessions.activeId === gone) this.resetToHero();
       if (readLastViewedConversation() === gone) clearLastViewedConversation();
@@ -5223,7 +4896,7 @@ export class SearchV3View extends JfElement {
     // slot honest: Send belongs in a fresh conversation, not a Stop for a run that is not in it.
     this.runDomain.detach();
     this.renamingId = null;
-    this.recordNotice = false;
+    this.contextDomain.recordNotice = false;
     // The open document was a citation of THIS conversation's answer; it says nothing about the one
     // being started, and a pane left open would attach another session's evidence to a blank hero.
     this.closePane();
@@ -5323,7 +4996,7 @@ export class SearchV3View extends JfElement {
     // ONE reading of the effective context per render, shared by the transcript's frames and the
     // bar's aggregate — so the dimmed turns and the "N turns hidden" count cannot disagree.
     const session = this.activeSession;
-    const contexts = this.turnContexts();
+    const contexts = this.contextDomain.turnContexts();
     return html`
       ${this.sidebarNarrow && !this.sidebarCollapsed ? html`<button
         type="button"
@@ -5390,7 +5063,9 @@ export class SearchV3View extends JfElement {
         @sv3-remedy=${this.onRemedy}
         @sv3-citation-open=${this.onCitationOpen}
         @sv3-context-menu=${this.onContextMenu}
-        @sv3-context-action=${this.onContextAction}
+        @sv3-context-action=${(event: CustomEvent<Sv3ContextAction>) => {
+          if (event.detail !== undefined) void this.contextDomain.runContextAction(event.detail);
+        }}
         @sv3-model-answer=${this.onModelAnswer}
         @sv3-model-focus=${this.onFocusComposerEvent}
         @sv3-branch-action=${this.onBranchAction}
@@ -5424,7 +5099,7 @@ export class SearchV3View extends JfElement {
           .run=${visibleRun}
           .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
           .unconfirmedSteerNotes=${this.runDomain.unconfirmedSteerNotes}
-          ?record-notice=${this.recordNotice}
+          ?record-notice=${this.contextDomain.recordNotice}
           ?history-locked=${this.historyLocked}
           ?locked-refusal=${this.lockedRefusal}
           .reasoning=${this.liveReasoning()}
@@ -5444,7 +5119,7 @@ export class SearchV3View extends JfElement {
              box and the transcript scrolls beneath it rather than being cut off above it. -->
         <div class="dock" data-testid="sv3-dock">
         <jf-sv3-context-bar
-          .notice=${session === null ? '' : this.contextNotice(session.id)}
+          .notice=${session === null ? '' : this.contextDomain.contextNotice(session.id)}
           .usage=${session?.contextUsage ?? null}
           .contextWindow=${this.aiSnapshot?.runtime.contextWindow ?? null}
           hidden-turns=${sv3ExcludedTurnCount(contexts)}

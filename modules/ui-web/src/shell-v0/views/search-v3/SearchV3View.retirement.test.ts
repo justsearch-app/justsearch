@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
+import type { Sv3ContextDomain } from './sv3-context-domain.js';
 import { __feedContactForTest, getAiState, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
 import { __resetConversationListForTest, loadConversations } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
@@ -14,7 +15,7 @@ import type { ThreadEvent } from '../unifiedThreadProjection.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
 
 type Region = HTMLElement & { updateComplete: Promise<unknown> };
-type View = Omit<SearchV3View, 'runAsk' | 'refreshRecord' | 'refreshHistory'> & { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void>; refreshRecord(id: string): Promise<boolean>; refreshHistory(id: string): Promise<void> };
+type View = Omit<SearchV3View, 'runAsk' | 'contextDomain'> & { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void>; contextDomain: Sv3ContextDomain };
 let records: ThreadEvent[];
 let failed: boolean;
 let gone: boolean;
@@ -119,9 +120,9 @@ it('S2 reloaded bulk-reindex refusal remains expanded, self-contained and occurs
 });
 it('S2 failed refresh notice clears on success without replacing the transcript with an empty state', async () => {
   records = [row('q', 'USER_MESSAGE', 'Saved question', 'core.rag-ask'), row('a', 'ASSISTANT_MESSAGE', 'Saved answer', 'core.rag-ask')];
-  const view = await mount(true); failed = true; await view.refreshRecord('saved'); await settle(view);
+  const view = await mount(true); failed = true; await view.contextDomain.refreshRecord('saved'); await settle(view);
   expect(main(view).shadowRoot!.querySelector('[data-testid="sv3-record-notice"]')).not.toBeNull();
-  failed = false; await view.refreshRecord('saved'); await settle(view);
+  failed = false; await view.contextDomain.refreshRecord('saved'); await settle(view);
   expect(main(view).shadowRoot!.querySelector('[data-testid="sv3-record-notice"]')).toBeNull();
   expect(main(view).shadowRoot!.querySelector('[data-testid="sv3-turn"]')).not.toBeNull();
 });
@@ -130,9 +131,10 @@ it.each(['thread', 'history'])('S2 confirmed deletion cannot be resurrected by a
   const view = await mount(true); expect(main(view).shadowRoot!.querySelector('[data-testid="sv3-turn"]')).not.toBeNull();
   const wait = new Promise<void>(resolve => release.push(resolve));
   if (channel === 'thread') threadWait = wait; else historyWait = wait;
-  const pending = channel === 'thread' ? view.refreshRecord('saved') : view.refreshHistory('saved');
+  const pending = channel === 'thread' ? view.contextDomain.refreshRecord('saved') : view.contextDomain.refreshHistory('saved');
   gone = true; await loadConversations(); await settle(view);
   release[0]!(); await pending; await settle(view);
+  expect(view.sessions.sessions.some(session => session.id === 'saved')).toBe(false);
   expect(readLastViewedConversation()).toBeNull();
   expect(main(view).shadowRoot!.querySelector('[data-testid="sv3-turn"]')).toBeNull();
   expect(main(view).shadowRoot!.textContent).not.toContain('Private answer');

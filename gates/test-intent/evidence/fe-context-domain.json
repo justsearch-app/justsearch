@@ -1,0 +1,527 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T15:30:59.176Z",
+  "revision": "c2b1967bb25806351419e4195c96e613c6b0038b",
+  "tree": "11368931458534f17fa242126200295726e0ac23",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" \"src/shell-v0/views/search-v3/sv3-context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/wwz2p5k_/tmp/test-intent-vitest-4-1793374245977.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 13184
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#still attempts the answer exclusion after a refused question and displays the saved partial result",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) still attempts the answer exclusion after a refused question and displays the saved partial result",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps Exclude Restore Include in selection order through an overlapping open read and final confirmation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps Exclude Restore Include in selection order through an overlapping open read and final confirmation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#caps uncertain-history retries at thirty seconds and online resets the cadence without duplicate listeners",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) caps uncertain-history retries at thirty seconds and online resets the cadence without duplicate listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the previous occupancy when a later terminal omits usage and redraws against the current runtime window",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "how full the context is, and what is in it keeps the previous occupancy when a later terminal omits usage and redraws against the current runtime window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#uses the current API base and encoded conversation ID for initial and later record and history reads",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "record and history transport preservation uses the current API base and encoded conversation ID for initial and later record and history reads",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps history HTTP 404 empty, uncertain or locked respectively",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "record and history transport preservation keeps history HTTP 404 empty, uncertain or locked respectively",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps history HTTP 500 empty, uncertain or locked respectively",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "record and history transport preservation keeps history HTTP 500 empty, uncertain or locked respectively",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps history HTTP 423 empty, uncertain or locked respectively",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "record and history transport preservation keeps history HTTP 423 empty, uncertain or locked respectively",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts#sends summary then individual nonblank messages in mixed-mode order, omitting unsuccessful Structured exchanges",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5339aae4354d0a5016d51cd5be7a56de661fc94a8f019a2229531e4b5eff32ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preserved follow-up message semantics sends summary then individual nonblank messages in mixed-mode order, omitting unsuccessful Structured exchanges",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts#fails open for an absent floor without putting a divider on a neighbouring turn",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5339aae4354d0a5016d51cd5be7a56de661fc94a8f019a2229531e4b5eff32ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preserved follow-up message semantics fails open for an absent floor without putting a divider on a neighbouring turn",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts#uses the saved assistant ID as the floor target when a turn has no saved question",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5339aae4354d0a5016d51cd5be7a56de661fc94a8f019a2229531e4b5eff32ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preserved follow-up message semantics uses the saved assistant ID as the floor target when a turn has no saved question",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:80e4b4a193b7c8d15d1be644c0e1ead41b09d063736b56ce6398d339dd0e5e62",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S2 Ask fallback wording survives a live done terminal",
+          "status": "passed"
+        },
+        {
+          "name": "S2 Ask fallback wording survives a live error terminal",
+          "status": "passed"
+        },
+        {
+          "name": "D-T44 live document-too-small fallback explains its retrieval mode",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders complete with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders early stop with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders partial stop with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders model with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders document fallback with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders no evidence with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 reloaded bulk-reindex refusal remains expanded, self-contained and occurs once",
+          "status": "passed"
+        },
+        {
+          "name": "S2 failed refresh notice clears on success without replacing the transcript with an empty state",
+          "status": "passed"
+        },
+        {
+          "name": "S2 confirmed deletion cannot be resurrected by a late thread response",
+          "status": "passed"
+        },
+        {
+          "name": "S2 confirmed deletion cannot be resurrected by a late history response",
+          "status": "passed"
+        },
+        {
+          "name": "S2 null or incomplete status never unlocks a locked transcript; disconnect tears down delivery",
+          "status": "passed"
+        },
+        {
+          "name": "S2 refused Structured Stop keeps streaming and permits a successful retry naming the same turn",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 activity cancellation coalesces repeated Structured Stop presses",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a record-only conversation renders without companion messages and an empty record keeps Search usable",
+          "status": "passed"
+        },
+        {
+          "name": "S2 reloaded no-evidence and its model answer retain separate outcome frames in one conversation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b8bb1dc26c9cc8b29bdf21019fc1b63c24da5f4d2fcd394f20e855897f712da",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S8 P5 reload projects an existing record with stop_requested before CANCELLED as on the baseline",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S8 P5 reload projects an existing record with stop_requested before DONE as on the baseline",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S8 P5 reload projects an existing record with stop_requested before READY_FOR_LLM as on the baseline",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S1 stopping uses Ask Stop presentation and retains arriving output until the terminal",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S3 refused uses Ask Stop unconfirmed presentation and keeps Stop retryable",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S3 network uses Ask Stop unconfirmed presentation and keeps Stop retryable",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 http start failure with Stop false shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 http start failure with Stop true shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 network start failure with Stop false shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 network start failure with Stop true shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 lost start failure with Stop false shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 lost start failure with Stop true shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record G1 a start that never answers releases the composer at the Stop deadline with a failed receipt and no polling",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 early Stop then completion before identity releases the composer without polling",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N3 resumed known conversation reconciles a later CANCELLED only at its actual address",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N3 resumed unknown conversation reconciles a later CANCELLED only at its actual address",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S3 S6 no stop response becomes unconfirmed, keeps output and allows one new attempt",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S4 losing the stream while stopping follows the CANCELLED lifecycle without inventing confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S4 losing the stream while stopping follows the DONE lifecycle without inventing confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S4 losing the stream while stopping follows the READY_FOR_LLM lifecycle without inventing confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S11 stopping closes the held decision and suppresses later automatic budget continuation",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S12 one confirmed receipt and announcement retain the final tool count and evidence through refresh",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record R4 discovery and record fetches that never answer are aborted and leave unconfirmed Stop available",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record R4 ERROR lifecycle after lost stopping stream produces a failed receipt without a streamed error",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record R4 Stop retry after the polling grace reads a later CANCELLED and removes the unconfirmed controls",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS1 DS2 DS3 DS8 delayed cancellation appears once without reload or focus movement",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS4 keeps completed output and disposition when completion wins Stop",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS4 DS5 an observer reconciles Stop saved after its completed record read",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DN1 clean DONE stops record reads after the five-second grace, also after navigation",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N4 accepted Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N4 refused Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N4 network Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N4 no-answer Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS3 DS4 this window own Halt still waits beyond the clean-DONE grace",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after pending",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after CANCELLED",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after DONE",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS5 DS7 remote cancellation with an early record read recovers once without generic failure",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS5 both windows reconcile one Stop and keep a different conversation untouched",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS7 a dropped observer retries a failed record fallback without inventing Stop",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS5 DS7 cold attach keeps the named conversation and its already loaded record turn",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DN2 an old-window Halt updates the observing Search turn and preserves saved partial output",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS6 clears a held budget decision when Stop settles",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS6 clears a held context decision when Stop settles",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS6 clears a held approval decision when Stop settles",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop preserves other terminal meanings DN1 a dropped transport alone does not remove the held decision",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop preserves other terminal meanings DN1 preserves genuine complete without inventing Stop",
+          "status": "passed"
+        },
+        {
+          "name": "Delegate Stop preserves other terminal meanings DN1 preserves genuine failure without inventing Stop",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps uncertainty through an overlapping open read until the pending write confirms its own result",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps uncertainty through an overlapping open read until the pending write confirms its own result",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts#S2 confirmed deletion cannot be resurrected by a late thread response",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:80e4b4a193b7c8d15d1be644c0e1ead41b09d063736b56ce6398d339dd0e5e62",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S2 confirmed deletion cannot be resurrected by a late thread response",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts#S2 confirmed deletion cannot be resurrected by a late history response",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:80e4b4a193b7c8d15d1be644c0e1ead41b09d063736b56ce6398d339dd0e5e62",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S2 confirmed deletion cannot be resurrected by a late history response",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0ed0804e666c46f0e163ea13baa49b89fb33da2cd86de1eecffc3d580673f1ec"
+}
