@@ -94,3 +94,14 @@ machine's `~/.gradle/init.d/50-agent-tmp.gradle`.
   "digest": "sha256:80eef422333e803b711b231c1c4cac7be1643b3e60d79c4e8195053c188344af"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-da2f9a-codex-5",
+  "verdict": "accept",
+  "digest": "sha256:d725790d97acc8d6aa3f6b19c20dc334f0a00817b39f542610c0234fbd294ec5",
+  "note": "Accepted narrowed scope after independent source preservation and native-run14 artifact review. Known boot-migration failures, empty findmnt snapshots and concurrent same-worktree ownership limitation remain explicitly disclosed; no drive operation run in verifier sandbox."
+}
+```
