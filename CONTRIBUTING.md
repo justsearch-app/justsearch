@@ -125,6 +125,13 @@ node scripts/lib/tool-invoker.cjs gradle build
 
 Tests tagged `evidence`/`experiment` and `stress` opt in with `-PincludeExperiment=true` and `-PincludeStress=true`.
 Real-drive integration tests are excluded from ordinary runs; `-PincludeRealDrives=true` enables them and mounts disposable loop images in the desktop session.
+A SIGKILLed opted-in run can leave loop devices, mounts and images under
+`modules/ui/build/drive-return-images/jvm-*`; later test runs leave these leftovers alone.
+List them with `losetup -a` or `udisksctl status` and identify each device by its backing image.
+Unmount a mounted leftover with `udisksctl unmount -b /dev/loopN`, then remove its loop device
+with `udisksctl loop-delete -b /dev/loopN`. After detaching, remove that run's image files and
+empty private directory. Loop devices and mounts disappear at reboot; image files on disk remain
+until removed manually.
 
 ### Code Style
 

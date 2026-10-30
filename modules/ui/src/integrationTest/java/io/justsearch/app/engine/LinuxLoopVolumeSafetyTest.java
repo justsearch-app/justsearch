@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.engine;
 
-import static io.justsearch.app.engine.LinuxLoopVolume.OwnerState.*;
-import static io.justsearch.app.engine.LinuxLoopVolume.SweepDecision.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -26,11 +24,6 @@ import org.junit.jupiter.api.io.TempDir;
 @Timeout(15)
 final class LinuxLoopVolumeSafetyTest {
   @TempDir Path directory;
-  private static final Path IMAGES = Path.of("/checkout/modules/ui/build/drive-return-images");
-  private static final Path IMAGE = IMAGES.resolve("drive-return-123-456-789-8-1-11.img");
-  private static final LinuxLoopVolume.FileIdentity BACKING = new LinuxLoopVolume.FileIdentity(11, "8:1");
-  private static final LinuxLoopVolume.FileIdentity REPLACEMENT = new LinuxLoopVolume.FileIdentity(12, "8:1");
-
   @BeforeEach void setUserIdentity() throws Exception {
     var uid = LinuxLoopVolume.class.getDeclaredField("uid");
     uid.setAccessible(true);
@@ -111,80 +104,164 @@ final class LinuxLoopVolumeSafetyTest {
     assertEquals("replacement", Files.readString(file));
   }
 
-  @Test void orphanSweepDeletesOnlyDeadUnreferencedIdentityMatchingImages() throws Exception {
-    for (boolean decoy : List.of(false, true)) {
-      Path file = LinuxLoopVolume.createImage(directory, decoy);
-      var identityMethod = LinuxLoopVolume.class.getDeclaredMethod("fileIdentity", Path.class);
-      identityMethod.setAccessible(true);
-      assertEquals(identityMethod.invoke(null, file), LinuxLoopVolume.recordedIdentity(file));
-      assertEquals(new LinuxLoopVolume.Owner(ProcessHandle.current().pid(),
-          LinuxLoopVolume.processStart(Files.readString(Path.of("/proc/self/stat")))), LinuxLoopVolume.owner(file));
-      for (var state : List.of(ALIVE, UNKNOWN)) {
-        LinuxLoopVolume.deleteOrphan(directory, file, state, false);
-        assertTrue(Files.exists(file));
+  private static LinuxLoopVolume volume(Path file) throws Exception {
+    var constructor = LinuxLoopVolume.class.getDeclaredConstructor(Path.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(file);
+  }
+
+  private static void set(Object target, String name, Object value) throws Exception {
+    var field = LinuxLoopVolume.class.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(target, value);
+  }
+
+  private static void shutdownCleanup(LinuxLoopVolume volume) throws Exception {
+    var method = LinuxLoopVolume.class.getDeclaredMethod("cleanup", boolean.class);
+    method.setAccessible(true);
+    method.invoke(volume, true);
+  }
+
+  private LinuxLoopVolume attachedVolume(Path images) throws Exception {
+    Path file = LinuxLoopVolume.createImage(images, false);
+    var volume = volume(file);
+    set(volume, "loop", new LinuxLoopVolume.Attachment("/dev/loop999998", file,
+        LinuxLoopVolume.recordedIdentity(file)));
+    return volume;
+  }
+
+  /** Only recorded devices are exposed. Any global scan or native command escapes fail. */
+  private org.mockito.MockedStatic<Files> associations(Path images) {
+    return mockStatic(Files.class, invocation -> {
+      String method = invocation.getMethod().getName();
+      if (method.equals("list")) throw new AssertionError("cleanup must never scan devices or images");
+      if (method.equals("readString")) {
+        Path path = invocation.getArgument(0);
+        if (path.startsWith("/sys/class/block")) {
+          if (path.endsWith("dev")) return "7:999998";
+          String suffix = path.toString().contains("loop999999") ? "-decoy.img" : ".img";
+          try (var files = Files.walk(images)) {
+            return files.filter(p -> p.toString().endsWith(suffix)
+                && (suffix.equals("-decoy.img") || !p.toString().endsWith("-decoy.img")))
+                .findFirst().orElseThrow().toString();
+          }
+        }
       }
-      LinuxLoopVolume.deleteOrphan(directory, file, DEAD, true);
-      assertTrue(Files.exists(file), "a referenced image is left for loop cleanup");
-      LinuxLoopVolume.deleteOrphan(directory, file, DEAD, false);
-      assertFalse(Files.exists(file));
+      if (method.equals("readAllLines") && invocation.getArgument(0).equals(Path.of("/proc/self/mountinfo"))) {
+        return List.of();
+      }
+      return invocation.callRealMethod();
+    });
+  }
+
+  private static Process completedProcess() throws Exception {
+    Process process = mock(Process.class);
+    when(process.waitFor(anyLong(), eq(TimeUnit.NANOSECONDS))).thenReturn(true);
+    when(process.exitValue()).thenReturn(0);
+    when(process.descendants()).thenAnswer(ignored -> java.util.stream.Stream.empty());
+    return process;
+  }
+
+  @Test void teardownThenHookNeverActsOnAReusedDevice() throws Exception {
+    Path images = LinuxLoopVolume.createImageDirectory(directory);
+    var volume = attachedVolume(images);
+    Process process = completedProcess();
+    try (var snapshots = associations(images);
+        var builders = mockConstruction(ProcessBuilder.class, withSettings().defaultAnswer(RETURNS_SELF),
+            (builder, context) -> when(builder.start()).thenReturn(process))) {
+      volume.close();
+      shutdownCleanup(volume); // The same device number may now belong to another JVM.
+      assertEquals(1, builders.constructed().size());
+      snapshots.verify(() -> Files.readString(Path.of("/sys/class/block/loop999998/loop/backing_file")), times(4));
     }
-    Path file = LinuxLoopVolume.createImage(directory, false);
-    Files.move(file, directory.resolve("original-orphan"));
+    assertFalse(Files.exists(images));
+  }
+
+  @Test void hookDuringTeardownNeverClaimsTheSameVolume() throws Exception {
+    Path images = LinuxLoopVolume.createImageDirectory(directory);
+    var volume = attachedVolume(images);
+    Process process = completedProcess();
+    when(process.waitFor(anyLong(), eq(TimeUnit.NANOSECONDS))).thenAnswer(ignored -> {
+      var failure = new AtomicReference<Throwable>();
+      Thread hook = new Thread(() -> {
+        try { shutdownCleanup(volume); }
+        catch (Throwable problem) { failure.set(problem); }
+      });
+      hook.start();
+      hook.join(1_000);
+      assertFalse(hook.isAlive(), "hook does not wait for teardown");
+      assertNull(failure.get());
+      return true;
+    });
+    try (var snapshots = associations(images);
+        var builders = mockConstruction(ProcessBuilder.class, withSettings().defaultAnswer(RETURNS_SELF),
+            (builder, context) -> when(builder.start()).thenReturn(process))) {
+      volume.close();
+      assertEquals(1, builders.constructed().size());
+      snapshots.verify(() -> Files.readString(Path.of("/sys/class/block/loop999998/loop/backing_file")), times(4));
+    }
+    assertFalse(Files.exists(images));
+  }
+
+  @Test void hookDuringAwayLeavesTheDeviceWithItsFirstCleanupOwner() throws Exception {
+    Path images = LinuxLoopVolume.createImageDirectory(directory);
+    var volume = attachedVolume(images);
+    Process process = completedProcess();
+    when(process.waitFor(anyLong(), eq(TimeUnit.NANOSECONDS))).thenAnswer(ignored -> {
+      shutdownCleanup(volume); // Deterministic interleaving after the device claim, before detach completes.
+      assertTrue(Files.exists(images), "in-flight image must not be unlinked");
+      return true;
+    });
+    try (var snapshots = associations(images);
+        var builders = mockConstruction(ProcessBuilder.class, withSettings().defaultAnswer(RETURNS_SELF),
+            (builder, context) -> when(builder.start()).thenReturn(process))) {
+      volume.away();
+      volume.close();
+      assertEquals(1, builders.constructed().size());
+      snapshots.verify(() -> Files.readString(Path.of("/sys/class/block/loop999998/loop/backing_file")), times(4));
+    }
+    assertFalse(Files.exists(images));
+  }
+
+  @Test void failedDeviceDoesNotPreventOtherOwnedDeviceCleanup() throws Exception {
+    Path images = LinuxLoopVolume.createImageDirectory(directory);
+    var volume = attachedVolume(images);
+    Path decoy = LinuxLoopVolume.createImage(images, true);
+    set(volume, "decoyImage", decoy);
+    set(volume, "decoyIdentity", LinuxLoopVolume.recordedIdentity(decoy));
+    set(volume, "decoy", new LinuxLoopVolume.Attachment("/dev/loop999999", decoy,
+        LinuxLoopVolume.recordedIdentity(decoy)));
+    Process failed = completedProcess();
+    when(failed.exitValue()).thenReturn(1);
+    Process success = completedProcess();
+    try (var snapshots = associations(images);
+        var builders = mockConstruction(ProcessBuilder.class, withSettings().defaultAnswer(RETURNS_SELF),
+            (builder, context) -> when(builder.start()).thenReturn(context.getCount() == 1 ? failed : success))) {
+      assertThrows(IOException.class, volume::close);
+      assertEquals(2, builders.constructed().size());
+      snapshots.verify(() -> Files.readString(Path.of("/sys/class/block/loop999999/loop/backing_file")), times(4));
+    }
+    assertFalse(Files.exists(decoy));
+    assertTrue(Files.exists(images), "failed device retains its image for manual cleanup");
+  }
+
+  @Test void privateImageCleanupChecksCreationIdentityAndPreservesOtherRuns() throws Exception {
+    Path images = LinuxLoopVolume.createImageDirectory(directory);
+    assertEquals(java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"),
+        Files.getPosixFilePermissions(images));
+    Path otherImages = LinuxLoopVolume.createImageDirectory(directory);
+    Path other = LinuxLoopVolume.createImage(otherImages, false);
+    Path file = LinuxLoopVolume.createImage(images, false);
+    var volume = volume(file);
+    Files.move(file, images.resolve("original"));
     Files.writeString(file, "replacement");
-    LinuxLoopVolume.deleteOrphan(directory, file, DEAD, false);
+    assertThrows(IOException.class, volume::close);
     assertEquals("replacement", Files.readString(file));
-    Path legacy = Files.writeString(directory.resolve("drive-return-123-456-789.img"), "unknown identity");
-    LinuxLoopVolume.deleteOrphan(directory, legacy, DEAD, false);
-    assertTrue(Files.exists(legacy));
-    Path unrelated = Files.writeString(directory.resolve("outside.img"), "unrelated");
-    LinuxLoopVolume.deleteOrphan(directory, unrelated, DEAD, false);
-    assertTrue(Files.exists(unrelated));
-  }
-
-  @Test void deletedBackingNeverUnlinksItsReplacement() {
-    assertEquals(DETACH, LinuxLoopVolume.decide(IMAGES, IMAGE, true, BACKING, REPLACEMENT, true, true, DEAD, false));
-    assertEquals(DETACH, LinuxLoopVolume.decide(IMAGES, IMAGE, true, BACKING, null, false, true, DEAD, false));
-  }
-
-  @Test void existingFileRequiresBothDeviceAndInode() {
-    assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGE, false, BACKING, REPLACEMENT, true, true, DEAD, false));
-    assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGE, false, BACKING,
-        new LinuxLoopVolume.FileIdentity(11, "8:2"), true, true, DEAD, false));
-    assertEquals(DETACH_AND_DELETE, LinuxLoopVolume.decide(IMAGES, IMAGE, false, BACKING, BACKING, true, true, DEAD, false));
-  }
-
-  @Test void liveOwnerSurvivesCleanAndAnotherJvmSweep() {
-    // Even with deleted build output and the same udisks UID, the original process is alive.
-    var owner = LinuxLoopVolume.owner(IMAGE);
-    assertEquals(new LinuxLoopVolume.Owner(123, 456), owner);
-    var live = LinuxLoopVolume.ownerState(owner, 456L, true);
-    assertEquals(ALIVE, live);
-    assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGE, true, BACKING, null, false, true, live, false));
-    assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGE, false, BACKING, BACKING, true, true, live, false));
-  }
-
-  @Test void onlyProvenDeadOwnersCanBeRecovered() {
-    var owner = LinuxLoopVolume.owner(IMAGE);
-    assertEquals(DEAD, LinuxLoopVolume.ownerState(owner, null, true));
-    assertEquals(DEAD, LinuxLoopVolume.ownerState(owner, 999L, true), "PID reuse is a different process");
-    assertEquals(UNKNOWN, LinuxLoopVolume.ownerState(owner, null, false));
-    assertEquals(UNKNOWN, LinuxLoopVolume.ownerState(null, null, true));
-    assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGE, true, BACKING, null, false, true, UNKNOWN, false));
-    assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGES.resolve("drive-return-789.img"), true,
-        BACKING, null, false, true, DEAD, false), "old names have no provable process owner");
-  }
-
-  @Test void unrelatedOrUnprovenAssociationsArePreserved() {
-    for (Path file : List.of(IMAGES.resolve("outside-pattern-decoy.img"),
-        Path.of("/another-worktree/build/drive-return-images/drive-return-123-456-789-8-1-11.img"),
-        IMAGES.resolve("../drive-return-123-456-789-8-1-11.img"))) {
-      assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, file, false, BACKING, BACKING, true, true, DEAD, false));
-    }
-    assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGE, false, BACKING, BACKING, true, false, DEAD, false));
-    assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGE, false, null, BACKING, true, true, DEAD, false));
-    assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGE, false, BACKING, BACKING, false, true, DEAD, false));
-    assertEquals(DETACH, LinuxLoopVolume.decide(IMAGES, IMAGE, true, BACKING, null, false, true, ALIVE, true),
-        "the owning JVM can clean its own tracked association");
+    assertTrue(Files.exists(other));
+    Path cleanImages = LinuxLoopVolume.createImageDirectory(directory);
+    volume(LinuxLoopVolume.createImage(cleanImages, false)).close();
+    assertFalse(Files.exists(cleanImages));
+    assertTrue(Files.exists(other));
   }
 
   @Test void processStartHandlesSpacesAndParenthesesInProcessName() throws Exception {
