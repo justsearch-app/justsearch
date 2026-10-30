@@ -1,7 +1,7 @@
 [package]
 name = "shell"
 default-run = "shell"
-version = "0.3.0"
+version = "0.3.1"
 description = "Private desktop search and AI answers over your files"
 authors = ["JustSearch Contributors"]
 license = "Apache-2.0"

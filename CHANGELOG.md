@@ -13,18 +13,44 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-30
+
+### Added
+- Linux desktop support: an x86_64 `.deb` for Ubuntu 24.04 and later, with a desktop launcher, tray and `justsearch://` links (#761, #986)
+- Search lists documents, filters by folder, date and size, and understands exact phrases, exclusions, `title:` and `author:`; Structured mode extracts schema-checked JSON (#805, #911, #1011, #1012, #1014)
+- Recent searches and conversations open from the search bar; conversation branches show their original and let you return to it (#912, #1009)
+- Pause indexing from its status controls, keep it paused across restarts, or set indexing hours and pause on battery; Search stays available (#904, #918, #1033)
+- Forget a file or folder from the Library and keep it out of search and assistant reads across rescans and restarts; review and forget assistant memories from Search (#935, #998)
+- Settings can delete local data while keeping downloaded AI models; Alt+Shift+Space summons Search on Windows and Linux X11, with `--focus-search` as the Wayland alternative (#821)
+- Turn off automatic update checks with `JUSTSEARCH_AUTO_UPDATE_CHECK=false`; administrators can forbid all app-update checks and downloads with `appUpdatesEnabled` in policy (#856)
+
 ### Changed
-- Search is now the main window. The old chat window is gone; its links, bookmarks and plugins open Search.
-- Answer and extraction links prepare the request and wait for you to send it.
-- Workflow-run links open Search with the notice “Workflow runs are not available here”.
-- Production API reads and streams now require the per-boot token except the six public Runtime Contract reads. Native clients read the owner-only runtime manifest; `/api/mcp/token` and stdout token emission are removed. Update MCPB to 0.3.1: older bridges fail with HTTP 401 against this Engine. The updated bridge also works with the previous Engine release. Explicit port overrides require `JUSTSEARCH_SESSION_TOKEN`.
-- `POST /api/settings/v2` writes now require the latest GET witness and a fresh canonical UUIDv7 operation key
-- `POST /api/worker/restart` returns HTTP 410; use `POST /api/engine/components/index/recover`
+- Search replaces the old chat window; old links, bookmarks and plugins open Search, answer and extraction links wait for you to send, and workflow-run links show an unavailable notice (#936, #1003, #1005)
+- Windows and Linux updates use signed multi-platform metadata; Linux installs through a system password prompt. **0.3.0 users cannot update in-app to this release: install the new version over the old one; your data is kept** (#993, #1053)
+- Install AI works on Linux for CPU search, obeys download policy even when it cannot be read, names missing required downloads as failures, resumes retries and repairs incomplete GPU-pack extraction; empty libraries can activate models (#853, #897, #992, #1013)
+- Search and chat share GPU memory, background work yields while chat answers, and chat unloads with a reason when another app needs the memory; the Engine uses less memory at startup (#759, #907, #952)
+- Answers show when citation checking is in progress or incomplete and when a source is gone; result highlights follow whole words and source previews hide supported front matter (#903, #938, #985, #1051)
+- Update the Claude Desktop extension (MCPB) to 0.3.1: older bridges receive HTTP 401; the updated bridge also works with the previous Engine. Production API reads and streams require the per-boot token except six public Runtime Contract reads; native clients use the owner-only runtime manifest, and explicit port overrides require both a proven manifest and `JUSTSEARCH_SESSION_TOKEN` (#775, #799, #825)
+- API settings writes require the latest GET witness and a fresh canonical UUIDv7 operation key (#727)
 
 ### Removed
-- The pins panel is removed. Stored pins are kept, and plugins can still read them.
-- The old window’s automatic search-history events and pin-run updates stop. Existing history records and pin data are kept.
-- `/api/inference/reload`; inference refresh now uses the accepted `core.reconfigure` operation
+- The pins panel and the old window’s automatic search-history events and pin-run updates; existing history and pins stay, and plugins can still read pins (#1005)
+- `/api/mcp/token` and stdout token emission; `/api/inference/reload` gives way to `core.reconfigure`, and `POST /api/worker/restart` returns HTTP 410: use `POST /api/engine/components/index/recover` (#727, #825)
+
+### Fixed
+- Text extraction preserves UTF-8, UTF-16, split Unicode characters and PDF page boundaries, reports decoding loss, and respects configured extraction limits (#976, #981, #983, #989, #995, #997, #1002)
+- Changed files with old timestamps are re-read, exclusions stay enforced, watcher deletions cannot remove newer content, returning drives resume, and files keep their declared folder’s collection (#843, #848, #910, #1004, #1045)
+- Upgrading from 0.3.0 keeps a compatible index and queued work; interrupted index switches recover, and removing folders during rebuilds leaves nested watched folders intact (#893, #921, #951, #1010, #1016)
+- Uncertain index state no longer triggers deletion, unreadable memories are not overwritten, and keystore saves survive crashes (#758, #812, #857)
+- Search during reload asks you to retry, keyword fallback pages correctly, answer retrieval handles ranking and timeouts honestly, and citations with wrong or cut-off numbers stay unverified (#914, #930, #959, #974, #977, #979)
+- Delegate applies every steering direction and resumes approval waits correctly; Stop stays pending until the Engine confirms, conversation deletion preserves unrelated drafts, and saved messages keep their order (#811, #899, #947, #954, #1048)
+- A crashed Engine can restart from recovery without quitting the app, keeps its crash evidence across restarts, and leaves indexing startable after a kill (#822, #826, #1025)
+- Open file and Show in folder work in installed builds; Windows High Contrast remains usable, and help and Report a problem lead to current guidance (#776, #792, #924, #986)
+- Credentials go only to a proven Engine, runtime and encryption folders are owner-only, and tokenizer tracking requests and Google Fonts preconnects stop (#799, #827, #831, #838, #873)
+
+#### Known Issues
+- Chat requires a supported NVIDIA GPU; it has no CPU fallback. Chat on a Windows GPU is not tested in this release (#1030, #1053)
+- Linux chat needs published NVIDIA GPU packs and a registry update; the shipped registry contains no Linux packs, so Install AI currently offers CPU search only (#1030, #1044)
 
 ## [0.3.0] - 2026-09-07
 
