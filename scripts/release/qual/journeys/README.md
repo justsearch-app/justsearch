@@ -247,6 +247,9 @@ the source that produced that candidate. For the round-nine development continua
 J3 adds the small corpus through the production API as a prerequisite, without
 a J2 result. Installation still uses fresh private downloads, production
 activation and the acknowledged Start AI control.
+For a development isolation check without AI installation or GPU work, use
+`--journeys J1 J2 --write-budget-bytes 2000000000`; the summary marks this
+subset as development evidence.
 The summary records its commit and the
 last release tag (default: latest reachable `v[0-9]*` tag via `git describe`).
 J9's relevance decision diffs that tag against the source commit. Named owners:
@@ -336,19 +339,34 @@ including Engine JSON log lines within ±5 seconds; it is not a passed GPU check
 It also reports the count and first/last time of BackfillScheduler's
 `ZERO stage advancement` warning without failing on that warning. The summary's
 `deviceWriteUpperBound` reports the whole-device write delta including unrelated
-host IO. No progress gap may exceed 600 seconds. An unexpected Engine restart
-fails; completion of the corpus is not required. The memory guard is the
+host IO. Indexing must advance within 600 seconds while it has work. The direct
+queue signal is `worker.core.pendingJobs`; the tracker also includes in-flight
+`pendingVduCount`, `writerQueueDepth`, `writerPendingDocs`, migration
+`pendingJobsCount`/`processingJobsCount` and a running `migrationEnumerator`.
+Each enabled enrichment stage with pending work (document embedding, chunk
+embedding, document SPLADE, chunk SPLADE and NER) gets its own 600-second window
+only once those indexing counters are zero and enumeration is stopped. Production
+defers enrichment during indexing; resumed indexing resets enrichment windows.
+An advancing stage cannot mask a stalled one. An eligible stage with no advance
+for over 600 seconds fails J9 as product, naming the stage, completed and pending
+counts, when indexing went idle and its last advance relative to soak start.
+Disabled stages and stages without pending work are exempt; new pending work
+starts its own window even if indexing was already idle.
+An unexpected Engine restart fails; completion of the corpus is not required. The memory guard is the
 packaged Engine's reported maximum heap (`-Xmx2g`): used heap must remain below
 it; the independent host MemAvailable guard protects native allocations and the
 owner. This does not claim a native/RSS leak test.
 
 `resources.json`, exact session process identities and their private display/bus
 record enforce isolation. Before and after the run, the external wrapper records
-only paths, mtimes, sizes and modes under the owner’s `~/.justsearch`; no file
-contents or symlink targets there are read. A metadata change fails isolation.
-The wrapper also creates, checks and removes one uniquely
-named sentinel in the **existing** owner's real app-data folder, without reading
-other contents. Before the runner starts, `sandbox.json` records DISPLAY naming the lane's Xvfb,
+only names, mtimes, sizes and modes for the owner’s `~/.justsearch`,
+`~/.local/share/io.justsearch*`, `~/.config/io.justsearch*` and
+`~/.cache/io.justsearch*`, including each root directory’s own mtime. The first
+snapshot precedes all lane setup and the second follows cleanup. No file contents
+or symlink targets are read, and no sentinel is created in owner state. Any
+metadata difference fails isolation. The structural sandbox proof records before
+the candidate starts that the owner home is hidden by the explicit private mounts.
+Before the runner starts, `sandbox.json` records DISPLAY naming the lane's Xvfb,
 `/tmp/.X11-unix` containing only its socket, the lane's actual D-Bus socket,
 and no owner Wayland, bus or Pulse sockets under the private `/run/user/<uid>`.
 Unreadable diagnostic `/proc` entries cannot fail this structural proof. New JVM
@@ -365,8 +383,8 @@ same baseline: resolve the private-root mount's major/minor device with
 device, not attribution to lane processes. No global sync is issued; pending
 writeback and the final accounting-file write are outside the final sample.
 `private-root-size.json` records `du -s -B1` before state removal (allocated
-size, not cumulative writes). The 30 GB continuation guard samples every second
-and reserves 512 MB for cleanup.
+size, not cumulative writes). The guard samples every second and reserves
+512 MB for cleanup. `--write-budget-bytes` can lower its default 30 GB limit.
 
 After downloads and activation, the lane saves a private development checkpoint.
 A later infrastructure failure retains that root with all processes stopped;

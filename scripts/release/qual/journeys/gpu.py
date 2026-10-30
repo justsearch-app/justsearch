@@ -173,14 +173,45 @@ def soak_decision(source, last_release=None):
                        'No indexing, enrichment or inference owner changed since ' + tag)}
 
 
+def progress_stages(status):
+    worker = status.get('worker') or {}
+    core = worker.get('core') or {}
+    enrichment = worker.get('enrichment') or {}
+    chunk = enrichment.get('chunk') or {}
+    stages = {}
+
+    def stage(name, source, completed, pending, enabled=True):
+        if type(enabled) is not bool:
+            raise Infrastructure('J9 stage enablement unavailable: ' + name)
+        counts = [source.get(completed), source.get(pending)]
+        if enabled and any(type(value) is not int or value < 0 for value in counts):
+            raise Infrastructure('J9 progress counters unavailable: ' + name)
+        stages[name] = {'enabled': enabled, 'completed': counts[0], 'pending': counts[1]}
+
+    stage('indexing', core, 'indexedDocuments', 'pendingJobs')
+    migration = worker.get('migration') or {}
+    # Include in-flight work and enumeration before queued jobs are visible.
+    stages['indexing']['pending'] = max(stages['indexing']['pending'],
+        *(core.get(key, 0) for key in ('pendingVduCount', 'writerQueueDepth', 'writerPendingDocs')),
+        *(migration.get(key, 0) for key in ('pendingJobsCount', 'processingJobsCount')),
+        int(bool((migration.get('migrationEnumerator') or {}).get('running'))))
+    stage('document embedding', enrichment, 'embeddingCompletedCount', 'embeddingPendingCount', enrichment.get('embeddingEnabled'))
+    stage('chunk embedding', chunk, 'chunkEmbeddingCompletedCount', 'chunkEmbeddingPendingCount', enrichment.get('embeddingEnabled'))
+    stage('document SPLADE', enrichment, 'spladeCompletedCount', 'spladePendingCount', enrichment.get('spladeEnabled'))
+    stage('chunk SPLADE', chunk, 'chunkSpladeCompletedCount', 'chunkSpladePendingCount', chunk.get('chunkSpladeEnabled'))
+    stage('NER', enrichment, 'completedNerCount', 'pendingNerCount', enrichment.get('nerEnabled'))
+    return stages
+
+
 class SoakProgress:
     def __init__(self, started):
-        self.started = self.last_progress = started
-        self.high_water = -1
+        self.started = started
+        self.stages = {}
         self.identity = None
         self.samples = 0
+        self.indexing_idle_since = None
 
-    def observe(self, now, progress, used, maximum, identity):
+    def observe(self, now, stages, used, maximum, identity):
         if not maximum or maximum <= 0 or used < 0:
             raise Infrastructure('Engine memory guard is unavailable')
         if used >= maximum:
@@ -188,18 +219,43 @@ class SoakProgress:
         if self.identity is not None and identity != self.identity:
             raise ProductFailure('Engine identity changed during soak (unexpected restart)')
         self.identity = identity
-        if progress > self.high_water:
-            self.high_water = progress
-            self.last_progress = now
-        if now - self.last_progress > 600:
-            raise ProductFailure('No steady indexing/enrichment progress for over 10 minutes')
+        # pendingJobs is the production queue signal; progress_stages also covers
+        # in-flight writes/VDU and enumeration before queued jobs are visible.
+        indexing_busy = stages['indexing']['pending'] > 0
+        if indexing_busy:
+            self.indexing_idle_since = None
+        elif self.indexing_idle_since is None:
+            self.indexing_idle_since = now - self.started
+        stalled = []
+        for name, counts in stages.items():
+            previous = self.stages.get(name)
+            # Production defers enrichment while indexing has work. Reset its
+            # window if ingest resumes, then start a fresh one on the next idle.
+            active = counts['enabled'] and counts['pending'] > 0 and (name == 'indexing' or not indexing_busy)
+            state = {**counts, 'lastAdvanceSeconds': previous['lastAdvanceSeconds'] if previous else now - self.started,
+                     'pendingSinceSeconds': previous['pendingSinceSeconds'] if previous and active else None,
+                     'highWater': previous['highWater'] if previous else (counts['completed'] if counts['enabled'] else -1)}
+            if active and state['pendingSinceSeconds'] is None:
+                state['pendingSinceSeconds'] = now - self.started
+            clock = max(state['lastAdvanceSeconds'], state['pendingSinceSeconds']) if active else None
+            if active and now - self.started - clock > 600:
+                stalled.append(f"{name}: completed={counts['completed']}, pending={counts['pending']}, "
+                               f"last advance at soak +{state['lastAdvanceSeconds']:.3f}s "
+                               f"(eligible pending since +{state['pendingSinceSeconds']:.3f}s)" +
+                               (f"; indexing idle since +{self.indexing_idle_since:.3f}s" if name != 'indexing' else ''))
+            if counts['enabled'] and counts['completed'] > state['highWater']:
+                state['highWater'] = counts['completed']
+                state['lastAdvanceSeconds'] = now - self.started
+            self.stages[name] = state
         self.samples += 1
+        if stalled:
+            raise ProductFailure('No stage progress for over 10 minutes: ' + '; '.join(stalled))
 
     def complete(self, now):
         if now - self.started < 3600:
             raise Infrastructure('J9 did not observe the full 60 minutes')
         return {'seconds': now - self.started, 'samples': self.samples,
-                'progressHighWater': self.high_water, 'engineIdentity': self.identity,
+                'progressStages': self.stages, 'engineIdentity': self.identity,
                 'memoryGuard': 'Production /api/status memoryUsedBytes < memoryMaxBytes (-Xmx2g)'}
 
 
@@ -768,12 +824,7 @@ def soak(run):
         while True:
             status = run.api('/api/status')
             manifest = json.loads(Path(run.data, 'runtime/manifest.json').read_text())
-            core = status.get('worker', {}).get('core', {})
-            enrichment = status.get('worker', {}).get('enrichment', {})
-            if type(core.get('indexedDocuments')) is not int:
-                raise Infrastructure('J9 progress counters unavailable')
-            progress = core['indexedDocuments'] + sum(enrichment.get(key, 0) for key in
-                ('embeddingCompletedCount', 'spladeCompletedCount', 'completedNerCount'))
+            stages = progress_stages(status)
             runtime = run.api('/api/ai/runtime/status')
             epoch = time.time()
             worker = worker_cuda(run, manifest['pid'])
@@ -782,10 +833,10 @@ def soak(run):
             worker['mapsEvidence'] = maps_file
             sample = {'seconds': time.monotonic() - tracker.started, 'epochSeconds': epoch,
                       'status': status, 'runtime': runtime, 'workerCuda': worker,
-                      'identity': [manifest['pid'], manifest['instanceId']], 'progress': progress}
+                      'identity': [manifest['pid'], manifest['instanceId']], 'progressStages': stages}
             samples.append(sample)
             run.evidence('J9-observations', samples)
-            tracker.observe(time.monotonic(), progress, status.get('memoryUsedBytes', 0),
+            tracker.observe(tracker.started + sample['seconds'], stages, status.get('memoryUsedBytes', 0),
                             status.get('memoryMaxBytes', 0), sample['identity'])
             gpu_tracker.observe(sample)
             if time.monotonic() - tracker.started >= 3600:
@@ -794,7 +845,7 @@ def soak(run):
     finally:
         diagnostics = soak_logs(Path(run.data, 'logs/engine.log'), started_epoch, time.time(),
                                 gpu_tracker.observations)
-        diagnostics.update(confirmedGpuChecks=gpu_tracker.confirmed_checks,
+        diagnostics.update(progressStages=tracker.stages, confirmedGpuChecks=gpu_tracker.confirmed_checks,
                            gpuObservationCount=len(gpu_tracker.observations),
                            observationMeaning='Runtime/worker mismatches are observations, not passed GPU checks; fallback requires consecutive CPU samples >=30s apart and absent worker compute memory and CUDA maps in both samples')
         run.facts['soak'] = diagnostics

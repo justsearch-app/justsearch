@@ -102,9 +102,16 @@ def owner_tree(root):
         if stat.S_ISDIR(info.st_mode):
             for child in sorted(path.iterdir()):
                 visit(child)
-    if root.exists():
+    if root.exists() or root.is_symlink():
         visit(root)
     return rows
+
+
+def owner_metadata(home):
+    roots = [home / '.justsearch']
+    for parent in ('.local/share', '.config', '.cache'):
+        roots.extend(sorted((home / parent).glob('io.justsearch*')))
+    return [{'root': str(root), 'entries': owner_tree(root)} for root in roots]
 
 
 def assert_home_bindings(home, bindings):
@@ -376,9 +383,9 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
                     for row in rows:
                         process_rows[(row['pid'], row['ticks'])] = row
                     current_writes = gpu.device_writes(args.write_start['device']) - args.write_start['startBytes']
-                    if current_writes >= BUDGET - 512_000_000:
-                        failure = 'Continuation device write upper bound approached (30 GB; 512 MB reserved for cleanup)'
-                        save(evidence / 'write-budget-stop.json', {'observedBytes': current_writes, 'budgetBytes': BUDGET})
+                    if current_writes >= args.write_budget_bytes - 512_000_000:
+                        failure = f'Device write upper bound approached ({args.write_budget_bytes} bytes; 512 MB reserved for cleanup)'
+                        save(evidence / 'write-budget-stop.json', {'observedBytes': current_writes, 'budgetBytes': args.write_budget_bytes})
                         break
                     if time.monotonic() >= next_check:
                         sample = gpu.resource_sample({r['pid'] for r in rows})
@@ -473,9 +480,13 @@ def main():
     parser.add_argument('--development-pack-mirror', type=Path)
     parser.add_argument('--development-mirror-port', type=int, default=8769)
     parser.add_argument('--journeys', nargs='+')
+    parser.add_argument('--write-budget-bytes', type=int, default=BUDGET,
+                        help='Whole-device write upper bound; at most 30 GB, with 512 MB reserved for cleanup')
     parser.add_argument('--development-resume-root', type=Path,
                         help='Development only: retained activated private root; no downloads are repeated')
     args, forwarded = parser.parse_known_args()
+    if not 512_000_000 < args.write_budget_bytes <= BUDGET:
+        parser.error('--write-budget-bytes must exceed the 512 MB cleanup reserve and be at most 30 GB')
     if not 1 <= args.development_mirror_port <= 65535:
         parser.error('--development-mirror-port must be a TCP port in 1..65535')
     out = args.evidence.resolve()
@@ -498,19 +509,11 @@ def main():
                       '--development-mirror-port', str(args.development_mirror_port)]
     if args.journeys:
         forwarded += ['--journeys', *args.journeys]
-    # Only the explicitly requested sentinel is touched in the owner's real app
-    # folder. Existing data/settings/index contents are never opened.
-    owner_data = Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local/share'))) / 'io.justsearch.shell'
-    sentinel = owner_data / ('.w4c-isolation-' + secrets.token_hex(12))
-    sentinel_bytes = secrets.token_bytes(64)
     report = None
-    owner_state = Path.home() / '.justsearch'
-    before = owner_tree(owner_state)
+    owner_home = Path.home()
+    before = owner_metadata(owner_home)
     save(out / 'owner-tree-before.json', before)
     try:
-        with sentinel.open('xb') as stream:
-            stream.write(sentinel_bytes)
-        save(out / 'owner-sentinel-before.json', {'path': str(sentinel), 'sha256': runner.digest(sentinel)})
         for attempt in (1, 2):
             evidence = out / f'attempt-{attempt}'
             report, interrupted = run_attempt(args, [*forwarded, '--evidence', str(evidence)], evidence,
@@ -528,23 +531,17 @@ def main():
                 time.sleep(min(300, max(0, deadline - time.monotonic())))
             if not sample['available']:
                 break
-        intact = sentinel.read_bytes() == sentinel_bytes
-        save(out / 'owner-sentinel.json', {'path': str(sentinel), 'unchanged': intact, 'sha256': runner.digest(sentinel)})
-        add_check(report, 'owner data sentinel', 'passed' if intact else 'failed-infrastructure',
-                  'Owner data sentinel unchanged' if intact else 'Owner data sentinel changed', ['owner-sentinel.json'])
     except BaseException as exc:
         report = report or runner.preparation_failure('gpu-linux', str(exc) or type(exc).__name__)
         if report.get('status') != 'failed':
             add_check(report, 'host failure', 'failed-infrastructure', str(exc), [])
     finally:
-        after = owner_tree(owner_state)
+        after = owner_metadata(owner_home)
         save(out / 'owner-tree-after.json', after)
         if report:
             add_check(report, 'owner saved state metadata', 'passed' if before == after else 'failed-infrastructure',
-                      'Owner ~/.justsearch metadata unchanged' if before == after else 'Owner ~/.justsearch metadata changed',
+                      'Owner JustSearch metadata unchanged, including root directory mtimes' if before == after else 'Owner JustSearch metadata changed (names, sizes, modes or mtimes, including root directories)',
                       ['owner-tree-before.json', 'owner-tree-after.json'])
-        if sentinel.exists():
-            sentinel.unlink()
         if report:
             report['execution'] = {**report.get('execution', {}),
                 'releaseQualification': not bool(args.development_pack_mirror or args.journeys or args.development_resume_root)}
@@ -563,7 +560,7 @@ def main():
             save(out / 'summary.json', report)
         final_bytes = gpu.device_writes(args.write_start['device'])
         save(out / 'write-volume.json', {**args.write_start, 'endBytes': final_bytes,
-            'writtenBytes': final_bytes - args.write_start['startBytes'], 'budgetBytes': BUDGET,
+            'writtenBytes': final_bytes - args.write_start['startBytes'], 'budgetBytes': args.write_budget_bytes,
             'measurement': 'Private-root mount device /proc/diskstats sectors written delta * 512; same baseline as live guard',
             'limit': 'Upper bound includes unrelated host IO on this device. No global sync; pending writeback and final accounting-file write are outside the sample.'})
         if report:

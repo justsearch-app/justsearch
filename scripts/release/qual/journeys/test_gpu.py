@@ -22,6 +22,7 @@ try:
 except ModuleNotFoundError:
     gpu = None
 import runner
+from test_w4c_repair import status as progress_status
 
 
 class GpuTests(unittest.TestCase):
@@ -208,7 +209,7 @@ class GpuTests(unittest.TestCase):
             def api(path, body=None):
                 if path == '/api/status':
                     calls['status'] += 1
-                    return {'worker': {'core': {'indexedDocuments': calls['status']}},
+                    return {**progress_status(calls['status'], 0),
                             'memoryUsedBytes': 100, 'memoryMaxBytes': 200}
                 if path == '/api/ai/runtime/status':
                     calls['runtime'] += 1
@@ -236,29 +237,29 @@ class GpuTests(unittest.TestCase):
 
     def test_soak_no_gap_over_ten_minutes_and_memory_guard(self):
         progress = gpu.SoakProgress(0)
-        progress.observe(0, 1, 100, 200, 'boot-one')
-        progress.observe(600, 2, 100, 200, 'boot-one')
+        progress.observe(0, gpu.progress_stages(progress_status(1)), 100, 200, 'boot-one')
+        progress.observe(600, gpu.progress_stages(progress_status(2)), 100, 200, 'boot-one')
         with self.assertRaisesRegex(runner.ProductFailure, 'progress'):
-            progress.observe(1201, 2, 100, 200, 'boot-one')
+            progress.observe(1201, gpu.progress_stages(progress_status(2)), 100, 200, 'boot-one')
         for used, maximum in ((200, 200), (201, 200)):
             with self.assertRaisesRegex(runner.ProductFailure, 'memory guard'):
-                gpu.SoakProgress(0).observe(0, 1, used, maximum, 'boot-one')
+                gpu.SoakProgress(0).observe(0, gpu.progress_stages(progress_status(1)), used, maximum, 'boot-one')
         with self.assertRaises(runner.Infrastructure):
-            gpu.SoakProgress(0).observe(0, 1, 0, 0, 'boot-one')
+            gpu.SoakProgress(0).observe(0, gpu.progress_stages(progress_status(1)), 0, 0, 'boot-one')
 
     def test_soak_engine_restart_is_not_a_pass(self):
         progress = gpu.SoakProgress(0)
-        progress.observe(0, 1, 100, 200, 'boot-one')
+        progress.observe(0, gpu.progress_stages(progress_status(1)), 100, 200, 'boot-one')
         with self.assertRaisesRegex(runner.ProductFailure, 'Engine identity'):
-            progress.observe(30, 2, 100, 200, 'boot-two')
+            progress.observe(30, gpu.progress_stages(progress_status(2)), 100, 200, 'boot-two')
 
     def test_soak_rejects_short_run(self):
         progress = gpu.SoakProgress(0)
-        progress.observe(0, 1, 100, 200, 'boot')
+        progress.observe(0, gpu.progress_stages(progress_status(1)), 100, 200, 'boot')
         with self.assertRaises(runner.Infrastructure):
             progress.complete(3599)
         for now in range(600, 3601, 600):
-            progress.observe(now, now, 100, 200, 'boot')
+            progress.observe(now, gpu.progress_stages(progress_status(now)), 100, 200, 'boot')
         self.assertEqual(progress.complete(3600)['seconds'], 3600)
 
     def test_skipped_soak_uses_shared_classification_and_is_never_pass(self):
