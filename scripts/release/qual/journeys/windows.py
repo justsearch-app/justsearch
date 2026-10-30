@@ -1449,7 +1449,23 @@ def update_success(run):
     return {'observation': observed, 'installer': installation, 'actions': actions, 'engine': engine, 'state': state}
 
 
-from linux import install_ai as shared_install_ai, author_state, restart, mcp
+from linux import install_ai as shared_install_ai, author_state as shared_author_state, restart, mcp
+
+
+def author_state(run):
+    if run.args.resume and run.facts.get('authored'):
+        from linux import assert_state, stored_bookmarks
+        # Development checkpoints already contain the UI-authored record.
+        # Preserve its identity instead of trying the now-absent add control.
+        bookmark = run.require('bookmark')
+        run.require('beforeState')
+        if bookmark not in stored_bookmarks(run):
+            raise ProductFailure('Checkpoint-authored bookmark missing from Web Storage')
+        state = assert_state(run)
+        run.evidence('J4-restored-authored-state', {'bookmark': bookmark, 'state': state,
+            'source': 'UI-authored prerequisite retained in the stopped checkpoint; Web Storage and Engine rechecked'})
+        return state
+    return shared_author_state(run)
 
 
 def install_ai(run):

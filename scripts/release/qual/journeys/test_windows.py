@@ -556,6 +556,32 @@ class WindowsOperationalTests(unittest.TestCase):
 
 
 class WindowsUpdateAndCrashTests(unittest.TestCase):
+    def test_cached_j4_preserves_checkpoint_bookmark_instead_of_reauthoring(self):
+        bookmark={'id':'fixture-id','label':'Library','url':'app://library'}
+        run=Mock(args=SimpleNamespace(resume='checkpoint.json'),
+                 facts={'authored':True,'bookmark':bookmark,'beforeState':{'retained':True}})
+        run.require.side_effect=lambda key:run.facts[key]
+        run.wd.click.side_effect=Infrastructure('Bookmark this view absent because already bookmarked')
+        with patch.object(linux,'stored_bookmarks',return_value=[bookmark]), \
+             patch.object(linux,'assert_state',return_value={'retained':True}) as state:
+            self.assertEqual(windows.author_state(run),{'retained':True})
+        state.assert_called_once_with(run)
+        run.wd.click.assert_not_called()
+        with patch.object(linux,'stored_bookmarks',return_value=[]), \
+             self.assertRaisesRegex(ProductFailure,'missing from Web Storage'):
+            windows.author_state(run)
+        with patch.object(linux,'stored_bookmarks',return_value=[bookmark]), \
+             patch.object(linux,'assert_state',side_effect=ProductFailure('Settings changed')), \
+             self.assertRaisesRegex(ProductFailure,'Settings changed'):
+            windows.author_state(run)
+
+    def test_fresh_j4_still_authors_through_the_ui(self):
+        for resume, authored in ((None,False),('checkpoint.json',False)):
+            run=Mock(args=SimpleNamespace(resume=resume),facts={'authored':authored})
+            with patch.object(windows,'shared_author_state',return_value='fresh UI record') as author:
+                self.assertEqual(windows.author_state(run),'fresh UI record')
+            author.assert_called_once_with(run)
+
     def test_log_collection_preserves_utf8_and_invalid_byte_diagnostics_on_windows(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);work=root/'work';work.mkdir()
