@@ -916,27 +916,60 @@ public final class WorkerIngestService {
     try (var ignoredMutation = mutationLease()) {
       requireWatcherRootCurrent(witness);
       if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
-          path, witness.root())) return;
-      acceptWatcherUpsertUnderLease(collection, path, witness.root());
+          path, witness.root()) || isUserExcluded(path, witness.root())) return;
+      if (!unchangedWatcherSource(collection, path, witness.root())) {
+        acceptWatcherUpsertUnderLease(collection, path, witness.root());
+      }
       requireWatcherRootCurrent(witness);
+    }
+  }
+
+  private boolean unchangedWatcherSource(String collection, Path path, Path root) {
+    if (!ingestIsServing || ingestLifecycle == null || !ingestLifecycle.isAcceptingWrites()
+        || isUserExcluded(path, root)) return false;
+    try {
+      var source = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
+          java.nio.file.LinkOption.NOFOLLOW_LINKS);
+      var fields = ingestLifecycle.documentFieldOps();
+      String key = PathNormalizer.normalizeKey(path);
+      if (!source.isRegularFile()
+          || !fields.isUnmodified(key, source.lastModifiedTime().toMillis(), source.size())
+          || !Objects.equals(normalizeRootCollection(collection),
+              normalizeRootCollection(fields.getDocumentFieldOrThrow(key, SchemaFields.COLLECTION)))) return false;
+      // A metadata-only event cannot replace accepted work while the source is deferred.
+      if (SyncDirectoryOps.isCloudPlaceholder(path) || !Files.isReadable(path)) return true;
+      String storedHash = fields.getDocumentFieldOrThrow(key, SchemaFields.SOURCE_SHA256);
+      if (storedHash == null
+          || !storedHash.equals(io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(path, root))) return false;
+      var current = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
+          java.nio.file.LinkOption.NOFOLLOW_LINKS);
+      return current.isRegularFile() && source.size() == current.size()
+          && source.lastModifiedTime().equals(current.lastModifiedTime())
+          && Objects.equals(source.fileKey(), current.fileKey());
+    } catch (IOException unreadable) {
+      return false;
     }
   }
 
   private boolean acceptWatcherUpsertUnderLease(String collection, Path path, Path root) {
     if (!prefixScope(root.toString()).contains(path.toAbsolutePath().normalize().toString())) return false;
-    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)) {
+    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
+        || isUserExcluded(path, root)) {
       return false;
     }
     var entry = WorkerMethvinWatcher.entryForLiveEvent(path).withinRoot(root);
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration != null) {
       if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
-          || !sbq.enqueueAndBufferFileForGeneration(
+          || !sbq.enqueueMaintenanceFileForGeneration(
               candidateGeneration, entry, collection)) {
         throw IngestSwitchBufferOps.switchBufferUnavailable();
       }
-    } else if (jobQueue.enqueueEntries(List.of(entry), collection) != 1) {
-      throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
+    } else {
+      int changed = jobQueue.enqueueMaintenanceScanEntries(List.of(entry), collection, null);
+      if (changed < 0 || changed > 1) {
+        throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
+      }
     }
     return true;
   }
@@ -2165,7 +2198,8 @@ public final class WorkerIngestService {
         // 813 Slice B: stat each admitted path for its byte size. A stat failure degrades that
         // entry to unknown size (NULL) — it never rejects the enqueue.
         var entries = validPaths.stream()
-            .map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance()).withinRoot(path)).toList();
+            .map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance()).withinRoot(path)
+                .withForceReindex(request.getForceReindex())).toList();
         String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
         int accepted = withFileMutationFence(() -> {
           if (ctx.cancelled() || collectionAtStart != collectionRemoval(collection)
@@ -2178,19 +2212,6 @@ public final class WorkerIngestService {
         });
         if (candidateGeneration != null && accepted != entries.size()) {
           throw IngestSwitchBufferOps.switchBufferUnavailable();
-        }
-
-        // Mark paths for force reindex if requested (bypasses "unchanged" check).
-        // The key must be the one JobBatchExtractor looks the forced set up by — the envelope's —
-        // so it is derived through the shared PathNormalizer#normalizeKey rather than re-spelled
-        // here. sanitizePath currently keeps a `..` or relative shape from ever reaching this line,
-        // which is what made the old hand-rolled derivation agree by accident; that agreement is now
-        // structural and survives a change to either side (tempdoc 821 §P/P3).
-        if (request.getForceReindex() && accepted > 0) {
-          List<String> normalizedPaths =
-              validPaths.stream().map(PathNormalizer::normalizeKey).toList();
-          forcedPathSink.accept(normalizedPaths);
-          log.info("Marked {} paths for force reindex", normalizedPaths.size());
         }
 
         // Record metrics
@@ -4401,11 +4422,7 @@ public final class WorkerIngestService {
           || collectionAtStart != collectionRemoval(request.getCollection())
           || untagged && !removalsAtStart.equals(collectionRemovals);
       try {
-        // Tempdoc 821 §3-C3 — a FORCE_REINDEX scan marks its admitted paths through the SAME
-        // forced-path set submitBatch's force_reindex flag feeds (see #submitBatch above).
-        // The marks go through the same sink as submitBatch's, so a forced scan admitted by a
-        // read-only (deferred) service set reaches the loop its writer upgrade creates.
-        var scanner = new WorkerScanOps(jobQueue, queueDepth, isCancelled, paths -> forcedPathSink.accept(paths),
+        var scanner = new WorkerScanOps(jobQueue, queueDepth, isCancelled,
             () -> validateRecordedGeneration(Objects.requireNonNull(recorded), ctx),
             switchBufferOps::buildingGenerationForFileAdmission);
         scanner.setAdmissionFence(admit -> withFileMutationFence(() ->

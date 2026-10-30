@@ -88,7 +88,7 @@ final class QueueScaleV24MigrationEvidenceTest {
           double seconds = (System.nanoTime() - start) / 1e9;
           System.out.printf("Q12 v%d -> V24 1M-row migration=%.3fs; crash exit=74, rollback version=%d%n", source, seconds, source);
           assertTrue(seconds < 60, "migration exceeds 60s");
-          assertEquals(25, version(conn)); // V24, then V25 in the same transaction
+          assertEquals(26, version(conn)); // V24 through V26 share the migration transaction
           assertEquals(before, digest(conn, columns), "migration changed saved fields");
         }
         try (var queue = attachMigratedQueue(db)) {
@@ -164,7 +164,7 @@ final class QueueScaleV24MigrationEvidenceTest {
         .redirectErrorStream(true).redirectOutput(log.toFile()).start();
     awaitSuccess(probe);
     String text = Files.readString(log);
-    assertTrue(text.contains("Unsupported jobs database schema version 25 (this binary supports through 23)"), text);
+    assertTrue(text.contains("Unsupported jobs database schema version 26 (this binary supports through 23)"), text);
     System.out.println("Q13 " + text.strip());
   }
 

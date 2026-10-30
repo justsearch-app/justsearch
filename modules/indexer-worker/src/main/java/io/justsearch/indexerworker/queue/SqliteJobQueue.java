@@ -2602,13 +2602,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // per-document terminal outcomes into one durable scan-completion audit record.
       String scan = (scanId != null && !scanId.isBlank()) ? scanId : null;
 
-      int count = inTransaction(
+      CandidateFileBatch result = inTransaction(
           () -> enqueueEntriesInTransaction(
               entries, col, scan, now, exactCollection, unitRevision, preserveRetryWaits, declared));
 
-      meters.recordEnqueued(count);
-      log.debug("Enqueued {} jobs (collection={}, scanId={})", count, col, scan);
-      return count;
+      meters.recordEnqueued(result.enqueued());
+      log.debug("Covered {} jobs (collection={}, scanId={})", result.covered(), col, scan);
+      return preserveRetryWaits ? result.enqueued() : result.covered();
     } catch (SQLException e) {
       log.error("Failed to enqueue jobs", e);
       if (preserveRetryWaits) {
@@ -2865,7 +2865,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             }
           }
           if (enqueueEntriesInTransaction(List.of(admitted), collection, null,
-              System.currentTimeMillis(), false, null, false, declared) != 1) {
+              System.currentTimeMillis(), false, null, false, declared).covered() != 1) {
             throw new SQLException("Retirement sync admission incomplete");
           }
           if (exact) bufferAdmittedFile(generation, admitted);
@@ -3083,22 +3083,46 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  private boolean preservesMaintenanceWork(JobQueue.EnqueueEntry entry, String collection, boolean exactCollection,
+      String sourceIdentity, long now) throws SQLException {
+    try (var query = connection.prepareStatement(
+        "SELECT state,collection,admitted_source_sha256,planned_source_sha256,unit_revision,ingestion_root FROM jobs WHERE path=?")) {
+      query.setString(1, normalizePath(entry.path()));
+      try (var row = query.executeQuery()) {
+        if (!row.next() || STATE_DONE.equals(row.getString(1))) return false;
+        String revision = row.getString(5);
+        if (revision != null && (revision.startsWith("release030")
+            || revision.startsWith("root1:") || revision.startsWith("root2:"))) {
+          return preservesMaintenanceRetryWait(entry.path(), now);
+        }
+        if (row.getString(3) == null && preservesMaintenanceRetryWait(entry.path(), now)) return true;
+        if ((exactCollection || collection != null) && !Objects.equals(collection, row.getString(2))) return false;
+        if (!Objects.equals(PathNormalizer.normalizeKey(entry.ingestionRoot()), row.getString(6))) return false;
+        String prior = row.getString(3) == null ? row.getString(4) : row.getString(3);
+        if (sourceIdentity != null && prior != null) return sourceIdentity.equals(prior);
+        // Missing legacy evidence or an unreadable source cannot establish changed work.
+        // Keep the accepted revision and retry history until a change can be proved.
+        return prior == null || sourceIdentity == null;
+      }
+    }
+  }
+
   private int enqueueEntriesInTransaction(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
       boolean exactCollection, String unitRevision) throws SQLException {
     return enqueueEntriesInTransaction(
         entries, collection, scanId, now, exactCollection, unitRevision, false,
-        List.of());
+        List.of()).covered();
   }
 
-  private int enqueueEntriesInTransaction(
+  private CandidateFileBatch enqueueEntriesInTransaction(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
       boolean exactCollection, String unitRevision, boolean preserveRetryWaits,
       List<IngestCollectionPolicy.RootBinding> declared)
       throws SQLException {
     String sql = """
         INSERT INTO jobs
-          (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
+          (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root, force_reindex, admitted_source_sha256)
         VALUES (
           ?, 'PENDING', 0, ?,
           CASE WHEN ? = 1 THEN ? ELSE COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)) END,
@@ -3107,17 +3131,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
           COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
           COALESCE(?, lower(hex(randomblob(16)))), ?, ?,
-          COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)))
+          COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)), ?, ?)
         """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT;
-    if (preserveRetryWaits) {
-      // A startup scan is discovery, not a request to retry a terminal failure or an unchanged
-      // failing parser/file before its deadline.
-      // Recorded memberships retain their own existing mutation contract. An exhausted row is
-      // still revived; explicit/forced scans, watcher events and ordinary sync are unchanged.
-      sql += " WHERE NOT (" + MAINTENANCE_RETRY_WAIT + ")";
-    }
     var frozen = frozenCollectionRoots.get();
     int accepted = 0;
+    int enqueued = 0;
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
       for (JobQueue.EnqueueEntry entry : entries) {
         if (entry == null || entry.path() == null) {
@@ -3125,6 +3143,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         }
         String normalizedPath =
             PathNormalizer.normalizePath(entry.path().toAbsolutePath().toString());
+        boolean ordinaryAdmission = unitRevision == null
+            && (releaseRecovery == null || !releaseRecovery.retiringBuild());
+        String sourceIdentity = !ordinaryAdmission ? null
+            : entry.plannedSourceSha256() != null ? entry.plannedSourceSha256()
+                : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot());
         sealBeforeMaintenance(normalizedPath);
         var membership =
             SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scanId);
@@ -3149,6 +3172,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             }
           }
         }
+        if (preserveRetryWaits && !entry.forceReindex()
+            && (ordinaryAdmission
+                ? preservesMaintenanceWork(entry, effectiveCollection, exact, sourceIdentity, now)
+                : preservesMaintenanceRetryWait(entry.path(), now))) {
+          accepted++;
+          continue;
+        }
         stmt.setInt(3, exact ? 1 : 0);
         stmt.setString(4, effectiveCollection);
         stmt.setString(5, effectiveCollection);
@@ -3170,15 +3200,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             ? entry.plannedSourceSha256() : membership.plannedSourceSha256());
         stmt.setString(16, PathNormalizer.normalizeKey(entry.ingestionRoot()));
         stmt.setString(17, normalizedPath);
-        if (preserveRetryWaits) stmt.setLong(18, now);
+        stmt.setInt(18, entry.forceReindex() ? 1 : 0);
+        stmt.setString(19, sourceIdentity);
         int changed = stmt.executeUpdate();
+        enqueued += changed;
         if (changed > 0 && membership.epoch() != null) {
           SqliteIngestionWalkOps.noteMutation(connection, membership.key());
         }
         accepted += changed;
       }
     }
-    return accepted;
+    return new CandidateFileBatch(accepted, enqueued);
   }
 
   /**
@@ -3199,19 +3231,26 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public int enqueueAndBufferFilesForGeneration(
       String generation, List<JobQueue.EnqueueEntry> entries, String collection, String scanId) {
-    return enqueueCandidateFileBatch(generation, entries, collection, scanId, false);
+    return enqueueCandidateFileBatch(generation, entries, collection, scanId, false, false);
+  }
+
+  @Override
+  public boolean enqueueMaintenanceFileForGeneration(
+      String generation, JobQueue.EnqueueEntry entry, String collection) {
+    return entry != null && entry.path() != null
+        && enqueueCandidateFileBatch(generation, List.of(entry), collection, null, false, true) == 1;
   }
 
   @Override
   public int enqueueEnumeratedFilesForGeneration(
       String generation, List<JobQueue.EnqueueEntry> entries, String collection) {
-    return enqueueCandidateFileBatch(generation, entries, collection, null, true);
+    return enqueueCandidateFileBatch(generation, entries, collection, null, true, false);
   }
 
   private record CandidateFileBatch(int covered, int enqueued) {}
 
   private int enqueueCandidateFileBatch(String generation, List<JobQueue.EnqueueEntry> entries,
-      String collection, String scanId, boolean enumeration) {
+      String collection, String scanId, boolean enumeration, boolean maintenance) {
     if (generation == null || generation.isBlank() || entries == null || entries.isEmpty()
         || entries.stream().anyMatch(entry -> entry == null || entry.path() == null)) {
       return 0;
@@ -3234,7 +3273,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             ? new JobQueue.EnqueueProvenance("system", "MIGRATION_ENUMERATOR")
             : entry.provenance();
         witnessedEntries.add(new JobQueue.EnqueueEntry(
-            entry.path(), entry.sizeBytes(), provenance, hash, entry.ingestionRoot()));
+            entry.path(), entry.sizeBytes(), provenance, hash, entry.ingestionRoot(), entry.forceReindex()));
       }
     } catch (IOException | RuntimeException unreadable) {
       log.warn("Refusing candidate file admission without source or declaration evidence", unreadable);
@@ -3249,19 +3288,21 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       CandidateFileBatch committed = inTransaction(() -> {
         List<JobQueue.EnqueueEntry> admitted = witnessedEntries;
         int superseded = 0;
-        if (enumeration) {
+        if (enumeration || maintenance) {
           admitted = new ArrayList<>(witnessedEntries.size());
           for (JobQueue.EnqueueEntry entry : witnessedEntries) {
-            if (enumerationSupersededByAcceptedMutation(
-                generation, normalizePath(entry.path()), entry.plannedSourceSha256(), normalizedCollection)) {
+            if ((enumeration && enumerationSupersededByAcceptedMutation(
+                generation, normalizePath(entry.path()), entry.plannedSourceSha256(), normalizedCollection))
+                || (!entry.forceReindex() && identicalCandidateAdmission(generation, entry, normalizedCollection))) {
               superseded++;
             } else {
               admitted.add(entry);
             }
           }
         }
-        int accepted = enqueueEntriesInTransaction(
+        CandidateFileBatch result = enqueueEntriesInTransaction(
             admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), enumeration, null, false, declared);
+        int accepted = result.covered();
         if (accepted != admitted.size()) {
           throw new SQLException("Atomic file batch did not accept every entry");
         }
@@ -3278,6 +3319,32 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       return 0;
     } finally {
       unlockAfterChanges();
+    }
+  }
+
+  /** Repeated enumeration retains the exact candidate receipt, including completed work. */
+  private boolean identicalCandidateAdmission(String generation, JobQueue.EnqueueEntry entry,
+      String collection) throws SQLException {
+    if (releaseRecovery != null && releaseRecovery.retiringBuild()) return false;
+    try (var query = connection.prepareStatement(
+        "SELECT j.unit_revision,j.planned_source_sha256,j.collection,b.op,b.payload,j.ingestion_root FROM jobs j "
+            + "JOIN switch_buffer b ON b.key='path:' || j.path AND b.generation=? WHERE j.path=?")) {
+      query.setString(1, generation);
+      query.setString(2, normalizePath(entry.path()));
+      try (var row = query.executeQuery()) {
+        if (!row.next() || !"UPSERT".equals(row.getString(4))) return false;
+        String revision = row.getString(1);
+        if (revision != null && (revision.startsWith("release030")
+            || revision.startsWith("root1:") || revision.startsWith("root2:"))) return false;
+        var prior = SwitchBufferUpsert.decode(row.getString(5));
+        return Objects.equals(entry.plannedSourceSha256(), row.getString(2))
+            && Objects.equals(collection, row.getString(3))
+            && Objects.equals(prior.unitRevision(), row.getString(1))
+            && Objects.equals(prior.sourceSha256(), row.getString(2))
+            && Objects.equals(prior.collection(), collection)
+            && Objects.equals(prior.ingestionRoot(), entry.ingestionRoot())
+            && Objects.equals(row.getString(6), PathNormalizer.normalizeKey(entry.ingestionRoot()));
+      }
     }
   }
 
@@ -4140,14 +4207,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 """
                 INSERT INTO jobs
                   (path, state, attempts, last_updated, collection, size_bytes, scan_id,
-                   originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
+                   originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root,
+                   admitted_source_sha256, force_reindex)
                 VALUES (?, 'PENDING', 0, ?,
                   (SELECT prior.collection FROM jobs prior WHERE prior.path = ?), ?,
                   ?,
                   COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
                   COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
                   lower(hex(randomblob(16))), ?, ?,
-                  COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)))
+                  COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)), ?, ?)
                 """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT;
             int accepted;
             try (PreparedStatement write = connection.prepareStatement(sql)) {
@@ -4168,6 +4236,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               write.setString(11, membership.plannedSourceSha256());
               write.setString(12, PathNormalizer.normalizeKey(entry.ingestionRoot()));
               write.setString(13, normalizedPath);
+              write.setString(14, entry.plannedSourceSha256() != null ? entry.plannedSourceSha256()
+                  : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot()));
+              write.setInt(15, entry.forceReindex() ? 1 : 0);
               accepted = executeMutation(write::executeUpdate) > 0 ? 1 : 0;
             }
             if (accepted > 0 && membership.epoch() != null) SqliteIngestionWalkOps.noteMutation(connection, membership.key());
@@ -4479,7 +4550,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 for (ClaimedRow row : claimedRows) {
                   claimed.add(new IndexJob(Path.of(row.path()), row.collection(), row.provenance(),
                       row.scanId(), row.unitRevision(), row.walkEpoch(), row.decision() == RecordedClaimDecision.ALLOW_FORCE,
-                      row.plannedHash(), row.ingestionRoot() == null ? null : Path.of(row.ingestionRoot())));
+                      row.plannedHash(), row.ingestionRoot() == null ? null : Path.of(row.ingestionRoot()),
+                      row.walkEpoch() == null && ordinaryForceReindex(row.path())));
                 }
                 return claimed;
               });
@@ -4498,6 +4570,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw SqliteServiceAvailability.failure("Failed to poll pending jobs", e);
     } finally {
       unlockAfterChanges();
+    }
+  }
+
+  private boolean ordinaryForceReindex(String path) throws SQLException {
+    try (var query = connection.prepareStatement("SELECT force_reindex FROM jobs WHERE path=?")) {
+      query.setString(1, path);
+      try (var row = query.executeQuery()) { return row.next() && row.getInt(1) != 0; }
     }
   }
 
@@ -4674,7 +4753,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try (var update = connection.prepareStatement(
         "UPDATE jobs SET state = 'PENDING', attempts = 0, retry_after = NULL, "
             + "first_failed_at = NULL, error_message = NULL, "
-            + "content_hash = NULL, last_updated = ?, unit_revision = ?, planned_source_sha256 = ?, "
+            + "content_hash = NULL, last_updated = ?, unit_revision = ?, planned_source_sha256 = ?, admitted_source_sha256 = NULL, "
             + "last_outcome_class = NULL, last_reason_code = NULL, last_retry_policy = NULL, "
             + "last_diagnostic_summary = NULL, last_outcome_at = NULL "
             + "WHERE path = ? AND state = 'PROCESSING' AND scan_id = ? "
@@ -4865,7 +4944,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               () -> {
                 String sql = """
                     UPDATE jobs
-                    SET state = 'DONE', content_hash = ?, last_updated = ?,
+                    SET state = 'DONE', force_reindex = 0, content_hash = ?, last_updated = ?,
                         last_outcome_class = ?, last_reason_code = ?, last_retry_policy = ?,
                         last_diagnostic_summary = ?, last_outcome_at = ?
                     WHERE path = ?
@@ -6551,7 +6630,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         return enqueueEntriesInTransaction(List.of(entry), collection, null,
-            System.currentTimeMillis(), false, null, false, declared) == 1;
+            System.currentTimeMillis(), false, null, false, declared).covered() == 1;
       });
     } catch (SQLException failure) {
       log.warn("Cannot admit recreated file {}", entry.path(), failure);

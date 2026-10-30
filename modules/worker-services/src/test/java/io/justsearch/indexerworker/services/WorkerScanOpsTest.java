@@ -305,8 +305,7 @@ final class WorkerScanOpsTest {
             file -> false,
             queueDepth,
             () -> false,
-            waiter,
-            paths -> {});
+            waiter);
 
     ScanRootProgress terminal =
         ops.scan(
@@ -344,7 +343,6 @@ final class WorkerScanOpsTest {
           waitCalls.incrementAndGet();
           return false;
         },
-        paths -> {},
         () -> {});
     List<ScanRootProgress> frames = new ArrayList<>();
 
@@ -379,7 +377,7 @@ final class WorkerScanOpsTest {
     };
     WorkerScanOps ops = new WorkerScanOps(
         queue, recorder, file -> file.equals(placeholder), () -> 0L, () -> false,
-        millis -> true, paths -> {}, () -> {});
+        millis -> true, () -> {});
 
     assertThrows(java.io.IOException.class,
         () -> ops.scan(capturedRequest(root, "captured-cloud", 1), ignored -> {}));
@@ -408,7 +406,7 @@ final class WorkerScanOpsTest {
         }, cancelled::get, millis -> {
           waitCalls.incrementAndGet();
           return false;
-        }, paths -> {}, () -> {});
+        }, () -> {});
     List<ScanRootProgress> frames = new ArrayList<>();
 
     ScanRootProgress terminal = ops.scan(capturedRequest(root, "captured-cancel", 1), frames::add);
@@ -465,8 +463,7 @@ final class WorkerScanOpsTest {
             file -> false,
             () -> 0L,
             isCancelled,
-            millis -> true,
-            paths -> {});
+            millis -> true);
 
     ScanRootProgress terminal =
         ops.scan(
@@ -635,40 +632,27 @@ final class WorkerScanOpsTest {
     assertEquals("", legacy.scanId(), "Back-compat constructor must default scanId to \"\"");
   }
 
-  // ===== Tempdoc 821 §3-C3 — FORCE_REINDEX marks the paths it admits =====
-  //
-  // Before this, every scan reached the Worker as SCAN_MODE_INITIAL and `request.mode()` was read
-  // only to build the DTO. Nothing downstream consulted it, so a user's force-reindex admitted the
-  // same paths and JobBatchExtractor took its UNCHANGED branch on all of them. The companion
-  // JobBatchExtractorForcedPathTest proves the other half: that a path in this set actually
-  // bypasses that branch.
-
   @Test
-  void forceReindexScanMarksEveryAdmittedPathForced() throws Exception {
+  void forceReindexScanCarriesForceInEveryAdmission() throws Exception {
     Path root = tempDir.resolve("forced");
     Files.createDirectories(root.resolve("nested"));
     Path a = Files.writeString(root.resolve("a.txt"), "alpha");
     Path b = Files.writeString(root.resolve("nested").resolve("b.txt"), "beta");
     RecordingQueue queue = new RecordingQueue();
-    List<String> forced = new ArrayList<>();
-    WorkerScanOps ops = new WorkerScanOps(queue, () -> 0L, () -> false, forced::addAll);
+    WorkerScanOps ops = new WorkerScanOps(queue, () -> 0L, () -> false);
 
     ops.scan(
         new WorkerScanOps.ScanRequest(
             root, null, WorkerScanOps.ScanMode.FORCE_REINDEX, List.of(), "scan-force"),
         p -> {});
 
-    // The key must be EXACTLY what FileFreshnessSnapshot.capture writes into the envelope
-    // (toAbsolutePath().normalize(), then PathNormalizer) — the extractor looks the path up by
-    // that string, so a key differing by separator, case, or a `..` segment would silently no-op.
-    assertEquals(
-        Set.of(normalizedKey(a), normalizedKey(b)),
-        Set.copyOf(forced),
-        "every path a FORCE_REINDEX scan admits must be marked forced, keyed as the envelope is");
+    assertEquals(Set.of(a, b), Set.copyOf(JobQueue.EnqueueEntry.paths(queue.enqueuedEntries)));
+    assertTrue(queue.enqueuedEntries.stream().allMatch(JobQueue.EnqueueEntry::forceReindex),
+        "every file must carry force in its queue admission");
   }
 
   @Test
-  void ordinaryScansMarkNothingForced() throws Exception {
+  void ordinaryScansCarryNoForce() throws Exception {
     Path root = tempDir.resolve("unforced");
     Files.createDirectories(root);
     Files.writeString(root.resolve("a.txt"), "alpha");
@@ -676,17 +660,16 @@ final class WorkerScanOpsTest {
     for (WorkerScanOps.ScanMode mode :
         List.of(WorkerScanOps.ScanMode.INITIAL, WorkerScanOps.ScanMode.RESCAN)) {
       RecordingQueue queue = new RecordingQueue();
-      List<String> forced = new ArrayList<>();
-      WorkerScanOps ops = new WorkerScanOps(queue, () -> 0L, () -> false, forced::addAll);
+      WorkerScanOps ops = new WorkerScanOps(queue, () -> 0L, () -> false);
 
       ScanRootProgress terminal =
           ops.scan(
               new WorkerScanOps.ScanRequest(root, null, mode, List.of(), "scan-" + mode), p -> {});
 
-      // Precision: the walk DID admit the file, so an empty `forced` is the mode gate firing —
-      // not a scan that silently admitted nothing.
       assertEquals(1L, terminal.getFilesAdmitted(), mode + " must still admit the file");
-      assertTrue(forced.isEmpty(), mode + " must not mark anything forced");
+      assertEquals(1, queue.enqueuedEntries.size());
+      assertTrue(queue.enqueuedEntries.stream().noneMatch(JobQueue.EnqueueEntry::forceReindex),
+          mode + " must not admit forced work");
     }
   }
 
@@ -704,11 +687,6 @@ final class WorkerScanOpsTest {
     assertTrue(progress.stream().noneMatch(ScanRootProgress::getComplete));
     assertTrue(progress.stream().allMatch(frame -> frame.getFilesAdmitted() == 0));
     assertFalse(progress.isEmpty(), "exercise the progress-before-flush branch too");
-  }
-
-  private static String normalizedKey(Path p) {
-    return io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
-        p.toAbsolutePath().normalize().toString());
   }
 
   private static final class RecordingQueue implements JobQueue {

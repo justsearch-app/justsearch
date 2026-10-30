@@ -39,6 +39,38 @@ final class JobQueueMigrationTest {
 
   @TempDir Path tempDir;
 
+  @Test
+  void v25AdmissionSurvivesAddingDurableForceAndSourceWitness() throws Exception {
+    Path db = tempDir.resolve("v25-admission.db");
+    Path file = Files.writeString(tempDir.resolve("source.txt"), "retained job");
+    String revision;
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file,
+          new JobQueue.EnqueueProvenance("user", "HTTP")).withinRoot(tempDir)), "docs", "scan");
+    }
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement()) {
+      try (var row = statement.executeQuery("SELECT unit_revision FROM jobs")) {
+        assertTrue(row.next()); revision = row.getString(1);
+      }
+      statement.execute("ALTER TABLE jobs DROP COLUMN force_reindex");
+      statement.execute("ALTER TABLE jobs DROP COLUMN admitted_source_sha256");
+      statement.execute("PRAGMA user_version=25");
+    }
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      assertEquals(1, queue.queueDepth());
+      var claim = queue.pollPending(1).getFirst();
+      assertEquals(revision, claim.unitRevision());
+      assertEquals("docs", claim.collection());
+      assertEquals("scan", claim.scanId());
+      assertEquals("HTTP", claim.provenance().transport());
+      assertEquals(tempDir, claim.ingestionRoot());
+      assertFalse(claim.forceReindex());
+    }
+  }
+
   @ParameterizedTest(name = "replayingV23PreservesAdmissionsAndCountsNewWritesOnce({0})")
   @ValueSource(ints = {20, 22})
   void replayingV23PreservesAdmissionsAndCountsNewWritesOnce(int version) throws Exception {
@@ -71,9 +103,9 @@ final class JobQueueMigrationTest {
     }
   }
 
-  @ParameterizedTest(name = "releasedVersionUpgradesToV25KeepingAdmissionCount({0})")
+  @ParameterizedTest(name = "releasedVersionUpgradesToV26KeepingAdmissionCount({0})")
   @ValueSource(ints = {22, 23, 24})
-  void releasedVersionUpgradesToV25KeepingAdmissionCount(int version) throws Exception {
+  void releasedVersionUpgradesToV26KeepingAdmissionCount(int version) throws Exception {
     Path db = tempDir.resolve("released-v" + version + ".db");
     try (var queue = new SqliteJobQueue(db)) {
       queue.open();
@@ -111,8 +143,8 @@ final class JobQueueMigrationTest {
         var statement = connection.createStatement()) {
       try (ResultSet rs = statement.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(25, rs.getInt(1),
-            "a V" + version + " queue must reach V25 so older readers refuse versioned DELETE");
+        assertEquals(26, rs.getInt(1),
+            "a V" + version + " queue must reach V26 so older readers refuse durable force admissions");
       }
       statement.execute("INSERT INTO switch_buffer "
           + "(generation, key, op, payload, last_updated, revision, accepted_order) "
@@ -1087,7 +1119,7 @@ final class JobQueueMigrationTest {
         assertTrue(rs.next());
         assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
-      assertEquals(25, SqliteSchema.TARGET_VERSION);
+      assertEquals(26, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
