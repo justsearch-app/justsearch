@@ -105,3 +105,14 @@ machine's `~/.gradle/init.d/50-agent-tmp.gradle`.
   "note": "Accepted narrowed scope after independent source preservation and native-run14 artifact review. Known boot-migration failures, empty findmnt snapshots and concurrent same-worktree ownership limitation remain explicitly disclosed; no drive operation run in verifier sandbox."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-da2f9a-codex-6",
+  "verdict": "accept",
+  "digest": "sha256:49ee3a397aa09824ec2795a4c0074e3c45077e769f72c6fef0ca30698b17d788",
+  "note": "Re-accepted merge 31ac8619a4: exact reconstruction of main's edit in all flagged files and unchanged branch patches; real-drives exclusion remains in configureEach(Test), outside pre-push and windowsOnly branches. Required Gradle checks pass. Native drive scenarios were not rerun; prior acceptance limitations remain."
+}
+```
