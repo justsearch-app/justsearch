@@ -21,11 +21,16 @@ class RunnerTests(unittest.TestCase):
             for lane, run_type in (('hosted-linux-x11', self.r.Run), ('vm-windows', windows.Run)):
                 args = types.SimpleNamespace(evidence=str(Path(tmp) / lane), vm=None, lane=lane)
                 run = run_type(args, {})
-                for timing in (0, 123, 2**63 - 1):
+                for timing in (0, 123, 2**63 - 1, 1.25):
                     profiles = {encoder: {'calls': 1, 'phaseTotalUs': {'tokenize': timing, 'ort': 456}}
                                 for encoder in ('embed', 'ner', 'splade')}
+                    telemetry = {word + suffix: timing
+                                 for word in ('tokenize', 'tokenizer', 'tokens', 'tokenCount',
+                                              'token_count', 'TOKENIZE', 'ToKeNiZeR', 'TOKENS',
+                                              'TOKENCOUNT', 'TOKEN_COUNT')
+                                 for suffix in ('', 'Us', 'Ms')}
                     status = {'lifecycle': {'state': 'READY'}, 'encoderProfiles': profiles,
-                              'tokens': [1, 2], 'tokenizer': 'model', 'tokenCount': 2}
+                              **telemetry}
                     for shape, payload in (
                             ('minimal', {'phaseTotalUs': {'tokenize': timing}}),
                             ('status', status), ('nested', {'status': status}),
@@ -37,14 +42,17 @@ class RunnerTests(unittest.TestCase):
 
     def test_evidence_redacts_whole_credential_values_at_every_depth(self):
         keys = ('token', 'TOKEN', 'sessionToken', 'access_token', 'bearer token',
-                'refresh-token', 'token_value', 'PASSWORD', 'dbPassword', 'clientSecret',
+                'refresh-token', 'token_value', 'tokenValue', 'accessTokenValue',
+                'sessionTokenData', 'TOKENVALUE', 'tokenizeSecret', 'sessionTokens',
+                'tokenCountPassword', 'PASSWORD', 'dbPassword', 'clientSecret',
                 'SECRET', 'api key', 'API_KEY', 'apiKey', 'api-key',
                 'authorization', 'AuthorizationHeader', 'cookie', 'sessionCookie')
         with tempfile.TemporaryDirectory() as tmp:
             args = types.SimpleNamespace(evidence=str(Path(tmp) / 'evidence'), vm=None,
                                          lane='hosted-linux-x11')
             run = self.r.Run(args, {})
-            for credential in ('sensitive', 0, 123, {'value': 'sensitive'}, ['sensitive'], None):
+            for credential in ('sensitive', 0, 123, 1.25, True,
+                               {'value': 'sensitive'}, ['sensitive'], None):
                 fields = dict.fromkeys(keys, credential)
                 expected = dict.fromkeys(keys, '<redacted>')
                 payload = {**fields, 'nested': {'fields': fields}, 'observations': [fields]}
@@ -54,15 +62,37 @@ class RunnerTests(unittest.TestCase):
                     self.assertEqual(saved, {**expected, 'nested': {'fields': expected},
                                              'observations': [expected]})
 
+    def test_evidence_redacts_nonnumeric_tokenization_fields(self):
+        import windows
+        keys = tuple(word + suffix
+                     for word in ('tokenize', 'tokenizer', 'tokens', 'tokenCount',
+                                  'token_count', 'TOKENIZE', 'ToKeNiZeR', 'TOKENS',
+                                  'TOKENCOUNT', 'TOKEN_COUNT')
+                     for suffix in ('', 'Us', 'Ms'))
+        with tempfile.TemporaryDirectory() as tmp:
+            for lane, run_type in (('hosted-linux-x11', self.r.Run), ('vm-windows', windows.Run)):
+                args = types.SimpleNamespace(evidence=str(Path(tmp) / lane), vm=None, lane=lane)
+                run = run_type(args, {})
+                for value in ('sensitive', '123', True, False, None,
+                              {'tokenize': 123}, [123], [], {}):
+                    fields = dict.fromkeys(keys, value)
+                    expected = dict.fromkeys(keys, '<redacted>')
+                    with self.subTest(lane=lane, value=value):
+                        run.evidence('credentials', {'fields': fields, 'observations': [fields]})
+                        saved = json.loads((run.out / 'credentials.json').read_text())
+                        self.assertEqual(saved, {'fields': expected, 'observations': [expected]})
+
     def test_evidence_preserves_input_and_unrelated_values(self):
         payload = {'sessionToken': {'value': 'sensitive'},
                    'nested': [{'clientSecret': ['sensitive'], 'name': 'visible'},
                               None, 0, False, 'token password secret'],
-                   'status': {'ready': True, 'ratio': 1.25, 'empty': []}}
+                   'status': {'ready': True, 'ratio': 1.25, 'empty': [],
+                              'token_count': 123, 'tokenizer': {'name': 'sensitive'}}}
         original = copy.deepcopy(payload)
         expected = copy.deepcopy(payload)
         expected['sessionToken'] = '<redacted>'
         expected['nested'][0]['clientSecret'] = '<redacted>'
+        expected['status']['tokenizer'] = '<redacted>'
         with tempfile.TemporaryDirectory() as tmp:
             args = types.SimpleNamespace(evidence=str(Path(tmp) / 'evidence'), vm=None,
                                          lane='hosted-linux-x11')
