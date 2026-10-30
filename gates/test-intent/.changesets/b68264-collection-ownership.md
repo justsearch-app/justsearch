@@ -73,11 +73,7 @@ collection field and are handled by their existing replay authority.
       "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "input re-encoding"
-      ],
-      "whatMoved": "The existing regular-file fixture now supplies the stored research collection that matches watch(). This represents the same already indexed, unchanged owning-folder file after C5 makes collection part of reconciliation metadata. Every assertion, force input, queue verification, root identity, failure injection, timeout and retry bound is retained. Dedicated defect pins retain the missing/obsolete-collection inputs.",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -85,8 +81,30 @@ collection field and are handled by their existing replay authority.
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:15:41Z",
           "delegationScope": "the testing task and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
           "label": "agent choice",
-          "choice": "C5 and C3: collection is part of unchanged file metadata; a file with unchanged bytes and its current declared research collection stays skipped without force and is readmitted with force. Missing collection metadata is separately pinned as a repair."
+          "choice": "C5/C3: retire the expectation that non-forced candidate reconciliation skips an unchanged file whose stored collection is missing although its owning declared folder is research. Unchanged bytes do not exempt a missing or obsolete owner label from reconciliation. The replacement matching-label fixture is a changed precondition, not an input re-encoding."
         }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none in docs/decisions/ for collection-label reconciliation; the supplied C5/C3 delegated settlement requires readmission of missing or obsolete labels."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Changed precondition in forceReadmitsAnExistingServingPathToTheScopedCandidateJournal: the existing regular-file fixture now stores collection research, matching watch(). Under this matching-label precondition the ordinary candidate scan adds zero files and does not enqueue; force still admits exactly one file to the building-generation journal. This replaces the missing-label skip scenario; it does not preserve its whole oracle. Size, mtime, root identity, queue observations and force assertions remain as written. The matching-label preservation expectation is independently exercised for both ordinary and candidate scans by DeclaredCollectionReconciliationTest.currentAndReservedLabelsStaySkipped (lines 39-44, 73-82); its executed current case is in the cited evidence. This New entry records the changed precondition, not repaired matching-label behaviour; the separate reconciliation Defect pin above records missing/obsolete-label assertion failures before the fix.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:15:41Z",
+          "delegationScope": "the testing task and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "label": "agent choice",
+          "choice": "C5/C3: scans re-admit unchanged files whose stored collection differs from the owning declared folder; a file with unchanged bytes and its current declared research collection stays skipped without force and is readmitted with force. Matching-label preservation and missing-label repair are separate scenarios."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b68264-collection-ownership.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionReconciliationTest.java"
       ]
     },
     {
@@ -107,7 +125,7 @@ collection field and are handled by their existing replay authority.
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:15:41Z",
           "delegationScope": "the testing task and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
           "label": "agent choice",
-          "choice": "C2/C1b/C7: real Engine pause and publication barriers prove hintless C parent/chunk labels, collection deletion, exact default clearing, and restart/cutover recovery of pre-fix NULL jobs and receipts; removed declarations drop the legacy admission."
+          "choice": "C2/C1b/C7: real Engine pause and publication barriers prove hintless C parent/chunk labels, collection deletion, exact default clearing, and restart/cutover recovery of pre-fix NULL jobs and receipts. Under the R1 settlement, removed declarations drop a legacy admission only with later generation-eligible covering scoped deletion evidence; unknown ownership alone preserves it."
         }
       ],
       "evidence": "gates/test-intent/evidence/b68264-collection-ownership.json",
