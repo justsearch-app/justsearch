@@ -1095,7 +1095,24 @@ return all(document,'[data-testid="search-result-row"]').find(e =>
     action = run.wd.execute("return arguments[0].querySelector('button[data-testid=\"row-actions\"]')", [hit])
     if not action:
         raise ProductFailure('Exact fixture row has no Actions button')
-    run.wd.click_element(action)
+    run.wd.execute("""
+window.__qualRowActionClick = null;
+arguments[0].addEventListener('click', e => {
+ window.__qualRowActionClick = {trusted:e.isTrusted,button:e.button,
+  row:e.currentTarget.closest('[data-testid="search-result-row"]').getAttribute('data-addressable-id')};
+}, {capture:true,once:true});
+""", [action])
+    # This plain button supports Edge's native current-layout hit test. Keep
+    # coordinate delivery for the nested shadow controls that Edge intercepts.
+    key = action['element-6066-11e4-a52e-4f735466cecf']
+    run.wd.call(f'/session/{run.wd.session}/element/{key}/click', {})
+    delivered = run.wd.execute('return window.__qualRowActionClick')
+    run.evidence('J2-row-action-delivery', delivered)
+    if (not isinstance(delivered, dict) or delivered.get('trusted') is not True
+            or delivered.get('button') != 0
+            or not isinstance(delivered.get('row'), str)
+            or ntpath.normcase(delivered['row']) != ntpath.normcase(fixture)):
+        raise Infrastructure('Exact fixture Actions click was not delivered; see J2-row-action-delivery.json')
     run.wd.click('button,[role="menuitem"]', 'Open file', error=ProductFailure)
     def receiving():
         rows = ps_json(ARGV + '$rows=' + PROCESSES + r""";

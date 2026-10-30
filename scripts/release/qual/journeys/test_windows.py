@@ -203,6 +203,12 @@ def process(pid=50, image=r'C:\app\JustSearch.exe', created='2026-10-29T09:00:00
 
 
 class WindowsOperationalTests(unittest.TestCase):
+    def test_element_click_without_a_session_sends_no_input(self):
+        target=Mock();driver=windows.WebDriver(target,4444)
+        with self.assertRaisesRegex(windows.Unavailable,'No attached WebDriver session'):
+            driver.click_element({'element-6066-11e4-a52e-4f735466cecf':'exact-element'})
+        target.http.assert_not_called()
+
     def test_owned_parent_chain_retains_exact_creation_times_and_excludes_reuse(self):
         target = windows.Target()
         shell = process()
@@ -326,7 +332,9 @@ class WindowsOperationalTests(unittest.TestCase):
         first={'element-6066-11e4-a52e-4f735466cecf':'unrelated-first'}
         exact={'element-6066-11e4-a52e-4f735466cecf':'fixture-second'}
         action={'element-6066-11e4-a52e-4f735466cecf':'fixture-actions'}
-        run.wd.element.return_value=first;run.wd.execute.side_effect=[exact,action];run.wd.text.return_value=OPEN_FILE
+        delivered={'trusted':True,'button':0,'row':fixture.lower()}
+        run.wd.session='owned-session'
+        run.wd.element.return_value=first;run.wd.execute.side_effect=[exact,action,None,delivered];run.wd.text.return_value=OPEN_FILE
         tools=Mock();tools.read_text.return_value=json.dumps({'viewer':image})
         path=lambda p:tools if str(p)=='C:/Qual/tools.json' else Path(p)
         with patch.object(windows,'Path',side_effect=path),patch.object(linux,'search_api',return_value={'results':[OPEN_FILE.lower()]}), \
@@ -338,8 +346,37 @@ class WindowsOperationalTests(unittest.TestCase):
         self.assertEqual(run.wd.execute.call_args_list[0].args[1],[fixture])
         self.assertIn('row-actions',run.wd.execute.call_args_list[1].args[0])
         self.assertEqual(run.wd.execute.call_args_list[1].args[1],[exact])
-        run.wd.click_element.assert_called_once_with(action)
+        run.wd.click_element.assert_not_called()
+        run.wd.call.assert_called_once_with('/session/owned-session/element/fixture-actions/click',{})
+        run.evidence.assert_any_call('J2-row-action-delivery', delivered)
         self.assertTrue(run.facts['search'])
+
+    def test_missed_or_untrusted_row_action_click_does_not_blame_the_product_menu(self):
+        import linux
+        from corpus import OPEN_FILE
+        corpus=r'C:\corpus';image=r'C:\Qual\viewer\notepad++.exe'
+        fixture=str(Path(corpus)/OPEN_FILE)
+        delivered={'trusted':True,'button':0,'row':fixture}
+        def click(selector,*args,**kwargs):
+            if selector=='button,[role="menuitem"]':
+                raise ProductFailure('missing menu')
+        observations=(None,{},dict(delivered,trusted=False),dict(delivered,button=2),
+                      dict(delivered,row=None),dict(delivered,row='other.txt'),delivered)
+        for observation in observations:
+            with self.subTest(observation=observation):
+                run=Mock(facts={});run.require.side_effect=lambda key:corpus if key=='corpus' else True
+                run.wd.execute.side_effect=[{'element':'fixture'},{'element-6066-11e4-a52e-4f735466cecf':'actions'},None,observation]
+                run.wd.click.side_effect=click
+                tools=Mock();tools.read_text.return_value=json.dumps({'viewer':image})
+                path=lambda p:tools if str(p)=='C:/Qual/tools.json' else Path(p)
+                with patch.object(windows,'Path',side_effect=path),patch.object(linux,'search_api',return_value={}), \
+                     patch.object(windows,'default_viewer',return_value={'executable':image}), \
+                     patch.object(windows,'ps_json',return_value=[]),patch.object(windows,'wait_for',once):
+                    expected=ProductFailure if observation==delivered else Infrastructure
+                    message='missing menu' if observation==delivered else 'click.*not delivered'
+                    with self.assertRaisesRegex(expected,message):
+                        windows.search_open(run)
+                self.assertNotIn('search',run.facts)
 
     def test_default_viewer_needs_exact_argv_path_image_new_lifetime_and_window(self):
         image = r'C:\Qual\viewer\notepad++.exe'

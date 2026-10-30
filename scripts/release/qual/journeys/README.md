@@ -448,6 +448,11 @@ bindings are cached before sealing (`uia-client.json`). Picker input uses UIA
 Value and Invoke patterns, with exact returned-value checks. The picker control
 inventory is retained for diagnosis.
 
+Windows J2 uses EdgeDriver's native element-click endpoint for the plain result
+Actions button; nested shadow controls retain the shared coordinate path.
+J2 records a trusted left click on the exact fixture's Actions
+button before attributing a missing menu to the product; a missed click is
+infrastructure.
 WebDriver uses the normal installed app's `LOCALAPPDATA/io.justsearch.shell`
 profile through `tauri:options.webviewOptions.userDataFolder`. Owned WebView2
 process arguments must confirm that profile (`webdriver-profile.json`).
