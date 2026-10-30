@@ -5,7 +5,7 @@ import { fetchUnifiedThread } from '../unifiedThreadClient.js';
 import { projectSv3RecordTurns } from './sv3-record.js';
 import type { Sv3Session, Sv3SessionHistory, Sv3Turn, Sv3TurnEvidence } from './sv3-sessions.js';
 
-export interface ConversationExportSource {
+interface ConversationExportSource {
   label: number;
   path: string;
   startLine: number;
@@ -13,7 +13,7 @@ export interface ConversationExportSource {
   heading: string;
   excerpt: string;
 }
-export interface ConversationExportMessage {
+interface ConversationExportMessage {
   role: 'user' | 'assistant';
   content: string;
   excludedFromContext: boolean;
@@ -53,7 +53,7 @@ function message(role: ConversationExportMessage['role'], content: string, exclu
   };
 }
 
-export function projectConversationExport(session: Pick<Sv3Session, 'id' | 'title' | 'turns' | 'history'>,
+function projectConversationExport(session: Pick<Sv3Session, 'id' | 'title' | 'turns' | 'history'>,
   sourcePaths: ReadonlyMap<string, readonly string[]> = new Map()): ConversationExport {
   const excluded = new Set(session.history?.excludedMessageIds ?? []);
   return {
