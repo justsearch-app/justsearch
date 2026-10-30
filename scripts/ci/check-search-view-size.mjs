@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const SEARCH_VIEW = 'modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ts';
-export const MAX_LINES = 5532;
+export const MAX_LINES = 5207;
 
 export function checkSearchViewSize(source) {
   const lines = source.split('\n').length - Number(source.endsWith('\n'));

@@ -22,6 +22,7 @@ import {
   sv3ContextMenuItems,
   sv3ExcludedMessageIds,
   sv3ExcludedTurnCount,
+  sv3FollowUpContext,
 } from './sv3-context.js';
 import type { Sv3SessionHistory, Sv3Turn } from './sv3-sessions.js';
 
@@ -111,6 +112,49 @@ describe('what the effective context does with each turn', () => {
     expect(contexts.map((c) => c.hasExcluded)).toEqual([false, true]);
     expect(sv3ExcludedTurnCount(contexts)).toBe(1);
     expect(sv3ExcludedMessageIds(history)).toEqual([stored(4)]);
+  });
+});
+
+describe('preserved follow-up message semantics', () => {
+  it('sends summary then individual nonblank messages in mixed-mode order, omitting unsuccessful Structured exchanges', () => {
+    const turns = [
+      recordTurn('ask', 0, 1),
+      turn({ id: 'model', kind: 'model', shapeId: 'core.free-chat', question: 'Model question', answer: 'Model answer' }),
+      turn({ id: 'refused', shapeId: 'core.extract', question: 'Refused extraction', answer: '', status: 'failed' }),
+      turn({ id: 'structured', shapeId: 'core.extract', question: 'Accepted extraction', answer: '{"saved":true}' }),
+      turn({ id: 'blank', question: '  ', answer: '\n' }),
+      turn({ ...recordTurn('combined', 3, 4), question: 'Combined question', answerMessages: [
+        { id: stored(4), content: 'First saved answer' },
+        { id: stored(5), content: ' ' },
+        { id: stored(6), content: 'Last saved answer' },
+      ] }),
+    ];
+    const history = { contextFloorSummary: 'Saved summary' };
+    expect(sv3FollowUpContext(turns, projectSv3TurnContexts(turns, history), history)).toEqual([
+      { role: 'system', content: 'Summary of earlier conversation:\nSaved summary' },
+      { role: 'user', content: 'why did the renewal fail?' },
+      { role: 'assistant', content: 'The lock held.' },
+      { role: 'user', content: 'Model question' },
+      { role: 'assistant', content: 'Model answer' },
+      { role: 'user', content: 'Accepted extraction' },
+      { role: 'assistant', content: '{"saved":true}' },
+      { role: 'user', content: 'Combined question' },
+      { role: 'assistant', content: 'First saved answer' },
+      { role: 'assistant', content: 'Last saved answer' },
+    ]);
+  });
+
+  it('fails open for an absent floor without putting a divider on a neighbouring turn', () => {
+    const turns = [recordTurn('a', 0, 1), recordTurn('b', 3, 4)];
+    const history = { contextFloor: stored(9), messageIds: [stored(0), stored(1), stored(3), stored(4)] };
+    const contexts = projectSv3TurnContexts(turns, history);
+    expect(contexts.map(c => [c.isFloor, c.outOfContext])).toEqual([[false, false], [false, false]]);
+    expect(sv3FollowUpContext(turns, contexts, history)).toHaveLength(4);
+  });
+
+  it('uses the saved assistant ID as the floor target when a turn has no saved question', () => {
+    const turns = [turn({ ...recordTurn('assistant-only', 0, 1), recordOpenedByUser: false })];
+    expect(projectSv3TurnContexts(turns, null)[0]?.floorMessageId).toBe(stored(1));
   });
 });
 
