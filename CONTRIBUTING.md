@@ -123,6 +123,20 @@ node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:test
 node scripts/lib/tool-invoker.cjs gradle build
 ```
 
+Tests tagged `evidence`/`experiment` and `stress` opt in with `-PincludeExperiment=true` and `-PincludeStress=true`.
+Real-drive integration tests are excluded from ordinary runs; `-PincludeRealDrives=true` enables them and mounts disposable loop images in the desktop session.
+An opted-in run that is killed or interrupted (including Ctrl-C/SIGTERM or SIGKILL) can leave
+loop devices and `/run/media` mounts; cleanup runs only when the test closes its volume normally.
+Images are `volume.img` and `decoy.img` beneath the test's JUnit temporary directory
+(`junit-*` under the JVM's `java.io.tmpdir`), in `loop`, `original-loop` or `foreign-loop`
+subdirectories. Local Gradle configuration may override the test JVM's `java.io.tmpdir`. Use the backing-image paths reported by `losetup -a` to locate leftover images rather than assuming a repository-relative temporary directory. Later test runs leave these leftovers alone.
+List devices with `losetup -a` and mounts with `findmnt -R /run/media`; identify each test
+device by its backing image before acting on it.
+Unmount a mounted leftover with `udisksctl unmount -b /dev/loopN`, then remove its loop device
+with `udisksctl loop-delete -b /dev/loopN`. After detaching, remove that run's image files and
+empty temporary directory. Loop devices and mounts disappear at reboot; retained image files
+remain until the temporary directory is cleaned or they are removed manually.
+
 ### Code Style
 
 Code style is enforced automatically:

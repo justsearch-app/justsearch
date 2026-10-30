@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Real Engine, search, queue and physical Linux watchers on disposable udisks loop filesystems. */
+@org.junit.jupiter.api.Tag("real-drives")
 final class LinuxWatchedDriveReturnIntegrationTest {
   @TempDir(cleanup = org.junit.jupiter.api.io.CleanupMode.ON_SUCCESS) Path directory;
   private static final EngineContext CONTEXT = EngineProvenance.internal(
@@ -33,7 +34,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
   @Timeout(300)
   void realUnmountReturnsWithHealthyWatcherReceiptsAndOfflineChanges(boolean changedDevice)
       throws Exception {
-    try (var volume = LinuxLoopVolume.create(directory.resolve("loop")); var f = fixture()) {
+    try (var volume = LinuxLoopVolume.create(directory.resolve("loop")); var f = descriptorFixture()) {
       Path mount = volume.mounted();
       Path root = Files.createDirectory(mount.resolve("documents"));
       Path gone = Files.writeString(root.resolve("gone.txt"), "mountgone old document");
@@ -121,6 +122,7 @@ final class LinuxWatchedDriveReturnIntegrationTest {
         volume.releaseDecoy();
         awaitRecoverySettled(f, root);
         awaitIndexingIdle(f);
+        awaitTelemetryStoreOpen();
         long descriptors = descriptorCount();
         var initialTargets = descriptorTargets();
         long watcherThreads = watcherThreadCount();
@@ -150,6 +152,12 @@ final class LinuxWatchedDriveReturnIntegrationTest {
           awaitIndexingIdle(f);
           volume.releaseDecoy();
           long returnedDescriptors = descriptorCount();
+          // Indexing can be idle while a background commit briefly opens a directory for fsync.
+          long settleUntil = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+          while (returnedDescriptors > descriptors && System.nanoTime() < settleUntil) {
+            Thread.sleep(25);
+            returnedDescriptors = descriptorCount();
+          }
           var addedTargets = descriptorTargets().entrySet().stream()
               .filter(entry -> entry.getValue() > initialTargets.getOrDefault(entry.getKey(), 0L))
               .toList();
@@ -847,6 +855,17 @@ final class LinuxWatchedDriveReturnIntegrationTest {
     assertFalse(((java.util.Set<?>) invoke(registry, "recoveryRoots", new Class<?>[0])).contains(root));
   }
 
+  private Fixture descriptorFixture() throws Exception {
+    return fixture(null, 1_000);
+  }
+
+  private void awaitTelemetryStoreOpen() throws Exception {
+    String store = directory.resolve("data/telemetry/metrics.rrd").toString();
+    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (!descriptorTargets().containsKey(store) && System.nanoTime() < until) Thread.sleep(25);
+    assertTrue(descriptorTargets().containsKey(store), "telemetry's retained store is open before the descriptor baseline");
+  }
+
   private static long descriptorCount() throws Exception {
     try (var descriptors = Files.list(Path.of("/proc/self/fd"))) { return descriptors.count(); }
   }
@@ -932,9 +951,14 @@ final class LinuxWatchedDriveReturnIntegrationTest {
 
   private Fixture fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook hook)
       throws Exception {
+    return fixture(hook, 60_000);
+  }
+
+  private Fixture fixture(io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook hook,
+      long telemetryFlushMs) throws Exception {
     var host = new RuntimeReloadProducersHttpIntegrationTest();
     host.directory = directory;
-    Fixture fixture = host.new Fixture(true, hook);
+    Fixture fixture = host.new Fixture(true, hook, telemetryFlushMs);
     var folders = new IndexingController(() -> fixture.client, null, directory.resolve("home"), null);
     var capability = mock(io.justsearch.app.api.lifecycle.Capability.class);
     when(capability.available()).thenReturn(true);

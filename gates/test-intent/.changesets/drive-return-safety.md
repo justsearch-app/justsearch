@@ -1,0 +1,118 @@
+---
+schema: test-intent.v1
+task: drive-return-safety
+author-role: builder
+author-session: codex-drive-return-minimal-20261030
+---
+
+# Drive-test opt-in and descriptor baseline
+
+Restore LinuxLoopVolume exactly to e580368790 and delete LinuxLoopVolumeSafetyTest.
+All added cleanup machinery is removed, including shutdown cleanup, command cancellation,
+attachment and image identity tracking, private image directories and cleanup ownership claims.
+The real-drives tag, Gradle opt-in and log line, telemetry warm-up and fixture interval remain.
+
+Settled scenarios:
+
+- S1: ordinary tests exclude real-drives; -PincludeRealDrives=true explicitly enables them.
+- S2: an opted-in run passes and leaves no test loop devices or mounts after normal teardown.
+- S3: removed; interrupted-run cleanup is no longer promised or tested.
+- S4: killed or interrupted runs can leave loop devices and /run/media mounts; the documented
+  commands identify and remove them. A subsequent opted-in run preserves all such leftovers
+  and the host script's outside-pattern decoy. The script removes only resources it created.
+- S5: warm telemetry's retained store before counting descriptors; after each cycle, allow up to
+  five seconds for transient background opens to close, retaining the original baseline and
+  reporting added targets from the final observation. Retained per-cycle growth still fails.
+- S6: preserve the other cases' product assertions, comparisons, budgets and timeouts.
+
+The required Gradle checks passed in tmp/drive-return-minimal-gradle.log. Static preservation,
+shell/Python syntax and isolated image-matcher checks passed in
+tmp/drive-return-minimal-static.log. The old matcher rejects main's image paths; the updated
+matcher accepts the test's paths and excludes unrelated paths. No .agents/preflight exists.
+Shared resources touched: the prescribed Gradle slot/daemon and dependency caches.
+No native drive operation is authorized in this sandbox. S1/S2/S4/S5 host execution remains
+unverified; the untracked host script is prepared for those scenarios. S6 requires independent
+review. The previous acceptance records are intentionally unchanged and stale; the gate result
+is recorded in tmp/drive-return-minimal-gate.log.
+
+S5 follow-up: `tmp/drive-return-settle-gradle.log` records successful integration-test
+compilation, Spotless and PMD. `tmp/drive-return-settle-static.log` records isolated execution
+of the exact before/after descriptor oracle against temporary and retained opens: the former
+fails before and passes after; the latter fails in both versions with its target reported.
+Both S5 host-script mutations apply unchanged. This is a narrower check; the native test was
+not run in the sandbox. `tmp/drive-return-settle-gate.log` reports stale acceptance, left for
+independent verification. CONTRIBUTING.md's temp path was checked against the developer
+machine's `~/.gradle/init.d/50-agent-tmp.gradle`.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt",
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/LinuxWatchedDriveReturnIntegrationTest.java",
+        "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java"
+      ],
+      "class": "Incidental",
+      "assessment": {
+        "purpose": "Keep the real drive-return product oracle intact while making mounts an explicit opt-in and observing telemetry’s one-time retained RRD open before the descriptor baseline.",
+        "callersAndStateOwners": "JvmBaseConventionsPlugin configures every Test task including UI integrationTest. The real-drives tagged class creates LinuxLoopVolume resources. LinuxLoopVolume is restored unchanged from e580368790: volume.img and decoy.img live in loop, original-loop or foreign-loop beneath JUnit @TempDir (java.io.tmpdir/junit-*). Udisks owns loop and mount associations. Normal close() releases only the loop names recorded by that volume; JUnit owns temporary-file cleanup.",
+        "indirectBehaviours": "S1: ordinary Test tasks exclude real-drives; integrationTest logs the -PincludeRealDrives=true opt-in. S2: an opted-in run retains all invocations and normal teardown leaves no test loops or mounts. S3 is removed: there is no shutdown-cleanup guarantee. S4: killed or interrupted runs, including Ctrl-C/SIGTERM and SIGKILL, can leave loop devices and /run/media mounts. CONTRIBUTING.md documents listing, identifying and manually removing them; devices and mounts vanish at reboot. The next opted-in run never sweeps or cleans another run’s leftovers. S5: the descriptor fixture’s short telemetry interval and warm-up precede the baseline. Each cycle polls the descriptor count every 25 ms for up to five seconds, requiring it to return to or below that unchanged baseline; persistent excess fails with the added targets from the final observation. No targets are excluded and no descriptor allowance is added. S6: all other product assertions, inequalities, budgets and timeouts remain unchanged.",
+        "evidence": "Static comparison checks LinuxLoopVolume against e580368790 and preserves S1/S5 source changes against the prior candidate. Required Gradle checks are logged in tmp/drive-return-minimal-gradle.log; script syntax and its embedded Python are checked without executing host operations. The orchestrator ran the untracked tmp/drive-return-host-check.sh natively on the developer's machine at 049f415bb7 (run 14; S1, S2, S4 and S5 passed). It selects this test's images as loop associations that appear during the script, are set up by the same uid and match the JUnit image pattern under the worktree's modules/ui/build/tmp/test-jvm/integrationTest; that selection would not distinguish a concurrent run of this test in the same worktree (none ran). It preserves SIGKILL leftovers and an outside-pattern decoy during the next run, then removes them. Its findmnt snapshots are empty; mount state rests on the helper's live mountinfo assertions and the loop snapshots. Its S2/S4 pass lines exclude the returnDuringBootMigrationPromotes(migration-before-switching) failures, which also occur on main (alternating native A/B runs). S6 requires independent review.",
+        "unresolvedRisks": "Interrupted opted-in runs can leave loop devices, mounts and temporary images. There is no shutdown hook or cross-run recovery. Real udisks behavior is verified only by the orchestrator's native host run; mount preservation is not independently snapshotted. The acceptance records below are deliberately retained and stale; independent verification must write a new record."
+      },
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "LinuxLoopVolume returns to main's behaviour (cleanup in close() only, as on e580368790); a killed opted-in run (SIGTERM or SIGKILL) can leave loop devices and mounts, which is documented.",
+          "location": "task drive-return-safety request"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "without loosening the comparison: per-cycle growth must still fail.",
+          "location": "task drive-return-safety request"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Other cases in the class are unchanged in assertions, budgets and timeouts.",
+          "location": "task drive-return-safety request"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-da2f9a-codex-1",
+  "verdict": "accept",
+  "digest": "sha256:80eef422333e803b711b231c1c4cac7be1643b3e60d79c4e8195053c188344af"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-da2f9a-codex-5",
+  "verdict": "accept",
+  "digest": "sha256:d725790d97acc8d6aa3f6b19c20dc334f0a00817b39f542610c0234fbd294ec5",
+  "note": "Accepted narrowed scope after independent source preservation and native-run14 artifact review. Known boot-migration failures, empty findmnt snapshots and concurrent same-worktree ownership limitation remain explicitly disclosed; no drive operation run in verifier sandbox."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-da2f9a-codex-6",
+  "verdict": "accept",
+  "digest": "sha256:49ee3a397aa09824ec2795a4c0074e3c45077e769f72c6fef0ca30698b17d788",
+  "note": "Re-accepted merge 31ac8619a4: exact reconstruction of main's edit in all flagged files and unchanged branch patches; real-drives exclusion remains in configureEach(Test), outside pre-push and windowsOnly branches. Required Gradle checks pass. Native drive scenarios were not rerun; prior acceptance limitations remain."
+}
+```
