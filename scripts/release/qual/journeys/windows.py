@@ -905,6 +905,8 @@ def run_installer(run, path, arguments=('/S',)):
     if run.args.lane == 'vm-windows':
         return broker_installer(run, path, arguments)
     before = run.target.owned()
+    # NSIS uninstallers remove their source executable; retain its launched bytes' identity.
+    sha256 = digest(path)
     row = run.target.spawn([str(path), *arguments], run.work + '/nsis.log')
     process = run.target.handles[row['pid']]
     run.facts.setdefault('installerProcesses', []).append(row)
@@ -927,7 +929,7 @@ def run_installer(run, path, arguments=('/S',)):
             branch.extend(children)
         return not run.target.alive(branch)
     wait_for(settled, 'NSIS process tree completed', seconds=120, error=Infrastructure)
-    result = {'exitCode': process.returncode, 'process': row, 'sha256': digest(path)}
+    result = {'exitCode': process.returncode, 'process': row, 'sha256': sha256}
     run.evidence('nsis-' + str(time.time_ns()), result)
     installer_result(result)
     return result

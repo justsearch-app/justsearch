@@ -467,6 +467,44 @@ class WindowsOperationalTests(unittest.TestCase):
             with patch.object(windows, 'wait_for', once), self.assertRaises(ProductFailure):
                 windows.run_installer(run, package)
 
+    def test_self_removing_installer_keeps_launched_digest_and_checks_exit_code(self):
+        import subprocess
+        import sys
+        from contextlib import ExitStack
+        for code in (0, 2):
+            with self.subTest(exitCode=code), tempfile.TemporaryDirectory() as temp, ExitStack() as stack:
+                root = Path(temp)
+                package = root / 'self-removing.py'
+                package.write_text('from pathlib import Path\nPath(__file__).unlink()\n'
+                                   + 'raise SystemExit(' + str(code) + ')\n')
+                expected_digest = windows.digest(package)
+                run = Mock(work=str(root), facts={})
+                run.args.lane = 'hosted-windows'
+                run.target.owned.return_value = []
+                run.target.alive.return_value = []
+                run.target.handles = {}
+
+                def spawn(argv, log):
+                    child = stack.enter_context(subprocess.Popen([sys.executable, *argv]))
+                    identity = process(child.pid, str(package))
+                    run.target.handles[child.pid] = child
+                    return identity
+
+                run.target.spawn.side_effect = spawn
+                if code:
+                    with self.assertRaisesRegex(ProductFailure, 'NSIS'):
+                        windows.run_installer(run, package)
+                else:
+                    result = windows.run_installer(run, package)
+                    self.assertEqual(result['sha256'], expected_digest)
+                    self.assertEqual(result['exitCode'], code)
+                self.assertFalse(package.exists())
+                run.target.spawn.assert_called_once_with([str(package), '/S'], str(root) + '/nsis.log')
+                evidence = run.evidence.call_args.args[1]
+                self.assertEqual(evidence['sha256'], expected_digest)
+                self.assertEqual(evidence['exitCode'], code)
+                self.assertEqual(evidence['process'], run.facts['installerProcesses'][0])
+
     def test_windows_state_reads_bookmarks_from_own_web_storage_and_model_bytes(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp);(root/'models').mkdir();(root/'models/model.onnx').write_bytes(b'actual model')
