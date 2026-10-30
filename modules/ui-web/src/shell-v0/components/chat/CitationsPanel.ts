@@ -571,8 +571,8 @@ export class CitationsPanel extends JfElement {
   private renderSourceCard(s: AnswerEvidenceSource, grounding?: SourceGrounding | null): TemplateResult {
     // 559 Authority IV — render the citation card as a typed projection of the
     // evidence record, not ad-hoc field reads.
-    const item = toEvidenceItem(s);
-    const excerpt = displayPassageExcerpt(item.excerpt);
+    const item = toEvidenceItem({ ...s, excerpt: displayPassageExcerpt(s.excerpt ?? '') });
+    const excerpt = item.excerpt;
     // Tempdoc 565 §29 Tier-3 — the cited file's basename, for the open-file affordance below the card.
     const docName = this.resultBeingExplained
       ? filenameOf(s.parentDocId)

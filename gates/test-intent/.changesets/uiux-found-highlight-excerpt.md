@@ -7,6 +7,8 @@ author-session: found-builder-2-20261030
 
 # Test-intent entries
 
+Round 2 (orchestrator repair after verifier-1): the source card now removes front matter before the card shortens the passage, and only metadata-shaped lines (key: value, indented continuations, list items) between the leading delimiters count as front matter, so ordinary Markdown between two horizontal rules stays visible. Two checks were added: a long closed header (repaired) and horizontal rules around ordinary Markdown (preservation: passes on the base, failed on the round-1 candidate).
+
 These are agent-adopted scenarios from the bounded builder brief, recorded as delegated choices;
 they are not owner-agreed scenarios. All tests are new, isolated files. Existing expectations and
 test selection are untouched. Repaired checks fail by assertion on 7959b712fd; preservation checks
@@ -95,7 +97,8 @@ The unchanged full suite provides narrower regression coverage; no live-system c
       "evidence": "gates/test-intent/evidence/uiux-found-highlight-excerpt.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 hides closed leading front matter in the source card, expanded preview and hover",
-        "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 handles an empty closed block without removing later separators"
+        "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 handles an empty closed block without removing later separators",
+        "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B1 removes a closed header longer than the card budget before the card shortens it"
       ],
       "repaired": true
     },
@@ -118,7 +121,8 @@ The unchanged full suite provides narrower regression coverage; no live-system c
       "evidence": "gates/test-intent/evidence/uiux-found-highlight-excerpt.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 preserves empty, unclosed, non-leading and front-matter-only passages verbatim",
-        "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps original evidence, verification, citation identity and character anchors"
+        "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps original evidence, verification, citation identity and character anchors",
+        "modules/ui-web/src/shell-v0/components/chat/passageExcerptPresentation.test.ts#B2 keeps ordinary Markdown between two leading horizontal rules"
       ]
     }
   ]

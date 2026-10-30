@@ -66,4 +66,20 @@ describe('Search citation excerpt presentation', () => {
     expect(panel.shadowRoot!.querySelector('.source')?.textContent).toContain('Grounds 1 sentence');
     expect(panel.shadowRoot!.querySelector('[data-cite-key]')?.getAttribute('data-cite-key')).toContain(source.parentDocId);
   });
+
+  it('B1 removes a closed header longer than the card budget before the card shortens it', async () => {
+    const header = ['---', 'title: Long header', ...Array.from({ length: 30 }, (_, i) => `tag${i}: value number ${i} for the metadata block`), '---'].join('\n');
+    const { panel, hover } = await sourceViews(`${header}\n\nOpen the desktop folder to find the report.`);
+    expect(panel.shadowRoot!.querySelector('.source .sentence')?.textContent).toContain('Open the desktop folder');
+    expect(panel.shadowRoot!.querySelector('.source .sentence')?.textContent).not.toContain('tag0:');
+    expect(panel.shadowRoot!.querySelector('.preview > div')?.textContent).toContain('Open the desktop folder');
+    expect(hover.shadowRoot!.querySelector('.excerpt')?.textContent).toContain('Open the desktop folder');
+  });
+
+  it('B2 keeps ordinary Markdown between two leading horizontal rules', async () => {
+    const excerpt = '---\n# Warning\nNever delete the original invoices before making a backup.\n---\nOpen the desktop folder.';
+    const { panel, hover } = await sourceViews(excerpt);
+    expect(panel.shadowRoot!.querySelector('.source .sentence')?.textContent).toContain('Never delete the original invoices');
+    expect(hover.shadowRoot!.querySelector('.excerpt')?.textContent).toBe(excerpt);
+  });
 });
