@@ -303,7 +303,7 @@ def _is_server_alive(info: dict) -> bool:
     # Check if port responds (most reliable cross-platform check)
     import urllib.request
     try:
-        urllib.request.urlopen(f"http://localhost:{port}", timeout=2)
+        urllib.request.urlopen(f"http://127.0.0.1:{port}", timeout=2)
     except Exception:
         return False
     # PROVENANCE, part 2 (tempdoc 814 §D8.4 / §R.2): the recorded `provenance.head` is written at
@@ -390,7 +390,7 @@ def _start_vite_server() -> str:
         try:
             info = json.loads(_SERVER_INFO_PATH.read_text())
             if _is_server_alive(info):
-                url = f"http://localhost:{info['port']}"
+                url = f"http://127.0.0.1:{info['port']}"
                 log.debug("Reusing existing Vite server at %s (pid %s)", url, info["pid"])
                 _renew_agent_spawn_lease(info)
                 return url
@@ -445,7 +445,9 @@ def _start_vite_server() -> str:
                 if os.name == "nt" else 0,
                 start_new_session=os.name != "nt",
             )
-            url = f"http://localhost:{port}"
+            # Probe and navigate the address Vite binds, never localhost's
+            # potentially different address family (and a foreign responder).
+            url = f"http://127.0.0.1:{port}"
             # Cold Vite starts can take 36s under contention. HTTP readiness is
             # separate from the browser's app-mounted readiness gate.
             deadline = time.monotonic() + 60
@@ -478,7 +480,8 @@ def _start_vite_server() -> str:
                 f"Vite exited with code {proc.returncode} on :{port}" if exited else
                 f"Vite did not accept connections from its own process on :{port} within 60s"
             ) + (f"; stderr tail: {tail}" if tail else "; no stderr captured") + remedy
-            if exited:
+            if (f"port {port} is already in use" in tail.lower()
+                    or _port_in_use(port, "127.0.0.1")):
                 log.debug("%s; trying the next free port", last_failure)
                 continue
             raise ServeStartError(last_failure)
@@ -529,7 +532,7 @@ def _resolve_ui_url(ui_url: str) -> str:
             info = json.loads(_SERVER_INFO_PATH.read_text())
             if _is_server_alive(info):
                 _renew_agent_spawn_lease(info)
-                return f"http://localhost:{info['port']}"
+                return f"http://127.0.0.1:{info['port']}"
         except Exception:
             pass
 

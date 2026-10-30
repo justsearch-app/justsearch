@@ -165,6 +165,10 @@ async def setup_run_budget(page):
     request = await fixture.wait_request("POST", BUDGET)
     assert request.body == {"sessionId": fixture.session_id, "decision": "finalize"}, request
     await asyncio.wait_for(request.answered.wait(), TIMEOUT / 1000)
+    await expect(page.get_by_test_id("sv3-run-prompt")).to_have_count(0, timeout=TIMEOUT)
+    await expect(run(page)).to_have_attribute("data-phase", "running", timeout=TIMEOUT)
+    await activity(fixture, page, "Resuming after the budget decision.")
+    await expect(run(page)).to_have_attribute("data-phase", "running")
     await fixture.stream.end(finalResponse="Fixture finalized", iterationsUsed=0,
                              toolCallsExecuted=0, totalTokensUsed=8192)
     await expect(page.get_by_test_id("sv3-run-receipt")).to_have_attribute("data-outcome", "complete", timeout=TIMEOUT)

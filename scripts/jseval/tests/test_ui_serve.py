@@ -18,6 +18,7 @@ import sys
 import threading
 from contextlib import nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.request import urlopen
 
 import pytest
 
@@ -58,7 +59,8 @@ def test_port_in_use_real_socket_smoke():
 # --- _start_vite_server honors the serve contract (mocked, no real Vite) -----
 
 @pytest.mark.parametrize("exit_delay", [0, 0.7])
-def test_start_vite_server_never_adopts_foreign_listener(tmp_path, monkeypatch, exit_delay):
+@pytest.mark.parametrize("collision_log", [True, False])
+def test_start_vite_server_never_adopts_foreign_listener(tmp_path, monkeypatch, exit_delay, collision_log):
     class ForeignHandler(BaseHTTPRequestHandler):
         def do_GET(self):
             self.send_response(200)
@@ -84,7 +86,8 @@ try:
     server = HTTPServer(('127.0.0.1', port), SimpleHTTPRequestHandler)
 except OSError:
     time.sleep({exit_delay!r})
-    print(f'Port {{port}} is already in use', file=sys.stderr, flush=True)
+    if {collision_log!r}:
+        print(f'Port {{port}} is already in use', file=sys.stderr, flush=True)
     sys.exit(1)
 server.serve_forever()
 """, encoding="utf-8")
@@ -111,13 +114,14 @@ server.serve_forever()
     monkeypatch.setattr(subprocess, "Popen", spawn)
     try:
         url = ui_shot._start_vite_server()
-        assert url != f"http://localhost:{port}", "adopted the foreign HTTP 200"
+        assert url != f"http://127.0.0.1:{port}", "adopted the foreign HTTP 200"
         info = json.loads(info_path.read_text())
         assert info["port"] > port
         assert children[-1].poll() is None
         assert info["pid"] == children[-1].pid
         assert children[0].poll() == 1
-        assert f"Port {port} is already in use" in (tmp_path / f"ui-shot-vite-{port}.log").read_text()
+        if collision_log:
+            assert f"Port {port} is already in use" in (tmp_path / f"ui-shot-vite-{port}.log").read_text()
     finally:
         for child in children:
             if child.poll() is None:
@@ -126,6 +130,125 @@ server.serve_forever()
         foreign.shutdown()
         foreign.server_close()
         thread.join(timeout=5)
+
+
+def test_start_and_reuse_probe_ipv4_with_foreign_ipv6_listener(tmp_path, monkeypatch):
+    foreign_requests = []
+
+    class ForeignHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            foreign_requests.append(self.path)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"foreign responder")
+
+        def log_message(self, *_args):
+            pass
+
+    class IPv6Server(ThreadingHTTPServer):
+        address_family = socket.AF_INET6
+
+    try:
+        foreign = IPv6Server(("::1", 0), ForeignHandler)
+    except OSError as exc:
+        pytest.skip(f"IPv6 loopback unavailable: {exc}")
+    thread = threading.Thread(target=foreign.serve_forever, daemon=True)
+    thread.start()
+    port = foreign.server_port
+    ui_web = tmp_path / "modules" / "ui-web"
+    ui_web.mkdir(parents=True)
+    entry = tmp_path / "vite_ipv4.py"
+    entry.write_text("""
+import sys
+from http.server import HTTPServer, BaseHTTPRequestHandler
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'owned IPv4 responder')
+    def log_message(self, *_args): pass
+HTTPServer(('127.0.0.1', int(sys.argv[sys.argv.index('--port') + 1])), Handler).serve_forever()
+""", encoding="utf-8")
+    info_path = tmp_path / "server.json"
+    monkeypatch.setattr(ui_shot, "_SERVER_INFO_PATH", info_path)
+    monkeypatch.setattr(ui_shot, "_find_ui_web_dir", lambda: ui_web)
+    monkeypatch.setattr(ui_shot, "_ensure_node_modules_junction", lambda _u: True)
+    monkeypatch.setattr(ui_shot, "_resolve_vite_entry", lambda _u: entry)
+    monkeypatch.setattr(ui_shot.shutil, "which", lambda _name: sys.executable)
+    monkeypatch.setattr(ui_shot, "_register_agent_spawn", lambda *_args: None)
+    monkeypatch.setattr(ui_shot, "_renew_agent_spawn_lease", lambda *_args: None)
+    monkeypatch.setattr(ui_shot, "_git_provenance", lambda _u: {})
+    # The foreign IPv6 listener appeared after the scan. Vite still owns IPv4.
+    monkeypatch.setattr(ui_shot, "_VITE_PORT_START", port)
+    monkeypatch.setattr(ui_shot, "_pick_free_port", lambda *_args: port)
+    getaddrinfo = socket.getaddrinfo
+
+    def ipv6_first(host, *args, **kwargs):
+        # Exercise the unsafe localhost resolution even on IPv4-first machines.
+        return getaddrinfo("::1" if host == "localhost" else host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", ipv6_first)
+    popen = subprocess.Popen
+    children = []
+
+    def spawn(*args, **kwargs):
+        child = popen(*args, **kwargs)
+        children.append(child)
+        return child
+
+    monkeypatch.setattr(subprocess, "Popen", spawn)
+    try:
+        url = ui_shot._start_vite_server()
+        with urlopen(url, timeout=2) as response:
+            assert response.read() == b"owned IPv4 responder"
+        assert url == f"http://127.0.0.1:{port}"
+        # The real child is Python; substitute only the Vite command-line check.
+        monkeypatch.setattr(ui_shot, "_pid_is_our_vite", lambda pid, _port: pid == children[0].pid)
+        assert ui_shot._start_vite_server() == url
+        assert ui_shot._resolve_ui_url("http://localhost:5173") == url
+        assert len(children) == 1
+        assert foreign_requests == [], "readiness or reuse probed the foreign IPv6 server"
+    finally:
+        for child in children:
+            if child.poll() is None:
+                child.kill()
+            child.wait(timeout=5)
+        foreign.shutdown()
+        foreign.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.mark.parametrize("message", [
+    "Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'rollup'",
+    "failed to load config: invalid configuration",
+])
+def test_start_vite_server_does_not_retry_other_child_exits(tmp_path, monkeypatch, message):
+    attempts = []
+
+    class Failed:
+        pid = 1234
+        returncode = 1
+        def poll(self): return self.returncode
+        def wait(self): return self.returncode
+
+    def spawn(cmd, **kwargs):
+        attempts.append(int(cmd[-2]))
+        kwargs["stderr"].write(message + "\n")
+        return Failed()
+
+    monkeypatch.setattr(ui_shot, "_SERVER_INFO_PATH", tmp_path / "server.json")
+    monkeypatch.setattr(ui_shot, "_find_ui_web_dir", lambda: tmp_path)
+    monkeypatch.setattr(ui_shot, "_ensure_node_modules_junction", lambda _u: True)
+    monkeypatch.setattr(ui_shot, "_resolve_vite_entry", lambda _u: tmp_path / "vite.js")
+    monkeypatch.setattr(ui_shot.shutil, "which", lambda _n: "node")
+    monkeypatch.setattr(ui_shot, "_is_free", lambda _port: True)
+    monkeypatch.setattr(ui_shot, "_port_in_use", lambda _port, _host: False)
+    monkeypatch.setattr(subprocess, "Popen", spawn)
+    with pytest.raises(ui_shot.ServeStartError) as error:
+        ui_shot._start_vite_server()
+    assert message in str(error.value)
+    assert attempts == [5174], "a non-collision exit must fail on the first attempt"
+    assert not (tmp_path / "server.json").exists()
 
 
 def test_start_vite_server_exhausts_range_with_child_log(tmp_path, monkeypatch):
@@ -204,7 +327,7 @@ def test_start_vite_server_honors_contract(tmp_path, monkeypatch):
 
     url = ui_shot._start_vite_server()
 
-    assert url == "http://localhost:5191"
+    assert url == "http://127.0.0.1:5191"
     # Launch via `node <vite-entry>` (615 §30) — NOT npx.cmd; NEUTRAL vite + strictPort, free port
     assert captured["cmd"] == ["C:/node/node.exe", str(vite_entry), "--port", "5191", "--strictPort"]
     assert "npx" not in captured["cmd"][0] and "npx.cmd" not in captured["cmd"]
@@ -250,7 +373,7 @@ def test_start_vite_server_reuse_renews_agent_spawn_lease(tmp_path, monkeypatch)
     monkeypatch.setattr(ui_shot, "_is_server_alive", lambda _info: True)
 
     url = ui_shot._start_vite_server()
-    assert url == "http://localhost:5192"
+    assert url == "http://127.0.0.1:5192"
 
     rec_path = ui_shot.agent_spawn_register.register_dir() / "ui-shot-5192.json"
     renewed = json.loads(rec_path.read_text(encoding="utf-8"))
@@ -274,7 +397,7 @@ def test_resolve_ui_url_reuse_renews_agent_spawn_lease(tmp_path, monkeypatch):
     monkeypatch.setattr(ui_shot, "_is_server_alive", lambda _info: True)
 
     url = ui_shot._resolve_ui_url("http://localhost:5173")
-    assert url == "http://localhost:5193"
+    assert url == "http://127.0.0.1:5193"
 
     rec_path = ui_shot.agent_spawn_register.register_dir() / "ui-shot-5193.json"
     renewed = json.loads(rec_path.read_text(encoding="utf-8"))
