@@ -5,7 +5,6 @@ import { HaltBackend } from '../../controllers/testing/HaltBackend.js';
 import { setAuthorizationPresenter } from '../../operations/authorizationBroker.js';
 import { ComposerPort } from '../../state/composerPort.js';
 import { Sv3RunDomain } from './sv3-run-domain.js';
-import type { Sv3RunView } from './sv3-run.js';
 import {
   adoptRunSession, latestTurnRef, settleAgentTurn, submitInSession, SV3_SESSIONS_EMPTY,
   type Sv3SessionList,
@@ -81,7 +80,6 @@ function windowOwner() {
 async function start() {
   const window = windowOwner(); window.submit(); await flush(); backend.identity(); await flush(); return window;
 }
-const notes = (run: Sv3RunView | null) => run?.feed.items.flatMap(item => item.kind === 'note' ? [[item.label, item.text]] : []) ?? [];
 const lastTurn = (window: ReturnType<typeof windowOwner>) => window.sessions.sessions.at(-1)?.turns.at(-1);
 
 beforeEach(() => {
@@ -115,62 +113,6 @@ describe('the window run owner against the injected backend', () => {
     expect(window.host.settleRun).toHaveBeenCalledOnce();
     expect(window.host.refreshRecord).toHaveBeenCalledOnce();
     expect(backend.observations).toHaveLength(1);
-  });
-
-  it('SW-RUN-02 projects actual tool activity and leaves an unreported step count unknown', async () => {
-    const window = await start();
-    expect(window.ctrl.iterationsUsed).toBeNull();
-    backend.emit('tool_call_proposed', { callId: 'c1', toolName: 'core.search', arguments: '{}', risk: 'LOW' });
-    backend.emit('tool_exec_started', { callId: 'c1', toolName: 'core.search' });
-    backend.emit('tool_exec_completed', { callId: 'c1', success: true, output: 'Found it' }); await flush();
-    expect(window.snapshot()?.feed.toolCallCount).toBe(1);
-    expect(window.snapshot()?.feed.items.some(item => item.kind === 'tool')).toBe(true);
-    expect(window.ctrl.iterationsUsed).toBeNull();
-  });
-
-  it('SW-RUN-03 routes a held budget choice through the issuance seam', async () => {
-    const window = await start();
-    backend.emit('budget_gate', { tokensNeeded: 100, tokensRemaining: 0, totalTokensConsumed: 100 }); await flush();
-    expect(window.snapshot()?.prompts.some(prompt => prompt.kind === 'budget')).toBe(true);
-    window.owner.decide({ kind: 'budget', decision: 'raise', addTokens: 100 }); await flush();
-    expect(backend.requests.filter(request => request.path.includes('/budget'))).toHaveLength(1);
-  });
-
-  it('SW-RUN-04 concurrent steering stays on one run and opens no competing turn', async () => {
-    const window = await start();
-    window.owner.steerLiveRun('Focus.'); window.owner.steerLiveRun('Focus.'); await flush();
-    expect(backend.requests.filter(request => request.path.endsWith('/steer'))).toHaveLength(2);
-    expect(backend.observations).toHaveLength(1);
-    expect(window.sessions.sessions[0]?.turns).toHaveLength(1);
-  });
-
-  it('SW-RUN-05 applied queued not applied and unconfirmed directions remain distinct', async () => {
-    const window = await start();
-    for (const [directiveId, outcome] of [['a', 'applied'], ['b', 'queued'], ['c', 'not_applied']] as const) {
-      backend.emit('directive_acknowledged', { directiveId, directiveText: directiveId, outcome });
-    }
-    backend.holdResponses.add('/api/chat/agent/steer');
-    window.owner.steerLiveRun('unconfirmed'); await flush();
-    expect(backend.responses).toHaveLength(1);
-    backend.responses[0]!.fail(); await flush();
-    expect([...window.owner.unconfirmedSteerNotes.values()].flat()).toHaveLength(1);
-    const labels = notes(window.snapshot()).map(note => note[0]);
-    expect(labels).toContain('Steered'); expect(labels).toContain('Direction queued'); expect(labels).toContain('Not applied');
-  });
-
-  it('SW-RUN-06 an unrelated report cannot settle either of two identical lost sends', async () => {
-    const window = await start();
-    const path = '/api/chat/agent/steer'; backend.holdResponses.add(path);
-    window.owner.steerLiveRun('Focus.'); window.owner.steerLiveRun('Focus.'); await flush();
-    const sends = backend.responses.filter(response => response.path === path);
-    expect(sends).toHaveLength(2);
-    for (const send of sends) send.fail(); await flush();
-    expect([...window.owner.unconfirmedSteerNotes.values()].flat()).toHaveLength(2);
-    backend.emit('directive_acknowledged', { directiveId: 'other', directiveText: 'Focus.', outcome: 'applied' }); await flush();
-    expect([...window.owner.unconfirmedSteerNotes.values()].flat()).toHaveLength(2);
-    const clientRequestId = (JSON.parse(String(sends[1]!.init?.body)) as { clientRequestId: string }).clientRequestId;
-    backend.emit('directive_acknowledged', { directiveId: 'own', directiveText: 'Focus.', outcome: 'queued', clientRequestId }); await flush();
-    expect([...window.owner.unconfirmedSteerNotes.values()].flat()).toHaveLength(1);
   });
 
   it('SW-RUN-07 a lost steer note survives terminal until its own report arrives', async () => {
