@@ -297,7 +297,10 @@ session configuration fails its AppArmor policy query with the read-only root;
 the private configuration permits activation-environment updates without any
 additional writable host path. The existing read-only `/run/dbus` binding is
 retained; J1/J2 with it hidden remain unverified. No other host service socket
-is restored.
+is restored. The sandbox does not guard against processes of the same user on
+the host: one can still reach the private bus through `/proc/<pid>/root`, as it
+could trace the lane's processes. The sandbox keeps the lane away from the
+owner's data and session, not the host user away from the lane.
 The owner's home
 remains hidden and only explicit lane inputs are restored there.
 
