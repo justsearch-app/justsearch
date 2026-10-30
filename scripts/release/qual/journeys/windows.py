@@ -1231,7 +1231,7 @@ def invoke_nsis(run, installation, button_id):
     # The Win32 UIA Invoke provider returned successfully without advancing
     # Next/Finish in the real wizard. Space activates the focused native button;
     # send rechecks process/window identity and foreground before any key.
-    run.native.send(window, '{SPACE}')
+    run.native.send(window, ' ')
     return {'handle':window['handle'], 'pid':window['process']['pid'], 'button':str(button_id),
             'label':label, 'invoked':True, 'interface':'IUIAutomation.SetFocus/SendKeys'}
 

@@ -681,7 +681,7 @@ class WindowsUpdateAndCrashTests(unittest.TestCase):
         result=windows.invoke_nsis(run,{'window':window},1)
         button.SetFocus.assert_called_once_with()
         run.native.element.assert_called_once_with(window)
-        run.native.send.assert_called_once_with(window,'{SPACE}')
+        run.native.send.assert_called_once_with(window,' ')
         self.assertEqual(result['interface'],'IUIAutomation.SetFocus/SendKeys')
         button.GetCurrentPattern.assert_not_called()
         run.native.send.reset_mock()
