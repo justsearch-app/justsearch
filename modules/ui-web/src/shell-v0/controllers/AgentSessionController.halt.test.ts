@@ -202,6 +202,28 @@ describe('Halt follows the backend across windows and reloads', () => {
     backend.terminal('run-3', 'DONE');
   });
 
+  it.each(['send', 'resume', 'fork', 'workflow'] as const)('G1 %s never answers before identity: Stop releases the composer at its deadline without discovering another run', async (entry) => {
+    vi.useFakeTimers();
+    const ctrl = window();
+    tasks.push(entry === 'send' ? ctrl.send('Inspect this folder')
+      : entry === 'resume' ? ctrl.resumeSession('prior')
+      : entry === 'fork' ? ctrl.forkRun('prior', 'Edited question') : ctrl.runWorkflow('workflow'));
+    await flush();
+    tasks.push(ctrl.cancelSession()); await flush();
+    await vi.advanceTimersByTimeAsync(STOP_RESPONSE_WAIT_MS - 1);
+    expect(ctrl.isStreaming).toBe(true);
+    tasks.push(ctrl.cancelSession()); await flush();
+    await vi.advanceTimersByTimeAsync(2); await flush();
+    expect(ctrl.isStreaming).toBe(false); expect(ctrl.runInFlight).toBe(false);
+    expect(ctrl.stopAttempt.intent).toBe(false); expect(ctrl.stopObservationLost).toBe(false);
+    expect(ctrl.conversation.find((entry) => entry.type === 'error')?.content).toBeTruthy();
+    expect(ctrl.terminalOutcome).not.toBe('cancelled'); expect(ctrl.concludedRunId).toBeNull();
+    expect(directiveAvailable(ctrl, { kind: 'halt' })).toBe(false);
+    expect(backend.discoveries).toBe(0); expect(backend.requests).toEqual([]);
+    backend.identity(); await flush();
+    expect(ctrl.sessionId).toBeNull(); expect(backend.requests).toEqual([]);
+  });
+
   it('N2 early Stop then completion before identity releases the composer and offers no permanent Stop', async () => {
     const ctrl = await start(false); tasks.push(ctrl.cancelSession());
     backend.terminal('run-1', 'DONE'); await flush();

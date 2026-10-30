@@ -229,6 +229,34 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(0);
   });
 
+  it('G1 a start that never answers releases the composer at the Stop deadline with a failed receipt and no polling', async () => {
+    const el = await mount();
+    const originalFetch = fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input).includes('/api/chat/dispatch') || String(input).endsWith('/api/chat/agent')) {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+        });
+      }
+      return originalFetch(input, init);
+    }));
+    await start(el, false);
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    try {
+      clickStop(el); await vi.advanceTimersByTimeAsync(10_001);
+      const ctrl = getAgentSessionController('');
+      expect(ctrl.isStreaming).toBe(false); expect(ctrl.runInFlight).toBe(false);
+      expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('failed');
+      expect(main(el).shadowRoot!.querySelector('[data-testid="sv3-turn-stopping"]')).toBeNull();
+      expect(el.shadowRoot!.querySelector('jf-sv3-composer')!.shadowRoot!.querySelector('[data-testid="sv3-composer-stop"]')).toBeNull();
+      expect(noteCount(el)).toBe(0); expect(threadReads).toBe(0);
+      expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(0);
+    } finally {
+      el.remove(); await vi.advanceTimersByTimeAsync(0);
+      vi.clearAllTimers(); vi.useRealTimers();
+    }
+  });
+
   it('N2 early Stop then completion before identity releases the composer without polling', async () => {
     const el = await mount(); await start(el, false); clickStop(el); await settle();
     emit('done', { finalResponse: 'Finished answer', disposition: 'COMPLETED' }); close(); await settle();
@@ -428,7 +456,7 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     }
   });
 
-  it.each(['refused', 'network', 'no-answer'] as const)('N4 %s Stop bounds record polling to the five-second grace even after further notifications', async (outcome) => {
+  it.each(['accepted', 'refused', 'network', 'no-answer'] as const)('N4 %s Stop bounds record polling to the five-second grace even after further notifications', async (outcome) => {
     const owner = await mount(); await start(owner);
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     try {
@@ -451,22 +479,55 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     }
   });
 
-  it('N4 preservation an accepted Halt keeps waiting beyond the clean-DONE grace for its saved confirmation', async () => {
+  it('N4 an accepted Halt keeps the completed answer and disposition when its saved confirmation arrives within the grace', async () => {
     const owner = await mount(); await start(owner);
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     try {
       runState = 'DONE';
       events = [prompt(), wire('2', 'ASSISTANT_MESSAGE', 'Finished answer', { disposition: 'COMPLETED', shapeId: 'core.agent-run' })];
       clickStop(owner); await vi.advanceTimersByTimeAsync(0);
-      finishDelete(); await vi.advanceTimersByTimeAsync(0);
-      const initialReads = threadReads;
-      await vi.advanceTimersByTimeAsync(20_000);
-      expect(threadReads).toBeGreaterThan(initialReads);
+      finishDelete(); await vi.advanceTimersByTimeAsync(4000);
       expect(noteCount(owner)).toBe(0);
       await saveStop(true);
       await vi.advanceTimersByTimeAsync(500);
       expect(noteCount(owner)).toBe(1);
       expect(owner.sessions.sessions.flatMap((s) => s.turns)[0]!.disposition).toBe('COMPLETED');
+    } finally {
+      owner.remove(); await vi.advanceTimersByTimeAsync(0);
+      vi.clearAllTimers(); vi.useRealTimers();
+    }
+  });
+
+  it.each(['pending', 'CANCELLED', 'DONE'] as const)('G2 a resumed run adopted into another conversation bounds accepted Stop polling after %s', async (terminal) => {
+    const owner = await mount();
+    const ctrl = getAgentSessionController('');
+    pendingControl = dispatchRunControl(ctrl, { kind: 'resume', sessionId: 'prior-run', resumable: true });
+    await settle();
+    const adopted = owner.sessions.sessions[0]!.id;
+    owner.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-select', {
+      detail: { id: adopted }, bubbles: true, composed: true,
+    }));
+    await settle();
+    conversationId = 'actual-conversation';
+    emit('run_started', { runId: RUN, conversationId }); emit('session_started', { sessionId: RUN });
+    await settle();
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    try {
+      clickStop(owner); await vi.advanceTimersByTimeAsync(0);
+      finishDelete(); await vi.advanceTimersByTimeAsync(0);
+      if (terminal === 'CANCELLED') emit('error', { error: 'Session cancelled', errorCode: 'CANCELLED' });
+      if (terminal === 'DONE') emit('done', { finalResponse: 'Finished answer', disposition: 'COMPLETED' });
+      await vi.advanceTimersByTimeAsync(0);
+      const initialReads = threadReads;
+      await vi.advanceTimersByTimeAsync(4900);
+      expect(threadReads).toBeGreaterThan(initialReads);
+      expect(threadAddresses.some((url) => url.endsWith('/api/thread/actual-conversation'))).toBe(true);
+      await vi.advanceTimersByTimeAsync(100);
+      const atGraceEnd = threadReads;
+      ctrl.onProgress({ phase: 'heartbeat', message: '' });
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(threadReads).toBe(atGraceEnd);
+      expect(noteCount(owner)).toBe(0);
     } finally {
       owner.remove(); await vi.advanceTimersByTimeAsync(0);
       vi.clearAllTimers(); vi.useRealTimers();

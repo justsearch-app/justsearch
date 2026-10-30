@@ -2453,7 +2453,7 @@ export class SearchV3View extends JfElement {
         const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
         if (state === 'DONE' && stop === undefined && !local.haltRequested) {
           pending.doneGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
-        } else if (!local.haltRequested || (ctrl?.sessionId === runId && ctrl.stopAttempt?.outcome === 'accepted')) {
+        } else if (!local.haltRequested) {
           delete pending.doneGraceUntil;
         }
         // A saved Stop can precede the final checkpoint; keep reading through both edges.
@@ -5221,13 +5221,11 @@ export class SearchV3View extends JfElement {
       if (local.haltRequested && ctrl.sessionId !== null && ctrl.terminalOutcome === null
           && recordConversationId !== null) {
         local.stopRecordGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
-        const accepted = ctrl.stopAttempt.outcome === 'accepted';
         const pending = this.pendingRunRecords.get(local.turnId);
-        if (pending && accepted) delete pending.doneGraceUntil;
-        if (!pending && (accepted || Date.now() < local.stopRecordGraceUntil)) {
+        if (!pending && Date.now() < local.stopRecordGraceUntil) {
           this.pendingRunRecords.set(local.turnId, {
             local, runId: ctrl.sessionId, conversationId: recordConversationId,
-            ...(accepted ? {} : { doneGraceUntil: local.stopRecordGraceUntil }),
+            doneGraceUntil: local.stopRecordGraceUntil,
           });
           void this.refreshRecord(recordConversationId);
         }
@@ -5390,7 +5388,7 @@ export class SearchV3View extends JfElement {
     if (local.acknowledged && ctrl?.sessionId != null && recordConversationId != null) {
       this.pendingRunRecords.set(local.turnId, {
         local, runId: ctrl.sessionId, conversationId: recordConversationId,
-        ...(local.haltRequested && ctrl.stopAttempt?.outcome !== 'accepted'
+        ...(local.haltRequested
           ? { doneGraceUntil: Date.now() + COMPLETED_RECORD_GRACE_MS } : {}),
       });
     }

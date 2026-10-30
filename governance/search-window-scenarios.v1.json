@@ -1924,6 +1924,21 @@
           "layer": "real-ui-fixture",
           "step": "sv3-run-halt-timeout",
           "observes": "An unanswered DELETE shows the Ask Stop unconfirmed presentation, keeps observation open, and permits one explicit retry without claiming a halted receipt."
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+          "test": "G1 %s never answers before identity: Stop releases the composer at its deadline without discovering another run"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+          "test": "G1 a start that never answers releases the composer at the Stop deadline with a failed receipt and no polling"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+          "test": "G2 a resumed run adopted into another conversation bounds accepted Stop polling after %s"
         }
       ]
     },
@@ -1944,6 +1959,47 @@
           "layer": "live-backend",
           "binding": null,
           "reason": "The saved conversation treats a recorded Stop as halt evidence before live-run discovery answers. Preserving today's saved-conversation presentation leaves this gap; no live backend check establishes backend-confirmed stopping during that interval."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-14",
+      "behavior": "When another part of the app starts a new agent run while an earlier run in the Search window is stopping, the earlier turn’s Stop can reach the newer run and the newer run’s end can settle the earlier turn.",
+      "kind": "known-gap",
+      "races": [
+        "late-response",
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The Search turn can retain its earlier run while the shared agent controller adopts a newer run. Isolating those owners is outside the agreed Stop fix; no check is bound to establish isolation for this case."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The Search turn can retain its earlier run while the shared agent controller adopts a newer run. Isolating those owners is outside the agreed Stop fix; no check is bound to establish isolation for this case."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-15",
+      "behavior": "A resumed run that is stopped shows its stopped status but not its saved partial output and evidence until reopened.",
+      "kind": "known-gap",
+      "races": [
+        "late-response"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "A resumed run can belong to a different saved conversation from the adopted Search turn. Recovering its partial output and evidence without reopening is outside the agreed Stop fix; no check is bound to establish that recovery."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "A resumed run can belong to a different saved conversation from the adopted Search turn. Recovering its partial output and evidence without reopening is outside the agreed Stop fix; no check is bound to establish that recovery."
         }
       ]
     },

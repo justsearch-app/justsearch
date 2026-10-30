@@ -449,6 +449,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   private stoppedCeremonies = 0;
   stopObservationLost = false;
   stopAttempt = new StopAttempt();
+  private stopIdentityTimer: ReturnType<typeof setTimeout> | null = null;
   terminalOutcome: RunTerminalOutcome | null = null;
   isStreaming = false;
   // Tempdoc 565 §33 — WHICH kind of run is live (null = idle). Only an `agent` run is steerable (§30
@@ -845,6 +846,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   destroy(): void {
+    if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
+    this.stopIdentityTimer = null;
     this.stopAttempt = new StopAttempt();
     this.stoppedCeremonies = 0;
     this.approvalLookupRevision++;
@@ -1994,6 +1997,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   /** The existing abort handle owns delivery and cleanup; replacing a view does not cancel its backend run. */
   private beginStream(sessionId: string | null = null, preserveApprovals = false): AbortController {
+    if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
+    this.stopIdentityTimer = null;
     if (!preserveApprovals) {
       this.runConversationId = this.conversationId;
       this.reattachedThisRun = false;
@@ -2024,6 +2029,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   private finishStream(stream: AbortController): void {
     if (this.abortController !== stream) return;
+    if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
+    this.stopIdentityTimer = null;
     this.liveWatchdog.clear();
     if (!this.sessionId && this.stopAttempt.intent && this.terminalOutcome === null) {
       this.onError({ error: friendlyStreamError(Object.assign(new Error('Stream ended without terminal event'), { code: 'STREAM_INCOMPLETE' })) });
@@ -2284,6 +2291,20 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   async cancelSession(): Promise<void> {
     if (this.stopObservationLost) this.stopAttempt.retry();
     this.stopAttempt.latch();
+    if (!this.sessionId && this.stopIdentityTimer === null && this.abortController !== null) {
+      const attempt = this.stopAttempt;
+      const stream = this.abortController;
+      // Admission can hang before there is an address to stop. Bound that wait too, without
+      // looking up another window's run by conversation or claiming that this run was halted.
+      this.stopIdentityTimer = setTimeout(() => {
+        this.stopIdentityTimer = null;
+        if (this.stopAttempt !== attempt || this.abortController !== stream || this.sessionId
+            || this.terminalOutcome !== null || !this.isStreaming) return;
+        this.onError({ error: friendlyStreamError(Object.assign(new Error('Stream ended without terminal event'), { code: 'STREAM_INCOMPLETE' })) });
+        stream.abort();
+        this.finishStream(stream);
+      }, STOP_RESPONSE_WAIT_MS);
+    }
     this.commitStreamingText();
     this.budgetGate = null;
     this.contextGate = null;
@@ -2299,6 +2320,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     const attempt = this.stopAttempt;
     const runId = this.sessionId;
     if (!attempt.intent || !runId || this.terminalOutcome !== null) return;
+    if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
+    this.stopIdentityTimer = null;
     if (!retry && attempt.attempt > 0) return;
     const delivery = attempt.deliver((signal) => this.transport.request(
       `${this.apiBase}/api/chat/sessions/${encodeURIComponent(runId)}`,
