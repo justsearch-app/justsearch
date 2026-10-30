@@ -236,18 +236,53 @@ describe('the window run owner against the injected backend', () => {
     const window = await start(); backend.holdResponses.add('/api/chat/approve');
     const approving = window.ctrl.approveCall('c1'); await flush();
     backend.responses[0]!.release(404); await approving; await flush();
-    expect(window.snapshot()?.feed.items.some(item => item.kind === 'note' && /approval/i.test(item.text))).toBe(true);
+    expect(window.snapshot()?.feed.errored).toBe(true);
+    expect(window.snapshot()?.feed.items).toContainEqual(expect.objectContaining({
+      kind: 'note', label: 'Error',
+      text: expect.stringContaining("Couldn't send your approval (HTTP 404) — the action was not approved."),
+    }));
   });
 
-  it('SW-RUN-11 Stop keeps both windows observing output until the backend terminal', async () => {
+  it('SW-RUN-11 Stop preserves arriving prose and tools in both windows through the halted terminal', async () => {
     const first = await start(); const observer = windowOwner();
     observer.ctrl.conversationId = first.ctrl.conversationId;
     tasks.push(observer.ctrl.reattachActiveRunOnLoad()); await flush(); backend.identity(); await flush();
     first.owner.haltRun(); first.owner.haltRun(); await flush();
     expect(backend.responses).toHaveLength(1); expect(first.owner.runStopping()?.state).toBe('stopping');
     backend.emit('chunk', { text: 'Still arriving' }, 0); backend.emit('chunk', { text: 'Still arriving' }, 1); await flush();
-    expect(first.snapshot()?.phase).toBe('running'); expect(observer.snapshot()?.phase).toBe('running');
+    for (const window of [first, observer]) {
+      expect(window.snapshot()?.phase).toBe('running');
+      expect(lastTurn(window)?.status).toBe('streaming');
+    }
+    // The stopping owner's feed includes buffered prose before a tool commits it for both windows.
+    expect(first.snapshot()?.feed.items).toContainEqual(expect.objectContaining({ kind: 'text', text: 'Still arriving' }));
+    expect(observer.ctrl.streamingText).toBe('Still arriving');
+    for (const index of [0, 1]) {
+      backend.emit('tool_call_proposed', { callId: 'stopping-tool', toolName: 'core.search', arguments: '{}', risk: 'LOW' }, index);
+      backend.emit('tool_exec_started', { callId: 'stopping-tool', toolName: 'core.search' }, index);
+      backend.emit('tool_exec_completed', { callId: 'stopping-tool', success: true, output: 'Found while stopping' }, index);
+    }
+    await flush();
+    const expectArrivingOutput = (window: ReturnType<typeof windowOwner>) => {
+      expect(window.snapshot()?.feed.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({ kind: 'text', text: 'Still arriving' }),
+        expect.objectContaining({ kind: 'tool', id: 'stopping-tool', call: expect.objectContaining({
+          toolName: 'core.search', status: 'completed', success: true, output: 'Found while stopping',
+        }) }),
+      ]));
+      expect(window.snapshot()?.feed.toolCallCount).toBe(1);
+    };
+    expect(first.owner.runStopping()?.state).toBe('stopping');
+    for (const window of [first, observer]) {
+      expect(window.snapshot()?.phase).toBe('running');
+      expect(lastTurn(window)?.status).toBe('streaming');
+      expectArrivingOutput(window);
+    }
     backend.responses[0]!.release(); backend.terminal('run-1', 'CANCELLED'); await flush();
-    expect(lastTurn(first)?.status).toBe('halted'); expect(lastTurn(observer)?.status).toBe('halted');
+    for (const window of [first, observer]) {
+      expect(lastTurn(window)?.status).toBe('halted');
+      expect(window.snapshot()?.phase).toBe('ended');
+      expectArrivingOutput(window);
+    }
   });
 });

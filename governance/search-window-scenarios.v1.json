@@ -2038,7 +2038,7 @@
         {
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
-          "test": "SW-RUN-11 Stop keeps both windows observing output until the backend terminal"
+          "test": "SW-RUN-11 Stop preserves arriving prose and tools in both windows through the halted terminal"
         }
       ]
     },
