@@ -106,6 +106,85 @@ describe('Halt follows the backend across windows and reloads', () => {
     }
   });
 
+  it('R4 explicit Stop retry reconciles CANCELLED recorded after the original grace', async () => {
+    vi.useFakeTimers();
+    const ctrl = await start(); tasks.push(ctrl.cancelSession()); backend.responses[0]!.release(); await flush();
+    backend.observations[0]!.lose(); await flush(); backend.identity();
+    backend.observations[1]!.lose(); await flush();
+    await vi.advanceTimersByTimeAsync(STOP_RESPONSE_WAIT_MS + 1);
+    backend.terminal('run-1', 'CANCELLED', false);
+    tasks.push(ctrl.cancelSession()); await flush();
+    expect(ctrl.terminalOutcome).toBe('cancelled');
+    expect(ctrl.isStreaming).toBe(false);
+  });
+
+  it('R4 a retry supersedes an unanswered reconciliation without losing the current record result', async () => {
+    vi.useFakeTimers();
+    const ctrl = await start(); tasks.push(ctrl.cancelSession()); backend.responses[0]!.release(); await flush();
+    backend.holdResponses.add('/api/chat/runs/live'); backend.holdResponses.add('/api/thread/conversation');
+    backend.observations[0]!.lose(); await flush();
+    tasks.push(ctrl.cancelSession()); await flush();
+    const records = backend.responses.filter((held) => held.path === '/api/thread/conversation');
+    const discoveries = backend.responses.filter((held) => held.path === '/api/chat/runs/live');
+    expect(records).toHaveLength(2); expect(discoveries).toHaveLength(2);
+    expect(records[0]!.init?.signal?.aborted).toBe(true);
+    backend.runs.get('run-1')!.state = 'CANCELLED';
+    records[1]!.release(200, { lifecycles: [{ sessionId: 'run-1', state: 'CANCELLED' }] });
+    discoveries[1]!.release(200, { runs: [] }); await flush();
+    expect(ctrl.terminalOutcome).toBe('cancelled'); expect(ctrl.isStreaming).toBe(false);
+  });
+
+  it.each(['discovery', 'record', 'both'] as const)('R4 unanswered %s reconciliation reads abort at the deadline and keep Stop available', async (held) => {
+    vi.useFakeTimers();
+    const ctrl = await start(); tasks.push(ctrl.cancelSession()); backend.responses[0]!.release(); await flush();
+    // No live row; the record still cannot establish a terminal.
+    backend.runs.clear();
+    if (held !== 'record') backend.holdResponses.add('/api/chat/runs/live');
+    if (held !== 'discovery') backend.holdResponses.add('/api/thread/conversation');
+    backend.observations[0]!.lose(); await flush();
+    await vi.advanceTimersByTimeAsync(STOP_RESPONSE_WAIT_MS + 1); await flush();
+    const reads = backend.requests.filter((request) => request.path.includes('/live') || request.path.includes('/thread/'));
+    expect(reads.some((request) => request.path.includes('/thread/'))).toBe(true);
+    for (const request of reads.filter((request) => backend.holdResponses.has(request.path))) {
+      expect(request.init?.signal?.aborted).toBe(true);
+    }
+    expect(ctrl.terminalOutcome).toBeNull(); expect(ctrl.stopObservationLost).toBe(true);
+    expect(directiveAvailable(ctrl, { kind: 'halt' })).toBe(true);
+    expect(backend.responses.every((response) => response.settled)).toBe(true);
+  });
+
+  it('R4 generated reconciliation schedules cover late retry, failed records and unanswered reads', async () => {
+    vi.useFakeTimers();
+    await fc.assert(fc.asyncProperty(fc.shuffledSubarray(['CANCELLED', 'ERROR', 'DONE', 'unanswered'], { minLength: 4, maxLength: 4 }),
+      fc.array(fc.constantFrom('chunk', 'halt', 'deadline'), { maxLength: 5 }), async (states, noise) => {
+        for (const state of states) {
+          backend = new HaltBackend();
+          const ctrl = await start(); tasks.push(ctrl.cancelSession()); backend.responses[0]!.release(); await flush();
+          backend.observations[0]!.lose(); await flush(); backend.identity();
+          backend.observations[1]!.lose(); await flush();
+          for (const action of noise) {
+            if (action === 'chunk') backend.emit('chunk', { text: 'Late output' }, 0);
+            if (action === 'halt') { tasks.push(ctrl.cancelSession()); await flush(); backend.responses.find((r) => !r.settled)?.release(); }
+            if (action === 'deadline') await vi.advanceTimersByTimeAsync(STOP_RESPONSE_WAIT_MS + 1);
+          }
+          await vi.advanceTimersByTimeAsync(STOP_RESPONSE_WAIT_MS + 1);
+          if (state === 'unanswered') {
+            backend.holdResponses.add('/api/chat/runs/live'); backend.holdResponses.add('/api/thread/conversation');
+          } else backend.runs.get('run-1')!.state = state;
+          tasks.push(ctrl.cancelSession()); await flush();
+          await vi.advanceTimersByTimeAsync(STOP_RESPONSE_WAIT_MS + 1); await flush();
+          expect(ctrl.terminalOutcome).toBe(state === 'CANCELLED' ? 'cancelled' : state === 'ERROR' ? 'failed' : state === 'DONE' ? 'completed' : null);
+          if (state === 'unanswered') {
+            expect(directiveAvailable(ctrl, { kind: 'halt' })).toBe(true);
+            for (const held of backend.responses.filter((r) => r.init?.method !== 'DELETE')) expect(held.init?.signal?.aborted).toBe(true);
+          }
+          for (const controller of controllers.splice(0)) controller.destroy();
+          for (const held of backend.responses) held.release();
+          await Promise.allSettled(tasks.splice(0));
+        }
+      }), { numRuns: 20, seed: 67104 });
+  });
+
   it.each(['resume', 'fork', 'workflow'] as const)('R2 %s reconciles a lost stopping stream and keeps retry available', async (entry) => {
     const ctrl = window();
     tasks.push(entry === 'resume' ? ctrl.resumeSession('prior')

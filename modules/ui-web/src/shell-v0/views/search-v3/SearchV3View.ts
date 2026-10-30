@@ -281,7 +281,7 @@ import {
   subscribeAgentSession,
 } from '../../state/agentSessionStore.js';
 import type { AgentSessionController } from '../../controllers/AgentSessionController.js';
-import { StopAttempt } from '../../state/stopAttempt.js';
+import { StopAttempt, STOP_RESPONSE_WAIT_MS } from '../../state/stopAttempt.js';
 import {
   directiveAvailable,
   dispatchRunControl,
@@ -2405,9 +2405,13 @@ export class SearchV3View extends JfElement {
     const abort = new AbortController();
     this.recordReads.set(conversationId, abort);
     let failed = false;
+    const stopping = this.agentController();
+    const timer = stopping?.stopAttempt?.intent
+      && (stopping.runConversationId ?? stopping.conversationId) === conversationId
+      ? setTimeout(() => abort.abort(), STOP_RESPONSE_WAIT_MS) : undefined;
     const record = await fetchUnifiedThread(this.apiBase, conversationId, abort.signal, () => {
       failed = true;
-    });
+    }).finally(() => clearTimeout(timer));
     // Reads supersede only their own conversation; a pending Stop can settle after navigation.
     if (abort.signal.aborted) return false;
     this.recordReads.delete(conversationId);
@@ -2429,11 +2433,22 @@ export class SearchV3View extends JfElement {
           state === 'CANCELLED' ? 'halted' : state === 'DONE' ? 'complete' : 'failed',
           turn.toolCalls, Date.now(), '', turn.disposition);
       }
+      const failedRun = ctrl?.stopAttempt?.intent && ctrl.terminalOutcome === 'failed'
+        && (ctrl.runConversationId ?? ctrl.conversationId) === conversationId ? this.run : null;
+      const failedTurn = failedRun === null ? undefined
+        : sessionById(this.sessions, failedRun.sessionId)?.turns.find((turn) => turn.id === failedRun.turnId);
       this.sessions = applySv3Record(
         this.sessions,
         conversationId,
         projectSv3RecordTurns(record.events),
       );
+      // The lifecycle can confirm failure before an ERROR item reaches the record. Preserve the
+      // live receipt across that partial snapshot without changing the saved-record projection.
+      if (failedRun !== null && failedTurn?.status === 'failed') {
+        this.sessions = { ...this.sessions, sessions: this.sessions.sessions.map((session) =>
+          session.id !== failedRun.sessionId ? session : { ...session, turns: session.turns.map((turn) =>
+            turn.id !== failedRun.turnId ? turn : { ...turn, status: 'failed', detail: failedTurn.detail }) }) };
+      }
       const stopIds = new Set(record.events
         .filter((e) => sv3RecordItemStopsRun(e.kind.toLowerCase(), e.attributes))
         .map((e) => e.id));
@@ -5372,7 +5387,7 @@ export class SearchV3View extends JfElement {
     this.sessions = settleAgentTurn(
       this.sessions,
       { sessionId: local.sessionId, turnId: local.turnId },
-      sv3RunOutcome(feed, ctrl?.terminalOutcome === 'cancelled'
+      ctrl?.terminalOutcome === 'failed' ? 'failed' : sv3RunOutcome(feed, ctrl?.terminalOutcome === 'cancelled'
         || (ctrl?.terminalOutcome === 'completed' && local.haltRequested && ctrl.stopAttempt.outcome === 'accepted' && ctrl.answerEvidenceRunId === ctrl.sessionId)),
       feed.toolCallCount,
       Date.now(),

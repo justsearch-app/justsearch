@@ -23,6 +23,7 @@ let runState: string;
 let discoveredRuns: unknown[];
 let discoveryGate: Promise<void> | undefined;
 let threadFailure: boolean;
+let hangingReads: RequestInit[] | null;
 let observeFails: boolean;
 let finishDelete: () => void;
 let deleteStatus: number;
@@ -46,6 +47,7 @@ beforeEach(() => {
   __resetAgentSessionStore(); __resetConversationListForTest(); __resetAiStateForTest();
   __resetDraftProvidersForTest(); __resetDraftKeptForTest();
   events = []; threadReads = 0; threadAddresses = []; startFailure = undefined; runState = 'READY_FOR_LLM'; discoveredRuns = []; discoveryGate = undefined; threadFailure = false; observeFails = false; conversationId = ''; pendingControl = undefined;
+  hangingReads = null;
   deleteStatus = 200; deleteNetworkFailure = false; deleteResolvers = [];
   finishDelete = () => {}; close = () => {};
   announcements = [];
@@ -71,6 +73,12 @@ beforeEach(() => {
         init.signal?.addEventListener('abort', close, { once: true });
       }});
       return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
+    }
+    if (hangingReads !== null && (url.includes('/api/thread/') || url.includes('/api/chat/runs/live'))) {
+      hangingReads.push(init);
+      await new Promise<void>((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+      });
     }
     if (url.includes('/api/thread/')) {
       threadReads++; threadAddresses.push(url);
@@ -243,7 +251,8 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     await start(el, false);
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     try {
-      clickStop(el); await vi.advanceTimersByTimeAsync(10_001);
+      clickStop(el); // The five-second polling grace can start later reads; allow each its ten-second deadline.
+      await vi.advanceTimersByTimeAsync(20_001);
       const ctrl = getAgentSessionController('');
       expect(ctrl.isStreaming).toBe(false); expect(ctrl.runInFlight).toBe(false);
       expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('failed');
@@ -374,6 +383,55 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     expect(main(el).shadowRoot!.querySelectorAll('[data-testid="sv3-run-receipt"]')).toHaveLength(1);
     expect(announcements.filter((message) => message === STOP)).toHaveLength(1);
     expect(turn().toolCalls).toBe(1); expect(turn().evidence?.sources).toHaveLength(1);
+  });
+
+  it('R4 discovery and record fetches that never answer are aborted and leave unconfirmed Stop available', async () => {
+    const el = await mount(); await start(el);
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    try {
+      clickStop(el); await vi.advanceTimersByTimeAsync(0); finishDelete(); await vi.advanceTimersByTimeAsync(0);
+      hangingReads = []; close(); await vi.advanceTimersByTimeAsync(0);
+      // The five-second polling grace can start later reads; allow each its ten-second deadline.
+      await vi.advanceTimersByTimeAsync(20_001);
+      expect(hangingReads.length).toBeGreaterThanOrEqual(2);
+      for (const read of hangingReads) expect(read.signal?.aborted).toBe(true);
+      expect(main(el).shadowRoot!.querySelector('[data-testid="sv3-turn-stopping"]')?.textContent).toBe(TURN_STOP_FAILED);
+      expect(el.shadowRoot!.querySelector('jf-sv3-composer')!.shadowRoot!.querySelector('[data-testid="sv3-composer-stop"]')).not.toBeNull();
+      expect(noteCount(el)).toBe(0);
+    } finally {
+      el.remove(); await vi.advanceTimersByTimeAsync(0); vi.clearAllTimers(); vi.useRealTimers();
+    }
+  });
+
+  it('R4 ERROR lifecycle after lost stopping stream produces a failed receipt without a streamed error', async () => {
+    const el = await mount(); await start(el); clickStop(el); await settle(); finishDelete(); await settle();
+    // Fail record reads during the original Stop; only stream-loss reconciliation finds ERROR.
+    threadFailure = true; await settle();
+    runState = 'ERROR'; threadFailure = false; observeFails = true; close(); await settle();
+    const turn = el.sessions.sessions.flatMap((s) => s.turns)[0]!;
+    expect(getAgentSessionController('').terminalOutcome).toBe('failed');
+    expect(turn.status).toBe('failed');
+    getAgentSessionController('').onProgress({ phase: 'heartbeat', message: '' }); await settle();
+    expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('failed');
+    expect(main(el).shadowRoot!.querySelectorAll('[data-testid="sv3-run-receipt"]')).toHaveLength(1);
+    expect(noteCount(el)).toBe(0);
+  });
+
+  it('R4 Stop retry after the polling grace reads a later CANCELLED and removes the unconfirmed controls', async () => {
+    const el = await mount(); await start(el);
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    try {
+      clickStop(el); await vi.advanceTimersByTimeAsync(0); finishDelete(); await vi.advanceTimersByTimeAsync(0);
+      observeFails = true; close(); await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(20_000);
+      await saveStop(); clickStop(el); await vi.advanceTimersByTimeAsync(0); finishDelete();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('halted');
+      expect(main(el).shadowRoot!.querySelector('[data-testid="sv3-turn-stopping"]')).toBeNull();
+      expect(el.shadowRoot!.querySelector('jf-sv3-composer')!.shadowRoot!.querySelector('[data-testid="sv3-composer-stop"]')).toBeNull();
+    } finally {
+      el.remove(); await vi.advanceTimersByTimeAsync(0); vi.clearAllTimers(); vi.useRealTimers();
+    }
   });
 
   it('DS1 DS2 DS3 DS8 delayed cancellation appears once without reload or focus movement', async () => {

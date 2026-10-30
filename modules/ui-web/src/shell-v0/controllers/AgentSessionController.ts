@@ -631,6 +631,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   // --- Private ---
   private entryIdCounter = 0;
   private abortController: AbortController | null = null;
+  private stoppingReconciliationAbort: AbortController | null = null;
   private availabilityPoll: number | null = null;
   private pendingNotify = false;
   private errorHandledDuringStream = false;
@@ -846,6 +847,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   destroy(): void {
+    this.stoppingReconciliationAbort?.abort();
+    this.stoppingReconciliationAbort = null;
     if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
     this.stopIdentityTimer = null;
     this.stopAttempt = new StopAttempt();
@@ -2000,6 +2003,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
     this.stopIdentityTimer = null;
     if (!preserveApprovals) {
+      this.stoppingReconciliationAbort?.abort();
+      this.stoppingReconciliationAbort = null;
       this.runConversationId = this.conversationId;
       this.reattachedThisRun = false;
       this.runStartedThisStream = false;
@@ -2289,7 +2294,12 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   async cancelSession(): Promise<void> {
-    if (this.stopObservationLost) this.stopAttempt.retry();
+    const retryObservation = this.stopObservationLost && !this.stopAttempt.pending;
+    if (retryObservation) {
+      this.stopAttempt.retry();
+      this.stoppingReconciliationAbort?.abort();
+      this.stoppingReconciliationAbort = null;
+    }
     this.stopAttempt.latch();
     if (!this.sessionId && this.stopIdentityTimer === null && this.abortController !== null) {
       const attempt = this.stopAttempt;
@@ -2313,6 +2323,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.pendingAutoApprovals = [];
     if (this.sessionId) this.stoppedCeremonies += cancelAuthorizationsForRun(this.sessionId);
     this.notify();
+    if (retryObservation) void this.reconcileStoppingStream(this.abortController);
     await this.deliverStop(true);
   }
 
@@ -2353,43 +2364,70 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.notify();
   }
 
-  private async reconcileStoppingStream(stream: AbortController): Promise<void> {
+  private async reconcileStoppingStream(stream: AbortController | null): Promise<void> {
     const attempt = this.stopAttempt;
     const runId = this.sessionId;
     // A conversation cannot identify this dispatch: another window can own its live run.
-    if (!attempt.intent || !runId || this.terminalOutcome !== null) return;
+    if (!attempt.intent || !runId || this.terminalOutcome !== null || this.stoppingReconciliationAbort) return;
+    const abort = new AbortController();
+    this.stoppingReconciliationAbort = abort;
+    const timer = setTimeout(() => abort.abort(), STOP_RESPONSE_WAIT_MS);
     this.stopObservationLost = true;
     this.commitStreamingText();
     this.notify();
     const conversationId = this.runConversationId ?? this.conversationId;
-    const ownsStream = (): boolean => this.abortController === stream
+    const ownsRun = (): boolean => this.stoppingReconciliationAbort === abort
+      && this.sessionId === runId
       && this.stopAttempt === attempt && this.terminalOutcome === null;
-    let run: LiveRunRow | null = null;
+    // Race the whole read (including its body) so even a transport ignoring abort cannot hold us.
+    const bounded = async <T>(read: () => Promise<T>): Promise<T | null> => {
+      let onAbort!: () => void;
+      try {
+        return await Promise.race([
+          read(),
+          new Promise<null>((resolve) => {
+            onAbort = () => resolve(null);
+            abort.signal.addEventListener('abort', onAbort, { once: true });
+            if (abort.signal.aborted) onAbort();
+          }),
+        ]);
+      } catch { return null; }
+      finally { abort.signal.removeEventListener('abort', onAbort); }
+    };
+    let run: LiveRunRow | null;
     try {
-      run = await this.transport.discover(this.apiBase, conversationId);
-    } catch { /* Discovery failure is not a terminal outcome; still try the addressed record. */ }
-    if (!ownsStream()) return;
-    if (runId && run?.runId === runId && !this.reattachedThisRun) {
+      const [discovered, record] = await Promise.all([
+        bounded(() => this.transport.discover(this.apiBase, conversationId, abort.signal)),
+        bounded(async (): Promise<unknown> => {
+          const response = await this.transport.request(
+            `${this.apiBase}/api/thread/${encodeURIComponent(conversationId ?? runId)}`,
+            { signal: abort.signal },
+          );
+          return response.ok ? response.json() : null;
+        }),
+      ]);
+      if (!ownsRun()) return;
+      run = discovered;
+      const lifecycles: unknown[] = typeof record === 'object' && record !== null && 'lifecycles' in record
+        && Array.isArray(record.lifecycles) ? record.lifecycles : [];
+      // Conflicting snapshots are settled in terminal precedence, never by response arrival order.
+      for (const state of ['CANCELLED', 'ERROR', 'DONE']) {
+        if (lifecycles.some((row) => typeof row === 'object' && row !== null
+            && 'sessionId' in row && row.sessionId === runId && 'state' in row && row.state === state)) {
+          this.reconcileRunLifecycle(runId, state);
+          return;
+        }
+      }
+    } finally {
+      clearTimeout(timer);
+      if (this.stoppingReconciliationAbort === abort) this.stoppingReconciliationAbort = null;
+    }
+    if ((this.abortController === stream || this.abortController === null)
+        && this.sessionId === runId && this.stopAttempt === attempt
+        && this.terminalOutcome === null && run?.runId === runId && !this.reattachedThisRun) {
       this.reattachedThisRun = true;
       await this.attachToRun(runId);
-      return;
     }
-    try {
-      const response = await this.transport.request(
-        `${this.apiBase}/api/thread/${encodeURIComponent(conversationId ?? runId)}`,
-      );
-      if (!ownsStream()) return;
-      if (response.ok) {
-        const record: unknown = await response.json();
-        if (!ownsStream()) return;
-        const lifecycles = typeof record === 'object' && record !== null && 'lifecycles' in record
-          && Array.isArray(record.lifecycles) ? record.lifecycles : [];
-        const lifecycle: unknown = lifecycles.find((row: unknown) => typeof row === 'object'
-          && row !== null && 'sessionId' in row && row.sessionId === runId);
-        if (typeof lifecycle === 'object' && lifecycle !== null && 'state' in lifecycle
-            && typeof lifecycle.state === 'string') this.reconcileRunLifecycle(runId, lifecycle.state);
-      }
-    } catch { /* Observation remains unconfirmed; the view also retries its record read. */ }
   }
 
   async resumeSession(sessionId: string): Promise<void> {

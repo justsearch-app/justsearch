@@ -66,9 +66,9 @@ export class HaltBackend {
         if (!this.runs.has(runId)) this.runs.set(runId, { state: 'READY_FOR_LLM', conversationId: 'conversation' });
         await this.observe(runId, dispatch, signal);
       },
-      discover: async (_base, conversationId) => {
+      discover: async (_base, conversationId, signal) => {
         this.discoveries++;
-        const response = await transport.request(`${_base}/api/chat/runs/live`);
+        const response = await transport.request(`${_base}/api/chat/runs/live`, { signal });
         if (!response.ok) return null;
         const { runs } = await response.json() as { runs: LiveRunRow[] };
         for (const run of runs) {
