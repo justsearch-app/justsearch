@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, access } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, access, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { createPrivateKey, generateKeyPairSync, sign } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -39,6 +41,36 @@ test('v2 producer and consumer agree on both signed targets and the complete pre
   register.durableStores.pop();
   await writeFile(f.compatibilityBaselinePath, JSON.stringify(register));
   await assert.rejects(buildReleaseAssets(f), /complete named predecessor register/);
+});
+
+test('published baseline covers current-era predecessors on both targets without changing other metadata', async t => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'justsearch-v2-published-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const f = await generateFixture(dir, { publishedBaseline: true });
+  const { descriptor: published, latest } = await verifyReleaseAssets(f);
+  const register = JSON.parse(await readFile(f.compatibilityRegisterPath));
+  const baseline = JSON.parse(await readFile(f.compatibilityBaselinePath));
+  assert.equal(baseline.durableStores.length, 42);
+  const expectedOwners = [...register.durableStores.map(store => store.id),
+    ...baseline.durableStores.filter(store => !register.durableStores.some(current => current.id === store.id))
+      .map(store => store.id)];
+  for (const target of ['windows-x86_64', 'linux-x86_64']) {
+    assert.deepEqual(published.targets[target].compatibility.map(row => row.ownerId), expectedOwners);
+  }
+  // The build-installer check and publish-release verification share these real entry points.
+  execFileSync(process.execPath, [fileURLToPath(new URL('./app-release-assets.mjs', import.meta.url)),
+    'check-compatibility', '--compatibility', f.compatibilityRegisterPath,
+    '--compat-baseline', f.compatibilityBaselinePath]);
+  const { descriptor: current, latest: currentLatest } = await buildReleaseAssets({
+    ...f, compatibilityBaselinePath: undefined,
+  });
+  assert.deepEqual(currentLatest, latest);
+  for (const target of Object.keys(current.targets)) {
+    assert.deepEqual(published.targets[target].artifact, current.targets[target].artifact);
+    delete published.targets[target].compatibility;
+    delete current.targets[target].compatibility;
+  }
+  assert.deepEqual(published, current);
 });
 
 test('v2 rejects tampered bytes and the wrong metadata root', async () => {

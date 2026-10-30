@@ -1,0 +1,299 @@
+{
+  "note": "Installed-store wire fields from v0.3.0 (28f5863389af91c30a35c562807632508d0c14f5); frozen so conformance tests also run in shallow checkouts.",
+  "durableStores": [
+    {
+      "id": "ui-settings",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "READ_V0_OR_V1_AND_WRITE_V1"
+    },
+    {
+      "id": "action-ledger-audit-journal",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "PRESERVE_OLD_LINES_AND_APPEND_NEW"
+    },
+    {
+      "id": "durable-grants",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "READ_V0_OR_V1_AND_WRITE_V1"
+    },
+    {
+      "id": "plugin-allowlist",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "READ_V0_ARRAY_OR_V1_ENVELOPE_AND_WRITE_V1"
+    },
+    {
+      "id": "feedback-capture-preference",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "READ_V0_OR_V1_AND_REQUIRE_EXPLICIT_REPAIR_ON_ERROR"
+    },
+    {
+      "id": "installed-packs",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 1,
+      "reconciliation": "RETAIN_INCOMPATIBLE_PROJECTION_DISABLE_AND_REIMPORT_PACKS"
+    },
+    {
+      "id": "ai-install-contract",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 2,
+      "reconciliation": "REBUILD_FROM_VERIFIED_INSTALLED_ASSETS"
+    },
+    {
+      "id": "encryption-keystore",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "REQUIRE_USER_UNLOCK_OR_RECOVERY_KEY"
+    },
+    {
+      "id": "user-policy",
+      "owner": "EXTERNAL",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "PRESERVE_EXTERNAL_AUTHORITY"
+    },
+    {
+      "id": "memories",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "READ_V0_ARRAY_OR_V1_ENVELOPE_AND_WRITE_V1"
+    },
+    {
+      "id": "conversations",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "READ_V0_META_OR_V1_META_AND_PRESERVE_MESSAGE_LINES"
+    },
+    {
+      "id": "agent-runs",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 4,
+      "reconciliation": "EXISTING_V0_TO_V4_UPCAST_THEN_ATOMIC_CHECKPOINT"
+    },
+    {
+      "id": "run-events",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "PRESERVE_APPEND_LOG_AND_UPCAST_METADATA"
+    },
+    {
+      "id": "file-operation-journal",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 2,
+      "reconciliation": "RECOVER_ACTIVE_TRANSACTION_PRESERVE_HISTORY"
+    },
+    {
+      "id": "feedback-records",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "PRESERVE_OLD_LINES_AND_VERSION_NEW_LINES"
+    },
+    {
+      "id": "gpl-training-triples",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "REGENERATE_FROM_SOURCE_DOCUMENTS"
+    },
+    {
+      "id": "watched-roots",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "MIGRATE_LEGACY_LOCATION_READ_V0_AND_WRITE_V1"
+    },
+    {
+      "id": "worker-config-snapshot",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START"
+    },
+    {
+      "id": "jobs-db",
+      "owner": "WORKER",
+      "recoverability": "DERIVED",
+      "currentVersion": 12,
+      "reconciliation": "RUN_EXISTING_SQLITE_MIGRATIONS_OR_REBUILD"
+    },
+    {
+      "id": "index-generations",
+      "owner": "WORKER",
+      "recoverability": "DERIVED",
+      "currentVersion": 2,
+      "reconciliation": "USE_STATE_PREV_THEN_REBUILD_FROM_SOURCE"
+    },
+    {
+      "id": "index-migration-progress",
+      "owner": "WORKER",
+      "recoverability": "EPHEMERAL",
+      "currentVersion": 1,
+      "reconciliation": "REGENERATE_FROM_ACTIVE_MIGRATION"
+    },
+    {
+      "id": "entity-clusters",
+      "owner": "WORKER",
+      "recoverability": "MIXED",
+      "currentVersion": 1,
+      "reconciliation": "PRESERVE_RESERVED_ENTITY_OVERRIDES_AND_REBUILD_MAPPINGS"
+    },
+    {
+      "id": "runtime-activation-status",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "RESCAN_INSTALLED_RUNTIME_VARIANTS"
+    },
+    {
+      "id": "pack-import-status",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "RESCAN_STAGING_AND_INSTALLED_PACKS"
+    },
+    {
+      "id": "runtime-manifest-history",
+      "owner": "HEAD",
+      "recoverability": "EPHEMERAL",
+      "currentVersion": 1,
+      "reconciliation": "PUBLISH_CURRENT_INSTANCE_AND_RETAIN_BOUNDED_HISTORY"
+    },
+    {
+      "id": "telemetry-rrd",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "RECONCILE_AGAINST_METRIC_CATALOG"
+    },
+    {
+      "id": "managed-ai-assets",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "VERIFY_MANAGED_MANIFESTS_AND_RESTORE_OR_REDOWNLOAD_OWNED_FILES"
+    },
+    {
+      "id": "byo-ai-assets",
+      "owner": "EXTERNAL",
+      "recoverability": "AUTHORED",
+      "currentVersion": 0,
+      "reconciliation": "PRESERVE_FILES_NOT_CLAIMED_BY_A_VERIFIED_MANAGED_MANIFEST"
+    },
+    {
+      "id": "user-plugin-payloads",
+      "owner": "EXTERNAL",
+      "recoverability": "AUTHORED",
+      "currentVersion": 0,
+      "reconciliation": "RESCAN_AND_VALIDATE_WITHOUT_REWRITING"
+    },
+    {
+      "id": "shell-upgrade-intent",
+      "owner": "SHELL",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "RECONCILE_SOURCE_TARGET_AND_DURABLE_PHASE_BEFORE_NEW_UPDATE"
+    },
+    {
+      "id": "shell-release-sequence",
+      "owner": "SHELL",
+      "recoverability": "AUTHORED",
+      "currentVersion": 1,
+      "reconciliation": "PRESERVE_HIGHEST_ACCEPTED_SEQUENCE"
+    },
+    {
+      "id": "head-shutdown-receipt",
+      "owner": "HEAD",
+      "recoverability": "EPHEMERAL",
+      "currentVersion": 1,
+      "reconciliation": "SHELL_ACCEPTS_ONLY_CURRENT_PREPARATION_ID_AND_RECEIPT_NONCE"
+    },
+    {
+      "id": "inference-runtime-projections",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "REOBSERVE_RUNTIME_IDENTITY_AND_START_NEW_TELEMETRY"
+    },
+    {
+      "id": "telemetry-and-crash-artifacts",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "START_NEW_WRITERS_AND_RETAIN_ONLY_BOUNDED_READABLE_HISTORY"
+    },
+    {
+      "id": "worker-protocol-markers",
+      "owner": "WORKER",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "CONSUME_MARKER_AND_TRIGGER_IDEMPOTENT_RECOVERY"
+    },
+    {
+      "id": "process-locks",
+      "owner": "HEAD",
+      "recoverability": "EPHEMERAL",
+      "currentVersion": 0,
+      "reconciliation": "REACQUIRE_FOR_CURRENT_PROCESS"
+    },
+    {
+      "id": "agent-history-transcripts",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "REGENERATE_FROM_RUN_EVENTS_AND_REINDEX"
+    },
+    {
+      "id": "ai-install-attempt-memory",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 1,
+      "reconciliation": "REBUILD_FROM_SUBSEQUENT_INSTALL_PASSES"
+    },
+    {
+      "id": "gpl-eval-snapshot",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "RERUN_EVALUATION_AND_REWRITE_SNAPSHOT"
+    },
+    {
+      "id": "gpl-stage-analysis-reports",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "REGENERATE_FROM_TRIPLE_STORE_ON_NEXT_ANALYSIS"
+    },
+    {
+      "id": "llama-server-log",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "START_NEW_LOG_AND_RETAIN_BOUNDED_GENERATIONS"
+    },
+    {
+      "id": "user-documents-under-agent-file-operations",
+      "owner": "HEAD",
+      "recoverability": "AUTHORED",
+      "currentVersion": 0,
+      "reconciliation": "PRESERVE_EXTERNAL_AUTHORITY"
+    }
+  ]
+}

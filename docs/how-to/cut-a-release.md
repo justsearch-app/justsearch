@@ -148,13 +148,10 @@ Both full VM lanes (Ubuntu Wayland and Windows) need a **lower-version, producti
 production-signed predecessor** for J5. Use the previous published release when it speaks
 descriptor v2 on both targets. For the first release after 0.3.0, the **never-published
 signing-rehearsal draft** is the intended predecessor: for example, rehearsal `v0.3.1`, real
-candidate `v0.3.2`. This path is **currently blocked**: the release producer emits compatibility
-metadata only for the last published release's store register (0.3.0: 42 owners), while a
-rehearsal build installs 59 owners. The updater rejects the candidate descriptor because it
-does not cover that complete installed register (first missing owner: `data-version-marker`).
-Until the producer covers the installed predecessor's complete register (planned release
-work), report J5 for this first release **blocked with this cause, never passed**. Fresh state
-and equal sequences do not remove this blocker; never work around it by editing signed metadata.
+candidate `v0.3.2`. The release producer covers the candidate's current store register as well
+as the last published release's register, including retired predecessor stores. This lets a
+rehearsal built from the same register, or an earlier subset, serve as the v2 predecessor
+when the candidate can read every installed store's format and its identity matches.
 Keep the rehearsal's original packages and signing/build evidence; never publish it or use
 0.3.0 as the v2 predecessor. For later releases, use the published v2 predecessor as above.
 Download the selected predecessor separately and hash-check it:
@@ -189,7 +186,7 @@ evidence and the candidate's unchanged metadata:
   match its descriptor hash/size. Its compatibility entries must also cover the predecessor's
   embedded durable-store register, including owner, recovery strategy and readable format.
 
-These checks do not certify a particular package pair or remove the first-release blocker above.
+These checks do not certify a particular package pair; qualify the selected bytes through J5.
 If a pin, target, compatibility entry or sequence prevents the update, report J5 blocked
 with that exact mismatch; never edit signed metadata to make it pass.
 

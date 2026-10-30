@@ -22,7 +22,7 @@ export function signArtifact(bytes) {
     signature: Buffer.from(`untrusted comment: test only\n${Buffer.concat([Buffer.from('Ed'), keyId, rawSignature]).toString('base64')}\ntrusted comment: ${comment}\n${sign(null, Buffer.concat([rawSignature, Buffer.from(comment)]), privateKey).toString('base64')}\n`).toString('base64'),
   };
 }
-export async function generateFixture(directory) {
+export async function generateFixture(directory, { publishedBaseline = false } = {}) {
   await mkdir(directory, { recursive: true });
   const privateKey = testKey('metadata');
   const metadataPrivateKeyPath = path.join(directory, 'metadata-private.pem');
@@ -33,7 +33,9 @@ export async function generateFixture(directory) {
   await writeFile(path.join(directory, 'metadata-public.base64'), metadataPublicKey.export({ type: 'spki', format: 'der' }).subarray(-32).toString('base64'));
   const compatibilityRegisterPath = fileURLToPath(new URL('../../governance/store-recoverability.v1.json', import.meta.url));
   const compatibilityBaselinePath = path.join(directory, 'predecessor.json');
-  await writeFile(compatibilityBaselinePath, await readFile(compatibilityRegisterPath));
+  await writeFile(compatibilityBaselinePath, await readFile(publishedBaseline
+    ? new URL('./fixtures/store-recoverability-v0.3.0.json', import.meta.url)
+    : compatibilityRegisterPath));
   const debHeader = 'debian-binary'.padEnd(16) + '0'.padEnd(12) + '0'.padEnd(6) + '0'.padEnd(6)
     + '100644'.padEnd(8) + '4'.padEnd(10) + '`\n';
   const targets = {};
@@ -51,7 +53,8 @@ export async function generateFixture(directory) {
       artifactKeyId: 'test-artifact', artifactPublicKey: signed.artifactPublicKey };
   }
   const options = { targets, metadataPrivateKeyPath, metadataPublicKeyPath,
-    compatibilityRegisterPath, compatibilityBaselinePath, compatibilityPredecessor: 'HEAD',
+    compatibilityRegisterPath, compatibilityBaselinePath,
+    compatibilityPredecessor: publishedBaseline ? undefined : 'HEAD',
     outDir: directory, releaseDir: directory, version: '1.2.3', sequence: 42,
     metadataKeyId: 'test-metadata', expectedMetadataKeyId: 'test-metadata',
     publishedAt: '2026-10-27T00:00:00Z' };
@@ -59,5 +62,5 @@ export async function generateFixture(directory) {
   return options;
 }
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  await generateFixture(process.argv[2]);
+  await generateFixture(process.argv[2], { publishedBaseline: process.argv[3] === 'published' });
 }
