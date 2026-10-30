@@ -501,7 +501,13 @@ existing completion checks are unchanged.
 J5 uses the production HTTPS URL, descriptor v2, generated test trust pins and a
 VM-local mirror. The shipped installer is `currentUser` and requests no UAC;
 the cancellation leg declines the **actual witnessed NSIS installer**. It must
-resume the old Engine and re-offer without a harness restart. Success requires
+leave the predecessor installed. Windows does not relaunch after a cancelled
+installer by design: the app exits when it hands control to NSIS. The user
+starts JustSearch normally through its installed executable (or Start menu);
+the check requires an identified predecessor window, Engine readiness, a matching
+update intent recorded as Cancelled, unchanged indexed data/settings/authored
+records/models, and a renewed update offer. Web Storage and the offer are then
+observed in the harness's own WebDriver session. Success requires
 identified NSIS actions, automatic candidate relaunch, retirement of both old
 shell and Engine identities, and retained data. A later harness-owned WebDriver
 restart observes persisted Web Storage; it does not certify the preceding

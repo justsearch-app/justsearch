@@ -82,7 +82,8 @@ def update_result(observation, version):
 
 def cancel_result(observation):
     if any(observation.get(key) is not True for key in
-           ('installerObserved', 'installerExited', 'versionUnchanged', 'engineReady', 'reoffered')):
+           ('installerObserved', 'installerExited', 'versionUnchanged', 'window',
+            'intentCancelled', 'engineReady', 'stateUnchanged', 'reoffered')):
         raise ProductFailure('Declined install did not recover and re-offer: ' + json.dumps(observation))
 
 
@@ -1294,15 +1295,38 @@ def cancel_update(run):
     wait_for(exited, 'Declined NSIS process exited', seconds=60, error=ProductFailure)
     run.evidence('J5-decline-exit', {'installerExited': True, 'process': installation['process'],
                                  'installedVersion': run.installed_version()['version']})
-    run.ready()
+    if run.installed_version()['version'] != version:
+        raise ProductFailure('Declined installer changed the installed version')
+    # Windows hands off to NSIS and exits. Cancellation is reconciled on the
+    # user's next normal start, unlike Linux's automatic apt recovery.
+    run.wd = None # The exited shell's WebDriver session cannot be reused.
+    run.facts.pop('ui', None)
+    run.normal_launch()
+    intent_path = Path(run.data) / 'upgrade/intent.v1.json'
+    def cancelled_intent():
+        if not intent_path.is_file():
+            return None
+        intent = json.loads(intent_path.read_text())
+        return intent if (intent.get('phase') == 'CANCELLED'
+                          and intent.get('attemptId') == installation['witness']['attemptId']
+                          and intent.get('sourceVersion') == version) else None
+    intent = wait_for(cancelled_intent, 'Declined update recorded as Cancelled on normal start',
+                      seconds=60, error=ProductFailure)
+    run.evidence('J5-cancel-normal-start', {'intent': intent,
+        'installedVersion': run.installed_version()['version'],
+        'windowEvidence': run.facts['windowShownEvidence'], 'engineReady': run.facts.get('ready') is True,
+        'trigger': 'User starts the installed executable after cancelling NSIS'})
+    # Only the following harness-owned session can certify Web Storage/DOM.
+    run.start_ui()
+    state = assert_state(run)
     open_update_offer(run, 'J5-cancel-reoffer')
     observation = {'installerObserved': True, 'installerExited': not run.target.alive([installation['process']]),
                    'versionUnchanged': run.installed_version()['version'] == version,
+                   'window': True, 'intentCancelled': True, 'stateUnchanged': True,
                    'engineReady': run.facts.get('ready') is True, 'reoffered': True}
     cancel_result(observation)
-    state = assert_state(run)
     run.facts['updateCancelled'] = True
-    return {'observation': observation, 'installer': installation, 'action': action, 'state': state}
+    return {'observation': observation, 'installer': installation, 'action': action, 'intent': intent, 'state': state}
 
 
 def confirm_nsis_cancel(run, process):

@@ -144,7 +144,8 @@ function Get-ItemProperty {param($Path) [pscustomobject]@{NoAutoUpdate=1;AUOptio
 
     def test_cancellation_needs_actual_installer_and_reoffer(self):
         valid = {'installerObserved': True, 'installerExited': True, 'versionUnchanged': True,
-                 'engineReady': True, 'reoffered': True}
+                 'window': True, 'intentCancelled': True, 'engineReady': True,
+                 'stateUnchanged': True, 'reoffered': True}
         windows.cancel_result(valid)
         for key in valid:
             with self.subTest(key=key), self.assertRaises(ProductFailure):
@@ -578,44 +579,75 @@ class WindowsUpdateAndCrashTests(unittest.TestCase):
         run.args.predecessor=Path('parent.exe');run.args.mirror=Path('mirror')
         with self.assertRaises(Infrastructure):windows.update_prepare(run)
 
-    def test_declining_nsis_requires_exit_old_engine_and_reoffer_without_harness_restart(self):
-        with tempfile.TemporaryDirectory() as temp:
-            run=Mock(data=temp,facts={'ready':True},args=SimpleNamespace())
-            run.installed_version.return_value={'version':'0.3.1'}
-            run.target.alive.return_value=[]
-            installation={'process':process(60,'C:/stage/setup.exe'),'window':{'handle':200},'witness':{'attemptId':'fresh'}}
-            with patch.object(windows,'installer_witness',return_value=installation),patch.object(windows,'invoke_nsis',return_value={'invoked':True}) as action,patch.object(windows,'wait_for',once),patch.object(linux,'open_update_offer') as reoffer,patch.object(linux,'assert_state',return_value={'retained':True}):
-                result=windows.cancel_update(run)
-            self.assertTrue(result['observation']['installerExited'])
-            action.assert_called_once_with(run,installation,2)
-            reoffer.assert_called_once()
-            run.start_ui.assert_not_called()
-            run.normal_launch.assert_not_called()
-            run.ready.side_effect=ProductFailure('Old Engine never resumed')
-            with patch.object(windows,'installer_witness',return_value=installation),patch.object(windows,'invoke_nsis'),patch.object(windows,'wait_for',once),self.assertRaisesRegex(ProductFailure,'never resumed'):
-                windows.cancel_update(run)
+    def test_declining_nsis_requires_normal_start_cancelled_intent_retention_and_reoffer(self):
+        intent = {'phase':'CANCELLED','attemptId':'fresh','sourceVersion':'0.3.1'}
+        cases = [(intent, None), (dict(intent, phase='INSTALL_LAUNCHED'), 'Cancelled'),
+                 (dict(intent, attemptId='older'), 'Cancelled'),
+                 (dict(intent, sourceVersion='0.3.0'), 'Cancelled')]
+        for persisted, failure in cases:
+            with self.subTest(intent=persisted), tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);(root/'upgrade').mkdir()
+                (root/'upgrade/intent.v1.json').write_text(json.dumps(persisted))
+                run=Mock(data=temp,facts={'ready':True,'windowShownEvidence':'normal-window.json'})
+                run.installed_version.return_value={'version':'0.3.1'}
+                run.target.alive.return_value=[]
+                installation={'process':process(60,'C:/stage/setup.exe'),'window':{'handle':200},
+                              'witness':{'attemptId':'fresh'}}
+                order=[]
+                run.normal_launch.side_effect=lambda:order.append('normal')
+                run.start_ui.side_effect=lambda:order.append('webdriver')
+                with patch.object(windows,'launch_update',return_value=installation), \
+                     patch.object(windows,'invoke_nsis',return_value={'invoked':True}) as action, \
+                     patch.object(windows,'wait_for',once), \
+                     patch.object(linux,'open_update_offer',side_effect=lambda *a:order.append('reoffer')), \
+                     patch.object(linux,'assert_state',side_effect=lambda *a:order.append('state') or {'retained':True}):
+                    if failure:
+                        with self.assertRaisesRegex(ProductFailure,failure):windows.cancel_update(run)
+                        self.assertEqual(order,['normal'])
+                        self.assertNotIn('updateCancelled',run.facts)
+                    else:
+                        result=windows.cancel_update(run)
+                        self.assertTrue(all(result['observation'].values()))
+                        self.assertEqual(result['intent'],intent)
+                        self.assertEqual(order,['normal','webdriver','state','reoffer'])
+                        self.assertTrue(run.facts['updateCancelled'])
+                    action.assert_called_once_with(run,installation,2)
+                    run.ready.assert_not_called() # normal_launch owns readiness.
 
-    def test_decline_boundary_evidence_survives_failed_engine_recovery(self):
+    def test_decline_rejects_changed_version_before_normal_start(self):
         with tempfile.TemporaryDirectory() as temp:
             run=Mock(data=temp,facts={})
-            run.installed_version.return_value={'version':'0.3.2'}
+            run.installed_version.side_effect=[{'version':'0.3.1'},{'version':'0.3.2'},{'version':'0.3.2'}]
+            run.target.alive.return_value=[]
+            installation={'process':process(60,'C:/stage/setup.exe')}
+            with patch.object(windows,'launch_update',return_value=installation), \
+                 patch.object(windows,'invoke_nsis'),patch.object(windows,'wait_for',once), \
+                 self.assertRaisesRegex(ProductFailure,'changed the installed version'):
+                windows.cancel_update(run)
+            run.normal_launch.assert_not_called()
+            self.assertNotIn('updateCancelled',run.facts)
+
+    def test_decline_boundary_evidence_survives_failed_normal_launch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run=Mock(data=temp,facts={})
+            run.installed_version.return_value={'version':'0.3.1'}
             run.target.alive.return_value=[]
             installation={'process':process(60,'C:/stage/setup.exe'),'window':{'handle':200}}
             action={'invoked':True,'button':'2','interface':'IUIAutomation'}
             order=[]
             run.evidence.side_effect=lambda name,value:order.append((name,value))
-            def failed_ready():
-                order.append(('ready',None))
-                raise ProductFailure('Old Engine never resumed')
-            run.ready.side_effect=failed_ready
+            def failed_launch():
+                order.append(('normal',None))
+                raise ProductFailure('Old Engine not ready on normal start')
+            run.normal_launch.side_effect=failed_launch
             with patch.object(windows,'launch_update',return_value=installation), \
                  patch.object(windows,'invoke_nsis',return_value=action), \
                  patch.object(windows,'wait_for',once), \
                  patch.object(linux,'open_update_offer') as reoffer, \
-                 self.assertRaisesRegex(ProductFailure,'never resumed'):
+                 self.assertRaisesRegex(ProductFailure,'not ready on normal start'):
                 windows.cancel_update(run)
             self.assertEqual(order,[('J5-decline-action',action),('J5-decline-exit',{
-                'installerExited':True,'process':installation['process'],'installedVersion':'0.3.2'}),('ready',None)])
+                'installerExited':True,'process':installation['process'],'installedVersion':'0.3.1'}),('normal',None)])
             self.assertNotIn('updateCancelled',run.facts)
             reoffer.assert_not_called()
             run.start_ui.assert_not_called()
