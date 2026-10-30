@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
+import type { Sv3Composer } from './Sv3Composer.js';
 import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
@@ -122,6 +123,31 @@ it('XT2 XT4 sends extraction schema and instruction and renders only terminal JS
   expect(main.shadowRoot!.textContent).not.toContain('{rejected}');
   expect(main.shadowRoot!.querySelector('[data-testid="sv3-turn-sources"]')).not.toBeNull();
 });
+it.each(['unchanged', 'identical assignment', 'A-B-A', 'composition start', 'newer input', 'failure', 'Stop'])(
+  'CP1b Structured completion clears only its unchanged draft: %s', async change => {
+    const previous = fetchMock.getMockImplementation()! as (url: unknown, init?: RequestInit) => Promise<unknown>;
+    let release!: (response: Response) => void;
+    fetchMock.mockImplementation(async (url: unknown, init?: RequestInit) =>
+      String(url).includes('/api/chat/dispatch') ? new Promise<Response>(resolve => { release = resolve; }) : previous(url, init));
+    const view = await mount(); await choose(view, 'structured');
+    const c = await fill(view) as Sv3Composer;
+    q<HTMLButtonElement>(c, 'sv3-composer-send')!.click(); await drain(view);
+    expect(dispatches()).toHaveLength(1);
+    const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!;
+    expect(input.value).toBe('extract the text');
+    if (change === 'identical assignment') c.draft = 'extract the text';
+    if (change === 'A-B-A') { c.draft = 'B'; c.draft = 'extract the text'; }
+    if (change === 'composition start') input.dispatchEvent(new Event('compositionstart'));
+    if (change === 'newer input') { input.value = 'newer B'; input.dispatchEvent(new Event('input')); }
+    if (change === 'Stop') q<HTMLButtonElement>(c, 'sv3-composer-stop')!.click();
+    const failed = change === 'failure' || change === 'Stop';
+    release(new Response(failed
+      ? `event: error\ndata: ${JSON.stringify({ errorCode: change === 'Stop' ? 'CANCELLED' : 'FAILED', error: change })}\n\n`
+      : `event: done\ndata: ${JSON.stringify({ finalResponse: answer })}\n\n`,
+    { headers: { 'content-type': 'text/event-stream' } }));
+    await drain(view); await c.updateComplete;
+    expect(input.value).toBe(change === 'unchanged' ? '' : change === 'newer input' ? 'newer B' : 'extract the text');
+  });
 it.each(['{bad}', '[]', 'null'])('XT5 rejects schema %s at the box without sending or clearing', async value => {
   const view = await mount(); await choose(view, 'structured');
   const c = await fill(view, value);

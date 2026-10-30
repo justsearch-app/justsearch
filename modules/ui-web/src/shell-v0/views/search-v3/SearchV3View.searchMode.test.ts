@@ -1174,6 +1174,16 @@ describe('S1.10 — the composer, the heading and the rows describe the one shar
     expect(await rowTitles(el)).toEqual(['c.md']);
   });
 
+  it.each(['ask', 'delegate'] as const)('CP10 a shared search preserves a live %s draft while mounted and on return', async tier => {
+    aiOnline(); const el = await mount(); await searchFor(el, 'amber');
+    await chooseTier(el, tier); await type(el, 'unrelated draft B');
+    await searchInOtherWindow('cobalt'); await settle(el);
+    expect((await fieldOf(el)).value).toBe('unrelated draft B'); expect(el.tier).toBe(tier);
+    el.remove(); await searchInOtherWindow('other window C'); await reenter(el);
+    expect((await fieldOf(el)).value).toBe('unrelated draft B'); expect(el.tier).toBe(tier);
+    expect(dispatches()).toEqual([]);
+  });
+
   it('never overwrites an unsent Ask draft; Search mode then searches what the composer holds', async () => {
     backend.corpus.amber = [wireHit('a', 'docs/a.md')];
     backend.corpus.cobalt = [wireHit('c', 'docs/c.md')];

@@ -623,6 +623,26 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
           "test": "renders each turn as question-then-answer, oldest first, and appends deltas as they arrive"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
+          "test": "CP1b Structured completion clears only its unchanged draft: %s"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/state/composerPort.test.ts",
+          "test": "CP2 every assignment invalidates a capture, including identical text and A-B-A"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/state/composerPort.test.ts",
+          "test": "returns a successor after a conditional change and never reuses the previous edit"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/state/composerPort.test.ts",
+          "test": "applies assignment synchronously before capturing the successor, including reentrant edits"
         }
       ]
     },
@@ -804,6 +824,11 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
           "test": "XT2 XT4 sends extraction schema and instruction and renders only terminal JSON literally with sources"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts",
+          "test": "CP1b Structured completion clears only its unchanged draft: %s"
         }
       ]
     },
@@ -1550,6 +1575,11 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
           "test": "sends plain Enter to the ask tier and nowhere near the run controller"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "CP1c %s clears at submission only after the draft write succeeds"
         }
       ]
     },
@@ -1634,6 +1664,11 @@
           "layer": "real-ui-fixture",
           "step": "sv3-run-activity-steering",
           "observes": "Enter and Ctrl+Enter during the run each send one steering POST with a clientRequestId to that run, without competing dispatch."
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "CP1c %s clears at submission only after the draft write succeeds"
         }
       ]
     },
@@ -2049,6 +2084,11 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
           "test": "keeps the results, the query and the chosen scope with the results, and none in the conversation"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.removalDraft.test.ts",
+          "test": "CP1d confirmed removal clears only its captured owning draft: %s"
         }
       ]
     },
@@ -2079,6 +2119,16 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
           "test": "X8 restored quoted Search draft keeps its text and requires the existing review before Search"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+          "test": "CP8 reconnect keeps the live draft while a fresh view reads another window snapshot"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+          "test": "CP8 pre-render writes seed once and later renders preserve typing, focus and caret"
         }
       ]
     },
@@ -2143,6 +2193,16 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
           "test": "invalid %s attachment fails closed and leaves exact durable bytes and raw text"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.initialLifecycle.test.ts",
+          "test": "CP8 reconnect keeps the live draft while a fresh view reads another window snapshot"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "CP1c %s clears at submission only after the draft write succeeds"
         }
       ]
     },
@@ -2175,6 +2235,11 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
           "test": "%s during force requires review and never dispatches the abandoned continuation"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/state/composerPort.test.ts",
+          "test": "CP4 a replacement composer refuses the old incarnation even with the same edit and text"
         }
       ]
     },
@@ -2193,6 +2258,11 @@
           "layer": "real-ui-fixture",
           "binding": null,
           "reason": "No real UI fixture step is bound for this scenario."
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+          "test": "CP5 a failed Ask handoff restores only the unchanged post-send draft: %s"
         }
       ]
     },
@@ -2620,6 +2690,16 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
           "test": "dispatches NOTHING when the reader types and sends while a decision is held"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "CP1c %s clears at submission only after the draft write succeeds"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/state/composerPort.test.ts",
+          "test": "CP3 composition start invalidates without publishing a committed edit"
         }
       ]
     },
@@ -2853,6 +2933,11 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
           "test": "follows a search made in the other window when the reader comes back"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+          "test": "CP10 a shared search preserves a live %s draft while mounted and on return"
         }
       ]
     },

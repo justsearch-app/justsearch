@@ -111,6 +111,27 @@ async function begin(view: SearchV3View, id: string, accept = true): Promise<voi
 }
 const activeId = (view: SearchV3View): string | null => (view as unknown as { sessions: { activeId: string | null } }).sessions.activeId;
 
+it.each(['unchanged', 'identical assignment', 'A-B-A', 'composition start', 'other window', 'late unchanged', 'late identical'])(
+  'CP1d confirmed removal clears only its captured owning draft: %s', async change => {
+    seed(1); const view = await mount('removal-0'); await type(view, 'owned A');
+    if (change.startsWith('late')) { lost = true; existenceUnavailable = true; }
+    await begin(view, 'removal-0');
+    if (change === 'identical assignment') composer(view).draft = 'owned A';
+    if (change === 'A-B-A') { composer(view).draft = 'B'; composer(view).draft = 'owned A'; }
+    if (change === 'composition start') field(view).dispatchEvent(new Event('compositionstart'));
+    if (change === 'other window') window.dispatchEvent(new StorageEvent('storage', { key: 'justsearch.draft.search-v3.composer', newValue: 'other window B' }));
+    release(); await settle(view);
+    if (change.startsWith('late')) {
+      expect(field(view).value).toBe('owned A'); expect(activeId(view)).toBe('removal-0');
+      if (change === 'late identical') composer(view).draft = 'owned A';
+      existenceUnavailable = false;
+      for (const listener of status.listeners) listener({} as StatusSnapshot);
+      await settle(view);
+    }
+    expect(field(view).value).toBe(change === 'unchanged' || change === 'late unchanged' ? '' : 'owned A');
+    expect(activeId(view)).toBeNull(); expect(dispatches).toEqual([]);
+  });
+
 for (const depth of [1, 3]) {
   it(`TD10a ${depth}-level active removal keeps the draft typed before completion`, async () => {
     const ids = seed(depth); const view = await mount(ids.at(-1)!);
