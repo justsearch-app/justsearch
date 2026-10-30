@@ -54,30 +54,79 @@ export function formatLocationBreadcrumb(p: string): string {
   return parts.slice(-3).join(' › ');
 }
 
+// SsotAnalyzerRegistry.createIcuAnalyzer defines no stop filter. Presentation therefore uses
+// Lucene EnglishAnalyzer.ENGLISH_STOP_WORDS_SET (the default English set), not an index change.
+const ENGLISH_STOP_WORDS = new Set(
+  'a an and are as at be but by for if in into is it no not of on or such that the their then there these they this to was will with'.split(' '),
+);
+
+/** Presentation only; SearchSyntax.java remains the request parser.
+ * Mirrors modules/core/src/main/java/io/justsearch/core/search/SearchSyntax.java:
+ * lines 35–55 (whitespace, exclusions, case-sensitive title:/author:), 56–82 (phrases and
+ * the three escapes). Invalid/incomplete input simply contributes no unfinished clause.
+ */
+function highlightQueryTerms(query: string): string[] {
+  const terms = new Set<string>();
+  // Character.isWhitespace: unlike JS \s, excludes non-breaking spaces/BOM and includes U+001C–1F.
+  const isWhitespace = (c: string): boolean =>
+    (/\s/u.test(c) && !/[\u00a0\u2007\u202f\ufeff]/u.test(c)) || (c >= '\u001c' && c <= '\u001f');
+  let offset = 0;
+  while (offset < query.length) {
+    if (isWhitespace(query[offset]!)) { offset++; continue; }
+    const excluded = query[offset] === '-'
+      && /[\p{L}"]/u.test(String.fromCodePoint(query.codePointAt(offset + 1) ?? 0));
+    if (excluded) offset++;
+    if (!excluded) {
+      for (const field of ['title:', 'author:']) {
+        if (query.startsWith(field, offset)) {
+          offset += field.length;
+          break;
+        }
+      }
+    }
+    const phrase = query[offset] === '"';
+    if (phrase) offset++;
+    let value = '';
+    let closed = !phrase;
+    while (offset < query.length) {
+      const c = query[offset]!;
+      const next = query[offset + 1];
+      if (c === '\\' && next !== undefined && ['"', '-', '\\'].includes(next)) {
+        value += next;
+        offset += 2;
+      } else if (c === '"') {
+        if (phrase) { closed = true; offset++; }
+        break;
+      } else if (!phrase && isWhitespace(c)) {
+        break;
+      } else {
+        value += c;
+        offset++;
+      }
+    }
+    if (excluded || !closed) continue;
+    for (const word of value.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []) {
+      if (word.length >= 2 && !ENGLISH_STOP_WORDS.has(word)) terms.add(word);
+    }
+  }
+  return [...terms].sort((a, b) => b.length - a.length);
+}
+
 /**
- * Q11: wrap occurrences of the query's terms in `<mark>` so the snippet shows
+ * Q11: wrap word prefixes matching the query's terms in `<mark>` so the snippet shows
  * WHY a result matched. Lit auto-escapes both the plain segments and the marked
  * text, so this is XSS-safe (no unsafeHTML). An empty / sub-2-char query yields
  * no marks (returns the text verbatim).
  */
 export function highlightTerms(text: string, query: string): TemplateResult | string {
-  const terms = [
-    ...new Set(
-      query
-        .toLowerCase()
-        .split(/\s+/)
-        .map((t) => t.replace(/[^\p{L}\p{N}]/gu, ''))
-        .filter((t) => t.length >= 2),
-    ),
-  ];
+  const terms = highlightQueryTerms(query);
   if (terms.length === 0) return text;
-  const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const re = new RegExp(`(${escaped.join('|')})`, 'gi');
-  const termSet = new Set(terms);
-  const parts = text.split(re).filter((p) => p !== '');
-  return html`${parts.map((p) =>
-    termSet.has(p.toLowerCase()) ? html`<mark class="hl">${p}</mark>` : p,
-  )}`;
+  // Terms contain only Unicode letters/digits. Split words first rather than using ASCII \b.
+  const prefix = new RegExp(`^(${terms.join('|')})`, 'iu');
+  return html`${text.split(/([\p{L}\p{N}]+)/u).map((part, index) => {
+    const match = index % 2 === 1 ? prefix.exec(part) : null;
+    return match ? html`<mark class="hl">${match[0]}</mark>${part.slice(match[0].length)}` : part;
+  })}`;
 }
 
 /**
