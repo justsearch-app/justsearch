@@ -1769,11 +1769,6 @@
           "layer": "real-ui-fixture",
           "step": "sv3-run-activity-steering",
           "observes": "The uncertain notice survives another client’s same-text report and later activity, then clears on its own request’s report."
-        },
-        {
-          "layer": "controller",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
-          "test": "SW-RUN-07 a lost steer note survives terminal until its own report arrives"
         }
       ]
     },

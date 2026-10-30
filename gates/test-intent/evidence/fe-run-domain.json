@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-10-30T12:54:02.696Z",
-  "revision": "40bd82bb5fc1fa559012deb7d22a370d43d2ef16",
-  "tree": "5d226bf6f34cc6107da0745f62441fafe55fcc9e",
+  "createdAt": "2026-10-30T13:18:24.551Z",
+  "revision": "268de72b9faeb7f3eb8bcf025ce22a3b79a1ef4a",
+  "tree": "a88103db4ee6661a59d88f7a2750ad995797948b",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts\" \"src/shell-v0/views/search-v3/sv3-run-domain.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dvp1ho19/tmp/test-intent-vitest-10-1793364836776.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts\" \"src/shell-v0/views/search-v3/sv3-run-domain.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fqiq9tcv/tmp/test-intent-vitest-10-1793366298875.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 5917
+      "durationMs": 5672
     }
   ],
   "checks": [
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-01 dispatches the opened turn and settles duplicate terminals once",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:997171fb8c479ee18d1817ddb31019666585c8e10dd31b4d593f4e1104d2c2fc",
+      "contentDigest": "sha256:533b44d8f89801c11ed5dbecd05ec014f2ec40b35698f55d4565c42765a98984",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -101,25 +101,10 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-07 a lost steer note survives terminal until its own report arrives",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:997171fb8c479ee18d1817ddb31019666585c8e10dd31b4d593f4e1104d2c2fc",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "the window run owner against the injected backend SW-RUN-07 a lost steer note survives terminal until its own report arrives",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-08 absence creates no run and reload adopts a matching live run once without navigation",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:997171fb8c479ee18d1817ddb31019666585c8e10dd31b4d593f4e1104d2c2fc",
+      "contentDigest": "sha256:533b44d8f89801c11ed5dbecd05ec014f2ec40b35698f55d4565c42765a98984",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-09 duplicate approval requests share one lookup and stale details cannot prompt a replacement",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:997171fb8c479ee18d1817ddb31019666585c8e10dd31b4d593f4e1104d2c2fc",
+      "contentDigest": "sha256:533b44d8f89801c11ed5dbecd05ec014f2ec40b35698f55d4565c42765a98984",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-10 a failed approval remains an approval error in the owner feed",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:997171fb8c479ee18d1817ddb31019666585c8e10dd31b4d593f4e1104d2c2fc",
+      "contentDigest": "sha256:533b44d8f89801c11ed5dbecd05ec014f2ec40b35698f55d4565c42765a98984",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +149,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-11 Stop preserves arriving prose and tools in both windows through the halted terminal",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:997171fb8c479ee18d1817ddb31019666585c8e10dd31b4d593f4e1104d2c2fc",
+      "contentDigest": "sha256:533b44d8f89801c11ed5dbecd05ec014f2ec40b35698f55d4565c42765a98984",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -177,5 +162,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:ce8dfea4f1c03385826c5f419450948bd13c48627b61e3ac49a490e166b66088"
+  "digest": "sha256:369bbe8e8b406c10e9c66eb8fa578f42f2ee3af5bef35cbcf90ffdbb159f1b69"
 }

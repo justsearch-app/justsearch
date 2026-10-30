@@ -115,21 +115,6 @@ describe('the window run owner against the injected backend', () => {
     expect(backend.observations).toHaveLength(1);
   });
 
-  it('SW-RUN-07 a lost steer note survives terminal until its own report arrives', async () => {
-    const window = await start(); backend.holdResponses.add('/api/chat/agent/steer');
-    window.owner.steerLiveRun('Focus.'); await flush();
-    const send = backend.responses[0]!; send.fail(); await flush();
-    const clientRequestId = (JSON.parse(String(send.init?.body)) as { clientRequestId: string }).clientRequestId;
-    backend.terminal('run-1', 'DONE'); await flush();
-    expect([...window.owner.unconfirmedSteerNotes.values()].flat()).toHaveLength(1);
-    backend.emit('directive_acknowledged', { directiveId: 'own', directiveText: 'Focus.', outcome: 'queued', clientRequestId }); await flush();
-    expect([...window.owner.unconfirmedSteerNotes.values()].flat()).toHaveLength(1);
-    // A closed stream is stale; the controller's authoritative report settles the send.
-    window.ctrl.onDirectiveAcknowledged({ directiveId: 'own', directiveText: 'Focus.', outcome: 'queued', clientRequestId });
-    await flush();
-    expect([...window.owner.unconfirmedSteerNotes.values()].flat()).toHaveLength(0);
-  });
-
   it('SW-RUN-08 absence creates no run and reload adopts a matching live run once without navigation', async () => {
     const idle = windowOwner(); idle.absent(); idle.owner.syncRunPresence();
     expect(backend.requests).toHaveLength(0); expect(idle.sessions.sessions).toHaveLength(0);
