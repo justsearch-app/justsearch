@@ -14,6 +14,26 @@ import { generateFixture, signArtifact } from './updater-v2-fixture.mjs';
 const subject = await import('./release-candidate.mjs').catch(() => ({}));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const commit = 'a'.repeat(40);
+for (const platform of ['windows', 'linux']) {
+  test(`release ${platform} builder inherits signing secrets`, async () => {
+    const yaml = createRequire(import.meta.url)('js-yaml');
+    const workflow = yaml.load(await readFile(new URL('../../.github/workflows/build-installer.yml', import.meta.url), 'utf8'));
+    const job = workflow.jobs[platform];
+    assert.equal(job.uses, `./.github/workflows/build-installer-${platform}.yml`);
+    assert.equal(job.with.release, true);
+    assert.equal(job.secrets, 'inherit', `release ${platform} caller must inherit signing secrets`);
+  });
+}
+test('manual and packaging-smoke builder calls pass no signing secrets', async () => {
+  const yaml = createRequire(import.meta.url)('js-yaml');
+  const release = yaml.load(await readFile(new URL('../../.github/workflows/build-installer.yml', import.meta.url), 'utf8'));
+  assert.equal(release.jobs['manual-windows'].secrets, undefined, 'manual-windows must stay unsigned');
+  const smoke = yaml.load(await readFile(new URL('../../.github/workflows/packaging-smoke.yml', import.meta.url), 'utf8'));
+  for (const platform of ['windows', 'linux']) {
+    assert.equal(smoke.jobs[platform].uses, `./.github/workflows/build-installer-${platform}.yml`);
+    assert.equal(smoke.jobs[platform].secrets, undefined, `packaging-smoke ${platform} must stay unsigned`);
+  }
+});
 async function fixture(t) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'release-candidate-'));
   t.after(() => rm(dir, { recursive: true, force: true }));

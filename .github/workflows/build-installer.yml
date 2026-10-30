@@ -87,11 +87,13 @@ jobs:
   windows:
     needs: prepare
     uses: ./.github/workflows/build-installer-windows.yml
+    secrets: inherit
     with:
       release: true
   linux:
     needs: prepare
     uses: ./.github/workflows/build-installer-linux.yml
+    secrets: inherit
     with:
       release: true
   assemble:
