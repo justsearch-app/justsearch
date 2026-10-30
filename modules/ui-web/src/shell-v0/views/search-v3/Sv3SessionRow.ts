@@ -522,6 +522,13 @@ export class Sv3SessionRow extends JfElement {
           transition: none;
         }
       }
+      :host([active]) { --sv3-row-actions-inline: calc(4 * var(--space-6)); }
+      :host([active][live]), :host([active]:not([store-backed])) { --sv3-row-actions-inline: calc(3 * var(--space-6)); }
+      :host([active][live]:not([store-backed])) { --sv3-row-actions-inline: calc(2 * var(--space-6)); }
+      :host([active]:not([compact])) button.act { opacity: 1; pointer-events: auto; }
+      :host([active]:not([compact]):not([status='act-now']):not([status='broken'])) .slot-content { opacity: 0; position: absolute; }
+      :host([active]:not([compact]):not([status='act-now']):not([status='broken'])) .status-slot { inline-size: var(--sv3-row-actions-inline); }
+
     `,
   ];
 
@@ -787,6 +794,12 @@ export class Sv3SessionRow extends JfElement {
         </span>
       </button>
       <div class="actions" data-testid="sv3-session-row-actions">
+        ${this.active ? html`<button type="button" class="act export"
+          aria-label=${this.named('Export')} title="Export conversation"
+          data-testid="sv3-session-row-export" @click=${(event: Event) => {
+            event.stopPropagation();
+            this.dispatchEvent(new CustomEvent('sv3-session-export', { bubbles: true, composed: true }));
+          }}>${icon({ name: 'download', size: ACTION_GLYPH_SIZE })}</button>` : nothing}
         ${this.storeBacked
           ? html`
               <button

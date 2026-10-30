@@ -2881,7 +2881,7 @@ export class SettingsSurface extends JfElement {
           Type <strong>DELETE</strong> to confirm.
         </p>
         <p class="help">
-          Copy any conversations you want to keep before resetting. There is no automatic
+          To keep a copy of any conversations before resetting, open each in Search and choose Export conversation beside its other actions. There is no automatic
           conversation backup for an unencrypted store. If encryption is enabled, you can also
           export an encrypted backup in Security &amp; Privacy first. Earlier backups and exports
           are not deleted.

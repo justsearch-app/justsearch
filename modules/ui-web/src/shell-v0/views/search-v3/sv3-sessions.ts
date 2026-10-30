@@ -260,6 +260,8 @@ export interface Sv3Turn {
 export interface Sv3AnswerMessage {
   readonly id: string;
   readonly content: string;
+  /** Evidence belongs to this message, even when a turn has several answers. */
+  readonly evidence?: Sv3TurnEvidence | null;
 }
 
 /**

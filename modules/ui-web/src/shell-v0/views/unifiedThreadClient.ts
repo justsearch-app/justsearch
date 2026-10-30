@@ -48,6 +48,8 @@ interface ThreadLifecycle {
 export interface ThreadResponse {
   readonly events: ThreadEvent[];
   readonly lifecycles: ThreadLifecycle[];
+  /** Export must refuse a record the display reader could only partially recover. */
+  readonly incomplete?: boolean;
 }
 
 /**
@@ -251,6 +253,7 @@ export async function fetchUnifiedThread(
     return {
       events,
       lifecycles: (parsed.data.lifecycles ?? []) as ThreadLifecycle[],
+      ...(droppedCount > 0 || parsed.data.conversationId !== conversationId ? { incomplete: true } : {}),
     };
   } catch (e) {
     // AbortError is a deliberate cancellation (Slice 516 FIX-T1: a new loadConversation aborts the

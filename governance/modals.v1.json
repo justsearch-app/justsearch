@@ -6,6 +6,7 @@
     "symbol": "ModalController"
   },
   "adopters": [
+    "modules/ui-web/src/shell-v0/views/search-v3/Sv3ConversationExport.ts",
     "modules/ui-web/src/shell-v0/components/ConfirmDialog.ts",
     "modules/ui-web/src/shell-v0/components/ElicitHost.ts",
     "modules/ui-web/src/shell-v0/components/MacroDryRun.ts",

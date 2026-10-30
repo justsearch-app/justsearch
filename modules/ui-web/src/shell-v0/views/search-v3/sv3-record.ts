@@ -431,7 +431,8 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     });
     if (item.kind === 'assistant') {
       turn.answers.push(item.content);
-      turn.answerMessages.push({ id: item.id, content: item.content });
+      const messageEvidence = recordEvidenceOf(item);
+      turn.answerMessages.push({ id: item.id, content: item.content, ...(messageEvidence === null ? {} : { evidence: messageEvidence }) });
       turn.activity.push({ kind: 'text', id: item.id, text: item.content });
       if (isSv3StoreMessageId(item.id)) turn.assistantId = item.id;
       const evidence = recordEvidenceOf(item);

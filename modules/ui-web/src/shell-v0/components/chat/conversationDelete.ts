@@ -32,7 +32,7 @@ export async function confirmConversationTree(
     <ol>${branches.get(0) ?? []}</ol>
     <p role="status">${count}</p>
     <p>All memories remain, including memories without a recorded conversation link. You can inspect and forget them in Memory.</p>
-    <p>Exports and backups you made remain.</p>`;
+    <p>To keep a copy first, cancel and open each conversation in Search, then choose Export conversation beside its other actions. Exports and backups you made remain.</p>`;
   const read = new AbortController();
   const abort = () => read.abort();
   signal?.addEventListener('abort', abort, { once: true });

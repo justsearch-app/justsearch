@@ -2896,12 +2896,12 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
-          "test": "exports the conversation as the SHARED serialisation, from the palette"
+          "test": "replaces the Markdown-only palette action with the conversation export control"
         },
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
-          "test": "exports nothing when there is no claimed conversation"
+          "test": "offers no conversation export trigger without a claimed conversation"
         }
       ]
     },
