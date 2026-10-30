@@ -292,9 +292,14 @@ def wait_for(fn, description, seconds=90, interval=1, error=AssertionError):
     raise error(f'{description} timed out after {seconds}s; last observation: {last}')
 
 
-def redact(value):
+def redact(value, parent_key=None):
     if isinstance(value, dict):
-        return {k: '<redacted>' if re.search('token|password|secret', k, re.I) else redact(v)
+        # Encoder profiles expose tokenization timings only in this phase map.
+        return {k: '<redacted>' if (
+                    re.search(r'token|password|secret|api[\W_]*key|authorization|cookie', k, re.I)
+                    and not (parent_key == 'phaseTotalUs' and k == 'tokenize'
+                             and isinstance(v, (int, float)) and not isinstance(v, bool)))
+                else redact(v, k)
                 for k, v in value.items()}
     if isinstance(value, list):
         return [redact(v) for v in value]
