@@ -32,7 +32,8 @@ import { AgentSessionController as RealAgentSessionController } from '../../cont
 import { StopAttempt, type RunTerminalOutcome } from '../../state/stopAttempt.js';
 import { ReasoningController } from '../../controllers/ReasoningController.js';
 import type { BudgetUpdate } from '../../controllers/AgentSessionController.js';
-import { SV3_STANDING_STOP_REASON } from './sv3-run.js';
+import { AUTO_CONTINUE_LIMIT, SV3_STANDING_STOP_REASON } from './sv3-run.js';
+import type { Sv3RunDomain } from './sv3-run-domain.js';
 
 /** The observable surface the window projects, plus the spies the seam should reach. */
 interface FakeCtrl {
@@ -111,6 +112,7 @@ function makeCtrl(): FakeCtrl {
 let ctrl: FakeCtrl = makeCtrl();
 let ctrlExists = false;
 let agentListener: (() => void) | null = null;
+let agentSubscriptionCount = 0;
 const getCtrl = vi.fn(() => {
   ctrlExists = true;
   return ctrl as unknown as AgentSessionController;
@@ -120,8 +122,10 @@ vi.mock('../../state/agentSessionStore.js', () => ({
   getAgentSessionController: () => getCtrl(),
   peekAgentSessionController: () => (ctrlExists ? (ctrl as unknown as AgentSessionController) : null),
   subscribeAgentSession: (listener: () => void) => {
+    agentSubscriptionCount += 1;
     agentListener = listener;
     return () => {
+      agentSubscriptionCount -= 1;
       agentListener = null;
     };
   },
@@ -1268,4 +1272,119 @@ it('S2 live bulk-reindex refusal is expanded and self-contained exactly once in 
     expect(card.expanded).toBe(true); expect(card.shadowRoot!.querySelector('.tool-output')?.textContent).toBe(output);
     expect(card.shadowRoot!.textContent!.split('Code: BULK_GENERATION_REFUSED')).toHaveLength(2);
   } finally { real.destroy(); }
+});
+
+
+describe('step 4 run preservation at notification boundaries', () => {
+  it('opens the delegated turn before a synchronous first notification and settles duplicate terminals once', async () => {
+    aiOnline();
+    const el = await mount();
+    const host = (el as unknown as { runDomain: { host: ConstructorParameters<typeof Sv3RunDomain>[0] } }).runDomain.host;
+    const settleRun = vi.spyOn(host, 'settleRun');
+    const refreshRecord = vi.spyOn(host, 'refreshRecord');
+    ctrl.send.mockImplementation(async () => {
+      expect(el.sessions.sessions.at(-1)?.turns.at(-1)?.status).toBe('streaming');
+      ctrl.runInFlight = true;
+      ctrl.runKind = 'agent';
+      ctrl.sessionId = 'immediate-run';
+      agentListener?.();
+    });
+    await type(el, 'immediate task');
+    await press(el, { ctrlKey: true });
+    settleRun.mockClear(); refreshRecord.mockClear();
+    await frame(el, { runInFlight: false, isStreaming: false });
+    expect(el.sessions.sessions.at(-1)?.turns.at(-1)?.status).toBe('complete');
+    expect(settleRun).toHaveBeenCalledOnce();
+    expect(refreshRecord).toHaveBeenCalledExactlyOnceWith(ctrl.conversationId);
+    await frame(el, {});
+    await frame(el, {});
+    expect(el.sessions.sessions.at(-1)?.turns).toHaveLength(1);
+    expect(settleRun).toHaveBeenCalledOnce();
+    expect(refreshRecord).toHaveBeenCalledOnce();
+  });
+
+  it('keeps acknowledgement latched when the server evidence disappears', async () => {
+    aiOnline();
+    const el = await mount();
+    await delegateWithCalls(el, 'acknowledged task', []);
+    expect(q(await region(el, 'jf-sv3-main'), 'sv3-run-echo')).toBeNull();
+    await frame(el, { conversation: [], streamingText: '', sessionId: null });
+    expect(q(await region(el, 'jf-sv3-main'), 'sv3-run-echo')).toBeNull();
+    expect(el.sessions.sessions.at(-1)?.turns.at(-1)?.status).toBe('streaming');
+  });
+
+  it('renews the automatic continuation allowance when a replacement run starts at a held gate', async () => {
+    aiOnline();
+    const el = await mount();
+    await delegateWithCalls(el, 'first held task', []);
+    const gate = { tokensNeeded: 4000, tokensRemaining: 500, totalTokensConsumed: 20000 };
+    const chooseAuto = async () => {
+      const main = await region(el, 'jf-sv3-main');
+      const toggle = q(main, 'sv3-run-budget-auto')?.querySelector('input') as HTMLInputElement;
+      toggle.checked = true; toggle.dispatchEvent(new Event('change'));
+      await settle(el);
+      await pressControl(q(main, 'sv3-run-budget-raise-again'));
+    };
+    await frame(el, { budgetGate: gate });
+    await chooseAuto();
+    // Exhaust the first run's automatic allowance, leaving its last gate latched at terminal.
+    for (let i = 0; i < AUTO_CONTINUE_LIMIT; i++) {
+      await frame(el, { budgetGate: null });
+      await frame(el, { budgetGate: gate });
+    }
+    expect(ctrl.raiseBudget).toHaveBeenCalledTimes(1 + AUTO_CONTINUE_LIMIT);
+    await frame(el, { runInFlight: false, isStreaming: false,
+      ...{ concludedRunId: 'run-1' } } as Partial<FakeCtrl>);
+    expect(el.sessions.sessions.at(-1)?.turns.at(-1)?.status).toBe('complete');
+    ctrl.raiseBudget.mockClear();
+    // Retire the old gate's presentation without notifying the owner: its latch stays held.
+    ctrl.budgetGate = null; el.requestUpdate(); await settle(el);
+    // The first notification is already held: no gate-free frame can accidentally clear a stale latch.
+    ctrl.send.mockImplementationOnce(async () => {
+      ctrl.runInFlight = true; ctrl.runKind = 'agent'; ctrl.sessionId = 'run-2';
+      ctrl.budgetGate = gate;
+      agentListener?.();
+    });
+    await type(el, 'second held task');
+    await press(el, { ctrlKey: true });
+    expect(ctrl.send).toHaveBeenCalledTimes(2);
+    expect(ctrl.sessionId).toBe('run-2');
+    expect(el.sessions.sessions.at(-1)?.turns.at(-1)?.status).toBe('streaming');
+    expect(ctrl.raiseBudget).not.toHaveBeenCalled();
+    const main = await region(el, 'jf-sv3-main');
+    expect((q(main, 'sv3-run-budget-auto')?.querySelector('input') as HTMLInputElement).checked).toBe(false);
+    await chooseAuto();
+    expect(ctrl.raiseBudget).toHaveBeenCalledTimes(1);
+    // A renewed choice must work even on that same held gate, then get its full per-run allowance.
+    await frame(el, { budgetGate: gate });
+    expect(ctrl.raiseBudget).toHaveBeenCalledTimes(2);
+    for (let i = 1; i < AUTO_CONTINUE_LIMIT; i++) {
+      await frame(el, { budgetGate: null });
+      await frame(el, { budgetGate: gate });
+      expect(ctrl.raiseBudget).toHaveBeenCalledTimes(2 + i);
+    }
+    await frame(el, { budgetGate: null });
+    await frame(el, { budgetGate: gate });
+    expect(ctrl.raiseBudget).toHaveBeenCalledTimes(1 + AUTO_CONTINUE_LIMIT);
+  });
+
+  it('reconnects the retained window without another adoption or stopping delegated work', async () => {
+    aiOnline();
+    const el = await mount();
+    await delegateWithCalls(el, 'retained task', []);
+    const turnId = el.sessions.sessions.at(-1)?.turns.at(-1)?.id;
+    expect(agentSubscriptionCount).toBe(1);
+    el.remove();
+    expect(agentSubscriptionCount).toBe(0);
+    expect(agentListener).toBeNull();
+    expect(ctrl.cancelSession).not.toHaveBeenCalled();
+    document.body.appendChild(el);
+    await settle(el);
+    expect(agentSubscriptionCount).toBe(1);
+    await frame(el, { streamingText: 'continued' });
+    expect(el.sessions.sessions).toHaveLength(1);
+    expect(el.sessions.sessions[0]?.turns).toHaveLength(1);
+    expect(el.sessions.sessions[0]?.turns[0]?.id).toBe(turnId);
+    expect(ctrl.cancelSession).not.toHaveBeenCalled();
+  });
 });

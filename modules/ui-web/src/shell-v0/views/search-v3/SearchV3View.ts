@@ -48,6 +48,8 @@
 import { subscribeProfileSwitch } from '../../state/UserStateDocument.js';
 import { subscribeProfiles, getActiveProfileId as getWorkspaceProfileId } from '../../substrates/profiles/index.js';
 import type { Sv3RecentItem } from './Sv3Composer.js';
+import { Sv3RunDomain } from './sv3-run-domain.js';
+import { Sv3RunController } from './sv3-run-controller.js';
 import { Sv3ComposerPort } from './Sv3ComposerPort.js';
 import type { ComposerCapture } from '../../state/composerPort.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
@@ -188,7 +190,6 @@ import {
 import {
   deriveSv3HistoryLocked,
   sv3ExplainsRankingTrace,
-  sv3RecordItemStopsRun,
   projectSv3Corpus,
   type Sv3RemedyDetail,
 } from './sv3-honesty.js';
@@ -276,40 +277,18 @@ import { requestLoadAnyway, retryWording, type ChatRefusalDetail } from '../../s
 import { isSv3Recovery, isSv3Preparation, type Sv3Preparation, type Sv3RecoveryDraft, type Sv3Recovery, type Sv3RecoveryTask, type RecoveryShape } from './sv3-recovery.js';
 import { notifyDraftKeptOnce } from '../../controllers/draftKeptHint.js';
 // Tempdoc 834 §15.3 — the backend's live-run enumeration, asked on a cold load.
-import { discoverLiveAgentRun, type LiveRunRow } from '../../controllers/liveRuns.js';
+import { discoverLiveAgentRun } from '../../controllers/liveRuns.js';
 import {
   getAgentSessionController,
   peekAgentSessionController,
-  subscribeAgentSession,
 } from '../../state/agentSessionStore.js';
 import type { AgentSessionController } from '../../controllers/AgentSessionController.js';
-import { StopAttempt, STOP_RESPONSE_WAIT_MS } from '../../state/stopAttempt.js';
+import { StopAttempt } from '../../state/stopAttempt.js';
 import {
-  directiveAvailable,
-  dispatchRunControl,
-  type RunControlRefusal,
-} from '../../controllers/runControlIntent.js';
-import {
-  deriveSv3RunPhase,
-  hasServerAcknowledgedLocalDispatch,
-  projectSv3RunFeed,
-  projectSv3RunPrompts,
   sv3PrimaryAction,
   isSv3Tier,
   SV3_TIER_DEFAULT,
   type Sv3ComposerTier,
-  sv3RunNeedsPresence,
-  sv3RunOutcome,
-  sv3RunPresenceStart,
-  sv3RunPresenceTitle,
-  sv3RunSessionStatus,
-  sv3UnconfirmedSteerNotes,
-  SV3_RUN_FEED_EMPTY,
-  type Sv3RunFeed,
-  type Sv3RunFeedItem,
-  shouldAutoContinue,
-  type Sv3RunLocal,
-  type Sv3RunTurnState,
   type Sv3RunView,
 } from './sv3-run.js';
 import { type Sv3CitationOpen, type Sv3RunDecision, type Sv3StopState } from './Sv3Main.js';
@@ -317,8 +296,6 @@ import {
   sameCitationHeader,
   type CitationHeader,
 } from '../../components/chat/evidenceProjection.js';
-// Tempdoc 859 §3 — the ONE delegate-plane evidence projection, shared with the record reader.
-import { agentAnswerEvidence, agentDeltaEvidence } from '../../components/chat/agentEvidence.js';
 import type { DocumentCitationAnchor } from '../../components/documentPane/DocumentPane.js';
 import {
   sv3CitationHeader,
@@ -384,11 +361,6 @@ import './Sv3Palette.js';
 import './Sv3Pane.js';
 
 const COMPOSER_STATE_ATTR = 'composer-state';
-
-// Stop disappears on DONE; an in-flight DELETE can still lag (DS4 observed ~1.1s).
-// Allow 5s for cross-window/network delivery. The Engine has no finished-run deadline;
-// this bounds clean-DONE reads, never our own Halt or Stop awaiting its checkpoint.
-const COMPLETED_RECORD_GRACE_MS = 5000;
 
 /** Tempdoc 867 — a stable empty-set identity for when no run controller exists yet. */
 const EMPTY_EVIDENCE_PATHS: ReadonlySet<string> = new Set();
@@ -1020,7 +992,6 @@ export class SearchV3View extends JfElement {
   private uiModeUnsubscribe: (() => void) | null = null;
   private appearanceUnsubscribe: (() => void) | null = null;
   private chatWidthUnsubscribe: (() => void) | null = null;
-  private agentUnsubscribe: (() => void) | null = null;
   private readonly forkReads = new Map<string, {
     abort: AbortController;
     rows: readonly Conversation[] | null;
@@ -1072,13 +1043,6 @@ export class SearchV3View extends JfElement {
   private convListUnsubscribe: (() => void) | null = null;
   /** The in-flight record fetch, so a claim that supersedes another cannot land out of order. */
   private readonly recordReads = new Map<string, AbortController>();
-  /** A local terminal can precede the Engine's journal and checkpoint writes. */
-  private readonly pendingRunRecords = new Map<string, {
-    local: Sv3RunLocal; runId: string; conversationId: string; doneGraceUntil?: number;
-  }>();
-  private readonly announcedStops = new Set<string>();
-  private recordRetryTimer: number | null = null;
-  private reattachRecordTurn: { runId: string; sessionId: string; turnId: string } | null = null;
   /** Reads are ordered within each conversation without cancelling another conversation's read. */
   private historyReads = new Map<string, AbortController>();
   /** A write includes its response AND saved-history refresh; later controls queue behind it. */
@@ -1638,13 +1602,53 @@ export class SearchV3View extends JfElement {
   private contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private contextRetryDelay = 1000;
   private contextAskPending = new Set<string>();
-  /**
-   * One-shot, mirroring the shipped window's `reattachChecked` (`views/UnifiedChatView.ts:3496`): a
-   * cold load asks the shared controller to reattach to a live run ONCE. Re-asking on every render
-   * would re-attach a run the reader has since halted.
-   */
-  private reattachChecked = false;
   private readonly composerDraft = new Sv3ComposerPort(() => this.composer);
+
+  private readonly runDomain = new Sv3RunDomain({
+    createConversationId: () => createConversationId(),
+    activeConversationId: () => this.sessions.activeId,
+    showingResults: () => this.search.showing,
+    hasPreparedHandoff: () => this.preparedHandoff !== null,
+    connected: () => this.isConnected,
+    turn: ref => sessionById(this.sessions, ref.sessionId)?.turns.find(turn => turn.id === ref.turnId),
+    lastTurn: id => sessionById(this.sessions, id)?.turns.at(-1),
+    adoptRun: (title, now, id, turnId) => {
+      const { list, ref } = adoptRunSession(this.sessions, title, now, id, turnId);
+      this.sessions = list;
+      return ref;
+    },
+    ensureConversation: (id, now) => {
+      this.sessions = mergeStoreConversations(this.sessions, [
+        { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
+      ]);
+    },
+    setEvidence: (ref, evidence) => { this.sessions = setTurnEvidence(this.sessions, ref, evidence); },
+    settleRun: (ref, outcome, calls, now, disposition) => {
+      this.sessions = settleAgentTurn(this.sessions, ref, outcome, calls, now, '', disposition);
+    },
+    applyRecord: (id, record) => {
+      this.sessions = applySv3Record(this.sessions, id, projectSv3RecordTurns(record.events));
+    },
+    preserveFailedReceipt: (ref, detail) => {
+      this.sessions = { ...this.sessions, sessions: this.sessions.sessions.map(session =>
+        session.id !== ref.sessionId ? session : { ...session, turns: session.turns.map(turn =>
+          turn.id !== ref.turnId ? turn : { ...turn, status: 'failed', detail }) }) };
+    },
+    refreshRecord: id => this.refreshRecord(id),
+    announceStop: message => emitEphemeralToast({ message }),
+    persistSteerDraft: () => this.persistDraft({ place: this.humanPlace(), text: '', preparation: this.currentPreparation() }),
+    dockComposer: () => { void this.setComposerState('docked'); },
+    focusDecision: () => this.focusRunDecision(),
+    requestUpdate: () => this.requestUpdate(),
+  }, this.composerDraft, {
+    peek: () => peekAgentSessionController(),
+    get: () => getAgentSessionController(this.apiBase),
+    discover: () => discoverLiveAgentRun(this.apiBase),
+  }, {
+    now: () => Date.now(),
+    setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+    clearTimeout: timer => window.clearTimeout(timer),
+  });
   /** The in-flight ask's abort handle; null exactly when no response is streaming. */
   private askAbort: AbortController | null = null;
   /** The reader's Stop for that ask: the Engine is asked to end the turn, and its stream says how. */
@@ -1665,27 +1669,6 @@ export class SearchV3View extends JfElement {
     this.askReasoningTurnId = ask?.turnId ?? null;
     if (ask !== undefined) this.askReasoning = ask.reasoning;
   }
-  /**
-   * What this window remembers about the delegated run it dispatched — including the explicit turn
-   * ref that is its `activeTurnId`. Not reactive state: it is mutated in place by the controller's
-   * notifications (a latch and two flags), and every one of those paths already re-renders.
-   */
-  private run: Sv3RunLocal | null = null;
-  /** Whether the run was observed LIVE, so its terminal is an EDGE rather than a repeated verdict. */
-  private runLive = false;
-  /**
-   * WP6.2 S8.2 — per turn, the run's notes for steer sends whose outcome is unconfirmed. Window-local
-   * and never saved: the settled turn renders from the record, which does not carry them, so they are
-   * kept here for as long as this window holds the conversation, until the run's report of that send
-   * removes them.
-   */
-  private unconfirmedSteerNotes: ReadonlyMap<string, readonly Sv3RunFeedItem[]> = new Map();
-  /**
-   * Controller run ids this window has already given a session (Phase F3 presence). Adoption happens
-   * once per run: without the latch, the same live run would be re-adopted on the next notification
-   * after its turn settled, and the sidebar would grow a row per frame.
-   */
-  private readonly adoptedRunIds = new Set<string>();
   /**
    * Conversations this window has already asked the model to name (inventory A11). Once per
    * conversation: the title is the row's label forever, so a second generation would rename a row
@@ -1738,6 +1721,7 @@ export class SearchV3View extends JfElement {
 
   constructor() {
     super();
+    new Sv3RunController(this, this.runDomain);
     this.composerState = COMPOSER_STATE_DEFAULT;
     // Read in the CONSTRUCTOR, not on connect: the attribute is reflected, so a value arriving one
     // render late would paint the dark set for a frame in a light app — the flash the app's own
@@ -1825,9 +1809,6 @@ export class SearchV3View extends JfElement {
     // Tempdoc 874 — the reader's chat-column width. `subscribeChatWidth` fires immediately with the
     // current value, so this subscription IS the initial apply as well as the live one.
     this.chatWidthUnsubscribe = subscribeChatWidth((w) => this.applyChatWidth(w));
-    // Subscribing does NOT create a controller (the read below is a `peek`), so a window that never
-    // delegates never starts the agent controller's polling as a side effect of being mounted.
-    this.agentUnsubscribe = subscribeAgentSession(this.onAgentUpdate);
     // ── The conversation record (tempdoc 822 Phase F6) ─────────────────────────────────────────
     // A session is a conversation, so the app-wide store is where the list comes from. The
     // subscription fires immediately with whatever is already loaded; the fetch refreshes it.
@@ -1892,13 +1873,13 @@ export class SearchV3View extends JfElement {
     // Cold-load reattach, started here and NOT awaited: discovery is a network round-trip now
     // (tempdoc 834 §15.3) and mount must not block on it. The ordering it used to buy — the run
     // already on the controller before the first presence look — is instead carried by the
-    // subscription taken just above: `attachToRun` notifies, `onAgentUpdate` runs
+    // run controller subscription: `attachToRun` notifies, `onAgentUpdate` runs
     // `syncRunPresence` first, and a recovered run reaches the window that way.
-    void this.reattachLiveRun();
+    void this.runDomain.reattachLiveRun();
     // The window may be mounting BESIDE a run that is already going (a surface switch, a re-mount).
     // The store notifies on change only, so the first look has to be taken here — see
     // `syncRunPresence` for why an unrepresented live run is this window's problem to state.
-    this.syncRunPresence();
+    this.runDomain.syncRunPresence();
     // Scoped to the HOST, not to `window`. A host listener is only reached by events whose composed
     // path runs through this window, so a chord pressed anywhere else in the shipped app is invisible
     // here by construction — there is no "is the focus inside?" test to get wrong. Capture phase so
@@ -1994,7 +1975,7 @@ export class SearchV3View extends JfElement {
     this.clearForkReads();
     for (const read of this.recordReads.values()) read.abort();
     this.recordReads.clear();
-    this.clearRecordRetry();
+    this.runDomain.clearRecordRetry();
     for (const [id, read] of this.historyReads) {
       this.markContextUnconfirmed(id);
       read.abort();
@@ -2009,11 +1990,6 @@ export class SearchV3View extends JfElement {
     this.appearanceUnsubscribe = null;
     this.chatWidthUnsubscribe?.();
     this.chatWidthUnsubscribe = null;
-    // The RUN is not cancelled here. Unlike the ask stream (which this window owns), a delegated run
-    // is hosted by the product-wide controller and may be watched from another surface; tearing it
-    // down because this dev window unmounted would be this window deciding for the whole product.
-    this.agentUnsubscribe?.();
-    this.agentUnsubscribe = null;
     // Lifecycle containment: an unmounted window's stream would keep a connection open against the
     // shared channel budget and settle a turn nobody can see.
     for (const ask of this.liveAsks.values()) { ask.abort.abort(); ask.reasoning.destroy(); }
@@ -2392,10 +2368,8 @@ export class SearchV3View extends JfElement {
     const abort = new AbortController();
     this.recordReads.set(conversationId, abort);
     let failed = false;
-    const stopping = this.agentController();
-    const timer = stopping?.stopAttempt?.intent
-      && (stopping.runConversationId ?? stopping.conversationId) === conversationId
-      ? setTimeout(() => abort.abort(), STOP_RESPONSE_WAIT_MS) : undefined;
+    const wait = this.runDomain.recordReadWait(conversationId);
+    const timer = wait === undefined ? undefined : setTimeout(() => abort.abort(), wait);
     const record = await fetchUnifiedThread(this.apiBase, conversationId, abort.signal, () => {
       failed = true;
     }).finally(() => clearTimeout(timer));
@@ -2404,96 +2378,10 @@ export class SearchV3View extends JfElement {
     this.recordReads.delete(conversationId);
     if (this.sessions.activeId === conversationId) this.recordNotice = failed;
     if (!failed) {
-      const ctrl = this.agentController();
-      if (ctrl?.stopAttempt?.intent && (ctrl.runConversationId ?? ctrl.conversationId) === conversationId) {
-        const lifecycle = record.lifecycles.find((row) => row.sessionId === ctrl.sessionId);
-        if (lifecycle) ctrl.reconcileRunLifecycle(lifecycle.sessionId, lifecycle.state);
-      }
-      // Navigation detaches the local handle. Its addressed turn still follows its record.
-      for (const { local, runId, conversationId: recordConversationId } of this.pendingRunRecords.values()) {
-        if (recordConversationId !== conversationId || this.run === local) continue;
-        const state = record.lifecycles.find((row) => row.sessionId === runId)?.state;
-        if (state !== 'CANCELLED' && state !== 'DONE' && state !== 'ERROR') continue;
-        const turn = sessionById(this.sessions, local.sessionId)?.turns.find((t) => t.id === local.turnId);
-        if (turn?.status !== 'streaming') continue;
-        this.sessions = settleAgentTurn(this.sessions, local,
-          state === 'CANCELLED' ? 'halted' : state === 'DONE' ? 'complete' : 'failed',
-          turn.toolCalls, Date.now(), '', turn.disposition);
-      }
-      const failedRun = ctrl?.stopAttempt?.intent && ctrl.terminalOutcome === 'failed'
-        && (ctrl.runConversationId ?? ctrl.conversationId) === conversationId ? this.run : null;
-      const failedTurn = failedRun === null ? undefined
-        : sessionById(this.sessions, failedRun.sessionId)?.turns.find((turn) => turn.id === failedRun.turnId);
-      this.sessions = applySv3Record(
-        this.sessions,
-        conversationId,
-        projectSv3RecordTurns(record.events),
-      );
-      // The lifecycle can confirm failure before an ERROR item reaches the record. Preserve the
-      // live receipt across that partial snapshot without changing the saved-record projection.
-      if (failedRun !== null && failedTurn?.status === 'failed') {
-        this.sessions = { ...this.sessions, sessions: this.sessions.sessions.map((session) =>
-          session.id !== failedRun.sessionId ? session : { ...session, turns: session.turns.map((turn) =>
-            turn.id !== failedRun.turnId ? turn : { ...turn, status: 'failed', detail: failedTurn.detail }) }) };
-      }
-      const stopIds = new Set(record.events
-        .filter((e) => sv3RecordItemStopsRun(e.kind.toLowerCase(), e.attributes))
-        .map((e) => e.id));
-      for (const [id, pending] of this.pendingRunRecords) {
-        const { local, runId } = pending;
-        if (pending.conversationId !== conversationId) continue;
-        const turn = sessionById(this.sessions, local.sessionId)?.turns.find((t) => t.id === local.turnId);
-        if (turn === undefined) {
-          this.pendingRunRecords.delete(id);
-          continue;
-        }
-        const stop = turn.activity.find((item) => item.kind === 'note' && stopIds.has(item.id));
-        if (stop?.kind === 'note' && !this.announcedStops.has(runId)) {
-          this.announcedStops.add(runId);
-          emitEphemeralToast({ message: stop.text });
-        }
-        const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
-        if (state === 'DONE' && stop === undefined && !local.haltRequested) {
-          pending.doneGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
-        } else if (!local.haltRequested || state === 'DONE') {
-          // Our Halt still needs its saved confirmation when completion wins the race.
-          delete pending.doneGraceUntil;
-        }
-        // A saved Stop can precede the final checkpoint; keep reading through both edges.
-        if ((state === 'DONE' || state === 'ERROR' || state === 'CANCELLED')
-          && (stop !== undefined || (!local.haltRequested && state === 'ERROR'))) {
-          this.pendingRunRecords.delete(id);
-        }
-      }
+      this.runDomain.recordArrival(conversationId, record);
     }
-    this.scheduleRecordRetry();
+    this.runDomain.scheduleRecordRetry();
     return !failed;
-  }
-
-  private clearRecordRetry(): void {
-    if (this.recordRetryTimer !== null) window.clearTimeout(this.recordRetryTimer);
-    this.recordRetryTimer = null;
-  }
-
-  private retireExpiredRecordReads(): void {
-    const now = Date.now();
-    for (const [id, pending] of this.pendingRunRecords) {
-      if (pending.doneGraceUntil !== undefined
-        && now >= pending.doneGraceUntil) this.pendingRunRecords.delete(id);
-    }
-  }
-
-  private scheduleRecordRetry(): void {
-    this.retireExpiredRecordReads();
-    if (this.pendingRunRecords.size === 0) this.clearRecordRetry();
-    if (!this.isConnected || this.pendingRunRecords.size === 0 || this.recordRetryTimer !== null) return;
-    this.recordRetryTimer = window.setTimeout(() => {
-      this.recordRetryTimer = null;
-      this.retireExpiredRecordReads();
-      for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.conversationId))) {
-        void this.refreshRecord(id);
-      }
-    }, 500);
   }
 
   /**
@@ -2566,10 +2454,7 @@ export class SearchV3View extends JfElement {
   }
 
   private retryContextOnReconnect = (): void => {
-    this.clearRecordRetry();
-    for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.conversationId))) {
-      void this.refreshRecord(id);
-    }
+    this.runDomain.retryRecords();
     this.clearContextRetry();
     this.contextRetryDelay = 1000;
     const id = this.sessions.activeId;
@@ -3208,39 +3093,6 @@ export class SearchV3View extends JfElement {
    * adopt. In the cold case that guard is vacuous: a controller this window just built has no
    * conversation pinned to it.
    */
-  private async reattachLiveRun(): Promise<void> {
-    if (this.reattachChecked) return;
-    this.reattachChecked = true;
-    const existing = peekAgentSessionController();
-    if (existing !== null) {
-      void existing.reattachActiveRunOnLoad(this.prepareReattachedRecord);
-      return;
-    }
-    if ((await discoverLiveAgentRun(this.apiBase)) === null) return;
-    if (!this.isConnected) return;
-    void getAgentSessionController(this.apiBase).reattachActiveRunOnLoad(this.prepareReattachedRecord);
-    // The mount-time presence look already ran, synchronously, while this round-trip was still in
-    // flight — and it found no controller because there was none yet to find. Take it again now
-    // that there is one, so a recovered run reaches the window on this path directly rather than
-    // only through whatever the controller happens to notify next.
-    this.syncRunPresence();
-  }
-
-  /** Bind an observer to the canonical turn before its first notification can create a placeholder. */
-  private prepareReattachedRecord = async (run: LiveRunRow): Promise<void> => {
-    const id = run.conversationId;
-    if (!this.isConnected || !id || !run.runId) return;
-    const now = Date.now();
-    this.sessions = mergeStoreConversations(this.sessions, [
-      { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
-    ]);
-    if (!await this.refreshRecord(id) || !this.isConnected) return;
-    const turn = sessionById(this.sessions, id)?.turns.at(-1);
-    if (turn?.kind === 'agent' && turn.recordId !== null) {
-      this.reattachRecordTurn = { runId: run.runId, sessionId: id, turnId: turn.id };
-    }
-  };
-
   /* ── The lock (tempdoc 822 Phase F7; inventory E4/E5) ─────────────────────────────────────── */
 
   /**
@@ -3842,7 +3694,7 @@ export class SearchV3View extends JfElement {
     // A chord pressed in Search mode reached here past none of the composer's run rules — the
     // composer's slot was the search slot — so they are applied here, the same ones.
     if (this.tier === 'search' && this.chordRefused()) return;
-    if (this.preparedHandoff === null && this.steerableRun !== null) {
+    if (this.preparedHandoff === null && this.runDomain.steerableRun !== null) {
       this.steerLiveRun(text);
       return;
     }
@@ -3873,9 +3725,9 @@ export class SearchV3View extends JfElement {
    * send, a live run takes only a steer, and an idle window delegates only when the agent can run.
    */
   private chordRefused(): boolean {
-    const run = this.run?.sessionId === this.sessions.activeId ? this.projectRun() : null;
+    const run = this.runDomain.run?.sessionId === this.sessions.activeId ? this.runDomain.snapshot() : null;
     if (run !== null && run.prompts.length > 0) return true;
-    if (this.isRunning(run)) return this.steerableRun === null;
+    if (this.isRunning(run)) return this.runDomain.steerableRun === null;
     return this.delegateUnavailableReason !== '';
   }
 
@@ -4990,19 +4842,6 @@ export class SearchV3View extends JfElement {
   }
 
   /**
-   * The live run this window owns AND that accepts a steer, or null. Both halves matter: the
-   * controller is product-wide, so a run this window did not dispatch is not this window's to
-   * redirect, and only an `agent` run has an interject channel at all (a workflow or background run
-   * does not) — the seam's own lifecycle predicate decides the rest.
-   */
-  private get steerableRun(): AgentSessionController | null {
-    const ctrl = this.agentController();
-    if (ctrl === null || this.run === null || (this.run.sessionId !== this.sessions.activeId && !(this.sessions.activeId === null && this.preparedHandoff === null)) || this.search.showing) return null;
-    if (ctrl.runKind !== 'agent') return null;
-    return directiveAvailable(ctrl, { kind: 'interject', text: '' }) ? ctrl : null;
-  }
-
-  /**
    * The DELEGATE path: the draft becomes an agent task. The causal order mirrors the ask — the turn
    * is opened first, then the run is dispatched — so the transcript already shows what was committed
    * before anything can come back, and the run has a turn to be written to from its very first frame.
@@ -5028,39 +4867,7 @@ export class SearchV3View extends JfElement {
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
     this.claimConversation(ref.sessionId);
-    this.composerDraft.clear();
-    void this.setComposerState('docked');
-
-    const ctrl = getAgentSessionController(this.apiBase);
-    // The run's thread events are stamped with THIS window's session, so a delegated run lands under
-    // the conversation that asked for it rather than under whatever the controller ran last.
-    ctrl.conversationId = ref.sessionId;
-    this.run = {
-      sessionId: ref.sessionId,
-      turnId: ref.turnId,
-      // The window's slice of a product-wide conversation: everything before this belongs to someone
-      // else's run and must never be counted into this one's receipt.
-      entryStart: ctrl.conversation.length,
-      sessionIdAtDispatch: ctrl.sessionId,
-      acknowledged: false,
-      haltRequested: false,
-      haltDispatched: false,
-      // Tempdoc 859 §D §2.5 — a fresh run starts asking again. The reader's "don't ask again" is
-      // scoped to the run they said it about, and this object IS that scope.
-      autoContinueTokens: null,
-      autoContinuesUsed: 0,
-    };
-    // Cleared here as well as on the first gate-free frame: a run that ended WHILE a gate was held
-    // leaves the latch set, and the reset would then depend on the new run producing a gate-free
-    // frame before its first gate. It does today; relying on that ordering would be the stale-flag
-    // short-circuit this window has been bitten by before.
-    this.budgetGateHandled = false;
-    this.runLive = false;
-    this.requestUpdate();
-    // Tempdoc 859 §D §2.1 — the composer's rung travels with the dispatch, as a NAME. It reaches
-    // `AgentBudgetPolicy`, which is the only place that can see the model's `n_ctx` and therefore
-    // the only place that may turn a rung into a token count.
-    void dispatchRunControl(ctrl, { kind: 'initiate', prompt: text, effort: this.effort });
+    this.runDomain.dispatch(ref, text, this.effort);
   }
 
   /**
@@ -5072,368 +4879,14 @@ export class SearchV3View extends JfElement {
    */
   private steerLiveRun(text: string): void {
     if (!this.draftMayIssue(false)) return;
-    const ctrl = this.steerableRun;
-    if (ctrl === null) return;
-    if (!this.persistDraft({ place: this.humanPlace(), text: '', preparation: this.currentPreparation() })) return;
-    this.composerDraft.clear();
-    void dispatchRunControl(ctrl, { kind: 'interject', text });
-  }
-
-  /** Ask and Halt share the same pending and unconfirmed presentation. */
-  private runStopping(): Sv3StopState | null {
-    const ctrl = this.agentController();
-    const local = this.run;
-    if (!ctrl?.stopAttempt?.intent || ctrl.terminalOutcome !== null || local === null
-        || local.sessionId !== this.sessions.activeId) return null;
-    return { turnId: local.turnId, state: ctrl.stopAttempt.outcome === 'refused'
-      || ctrl.stopAttempt.outcome === 'unknown' || ctrl.stopObservationLost ? 'failed' : 'stopping' };
-  }
-
-  /** Latch before dispatch; the controller keeps observing until the backend ends this run. */
-  private haltRun(): void {
-    const local = this.run;
-    if (local === null) return;
-    local.haltRequested = true;
-    local.haltDispatched = false;
-    this.deliverHalt();
-    this.requestUpdate();
-  }
-
-  private deliverHalt(): void {
-    const ctrl = this.agentController();
-    const local = this.run;
-    if (ctrl === null || local === null || local.haltDispatched) return;
-    local.haltDispatched = true;
-    void dispatchRunControl(ctrl, { kind: 'halt' }).then((result) => {
-      // A lifecycle refusal may be retried by the next update. HTTP failures require another press.
-      if ((result as RunControlRefusal | undefined)?.refused === true) local.haltDispatched = false;
-    });
-  }
-
-  /**
-   * The shared controller moved. Three things happen: the optimistic handoff latches the first time
-   * the SERVER says anything, a pending halt is delivered once the run can honour it, and the run's
-   * TERMINAL edge is detected so exactly one receipt lands.
-   */
-  /**
-   * Does this window have an OPEN turn standing for a run? A settled turn stands for nothing: its
-   * receipt is written and a later run is not the same run.
-   */
-  private get runRepresented(): boolean {
-    const local = this.run;
-    if (local === null) return false;
-    const turn = sessionById(this.sessions, local.sessionId)?.turns.find(
-      (t) => t.id === local.turnId,
-    );
-    return turn?.status === 'streaming';
-  }
-
-  /**
-   * PRESENCE (tempdoc 822 Phase F3) — the fix for F2's named finding: *window-local in-memory
-   * sessions orphan a live run on reload*. A fresh window showed zero sessions while the run went on
-   * holding server-side, so the window was silently disagreeing with the product about what was
-   * happening.
-   *
-   * The rule this establishes: the SHARED CONTROLLER is the authority on whether a run is live, and
-   * this window's memory is not. When the controller reports a live or holding run that no session
-   * here accounts for, the window synthesises one — titled with the run's own task text, carrying an
-   * open agent turn, landing on the Active shelf — and adopts it as the run it renders. `entryStart`
-   * is 0 because this window dispatched nothing: the whole conversation the controller holds is that
-   * run's. `acknowledged` is true for the same reason — there is no optimistic local echo to yield;
-   * every frame of it came from the server already.
-   *
-   * It reads through `peek`, so a window that never delegates still constructs no controller and
-   * starts no polling by being mounted (the F2 law). And it does not CLAIM the adopted session: the
-   * run is news, not a navigation.
-   */
-  private syncRunPresence(): void {
-    const ctrl = this.agentController();
-    if (ctrl === null) return;
-    // The controller's conversation accumulates across runs, so the LIVE run's slice starts at the
-    // task it was given — not at 0, which would read a finished run's steps as this one's.
-    const start = sv3RunPresenceStart(ctrl);
-    const feed = projectSv3RunFeed(ctrl, start);
-    const probe = {
-      status: sv3RunSessionStatus(ctrl, feed),
-      represented: this.runRepresented,
-      runId: ctrl.sessionId,
-      adoptedRunIds: this.adoptedRunIds,
-    };
-    if (!sv3RunNeedsPresence(probe)) return;
-    // The controller's own conversationId when it has one (a run dispatched from another surface
-    // carries the conversation it belongs to), so the adopted session IS that conversation rather
-    // than a second row for it. Only a run with no conversation gets a freshly minted id.
-    const { list, ref } = adoptRunSession(
-      this.sessions,
-      sv3RunPresenceTitle(ctrl),
-      Date.now(),
-      ctrl.conversationId ?? createConversationId(),
-      this.reattachRecordTurn?.runId === ctrl.sessionId
-        && this.reattachRecordTurn.sessionId === ctrl.conversationId
-        ? this.reattachRecordTurn.turnId : null,
-    );
-    this.reattachRecordTurn = null;
-    this.sessions = list;
-    this.run = {
-      sessionId: ref.sessionId,
-      turnId: ref.turnId,
-      entryStart: start,
-      sessionIdAtDispatch: null,
-      acknowledged: true,
-      haltRequested: false,
-      haltDispatched: false,
-      // An ADOPTED run is one this window did not dispatch: nobody here made an auto-continue
-      // choice about it, so its gates ask. Inheriting a choice made for a different run would be
-      // exactly the standing autonomy the per-run scope exists to prevent.
-      autoContinueTokens: null,
-      autoContinuesUsed: 0,
-    };
-    this.budgetGateHandled = false;
-    // Observed live at adoption, so the run's terminal is an EDGE for this window too and the
-    // adopted turn gets its one receipt instead of streaming forever.
-    this.runLive = true;
-    if (ctrl.sessionId !== null) this.adoptedRunIds.add(ctrl.sessionId);
-  }
-
-  private readonly onAgentUpdate = (): void => {
-    // Presence first: a run this window has no session for gets one before the frame is read, so the
-    // rest of this method has something to write the run's progress into.
-    this.syncRunPresence();
-    const ctrl = this.agentController();
-    const local = this.run;
-    if (ctrl !== null && local !== null) {
-      // Latched once and never read again: a run whose evidence later disappears cannot push this
-      // window back into claiming it is still sending.
-      if (!local.acknowledged && hasServerAcknowledgedLocalDispatch(local, ctrl)) {
-        local.acknowledged = true;
-      }
-      // A run this window is already rendering is a run it must never ALSO adopt as presence — the
-      // id is only knowable once the server names it, which is here rather than at dispatch.
-      if (ctrl.sessionId !== null) this.adoptedRunIds.add(ctrl.sessionId);
-      if (ctrl.stopAttempt?.intent && !local.haltRequested) local.haltRequested = true;
-      const recordConversationId = ctrl.runConversationId ?? ctrl.conversationId;
-      if (local.haltRequested && ctrl.sessionId !== null && ctrl.terminalOutcome === null
-          && recordConversationId !== null) {
-        local.stopRecordGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
-        const pending = this.pendingRunRecords.get(local.turnId);
-        if (!pending && Date.now() < local.stopRecordGraceUntil) {
-          this.pendingRunRecords.set(local.turnId, {
-            local, runId: ctrl.sessionId, conversationId: recordConversationId,
-            doneGraceUntil: local.stopRecordGraceUntil,
-          });
-          void this.refreshRecord(recordConversationId);
-        }
-      }
-      const feed = projectSv3RunFeed(ctrl, local.entryStart);
-      this.keepUnconfirmedSteerNotes(local.turnId, sv3UnconfirmedSteerNotes(ctrl, local.entryStart, feed));
-      const status = sv3RunSessionStatus(ctrl, feed);
-      if (status === 'live' || status === 'holding') {
-        this.runLive = true;
-        if (local.haltRequested) this.deliverHalt();
-        this.maybeAutoContinue(ctrl, local);
-      } else if (this.runLive) {
-        this.runLive = false;
-        this.concludeRun(local, feed);
-      }
-    }
-    this.requestUpdate();
-  };
-
-  /** Replaced only when the turn's set of notes changes, so an unchanged frame re-renders nothing new. */
-  private keepUnconfirmedSteerNotes(turnId: string, notes: readonly Sv3RunFeedItem[]): void {
-    const kept = this.unconfirmedSteerNotes.get(turnId) ?? [];
-    if (kept.length === notes.length && kept.every((n, i) => n.id === notes[i]!.id)) return;
-    const next = new Map(this.unconfirmedSteerNotes);
-    if (notes.length > 0) next.set(turnId, notes);
-    else next.delete(turnId);
-    this.unconfirmedSteerNotes = next;
-  }
-
-  /**
-   * Tempdoc 859 §D §2.5 / P3 — a decision made once is RE-APPLIED, not re-asked.
-   *
-   * The reader ticked "don't ask again for this run" and chose an amount; the next gate takes that
-   * same amount without stopping them. Three guard rails keep this from becoming standing autonomy:
-   * it is scoped to ONE run (the state lives on {@link Sv3RunLocal}, which a new dispatch replaces),
-   * it is BOUNDED (after {@link AUTO_CONTINUE_LIMIT} the gate asks again rather than continuing
-   * forever), and every silent continue is NARRATED — the backend emits a `budget_raised` progress
-   * note, which the feed renders like any other step.
-   *
-   * `budgetGateHandled` is the idempotence latch: the controller notifies on every frame, and the
-   * gate stays held until the raise lands, so without it one gate would fire a raise per frame.
-   */
-  private maybeAutoContinue(ctrl: AgentSessionController, local: Sv3RunLocal): void {
-    if (ctrl.stopAttempt?.intent) return;
-    if (ctrl.budgetGate === null) {
-      // The gate cleared — re-arm for the NEXT one.
-      this.budgetGateHandled = false;
-      return;
-    }
-    if (this.budgetGateHandled) return;
-    if (!shouldAutoContinue(local)) return;
-    const addTokens = local.autoContinueTokens;
-    if (addTokens === null || addTokens <= 0) return;
-    this.budgetGateHandled = true;
-    local.autoContinuesUsed += 1;
-    void dispatchRunControl(ctrl, { kind: 'raise-budget', addTokens });
-  }
-
-  /** One raise per held gate — see {@link maybeAutoContinue}. */
-  private budgetGateHandled = false;
-
-  /**
-   * The run's terminal: exactly ONE receipt, written to the turn the dispatch opened. The count comes
-   * from the SAME feed projection the cards were rendered from, so the receipt can never disagree
-   * with what the reader watched — and it is addressed by ref, so a later run started from another
-   * surface cannot write its numbers into this window's turn.
-   */
-  private concludeRun(local: Sv3RunLocal, feed: Sv3RunFeed): void {
-    // Tempdoc 859 §3b — the run's EVIDENCE, written at the same terminal as its receipt and through
-    // the same shared projection the record reader uses, so live and record produce one value from
-    // one function over the same bytes. This is the C-small defect: the delegate path resolved
-    // grounding on the backend, persisted it, and then never wrote it onto the turn, so a delegate
-    // answer rendered with no marks and no sources while the evidence sat on the wire.
-    //
-    // §3c — GUARDED by the run the evidence belongs to. `concludeRun` fires on every terminal,
-    // including the ones that emit no `done` (error, abort, watchdog, budget stop), and only `onDone`
-    // writes the controller's evidence fields. Without this test a failed run N would settle wearing
-    // run N-1's sources.
-    //
-    // TWO conditions, because the id test alone has a hole: a dispatch the server never named
-    // leaves `ctrl.sessionId` still holding the PREVIOUS run's id, which the id test would then
-    // read as a match. `acknowledged` is the window's own latch for "the server said something
-    // about the run I opened" — the same identity discipline `entryStart` and `adoptedRunIds`
-    // apply, and the reason it is not `runInFlight`/`isStreaming` (both local optimism, set inside
-    // `send()` before the server answers).
-    const ctrl = this.agentController();
-    // Tempdoc 859 §D §2.6 (review F9) — ONE predicate, named, read by both the evidence write below
-    // and the disposition write further down. They were two hand-copied condition lists that had
-    // already drifted apart by one clause; a shared name is what makes "the same guard" checkable
-    // rather than a claim in a comment.
-    const terminalBelongsToThisRun =
-      ctrl !== null &&
-      local.acknowledged &&
-      ctrl.answerEvidenceRunId !== null &&
-      ctrl.answerEvidenceRunId === ctrl.sessionId;
-    // Tempdoc 865 §7.1 / §7.9 A9 — PLANE AUTHORITY. The terminal is authoritative when it MADE A
-    // GROUNDING CLAIM; the per-call deltas fill the gap when it did not. A run that ends without a
-    // grounded terminal — cancelled, errored — establishes real evidence and then has nothing to
-    // report it, which is exactly why the mint moved onto the tool events. The deltas are never
-    // ADDED to a terminal that spoke: they are the same set, so accumulating both would double every
-    // source and break the positional index the inline marks resolve through.
-    //
-    // OWNERSHIP IS NOT A CLAIM, and separating the two is the whole correctness of this gate.
-    // `terminalBelongsToThisRun` answers "whose evidence is this" — it stays exactly as it was, and
-    // the disposition write below still reads it, because a cut-short run must keep saying so. But
-    // an answerless terminal still emits a `done` whose payload always carries a `sources` key
-    // (`AgentEventPayloads` puts it unconditionally), and `onDone` writes `answerEvidenceRunId`
-    // unconditionally — so ownership alone is TRUE for a terminal that reports nothing, and an empty
-    // terminal would win over the deltas that hold the run's real evidence. The extra clause is the
-    // record plane's own rule, mirrored: `AgentInteractionMapper` attaches `sources` only
-    // `&& !srcs.isEmpty()`. Two planes, one test for "this terminal said something about grounding".
-    //
-    // Tempdoc 878 §D.1 — MAX_ITERATIONS has LEFT that list. The step ceiling now finalizes through
-    // the same grounded seam as every other terminal, so it carries its evidence and this gate
-    // simply resolves TRUE for it. Nothing here changes: the gate always asked what the terminal
-    // said, never which disposition it wore, which is why the behaviour follows the backend fix
-    // without an edit.
-    const terminalMadeAGroundingClaim =
-      terminalBelongsToThisRun && ctrl !== null && ctrl.answerSources.length > 0;
-    if (terminalMadeAGroundingClaim) {
-      const evidence = agentAnswerEvidence(
-        ctrl.answerSources,
-        ctrl.answerCitations,
-        ctrl.answerCitationScorer,
-      );
-      this.sessions = setTurnEvidence(
-        this.sessions,
-        { sessionId: local.sessionId, turnId: local.turnId },
-        { ...evidence, retrievalMode: '' },
-      );
-    } else if (
-      ctrl !== null &&
-      local.acknowledged &&
-      ctrl.groundingDeltasRunId !== null &&
-      ctrl.groundingDeltasRunId === ctrl.sessionId &&
-      ctrl.groundingDeltas.length > 0
-    ) {
-      this.sessions = setTurnEvidence(
-        this.sessions,
-        { sessionId: local.sessionId, turnId: local.turnId },
-        { ...agentDeltaEvidence(ctrl.groundingDeltas), retrievalMode: '' },
-      );
-    }
-    this.sessions = settleAgentTurn(
-      this.sessions,
-      { sessionId: local.sessionId, turnId: local.turnId },
-      ctrl?.terminalOutcome === 'failed' ? 'failed' : sv3RunOutcome(feed, ctrl?.terminalOutcome === 'cancelled'
-        || (ctrl?.terminalOutcome === 'completed' && local.haltRequested && ctrl.stopAttempt.outcome === 'accepted' && ctrl.answerEvidenceRunId === ctrl.sessionId)),
-      feed.toolCallCount,
-      Date.now(),
-      '',
-      // Tempdoc 859 §D §2.6 — the terminal DISPOSITION, guarded by the SAME predicate the evidence
-      // above is (literally the same expression now) and for the same reason: `concludeRun` fires on
-      // every terminal, including the ones that emit no `done`, and only `onDone` writes the
-      // controller's disposition. Without the guard a failed run N would settle wearing run N-1's
-      // cut-short badge.
-      terminalBelongsToThisRun && ctrl !== null ? ctrl.terminalDisposition : null,
-    );
-    const recordConversationId = ctrl?.runConversationId ?? ctrl?.conversationId;
-    if (local.acknowledged && ctrl?.sessionId != null && recordConversationId != null) {
-      this.pendingRunRecords.set(local.turnId, {
-        local, runId: ctrl.sessionId, conversationId: recordConversationId,
-        ...(local.haltRequested
-          ? { doneGraceUntil: Date.now() + COMPLETED_RECORD_GRACE_MS } : {}),
-      });
-    }
-    // The live feed was ATTENTION; the record is what survives it. Refreshing at the terminal is what
-    // makes the yield happen (inventory D1): the settled turn re-renders from the canonical record's
-    // interleaved items instead of vanishing with the controller that produced them.
-    if (ctrl?.sessionId != null && recordConversationId != null) void this.refreshRecord(recordConversationId);
-  }
-
-  /** A typed prompt resolved by its OWN control — never by anything typed into the composer. */
-  private onRunDecision(event: Event): void {
-    const ctrl = this.agentController();
-    const detail = (event as CustomEvent<Sv3RunDecision>).detail;
-    if (ctrl === null || detail === undefined || this.preparedHandoff !== null || (this.sessions.activeId !== null && this.run?.sessionId !== this.sessions.activeId)) return;
-    if (detail.kind === 'budget') {
-      // B8 — RAISE is a different directive, not a third value of the gate's decision: the gate is
-      // resolved by finalize/stop, whereas raising extends the run's allowance and leaves the gate to
-      // clear itself (tempdoc 577 Ext III, `views/UnifiedChatView.ts:3748-3755`). Same seam either
-      // way — `dispatchRunControl` is the only way a directive leaves this window.
-      if (detail.decision === 'raise') {
-        // Tempdoc 859 §D §2.5 — the arm carries its OWN amount, already floored to clear this gate.
-        // The fixed 4,096-token step it replaced could be smaller than the shortfall, in which case
-        // the click resumed the loop straight into an immediate re-gate — visibly doing nothing.
-        const addTokens = detail.addTokens ?? 0;
-        if (addTokens <= 0) return;
-        if (detail.autoContinue === true && this.run !== null) {
-          // Remembered on the RUN, with the amount it applies to: one decision, one object, and it
-          // dies with the run rather than becoming a standing preference.
-          this.run.autoContinueTokens = addTokens;
-        }
-        void dispatchRunControl(ctrl, { kind: 'raise-budget', addTokens });
-        return;
-      }
-      if (detail.decision === 'stop') this.markHaltRequested();
-      void dispatchRunControl(ctrl, { kind: 'budget-decision', decision: detail.decision });
-      return;
-    }
-    if (detail.decision === 'stop') this.markHaltRequested();
-    void dispatchRunControl(ctrl, { kind: 'context-decision', decision: detail.decision });
-  }
-
-  /** A gate resolved with "stop" IS the reader halting, so the receipt must say so. */
-  private markHaltRequested(): void {
-    if (this.run !== null) this.run.haltRequested = true;
+    this.runDomain.steerLiveRun(text);
   }
 
   /**
    * The `answer` rung of the primary slot. The composer cannot resolve a typed prompt, so the control
    * does the one honest thing available to it: it takes the reader to the decision.
    */
-  private onComposerAnswer(): void {
+  private focusRunDecision(): void {
     const main = this.shadowRoot?.querySelector('jf-sv3-main');
     const prompt = main?.shadowRoot?.querySelector<HTMLElement>('[data-testid="sv3-run-prompt"]');
     if (prompt === null || prompt === undefined) return;
@@ -5597,12 +5050,12 @@ export class SearchV3View extends JfElement {
    * expression, rather than two expressions — the row's affordance and the list's refusal have to be
    * the same judgement or the reader gets offered a delete that silently does nothing.
    */
-  private runGate(run: Sv3RunView | null = this.projectRun()): Sv3RunGate {
+  private runGate(run: Sv3RunView | null = this.runDomain.snapshot()): Sv3RunGate {
     // `isRefining` counts too: the store runs a re-query BEHIND displayed results quietly
     // (`state/searchState.ts:611` — no skeleton, so the content surface keeps the old rows), and the
     // row's dot is then the only thing on screen saying the session is running a pass.
     const searching = this.search.busy;
-    const local = this.run;
+    const local = this.runDomain.run;
     // The render pass HANDS IN the projection it already made: projecting the feed a second time per
     // frame would be the same answer at twice the cost.
     const pendingPrompt = (run?.prompts.length ?? 0) > 0;
@@ -5686,10 +5139,7 @@ export class SearchV3View extends JfElement {
       this.placeTiers.delete(gone);
       this.recordReads.get(gone)?.abort();
       this.recordReads.delete(gone);
-      for (const [id, pending] of this.pendingRunRecords) {
-        if (pending.local.sessionId === gone) this.pendingRunRecords.delete(id);
-      }
-      if (this.pendingRunRecords.size === 0) this.clearRecordRetry();
+      this.runDomain.forgetConversation(gone);
       if (this.sessions.activeId === gone) this.resetToHero();
       if (readLastViewedConversation() === gone) clearLastViewedConversation();
       if (this.renamingId === gone) this.renamingId = null;
@@ -5791,8 +5241,7 @@ export class SearchV3View extends JfElement {
     // hosted by the product-wide controller and may be watched elsewhere, so this window stops
     // RENDERING it and never stops it. Dropping the local handle is also what keeps the composer's
     // slot honest: Send belongs in a fresh conversation, not a Stop for a run that is not in it.
-    this.run = null;
-    this.runLive = false;
+    this.runDomain.detach();
     this.renamingId = null;
     this.recordNotice = false;
     // The open document was a citation of THIS conversation's answer; it says nothing about the one
@@ -5826,43 +5275,7 @@ export class SearchV3View extends JfElement {
       this.askStop?.();
       return;
     }
-    this.haltRun();
-  }
-
-  /**
-   * TWO AXES, ONE PHASE. The SESSION axis is what the shared controller says; the
-   * TURN axis is what this window's own turn is doing — including the optimistic window before the
-   * server has acknowledged the dispatch, which no controller field can report because the controller
-   * is optimistic too. `deriveSv3RunPhase` collapses them into the one value everything renders from,
-   * so the slot, the feed, the sidebar colour and the receipt cannot each decide separately.
-   */
-  private projectRun(): Sv3RunView | null {
-    const local = this.run;
-    if (local === null) return null;
-    const ctrl = this.agentController();
-    const feed = ctrl === null ? SV3_RUN_FEED_EMPTY : projectSv3RunFeed(ctrl, local.entryStart);
-    const turn = sessionById(this.sessions, local.sessionId)?.turns.find(
-      (t) => t.id === local.turnId,
-    );
-    const prompts =
-      ctrl === null
-        ? []
-        : // Tempdoc 859 §D §2.4 — elapsed comes from the TURN's own `askedAt`, which the record
-          // carries too, so a gate met after a reload still says how long the run has been going.
-          // The clock is read HERE and passed in; the projection stays pure.
-          projectSv3RunPrompts(ctrl, feed, { askedAt: turn?.askedAt ?? null, now: Date.now() });
-    const turnState: Sv3RunTurnState =
-      turn === undefined || turn.status !== 'streaming'
-        ? 'settled'
-        : local.acknowledged
-          ? 'open'
-          : 'dispatching';
-    return {
-      turnId: local.turnId,
-      phase: deriveSv3RunPhase({ session: sv3RunSessionStatus(ctrl, feed), turn: turnState }),
-      feed,
-      prompts,
-    };
+    this.runDomain.haltRun();
   }
 
   /**
@@ -5907,9 +5320,9 @@ export class SearchV3View extends JfElement {
     const indexing = selectIndexingProgress(ai?.status, ai?.indexingStatusLive ?? false,
       ai?.episodeMaxPendingJobs ?? 0, ai?.enrichSettleSamples ?? []);
     const results = this.search.view(projectAvailability('documents', this.aiSnapshot, true));
-    const run = this.projectRun();
+    const run = this.runDomain.snapshot();
     const turns = activeTurns(this.sessions);
-    const visibleRun = !this.search.showing && (this.run?.sessionId === this.sessions.activeId || this.sessions.activeId === null && this.preparedHandoff === null) ? run : null;
+    const visibleRun = !this.search.showing && (this.runDomain.run?.sessionId === this.sessions.activeId || this.sessions.activeId === null && this.preparedHandoff === null) ? run : null;
     const pendingPrompt = visibleRun !== null && visibleRun.prompts.length > 0;
     const scope = this.search.showing || this.tier === 'structured' || this.preparedHandoff !== null || this.placeScopes.has(this.sessions.activeId ?? '') ? this.search.pendingScope : null;
     const slot = sv3PrimaryAction({
@@ -5917,7 +5330,7 @@ export class SearchV3View extends JfElement {
       running: this.isRunning(visibleRun),
       followUp: turns.length > 0,
       tier: this.tier,
-      steerable: this.steerableRun !== null,
+      steerable: this.runDomain.steerableRun !== null,
       delegateReady: this.delegateUnavailableReason === '',
       scoped: scope !== null,
     });
@@ -5987,10 +5400,10 @@ export class SearchV3View extends JfElement {
         @card-facet-toggle=${this.onCardFacetToggle}
         @card-scope-file=${this.onCardScopeFile}
         @sv3-composer-stop=${this.onComposerStop}
-        @sv3-composer-answer=${this.onComposerAnswer}
+        @sv3-composer-answer=${() => this.runDomain.answer()}
         @sv3-effort-change=${this.onEffortChange}
         @sv3-tier-change=${this.onTierChange}
-        @sv3-run-decision=${this.onRunDecision}
+        @sv3-run-decision=${(event: CustomEvent<Sv3RunDecision>) => this.runDomain.decide(event.detail)}
         @sv3-palette-request=${this.onPaletteRequest}
         @sv3-remedy=${this.onRemedy}
         @sv3-citation-open=${this.onCitationOpen}
@@ -6028,7 +5441,7 @@ export class SearchV3View extends JfElement {
           .structuredNotes=${new Map(turns.filter(t => t.shapeId === 'core.extract').map(t => [t.id, this.structuredNote(t.id)]))}
           .run=${visibleRun}
           .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
-          .unconfirmedSteerNotes=${this.unconfirmedSteerNotes}
+          .unconfirmedSteerNotes=${this.runDomain.unconfirmedSteerNotes}
           ?record-notice=${this.recordNotice}
           ?history-locked=${this.historyLocked}
           ?locked-refusal=${this.lockedRefusal}
@@ -6041,7 +5454,7 @@ export class SearchV3View extends JfElement {
           .continuationVersions=${this.continuationVersions()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
-          .stopping=${this.askStopping ?? this.runStopping()}
+          .stopping=${this.askStopping ?? this.runDomain.runStopping()}
           .checkingTurnId=${this.askCheckingTurnId}
           data-testid="sv3-main"
         ></jf-sv3-main>
@@ -6063,7 +5476,7 @@ export class SearchV3View extends JfElement {
           slot-kind=${slot.kind}
           slot-reason=${slot.reason}
           halt-reason=${slot.haltReason}
-          ?steerable=${this.steerableRun !== null}
+          ?steerable=${this.runDomain.steerableRun !== null}
           unavailable-reason=${this.retiredHandoffNotice || (this.handoffBlocked ? this.handoffNotice : this.askUnavailableReason)}
           delegate-unavailable-reason=${this.retiredHandoffNotice || this.delegateUnavailableReason}
           structured-unavailable-reason=${this.retiredHandoffNotice || this.structuredUnavailableReason}

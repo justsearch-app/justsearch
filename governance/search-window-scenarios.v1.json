@@ -1580,6 +1580,16 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
           "test": "CP1c %s clears at submission only after the draft write succeeds"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+          "test": "SW-RUN-01 dispatches the opened turn and settles duplicate terminals once"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "opens the delegated turn before a synchronous first notification and settles duplicate terminals once"
         }
       ]
     },
@@ -1641,6 +1651,11 @@
           "layer": "real-ui-fixture",
           "binding": null,
           "reason": "This flow observes the budget decision only; approval and context decision controls are not bound by this observation."
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+          "test": "renews the automatic continuation allowance when a replacement run starts at a held gate"
         }
       ]
     },
@@ -1786,6 +1801,11 @@
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
           "test": "reattaches when the live run conversation matches this tab"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+          "test": "SW-RUN-08 absence creates no run and reload adopts a matching live run once without navigation"
         }
       ]
     },
@@ -1833,6 +1853,11 @@
           "layer": "real-ui-fixture",
           "binding": null,
           "reason": "The replay flow does not observe stale requests against a replacement run."
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+          "test": "SW-RUN-09 duplicate approval requests share one lookup and stale details cannot prompt a replacement"
         }
       ]
     },
@@ -1878,6 +1903,11 @@
           "layer": "real-ui-fixture",
           "binding": null,
           "reason": "Unavailable approval details and cancellation of pending approvals when a run ends are not observed by this failed-answer flow."
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+          "test": "SW-RUN-10 a failed approval remains an approval error in the owner feed"
         }
       ]
     },
@@ -1974,6 +2004,11 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
           "test": "G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after %s"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+          "test": "SW-RUN-11 Stop preserves arriving prose and tools in both windows through the halted terminal"
         }
       ]
     },
