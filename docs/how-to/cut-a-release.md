@@ -89,12 +89,17 @@ Windows qualification builds; `sandboxTestMode`/`candidateVersion` are test-buil
 never release inputs. A signing rehearsal uses a real tag on a **throwaway patch version**;
 **never publish** its draft, and use a higher patch next time.
 
-Estimate: 30–90 minutes plus queues. The workflow creates one GitHub **draft**, nothing public:
+Estimate: 30–90 minutes plus queues. The workflow creates one private GitHub **draft** containing:
 SSL.com-signed NSIS, Ubuntu 24.04 x86_64 `.deb`, both updater artifact signatures,
 MCPB, signed descriptor v2, `latest.json`, compatibility registers, packaged smoke reports,
 `candidate.json`, saved build attestations (`provenance.sigstore.json`) and `SHA256SUMS`.
 The attestations cover the payloads and candidate inventory; the provenance bundle cannot
 attest itself. Every asset except `SHA256SUMS` itself is checksummed.
+
+The workflow's **Actions artifacts**, including the signed installers and candidate assets,
+are downloadable from this public repository before promotion, until they expire. The GitHub
+release stays a private draft; nothing is promoted or put on the update feed before
+`publish-release.yml`.
 
 A failed candidate is never re-tagged. Fix on main and use `vX.Y.(Z+1)`.
 For an upload-only failure, **Re-run failed jobs** on the same run reuses immutable signed
@@ -135,8 +140,103 @@ Keep the test list short:
 
 Follow the [VM harness README](../../scripts/release/qual/README.md) for ownership, resource
 limits and screen control, and the [journey README](../../scripts/release/qual/journeys/README.md)
-for exact `vm-run.py` (Wayland, then X11 J1), `vm-windows.py` and `gpu-host.py` commands,
-predecessor packages, update mirrors, tools and evidence inputs. Do not duplicate their setup.
+for tools and evidence inputs. Their test-key/rebuild procedure is **development-only**;
+release qualification uses the production-trusting packages and mirror below. Do not rebuild,
+re-sign, generate test signing keys or enable `JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE`.
+
+Both full VM lanes (Ubuntu Wayland and Windows) need a **lower-version, production-pinned,
+production-signed predecessor** for J5. Use the previous published release when it speaks
+descriptor v2 on both targets. For the first release after 0.3.0, use the **never-published
+signing-rehearsal draft** instead: for example, rehearsal `v0.3.1`, real candidate `v0.3.2`.
+Keep its original packages and signing/build evidence; never publish the rehearsal or use
+0.3.0 as the v2 predecessor. Download the selected predecessor separately and hash-check it:
+
+```bash
+# PREDECESSOR_TAG is the selected published v2 release or never-published rehearsal tag.
+mkdir -p "$QUAL/predecessor-assets"
+gh release download "$PREDECESSOR_TAG" --repo "$REPO" --dir "$QUAL/predecessor-assets"
+(cd "$QUAL/predecessor-assets" && sha256sum --check SHA256SUMS)
+# Set PREDECESSOR_DEB and PREDECESSOR_NSIS to those checked package paths.
+```
+
+Before running J5, check these constraints against the predecessor's tagged source/build
+evidence and the candidate's unchanged metadata:
+
+- The candidate version in `release.v2.json` and `latest.json` must match and be strictly
+  higher than the installed predecessor (the updater uses SemVer ordering).
+- [Sequence derivation](../../scripts/ci/derive-release-sequence.mjs) ignores drafts, so the
+  rehearsal and candidate may share a sequence. In the [updater](../../modules/shell/src-tauri/src/updater.rs),
+  a fresh predecessor install starts with `highest_accepted_sequence=0`; `validate_sequence`
+  rejects only a **lower** sequence, so equality is accepted even after an earlier check.
+  Use fresh predecessor state, not state from an unrelated newer update.
+- The predecessor must pin the production descriptor URL ending in `release.v2.json`,
+  metadata root public key and metadata key ID that authenticate the candidate. Keep
+  `OFFLINE_LONG_LIVED_V1`. The root-signed descriptor delegates each artifact's public key
+  and key ID; the updater uses that public key to verify the installer signature. Check the
+  candidate artifact key/public-key fields against its production build pins and signatures;
+  do not substitute test pins. Changing Actions variables cannot change an installed root.
+- The descriptor's `targets` and `latest.json`'s `platforms` must both contain
+  `windows-x86_64` (NSIS) and `linux-x86_64` (`.deb`). For each selected target, version,
+  artifact URL and signature must match across both files; the downloaded package must
+  match its descriptor hash/size. Its compatibility entries must also cover the predecessor's
+  embedded durable-store register, including owner, recovery strategy and readable format.
+
+These code rules permit the rehearsal path; they do not certify a particular package pair.
+If a pin, target, compatibility entry or sequence prevents the update, report J5 blocked
+with that exact mismatch; never edit signed metadata to make it pass.
+
+Populate `MIRROR="$QUAL/mirror"` from the **candidate draft's own hash-checked downloads**.
+Use their exact filenames and the paths in the signed descriptor's production URLs:
+
+```text
+mirror/
+  justsearch-app/justsearch/releases/latest/download/release.v2.json
+  justsearch-app/justsearch/releases/latest/download/release.v2.json.sig
+  justsearch-app/justsearch/releases/latest/download/latest.json
+  justsearch-app/justsearch/releases/download/vX.Y.Z/JustSearch_X.Y.Z_x64-setup.exe
+  justsearch-app/justsearch/releases/download/vX.Y.Z/JustSearch_X.Y.Z_amd64.deb
+```
+
+```bash
+# DEB and NSIS are absolute paths to the candidate packages in ASSETS.
+MIRROR="$QUAL/mirror"
+LATEST="$MIRROR/justsearch-app/justsearch/releases/latest/download"
+VERSIONED="$MIRROR/justsearch-app/justsearch/releases/download/$TAG"
+mkdir -p "$LATEST" "$VERSIONED"
+cp "$ASSETS/release.v2.json" "$ASSETS/release.v2.json.sig" "$ASSETS/latest.json" "$LATEST/"
+cp "$DEB" "$NSIS" "$VERSIONED/"
+# The sources passed SHA256SUMS; require byte-identical copies before use.
+for name in release.v2.json release.v2.json.sig latest.json; do
+  cmp "$ASSETS/$name" "$LATEST/$name" || exit 1
+done
+cmp "$DEB" "$VERSIONED/$(basename "$DEB")" || exit 1
+cmp "$NSIS" "$VERSIONED/$(basename "$NSIS")" || exit 1
+```
+
+The VM's generated test CA stands in **only for github.com TLS**. The mirror serves the
+unchanged production-signed metadata and packages; no release private key is needed.
+Run the lanes sequentially with separately prepared Linux/Windows tauri-driver tooling
+from the journey README (`LINUX_DRIVER`/`WINDOWS_DRIVER` below):
+
+```bash
+export QUAL_OWNER=release-qualification
+python3 scripts/release/qual/journeys/vm-run.py \
+  --session wayland --assets "$ASSETS" --package "$(basename "$DEB")" \
+  --registry "$QUAL/server.json" --predecessor "$PREDECESSOR_DEB" --mirror "$MIRROR" \
+  --driver "$LINUX_DRIVER" --evidence "$QUAL/wayland-evidence"
+# Then repeat J1 on X11; this lane needs no predecessor or mirror.
+python3 scripts/release/qual/journeys/vm-run.py \
+  --session x11 --assets "$ASSETS" --package "$(basename "$DEB")" \
+  --registry "$QUAL/server.json" --driver "$LINUX_DRIVER" --evidence "$QUAL/x11-evidence"
+windows_inputs=( \
+  --assets "$ASSETS" --package "$(basename "$NSIS")" --registry "$QUAL/server.json" \
+  --predecessor "$PREDECESSOR_NSIS" --mirror "$MIRROR" --driver "$WINDOWS_DRIVER" )
+python3 scripts/release/qual/journeys/vm-windows.py "${windows_inputs[@]}" \
+  --mode prepare --evidence "$QUAL/windows-tools-snapshot"
+python3 scripts/release/qual/journeys/vm-windows.py "${windows_inputs[@]}" \
+  --setup-snapshot "$QUAL/windows-tools-snapshot" --evidence "$QUAL/windows-evidence"
+```
+
 Use `gpu-host.py --source` with the exact tagged checkout and `--last-release` naming the
 last **published** release (local tags can include abandoned drafts):
 
