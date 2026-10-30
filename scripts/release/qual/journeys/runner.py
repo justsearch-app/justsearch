@@ -294,7 +294,10 @@ def wait_for(fn, description, seconds=90, interval=1, error=AssertionError):
 
 def redact(value):
     if isinstance(value, dict):
-        return {k: '<redacted>' if re.search('token|password|secret', k, re.I) else redact(v)
+        # Credential words and token suffixes exclude tokenize, tokens and tokenCount.
+        return {k: '<redacted>' if re.search(
+                    r'token(?:$|[\W_])|password|secret|api[\W_]*key|authorization|cookie', k, re.I)
+                else redact(v)
                 for k, v in value.items()}
     if isinstance(value, list):
         return [redact(v) for v in value]

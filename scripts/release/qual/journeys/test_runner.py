@@ -1,4 +1,5 @@
 """Harness checks; no app, display, network, shared VM or installed packages."""
+import copy
 import importlib.util
 import json
 from pathlib import Path
@@ -13,6 +14,62 @@ class RunnerTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('journey_runner', Path(__file__).with_name('runner.py'))
         self.r = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.r)
+
+    def test_evidence_preserves_tokenization_telemetry_on_linux_and_windows(self):
+        import windows
+        with tempfile.TemporaryDirectory() as tmp:
+            for lane, run_type in (('hosted-linux-x11', self.r.Run), ('vm-windows', windows.Run)):
+                args = types.SimpleNamespace(evidence=str(Path(tmp) / lane), vm=None, lane=lane)
+                run = run_type(args, {})
+                for timing in (0, 123, 2**63 - 1):
+                    profiles = {encoder: {'calls': 1, 'phaseTotalUs': {'tokenize': timing, 'ort': 456}}
+                                for encoder in ('embed', 'ner', 'splade')}
+                    status = {'lifecycle': {'state': 'READY'}, 'encoderProfiles': profiles,
+                              'tokens': [1, 2], 'tokenizer': 'model', 'tokenCount': 2}
+                    for shape, payload in (
+                            ('minimal', {'phaseTotalUs': {'tokenize': timing}}),
+                            ('status', status), ('nested', {'status': status}),
+                            ('observations', {'observations': [status, status]})):
+                        with self.subTest(lane=lane, timing=timing, shape=shape):
+                            run.evidence('telemetry', payload)
+                            saved = json.loads((run.out / 'telemetry.json').read_text())
+                            self.assertEqual(saved, payload)
+
+    def test_evidence_redacts_whole_credential_values_at_every_depth(self):
+        keys = ('token', 'TOKEN', 'sessionToken', 'access_token', 'bearer token',
+                'refresh-token', 'token_value', 'PASSWORD', 'dbPassword', 'clientSecret',
+                'SECRET', 'api key', 'API_KEY', 'apiKey', 'api-key',
+                'authorization', 'AuthorizationHeader', 'cookie', 'sessionCookie')
+        with tempfile.TemporaryDirectory() as tmp:
+            args = types.SimpleNamespace(evidence=str(Path(tmp) / 'evidence'), vm=None,
+                                         lane='hosted-linux-x11')
+            run = self.r.Run(args, {})
+            for credential in ('sensitive', 0, 123, {'value': 'sensitive'}, ['sensitive'], None):
+                fields = dict.fromkeys(keys, credential)
+                expected = dict.fromkeys(keys, '<redacted>')
+                payload = {**fields, 'nested': {'fields': fields}, 'observations': [fields]}
+                with self.subTest(credential=credential):
+                    run.evidence('credentials', payload)
+                    saved = json.loads((run.out / 'credentials.json').read_text())
+                    self.assertEqual(saved, {**expected, 'nested': {'fields': expected},
+                                             'observations': [expected]})
+
+    def test_evidence_preserves_input_and_unrelated_values(self):
+        payload = {'sessionToken': {'value': 'sensitive'},
+                   'nested': [{'clientSecret': ['sensitive'], 'name': 'visible'},
+                              None, 0, False, 'token password secret'],
+                   'status': {'ready': True, 'ratio': 1.25, 'empty': []}}
+        original = copy.deepcopy(payload)
+        expected = copy.deepcopy(payload)
+        expected['sessionToken'] = '<redacted>'
+        expected['nested'][0]['clientSecret'] = '<redacted>'
+        with tempfile.TemporaryDirectory() as tmp:
+            args = types.SimpleNamespace(evidence=str(Path(tmp) / 'evidence'), vm=None,
+                                         lane='hosted-linux-x11')
+            run = self.r.Run(args, {})
+            run.evidence('unchanged', payload)
+            self.assertEqual(payload, original)
+            self.assertEqual(json.loads((run.out / 'unchanged.json').read_text()), expected)
 
     def test_windows_webdriver_profile_option_and_default_linux_request(self):
         from unittest.mock import Mock
