@@ -351,11 +351,12 @@ final class WorkerScanOps {
     String coll = collection == null || collection.isBlank() ? null : collection;
     if (recordedEpoch != null) beforeRecordedAdmission.run();
     String candidateGeneration = migratingGeneration.get();
+    boolean maintenance = candidateGeneration == null && recordedEpoch == null
+        && mode == ScanMode.INITIAL && batch.stream().allMatch(entry ->
+            entry.provenance() != null && "system".equals(entry.provenance().originator())
+                && "SYSTEM_INTERNAL".equals(entry.provenance().transport()));
     int accepted;
     if (candidateGeneration == null) {
-      boolean maintenance = mode == ScanMode.INITIAL && batch.stream().allMatch(entry ->
-          entry.provenance() != null && "system".equals(entry.provenance().originator())
-              && "SYSTEM_INTERNAL".equals(entry.provenance().transport()));
       String normalizedScan = scanId == null || scanId.isBlank() ? null : scanId;
       accepted = recordedEpoch != null
           ? jobQueue.enqueueRecordedEntries(scanId, recordedEpoch, List.copyOf(batch), coll)
@@ -371,7 +372,7 @@ final class WorkerScanOps {
     } else {
       throw WorkerServiceException.unavailable("CANDIDATE_JOURNAL_UNAVAILABLE");
     }
-    if (accepted != batch.size()) {
+    if (accepted < 0 || accepted > batch.size() || (!maintenance && accepted != batch.size())) {
       throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
     }
     counters[1] += accepted;

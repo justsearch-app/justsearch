@@ -80,7 +80,7 @@ final class SqliteQueueSwitchBufferOps {
     this.errorRecorder = errorRecorder;
   }
 
-  /** Returns the number of buffered ops currently in the durable switch buffer (best-effort). */
+  /** Returns the buffered count, or throws when the observation is unavailable. */
   long depth() {
     lock.lock();
     try {
@@ -94,20 +94,16 @@ final class SqliteQueueSwitchBufferOps {
       }
     } catch (SQLException e) {
       errorRecorder.run();
-      log.debug("Failed to get switch buffer depth (best-effort): {}", e.getMessage());
-      return 0L;
+      throw new io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException(
+          "Cannot read switch buffer depth", e);
     } finally {
       lock.unlock();
     }
   }
 
-  /** Returns best-effort counts for PENDING/PROCESSING/DONE/FAILED and PENDING runnable subset. */
+  /** Returns state and runnable counts, or throws when the observation is unavailable. */
   JobQueue.JobStateCounts stateCounts() {
-    try { return stateCountsStrict(); }
-    catch (IllegalStateException unreadable) {
-      log.debug("Failed to get job state counts (best-effort): {}", unreadable.getMessage());
-      return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
-    }
+    return stateCountsStrict();
   }
 
   /** Exact drain count; SQLite read failures must block generation promotion. */
@@ -143,7 +139,7 @@ final class SqliteQueueSwitchBufferOps {
       }
     } catch (SQLException e) {
       errorRecorder.run();
-      throw new IllegalStateException("Failed to get job state counts", e);
+      throw new io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException("Failed to get job state counts", e);
     } finally {
       lock.unlock();
     }
@@ -405,13 +401,9 @@ final class SqliteQueueSwitchBufferOps {
     }
   }
 
-  /** Returns retained buffered ops in SQLite's serialized admission order (best-effort). */
+  /** Returns retained buffered ops in admission order, or throws if they cannot be read. */
   List<SwitchBufferCapableQueue.SwitchBufferOp> listAll() {
-    try { return listAllStrict(); }
-    catch (IllegalStateException unreadable) {
-      log.error("Failed to read switch buffer ops", unreadable);
-      return List.of();
-    }
+    return listAllStrict();
   }
 
   /**
@@ -459,7 +451,7 @@ final class SqliteQueueSwitchBufferOps {
       return out;
     } catch (SQLException e) {
       errorRecorder.run();
-      throw new IllegalStateException("Failed to read switch buffer ops", e);
+      throw new io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException("Failed to read switch buffer ops", e);
     } finally {
       lock.unlock();
     }

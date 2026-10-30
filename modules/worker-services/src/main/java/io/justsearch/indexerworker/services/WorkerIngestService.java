@@ -4735,7 +4735,7 @@ public final class WorkerIngestService {
       Path path = Path.of(pathStr);
       var outcome =
           io.justsearch.indexerworker.ingest.IngestionOutcome.of(
-              io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_PARTIAL,
+              io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SKIPPED_POLICY,
               "CANCELLED",
               io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE,
               "cancelled via core.cancel-indexing-job");

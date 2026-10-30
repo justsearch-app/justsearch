@@ -229,11 +229,13 @@ final class RecordedWalkAuthorityTest {
       queue.open();
       assertEquals(0, queue.recoverStuckJobs(), "denied authority keeps processing fenced");
       permitted.set(true);
+      try(var stmt=JobCountsTest.connection(queue).createStatement()) {
+        stmt.executeUpdate("UPDATE jobs SET last_updated=1 WHERE state='PROCESSING'");
+      }
       queue.heartbeatProcessing();
-      assertEquals(0, queue.recoverStuckJobs(60_000),
-          "a recent heartbeat must stay outside the aged recovery window");
-      assertEquals(1, queue.recoverStuckJobs(),
-          "unconditional recovery must revive an authorized heartbeated row");
+      assertEquals(1, queue.recoverStuckJobs(60_000),
+          "an unrelated heartbeat cannot renew a restart orphan");
+      assertEquals(0, queue.recoverStuckJobs(), "the orphan was already recovered");
       assertEquals(1, queue.pollPending(1).size());
     }
   }

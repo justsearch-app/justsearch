@@ -1191,6 +1191,22 @@ final class RecordedBulkIngestionCoordinatorTest {
     }
   }
 
+  @Test
+  void bulkPermissionGrantInvalidatesClaimsBeforeAttemptingOrphanRecovery() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("bulk-grant"))) {
+      JobQueue observed = mock(JobQueue.class, org.mockito.AdditionalAnswers.delegatesTo(harness.queue));
+      harness.queue = observed;
+      harness.replacePhysical(buildingRuntime(harness.key));
+      harness.coordinator.maintain();
+      var calls = org.mockito.Mockito.mockingDetails(observed).getInvocations().stream()
+          .map(call -> call.getMethod().getName())
+          .filter(name -> name.equals("recordedClaimAuthorityChanged") || name.equals("recoverStuckJobs"))
+          .toList();
+      assertEquals(List.of("recordedClaimAuthorityChanged", "recoverStuckJobs"), calls);
+      assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE, harness.coordinator.recordedClaimDecision(harness.key));
+    }
+  }
+
   private static void assertAcknowledged(JobQueue queue, String key) {
     JobQueue.WalkProgress walk = queue.recordedWalk(key).orElseThrow();
     assertNotNull(walk.sealedAt());

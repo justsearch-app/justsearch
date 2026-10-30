@@ -190,9 +190,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
     Objects.requireNonNull(identities, "identities");
     lock.lock();
     try {
-      boolean wasAutoCommit = openConnection().getAutoCommit();
-      openConnection().setAutoCommit(false);
-      try {
+      return inTransaction(() -> {
         int inserted = 0;
         for (ImportedIdentity identity : identities) {
           Objects.requireNonNull(identity, "identity");
@@ -202,14 +200,8 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
             inserted++;
           }
         }
-        openConnection().commit();
         return inserted;
-      } catch (SQLException | RuntimeException e) {
-        openConnection().rollback();
-        throw e;
-      } finally {
-        openConnection().setAutoCommit(wasAutoCommit);
-      }
+      });
     } catch (SQLException e) {
       throw failure("importExistingBatch", "<active-index-snapshot>", e);
     } finally {
@@ -332,9 +324,7 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
             : RekeyResult.NOT_FOUND;
       }
 
-      boolean wasAutoCommit = openConnection().getAutoCommit();
-      openConnection().setAutoCommit(false);
-      try {
+      return inTransaction(() -> {
         // Identity rows deliberately have no GC. A valid rename onto a historically-used path
         // therefore makes the moving source authoritative and replaces that stale destination.
         try (PreparedStatement delete =
@@ -357,18 +347,57 @@ public final class SqliteDocumentIdentityStore implements DocumentIdentityStore,
                 "Document identity rekey did not update exactly one row for " + oldPathHash);
           }
         }
-        openConnection().commit();
         return RekeyResult.MOVED;
-      } catch (SQLException | RuntimeException e) {
-        openConnection().rollback();
-        throw e;
-      } finally {
-        openConnection().setAutoCommit(wasAutoCommit);
-      }
+      });
     } catch (SQLException e) {
       throw failure("rekey", oldPathHash, e);
     } finally {
       lock.unlock();
+    }
+  }
+
+  @FunctionalInterface
+  private interface SqlWork<T> {
+    T run() throws SQLException;
+  }
+
+  private <T> T inTransaction(SqlWork<T> work) throws SQLException {
+    Connection conn = openConnection();
+    boolean wasAutoCommit = conn.getAutoCommit();
+    T result;
+    try {
+      conn.setAutoCommit(false);
+      result = work.run();
+      conn.commit();
+    } catch (SQLException | RuntimeException | Error failure) {
+      boolean rolledBack = false;
+      try { conn.rollback(); rolledBack = true; }
+      catch (SQLException | RuntimeException | Error rollbackFailure) {
+        if (failure != rollbackFailure) failure.addSuppressed(rollbackFailure);
+        disposeConnection(conn, failure);
+      }
+      if (rolledBack) {
+        try { conn.setAutoCommit(wasAutoCommit); }
+        catch (SQLException | RuntimeException | Error cleanupFailure) {
+          if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
+          disposeConnection(conn, failure);
+        }
+      }
+      throw failure;
+    }
+    try { conn.setAutoCommit(wasAutoCommit); }
+    catch (SQLException | RuntimeException | Error cleanupFailure) {
+      disposeConnection(conn, cleanupFailure);
+      throw cleanupFailure;
+    }
+    return result;
+  }
+
+  private void disposeConnection(Connection conn, Throwable failure) {
+    closed = true;
+    try { conn.close(); }
+    catch (SQLException | RuntimeException | Error closeFailure) {
+      if (failure != closeFailure) failure.addSuppressed(closeFailure);
     }
   }
 

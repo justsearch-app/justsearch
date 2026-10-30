@@ -73,6 +73,51 @@ final class WorkerIngestServiceTest {
   }
 
   @Test
+  void unreadableQueueCannotProduceHealthyStatusOrEmptyOutcomeSummaries() throws Exception {
+    jobQueue.enqueue(List.of(tempDir.resolve("populated.txt")));
+    try(var raw=DriverManager.getConnection("jdbc:sqlite:"+tempDir.resolve("jobs.db"));var stmt=raw.createStatement()) {
+      stmt.execute("ALTER TABLE job_counts RENAME TO unreadable_counts");
+      var status=service.indexStatus(StatusRequest.getDefaultInstance(),CallContext.none());
+      assertFalse(status.getCore().getIsHealthy());assertEquals("ERROR",status.getCore().getState());
+      assertThrows(IllegalStateException.class,()->service.listFailedJobs(io.justsearch.ipc.ListFailedJobsRequest.getDefaultInstance(),CallContext.none()));
+      stmt.execute("ALTER TABLE unreadable_counts RENAME TO job_counts");
+      stmt.execute("ALTER TABLE ingestion_ledger RENAME TO unreadable_ledger");
+      assertThrows(IllegalStateException.class,()->service.ingestionOutcomeSummary(io.justsearch.ipc.IngestionOutcomeSummaryRequest.getDefaultInstance(),CallContext.none()));
+      stmt.execute("ALTER TABLE unreadable_ledger RENAME TO ingestion_ledger");
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings={"pending", "retry", "recorded"})
+  void cancelThroughServiceRecordsSkippedOutcomeAndStopsPendingWork(String kind) throws Exception {
+    Path path = tempDir.resolve("cancel.txt");
+    String hash = io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(path.toString());
+    try (var resolutions = new io.justsearch.indexerworker.queue.SqlitePathResolutionStore(tempDir.resolve("jobs.db"))) {
+      resolutions.record(hash, path.toString(), System.currentTimeMillis());
+      service.setPathResolutionStore(resolutions);
+      if (kind.equals("recorded")) {
+        var walk = jobQueue.beginRecordedWalk("cancel-walk", "a".repeat(64), true);
+        jobQueue.enqueueRecordedEntries("cancel-walk", walk.enumerationEpoch(), List.of(new JobQueue.EnqueueEntry(path,1)),null);
+      } else {
+        jobQueue.enqueue(List.of(path));
+        if (kind.equals("retry")) jobQueue.markFailed(path,
+            io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                io.justsearch.indexerworker.ingest.IngestionOutcomeClass.IO_FAILED,"TEST",
+                io.justsearch.indexerworker.ingest.IngestionRetryPolicy.RETRY_WITH_BACKOFF));
+      }
+      var request = io.justsearch.ipc.CancelIndexingJobRequest.newBuilder().setPathHash(hash).build();
+      assertTrue(service.cancelIndexingJob(request,CallContext.none()).getCancelled());
+      assertTrue(service.cancelIndexingJob(request,CallContext.none()).getCancelled());
+      assertEquals(0,jobQueue.queueDepth());
+      assertTrue(jobQueue.pollPending(1).isEmpty());
+      var events=jobQueue.recentIngestionEvents(100);
+      assertEquals("SKIPPED_POLICY",events.getFirst().outcomeClass());
+      assertEquals("CANCELLED",events.getFirst().reasonCode());
+      assertEquals("NONE",events.getFirst().retryPolicy());
+    }
+  }
+
+  @Test
   void submitBatchAcceptsExistingFiles() throws Exception {
     // Create real files for the test
     Path file1 = tempDir.resolve("file1.txt");

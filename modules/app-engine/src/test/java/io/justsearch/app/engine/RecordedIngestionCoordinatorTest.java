@@ -64,6 +64,29 @@ final class RecordedIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   @TempDir Path temp;
 
+  @Test
+  void childPermissionGrantInvalidatesClaimsBeforeAttemptingOrphanRecovery() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      f.attachment.close();
+      JobQueue observed = org.mockito.Mockito.mock(JobQueue.class,
+          org.mockito.AdditionalAnswers.delegatesTo(f.queue));
+      f.attachment = f.coordinator.attach(observed, () -> Optional.of(GENERATION), () -> true);
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) ->
+          CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE));
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        f.coordinator.maintain();
+        var calls = org.mockito.Mockito.mockingDetails(observed).getInvocations().stream()
+            .map(call -> call.getMethod().getName())
+            .filter(name -> name.equals("recordedClaimAuthorityChanged") || name.equals("recoverStuckJobs"))
+            .toList();
+        assertEquals(List.of("recordedClaimAuthorityChanged", "recoverStuckJobs"), calls);
+      }
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer(boolean reindex) throws Exception {

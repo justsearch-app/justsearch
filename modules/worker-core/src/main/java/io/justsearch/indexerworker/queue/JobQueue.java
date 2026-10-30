@@ -477,7 +477,10 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Exact collection enqueue is unavailable");
   }
 
-  /** Automatic discovery keeps terminal failures and parser/I/O waits; explicit retries use normal admission. */
+  /**
+   * Automatic discovery keeps terminal failures and parser/I/O waits; explicit retries use normal admission.
+   * Returns actual changed rows. Failures must throw so callers can distinguish preserved no-ops.
+   */
   default int enqueueMaintenanceScanEntries(List<EnqueueEntry> entries, String collection, String scanId) {
     return enqueueEntries(entries, collection, scanId);
   }
@@ -787,6 +790,9 @@ public interface JobQueue extends Closeable {
         "Typed defer requires an outcome-aware queue implementation");
   }
 
+  /** Reconsider skipped recorded units after their owner's authority changes. */
+  default void recordedClaimAuthorityChanged(String operationKey) {}
+
   /**
    * Recovers any jobs that were stuck in PROCESSING state (e.g., after a crash).
    *
@@ -811,7 +817,7 @@ public interface JobQueue extends Closeable {
   }
 
   /**
-   * Heartbeat: refresh {@code last_updated} on every row currently in PROCESSING, signalling that a
+   * Heartbeat: refresh {@code last_updated} only on exact issued PROCESSING units, signalling that a
    * live owner (the indexing loop) is still actively draining them (tempdoc 575 §4.3b / 550 Thesis II —
    * the liveness invariant: "in-flight" derives from a live owner, not mere stream membership). The
    * indexing loop calls this at batch phase boundaries + time-gated during the write loop, so a

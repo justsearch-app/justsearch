@@ -66,6 +66,7 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   /** Failure identities in emission order; PROCESSING identities are never evicted. */
   private final LinkedHashMap<Long, String> failedRows = new LinkedHashMap<>();
   private boolean pendingResync;
+  private boolean resyncRequired;
   private Set<String> presentStates = Set.of();
   private final Set<String> enteredStates = new HashSet<>();
   private final Set<String> leftStates = new HashSet<>();
@@ -373,25 +374,24 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
         enteredStates.clear();
         leftStates.clear();
       } catch (SQLException failure) {
-        throw new IllegalStateException("Cannot refresh queue state presence", failure);
+        requireResync(failure);
       }
     }
     int commitStart = committed.size();
     // Freeze rows now: a later committed chunk or a reentrant subscriber may replace/delete them.
     for (PendingChange change : snapshot) {
-      Delta delta = materialize(change);
-      if (delta != null) committed.add(new CommittedDelta(seq.incrementAndGet(), delta));
+      try {
+        Delta delta = materialize(change);
+        if (delta != null) committed.add(new CommittedDelta(seq.incrementAndGet(), delta));
+      } catch (SQLException failure) {
+        requireResync(failure);
+      }
     }
     if (pendingResync) {
       pendingResync = false;
-      try {
-        List<JobRow> rows = readWindow();
-        presentStates = readPresentStates();
-        committed.add(new CommittedDelta(seq.incrementAndGet(), new Delta.Resync(rows, presentStates)));
-      } catch (SQLException e) {
-        throw new IllegalStateException("Cannot resynchronize indexing jobs window", e);
-      }
+      resyncRequired = true;
     }
+    if (resyncRequired) tryResync();
     if (!beforeStates.equals(presentStates) && committed.size() > commitStart) {
       int last = committed.size() - 1;
       CommittedDelta change = committed.get(last);
@@ -402,6 +402,25 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
         case Delta.Resync resync -> new Delta.Resync(resync.items(), presentStates);
       };
       committed.set(last, new CommittedDelta(change.sequence(), delta));
+    }
+  }
+
+  private void requireResync(SQLException failure) {
+    resyncRequired = true;
+    log.warn("Committed indexing jobs projection requires resync: {}", failure.getMessage());
+  }
+
+  private void tryResync() {
+    try {
+      List<JobRow> rows = readWindow();
+      Set<String> states = readPresentStates();
+      presentStates = states;
+      committed.add(new CommittedDelta(seq.incrementAndGet(), new Delta.Resync(rows, states)));
+      resyncRequired = false;
+      enteredStates.clear();
+      leftStates.clear();
+    } catch (SQLException failure) {
+      requireResync(failure);
     }
   }
 
@@ -422,6 +441,8 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   void drainCommitted() {
     if (closed || !draining.compareAndSet(false, true)) return;
     try {
+      // Idle polls and read-only observations also drain; recovery needs no later mutation.
+      if (resyncRequired) tryResync();
       while (!committed.isEmpty() && !closed) {
         List<CommittedDelta> batch = List.copyOf(committed);
         committed.clear();
@@ -450,7 +471,7 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
     }
   }
 
-  private Delta materialize(PendingChange change) {
+  private Delta materialize(PendingChange change) throws SQLException {
     long rowId = change.rowId;
     return switch (change.type) {
       case INSERT -> {
@@ -508,7 +529,7 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
     return "FAILED".equals(state) || "RETRY_EXHAUSTED".equals(state);
   }
 
-  private JobRow readRowByRowId(long rowId) {
+  private JobRow readRowByRowId(long rowId) throws SQLException {
     String sql =
         "SELECT path, state, attempts, last_updated, error_message, retry_after, collection, scan_id "
             + "FROM jobs WHERE rowid = ?";
@@ -519,8 +540,6 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
           return rowFromResultSet(rs);
         }
       }
-    } catch (SQLException e) {
-      log.warn("readRowByRowId({}) failed: {}", rowId, e.getMessage());
     }
     return null;
   }

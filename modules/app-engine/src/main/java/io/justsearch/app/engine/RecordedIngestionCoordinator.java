@@ -1043,7 +1043,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           child.retryEnumeration = false;
         }
         Permission previous = permissions.put(row.key(), new Permission(physical, parent.row, parent.preparation, child.plan, child.fresh, parent));
-        if (previous == null) physical.queue.recoverStuckJobs();
+        if (previous == null) {
+          physical.queue.recordedClaimAuthorityChanged(row.key());
+          physical.queue.recoverStuckJobs();
+        }
         if (observed.isEmpty() || observed.orElseThrow().enumerationClosedAt() == null) {
           if (child.exit == null) {
             if (physical.producer == null) return;
@@ -1816,7 +1819,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         }
         bulk.ready = true;
         Bulk previous = bulkPermissions.put(row.key(), bulk);
-        if (previous == null) physical.queue.recoverStuckJobs();
+        if (previous == null) {
+          physical.queue.recordedClaimAuthorityChanged(row.key());
+          physical.queue.recoverStuckJobs();
+        }
       }
     } catch (IOException unavailable) {
       bulkPermissions.remove(row.key());
