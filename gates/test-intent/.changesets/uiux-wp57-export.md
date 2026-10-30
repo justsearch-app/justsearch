@@ -75,3 +75,16 @@ cancellation cannot be observed by the existing blob-anchor API; receipts say on
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18c3b-d85e-7aa3-99b2-cc6e40366cf8",
+  "verdict": "accept",
+  "digest": "sha256:ab6bb3bd65f0cee58d68ef38adf54b0fd9a6f69650206c020e38e8e2d44d486e",
+  "note": "Codex verifier-1 on 6cd94ac175: test-intent audit ACCEPT (classifications honest, fail-before by assertion, evidence real); no export defect. Real-model recheck verifier-2 passed S57.2, S57.3, S57.7; S57.1 Delegate sources lack line locations upstream (export says 'line location not reported')."
+}
+```
