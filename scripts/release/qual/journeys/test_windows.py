@@ -559,7 +559,7 @@ class WindowsUpdateAndCrashTests(unittest.TestCase):
     def test_cached_j4_preserves_checkpoint_bookmark_instead_of_reauthoring(self):
         bookmark={'id':'fixture-id','label':'Library','url':'app://library'}
         run=Mock(args=SimpleNamespace(resume='checkpoint.json'),
-                 facts={'authored':True,'bookmark':bookmark,'beforeState':{'retained':True}})
+                 facts={'ui':True,'folder':True,'authored':True,'bookmark':bookmark,'beforeState':{'retained':True}})
         run.require.side_effect=lambda key:run.facts[key]
         run.wd.click.side_effect=Infrastructure('Bookmark this view absent because already bookmarked')
         with patch.object(linux,'stored_bookmarks',return_value=[bookmark]), \
