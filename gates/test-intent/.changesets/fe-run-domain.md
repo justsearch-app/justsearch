@@ -85,3 +85,13 @@ author-session: fe-run-domain
   "digest": "sha256:de7bc943835470af0ac3de76328f0ae29a98eb535c0ec99d9607481c2ebacc6f"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-io9qbaps",
+  "verdict": "accept",
+  "digest": "sha256:de7bc943835470af0ac3de76328f0ae29a98eb535c0ec99d9607481c2ebacc6f"
+}
+```
