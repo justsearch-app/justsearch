@@ -289,11 +289,15 @@ the GPU. The remainder of `/run` is hidden by an empty read-only mount, except
 Product Rust/Java sources contain no explicit system-bus request. The shell
 uses GTK/WebKit through Tauri (`modules/shell/src-tauri/Cargo.toml`); its locked
 Linux single-instance, notification and Tao portal implementations use the
-private session bus. A real bus-hidden J1/J2 attempt on this host stopped before
-candidate launch: `dbus-update-activation-environment` reported
-`Failed to query AppArmor policy: Read-only file system`. J1/J2 without the
-system bus remain unverified; the endpoint stays reachable for this host's
-session D-Bus policy query. No other host service socket is restored.
+private session bus. That bus uses a `session.conf` generated in private state
+and copied into the attempt evidence, with AppArmor mediation disabled for
+this private bus only. It uses EXTERNAL authentication and the normal session
+service directories, without importing host bus policy. The host's default
+session configuration fails its AppArmor policy query with the read-only root;
+the private configuration permits activation-environment updates without any
+additional writable host path. The existing read-only `/run/dbus` binding is
+retained; J1/J2 with it hidden remain unverified. No other host service socket
+is restored.
 The owner's home
 remains hidden and only explicit lane inputs are restored there.
 
@@ -401,7 +405,14 @@ lane's private state, including downloaded llama-server runtimes, are product
 executables. Crash evidence retains host PID, namespace PIDs and start ticks
 when supplied by the journal. SIGTERM and SIGINT run the same process/state
 cleanup, owner metadata comparison and final write accounting as other
-interruptions. As with hosted Linux,
+interruptions. Before removing private state, the host subreaper stops every
+descendant, including extraction tools started before the sandbox: SIGTERM,
+up to 10 seconds to exit, then SIGKILL and an exit/reap barrier. The tree is
+rescanned during shutdown to include newly forked and adopted descendants.
+A process that still cannot exit fails cleanup and retains state. State removal
+is retried once after the barrier; failures report the remaining paths in
+`private-state-cleanup.json` and the summary. `host-process-stop.json` records
+the shutdown identities and signals. As with hosted Linux,
 native crash collection is currently unproven and always adds an
 `owner-validation` row; even otherwise passing results are therefore
 `passed-pending-owner-validation` (exit 2). A crash or unavailable check still

@@ -40,7 +40,7 @@ def mount_device(root):
 
 
 @contextlib.contextmanager
-def private_root(resume=None):
+def private_root(resume=None, *, evidence=None):
     if resume:
         root = resume.resolve()
         if (root.parent != PRIVATE_ROOTS or not root.name.startswith('w4c-gpu-')
@@ -52,8 +52,33 @@ def private_root(resume=None):
     try:
         yield root
     finally:
+        # This covers setup too, before a sandbox Popen/identity exists. The
+        # host is a subreaper: extraction grandchildren orphaned by a dying
+        # dpkg-deb are still our descendants and must exit before any removal.
+        stopped = stop_lane_processes()
+        if evidence:
+            evidence.mkdir(exist_ok=True)
+            save(evidence / 'host-process-cleanup.json', stopped)
         if not (root / 'keep-state').exists():
-            shutil.rmtree(root)
+            errors = []
+            for _ in range(2):
+                try:
+                    shutil.rmtree(root)
+                    break
+                except FileNotFoundError:
+                    if not root.exists():
+                        break
+                    errors.append('A path vanished during private state removal')
+                except OSError as exc:
+                    errors.append(str(exc))
+                stop_lane_processes()  # Retry only after the exit/reap barrier.
+            remaining = sorted(map(str, [root, *root.rglob('*')])) if root.exists() else []
+            cleanup = {'privateRoot': str(root), 'errors': errors, 'remainingPaths': remaining}
+            if evidence:
+                save(evidence / 'private-state-cleanup.json', cleanup)
+            if remaining:
+                raise runner.Infrastructure('Private state cleanup failed after retry: '
+                                            + json.dumps(cleanup))
 
 
 def desktop_proof(env, *, tmp=Path('/tmp'), runtime=None):
@@ -182,8 +207,8 @@ def sandbox_command(root, evidence, readonly, command):
             '--tmpfs', '/tmp', '--tmpfs', '/run/user/' + str(os.getuid()),
             '--dev-bind', '/dev', '/dev', '--proc', '/proc',
             '--bind', str(root), str(root), '--bind', str(evidence), str(evidence)]
-    # On this host session D-Bus's AppArmor policy query fails before product
-    # launch without this endpoint. No direct product system-bus API was found.
+    # Retain the existing system endpoint binding. The private session bus has
+    # its own policy; it no longer relies on the host's session configuration.
     if Path('/run/dbus').is_dir():
         args += ['--ro-bind', '/run/dbus', '/run/dbus']
     for path in dict.fromkeys(map(Path, readonly)):
@@ -210,6 +235,79 @@ def descendants(root_identity, known):
         if more == owned:
             return [r for r in rows if r['pid'] in owned]
         owned = more
+
+
+def stop_lane_processes():
+    """Stop/reap every host descendant, including tools started before bwrap.
+
+    Rescan while stopping, because children can fork or be adopted by this
+    subreaper during teardown. PID/start ticks are checked before each signal.
+    A stuck process fails cleanup; its private files must not be removed.
+    """
+    pid = os.getpid()
+    ticks = Path('/proc', str(pid), 'stat').read_text().rsplit(') ', 1)[1].split()[19]
+    known, sent = {}, set()
+    signals = []
+    def rows():
+        # Reap children, including adopted grandchildren, before deciding the
+        # tree is empty. No subprocess is launched by this cleanup routine.
+        while True:
+            try:
+                if os.waitpid(-1, os.WNOHANG)[0] == 0:
+                    break
+            except ChildProcessError:
+                break
+        current = [r for r in descendants((pid, ticks), known) if r['pid'] != pid]
+        known.update({(r['pid'], r['ticks']): r for r in current})
+        return current
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        deadline = time.monotonic() + 10
+        while True:
+            current = rows()
+            if not current:
+                return {'observedProcesses': list(known.values()), 'signals': signals, 'remainingProcesses': []}
+            for row in current:
+                identity = (row['pid'], row['ticks'], sig)
+                if identity in sent:
+                    continue
+                try:
+                    fields = Path('/proc', str(row['pid']), 'stat').read_text().rsplit(') ', 1)[1].split()
+                    if fields[19] == row['ticks'] and fields[0] != 'Z':
+                        os.kill(row['pid'], sig)
+                        sent.add(identity)
+                        signals.append({**row, 'signal': signal.Signals(sig).name})
+                except (FileNotFoundError, ProcessLookupError):
+                    pass
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(.05)
+    remaining = rows()
+    if remaining:
+        raise runner.Infrastructure('Lane descendants did not exit after SIGKILL; state retained: '
+                                    + json.dumps(remaining))
+    return {'observedProcesses': list(known.values()), 'signals': signals, 'remainingProcesses': []}
+
+
+def session_bus_config(root):
+    # No host policy includes: this bus carries only the lane's private PID
+    # namespace. The host default's AppArmor policy query fails with a read-only
+    # root, so disable mediation on this bus, leaving all mounts sealed.
+    config = root / 'session.conf'
+    config.write_text('''<busconfig>
+  <type>session</type>
+  <keep_umask/>
+  <listen>unix:tmpdir=/tmp</listen>
+  <auth>EXTERNAL</auth>
+  <apparmor mode="disabled"/>
+  <standard_session_servicedirs/>
+  <policy context="default">
+    <allow send_destination="*" eavesdrop="true"/>
+    <allow eavesdrop="true"/>
+    <allow own="*"/>
+  </policy>
+</busconfig>
+''')
+    return config
 
 
 def sandbox_session(forwarded):
@@ -239,8 +337,10 @@ def sandbox_session(forwarded):
             time.sleep(.3)
             if mirror.poll() is not None:
                 raise runner.Infrastructure('Development mirror could not bind its private loopback port')
+        config = session_bus_config(root)
         child = subprocess.Popen(['xvfb-run', '-a', '-s', '-screen 0 1440x1000x24 -nolisten tcp',
-            'dbus-run-session', '--', sys.executable, str(Path(__file__).resolve()), '--session', *forwarded])
+            'dbus-run-session', '--config-file=' + str(config), '--', sys.executable,
+            str(Path(__file__).resolve()), '--session', *forwarded])
         while child.poll() is None:
             observed.update({(p['pid'], p['ticks']): p for p in rows()})
             if (root / 'stop-reason').exists():
@@ -366,7 +466,7 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
     failure = None
     child = None
     child_identity = None
-    with private_root(args.development_resume_root) as root:
+    with private_root(args.development_resume_root, evidence=evidence) as root:
         save(root / 'write-start.json', args.write_start)
         env = gpu.private_environment(os.environ, root, marker, resume=bool(args.development_resume_root))
         env.update(QUAL_GPU_ROOT=str(root), QUAL_GPU_EVIDENCE=str(evidence),
@@ -452,25 +552,18 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
         except BaseException as exc:
             failure = str(exc) or type(exc).__name__
         finally:
-            # Every signal checks the recorded /proc start identity through the
-            # shared Target.stop; unrelated processes are never eligible.
             rows = descendants(child_identity, process_rows) if child else []
             process_rows.update({(p['pid'], p['ticks']): p for p in rows})
             if failure:
                 (root / 'stop-reason').write_text(failure)
-                # Stop namespace children immediately using host PID/start
-                # identities; leave the namespace reporter briefly to flush.
-                app_rows = [row for row in rows if row['comm'] in ('JustSearch', 'java', 'llama-server')]
-                runner.Target().stop(app_rows)
-                until = time.monotonic() + 5
-                while time.monotonic() < until and child and child.poll() is None:
-                    time.sleep(.1)
-            runner.Target().stop(descendants(child_identity, process_rows) if child else [])
+            stopped = stop_lane_processes()
+            save(evidence / 'host-process-stop.json', stopped)
             if child:
                 child.wait(timeout=15)
             evidence.mkdir(exist_ok=True)
             shutil.copy2(root / 'session.log', evidence / 'session.log') if (root / 'session.log').exists() else None
             shutil.copy2(root / 'openbox.log', evidence / 'openbox.log') if (root / 'openbox.log').exists() else None
+            shutil.copy2(root / 'session.conf', evidence / 'session.conf') if (root / 'session.conf').exists() else None
             save(evidence / 'resources.json', samples)
             save(evidence / 'session-processes.json', list(process_rows.values()))
             summary = evidence / 'summary.json'
@@ -650,9 +743,15 @@ def main():
 
 
 def interrupted(signum, frame):
-    # Ignore repeat interrupts while the ordinary BaseException cleanup unwinds.
+    # Stop before unwinding: subprocess.run kills its immediate child when an
+    # exception escapes its wait. All descendants must get SIGTERM first, not
+    # have their extraction parent killed by subprocess's context manager.
     for sig in (signal.SIGTERM, signal.SIGINT):
         signal.signal(sig, signal.SIG_IGN)
+    try:
+        stop_lane_processes()
+    except runner.Infrastructure as exc:
+        raise KeyboardInterrupt('Interrupted by ' + signal.Signals(signum).name + ': ' + str(exc)) from exc
     raise KeyboardInterrupt('Interrupted by ' + signal.Signals(signum).name)
 
 
