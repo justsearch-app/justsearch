@@ -35,7 +35,8 @@ fn published_baseline_producer_bytes_cover_full_current_register() {
     let bytes = fs::read(root.path().join("release.v2.json")).unwrap();
     for target in ["windows-x86_64", "linux-x86_64"] {
         let descriptor = parse_descriptor(&bytes, target).unwrap();
-        validate_store_compatibility(&descriptor).unwrap();
+        let result = validate_store_compatibility(&descriptor);
+        assert!(result.is_ok(), "assertion failed: {target}: {result:?}");
     }
 }
 
@@ -51,7 +52,8 @@ fn published_baseline_producer_bytes_cover_earlier_current_subset() {
             .retain(|store| store.id == "data-version-marker");
         assert_eq!(local.durable_stores.len(), 1);
         let descriptor = parse_descriptor(&bytes, target).unwrap();
-        validate_store_compatibility_against(local, &descriptor).unwrap();
+        let result = validate_store_compatibility_against(local, &descriptor);
+        assert!(result.is_ok(), "assertion failed: {target}: {result:?}");
     }
 }
 
