@@ -1,31 +1,234 @@
 ---
 title: "Cut a JustSearch release"
 type: how-to
-status: draft
-description: "Build one immutable Windows/Linux draft candidate, qualify its bytes, and publish only on the owner's instruction."
+status: stable
+description: "Prepare one immutable Windows/Linux draft, qualify its bytes, and publish after the owner's final validation."
 ---
 
 # Cut a JustSearch release
 
-## What this does
+This is the single living procedure. Put candidate identities, evidence and results in the
+draft's notes and release working record, never here. All times below are estimates.
 
-Describes how a JustSearch release is produced and published. It is the durable "how";
-per-release *results* (the round-by-round Sandbox convergence for a given candidate) live in
-that release's own working notes, and the shipped record lives in the GitHub Release. This page
-is the single living surface — it does not accrete per release (that was the failure mode of the
-old rolling packaging log).
+The owner's instructions (2026-10-27):
 
-> **Status.** The Sandbox verification *loop* has been exercised across many candidates.
-> `build-installer.yml` has been dispatched successfully against both `main` and a worktree branch
-> (2026-07-15). Dispatches now produce unsigned qualification builds; only a release tag push
-> can create a signed draft. The first stable release, **v0.2.0**, was published on
-> 2026-08-13 with Authenticode signatures (publisher **Elias Justus**). The exact published-installer
-> updater qualification tracked by tempdoc 617 remains a separate, still-open evidence tier.
+> "for each release, owner attention should only be necessary, and thats for final validation."
+>
+> "the release workflow doesnt need to have every issue fixed before being shipped, but only the critical ones every user would experience and that would block using justsearch in general"
+>
+> "i dont want for agents to automatically decide when its time for a new release, i should do that for now"
+>
+> "i think we will just skip the GPU tests on windows"
 
-## Downgrade and recovery policy
+## 0. Keep packaging smoke running on main
 
-Releases are **fix-forward only**: repair a broken release by installing a newer release through
-the updater, including its dead-Engine update path. The updater does not provide a downgrade path.
+[packaging-smoke.yml](../../.github/workflows/packaging-smoke.yml) runs daily at 04:23 UTC
+and can be dispatched on main. It builds unsigned Windows and Linux packages when packaging
+inputs changed. It uses test keys, spends no production signing balance and publishes nothing.
+Inspect its results alongside the full CI run; a skipped build is not a packaging pass.
+Estimate: 20–60 minutes when builds run, plus queue time.
+
+```bash
+gh run list --workflow packaging-smoke.yml --branch main --limit 5
+# Only if a fresh smoke is needed:
+gh workflow run packaging-smoke.yml --ref main
+```
+
+## 1. Prepare one release PR after the owner says to release
+
+Agents never choose the release date. Choose the newest main commit with a completed full
+push CI run whose **Build (no model blobs)**, **License and notices**, **Secret scan** and
+packaging checks passed. Inspect every other failure against the blocker rule below;
+do not require every advisory check to be green. Estimate: 15–30 minutes plus CI/merge time.
+
+```bash
+gh run list --workflow ci.yml --branch main --event push --status completed --limit 30 \
+  --json databaseId,headSha,createdAt,conclusion
+gh run view "$RUN" --json headSha,event,status,jobs
+```
+
+`RUN` is the inspected full run, not a PR run with unselected lanes. Record its SHA and the
+packaging evidence. Selection and triage are agent work; `release-candidate.mjs admit`
+checks release identity and keys, not this CI selection policy.
+
+Create the release branch at that SHA. Edit only the canonical `version` in
+`gradle.properties`, then sync the app, Cargo/npm app lock identities, MCPB manifest,
+registry version, URL and bundle hash. Root/frontend npm package versions identify tooling,
+not the shipped application. Add user-facing entries under `CHANGELOG.md`'s Unreleased section.
+For example, with `VERSION` set to the new `X.Y.Z`:
+
+```bash
+node scripts/ci/sync-version.mjs --require-release-semver
+node scripts/ci/sync-version.mjs --check
+node scripts/release/release-changelog.mjs prepare --version "$VERSION" --date "$(date -u +%F)" --write
+node scripts/release/release-changelog.mjs check
+node scripts/ci/check-mcpb-consistency.mjs --release-version "$VERSION"
+```
+
+Merge one PR containing the version projections and changelog through the normal main checks.
+Use its actual merge commit as the candidate; do not tag the PR branch head.
+
+## 2. Tag the merge commit; build a private draft
+
+After the release PR merges, set `MERGE_COMMIT` to that commit on main:
+
+```bash
+export REPO=justsearch-app/justsearch
+export TAG="v$VERSION"
+git tag "$TAG" "$MERGE_COMMIT"
+git push origin "$TAG"
+gh run list --workflow build-installer.yml --event push --limit 5
+```
+
+[build-installer.yml](../../.github/workflows/build-installer.yml) is the release workflow.
+It calls [build-installer-windows.yml](../../.github/workflows/build-installer-windows.yml)
+and [build-installer-linux.yml](../../.github/workflows/build-installer-linux.yml).
+Keep all three: packaging smoke also calls both platform builders.
+Tag pushes alone enter production signing. Manual branch dispatch produces unsigned
+Windows qualification builds; `sandboxTestMode`/`candidateVersion` are test-build inputs,
+never release inputs. A signing rehearsal uses a real tag on a **throwaway patch version**;
+**never publish** its draft, and use a higher patch next time.
+
+Estimate: 30–90 minutes plus queues. The workflow creates one GitHub **draft**, nothing public:
+SSL.com-signed NSIS, Ubuntu 24.04 x86_64 `.deb`, both updater artifact signatures,
+MCPB, signed descriptor v2, `latest.json`, compatibility registers, packaged smoke reports,
+`candidate.json`, saved build attestations (`provenance.sigstore.json`) and `SHA256SUMS`.
+The attestations cover the payloads and candidate inventory; the provenance bundle cannot
+attest itself. Every asset except `SHA256SUMS` itself is checksummed.
+
+A failed candidate is never re-tagged. Fix on main and use `vX.Y.(Z+1)`.
+For an upload-only failure, **Re-run failed jobs** on the same run reuses immutable signed
+outputs; existing assets must match byte for byte. A partial draft remains private.
+Artifacts expire after 14 days; abandon an incomplete candidate after expiry.
+
+## 3. Qualify the draft's exact bytes, without rebuilding
+
+Download into a new directory, check hashes before use, and keep the tagged source and
+registry alongside the evidence. Recheck hashes after copying to each lane. Never replace
+qualified assets. Estimate: hosted lanes 30–120 minutes; clean VMs 1–3 hours each, sequential;
+GPU 1–3 hours including a relevant 60-minute soak. Downloads and infrastructure can add time.
+
+```bash
+# QUAL is a new absolute scratch directory; ASSETS is its draft-assets subdirectory.
+mkdir -p "$ASSETS"
+gh release view "$TAG" --repo "$REPO" --json isDraft,tagName,targetCommitish
+gh release download "$TAG" --repo "$REPO" --dir "$ASSETS"
+(cd "$ASSETS" && sha256sum --check SHA256SUMS)
+git worktree add --detach "$QUAL/source" "$TAG"
+git show "$TAG":packaging/mcpb/server.json > "$QUAL/server.json"
+gh workflow run qualify-release-windows.yml --ref main -f tag="$TAG"
+gh workflow run qualify-release-linux.yml --ref main -f tag="$TAG"
+```
+
+Require `isDraft=true` and candidate identity matching the tag/merge commit. The two hosted
+workflows have the single input `tag` and read-only release access; they upload observations
+on every outcome. They do not publish. Watch each run to completion, including failures/stalls.
+
+Keep the test list short:
+
+- **J1–J8:** install/launch; add a folder, index, search and open; default Install AI;
+  restart/persistence; update/recovery; uninstall/reinstall retention; desktop integration; MCP.
+- **GPU:** private Linux host lane with the draft's unchanged registry and production pack URLs.
+  J9 is a 60-minute soak only when indexing, enrichment or inference changed.
+- **Exploration:** one exploring agent per clean VM, using its screen, at most 45 minutes each.
+  Record surprises, screenshots and reproducible steps.
+
+Follow the [VM harness README](../../scripts/release/qual/README.md) for ownership, resource
+limits and screen control, and the [journey README](../../scripts/release/qual/journeys/README.md)
+for exact `vm-run.py` (Wayland, then X11 J1), `vm-windows.py` and `gpu-host.py` commands,
+predecessor packages, update mirrors, tools and evidence inputs. Do not duplicate their setup.
+Use `gpu-host.py --source` with the exact tagged checkout and `--last-release` naming the
+last **published** release (local tags can include abandoned drafts):
+
+```bash
+PREVIOUS_TAG=$(gh release view --repo "$REPO" --json tagName --jq .tagName)
+# Add --source "$QUAL/source" --last-release "$PREVIOUS_TAG" to the README's GPU command.
+```
+
+**Never pass `--development-pack-mirror`** for release qualification. The runner decides
+J9 relevance from that source's release diff. Development subsets/resume results are not full acceptance.
+
+**Coverage limits:** the journey implementations remain experimental; their READMEs record
+unqualified paths. Hosted crash coverage can cap an otherwise successful run at pending
+validation (exit 2). Report passed, failed, skipped by decision and unavailable separately.
+Chat on a **Windows GPU is not tested**, by owner decision. Hosted/VM lanes do not prove GPU
+chat. Do not turn an unavailable check or infrastructure failure into a product pass.
+
+## 4. Agents triage and fix forward
+
+A defect blocks only if it breaks a normal path for **most users of a supported target**,
+with **no reasonable workaround**: install, launch, add a folder, index to completion,
+search, open a result, or the default Install AI plan (search everywhere; chat on a supported GPU).
+Always block known security or data-loss defects and invalid release artifacts: missing
+packages, bad signatures or broken update metadata.
+
+Non-blockers include uncommon hardware, file types or configurations; GPU-only failures
+where CPU search works; uninstall leftovers that lose no data; cosmetic/wording issues;
+and automatic 0.3.0 upgrade repairs (0.3.0 users install the new version over the old one).
+Record these as known issues. Agents make the triage decision without asking the owner.
+
+Fix blockers on main, merge the next patch release PR and produce a new draft. Rerun the
+journeys the fix can affect plus J1–J2; keep evidence of unaffected journeys and its candidate
+identity explicit. The existing runners label subsets incomplete: retain that limit when
+assembling the overall qualification evidence. Repairs take as long as the defect requires.
+
+## 5. Prepare the owner's final validation
+
+Prepare both clean OS environments with the candidate installed and the corpus ready, then
+open them visibly on the owner's monitor. The current harness supports **one VM at a time**:
+use these commands sequentially, stopping your VM before preparing the other.
+
+```bash
+export QUAL_OWNER=owner-release-round
+python3 scripts/release/qual/vm.py prepare-owner ubuntu --package "$DEB" --corpus "$CORPUS"
+# Open JustSearch through the VM screen, add/index the corpus, and present it visibly.
+# After that OS's validation:
+python3 scripts/release/qual/vm.py stop
+python3 scripts/release/qual/vm.py prepare-owner windows --package "$NSIS" --corpus "$CORPUS"
+```
+
+`DEB`/`NSIS` must name the hash-checked draft packages. `prepare-owner` installs and copies the
+corpus to Documents, then boots the same overlay visibly; **it does not start the app or index
+the corpus**. Finish those actions through the screen before inviting validation. There is
+currently no automated restore of qualified application snapshots into this owner view.
+
+Give the owner one page: version, what changed, journey results, what was not tested and
+known issues. Update the draft's notes from that summary, filling `Not tested` and `Known issues`;
+retain the hidden candidate-identity marker. The owner tries the result for about **10 minutes**
+and replies **"publish"** or names what is wrong. Agents handle preparation, evidence and
+triage. Estimate: 15–30 minutes preparation per VM plus indexing/download time.
+
+## 6. Publish only after "publish", then watch for a week
+
+```bash
+gh workflow run publish-release.yml --ref main -f tag="$TAG"
+gh run list --workflow publish-release.yml --limit 5
+```
+
+[publish-release.yml](../../.github/workflows/publish-release.yml) checks the closed asset set,
+hashes, updater signatures, saved provenance, original tag/commit and published sequence floor,
+then promotes the existing draft as latest. It **never rebuilds or re-signs**. The production
+feed is `https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json`.
+Confirm the latest release/feed resolves to the promoted bytes. Estimate: 5–15 minutes plus queue.
+Publication of the same candidate is idempotent; a failed promotion can be retried on the same tag.
+
+An agent watches new issues for a week, triages using the same blocker rule and fixes forward.
+Arrange that watch explicitly; there is no automatic week-long issue watcher in these workflows.
+
+## Recovery and downgrade policy
+
+Never delete or edit a **published** release. Repair with a higher version and sequence,
+through the updater including its dead-Engine update path, or by installing the new package.
+Sequence is the maximum from published v1/v2 descriptors plus one, with floor 41; drafts do
+not advance it. Unreadable descriptors fail closed. If another publication makes a draft's
+sequence stale, abandon it and prepare the next patch candidate.
+
+A failed update reconciles ownership/state on restart on Windows; Linux follows the same
+recovery contract. The documented fallback is installing the new package over the old one.
+On Linux, `apt remove just-search` preserves settings, index, downloaded models and authored
+records under `~/.local/share/io.justsearch.shell` (or `$XDG_DATA_HOME`); reinstall reuses them.
+Indexed source files are not removed. The updater has no downgrade path.
+
 Installing an older build over Lane F data has these effects:
 
 | Store | Effect |
@@ -59,325 +262,89 @@ that finds a marker written by a newer build shows a notice naming that version 
 files. Releases before Lane F (0.3.x and earlier) do not read the marker, so for them the table
 above is the whole behavior.
 
-## Release candidate and publication
+## Owner duties and one-time settings
 
-The [Linux journey suite](../../scripts/release/qual/journeys/README.md) qualifies
-the downloaded draft bytes on the hosted Ubuntu runner and the clean Ubuntu
-Wayland/X11 VMs. Its result summary keeps product failures, infrastructure
-failures, decision skips and unavailable checks separate. The hosted workflow
-accepts a draft tag and has no publishing or signing permission.
+Per release, the owner says **when to release** and performs the final validation. Agents do
+all other recurring work. Rare duties: renew the code-signing certificate and signing balance;
+agents remind the owner a month ahead. There is no automated renewal reminder in this repository.
 
-On Linux, `apt remove just-search` removes the application package and retains
-the user's settings, index, downloaded models and authored records under
-`~/.local/share/io.justsearch.shell` (or the corresponding `$XDG_DATA_HOME`
-folder). Reinstalling the same or a newer package reuses that data. Removing
-the package does not delete the user's indexed source files. J6 checks this
-retention on a disposable Ubuntu VM.
+Set these once in the **source repository's Settings → Environments / Secrets and variables → Actions**:
 
-The owner decides when to cut a release. An agent prepares and lands the release PR only after
-that instruction: bump `version` in `gradle.properties`, run
-`node scripts/ci/sync-version.mjs` (Windows and Linux), and add the user-facing `CHANGELOG.md`
-section. Keep known security or data-loss defects out of a release. Other issues block only when
-they affect every user and prevent general use; list remaining known issues in the draft notes.
+| Location | Setting |
+|---|---|
+| Environment `release-signing` → Deployment branches and tags | Selected branches and tags: **Tag** rule matching **`v*`** and **Branch** rule matching **`main`** only. Keep main protected. Required reviewers empty/disabled, wait timer disabled, no custom approval rule. |
+| Environment secrets: Authenticode | `JUSTSEARCH_CODESIGN_MODE=command`; `JUSTSEARCH_CODESIGN_COMMAND` with the SSL.com template below. The workflows also read `JUSTSEARCH_CODESIGN_PFX_B64`, `JUSTSEARCH_CODESIGN_PFX_PASSWORD`, `JUSTSEARCH_CODESIGN_TIMESTAMP_URL` and `JUSTSEARCH_CODESIGN_THUMBPRINT`; these are needed only for the corresponding PFX/store mode, not SSL.com command mode. Release admission currently requires the command credential. |
+| Environment secrets: updater / metadata | `JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY`, `JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY_PASSWORD` (empty only for an unencrypted key), `JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM` (Ed25519 metadata root). |
+| Environment secret: Linux pack producer | `JUSTSEARCH_RELEASES_PACK_TOKEN`: fine-grained PAT restricted to **`eliasjustus/justsearch-releases`**, **Contents: read and write**, mandatory Metadata read. Used only by `build-linux-gpu-packs.yml` to create its private draft; the source repo's `GITHUB_TOKEN` cannot write there. |
+| Repository Actions variables (public) | `JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM`, `JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY` (base64 raw Ed25519 matching the PEM), `JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID`, `JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY` (Tauri base64 Minisign), `JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID`. Private/public pairs must match. |
+| Repository/environment variables | Delete `JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED` for production. The old `JUSTSEARCH_RELEASE_DESCRIPTOR_URL` variable is unused; workflows set the production URL directly. |
+| Repository Actions permissions | Enable Actions and artifact attestations; permit job-scoped `contents: write` for draft/publish and `id-token: write` + `attestations: write` for provenance. Default token permissions may remain read-only. Builds use hosted runners. |
+| Repository tag ruleset `v*` / access | Restrict tag creation to authorized release operators; prohibit update/deletion, including failed tags. Restrict publication dispatch through operator access. |
 
-1. Tag the release PR's **merge commit on main** as `vX.Y.Z`. Pushing the tag starts
-   `build-installer.yml`. No balance input, provider-portal visit, or environment approval is
-   needed. The production descriptor URL is compiled as
-   `https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json`;
-   release builds retain the runtime-override rejection.
-2. The workflow builds the SSL.com-signed Windows NSIS installer and Ubuntu 24.04 x86_64 `.deb`,
-   runs the Windows packaged verifier and Linux installed-Engine/help-search smoke, then creates
-   **one draft** containing both platforms. Nothing becomes public. It includes both installers
-   and their Tauri signatures, `justsearch-mcp.mcpb`, signed `release.v2.json`, one `latest.json`,
-   `candidate.json` (commit/run identity and inventory), the compatibility registers, both packaged
-   check reports, `provenance.sigstore.json`, and `SHA256SUMS`.
-   Every file except `SHA256SUMS` itself is checksummed. The saved GitHub build-provenance bundle
-   attests every payload, including the candidate inventory; the bundle is checksummed and cannot
-   attest itself. See [GitHub CLI verification](https://cli.github.com/manual/gh_attestation_verify).
-3. Qualify and finally validate **those downloaded draft bytes**, recording their SHA-256 values
-   and evidence in the draft notes. Fill the `Not tested` and `Known issues` placeholders; retain
-   the hidden candidate-identity marker. Never replace an asset after qualification. Changes to
-   main during this work cannot alter this candidate. The existing Sandbox silent-install and
-   update-preserves-models lanes remain available for qualification.
-4. After qualification and the owner's explicit word, dispatch `publish-release.yml` **on main**
-   with input `tag=vX.Y.Z`. It checks the complete asset set, SHA256SUMS, updater signatures, and
-   saved provenance against the original tag and commit. It also checks the published sequence
-   floor, then promotes the draft as latest. It never rebuilds or re-signs anything.
+Keep production signing secrets **only** in `release-signing`: remove repository copies, other
+environment copies and organization-secret access that exposes the same credentials outside it.
+No per-release balance input, provider-portal visit or environment approval is required.
 
-A failed candidate is abandoned. Prepare the **next patch version**; never move or reuse its tag.
-A draft accepts only the same commit and workflow run. If upload fails, use **Re-run failed jobs**
-on the same run: signed packages and the assembled candidate are retained as immutable workflow
-outputs for that retry. Existing uploaded assets must match byte for byte; there is no clobber.
-A platform/check failure creates no release. An upload failure can leave a partial draft of that
-single candidate; it remains private. A failed publication can be retried by dispatching the same
-tag; a completed promotion is idempotent. Workflow artifacts last 14 days; after expiry abandon
-an incomplete candidate rather than re-signing it. Successful draft uploads preserve the evidence
-and provenance with the draft, independently of Actions retention.
-
-Sequence is `max(sequence from every published release.v1.json/release.v2.json) + 1`, with the
-existing floor of 41. Drafts do not advance it. Unreadable published descriptors and inconsistent
-predecessor compatibility fail closed. If another candidate publishes first and makes a draft's
-sequence stale, abandon the stale candidate and cut the next patch.
-
-## Manual Windows builds and daily smoke
-
-`build-installer.yml` still supports branch `workflow_dispatch` for existing Windows qualification
-uses. It calls `build-installer-windows.yml`, retaining `sandboxTestMode`, `candidateVersion`
-(qualification only). Manual builds, including Sandbox qualification, are unsigned and use
-generated test trust pins. Signed candidates come only from `v*` tag pushes; dispatching on main
-or a tag cannot sign or create a draft. A qualification build is forbidden on a tag. Release publication has moved entirely to `publish-release.yml`.
-The existing `windows-installer` artifact name remains available to qualification consumers.
-
-`packaging-smoke.yml` runs daily on main at 04:23 UTC (and can be dispatched on main). It compares
-all paths except `docs/**` and root Markdown files with the last successful run, and skips both
-builds only when none changed. If that commit is missing or no longer an ancestor after a history
-rewrite, it runs both builds. Selected builds use release configuration with test pins and no
-production signing secrets. Windows runs `installer_verify`; Ubuntu installs the `.deb`, launches
-its installed Engine with its bundled JVM and isolated data, waits for Engine readiness, and
-searches the bundled keyboard-shortcuts help. Failure is a red Actions run; no issue is posted.
-
-## One-time repository settings (admin)
-
-Apply these once; these instructions do not change repository settings:
-
-- Create environment **`release-signing`**. Under **Deployment branches and tags**, choose
-  **Selected branches and tags**, add a **Tag** rule matching **`v*`** and a
-  **Branch** rule matching **`main`**. Keep `main` protected by the existing merge checks; remove
-  any other branch or broader tag rules. Under **Deployment protection rules**, leave **Required reviewers empty/disabled** and **Wait timer disabled**; add no custom
-  approval rules. Tags sign unattended; the mirror producer dispatches on protected `main`
-  with merged code.
-  Arbitrary branch dispatches stay excluded. Main dispatches of `build-installer.yml`, PR builds
-  and daily smoke remain unsigned; only tag pushes enter its signing and draft graph. Every job
-  reading a production signing or updater key binds this environment.
-- Move all production signing **secrets** into `release-signing`:
-  `JUSTSEARCH_CODESIGN_MODE` (`command`), `JUSTSEARCH_CODESIGN_COMMAND` (the SSL.com template
-  below), `JUSTSEARCH_CODESIGN_PFX_B64`, `JUSTSEARCH_CODESIGN_PFX_PASSWORD`,
-  `JUSTSEARCH_CODESIGN_TIMESTAMP_URL`, `JUSTSEARCH_CODESIGN_THUMBPRINT` (the latter four only
-  if used by the selected signing mode), `JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY`,
-  `JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY_PASSWORD` (empty only for an unencrypted key), and
-  `JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM` (Ed25519). **Delete their repository-scoped
-  copies** and any copies in other environments; remove any organization-secret repository
-  access granting these credentials outside `release-signing`. Do not leave a fallback copy.
-- Public **variables remain repository-scoped** so unsigned builds and publication can read them:
-  `JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM`, `JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY`
-  (base64 raw Ed25519, same key as the PEM), `JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID`,
-  `JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY` (Tauri base64 Minisign public key), and
-  `JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID`. No variable needs moving into the environment.
-  The private/public pairs must match. Delete `JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED` from both
-  repository and environment variables for production. The production descriptor URL is fixed
-  in the workflows; the old `JUSTSEARCH_RELEASE_DESCRIPTOR_URL` variable is no longer consulted.
-- Tag ruleset for **`v*`**: restrict creation to authorized release operators/agents and prohibit
-  updates and deletion (including failed candidates). Keep main's existing merge checks. Limit
-  who may dispatch publication to the owner's authorized operators through repository access.
-- Enable Actions and GitHub artifact attestations for this repository/plan; permit the job-scoped
-  `contents: write` for draft creation/publication and `id-token: write` + `attestations: write`
-  for candidate attestation. All builds use hosted runners. Repository/default token permissions
-  can remain read-only.
-
-## Code signing
-
-Authenticode signing is live: v0.2.0 shipped signed by **Elias Justus**. Branch qualification
-builds are unsigned. Every `v*` tag push requires a configured credential and the full `-Release`
-contract. `scripts/ci/sign-windows.ps1` selects a credential mode via
-`JUSTSEARCH_CODESIGN_MODE` (default `pfx`), all fail-closed under
-`JUSTSEARCH_REQUIRE_SIGNING`:
-
-| Mode | Secrets it reads | Use |
-|---|---|---|
-| `pfx` | `JUSTSEARCH_CODESIGN_PFX_B64` + `JUSTSEARCH_CODESIGN_PFX_PASSWORD` + `JUSTSEARCH_CODESIGN_TIMESTAMP_URL` | A PFX cert file (base64). |
-| `store` | `JUSTSEARCH_CODESIGN_THUMBPRINT` | Cert from the Windows cert store — how USB-token / HSM CSP-backed non-exportable keys present locally (`signtool /sha1`). |
-| `command` | `JUSTSEARCH_CODESIGN_COMMAND` (a template with a `{file}` placeholder) | Any vendor CLI (Azure Trusted Signing, eSigner, …) — pluggable with zero further repo changes. |
-
-**Credential scope.** Release jobs and the bulk mirror producer read production keys only from
-`release-signing`, whose deployment policy allows `v*` tags and protected `main`, with no required
-reviewers. The mirror producer uses main dispatch; branch qualification, PR and daily-smoke builds
-use generated test keys. See the one-time settings above before the first tag build.
-
-**eSigner (SSL.com) via `command` mode — validated template.** Sandbox-validated end-to-end
-(2026-07-22, CodeSignTool 1.3.3, demo credentials; tempdoc 760): signs in place, non-interactive,
-distinct nonzero exit codes on failure (fail-closed semantics hold through the `.cmd` wrapper).
-`build-installer-windows.yml` installs CodeSignTool into `%RUNNER_TEMP%\CodeSignTool` only when the command
-template references it. The shared bootstrap verifies the downloaded archive against the committed
-SHA-256 before extraction and writes a provenance receipt. During vendor execution the signer
-removes unrelated updater, release-metadata, and GitHub secrets from the child environment. Set
-`JUSTSEARCH_CODESIGN_COMMAND` to:
+The SSL.com command template (secret; substitute credential values once) is:
 
 ```text
-%RUNNER_TEMP%\CodeSignTool\CodeSignTool.bat sign -username=<eSigner login> -password="<password>" -totp_secret="<TOTP secret captured at 2FA enrollment>" -credential_id=<credential id> -input_file_path="{file}" -override="true"
+%RUNNER_TEMP%\CodeSignTool\CodeSignTool.bat sign -username=<eSigner login> -password="<password>" -totp_secret="<TOTP secret>" -credential_id=<credential id> -input_file_path="{file}" -override="true"
 ```
 
-Notes from the validation: each signature takes ~9-12 s end-to-end (an unmirrored ~99-file build
-adds ~15-20 min of signing; post-mirrors ~8 files ≈ 1.5 min); check the eSigner **malware-scan /
-Malware Blocker** setting on the credential before the first dispatch (if enabled it can block
-signing of flagged files); `get_credential_ids -username=... -password=...` prints the credential
-id if it wasn't captured from the dashboard; the eSigner **30-day unlimited-signing trial window**
-is the right time to run the per-pin-bump signed-mirror procedure below (the ~93 one-time mirror
-signatures are then free).
+The Windows builder installs the hash-pinned CodeSignTool when the template references it.
+The signer verifies Authenticode and enforces its run-local attempt ledger and 12-signature
+installer ceiling. Keep the certificate current and provider balance sufficient.
 
-> **`JUSTSEARCH_CODESIGN_ALLOW_UNTRUSTED` is REHEARSAL-ONLY and must NEVER be set for a production
-> release or `command`-mode/vendor signing.** It relaxes the post-sign check from `signtool verify
-> /pa` to a hash-valid-Authenticode presence check, so a chain-untrusted (self-signed) signature is
-> accepted — exactly what a real release must reject. Both release admission and the shared signer
-> reject the combination with `command` mode. The shared signer also requires a run-local ledger
-> path and positive ceiling before any command/vendor invocation; bulk mirror dispatches additionally supply provider-authoritative remaining budget.
-> Installer runs enforce the existing 12-signature per-run ceiling without a balance input.
+One-time local duties: retain an **offline backup of the metadata root key**, and arrange the
+Windows test VM licence using Microsoft's Windows 11 Enterprise evaluation (90-day expiry;
+see the [VM README](../../scripts/release/qual/README.md)). Artifact signing keys are delegated
+and replaceable through root-signed metadata. Root-key loss needs the offline backup and a
+written bridge procedure; **no operational root-key bridge procedure exists in this repository**.
+Do not assume changing Actions variables can update clients' compiled trust roots.
 
-**Rehearsal.** Use a real tag on a throwaway patch version merged on main, with the production
-signing configuration. Build and qualify its draft through the same path as a release, but
-**never publish** that draft. It consumes real signing allocation. Abandon the candidate after the
-rehearsal and use the next patch version for the next candidate; never move or reuse the tag.
-The signing script itself can be checked separately with `scripts/ci/test-sign-windows.ps1`.
+## Maintenance when dependency pins change
 
-Each signing run keeps two credential-free journals. The append-only attempt journal reserves a
-slot before every vendor invocation, so failures, retries, and interrupted calls still consume the
-reviewed ceiling. The verified-signature ledger is appended only after local Authenticode
-verification succeeds. The mirror producer separately checks provider allocation before bulk signing.
+Ordinary app releases reuse immutable signed mirrors and Linux GPU packs. Agents handle pin
+maintenance, rather than adding owner chores to each release.
 
-### Per-pin-bump signed-mirror procedure
+For Windows vendored mirrors, the retained producer signs pinned inputs once per pin bump
+(estimate 20–40 minutes); it requires the provider's authoritative remaining allocation:
 
-The bundler signs **every** unsigned bundled PE — ~93 third-party (Tesseract + llama.cpp) + ~8 own
-≈ ~100 signatures per release. Because the third-party PEs are pin-stable, sign them **once per
-upstream pin bump** and re-host the signed archives, dropping per-release signings from ~100 to
-**~8**. Per pin bump:
+```bash
+gh workflow run sign-vendored-mirrors.yml --ref main \
+  -f signLlama=true -f signTesseract=true -f providerRemainingSignatures=<portal-value>
+gh run download <run-id> -n signed-vendored-mirrors
+node scripts/release/regen-tesseract-manifest.mjs <tesseract-signed.zip>
+```
 
-1. **Dispatch the `Sign Vendored Mirrors` workflow**
-   (`.github/workflows/sign-vendored-mirrors.yml` — `workflow_dispatch` only, because it *spends*
-   metered signings):
+Upload the signed ZIPs to the payload repository, then PR the exact URL/SHA256 pairs in
+`packaging/signed-mirrors.v1.json` and regenerated Tesseract per-file pins together. Preserve
+upstream source pins and extracted layout. Tesseract redistribution requires its GPL notice
+and source-offer treatment in the payload repository. No partial URL/hash entry is accepted.
 
-   ```bash
-   gh workflow run sign-vendored-mirrors.yml --ref main -f signLlama=true -f signTesseract=true -f providerRemainingSignatures=<portal-value>
-   ```
+### Linux GPU pack procedure
 
-   Dispatch on protected `main` after the reviewed pins have merged; arbitrary branch dispatches
-   cannot access `release-signing`. A release tag is not required. Both inputs default to `true`;
-   set one to `false` to re-sign a single payload when only one pin moved. The workflow reads the pins from their existing authorities rather than restating them
-   (llama from `modules/ui/build.gradle.kts`, Tesseract from
-   `packaging/runtime/tesseract-windows.v1.json`), sha256-verifies each upstream download before
-   signing anything, repacks the Tesseract self-extracting NSIS installer into a layout-preserving
-   zip, and runs `scripts/release/sign-vendored-payload.ps1` on each archive (extract → sign every
-   unsigned inner PE → deterministic re-zip → sha256 out). Budget ~9-12 s per PE: a full two-payload
-   run is ~20 min of signing. The same script can be run locally with the
-   `JUSTSEARCH_CODESIGN_*` env set and `-ProviderRemainingSignatures <portal-value>`, if you would
-   rather not go through CI.
-2. **Download the run's `signed-vendored-mirrors` artifact** (`gh run download <run-id>`): the two
-   `-signed.zip` files and their `.sha256` sidecars. The sidecar lines are also printed near the end
-   of the run log, ready to paste.
-3. **Upload both `-signed.zip` files to the `justsearch-releases` repo** and note each URL.
-   (Tesseract has a licensing obligation here — see below.)
-4. **Regenerate the Tesseract per-file manifest pins** (Tesseract only). The override is
-   *archive*-level, but `packaging/runtime/tesseract-windows.v1.json` also pins each staged file by
-   sha256 + size in `files[]`, and signing rewrites those bytes:
+For Linux packs, [build-linux-gpu-packs.yml](../../.github/workflows/build-linux-gpu-packs.yml)
+accepts only a new immutable `linux-cuda12-<positive integer>` tag on main (estimate 1–6 hours):
 
-   ```bash
-   node scripts/release/regen-tesseract-manifest.mjs <tesseract-...-signed.zip>
-   # verify instead of write:
-   node scripts/release/regen-tesseract-manifest.mjs <tesseract-...-signed.zip> --check
-   ```
+```bash
+gh workflow run build-linux-gpu-packs.yml --ref main -f tag=linux-cuda12-<N>
+```
 
-   It rewrites only the affected `sha256`/`sizeBytes` values in place (key order and formatting are
-   preserved) and leaves the manifest's `sourceUrl`/`sourceSha256` — the *upstream* archive pin —
-   alone. Entries with their own `sourceUrl` (today `tessdata/eng.traineddata`) are skipped: they
-   are downloaded separately and copied over the extraction, so signing cannot have touched them.
-   Skipping this step is not silent — `verifyTesseractRuntime` fails with a pointer back to this
-   command.
-5. **Commit the URL + sha256 pairs into `packaging/signed-mirrors.v1.json`** (`llama-cpu` and/or
-   `tesseract` entry), together with the regenerated manifest, as one PR. The build reads that file
-   and applies the matching gradle override pair; the pins are committed there — not in repo
-   variables — so each bump is PR-reviewed supply-chain history. If a payload entry is absent, the
-   build uses the byte-identical default pinned upstream download; a
-   half-complete entry (url without sha256, or vice versa) fails the build loudly before it starts.
+It builds pinned inputs, audits glibc/dependency closure and creates a private draft in
+`eliasjustus/justsearch-releases`, never publishing. Validate the exact ZIPs using the
+[private Install AI journey](test-gpu-locally.md#host-only-install-ai-check-with-a-registry-override),
+then obtain the owner's final validation before publishing that pack draft. Merge its generated
+`model-registry.v2.json` pins only after publication; never commit placeholder URLs/hashes.
 
-**Notes:**
-- The Tesseract mirror is a **zip** even though the manifest's `sourceUrl` names a `.exe`: the build
-  saves whatever that URL returns under a fixed `...-setup-<ver>.exe` filename and runs `7z x` on
-  it, and 7-Zip picks its handler by content signature, so a zip under that name extracts to the
-  same layout. What must be preserved is the *extracted layout* — the `files[]` paths resolve
-  against the extraction root.
-- Hosting a signed Tesseract mirror on `justsearch-releases` **redistributes GPL-2.0-obligated
-  binaries** from that repo — that repo's `THIRD_PARTY_NOTICES.txt` needs the corresponding GPL
-  notice / source-offer treatment. **Flagged as a required step; do it before hosting** (not covered
-  by this doc).
+When ORT changes, keep its Gradle JAR version, rebuilt GPU pack, in-pack
+`ort-native-version.txt`, registry filename/hash/size and
+`OrtCudaHelper.EXPECTED_ORT_NATIVE_VERSION` aligned. Before pinning an archive:
 
-## ORT native version bump — coupling checklist
+```bash
+node scripts/release/check-ort-native-asset.mjs <ort-native-pack.zip>
+```
 
-The onnxruntime jar version and the GPU ORT-CUDA pack are **coupled** (tempdoc 772 §J): a bump to
-one that misses the others makes GPU users **silently lose ORT CUDA** (embeddings fall back to CPU
-speed). When bumping the ORT version, all of the following must move together:
-
-- [ ] The **onnxruntime jar** version (Gradle dependency).
-- [ ] The re-built **`ort-native-cuda12-v<ver>.zip`** pack asset (uploaded to `justsearch-releases`).
-      **Before pinning its sha, assert its contents:**
-      ```bash
-      node scripts/release/check-ort-native-asset.mjs <path-to>/ort-native-cuda12-v<ver>.zip
-      ```
-      It fails (exit 1) listing any of `OrtCudaHelper.ortNativeDllSet()` the archive lacks for the current platform —
-      on Windows: `onnxruntime.dll`, `onnxruntime4j_jni.dll`, `onnxruntime_providers_shared.dll`,
-      `onnxruntime_providers_cuda.dll`. Library IDs come from the Java authority and filenames
-      from the native-target contract (Linux uses the corresponding `.so` names), not a second list. A pack
-      missing one does **not** fail loudly at runtime: ORT falls back to CPU and every ONNX encoder
-      runs at CPU speed while the status surfaces still report a GPU variant (tempdoc 734 R11-F3).
-      The registry pin then makes the verified bytes the only accepted bytes, so this is the one
-      moment the contents can be wrong.
-- [ ] The **registry entry** — `filename` / `sha256` / `sizeBytes` for that asset — in
-      `model-registry.v2.json` (`modules/configuration/src/main/resources/ai/`).
-- [ ] The in-zip **`ort-native-version.txt`** marker inside the pack archive.
-- [ ] **`OrtCudaHelper.EXPECTED_ORT_NATIVE_VERSION`** (`modules/ort-common/…/OrtCudaHelper.java`).
-
-If the marker or `EXPECTED_ORT_NATIVE_VERSION` disagree, the pack is treated as
-`VERSION_MISMATCH` and CUDA is not activated.
-
-## Release index
-
-One row per release (this table is the only living per-release record here; detail lives in
-each release's convergence tempdoc + its GitHub Release):
-
-| Version | Date | Sandbox verdict | Notes | Links |
-|---|---|---|---|---|
-| v0.1.0 | 2026-06-25 | (pre-pipeline) | Prerelease/alpha. **No MCP endpoint.** Installer built locally, not via CI. | [release](https://github.com/justsearch-app/justsearch/releases/tag/v0.1.0) |
-| v0.2.0 | 2026-08-13 | published after the 0.2.0 convergence campaign; tempdoc 617's exact updater N→N+1 lanes remain open | First stable cut with the MCP endpoint, authenticated update assets, and Authenticode-signed installer (publisher Elias Justus). | [release](https://github.com/justsearch-app/justsearch/releases/tag/v0.2.0), tempdoc 734, tempdoc 823, tempdoc 617 |
-| v0.3.0 | 2026-09-07 | No additional Sandbox verdict recorded here | Published release; in-place update from 0.2.0 remains unverified in its changelog. | [release](https://github.com/justsearch-app/justsearch/releases/tag/v0.3.0), [changelog](../../CHANGELOG.md#030---2026-09-07) |
-
-## See also
-
-- MCPB bundle + registry: `packaging/mcpb/README.md`
-- Owner funnel: `docs/m1-operator-checklist.md`
-- Workflow: `.github/workflows/build-installer.yml`
-
-## Linux GPU pack procedure
-
-Linux GPU packs are produced once per pin bump by
-[Build Linux GPU Packs](../../.github/workflows/build-linux-gpu-packs.yml), dispatched on
-`main` with a new immutable tag such as `linux-cuda12-1`. The workflow builds on Ubuntu
-24.04, verifies every input's SHA-256 before using it, audits the glibc 2.39 ceiling and
-pack dependency closure, and creates a **draft** in `eliasjustus/justsearch-releases`.
-Candidate ZIPs are never uploaded as source-repository Actions artifacts, which could expose them
-before publication; only non-payload IO counters are retained there. The draft is the sole upload
-destination for the candidate ZIPs and registry/provenance files. It never publishes or replaces an
-existing release. CUDA 12.8.2 and cuDNN 9.8.0 archives
-come from NVIDIA's official redistrib channel with redistribution notices in both packs.
-The pack manifest records input sources and hashes; `verified-inputs.json` also records
-compiler versions and build configuration. Ordinary application releases reuse these
-immutable packs; there is no per-release rebuild or owner preparation step.
-
-One-time owner setting: create Actions secret **`JUSTSEARCH_RELEASES_PACK_TOKEN`** in the source
-repository's existing **`release-signing` environment**, which permits protected `main` as described
-above and has no required reviewer or wait timer. Its value is a fine-grained personal access token restricted to
-**`eliasjustus/justsearch-releases`**, with **Contents: read and write** (and the mandatory
-Metadata read permission). The source repository's ordinary `GITHUB_TOKEN` cannot write to
-that other repository. Do not give the token access to other repositories or workflows.
-The workflow itself retains only `contents: read`; the credential is exposed only to the
-presence check and the final draft-upload step. No token is created by the build script.
-
-Download and validate those exact draft ZIPs through the
-[private Linux Install AI journey](test-gpu-locally.md#host-only-install-ai-check-with-a-registry-override),
-using a private registry pointing at the release-quality ZIPs (without `--test-only`). Require
-chat answers with sources and process maps showing CUDA/cuDNN libraries inside the installed
-pack, with OS driver libraries supplied by the host. Record sizes and hashes. Publish the
-draft only after the owner's final validation. Nothing is public while it is a draft.
-
-Use the workflow's generated `model-registry.v2.json`, or run
-`update-linux-gpu-registry.py` with that run's `SHA256SUMS` and `SIZES`, to prepare a registry
-PR. Inspect the two Linux URLs, sizes and SHA-256 values and preserve Windows packages.
-Merge the PR after the owner publishes the pack draft. No placeholder assets belong in the
-registry. The workflow is advisory in the workflow signal policy; its failure prevents that
-pack candidate's draft upload, without creating a general application release gate.
+See also [download verification](verify-your-download.md),
+[MCPB packaging](../../packaging/mcpb/README.md) and the
+[supplementary model-retention check](verify-update-preserves-models.md).

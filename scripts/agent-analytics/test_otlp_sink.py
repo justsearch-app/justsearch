@@ -23,8 +23,7 @@ Covers the defects this fix closes:
      `LedgerTests` below.
 
 Loaded via importlib (the hyphenated filename `otlp-sink.py` is not a valid
-Python module name), mirroring `scripts/sandbox/test_sandbox_launch_evidence_archive.py`'s
-`sandbox-launch.py` load pattern.
+Python module name).
 
 Run: python scripts/agent-analytics/test_otlp_sink.py
 """

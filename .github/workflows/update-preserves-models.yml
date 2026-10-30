@@ -9,13 +9,9 @@ name: Update Preserves Models
 # Sandbox round which, as of 617:798-800, had never been executed. This lane executes the
 # installer-over-release half of it unattended.
 #
-# Why two PUBLISHED installers rather than a freshly built candidate by default: the
-# build-installer.yml job runs in the `release-signing` GitHub environment, which carries a
-# `required_reviewers` protection rule. Any workflow_call into it parks awaiting a human
-# approval, so a reusable-workflow design could never run unattended. Downloading two already
-# published release assets is both autonomous AND literally what 617 section 9 item 3 asks for
-# ("the exact published installer-over-release lane"). `candidate_run_id` covers the other case:
-# gating an unpublished candidate before a release cut.
+# Published installers are the default historical comparison. candidate_run_id
+# selects the original build's windows-installer artifact for a draft candidate.
+# Signing and draft creation need no per-release environment approval.
 #
 # ADR-0026: specialty workflows are manual. workflow_dispatch only, registered in
 # scripts/ci/workflow-signal-policy.v1.json.

@@ -1136,8 +1136,7 @@ async fn run_qualification_attempt(
     Ok(version)
 }
 
-/// Emits the lane's verdict in the same shape `sandbox-silent-install-test.ps1` uses, so
-/// `collect-updater-evidence.ps1` can read one file rather than infer success from logs.
+/// Emits a qualification verdict that can be read without inferring success from logs.
 fn write_qualification_result(app: &AppHandle, verdict: &str, detail: &str) {
     let payload = serde_json::json!({
         "schema": "justsearch.sandbox-in-app-update-test.v1",

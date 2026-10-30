@@ -11,8 +11,8 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'js-version-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const rel of ['gradle.properties', 'modules/shell/package.json',
-    'modules/shell/src-tauri/tauri.conf.json', 'modules/shell/src-tauri/Cargo.toml',
+  for (const rel of ['gradle.properties', 'modules/shell/package.json', 'modules/shell/package-lock.json',
+    'modules/shell/src-tauri/tauri.conf.json', 'modules/shell/src-tauri/Cargo.toml', 'modules/shell/src-tauri/Cargo.lock',
     'scripts/ci/pack-mcpb.mjs', 'packaging/mcpb']) {
     const dest = path.join(root, rel);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -70,4 +70,35 @@ test('WhatIf leaves every projection unchanged; release mode rejects SNAPSHOT be
   assert.equal(result.status, 1);
   assert.match(result.stderr, /without SNAPSHOT/);
   assert.equal(read(root, 'modules/shell/src-tauri/tauri.conf.json'), before);
+});
+
+// Exercise the actual guard, including drift hidden by a correct MCPB hash.
+test('check rejects every divergent projection without repairing it; sync restores agreement', (t) => {
+  const root = fixture(t);
+  setVersion(root, '0.3.0');
+  assert.equal(sync(root).status, 0);
+  assert.equal(sync(root, '--check').status, 0);
+  const mutations = [
+    ['modules/shell/package.json', value => value.replace('"version": "0.3.0"', '"version": "9.9.9"')],
+    ['modules/shell/package-lock.json', value => value.replace('"version": "0.3.0"', '"version": "9.9.9"')],
+    ['modules/shell/package-lock.json', value => value.replace(/("": \{\s*"name": "shell",\s*"version": ")[^"]+/, '$19.9.9')],
+    ['modules/shell/src-tauri/tauri.conf.json', value => value.replace('"version": "0.3.0"', '"version": "9.9.9"')],
+    ['modules/shell/src-tauri/Cargo.toml', value => value.replace('version = "0.3.0"', 'version = "9.9.9"')],
+    ['modules/shell/src-tauri/Cargo.lock', value => value.replace('name = "shell"\nversion = "0.3.0"', 'name = "shell"\nversion = "9.9.9"')],
+    ['packaging/mcpb/manifest.json', value => value.replace('"version": "0.3.0"', '"version": "9.9.9"')],
+    ['packaging/mcpb/server.json', value => value.replace('"version": "0.3.0"', '"version": "9.9.9"')],
+    ['packaging/mcpb/server.json', value => value.replace('/v0.3.0/', '/v9.9.9/')],
+  ];
+  for (const [rel, mutate] of mutations) {
+    const original = read(root, rel);
+    const changed = mutate(original);
+    assert.notEqual(changed, original, rel);
+    fs.writeFileSync(path.join(root, rel), changed);
+    const result = sync(root, '--check');
+    assert.equal(result.status, 1, rel);
+    assert.match(result.stderr, /Version projections differ/);
+    assert.equal(read(root, rel), changed, 'check must not repair drift');
+    assert.equal(sync(root).status, 0, rel);
+    assert.equal(sync(root, '--check').status, 0, rel);
+  }
 });

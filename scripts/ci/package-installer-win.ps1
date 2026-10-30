@@ -454,68 +454,6 @@ try {
   Write-Host ("Installer size: {0} MB ({1:N0} bytes)" -f $installerSizeMB, $installerSizeBytes)
   $installerDest = $dest
 
-  # Convenience: keep the Windows Sandbox share staged with the newest installer so the existing .wsb
-  # (which maps tmp/offline-installer-sandbox/share) always sees a fresh setup exe without requiring
-  # re-running the staging/launcher script.
-  Measure-Phase "sandbox_stage" {
-    $stagingSuccess = $true
-    try {
-      $sandboxShare = Join-Path -Path $repoRoot -ChildPath "tmp\\offline-installer-sandbox\\share"
-      New-Item -ItemType Directory -Force -Path $sandboxShare | Out-Null
-
-      # IMPORTANT: The mapped share can keep file handles open while Sandbox is running, which makes
-      # overwriting a stable alias fail ("file is being used by another process"). To make staging
-      # robust, always write a unique alias and then best-effort update the stable alias.
-      $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-      $uniqueAliasFile = "JustSearch-LATEST-setup-$stamp.exe"
-      $uniqueAlias = Join-Path -Path $sandboxShare -ChildPath $uniqueAliasFile
-      Copy-Item -LiteralPath $dest -Destination $uniqueAlias -Force
-
-      $stableAliasFile = "JustSearch-LATEST-setup.exe"
-      $stableAlias = Join-Path -Path $sandboxShare -ChildPath $stableAliasFile
-      try {
-        Copy-Item -LiteralPath $dest -Destination $stableAlias -Force
-      } catch {
-        $stagingSuccess = $false
-        Write-Warning "Failed to update stable Sandbox alias (non-fatal): $($_.Exception.Message)"
-      }
-
-      # Write a tiny breadcrumb so it's obvious which build was staged.
-      $meta = @(
-        "source=$dest",
-        "aliasFile=$uniqueAliasFile",
-        "stableAliasFile=$stableAliasFile",
-        "alias=$uniqueAlias",
-        "stableAlias=$stableAlias",
-        "stagedAt=$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-      )
-      $meta | Set-Content -LiteralPath (Join-Path -Path $sandboxShare -ChildPath "latest-installer.txt") -Encoding UTF8
-
-      # Keep the Sandbox logon script in sync with repo changes so it can pick up the newest staged installer.
-      try {
-        $startScript = Join-Path -Path $repoRoot -ChildPath "scripts\\sandbox\\offline-installer-sandbox-start.ps1"
-        $stepsFile = Join-Path -Path $repoRoot -ChildPath "scripts\\sandbox\\offline-installer-sandbox-steps.txt"
-        if (Test-Path -LiteralPath $startScript) {
-          Copy-Item -LiteralPath $startScript -Destination (Join-Path -Path $sandboxShare -ChildPath "offline-installer-sandbox-start.ps1") -Force
-        }
-        if (Test-Path -LiteralPath $stepsFile) {
-          Copy-Item -LiteralPath $stepsFile -Destination (Join-Path -Path $sandboxShare -ChildPath "offline-installer-sandbox-steps.txt") -Force
-        }
-      } catch {
-        $stagingSuccess = $false
-        Write-Warning "Failed to stage Sandbox helper scripts (non-fatal): $($_.Exception.Message)"
-      }
-
-      Write-Host "Sandbox share staged: $uniqueAlias"
-    } catch {
-      $stagingSuccess = $false
-      Write-Warning "Failed to stage Sandbox share (non-fatal): $($_.Exception.Message)"
-    }
-    if (-not $stagingSuccess) {
-      Write-Host "  (staging had partial errors)" -ForegroundColor Yellow
-    }
-  }
-
   # Assemble the full release asset set (installer + SHA256SUMS + MCPB bundle) into OutDir.
   # Opt-in (-AssembleReleaseAssets) so dev/smoke builds are unaffected. Fails closed on any
   # MCPB hash drift. -Release also verifies server.json version/URL match the cut version. (726)

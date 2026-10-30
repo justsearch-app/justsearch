@@ -123,14 +123,6 @@ jobs:
           python -m pip install --quiet "pytest>=7.0" "pyyaml>=6.0"
           python -m pytest scripts/jseval/tests/test_release.py -q
 
-      - name: Test sandbox validation harness (Python)
-        # Pillow backs plant_defects.py's mislabeled-capture re-encode (a SHA-unique
-        # PNG, not a byte-copy — see the tool's docstring). Install it so the test
-        # runs for real rather than skipping; a skipped test is a dormant bite.
-        run: |
-          python -m pip install --quiet pillow
-          python -m unittest discover -s scripts/sandbox -p "test_*.py" -v
-
       # A lockfile can install fine under the npm that wrote it and still be REFUSED by the
       # runner's npm ("Missing: X@V from lock file"), because writing prunes edges the reader
       # demands. Nothing local caught that; three jobs went red on it. This reads all five
@@ -601,6 +593,11 @@ jobs:
 
       - name: Test MCPB release-bundle consistency gate
         run: node scripts/ci/check-mcpb-consistency.test.mjs
+
+      - name: Version projections agree with the canonical source
+        run: |
+          node scripts/ci/sync-version.mjs --check
+          node --test scripts/ci/sync-version.test.mjs scripts/sandbox/mcp-typed-confirm*.test.mjs
 
       - name: MCPB source matches server.json.fileSha256 (release integrity + freshness)
         run: node scripts/ci/check-mcpb-consistency.mjs

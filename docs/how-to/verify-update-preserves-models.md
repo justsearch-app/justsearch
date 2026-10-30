@@ -44,12 +44,12 @@ Inputs:
 
 The defaults test the historical v0.1.0 → v0.2.0 pair. Set explicit inputs to test the intended upgrade.
 
-To gate a candidate **before** publishing it, dispatch `build-installer.yml` against an unpublished
-**branch** ref (release-loop step 1), then feed its run id. A tag build publishes before this lane can run:
+For a draft candidate, use its original `build-installer.yml` run's retained
+`windows-installer` artifact; a tag build creates a draft, without publishing it:
 
 ```bash
-gh workflow run update-preserves-models.yml \
-  -f base_release_tag=<previous vX.Y.Z> -f candidate_source=run-artifact -f candidate_run_id=<branch-run-id>
+gh workflow run update-preserves-models.yml --ref main \
+  -f base_release_tag=<previous-vX.Y.Z> -f candidate_source=run-artifact -f candidate_run_id=<candidate-run-id>
 ```
 
 The run uploads `update-preserves-models-evidence` containing
@@ -84,8 +84,8 @@ the before/after deletion diffs, and a `verdict`). The job summary carries a one
 
 Every step fails closed, and the evidence JSON is written even on an unexpected exception.
 
-> **Never run `scripts/release/update-preserves-models-test.ps1` on your own machine.** Like
-> `sandbox-guest-silent-test.ps1`, its lookups are host-global: it will find whatever JustSearch
+> **Never run `scripts/release/update-preserves-models-test.ps1` on your own machine.**
+> Its lookups are host-global: it will find whatever JustSearch
 > the machine has registered and silently `/S`-uninstall it. The script refuses to start unless
 > `GITHUB_ACTIONS=true`, with no override. Syntax-check it with
 > `[System.Management.Automation.Language.Parser]::ParseFile(...)` instead.
@@ -95,29 +95,16 @@ Every step fails closed, and the evidence JSON is written even on an unexpected 
 - **Nothing at runtime.** The installed app is never launched, so this does not prove the app
   refrains from re-downloading models after an update — only that the installer does not remove
   them.
-- **Not the in-app updater.** Tempdoc 617 §9 item 4 (the in-app N→N+1 path through normal commit
-  plus an interruption/reconciliation case) still needs a GUI Sandbox host. This lane supersedes
-  only item 3 ("the exact published installer-over-release lane") and the model-survival half of
-  item 5.
+- **Not the in-app updater.** The [clean VM journeys](../../scripts/release/qual/journeys/README.md)
+  cover update and interruption/reconciliation separately, with their documented limitations.
 - **Not scale.** The multi-gigabyte model set is mimicked by a sparse blob, not reproduced.
 - **Not the install-tree collision.** `%LOCALAPPDATA%\JustSearch\models` is recorded, not gated.
 
-## Why it downloads two published installers instead of building one
+## Candidate identity
 
-`build-installer.yml`'s build job declares `environment: release-signing`, which carries a
-`required_reviewers` protection rule. A `workflow_call` into it would park awaiting a human
-approval, so a reusable-workflow design could never run unattended. Using two already published
-release assets is both autonomous and literally what tempdoc 617 §9 item 3 asks for. The
-`candidate_source: run-artifact` path covers the pre-publication consumer path, but producing that
-artifact remains owner-mediated: when the protected Environment normally admits only `main` and
-`v*`, add an exact branch deployment policy for the candidate, verify the pending run's head SHA,
-approve that one run, and remove the temporary policy as soon as the job starts. The build can remain
-unsigned, meaning that it does not invoke the provider signer or spend a signing; approval still makes
-the Environment's referenced Authenticode secrets available to the reviewed job. The Environment also
-supplies the updater-signing material required by a valid candidate artifact.
-
-## Related
-
-- `docs/how-to/cut-a-release.md` — the release checklist; this lane is a pre-publication step.
-- `scripts/release/sandbox-silent-install-test.ps1` — the GUI Sandbox silent install/uninstall
-  harness. Complementary: it covers first-install cleanliness, this lane covers upgrade survival.
+This supplementary installer-only lane downloads published assets by default;
+`candidate_source=run-artifact` selects the original candidate run's installer.
+Release signing is unattended in the `release-signing` environment. No temporary
+branch permission or environment approval is needed. For the full release
+qualification, use the draft's downloaded bytes and the journey suite in the
+[release checklist](cut-a-release.md).

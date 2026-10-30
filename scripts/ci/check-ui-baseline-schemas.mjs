@@ -16,8 +16,7 @@
  * accepted here".
  *
  * SCOPE IS BY EXPLICIT ROW, mirroring the proportion register's own adoption doctrine. The same
- * defect class exists elsewhere in `governance/` — `declaration-kinds.v1.json` and
- * `sandbox-defect-classes.v1.json` name schemas that are not files at all, `design-reference.v1.json`
+ * defect class exists elsewhere in `governance/` — `declaration-kinds.v1.json` names a schema that is not a file at all, `design-reference.v1.json`
  * points at a missing sibling, and `registry.v1.json` does not validate against the schema it DOES
  * name. Those are pre-existing and belong to their own authorities; they are
  * logged to the observations inbox rather than swept into this gate, because making them green means
