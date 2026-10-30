@@ -143,6 +143,73 @@ final class HeadlessAppUpgradeShutdownWiringTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "signalAndAcknowledgedUpgradeShareOneExitAuthority({index}: {arguments})")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+  void signalAndAcknowledgedUpgradeShareOneExitAuthority(boolean signalWins, @TempDir Path dataDir)
+      throws Exception {
+    java.lang.reflect.Method claim = null;
+    try { claim = EngineShutdownSequence.class.getMethod("claimSignalStop", int.class,
+        io.justsearch.app.engine.QuitBudget.class); }
+    catch (NoSuchMethodException baseline) { /* fail by assertion on the missing authority */ }
+    org.junit.jupiter.api.Assertions.assertNotNull(claim, "signal exits must share upgrade exit authority");
+    var dispatch = new CountDownLatch(1);
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var exited = new CountDownLatch(1);
+    var code = new java.util.concurrent.atomic.AtomicInteger(-1);
+    var sequence = new EngineShutdownSequence(dataDir,
+        List.of(new EngineShutdownSequence.Step(EngineShutdownSequence.INDEX_HALF_STEP, reason -> {
+          entered.countDown();
+          if (!release.await(5, TimeUnit.SECONDS)) throw new AssertionError("held close not released");
+          return "GRACEFUL";
+        })), status -> { code.set(status); exited.countDown(); });
+    var bridge = new UpgradeShutdownBridge();
+    bridge.install((preparation, nonce) -> {
+      try {
+        if (!dispatch.await(5, TimeUnit.SECONDS)) throw new AssertionError("dispatch not released");
+        sequence.runAndExitWithReceipt(preparation, nonce);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new AssertionError(interrupted);
+      }
+    });
+    LocalApiServer server = server(dataDir, bridge);
+    Thread signalClose = null;
+    try {
+      HttpClient client = HttpClient.newHttpClient();
+      var prepared = JSON.readTree(post(client, server, "/api/upgrade/prepare", "{}").body());
+      var response = post(client, server, "/api/upgrade/commit-shutdown", capabilityBody(prepared));
+      assertEquals(200, response.statusCode());
+      assertTrue(JSON.readTree(response.body()).get("shutdownAccepted").asBoolean());
+      if (!signalWins) {
+        dispatch.countDown();
+        assertTrue(entered.await(2, TimeUnit.SECONDS));
+      }
+      Runnable action = (Runnable) claim.invoke(sequence, 143, io.justsearch.app.engine.QuitBudget.fromNow());
+      if (signalWins) {
+        org.junit.jupiter.api.Assertions.assertNotNull(action);
+        signalClose = Thread.ofPlatform().start(action);
+        assertTrue(entered.await(2, TimeUnit.SECONDS));
+      } else assertNull(action);
+      dispatch.countDown();
+      release.countDown();
+      assertTrue(exited.await(3, TimeUnit.SECONDS));
+      assertEquals(signalWins ? 143 : 0, code.get());
+      Path receipt = dataDir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE);
+      assertEquals(!signalWins, Files.exists(receipt));
+      if (!signalWins) {
+        var body = JSON.readTree(Files.readString(receipt));
+        assertEquals(prepared.get("preparationId").asString(), body.get("preparationId").asString());
+        assertEquals(prepared.get("shutdownNonce").asString(), body.get("shutdownNonce").asString());
+      }
+    } finally {
+      dispatch.countDown();
+      release.countDown();
+      if (signalClose != null) signalClose.join(3_000);
+      server.stop();
+    }
+  }
+
   private static LocalApiServer server(Path dataDir, UpgradeShutdownBridge bridge) {
     return LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
             dataDir.resolve("index"))
