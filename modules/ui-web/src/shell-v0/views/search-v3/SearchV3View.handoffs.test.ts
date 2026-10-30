@@ -390,7 +390,7 @@ it('HO8 a held real controller keeps its decision and reopens from the sidebar',
   ctrl.isStreaming = true; ctrl.sessionId = 'run-held'; ctrl.conversationId = 'held';
   ctrl.budgetGate = { tokensNeeded: 100, tokensRemaining: 0, totalTokensConsumed: 100 };
   const resolve = vi.spyOn(ctrl, 'resolveBudgetGate'); const stop = vi.spyOn(ctrl, 'cancelSession');
-  (view as unknown as { onAgentUpdate(): void }).onAgentUpdate();
+  (view as unknown as { runDomain: { onAgentUpdate(): void } }).runDomain.onAgentUpdate();
   await navigate({ conversationId: 'held' }); await drain(view);
   await navigate({ query: 'prepared task', forceShapeId: 'core.rag-ask', docIds: ['chosen.md'] }); await drain(view);
   const c = await composer(view);

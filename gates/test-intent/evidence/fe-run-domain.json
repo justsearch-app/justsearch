@@ -1,0 +1,256 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T11:38:26.702Z",
+  "revision": "9538356c465d58d34ebd5ed65b573faa30a94545",
+  "tree": "72635d790c0c6148abe4d04fdc6c8475729102bd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts\" \"src/shell-v0/views/search-v3/sv3-run-domain.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/wwljc3qz/tmp/test-intent-vitest-4-1793360301747.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4953
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#opens the delegated turn before a synchronous first notification and settles duplicate terminals once",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5125abacdfa743bf2688a9ea4e6d5da490428efb2de7e01ff07f607bbed0724f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "step 4 run preservation at notification boundaries opens the delegated turn before a synchronous first notification and settles duplicate terminals once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#keeps acknowledgement latched when the server evidence disappears",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5125abacdfa743bf2688a9ea4e6d5da490428efb2de7e01ff07f607bbed0724f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "step 4 run preservation at notification boundaries keeps acknowledgement latched when the server evidence disappears",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#resets budget choice count and latch after a run ends with its gate still held",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5125abacdfa743bf2688a9ea4e6d5da490428efb2de7e01ff07f607bbed0724f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "step 4 run preservation at notification boundaries resets budget choice count and latch after a run ends with its gate still held",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#reconnects the retained window without another adoption or stopping delegated work",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5125abacdfa743bf2688a9ea4e6d5da490428efb2de7e01ff07f607bbed0724f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "step 4 run preservation at notification boundaries reconnects the retained window without another adoption or stopping delegated work",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-01 opens its turn before dispatch and settles duplicate terminals once",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-01 opens its turn before dispatch and settles duplicate terminals once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-02 projects actual tool activity and leaves an unreported step count unknown",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-02 projects actual tool activity and leaves an unreported step count unknown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-03 routes a held budget choice through the issuance seam",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-03 routes a held budget choice through the issuance seam",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-04 concurrent steering stays on one run and opens no competing turn",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-04 concurrent steering stays on one run and opens no competing turn",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-05 applied queued not applied and unconfirmed directions remain distinct",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-05 applied queued not applied and unconfirmed directions remain distinct",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-06 an unrelated report cannot settle either of two identical lost sends",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-06 an unrelated report cannot settle either of two identical lost sends",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-07 a lost steer note survives terminal until its own report arrives",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-07 a lost steer note survives terminal until its own report arrives",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-08 absence creates no run and reload adopts a matching live run once without navigation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-08 absence creates no run and reload adopts a matching live run once without navigation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-09 duplicate approval requests share one lookup and stale details cannot prompt a replacement",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-09 duplicate approval requests share one lookup and stale details cannot prompt a replacement",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-10 a failed approval remains an approval error in the owner feed",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-10 a failed approval remains an approval error in the owner feed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts#SW-RUN-11 Stop keeps both windows observing output until the backend terminal",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1509187134e4022b876ba3c71b1d9168e5462708718e6c6a3e0ff9ec2f5a964e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window run owner against the injected backend SW-RUN-11 Stop keeps both windows observing output until the backend terminal",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b867df69d22a45cbe26dbfa95093b3a989d2a153201ec6ed8fbfc7a51f9ff721"
+}
