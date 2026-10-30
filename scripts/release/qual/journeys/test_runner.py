@@ -24,13 +24,8 @@ class RunnerTests(unittest.TestCase):
                 for timing in (0, 123, 2**63 - 1, 1.25):
                     profiles = {encoder: {'calls': 1, 'phaseTotalUs': {'tokenize': timing, 'ort': 456}}
                                 for encoder in ('embed', 'ner', 'splade')}
-                    telemetry = {word + suffix: timing
-                                 for word in ('tokenize', 'tokenizer', 'tokens', 'tokenCount',
-                                              'token_count', 'TOKENIZE', 'ToKeNiZeR', 'TOKENS',
-                                              'TOKENCOUNT', 'TOKEN_COUNT')
-                                 for suffix in ('', 'Us', 'Ms')}
-                    status = {'lifecycle': {'state': 'READY'}, 'encoderProfiles': profiles,
-                              **telemetry}
+                    status = {'lifecycle': {'state': 'READY'},
+                              'worker': {'enrichment': {'encoderProfiles': profiles}}}
                     for shape, payload in (
                             ('minimal', {'phaseTotalUs': {'tokenize': timing}}),
                             ('status', status), ('nested', {'status': status}),
@@ -55,12 +50,40 @@ class RunnerTests(unittest.TestCase):
                                {'value': 'sensitive'}, ['sensitive'], None):
                 fields = dict.fromkeys(keys, credential)
                 expected = dict.fromkeys(keys, '<redacted>')
-                payload = {**fields, 'nested': {'fields': fields}, 'observations': [fields]}
+                payload = {**fields, 'nested': {'fields': fields}, 'observations': [fields],
+                           'phaseTotalUs': fields}
                 with self.subTest(credential=credential):
                     run.evidence('credentials', payload)
                     saved = json.loads((run.out / 'credentials.json').read_text())
                     self.assertEqual(saved, {**expected, 'nested': {'fields': expected},
-                                             'observations': [expected]})
+                                             'observations': [expected], 'phaseTotalUs': expected})
+
+    def test_evidence_redacts_numeric_token_fields_outside_phase_timings(self):
+        import windows
+        keys = tuple(word + suffix
+                     for word in ('tokenize', 'tokenizer', 'tokens', 'tokenCount',
+                                  'token_count', 'TOKENIZE', 'ToKeNiZeR', 'TOKENS',
+                                  'TOKENCOUNT', 'TOKEN_COUNT')
+                     for suffix in ('', 'Us', 'Ms'))
+        with tempfile.TemporaryDirectory() as tmp:
+            for lane, run_type in (('hosted-linux-x11', self.r.Run), ('vm-windows', windows.Run)):
+                args = types.SimpleNamespace(evidence=str(Path(tmp) / lane), vm=None, lane=lane)
+                run = run_type(args, {})
+                for value in (0, 123, 123456, 2**63 - 1, 1.25):
+                    fields = dict.fromkeys(keys, value)
+                    redacted = dict.fromkeys(keys, '<redacted>')
+                    payload = {**fields, 'credentials': fields, 'observations': [fields],
+                               'phaseTotalUs': {**fields, 'nested': fields},
+                               'phaseTotalMs': fields, 'PHASETOTALUS': fields,
+                               'profile': {'phaseTotalUs': [fields]}}
+                    expected = {**redacted, 'credentials': redacted, 'observations': [redacted],
+                                'phaseTotalUs': {**redacted, 'tokenize': value, 'nested': redacted},
+                                'phaseTotalMs': redacted, 'PHASETOTALUS': redacted,
+                                'profile': {'phaseTotalUs': [redacted]}}
+                    with self.subTest(lane=lane, value=value):
+                        run.evidence('credentials', payload)
+                        saved = json.loads((run.out / 'credentials.json').read_text())
+                        self.assertEqual(saved, expected)
 
     def test_evidence_redacts_nonnumeric_tokenization_fields(self):
         import windows
@@ -78,21 +101,25 @@ class RunnerTests(unittest.TestCase):
                     fields = dict.fromkeys(keys, value)
                     expected = dict.fromkeys(keys, '<redacted>')
                     with self.subTest(lane=lane, value=value):
-                        run.evidence('credentials', {'fields': fields, 'observations': [fields]})
+                        run.evidence('credentials', {'fields': fields, 'observations': [fields],
+                                                     'phaseTotalUs': fields})
                         saved = json.loads((run.out / 'credentials.json').read_text())
-                        self.assertEqual(saved, {'fields': expected, 'observations': [expected]})
+                        self.assertEqual(saved, {'fields': expected, 'observations': [expected],
+                                                'phaseTotalUs': expected})
 
     def test_evidence_preserves_input_and_unrelated_values(self):
         payload = {'sessionToken': {'value': 'sensitive'},
                    'nested': [{'clientSecret': ['sensitive'], 'name': 'visible'},
                               None, 0, False, 'token password secret'],
                    'status': {'ready': True, 'ratio': 1.25, 'empty': [],
-                              'token_count': 123, 'tokenizer': {'name': 'sensitive'}}}
+                              'token_count': 123, 'tokenizer': {'name': 'sensitive'},
+                              'phaseTotalUs': {'tokenize': 123, 'ort': 456}}}
         original = copy.deepcopy(payload)
         expected = copy.deepcopy(payload)
         expected['sessionToken'] = '<redacted>'
         expected['nested'][0]['clientSecret'] = '<redacted>'
         expected['status']['tokenizer'] = '<redacted>'
+        expected['status']['token_count'] = '<redacted>'
         with tempfile.TemporaryDirectory() as tmp:
             args = types.SimpleNamespace(evidence=str(Path(tmp) / 'evidence'), vm=None,
                                          lane='hosted-linux-x11')
