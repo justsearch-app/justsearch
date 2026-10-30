@@ -93,3 +93,13 @@ from a changeset under the test-intent rules. The ceiling script self-test is to
   "digest": "sha256:7c2fdb33b6b502c6d05f0fb56cabd4eda001527d0046b5155e900f6aabdb38b1"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18c66-41d4-7113-a60e-d07c17c8179c",
+  "verdict": "accept",
+  "digest": "sha256:dd3b91176409a196e5618c2edb305c948422342fb8ed77c4cd131b65582db5a3"
+}
+```
