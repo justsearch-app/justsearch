@@ -17,6 +17,7 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../../primitives/JfElement.js';
+import { displayPassageExcerpt } from './passageExcerptPresentation.js';
 import { authorizedFetch } from '../../api/authorizedFetch.js';
 import '../Control.js';
 // Tempdoc 565 §29 Tier-3 — open the cited LOCAL file (the uniquely-local citation affordance).
@@ -571,6 +572,7 @@ export class CitationsPanel extends JfElement {
     // 559 Authority IV — render the citation card as a typed projection of the
     // evidence record, not ad-hoc field reads.
     const item = toEvidenceItem(s);
+    const excerpt = displayPassageExcerpt(item.excerpt);
     // Tempdoc 565 §29 Tier-3 — the cited file's basename, for the open-file affordance below the card.
     const docName = this.resultBeingExplained
       ? filenameOf(s.parentDocId)
@@ -614,12 +616,12 @@ export class CitationsPanel extends JfElement {
               ? html`<span class="heading-breadcrumb">${item.headingText}</span>`
               : nothing}
           </div>
-          ${item.excerpt
-            ? html`<div class="sentence">${item.excerpt}</div>`
+          ${excerpt
+            ? html`<div class="sentence">${excerpt}</div>`
             : nothing}
           <div class="preview">
-            ${item.excerpt
-              ? html`<div>${item.excerpt}</div>`
+            ${excerpt
+              ? html`<div>${excerpt}</div>`
               : html`<div>(no excerpt)</div>`}
             ${item.headingText
               ? html`<div class="detail">Section: ${item.headingText}</div>`
