@@ -1097,14 +1097,30 @@ describe('record and history transport preservation', () => {
     await openTheOnlyConversation(el);
     if (status === 404) {
       expect(el.sessions.sessions[0]?.history).not.toBeNull();
+      const history = el.sessions.sessions[0]!.history!;
+      expect(history.contextFloor).toBeUndefined();
+      expect(history.contextFloorSummary).toBeUndefined();
+      expect(history.excludedMessageIds ?? []).toEqual([]);
+      expect(history.excludedSourceIds ?? []).toEqual([]);
+      expect(history.messageIds).toEqual([]);
       expect(await contextNotice(el)).toBe('');
       expect((await region(el, 'jf-sv3-main')).shadowRoot?.querySelector('[data-testid="sv3-history-locked"]')).toBeNull();
+      expect(await nextContext(el)).toEqual([
+        { role: 'user', content: 'why did the renewal fail?' },
+        { role: 'assistant', content: 'The lock held.' },
+        { role: 'user', content: 'and the second one?' },
+        { role: 'assistant', content: 'The same lock.' },
+      ]);
+      expect(backend.dispatches).toHaveLength(1);
     } else if (status === 500) {
       expect(el.sessions.sessions[0]?.history).toBeNull();
       expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+      expect((await region(el, 'jf-sv3-main')).shadowRoot?.querySelector('[data-testid="sv3-history-locked"]')).toBeNull();
+      expect(el.historyLocked).toBe(false);
     } else {
-      expect((await region(el, 'jf-sv3-main')).shadowRoot?.querySelector('[data-testid="sv3-history-locked"]')).not.toBeNull();
+      await ask(el, 'Can this locked conversation answer?');
       expect(backend.dispatches).toHaveLength(0);
+      expect((await region(el, 'jf-sv3-main')).shadowRoot?.querySelector('[data-testid="sv3-history-locked"]')).not.toBeNull();
     }
   });
 });
@@ -1711,6 +1727,34 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
     await settle(el);
   });
 
+  it('keeps uncertainty through an overlapping open read until the pending write confirms its own result', async () => {
+    twoTurnConversation();
+    backend.failHistoryFor.add('uc-ctx');
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+    backend.failHistoryFor.clear();
+    const release = holdWriteResponse(`/messages/${storedId(0)}/exclude`);
+    try {
+      contextAction(el, 'exclude', 0);
+      await settle(el);
+      expect(backend.writes).toHaveLength(1);
+      const reads = backend.historyReads.length;
+      const { restoreActiveConversation } = await import('../../state/conversationListStore.js');
+      restoreActiveConversation(null);
+      restoreActiveConversation('uc-ctx');
+      await settle(el);
+      expect(backend.historyReads).toHaveLength(reads + 1);
+      expect(el.sessions.sessions[0]?.history?.excludedMessageIds).toEqual([storedId(0)]);
+      expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+    } finally {
+      release();
+      await settle(el);
+    }
+    expect(el.sessions.sessions[0]?.history?.excludedMessageIds).toEqual([storedId(0), storedId(1)]);
+    expect(await contextNotice(el)).toBe('');
+  });
+
   it.each([
     { race: 'R1', first: 'restore', second: 'floor', tail: '/context-floor', method: 'DELETE', phase: 'response' },
     { race: 'R4', first: 'restore', second: 'exclude', tail: '/context-floor', method: 'DELETE', phase: 'request' },
@@ -2073,7 +2117,11 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
 
   it('caps uncertain-history retries at thirty seconds and online resets the cadence without duplicate listeners', async () => {
     twoTurnConversation();
+    const added = vi.spyOn(window, 'addEventListener');
+    const removed = vi.spyOn(window, 'removeEventListener');
     const el = await mount();
+    const onlineListener = added.mock.calls.find(([type]) => type === 'online')?.[1];
+    expect(onlineListener).toEqual(expect.any(Function));
     await openTheOnlyConversation(el);
     vi.useFakeTimers();
     try {
@@ -2096,6 +2144,7 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
       await vi.advanceTimersByTimeAsync(1);
       expect(backend.historyReads).toHaveLength(beforeOnline + 2);
       el.remove();
+      expect(removed).toHaveBeenCalledWith('online', onlineListener);
       const detached = backend.historyReads.length;
       window.dispatchEvent(new Event('online'));
       await vi.advanceTimersByTimeAsync(60000);

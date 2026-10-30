@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-10-30T14:37:25.778Z",
-  "revision": "7d36fb903f8068f6c2e13ea8c21a489cc5368774",
-  "tree": "31da01df8dbb2dc0804390796c3f1de8f8a9ff0c",
+  "createdAt": "2026-10-30T15:30:59.176Z",
+  "revision": "c2b1967bb25806351419e4195c96e613c6b0038b",
+  "tree": "11368931458534f17fa242126200295726e0ac23",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" \"src/shell-v0/views/search-v3/sv3-context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/10sdir19/tmp/test-intent-vitest-5-1793371027108.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" \"src/shell-v0/views/search-v3/sv3-context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/wwz2p5k_/tmp/test-intent-vitest-4-1793374245977.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 18661
+      "durationMs": 13184
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#still attempts the answer exclusion after a refused question and displays the saved partial result",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1384156b4b27089f414d19e73fc318ed80ff49ba1dfc3804f75e38793064fa2b",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps Exclude Restore Include in selection order through an overlapping open read and final confirmation",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1384156b4b27089f414d19e73fc318ed80ff49ba1dfc3804f75e38793064fa2b",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#caps uncertain-history retries at thirty seconds and online resets the cadence without duplicate listeners",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1384156b4b27089f414d19e73fc318ed80ff49ba1dfc3804f75e38793064fa2b",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the previous occupancy when a later terminal omits usage and redraws against the current runtime window",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1384156b4b27089f414d19e73fc318ed80ff49ba1dfc3804f75e38793064fa2b",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#uses the current API base and encoded conversation ID for initial and later record and history reads",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1384156b4b27089f414d19e73fc318ed80ff49ba1dfc3804f75e38793064fa2b",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps history HTTP 404 empty, uncertain or locked respectively",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1384156b4b27089f414d19e73fc318ed80ff49ba1dfc3804f75e38793064fa2b",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps history HTTP 500 empty, uncertain or locked respectively",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1384156b4b27089f414d19e73fc318ed80ff49ba1dfc3804f75e38793064fa2b",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps history HTTP 423 empty, uncertain or locked respectively",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1384156b4b27089f414d19e73fc318ed80ff49ba1dfc3804f75e38793064fa2b",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -194,7 +194,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:07cf947070b92d5cd7eccb297aec007d51f24cec7c5c87d364dbebbba9f89b7c",
+      "contentDigest": "sha256:80e4b4a193b7c8d15d1be644c0e1ead41b09d063736b56ce6398d339dd0e5e62",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -475,8 +475,53 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps uncertainty through an overlapping open read until the pending write confirms its own result",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7158f3bbf93f62056a3770258b963b3d3f11c9cf17877c0e03c07fddeec58931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps uncertainty through an overlapping open read until the pending write confirms its own result",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts#S2 confirmed deletion cannot be resurrected by a late thread response",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:80e4b4a193b7c8d15d1be644c0e1ead41b09d063736b56ce6398d339dd0e5e62",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S2 confirmed deletion cannot be resurrected by a late thread response",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts#S2 confirmed deletion cannot be resurrected by a late history response",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:80e4b4a193b7c8d15d1be644c0e1ead41b09d063736b56ce6398d339dd0e5e62",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S2 confirmed deletion cannot be resurrected by a late history response",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:fd3b32699b7a607d653f77c36d8028e43f485f2d41adc19414a88ffba503a732"
+  "digest": "sha256:0ed0804e666c46f0e163ea13baa49b89fb33da2cd86de1eecffc3d580673f1ec"
 }

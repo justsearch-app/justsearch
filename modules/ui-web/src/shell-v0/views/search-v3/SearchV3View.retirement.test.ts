@@ -134,6 +134,7 @@ it.each(['thread', 'history'])('S2 confirmed deletion cannot be resurrected by a
   const pending = channel === 'thread' ? view.contextDomain.refreshRecord('saved') : view.contextDomain.refreshHistory('saved');
   gone = true; await loadConversations(); await settle(view);
   release[0]!(); await pending; await settle(view);
+  expect(view.sessions.sessions.some(session => session.id === 'saved')).toBe(false);
   expect(readLastViewedConversation()).toBeNull();
   expect(main(view).shadowRoot!.querySelector('[data-testid="sv3-turn"]')).toBeNull();
   expect(main(view).shadowRoot!.textContent).not.toContain('Private answer');
