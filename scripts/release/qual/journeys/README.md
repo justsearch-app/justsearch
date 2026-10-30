@@ -186,13 +186,18 @@ private signing key is needed or used for these tests.
 
 ## GPU host (Ubuntu, supported NVIDIA GPU)
 
-W4c development status: J1/J2 ran successfully. The third full attempt reached
-an AI_OFFLINE response because the harness omitted the separate Start AI action
-after promoting the models. That omission is repaired and unit checked, but has
-not been rerun against the candidate. GPU chat, J4 and the 60-minute J9 remain
-**unverified**. The failure is not an established product defect. The raw attempt
-report is retained with a separate assessment in the W4c evidence folder. No
-more fresh model downloads were attempted within this assignment's write budget.
+W4c development status: J1/J2 passed again in round four. J3 downloaded and
+activated the Linux GPU plan and invoked Start AI, but acknowledgment probes
+failed to read the Engine's `/proc/<pid>/environ` (permission denied). The lane
+correctly reports infrastructure failure; GPU chat, positive CUDA maps, J4 and
+J9 remain **unverified**. J9 was relevant but never started. No second full run
+was attempted. Root-process accounting after waiting for every descendant
+reported 15,880,499,200 write bytes, within the continuation's 20 GB budget.
+Retained Engine logs also show ONNX using `/home/elias/.justsearch/cache/ort-optimized`
+outside private HOME/XDG roots. Desktop/session isolation and the owner sentinel
+passed, but **state isolation failed**; private HOME alone does not establish
+private JVM cache paths. This needs a separate decision before another run.
+Raw reports and a separate assessment are retained in the W4c round-four evidence.
 
 Use `gpu-host.py` on the owner host; **never use hosted.py, apt install or the
 VM wrapper here**. Prerequisites already on PATH: Python 3 with Pillow, Xvfb,
@@ -302,12 +307,16 @@ native crash collection is currently unproven and always adds an
 `owner-validation` row; even otherwise passing results are therefore
 `passed-pending-owner-validation` (exit 2). A crash or unavailable check still
 fails the lane. Screenshots are triage only. Every attempt retains per-journey
-write observations; `write-volume.json` records sampled per-process kernel write
-bytes and waited-for child block IO separately (they overlap). Short-lived
-processes may be missed and ancestor counters may include sampled children's
-IO, so the sampled sum is neither an exact total nor a bound. No global
-sync is issued on the owner's machine. Swap writes cannot be attributed per
-process and are explicitly unavailable.
+write observations. The top-level `write-volume.json` reads the lane root's
+`/proc/<pid>/io` `write_bytes` after all descendants are waited for. The root
+uses Linux child-subreaper mode so orphaned grandchildren are also accounted
+for. This measures attributed block writes, including cancelled writes; it
+excludes the final accounting-file write, physical device amplification and
+unattributed swap. No global sync is issued on the owner's machine. A 20 GB
+write guard reserves 512 MB for cleanup and checks outstanding process counters
+every second; these live observations may race with process exits. Start AI
+must be invoked and its chat intent acknowledged before chat startup failures
+can be classified as product failures.
 
 ### Development candidate and loopback packs
 

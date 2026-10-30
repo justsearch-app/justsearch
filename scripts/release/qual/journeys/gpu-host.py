@@ -5,7 +5,7 @@ import datetime
 import json
 import os
 from pathlib import Path
-import resource
+import ctypes
 import secrets
 import shutil
 import signal
@@ -116,10 +116,9 @@ def session(forwarded):
 
 def run_attempt(args, forwarded, evidence, attempt, soak_marker):
     marker = 'w4c-' + secrets.token_hex(12)
-    samples, process_rows, io = [], {}, {}
+    samples, process_rows = [], {}
     failure = None
     child = None
-    start_io = resource.getrusage(resource.RUSAGE_CHILDREN).ru_oublock * 512
     with tempfile.TemporaryDirectory(prefix='justsearch-gpu-') as directory:
         root = Path(directory)
         env = gpu.private_environment(os.environ, root, marker)
@@ -167,11 +166,20 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
                     rows = processes(marker)
                     for row in rows:
                         process_rows[(row['pid'], row['ticks'])] = row
+                    # Root includes reaped children; extant descendants (including
+                    # adopted zombies) still hold their own cumulative counters.
+                    current_writes = written_bytes()
+                    for row in process_rows.values():
                         try:
-                            counters = dict(line.split(':', 1) for line in Path('/proc', str(row['pid']), 'io').read_text().splitlines())
-                            io[(row['pid'], row['ticks'])] = max(io.get((row['pid'], row['ticks']), 0), int(counters['write_bytes']))
+                            stat = Path('/proc', str(row['pid']), 'stat').read_text().rsplit(') ', 1)[1].split()
+                            if stat[19] == row['ticks']:
+                                current_writes += written_bytes(row['pid'])
                         except (OSError, ValueError):
                             pass
+                    if current_writes >= 20_000_000_000 - 512_000_000:
+                        failure = 'Continuation write budget approached (20 GB; 512 MB reserved for cleanup)'
+                        save(evidence / 'write-budget-stop.json', {'observedBytes': current_writes, 'budgetBytes': 20_000_000_000})
+                        break
                     if time.monotonic() >= next_check:
                         sample = gpu.resource_sample({r['pid'] for r in rows})
                         samples.append(sample)
@@ -218,11 +226,6 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
             shutil.copy2(root / 'openbox.log', evidence / 'openbox.log') if (root / 'openbox.log').exists() else None
             save(evidence / 'resources.json', samples)
             save(evidence / 'session-processes.json', list(process_rows.values()))
-            save(evidence / 'write-volume.json', {
-                'sampledProcessWrittenBytes': sum(io.values()),
-                'waitedForChildWrittenBytes': resource.getrusage(resource.RUSAGE_CHILDREN).ru_oublock * 512 - start_io,
-                'measurement': 'sum of sampled /proc/pid/io by PID/start identity; waited-for child block IO separate; overlap, do not add',
-                'limitation': 'short-lived processes can be missed, and ancestor counters can include waited-for child IO already sampled; neither an exact total nor a bound'})
             summary = evidence / 'summary.json'
             report = json.loads(summary.read_text()) if summary.exists() else runner.preparation_failure('gpu-linux', failure or 'Private session exited without a summary')
             if failure:
@@ -253,6 +256,10 @@ def run_attempt(args, forwarded, evidence, attempt, soak_marker):
         add_check(report, 'private state cleanup', 'failed-infrastructure', 'Private state was not removed', ['isolation.json'])
     save(evidence / 'summary.json', report)
     return report, failure == gpu.INTERRUPTED
+
+
+def written_bytes(pid='self'):
+    return int(dict(line.split(':', 1) for line in Path('/proc', str(pid), 'io').read_text().splitlines())['write_bytes'])
 
 
 def main():
@@ -332,4 +339,23 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    if '--session' in sys.argv:
+        sys.exit(main())
+    # Adopt orphaned grandchildren so every lane child is eventually waited for;
+    # Linux then rolls its /proc/io counters into this root exactly once.
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(36, 1, 0, 0, 0):  # PR_SET_CHILD_SUBREAPER
+        raise OSError(ctypes.get_errno(), 'Cannot enable lane child subreaper')
+    result = main()
+    while True:
+        try:
+            os.waitpid(-1, 0)
+        except ChildProcessError:
+            break
+    out = Path(sys.argv[sys.argv.index('--evidence') + 1]).resolve()
+    save(out / 'write-volume.json', {
+        'writtenBytes': written_bytes(),
+        'measurement': 'Linux /proc/<lane-root-pid>/io write_bytes after all descendants waited for; root is PR_SET_CHILD_SUBREAPER',
+        'limit': 'Attributed block writes, including cancelled writes; not device physical writes, swap writes or unrelated owner IO. Final accounting-file write itself is excluded.',
+        'budgetBytes': 20_000_000_000})
+    sys.exit(result)

@@ -174,13 +174,39 @@ class GpuTests(unittest.TestCase):
             gpu.require_gpu_encoders(runtime)
 
     def test_start_ai_is_a_separate_real_control_after_model_activation(self):
-        run = Mock()
+        run = Mock(facts={})
         run.api.side_effect = [
+            {'inference': {'chatEnabledSpec': True}},
             {'inference': {'engineState': 'Healthy', 'chatEnabledSpec': True}},
             {'active': {'modelPath': '/private/models/chat.gguf', 'chatProfile': 'standard'}, 'activation': {'state': 'idle'}}]
         gpu.start_chat(run)
         run.wd.click.assert_called_once_with('button[aria-label="Start AI"]')
         self.assertEqual(run.api.call_args_list[0].args, ('/api/status',))
+
+    def test_chat_failure_needs_invoked_and_acknowledged_start_ai(self):
+        for proof in ({}, {'invoked': True}, {'acknowledged': True}):
+            run = Mock(facts={'chatStart': proof})
+            run.api.return_value = {'inference': {'engineState': 'Down', 'lastFailure': 'AI_OFFLINE'}}
+            with self.assertRaises(runner.Infrastructure):
+                gpu.wait_chat_ready(run, 'J3')
+            run.api.assert_not_called()
+        run = Mock(facts={'chatStart': {'invoked': True, 'acknowledged': True}})
+        run.api.side_effect = [
+            {'inference': {'engineState': 'Down', 'lastFailure': 'runtime failed'}},
+            {'activation': {'state': 'idle'}}]
+        with self.assertRaises(runner.ProductFailure):
+            gpu.wait_chat_ready(run, 'J3')
+
+    def test_start_ai_unacknowledged_is_infrastructure(self):
+        run = Mock(facts={})
+        run.api.return_value = {'inference': {'chatEnabledSpec': False}}
+        def once(probe, description, **kwargs):
+            if not probe():
+                raise kwargs.get('error', AssertionError)(description)
+        with patch.object(gpu, 'wait_for', side_effect=once):
+            with self.assertRaises(runner.Infrastructure):
+                gpu.start_chat(run)
+        self.assertEqual(run.facts['chatStart'], {'invoked': True, 'acknowledged': False})
 
     def test_installed_runtime_paths_and_requested_gpu_layers_are_not_live_chat_readiness(self):
         status = {'inference': {'engineState': 'Healthy', 'chatEnabledSpec': True}}
