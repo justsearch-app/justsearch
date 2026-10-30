@@ -129,10 +129,7 @@ An opted-in run that is killed or interrupted (including Ctrl-C/SIGTERM or SIGKI
 loop devices and `/run/media` mounts; cleanup runs only when the test closes its volume normally.
 Images are `volume.img` and `decoy.img` beneath the test's JUnit temporary directory
 (`junit-*` under the JVM's `java.io.tmpdir`), in `loop`, `original-loop` or `foreign-loop`
-subdirectories. On the developer machine, `~/.gradle/init.d/50-agent-tmp.gradle` sets each test
-JVM's temp directory to `<module>/build/tmp/test-jvm/<task>`; for UI integration tests, images
-are under `modules/ui/build/tmp/test-jvm/integrationTest/junit-*/loop/{volume,decoy}.img`
-(or `original-loop`/`foreign-loop`). Later test runs leave these leftovers alone.
+subdirectories. Local Gradle configuration may override the test JVM's `java.io.tmpdir`. Use the backing-image paths reported by `losetup -a` to locate leftover images rather than assuming a repository-relative temporary directory. Later test runs leave these leftovers alone.
 List devices with `losetup -a` and mounts with `findmnt -R /run/media`; identify each test
 device by its backing image before acting on it.
 Unmount a mounted leftover with `udisksctl unmount -b /dev/loopN`, then remove its loop device
