@@ -53,15 +53,20 @@ lock.packages[''].version = version;
 updates.set(lockPath, { original: lockOriginal, next: JSON.stringify(lock, null, 2) + '\n' });
 
 // The existing JSON-aware packer stamps both MCPB versions and the release URL,
-// rehashing the bundle when its manifest changes. Preflight before writing files.
+// then syncs the hash even when only the bundle's source changed. Preflight before writing files.
 function stamp(checkOnly) {
-  const result = spawnSync(process.execPath, [path.join(root, 'scripts/ci/pack-mcpb.mjs'),
-    '--set-version', version, ...(checkOnly ? ['--dry-run'] : [])], {
-    env: { ...process.env, CHECK_MCPB_ROOT: root }, encoding: 'utf8',
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`pack-mcpb.mjs --set-version failed (exit=${result.status}): ${result.stderr || result.stdout}`);
-  return result.stdout.trim();
+  const commands = [['--set-version', version, ...(checkOnly ? ['--dry-run'] : [])]];
+  if (!checkOnly) commands.push(['--sync']);
+  const output = [];
+  for (const command of commands) {
+    const result = spawnSync(process.execPath, [path.join(root, 'scripts/ci/pack-mcpb.mjs'), ...command], {
+      env: { ...process.env, CHECK_MCPB_ROOT: root }, encoding: 'utf8',
+    });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(`pack-mcpb.mjs ${command[0]} failed (exit=${result.status}): ${result.stderr || result.stdout}`);
+    output.push(result.stdout.trim());
+  }
+  return output.join('\n');
 }
 stamp(true);
 if (check) {

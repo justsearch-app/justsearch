@@ -102,3 +102,45 @@ test('check rejects every divergent projection without repairing it; sync restor
     assert.equal(sync(root, '--check').status, 0, rel);
   }
 });
+
+for (const [name, rel, mutate] of [
+  ['hash-only drift', 'packaging/mcpb/server.json', value => {
+    const server = JSON.parse(value);
+    server.packages[0].fileSha256 = 'f'.repeat(64);
+    return JSON.stringify(server, null, 2) + '\n';
+  }],
+  ['source-content drift', 'packaging/mcpb/server/index.js', value => value + '\n// Changed bundle content.\n'],
+]) {
+  test(`sync repairs ${name} without a version bump; check and WhatIf write nothing`, (t) => {
+    const root = fixture(t);
+    assert.equal(sync(root).status, 0);
+    assert.equal(sync(root, '--check').status, 0);
+    const original = read(root, rel);
+    const changed = mutate(original);
+    assert.notEqual(changed, original);
+    fs.writeFileSync(path.join(root, rel), changed);
+    const snapshot = () => Object.fromEntries(fs.readdirSync(root, { recursive: true })
+      .filter(file => fs.statSync(path.join(root, file)).isFile())
+      .map(file => [file, read(root, file)]));
+    const before = snapshot();
+    const check = sync(root, '--check');
+    assert.equal(check.status, 1, check.stderr);
+    assert.match(check.stderr, /Version projections differ.*packaging\/mcpb\/server\.json/);
+    assert.match(check.stderr, /Run node scripts\/ci\/sync-version\.mjs/);
+    assert.deepEqual(snapshot(), before, 'check must not write any file');
+    const whatIf = sync(root, '--what-if');
+    assert.equal(whatIf.status, 0, whatIf.stderr);
+    assert.deepEqual(snapshot(), before, 'WhatIf must not write any file');
+    const result = sync(root);
+    assert.equal(result.status, 0, result.stderr);
+    const after = sync(root, '--check');
+    assert.equal(after.status, 0, after.stderr);
+    const expected = { ...before };
+    const server = JSON.parse(expected['packaging/mcpb/server.json']);
+    const repaired = json(root, 'packaging/mcpb/server.json');
+    assert.notEqual(repaired.packages[0].fileSha256, server.packages[0].fileSha256);
+    server.packages[0].fileSha256 = repaired.packages[0].fileSha256;
+    expected['packaging/mcpb/server.json'] = JSON.stringify(server, null, 2) + '\n';
+    assert.deepEqual(snapshot(), expected, 'sync must only repair the hash');
+  });
+}
