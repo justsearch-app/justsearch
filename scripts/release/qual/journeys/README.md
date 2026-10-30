@@ -467,8 +467,8 @@ python3 scripts/release/qual/journeys/gpu-host.py \
 
 This skips all downloads/activation, restores only the kept lane's facts and
 saved state, and labels the result `development-rerun`, never fresh release
-qualification. The original failed report remains unchanged. The write budget
-retains its original device baseline across recovery. Completed UI-authored
+qualification. The original failed report remains unchanged. Recovery is a new
+invocation: its write backstop starts a fresh baseline. Completed UI-authored
 facts are checkpointed and verified against their saved-state snapshot on
 recovery; the already-bookmarked view is not authored a second time. The empty
 sandbox-home mount placeholders are rebuilt for the new evidence path. Exited

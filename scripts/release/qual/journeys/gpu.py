@@ -199,6 +199,8 @@ def soak_decision(source, last_release=None):
         raise Infrastructure('--last-release must be a version release tag')
     if tag not in git('tag', '--list', tag).splitlines():
         raise Infrastructure('--last-release must name a local release tag')
+    if git('rev-parse', tag + '^{commit}') == candidate:
+        raise Infrastructure('--last-release points at the candidate itself; name the previous release')
     paths = git('diff', '--name-only', tag, candidate).splitlines()
     # Uncommitted production changes cannot be described by the pinned candidate.
     dirty = git('diff', '--name-only', 'HEAD').splitlines() + git('ls-files', '--others', '--exclude-standard').splitlines()

@@ -128,7 +128,8 @@ class ReviewTests(unittest.TestCase):
             git('tag', '-d', 'v1.0.0')
             with self.assertRaisesRegex(runner.Infrastructure, 'last-release'):
                 gpu.soak_decision(source)
-            self.assertFalse(gpu.soak_decision(source, 'v1.1.0')['run'])
+            with self.assertRaisesRegex(runner.Infrastructure, 'candidate itself'):
+                gpu.soak_decision(source, 'v1.1.0')
 
     def test_idle_app_does_not_pass_the_soak_without_long_corpus_ingestion(self):
         with tempfile.TemporaryDirectory() as tmp:
