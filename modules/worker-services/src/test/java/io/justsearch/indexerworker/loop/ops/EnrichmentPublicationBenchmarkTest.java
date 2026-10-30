@@ -35,6 +35,7 @@ final class EnrichmentPublicationBenchmarkTest extends LuceneExecutorTestBase {
             return result;
           }));
       var provider = mock(EmbeddingProvider.class);
+      when(provider.isAvailable()).thenReturn(true);
       when(provider.embedDocumentBatch(anyList())).thenAnswer(invocation -> {
         List<String> contents = invocation.getArgument(0);
         return contents.stream().map(text -> { float[] vector = new float[384]; vector[0] = 1; return vector; }).toList();

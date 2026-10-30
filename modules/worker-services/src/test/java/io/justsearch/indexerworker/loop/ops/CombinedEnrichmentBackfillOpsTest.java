@@ -507,38 +507,21 @@ class CombinedEnrichmentBackfillOpsTest {
     assertFalse(drained.progressed());
   }
 
-  /**
-   * The other half of {@code progressed}'s contract (tempdoc 798 review F2): an embed batch whose
-   * result is null or size-mismatched gives its documents NO update at all — not even a retry bump
-   * — so nothing changed on disk and the next batch would be byte-identical. Counting those docs
-   * as progress kept the tight loop spinning on a systematically failing encoder until the cycle
-   * budget expired.
-   */
   @Test
-  @DisplayName("embed batch size mismatch is NOT progress (no doc received any update)")
-  void embedBatchSizeMismatch_isNotProgress() {
-    seedDoc(
-        "doc-x",
-        "content x",
-        Map.of(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING));
-    seedDoc(
-        "doc-y",
-        "content y",
-        Map.of(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING));
-    // One vector back for two requested docs — the index-aligned loop cannot use it.
-    when(embeddingProvider.embedDocumentBatch(anyList()))
-        .thenReturn(List.of(new float[] {1f, 2f}));
-
+  @DisplayName("malformed embedding batch reaches individual escalation")
+  void embedBatchSizeMismatch_fallsBackToIndividualAttempts() {
+    seedDoc("doc-x", "content x", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING"));
+    seedDoc("doc-y", "content y", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING"));
+    when(embeddingProvider.embedDocumentBatch(anyList())).thenReturn(List.of(new float[] {1f, 2f}));
     var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(embedOnlyContext());
-
-    assertFalse(outcome.wroteAnything(), "no update map was populated, so no write went out");
-    assertFalse(
-        outcome.progressed(),
-        "a doc that received no update has not advanced — reporting progress here spins the tight"
-            + " loop against a systematically failing embed batch until the cycle budget expires");
-    assertNull(
-        fakeIndex.get("doc-x").get(SchemaFields.EMBEDDING_RETRY_COUNT),
-        "the size-mismatch branch deliberately leaves the docs untouched for the next cycle");
+    assertTrue(outcome.wroteAnything());
+    assertTrue(outcome.progressed());
+    for (String id : List.of("doc-x", "doc-y")) {
+      assertEquals("1", fakeIndex.get(id).get(SchemaFields.EMBEDDING_RETRY_COUNT));
+      assertEquals("PENDING", fakeIndex.get(id).get(SchemaFields.EMBEDDING_STATUS));
+    }
+    verify(embeddingProvider).embedDocument(eq("content x"), any());
+    verify(embeddingProvider).embedDocument(eq("content y"), any());
   }
 
   @Test
@@ -575,9 +558,8 @@ class CombinedEnrichmentBackfillOpsTest {
 
   @Test
   @DisplayName(
-      "SPLADE batch catch does not clobber a doc that already got a successful write earlier in"
-          + " the same batch (partial-result-then-exception case)")
-  void spladeBatchPartialWrite_doesNotClobberAlreadyCompletedDocOnEscalation() throws Exception {
+      "a misaligned SPLADE batch cannot publish positional results")
+  void spladeBatchPartialResult_escalatesOnlyTheAttemptedSlice() throws Exception {
     seedDoc(
         "doc-a",
         "splade content a",
@@ -591,20 +573,15 @@ class CombinedEnrichmentBackfillOpsTest {
         "splade content b",
         Map.of(SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_PENDING));
 
-    // Encoder returns a short (size-1) result for a 2-doc request: index 0 succeeds, index 1
-    // throws IndexOutOfBoundsException inside the loop — same trigger class as the AIOOBE
-    // crash-loop this codebase has hardened against elsewhere (EmbeddingBackfillOps).
     when(spladeEncoder.encodeBatch(anyList()))
         .thenReturn(new ArrayList<>(List.of(Map.of("tok", 1.0f))));
 
     CombinedEnrichmentBackfillOps.processCombinedBackfill(context(false, true, false));
 
     Map<String, Object> aState = fakeIndex.get("doc-a");
-    assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, aState.get(SchemaFields.SPLADE_STATUS));
-    assertEquals(
-        "0",
-        aState.get(SchemaFields.SPLADE_RETRY_COUNT),
-        "doc-a's successful write must not be overwritten by the batch-catch escalation");
+    assertEquals(SchemaFields.SPLADE_STATUS_PENDING, aState.get(SchemaFields.SPLADE_STATUS));
+    assertEquals("1", aState.get(SchemaFields.SPLADE_RETRY_COUNT));
+    assertFalse(aState.containsKey(SchemaFields.SPLADE));
 
     Map<String, Object> bState = fakeIndex.get("doc-b");
     assertEquals("1", bState.get(SchemaFields.SPLADE_RETRY_COUNT));
@@ -730,8 +707,8 @@ class CombinedEnrichmentBackfillOpsTest {
 
   @Test
   @DisplayName(
-      "a stop before the re-derived SPLADE stage withholds the parent's unrelated update")
-  void completedParentSplade_stopBeforeSplade_preservesExistingRmwInputs() throws Exception {
+      "a deadline after embedding still publishes its required SPLADE preservation")
+  void completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes() throws Exception {
     seedDoc(
         "parent-stop",
         "parent content",
@@ -749,23 +726,21 @@ class CombinedEnrichmentBackfillOpsTest {
               return List.of(new float[] {3f, 4f});
             });
 
+    when(spladeEncoder.encodeBatch(anyList())).thenReturn(List.of(Map.of("fresh", 1f)));
     var outcome =
         CombinedEnrichmentBackfillOps.processCombinedBackfill(
             context(true, true, false, false, false, false, stop::get));
 
-    assertTrue(outcome.aborted());
-    assertFalse(outcome.progressed());
-    verify(spladeEncoder, never()).encodeBatch(anyList());
-    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+    assertTrue(outcome.progressed());
+    verify(spladeEncoder).encodeBatch(List.of("parent content"));
     Map<String, Object> state = fakeIndex.get("parent-stop");
-    assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING, state.get(SchemaFields.EMBEDDING_STATUS));
+    assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED, state.get(SchemaFields.EMBEDDING_STATUS));
     assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
-    assertEquals(Map.of("old", 2.0f), state.get(SchemaFields.SPLADE));
   }
 
   @Test
-  @DisplayName("a stop after re-derived SPLADE but before NER withholds SPLADE-only churn")
-  void completedParentSplade_stopBeforeNer_requiresNerOutcome() throws Exception {
+  @DisplayName("SPLADE preservation follows the NER outcome it must preserve")
+  void completedParentSplade_preservationFollowsNerOutcome() throws Exception {
     seedDoc(
         "parent-stop-ner",
         "parent content",
@@ -786,10 +761,11 @@ class CombinedEnrichmentBackfillOpsTest {
         CombinedEnrichmentBackfillOps.processCombinedBackfill(
             context(false, true, true, false, false, false, stop::get));
 
-    assertTrue(outcome.aborted());
-    assertFalse(outcome.progressed());
-    verify(nerService, never()).extractEntitiesBatch(anyList());
-    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+    assertTrue(outcome.progressed());
+    verify(nerService).extractEntitiesBatch(List.of("parent content"));
+    assertEquals(SchemaFields.NER_STATUS_COMPLETED_EMPTY,
+        fakeIndex.get("parent-stop-ner").get(SchemaFields.NER_STATUS));
+    assertEquals(Map.of("fresh", 1f), fakeIndex.get("parent-stop-ner").get(SchemaFields.SPLADE));
   }
 
   @Test
@@ -888,7 +864,8 @@ class CombinedEnrichmentBackfillOpsTest {
     assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
         fakeIndex.get("second").get(SchemaFields.EMBEDDING_STATUS));
 
-    var retried = CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
+    var retried = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+        context(true, true, false, false, false, false, () -> false, () -> false, progress));
     assertTrue(retried.progressed());
     verify(embeddingProvider, times(1)).embedDocumentWindows(eq("second content"), eq(0), anyInt());
     assertFalse(progress.isComplete("second"));
@@ -917,7 +894,9 @@ class CombinedEnrichmentBackfillOpsTest {
               return new EmbeddingProvider.WindowSlice(
                   List.of(new float[] {1f, 0f}, new float[] {0f, 1f}), 0, 2);
             });
-    when(spladeEncoder.encodeBatch(anyList())).thenReturn(List.of(Map.of("fresh", 1.0f)));
+    when(spladeEncoder.encodeBatch(anyList()))
+        .thenThrow(new io.justsearch.ort.SessionTemporarilyUnavailableException("temporarily unavailable"))
+        .thenReturn(List.of(Map.of("fresh", 1.0f)));
 
     var withheld =
         CombinedEnrichmentBackfillOps.processCombinedBackfill(

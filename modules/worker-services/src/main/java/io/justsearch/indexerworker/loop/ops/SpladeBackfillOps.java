@@ -8,6 +8,7 @@ import io.justsearch.indexerworker.loop.pacing.BulkPacePolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
+import io.justsearch.ort.SessionAcquisitionException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -175,8 +176,16 @@ public final class SpladeBackfillOps {
         }
       } catch (Exception e) {
         context.log().error("SPLADE batch encoding failed: {}", e.getMessage());
+        if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e)) {
+          commitIfNeeded(context, processed, failed, markedFailed);
+          return new StageOutcome(false, processed, (System.nanoTime() - t0) / 1_000_000);
+        }
         // Fallback to per-doc encoding
         for (int i = 0; i < batchDocIds.size(); i++) {
+          if (context.spladeEncoderSupplier().get() != encoder) {
+            commitIfNeeded(context, processed, failed, markedFailed);
+            return new StageOutcome(false, processed, (System.nanoTime() - t0) / 1_000_000);
+          }
           pacer.beforeUnit(1);
           try {
             Map<String, Float> sparseVec = encoder.encode(
@@ -187,6 +196,10 @@ public final class SpladeBackfillOps {
             updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
             if (batch.update(batchDocIds.get(i), updates)) processed++;
           } catch (Exception e2) {
+            if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e2)) {
+              commitIfNeeded(context, processed, failed, markedFailed);
+              return new StageOutcome(false, processed, (System.nanoTime() - t0) / 1_000_000);
+            }
             markedFailed +=
                 batch.failure(batchDocIds.get(i), SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
             failed++;
@@ -253,6 +266,15 @@ public final class SpladeBackfillOps {
       context.log().error("Error during SPLADE backfill", e);
       return new StageOutcome(false, 0, (System.nanoTime() - t0) / 1_000_000);
     }
+  }
+
+  static boolean isSystemicFailure(Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof SessionAcquisitionException
+          || cause instanceof java.util.concurrent.CancellationException) return true;
+      if (CombinedEnrichmentBackfillOps.isArenaOomFailure(cause)) return true;
+    }
+    return false;
   }
 
   /**

@@ -39,6 +39,11 @@ class EmbeddingBackfillOpsTest {
   @Mock WorkerSignalBus signalBus;
   @Mock EmbeddingProvider embeddingProvider;
 
+  @org.junit.jupiter.api.BeforeEach
+  void availableProvider() {
+    lenient().when(embeddingProvider.isAvailable()).thenReturn(true);
+  }
+
   private EmbeddingBackfillOps.BackfillContext context() {
     return new EmbeddingBackfillOps.BackfillContext(
         documentFieldOps,
