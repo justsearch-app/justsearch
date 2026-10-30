@@ -637,12 +637,12 @@
         {
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/state/composerPort.test.ts",
-          "test": "returns a successor after a conditional change and never reuses the previous edit"
+          "test": "clears only a current capture and invalidates it on success"
         },
         {
           "layer": "controller",
           "file": "modules/ui-web/src/shell-v0/state/composerPort.test.ts",
-          "test": "applies assignment synchronously before capturing the successor, including reentrant edits"
+          "test": "clears synchronously before returning, including reentrant edits"
         }
       ]
     },
@@ -2695,11 +2695,6 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
           "test": "CP1c %s clears at submission only after the draft write succeeds"
-        },
-        {
-          "layer": "controller",
-          "file": "modules/ui-web/src/shell-v0/state/composerPort.test.ts",
-          "test": "CP3 composition start invalidates without publishing a committed edit"
         }
       ]
     },

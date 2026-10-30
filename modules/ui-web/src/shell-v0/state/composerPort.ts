@@ -17,8 +17,6 @@ interface ComposerSource {
   clear(): void;
 }
 
-export type ComposerChange = { status: 'applied'; capture: ComposerCapture } | { status: 'stale' };
-
 /** A port stays bound to its incarnation, even after the current composer changes. */
 export class ComposerPort {
   private readonly incarnation = Symbol('composer');
@@ -38,15 +36,9 @@ export class ComposerPort {
   replace(text: string): void { this.source.replace(text); }
   clear(): void { this.source.clear(); }
 
-  replaceIf(capture: ComposerCapture, text: string): ComposerChange {
-    if (!this.isCurrent(capture)) return { status: 'stale' };
-    this.replace(text);
-    return { status: 'applied', capture: this.snapshot() };
-  }
-
-  clearIf(capture: ComposerCapture): ComposerChange {
-    if (!this.isCurrent(capture)) return { status: 'stale' };
+  clearIf(capture: ComposerCapture): boolean {
+    if (!this.isCurrent(capture)) return false;
     this.clear();
-    return { status: 'applied', capture: this.snapshot() };
+    return true;
   }
 }

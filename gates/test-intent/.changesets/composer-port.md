@@ -58,4 +58,12 @@ from a changeset under the test-intent rules. The ceiling script self-test is to
 
 ## Acceptance records
 
-Independent acceptance is pending.
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-mmo8jwuu-0605675",
+  "verdict": "accept",
+  "digest": "sha256:7c2fdb33b6b502c6d05f0fb56cabd4eda001527d0046b5155e900f6aabdb38b1"
+}
+```
