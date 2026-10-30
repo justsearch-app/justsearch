@@ -2468,7 +2468,8 @@ export class SearchV3View extends JfElement {
         const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
         if (state === 'DONE' && stop === undefined && !local.haltRequested) {
           pending.doneGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
-        } else if (!local.haltRequested) {
+        } else if (!local.haltRequested || state === 'DONE') {
+          // Our Halt still needs its saved confirmation when completion wins the race.
           delete pending.doneGraceUntil;
         }
         // A saved Stop can precede the final checkpoint; keep reading through both edges.

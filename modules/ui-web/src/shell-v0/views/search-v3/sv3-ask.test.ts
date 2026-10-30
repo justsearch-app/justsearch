@@ -79,8 +79,14 @@ describe('S9 Ask Stop keeps delivery outcomes available to the shared attempt vo
   });
 
   it('a lost answer rejects rather than reporting an HTTP refusal', async () => {
-    fetchMock.mockRejectedValue(new TypeError('connection lost'));
-    await expect(sv3StopAsk('', 'conversation', 'turn')).rejects.toThrow('connection lost');
+    const lostAnswer = new TypeError('connection lost');
+    fetchMock.mockRejectedValue(lostAnswer);
+    const outcome = await sv3StopAsk('', 'conversation', 'turn').then(
+      (response) => ({ rejected: false, value: response }),
+      (error: unknown) => ({ rejected: true, value: error }),
+    );
+    expect(outcome.rejected).toBe(true);
+    expect(outcome.value).toBe(lostAnswer);
   });
 });
 

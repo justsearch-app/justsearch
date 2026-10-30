@@ -514,7 +514,7 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     }
   });
 
-  it.each(['accepted', 'refused', 'network', 'no-answer'] as const)('N4 %s Stop bounds record polling to the five-second grace even after further notifications', async (outcome) => {
+  it.each(['accepted', 'refused', 'network', 'no-answer'] as const)('N4 %s Stop without a saved DONE bounds record polling to the five-second grace even after further notifications', async (outcome) => {
     const owner = await mount(); await start(owner);
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     try {
@@ -537,26 +537,29 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     }
   });
 
-  it('N4 an accepted Halt keeps the completed answer and disposition when its saved confirmation arrives within the grace', async () => {
+  it('DS3 DS4 this window own Halt still waits beyond the clean-DONE grace', async () => {
     const owner = await mount(); await start(owner);
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     try {
       runState = 'DONE';
       events = [prompt(), wire('2', 'ASSISTANT_MESSAGE', 'Finished answer', { disposition: 'COMPLETED', shapeId: 'core.agent-run' })];
       clickStop(owner); await vi.advanceTimersByTimeAsync(0);
-      finishDelete(); await vi.advanceTimersByTimeAsync(4000);
+      const initialReads = threadReads;
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(threadReads).toBeGreaterThan(initialReads);
       expect(noteCount(owner)).toBe(0);
-      await saveStop(true);
+      await saveStop(true); finishDelete();
       await vi.advanceTimersByTimeAsync(500);
       expect(noteCount(owner)).toBe(1);
       expect(owner.sessions.sessions.flatMap((s) => s.turns)[0]!.disposition).toBe('COMPLETED');
     } finally {
-      owner.remove(); await vi.advanceTimersByTimeAsync(0);
+      owner.remove();
+      await vi.advanceTimersByTimeAsync(0);
       vi.clearAllTimers(); vi.useRealTimers();
     }
   });
 
-  it.each(['pending', 'CANCELLED', 'DONE'] as const)('G2 a resumed run adopted into another conversation bounds accepted Stop polling after %s', async (terminal) => {
+  it.each(['pending', 'CANCELLED', 'DONE'] as const)('G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after %s', async (terminal) => {
     const owner = await mount();
     const ctrl = getAgentSessionController('');
     pendingControl = dispatchRunControl(ctrl, { kind: 'resume', sessionId: 'prior-run', resumable: true });

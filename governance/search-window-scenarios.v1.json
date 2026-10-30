@@ -1938,7 +1938,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
-          "test": "G2 a resumed run adopted into another conversation bounds accepted Stop polling after %s"
+          "test": "G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after %s"
         }
       ]
     },
@@ -2012,7 +2012,7 @@
         {
           "layer": "real-ui-fixture",
           "binding": null,
-          "reason": "For a resumed run the stop request is sent and the run stays observed, but the window does not show the stopping state; it shows the outcome once the run ends."
+          "reason": "For a run resumed from session history without selecting the conversation it was adopted into, the stop request is sent and the run stays observed, but the window does not show the stopping state; it shows the outcome once the run ends. Selecting that conversation shows the stopping state."
         }
       ]
     },
