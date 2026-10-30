@@ -152,6 +152,12 @@ final class LinuxWatchedDriveReturnIntegrationTest {
           awaitIndexingIdle(f);
           volume.releaseDecoy();
           long returnedDescriptors = descriptorCount();
+          // Indexing can be idle while a background commit briefly opens a directory for fsync.
+          long settleUntil = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+          while (returnedDescriptors > descriptors && System.nanoTime() < settleUntil) {
+            Thread.sleep(25);
+            returnedDescriptors = descriptorCount();
+          }
           var addedTargets = descriptorTargets().entrySet().stream()
               .filter(entry -> entry.getValue() > initialTargets.getOrDefault(entry.getKey(), 0L))
               .toList();
