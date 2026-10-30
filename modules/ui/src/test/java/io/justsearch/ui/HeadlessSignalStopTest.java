@@ -152,6 +152,33 @@ final class HeadlessSignalStopTest {
     } finally { stop(child, dir); }
   }
 
+  @ParameterizedTest(name = "deadlineIsFatalWhenCooperativeOwnerHasNotSelectedStatus({index}: {arguments})")
+  @CsvSource({"quit,TERM", "quit,INT", "restart,TERM", "restart,INT", "upgrade,TERM", "upgrade,INT"})
+  void deadlineIsFatalWhenCooperativeOwnerHasNotSelectedStatus(String owner, String signal,
+      @TempDir Path dir) throws Exception {
+    Process child = child(dir, "deadline-owned-" + owner);
+    try {
+      await(dir, child, "ready");
+      signal(child, signal);
+      assertTrue(child.waitFor(3, TimeUnit.SECONDS), output(dir));
+      assertEquals(1, child.exitValue(), "held " + owner + " close must be fatal: " + output(dir));
+      assertFalse(Files.exists(dir.resolve("hook")), "deadline halt must bypass every JVM hook");
+    } finally { stop(child, dir); }
+  }
+
+  @ParameterizedTest(name = "deadlineKeepsStatusAlreadySelectedByRestart({index}: {arguments})")
+  @CsvSource({"TERM", "INT"})
+  void deadlineKeepsStatusAlreadySelectedByRestart(String signal, @TempDir Path dir) throws Exception {
+    Process child = child(dir, "deadline-selected-restart");
+    try {
+      await(dir, child, "ready");
+      assertTrue(Files.exists(dir.resolve("hook")), "restart selected its status before starting hooks");
+      signal(child, signal);
+      assertTrue(child.waitFor(3, TimeUnit.SECONDS), output(dir));
+      assertEquals(4, child.exitValue(), "deadline must keep the selected restart status: " + output(dir));
+    } finally { stop(child, dir); }
+  }
+
   @Test
   void handlerRegistrationFailureKeepsDefaultHandlingAndAttemptsBothSignals() throws Exception {
     Class<?> routerType = null;

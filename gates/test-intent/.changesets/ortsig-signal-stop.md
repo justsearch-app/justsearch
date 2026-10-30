@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: ortsig
 author-role: builder
-author-session: ortsig-builder-3
+author-session: ortsig-builder-4
 ---
 
 # Test-intent entries
@@ -19,11 +19,16 @@ The supplied contract is agent-adopted under delegated choice, not owner-adopted
 The existing competing-JVM-hook limitation probe is retained unchanged.
 Baseline 7959b712fd is built as a private shared clone; no source metadata is changed.
 Evidence uses a temporary copy of the repository runner, with the reviewable adapter at
-`tmp/verify/ortsig-round3/evidence-runner.patch`: js-gradle-slot, shared clones, no init scripts,
+`tmp/verify/ortsig-round4/evidence-runner.patch`: js-gradle-slot, shared clones, no init scripts,
 slot-75 retries, and a read-only SHA-256 working-tree hash in place of git add. No assertions or test selection
 semantics are changed. Child launch resets inherited SIG_IGN for INT before exec on both trees.
 Python3 and Node are test-launch/classification dependencies, not product dependencies.
-Detailed before/after observations and limits: `tmp/verify/ortsig-builder-3-report.md`.
+Detailed before/after observations and limits: `tmp/verify/ortsig-builder-4-report.md`.
+The S3/S5 deadline repair covers a held close already owned by quit, restart or upgrade
+for TERM and INT: status 1 with no hooks. Both signals also retain a previously selected
+restart status 4. All six held-close cases fail by status assertion on candidate 59714ea571;
+the selected-status controls pass on that candidate. The evidence below reruns against
+7959b712fd; the repair report retains the separate 59714ea571 comparison.
 Independent acceptance is left to the verifier; this builder does not author an acceptance record.
 
 ```json
@@ -38,7 +43,7 @@ Independent acceptance is left to the verifier; this builder does not author an 
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessSignalHandoffProbe.java"
       ],
       "class": "New",
-      "behaviour": "S1\u2013S6: real TERM/INT child-JVM ordering for active, queued and truly detached native leases; bounded boot/close and fatal deadline status; one exit with first reason and nonce-bound upgrade receipt; registration refusal retains defaults; clean or halted Engine-only termination ends Linux-bound extraction/MCP stand-in helpers, with fatal status at deadline. The probe uses mocked OrtSession.run with real NativeSessionHandle/DetachableRun and admission ownership; it requires no model or GPU.",
+      "behaviour": "S1\u2013S6: real TERM/INT child-JVM ordering for active, queued and truly detached native leases; bounded boot/close and fatal deadline status even when quit/restart/upgrade already owns a held close, retaining already-selected status; one exit with first reason and nonce-bound upgrade receipt; registration refusal retains defaults; clean or halted Engine-only termination ends Linux-bound extraction/MCP stand-in helpers, with fatal status at deadline. The probe uses mocked OrtSession.run with real NativeSessionHandle/DetachableRun and admission ownership; it requires no model or GPU.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -59,6 +64,8 @@ Independent acceptance is left to the verifier; this builder does not author an 
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessSignalStopTest.java#deadlineHaltsWithoutHooksAndSecondSignalCannotExtendIt",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessSignalStopTest.java#signalDuringBootFailureWaitsForFatalCleanup",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessSignalStopTest.java#fatalShutdownKeepsItsRealProcessStatusAtDeadline",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessSignalStopTest.java#deadlineIsFatalWhenCooperativeOwnerHasNotSelectedStatus",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessSignalStopTest.java#deadlineKeepsStatusAlreadySelectedByRestart",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessSignalStopTest.java#handlerRegistrationFailureKeepsDefaultHandlingAndAttemptsBothSignals",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessSignalStopTest.java#containedExtractionAndMcpHelpersEndWithSignalStoppedEngine",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppUpgradeShutdownWiringTest.java#signalAndAcknowledgedUpgradeShareOneExitAuthority"

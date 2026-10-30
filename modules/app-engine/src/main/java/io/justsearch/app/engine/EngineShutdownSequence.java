@@ -155,9 +155,8 @@ public final class EngineShutdownSequence {
   private final Object exitAuthority = new Object();
   private boolean selfIntentDurable;
   private volatile boolean exitRequested;
-  private volatile boolean fatalExitRequested;
+  private boolean fatalExitRequested;
   private volatile boolean exitSelected;
-  private volatile int requestedExitCode;
   private int selectedExitCode;
 
   /**
@@ -352,7 +351,7 @@ public final class EngineShutdownSequence {
   /** {@link #runAndExit(Reason)} under a quit's budget; see {@link #run(Reason, QuitBudget)}. */
   public void runAndExit(Reason reason, QuitBudget budget) {
     Objects.requireNonNull(budget, "budget");
-    if (!claimExit(false, reason == Reason.RESTART ? EngineExit.REQUESTED_RESTART : EngineExit.OK)) {
+    if (!claimExit(false)) {
       return;
     }
     recordSelfIntent(selfIntentOf(reason));
@@ -367,7 +366,7 @@ public final class EngineShutdownSequence {
    * charged to the host's transient restart budget; an unclean close retains the fatal code.
    */
   public void runAndExitEscalated() {
-    if (!claimExit(false, EngineExit.ESCALATED_RESTART)) {
+    if (!claimExit(false)) {
       return;
     }
     recordSelfIntent(escalatedSelfIntent());
@@ -395,7 +394,7 @@ public final class EngineShutdownSequence {
         log.warn("Device-loss restart refused: device_lost_restart_commit_failed");
         return false;
       }
-      if (!claimExit(false, EngineExit.REQUESTED_RESTART)) return false;
+      if (!claimExit(false)) return false;
     }
     beforeClose.run();
     Result shutdown = run(Reason.RESTART);
@@ -414,7 +413,7 @@ public final class EngineShutdownSequence {
    * after selection cannot revise an exit already in progress.
    */
   public void runAndExitFatal(Reason reason) {
-    if (!claimExit(true, EngineExit.FATAL_OR_UNCAUGHT)) {
+    if (!claimExit(true)) {
       return;
     }
     Result shutdown = run(reason);
@@ -429,7 +428,7 @@ public final class EngineShutdownSequence {
    * shell treats absence as "did not stop cleanly", which is the safe reading.
    */
   public void runAndExitWithReceipt(String preparationId, String shutdownNonce) {
-    if (!claimExit(false, EngineExit.OK)) {
+    if (!claimExit(false)) {
       return;
     }
     recordSelfIntent(selfIntentOf(Reason.UPGRADE));
@@ -468,7 +467,7 @@ public final class EngineShutdownSequence {
   public Runnable claimSignalStop(int status, QuitBudget budget) {
     if (status != 130 && status != 143) throw new IllegalArgumentException("not TERM/INT status");
     Objects.requireNonNull(budget, "budget");
-    if (!claimExit(false, status)) return null;
+    if (!claimExit(false)) return null;
     return () -> {
       recordSelfIntent(selfIntentOf(Reason.QUIT));
       Result shutdown = run(Reason.QUIT, budget);
@@ -480,12 +479,10 @@ public final class EngineShutdownSequence {
   /** Lock-free for the signal watchdog: even a stuck close or intent write cannot delay halt. */
   public int signalDeadlineExitCode(int unclaimedCode) {
     if (exitSelected) return selectedExitCode;
-    return fatalExitRequested ? EngineExit.FATAL_OR_UNCAUGHT
-        : exitRequested ? (requestedExitCode == 130 || requestedExitCode == 143
-            ? EngineExit.FATAL_OR_UNCAUGHT : requestedExitCode) : unclaimedCode;
+    return exitRequested ? EngineExit.FATAL_OR_UNCAUGHT : unclaimedCode;
   }
 
-  private boolean claimExit(boolean fatal, int preferredCode) {
+  private boolean claimExit(boolean fatal) {
     synchronized (exitAuthority) {
       if (fatal) {
         fatalExitRequested = true;
@@ -493,7 +490,6 @@ public final class EngineShutdownSequence {
       if (exitRequested) {
         return false;
       }
-      requestedExitCode = preferredCode;
       exitRequested = true;
       return true;
     }

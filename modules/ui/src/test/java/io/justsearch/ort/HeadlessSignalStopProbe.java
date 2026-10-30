@@ -56,6 +56,10 @@ public final class HeadlessSignalStopProbe {
       return;
     }
     if (router != null) invoke(router, "beginNativeInitialization");
+    if (mode.startsWith("deadline-owned-") || mode.equals("deadline-selected-restart")) {
+      competingExit(dir, mode, router);
+      return;
+    }
     var admission = new EngineAdmissionController(4, 4, 1);
     var context = new EngineContext(EngineContext.ClientKind.INTERNAL, "signal-probe",
         Optional.empty(), Optional.empty(), "local", "HTTP",
@@ -156,6 +160,40 @@ public final class HeadlessSignalStopProbe {
         sequence.runAndExitFatal(Reason.RESTART);
       } else if (router != null) publish(router, sequence);
     }
+    new java.util.concurrent.CountDownLatch(1).await();
+  }
+
+  private static void competingExit(Path dir, String mode, Object router) throws Exception {
+    boolean selected = mode.equals("deadline-selected-restart");
+    var sequence = new EngineShutdownSequence(dir, List.of(new EngineShutdownSequence.Step(
+        EngineShutdownSequence.INDEX_HALF_STEP, reason -> {
+          write(dir, "draining", reason.name());
+          if (!selected) await(dir, "release");
+          return "GRACEFUL";
+        })), System::exit, code -> Runtime.getRuntime().halt(code),
+        () -> selected ? NativeQuiescence.QUIESCED : NativeQuiescence.UNQUIESCED,
+        ignored -> {});
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      write(dir, "hook", "started");
+      if (selected) {
+        try { await(dir, "release"); }
+        catch (Exception failure) { throw new RuntimeException(failure); }
+      } else {
+        write(dir, "release", "baseline hook releases held close");
+        sequence.runFromJvmShutdownHook(Reason.QUIT);
+      }
+    }, "competing-exit-hook"));
+    if (router != null) publish(router, sequence);
+    Thread.ofPlatform().name("competing-exit-owner").start(() -> {
+      switch (mode) {
+        case "deadline-owned-upgrade" -> sequence.runAndExitWithReceipt("preparation", "nonce");
+        case "deadline-owned-restart", "deadline-selected-restart" -> sequence.runAndExit(Reason.RESTART);
+        case "deadline-owned-quit" -> sequence.runAndExit(Reason.QUIT);
+        default -> throw new IllegalArgumentException(mode);
+      }
+    });
+    await(dir, selected ? "hook" : "draining");
+    write(dir, "ready", mode);
     new java.util.concurrent.CountDownLatch(1).await();
   }
 
