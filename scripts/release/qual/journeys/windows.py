@@ -291,7 +291,11 @@ class Target(LinuxTarget):
 
     def stop(self, identities):
         # Revalidate creation time and image immediately before terminating.
-        payload = base64.b64encode(json.dumps(identities).encode()).decode()
+        # WebView2 command lines can overflow CreateProcess's command limit
+        # after JSON/base64/EncodedCommand expansion. They are not stop evidence.
+        payload = base64.b64encode(json.dumps([
+            {key: row[key] for key in ('pid', 'created', 'exe')} for row in identities
+        ]).encode()).decode()
         powershell(r"""
 $rows = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('""" + payload + r"""')) | ConvertFrom-Json
 foreach ($row in $rows) {

@@ -151,6 +151,24 @@ function Get-ItemProperty {param($Path) [pscustomobject]@{NoAutoUpdate=1;AUOptio
             with self.subTest(key=key), self.assertRaises(ProductFailure):
                 windows.cancel_result(dict(valid, **{key: False}))
 
+    def test_process_cleanup_fits_windows_command_limit_without_dropping_lifetime_checks(self):
+        import base64
+        import re
+        target=windows.Target()
+        rows=[{'pid':50+i,'created':'2026-10-30T01:00:00.1234567Z',
+               'exe':r'C:\app\msedgewebview2.exe','command':'x'*3000,'ppid':49}
+              for i in range(12)]
+        with patch.object(windows,'powershell') as shell,patch.object(target,'alive',return_value=[]):
+            target.stop(rows)
+        source=shell.call_args.args[0]
+        encoded=base64.b64encode(source.encode('utf-16-le')).decode()
+        self.assertLess(len(encoded)+100,32767,'PowerShell cleanup exceeds Windows command limit')
+        payload=re.search(r"FromBase64String\('([^']+)'\)",source)[1]
+        observed=json.loads(base64.b64decode(payload))
+        self.assertEqual(observed,[{k:r[k] for k in ('pid','created','exe')} for r in rows])
+        self.assertIn('$p.StartTime.ToUniversalTime()',source)
+        self.assertIn('$p.MainModule.FileName -ieq $row.exe',source)
+
 
 
 
