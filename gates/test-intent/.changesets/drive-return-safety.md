@@ -93,3 +93,13 @@ are covered. Builder evidence is not an acceptance record.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-da2f9a-codex-1",
+  "verdict": "accept",
+  "digest": "sha256:80eef422333e803b711b231c1c4cac7be1643b3e60d79c4e8195053c188344af"
+}
+```
