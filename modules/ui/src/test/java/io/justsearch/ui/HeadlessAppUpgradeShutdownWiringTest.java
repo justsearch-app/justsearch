@@ -194,14 +194,9 @@ final class HeadlessAppUpgradeShutdownWiringTest {
       dispatch.countDown();
       release.countDown();
       assertTrue(exited.await(3, TimeUnit.SECONDS));
-      assertEquals(signalWins ? 143 : 0, code.get());
+      assertEquals(143, code.get());
       Path receipt = dataDir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE);
-      assertEquals(!signalWins, Files.exists(receipt));
-      if (!signalWins) {
-        var body = JSON.readTree(Files.readString(receipt));
-        assertEquals(prepared.get("preparationId").asString(), body.get("preparationId").asString());
-        assertEquals(prepared.get("shutdownNonce").asString(), body.get("shutdownNonce").asString());
-      }
+      assertFalse(Files.exists(receipt));
     } finally {
       dispatch.countDown();
       release.countDown();

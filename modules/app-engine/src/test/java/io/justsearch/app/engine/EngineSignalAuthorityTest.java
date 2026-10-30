@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -38,20 +39,55 @@ final class EngineSignalAuthorityTest {
   }
 
   @ParameterizedTest(name = "competingTriggersCloseOnceAndKeepFirstReason({index}: {arguments})")
-  @CsvSource({"signal,upgrade,143", "upgrade,signal,143", "signal,quit,143", "quit,signal,143", "signal,restart,143", "restart,signal,143", "signal,fatal,143", "fatal,signal,143", "signal,upgrade,130", "upgrade,signal,130", "signal,quit,130", "quit,signal,130", "signal,restart,130", "restart,signal,130", "signal,fatal,130", "fatal,signal,130"})
-  void competingTriggersCloseOnceAndKeepFirstReason(String first, String second, int signalStatus,
-      @TempDir Path dir) throws Exception {
+  @CsvSource({
+      "quit,signal,143,true",
+      "signal,quit,143,true",
+      "restart,signal,143,true",
+      "signal,restart,143,true",
+      "upgrade,signal,143,true",
+      "signal,upgrade,143,true",
+      "fatal,signal,143,true",
+      "signal,fatal,143,true",
+      "quit,signal,143,false",
+      "signal,quit,143,false",
+      "restart,signal,143,false",
+      "signal,restart,143,false",
+      "upgrade,signal,143,false",
+      "signal,upgrade,143,false",
+      "fatal,signal,143,false",
+      "signal,fatal,143,false",
+      "quit,signal,130,true",
+      "signal,quit,130,true",
+      "restart,signal,130,true",
+      "signal,restart,130,true",
+      "upgrade,signal,130,true",
+      "signal,upgrade,130,true",
+      "fatal,signal,130,true",
+      "signal,fatal,130,true",
+      "quit,signal,130,false",
+      "signal,quit,130,false",
+      "restart,signal,130,false",
+      "signal,restart,130,false",
+      "upgrade,signal,130,false",
+      "signal,upgrade,130,false",
+      "fatal,signal,130,false",
+      "signal,fatal,130,false"})
+  void competingTriggersCloseOnceAndKeepFirstReason(String first, String second,
+      int signalStatus, boolean quiesced, @TempDir Path dir) throws Exception {
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var closes = new AtomicInteger();
     var code = new AtomicInteger(-1);
+    var intent = new AtomicReference<String>();
     var seq = new EngineShutdownSequence(dir, List.of(new EngineShutdownSequence.Step(
         EngineShutdownSequence.INDEX_HALF_STEP, reason -> {
           closes.incrementAndGet();
           entered.countDown();
           if (!release.await(5, TimeUnit.SECONDS)) throw new AssertionError("test did not release");
           return "GRACEFUL";
-        })), code::set);
+        })), code::set, code::set,
+        () -> quiesced ? NativeQuiescence.QUIESCED : NativeQuiescence.UNQUIESCED,
+        ignored -> {}, (reason, detail, expected) -> intent.set(reason + ":" + expected));
     // Reserve synchronously, just as the production signal handler does before dispatch.
     Runnable initial = action(seq, first, signalStatus);
     Thread owner = Thread.ofPlatform().start(initial);
@@ -70,17 +106,37 @@ final class EngineSignalAuthorityTest {
       default -> ShutdownRequest.Reason.QUIT;
     };
     assertEquals(reason, seq.resultIfRun().reason());
-    int expected = first.equals("fatal") || second.equals("fatal") ? 1
-        : first.equals("signal") ? signalStatus
-        : first.equals("restart") ? EngineExit.REQUESTED_RESTART : 0;
+    assertEquals(quiesced ? signalStatus : 1, code.get());
+    assertEquals(switch (first) {
+      case "fatal" -> null;
+      case "restart" -> "ENGINE_RESTART:4";
+      case "upgrade" -> "UPGRADE:0";
+      default -> "QUIT:0";
+    }, intent.get());
+    assertFalse(Files.exists(dir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE)));
+  }
+
+  @ParameterizedTest(name = "signalAfterSelectionKeepsOwnerStatus({index}: {arguments})")
+  @CsvSource({"quit,130,0", "quit,143,0", "restart,130,4", "restart,143,4",
+      "upgrade,130,0", "upgrade,143,0", "fatal,130,1", "fatal,143,1"})
+  void signalAfterSelectionKeepsOwnerStatus(String owner, int signalStatus, int expected,
+      @TempDir Path dir) throws Exception {
+    var code = new AtomicInteger(-1);
+    var sequence = new AtomicReference<EngineShutdownSequence>();
+    var seq = new EngineShutdownSequence(dir, List.of(), selected -> {
+      try {
+        assertNull(claim(sequence.get(), signalStatus));
+      } catch (Exception failure) {
+        throw new AssertionError(failure);
+      }
+      code.set(selected);
+    });
+    sequence.set(seq);
+    action(seq, owner, signalStatus).run();
     assertEquals(expected, code.get());
-    assertEquals(first.equals("upgrade"), Files.exists(dir.resolve("upgrade")
+    assertEquals(expected, method("signalDeadlineExitCode", int.class).invoke(seq, 1));
+    assertEquals(owner.equals("upgrade"), Files.exists(dir.resolve("upgrade")
         .resolve(EngineShutdownSequence.RECEIPT_FILE)));
-    if (first.equals("upgrade")) {
-      String receipt = Files.readString(dir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE));
-      assertTrue(receipt.contains("test-nonce"));
-      assertTrue(receipt.contains("test-preparation"));
-    }
   }
 
   @Test

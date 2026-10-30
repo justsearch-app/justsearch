@@ -156,6 +156,7 @@ public final class EngineShutdownSequence {
   private boolean selfIntentDurable;
   private volatile boolean exitRequested;
   private boolean fatalExitRequested;
+  private int signalStatus;
   private volatile boolean exitSelected;
   private int selectedExitCode;
 
@@ -358,7 +359,7 @@ public final class EngineShutdownSequence {
     Result shutdown = run(reason, budget);
     int completedCode =
         shutdown.reason() == Reason.RESTART ? EngineExit.REQUESTED_RESTART : EngineExit.OK;
-    terminate(shutdown, selectExitCode(shutdown.clean() ? completedCode : EngineExit.FATAL_OR_UNCAUGHT));
+    terminate(shutdown, selectExitCode(shutdown, shutdown.clean() ? completedCode : EngineExit.FATAL_OR_UNCAUGHT));
   }
 
   /**
@@ -373,7 +374,7 @@ public final class EngineShutdownSequence {
     Result shutdown = run(Reason.RESTART);
     int completedCode = shutdown.clean()
         ? EngineExit.ESCALATED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
-    terminate(shutdown, selectExitCode(completedCode));
+    terminate(shutdown, selectExitCode(shutdown, completedCode));
   }
 
   /**
@@ -400,7 +401,7 @@ public final class EngineShutdownSequence {
     Result shutdown = run(Reason.RESTART);
     int completedCode = shutdown.clean()
         ? EngineExit.REQUESTED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
-    terminate(shutdown, selectExitCode(completedCode));
+    terminate(shutdown, selectExitCode(shutdown, completedCode));
     return true;
   }
 
@@ -409,15 +410,16 @@ public final class EngineShutdownSequence {
    *
    * <p>The fatal request and final code selection share {@link #exitAuthority} with the cooperative
    * paths. If a cooperative close is already running, a fatal request that arrives before its code
-   * is selected upgrades that one exit to {@link EngineExit#FATAL_OR_UNCAUGHT}; a request observed
-   * after selection cannot revise an exit already in progress.
+   * is selected upgrades that one exit to {@link EngineExit#FATAL_OR_UNCAUGHT}, unless a signal
+   * selects its baseline status instead. A request observed after selection cannot revise an exit
+   * already in progress.
    */
   public void runAndExitFatal(Reason reason) {
     if (!claimExit(true)) {
       return;
     }
     Result shutdown = run(reason);
-    terminate(shutdown, selectExitCode(EngineExit.FATAL_OR_UNCAUGHT));
+    terminate(shutdown, selectExitCode(shutdown, EngineExit.FATAL_OR_UNCAUGHT));
   }
 
   /**
@@ -433,23 +435,26 @@ public final class EngineShutdownSequence {
     }
     recordSelfIntent(selfIntentOf(Reason.UPGRADE));
     Result shutdown = run(Reason.UPGRADE);
-    int selectedExitCode = selectExitCode(shutdown.clean() ? 0 : 1);
+    int selectedExitCode = selectExitCode(shutdown, shutdown.clean() ? 0 : 1);
     boolean cleanReceipt = shutdown.clean() && selectedExitCode == 0;
-    try {
-      AtomicFileWrites.replace(
-          receiptPath,
-          JSON.writeValueAsBytes(
-              Map.of(
-                  "schemaVersion", 1,
-                  "preparationId", preparationId,
-                  "shutdownNonce", shutdownNonce,
-                  "headPid", ProcessHandle.current().pid(),
-                  "clean", cleanReceipt,
-                  "workerOutcome", shutdown.workerOutcome(),
-                  "errors", shutdown.errors(),
-                  "completedAt", Instant.now().toString())));
-    } catch (Exception e) {
-      log.warn("Could not write the shutdown receipt: {}", e.toString());
+    // Signal status is fixed once selected; a signal-won stop cannot acknowledge an upgrade.
+    if (signalStatus == 0) {
+      try {
+        AtomicFileWrites.replace(
+            receiptPath,
+            JSON.writeValueAsBytes(
+                Map.of(
+                    "schemaVersion", 1,
+                    "preparationId", preparationId,
+                    "shutdownNonce", shutdownNonce,
+                    "headPid", ProcessHandle.current().pid(),
+                    "clean", cleanReceipt,
+                    "workerOutcome", shutdown.workerOutcome(),
+                    "errors", shutdown.errors(),
+                    "completedAt", Instant.now().toString())));
+      } catch (Exception e) {
+        log.warn("Could not write the shutdown receipt: {}", e.toString());
+      }
     }
     terminate(shutdown, selectedExitCode);
   }
@@ -462,17 +467,21 @@ public final class EngineShutdownSequence {
   /**
    * Reserve a signal stop before dispatching its close, preserving the QUIT self-intent written
    * by the JVM shutdown hook on an externally signalled exit.
-   * A null action means another trigger already owns the exit.
+   * A signal before status selection overrides the eventual status, even if another trigger
+   * owns the close. A null action leaves that owner and its self-intent in place.
    */
   public Runnable claimSignalStop(int status, QuitBudget budget) {
     if (status != 130 && status != 143) throw new IllegalArgumentException("not TERM/INT status");
     Objects.requireNonNull(budget, "budget");
-    if (!claimExit(false)) return null;
+    synchronized (exitAuthority) {
+      if (exitSelected) return null;
+      if (signalStatus == 0) signalStatus = status;
+      if (!claimExit(false)) return null;
+    }
     return () -> {
       recordSelfIntent(selfIntentOf(Reason.QUIT));
       Result shutdown = run(Reason.QUIT, budget);
-      terminate(shutdown, selectExitCode(shutdown.nativeQuiescence() == NativeQuiescence.QUIESCED
-          ? status : EngineExit.FATAL_OR_UNCAUGHT));
+      terminate(shutdown, selectExitCode(shutdown, status));
     };
   }
 
@@ -495,12 +504,15 @@ public final class EngineShutdownSequence {
     }
   }
 
-  private int selectExitCode(int preferredCode) {
+  private int selectExitCode(Result shutdown, int preferredCode) {
     synchronized (exitAuthority) {
       if (exitSelected) {
         throw new IllegalStateException("exit code was already selected by another owner");
       }
-      int selectedCode = fatalExitRequested ? EngineExit.FATAL_OR_UNCAUGHT : preferredCode;
+      int selectedCode = signalStatus != 0
+          ? shutdown.nativeQuiescence() == NativeQuiescence.QUIESCED
+              ? signalStatus : EngineExit.FATAL_OR_UNCAUGHT
+          : fatalExitRequested ? EngineExit.FATAL_OR_UNCAUGHT : preferredCode;
       selectedExitCode = selectedCode;
       exitSelected = true;
       return selectedCode;
