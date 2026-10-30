@@ -4,80 +4,34 @@ package io.justsearch.app.engine;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Assumptions;
 
 /** Disposable, user-owned ext4 volume. Never mounts or detaches a device it did not create. */
 final class LinuxLoopVolume implements AutoCloseable {
-  // Names retain the owning process identity even when build output is removed during a run.
-  private static final Path IMAGES = Path.of("build/drive-return-images").toAbsolutePath().normalize();
-  private static final Pattern IMAGE_NAME = Pattern.compile(
-      "drive-return-([0-9]+)-([0-9]+)-[0-9]+(?:-([0-9]+)-([0-9]+)-([0-9]+))?(-decoy)?\\.img");
-  private static final List<LinuxLoopVolume> OWNED = new java.util.concurrent.CopyOnWriteArrayList<>();
-  private static final Commands COMMANDS = new Commands();
-  private static int uid;
-  private static boolean prepared;
   private final Path image;
-  private final FileIdentity identity;
-  private FileIdentity decoyIdentity;
-  private volatile Attachment loop;
-  private volatile Attachment decoy;
-  private final AtomicBoolean cleaning = new AtomicBoolean();
-  private final AtomicBoolean imageCleanup = new AtomicBoolean();
-  private final AtomicBoolean decoyCleanup = new AtomicBoolean();
-  private Path decoyImage;
+  private String loop;
+  private String decoy;
   private Path mounted;
 
-  private LinuxLoopVolume(Path image) throws IOException {
-    this.image = image;
-    identity = recordedIdentity(image);
-    checkImage(image, identity);
-  }
+  private LinuxLoopVolume(Path image) { this.image = image; }
 
-  private static synchronized void prepare() throws Exception {
-    if (COMMANDS.stopping) throw new IOException("Drive test JVM is stopping");
-    if (prepared) return;
-    try { run("udisksctl", "status"); }
-    catch (IOException unavailable) {
-      Assumptions.abort("udisks user loop mounts unavailable: " + unavailable.getMessage());
-    }
-    uid = ((Number) Files.getAttribute(Path.of("/proc/self"), "unix:uid")).intValue();
-    Files.createDirectories(IMAGES, PosixFilePermissions.asFileAttribute(
-        PosixFilePermissions.fromString("rwx------")));
-    if (Files.isSymbolicLink(IMAGES) || !IMAGES.toRealPath().equals(IMAGES)
-        || !owned(IMAGES)) throw new IOException("Unsafe drive image directory: " + IMAGES);
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> COMMANDS.shutdown(() -> {
-      // No class or volume monitor: interrupted test threads may still hold either one.
-      for (var volume : List.copyOf(OWNED)) {
-        try { volume.cleanup(true); }
-        catch (Exception failure) { System.err.println("Drive shutdown cleanup: " + failure); }
-      }
-    }, 20_000), "drive-return-shutdown"));
-    prepared = true;
-  }
-
-  static synchronized LinuxLoopVolume create(Path directory) throws Exception {
-    prepare();
-    Path privateImages = createImageDirectory(IMAGES);
-    var result = new LinuxLoopVolume(createImage(privateImages, false));
-    OWNED.add(result); // Register before any external operation, including a partial attach.
+  static LinuxLoopVolume create(Path directory) throws Exception {
+    Files.createDirectories(directory);
+    var result = new LinuxLoopVolume(directory.resolve("volume.img"));
     try {
-      try (var file = Files.newByteChannel(result.image, StandardOpenOption.WRITE)) {
+      try (var file = Files.newByteChannel(result.image,
+          StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
         file.position(64L * 1024 * 1024 - 1);
         file.write(ByteBuffer.wrap(new byte[1]));
       }
-      Files.createDirectories(directory);
       String owner = Files.getAttribute(directory, "unix:uid") + ":"
           + Files.getAttribute(directory, "unix:gid");
-      checkImage(result.image, result.identity);
       run("mkfs.ext4", "-q", "-F", "-E", "root_owner=" + owner, result.image.toString());
       result.attachAndMount(false);
       return result;
@@ -88,72 +42,11 @@ final class LinuxLoopVolume implements AutoCloseable {
     }
   }
 
-  record FileIdentity(long inode, String device) { }
-  static long processStart(String stat) {
-    // comm can contain spaces and ')'; fields after the final ')' begin at field 3.
-    return Long.parseLong(stat.substring(stat.lastIndexOf(')') + 2).split(" ")[19]);
-  }
-
-  private static boolean owned(Path file) throws IOException {
-    return ((Number) Files.getAttribute(file, "unix:uid", LinkOption.NOFOLLOW_LINKS)).intValue() == uid;
-  }
-
-  private static FileIdentity fileIdentity(Path file) throws IOException {
-    var attributes = Files.readAttributes(file, "unix:ino,dev", LinkOption.NOFOLLOW_LINKS);
-    long dev = ((Number) attributes.get("dev")).longValue();
-    long major = ((dev >>> 8) & 0xfff) | ((dev >>> 32) & 0xfffff000L);
-    long minor = (dev & 0xff) | ((dev >>> 12) & 0xffffff00L);
-    return new FileIdentity(((Number) attributes.get("ino")).longValue(), major + ":" + minor);
-  }
-
-  private static boolean safeFile(Path file) throws IOException {
-    return Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) && owned(file);
-  }
-
-  static Path createImage(Path images, boolean decoy) throws IOException {
-    long pid = ProcessHandle.current().pid();
-    long start = processStart(Files.readString(Path.of("/proc/self/stat")));
-    Path temporary = Files.createTempFile(images, "drive-return-" + pid + "-" + start + "-", ".img");
-    FileIdentity identity = fileIdentity(temporary);
-    Path file = temporary.resolveSibling(temporary.getFileName().toString().replace(".img",
-        "-" + identity.device().replace(':', '-') + "-" + identity.inode() + (decoy ? "-decoy" : "") + ".img"));
-    Files.move(temporary, file); // The identity is durable in the name before any loop can attach.
-    checkImage(file, identity);
-    return file;
-  }
-
-  static FileIdentity recordedIdentity(Path file) {
-    var match = IMAGE_NAME.matcher(file.getFileName().toString());
-    if (!match.matches() || match.group(3) == null) return null;
-    try { return new FileIdentity(Long.parseLong(match.group(5)), match.group(3) + ":" + match.group(4)); }
-    catch (NumberFormatException invalid) { return null; }
-  }
-
-  static Path createImageDirectory(Path images) throws IOException {
-    return Files.createTempDirectory(images, "jvm-" + ProcessHandle.current().pid() + "-",
-        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
-  }
-
-  private static void deleteImage(Path file, FileIdentity identity) throws IOException {
-    if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) return;
-    checkImage(file, identity);
-    // This JVM created the enclosing 0700 directory. Same-user replacement inside it is
-    // outside the threat model, at the same trust level as JUnit's @TempDir cleanup.
-    Files.delete(file);
-  }
-
-  private static void checkImage(Path file, FileIdentity identity) throws IOException {
-    if (identity == null || !safeFile(file) || !identity.equals(fileIdentity(file))) {
-      throw new IOException("Refusing to use a changed image: " + file);
-    }
-  }
-
   Path mounted() { return mounted; }
 
-  synchronized Path attachAndMount(boolean readOnly) throws Exception {
-    if (COMMANDS.stopping || cleaning.get()) throw new IOException("Drive test volume is stopping");
-    if (loop == null || loop.detached) loop = new Attachment(attach(image, identity), image, identity);
-    var args = new ArrayList<>(List.of("udisksctl", "mount", "--no-user-interaction", "-b", loop.device));
+  Path attachAndMount(boolean readOnly) throws Exception {
+    if (loop == null) loop = attach(image);
+    var args = new ArrayList<>(List.of("udisksctl", "mount", "--no-user-interaction", "-b", loop));
     if (readOnly) args.addAll(List.of("--options", "ro"));
     String output = run(args.toArray(String[]::new));
     int at = output.indexOf(" at ");
@@ -164,219 +57,68 @@ final class LinuxLoopVolume implements AutoCloseable {
     return mounted;
   }
 
-  synchronized void away() throws Exception {
-    if (loop != null) detachOnce(loop, false);
-    mounted = null;
-  }
-
-  private static boolean checkAssociation(String device, Path image, FileIdentity identity) throws Exception {
-    Path backing = Path.of("/sys/class/block", Path.of(device).getFileName().toString(), "loop/backing_file");
-    String value = Files.readString(backing).strip();
-    boolean deleted = value.endsWith(" (deleted)");
-    String actual = deleted ? value.substring(0, value.length() - " (deleted)".length()) : value;
-    if (!actual.equals(image.toString()) || identity == null) {
-      throw new IOException("Refusing to detach a changed association: " + device + " " + actual);
-    }
-    // A linked d_path identifies the file currently at that path without opening /dev/loopN.
-    // The creation identity rejects pathname reuse; the second read closes the read/stat race.
-    if (!deleted) checkImage(image, identity);
-    if (!value.equals(Files.readString(backing).strip())) {
-      throw new IOException("Backing changed while checking association: " + device);
-    }
-    return !deleted;
-  }
-
-  private static boolean detach(String device, Path expectedImage, FileIdentity identity, boolean cleanup) throws Exception {
-    checkAssociation(device, expectedImage, identity);
-    // Unmount even after a partial mount response, but never ignore a real unmount failure.
-    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-    while (isMounted(device)) {
-      try {
-        checkAssociation(device, expectedImage, identity);
-        COMMANDS.run(cleanup, "udisksctl", "unmount", "--no-user-interaction", "-b", device);
-        break;
-      } catch (IOException failure) {
-        if (failure.getMessage().contains("UDisks2.Error.NotMounted")) break;
-        if (!failure.getMessage().contains("UDisks2.Error.DeviceBusy")
-            || System.nanoTime() >= until) throw failure;
-        Thread.sleep(100);
+  void away() throws Exception {
+    if (mounted != null) {
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (true) {
+        try {
+          run("udisksctl", "unmount", "--no-user-interaction", "-b", loop);
+          break;
+        } catch (IOException busy) {
+          // A concurrent, strictly held root observation can temporarily keep this mount busy.
+          if (!busy.getMessage().contains("UDisks2.Error.DeviceBusy")
+              || System.nanoTime() >= until) throw busy;
+          Thread.sleep(100);
+        }
       }
+      mounted = null;
     }
-    boolean linked = checkAssociation(device, expectedImage, identity);
-    COMMANDS.run(cleanup, "udisksctl", "loop-delete", "--no-user-interaction", "-b", device);
-    return linked;
+    if (loop != null) {
+      run("udisksctl", "loop-delete", "--no-user-interaction", "-b", loop);
+      loop = null;
+    }
   }
 
-  private static boolean isMounted(String device) throws IOException {
-    String number = Files.readString(Path.of("/sys/class/block", Path.of(device).getFileName().toString(), "dev")).strip();
-    return Files.readAllLines(Path.of("/proc/self/mountinfo")).stream()
-        .anyMatch(line -> line.split(" ")[2].equals(number));
-  }
-
-  synchronized void label(String value) throws Exception {
-    if (loop != null && !loop.detached) throw new IllegalStateException("Relabel only a detached volume");
-    checkImage(image, identity);
+  void label(String value) throws Exception {
+    if (loop != null) throw new IllegalStateException("Relabel only a detached volume");
     run("e2label", image.toString(), value);
   }
 
-  synchronized void holdDecoy() throws Exception {
-    if (COMMANDS.stopping || cleaning.get()) throw new IOException("Drive test volume is stopping");
-    if (decoy != null && !decoy.detached) throw new IllegalStateException("Decoy already held");
-    decoyCleanup.set(false);
-    decoyImage = createImage(image.getParent(), true);
-    decoyIdentity = recordedIdentity(decoyImage);
-    checkImage(decoyImage, decoyIdentity);
-    Files.write(decoyImage, new byte[4096], StandardOpenOption.WRITE);
-    decoy = new Attachment(attach(decoyImage, decoyIdentity), decoyImage, decoyIdentity);
+  void holdDecoy() throws Exception {
+    if (decoy != null) throw new IllegalStateException("Decoy already held");
+    Path file = image.resolveSibling("decoy.img");
+    if (!Files.exists(file)) Files.write(file, new byte[4096]);
+    decoy = attach(file);
   }
 
-  synchronized void releaseDecoy() throws Exception {
-    if (decoy != null && detachOnce(decoy, false)) deleteOwnImage(decoyImage, decoyIdentity);
+  void releaseDecoy() throws Exception {
+    if (decoy != null) {
+      run("udisksctl", "loop-delete", "--no-user-interaction", "-b", decoy);
+      decoy = null;
+    }
   }
 
-  private static String attach(Path file, FileIdentity identity) throws Exception {
-    checkImage(file, identity);
+  private static String attach(Path file) throws Exception {
     String output = run("udisksctl", "loop-setup", "--no-user-interaction", "--file", file.toString());
     var match = Pattern.compile("/dev/loop[0-9]+").matcher(output);
     if (!match.find()) throw new IOException("No loop device in udisks response: " + output);
     return match.group();
   }
 
-  static String run(String... args) throws Exception { return COMMANDS.run(false, args); }
-
-  /** The same command cancellation and monitor-free deadline used by the shutdown hook. */
-  static final class Commands {
-    private final List<Process> running = new ArrayList<>();
-    private volatile boolean stopping;
-    private volatile long deadline;
-
-    String run(boolean cleanup, String... args) throws Exception {
-      Process process;
-      Path outputFile = Files.createTempFile("drive-return-command-", ".log");
-      try {
-        synchronized (this) {
-          if (stopping && !cleanup) throw new IOException("Drive test JVM is stopping");
-          if (cleanup && deadline - System.nanoTime() <= 0) throw new IOException("Drive cleanup deadline expired");
-          process = new ProcessBuilder(args).redirectErrorStream(true).redirectOutput(outputFile.toFile()).start();
-          running.add(process);
-        }
-        try {
-          long wait = cleanup ? Math.min(TimeUnit.SECONDS.toNanos(5), deadline - System.nanoTime())
-              : TimeUnit.SECONDS.toNanos(30);
-          if (!process.waitFor(Math.max(0, wait), TimeUnit.NANOSECONDS)) throw new IOException("Command timed out: " + args[0]);
-          String output = Files.readString(outputFile);
-          if (process.exitValue() != 0) throw new IOException(String.join(" ", args) + ": " + output);
-          return output;
-        } finally {
-          kill(process);
-          synchronized (this) { running.remove(process); }
-        }
-      } finally { Files.deleteIfExists(outputFile); }
-    }
-
-    private static void kill(Process process) {
-      var children = process.descendants().toList();
-      children.forEach(ProcessHandle::destroyForcibly);
-      // Let a waiting shell reap its children before killing the shell itself.
-      if (!children.isEmpty()) {
-        try { process.waitFor(100, TimeUnit.MILLISECONDS); }
-        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-      }
-      if (process.isAlive()) {
-        process.destroyForcibly();
-        try { process.waitFor(100, TimeUnit.MILLISECONDS); }
-        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-      }
-    }
-
-    void shutdown(Runnable cleanup, long budgetMillis) {
-      List<Process> cancel;
-      synchronized (this) {
-        stopping = true;
-        deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMillis);
-        cancel = List.copyOf(running);
-      }
-      cancel.forEach(Commands::kill);
-      Thread worker = new Thread(cleanup, "drive-return-cleanup");
-      worker.setDaemon(true);
-      worker.start();
-      try { worker.join(Math.max(1, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime()))); }
-      catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-      if (worker.isAlive()) {
-        worker.interrupt();
-        synchronized (this) { cancel = List.copyOf(running); }
-        cancel.forEach(Commands::kill);
-        System.err.println("Drive shutdown cleanup exceeded its deadline; images retained for recovery");
-      }
+  static String run(String... args) throws Exception {
+    Process process = new ProcessBuilder(args).redirectErrorStream(true).start();
+    try {
+      if (!process.waitFor(30, TimeUnit.SECONDS)) throw new IOException("Command timed out: " + args[0]);
+      String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+      if (process.exitValue() != 0) throw new IOException(String.join(" ", args) + ": " + output);
+      return output;
+    } finally {
+      if (process.isAlive()) { process.destroyForcibly(); process.waitFor(); }
     }
   }
 
-  /** Retained after detachment, so a reused device number can never be claimed again. */
-  static final class Attachment {
-    private final String device;
-    private final Path image;
-    private final FileIdentity identity;
-    private final AtomicBoolean claimed = new AtomicBoolean();
-    private volatile boolean detached;
-
-    Attachment(String device, Path image, FileIdentity identity) {
-      this.device = device;
-      this.image = image;
-      this.identity = identity;
-    }
+  @Override public void close() throws Exception {
+    try { away(); }
+    finally { releaseDecoy(); }
   }
-
-  private boolean detachOnce(Attachment attachment, boolean shutdown) throws Exception {
-    if (!attachment.claimed.compareAndSet(false, true)) return attachment.detached;
-    detach(attachment.device, attachment.image, attachment.identity, shutdown);
-    attachment.detached = true;
-    // If shutdown raced an ordinary away/release, that operation retains cleanup ownership.
-    if (cleaning.get()) {
-      deleteOwnImage(attachment.image, attachment.identity);
-      removeImageDirectory();
-    }
-    return true;
-  }
-
-  private void deleteOwnImage(Path file, FileIdentity expected) throws IOException {
-    AtomicBoolean claim = file.equals(image) ? imageCleanup : decoyCleanup;
-    if (claim.compareAndSet(false, true)) deleteImage(file, expected);
-  }
-
-  private void removeImageDirectory() throws IOException {
-    try { Files.deleteIfExists(image.getParent()); }
-    catch (java.nio.file.DirectoryNotEmptyException retained) { /* Failed/in-flight images stay. */ }
-  }
-
-  private void cleanup(boolean shutdown) throws Exception {
-    if (!cleaning.compareAndSet(false, true)) return;
-    Exception failure = null;
-    // Each device has its own claim, including ordinary away/release operations.
-    // No monitor here: shutdown must not wait for a test thread holding one.
-    for (Attachment attachment : new Attachment[] {loop, decoy}) {
-      if (attachment == null) continue;
-      try { detachOnce(attachment, shutdown); }
-      catch (Exception problem) {
-        System.err.println("Drive cleanup " + attachment.device + ": " + problem);
-        if (failure == null) failure = problem;
-        else failure.addSuppressed(problem);
-      }
-    }
-    for (Path file : new Path[] {image, decoyImage}) {
-      if (file == null) continue;
-      Attachment attachment = file.equals(image) ? loop : decoy;
-      if (attachment != null && !attachment.detached) continue;
-      try { deleteOwnImage(file, file.equals(image) ? identity : decoyIdentity); }
-      catch (Exception problem) {
-        System.err.println("Drive image cleanup " + file + ": " + problem);
-        if (failure == null) failure = problem;
-        else failure.addSuppressed(problem);
-      }
-    }
-    removeImageDirectory();
-    OWNED.remove(this);
-    if (failure != null) throw failure;
-  }
-
-  @Override public void close() throws Exception { cleanup(false); }
 }
