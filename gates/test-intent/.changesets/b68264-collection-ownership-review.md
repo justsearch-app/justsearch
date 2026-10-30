@@ -226,3 +226,14 @@ parses do not replace the previous snapshot, and are retried rather than served 
   "note": "Correctly separates retirement, replacement deletion scenario and harness instrumentation. Evidence hashes match current tests and pass the official validator. (Recorded by the orchestrator: the verifier sandbox refuses the gate's git subprocess, spawnSync git EPERM.)"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "auditor-1045-codex-4",
+  "verdict": "accept",
+  "digest": "sha256:4483431a7217ac4b7132330cc01144230eece2f19c385ec5717c73925c8dc500",
+  "note": "Compared the earlier Engine fixture and merge-base harness with the candidate, assessed all five entries against their cited warrants, and repeated the decision-record conflict search. Evidence regeneration retains the Engine assertion fail-before and passing cases; unchanged review evidence and all cited test hashes pass validation, supporting the classifications and warrants."
+}
+```
