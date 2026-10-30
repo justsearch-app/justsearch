@@ -1,0 +1,211 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T06:34:43.988Z",
+  "revision": "bdb4c8ad4a962692cd45c3ebef6438b5a3e401f7",
+  "tree": "e6711236200e29f268ab4e553c4f89fed08c4053",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.ask.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/xylw8iw2/tmp/test-intent-vitest-284-1793342073199.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 10786
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#says NOTHING about the outcome when the halt reached no terminal at all",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a726af387cab70ddf1a38399a8ea8ae9224995524e0ee9c83b3b0dfe88ce252f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the run ends in ONE receipt whose counts come from the feed it summarises says NOTHING about the outcome when the halt reached no terminal at all",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#says stopped-by-you when the halt DID reach a terminal — the late-cancel race",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a726af387cab70ddf1a38399a8ea8ae9224995524e0ee9c83b3b0dfe88ce252f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the run ends in ONE receipt whose counts come from the feed it summarises says stopped-by-you when the halt DID reach a terminal — the late-cancel race",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#R1 Ask Stop waits beyond the Halt deadline and accepts a late success",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bf09a4978f7654157dd93edd149f802778c7300aca6924e9c3abc10e0e2bc590",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) R1 Ask Stop waits beyond the Halt deadline and accepts a late success",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S8 P5 reload projects an existing record with stop_requested before CANCELLED as on the baseline",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S8 P5 reload projects an existing record with stop_requested before CANCELLED as on the baseline",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S8 P5 reload projects an existing record with stop_requested before DONE as on the baseline",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S8 P5 reload projects an existing record with stop_requested before DONE as on the baseline",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S8 P5 reload projects an existing record with stop_requested before READY_FOR_LLM as on the baseline",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S8 P5 reload projects an existing record with stop_requested before READY_FOR_LLM as on the baseline",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 http start failure with Stop false shows a failed receipt and releases the composer without polling",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 http start failure with Stop false shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 network start failure with Stop false shows a failed receipt and releases the composer without polling",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 network start failure with Stop false shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 lost start failure with Stop false shows a failed receipt and releases the composer without polling",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 lost start failure with Stop false shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S4 losing the stream while stopping follows the CANCELLED lifecycle without inventing confirmation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S4 losing the stream while stopping follows the CANCELLED lifecycle without inventing confirmation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#R4 Stop retry after the polling grace reads a later CANCELLED and removes the unconfirmed controls",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record R4 Stop retry after the polling grace reads a later CANCELLED and removes the unconfirmed controls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#DS3 DS4 this window own Halt still waits beyond the clean-DONE grace",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record DS3 DS4 this window own Halt still waits beyond the clean-DONE grace",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:df16df0afa9bdcb060bb5933c9fa7fecad5974794be4150e71af7e8bb550391d"
+}

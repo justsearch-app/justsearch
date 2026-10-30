@@ -2188,7 +2188,13 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              isolated=True, fixtures_variant="agent-live"),
         Step("sv3-run-approval-failure", setup=ui_agent_flows.setup_run_approval_failure,
              isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-ask-stop-late-response", setup=ui_agent_flows.setup_ask_stop_late_response,
+             isolated=True, fixtures_variant="agent-live"),
         Step("sv3-run-halt", setup=ui_agent_flows.setup_run_halt,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-halt-failure", setup=ui_agent_flows.setup_run_halt_failure,
+             isolated=True, fixtures_variant="agent-live"),
+        Step("sv3-run-halt-timeout", setup=ui_agent_flows.setup_run_halt_timeout,
              isolated=True, fixtures_variant="agent-live"),
         Step("legacy-token-plugin", setup=_check_legacy_token_plugin, isolated=True),
 

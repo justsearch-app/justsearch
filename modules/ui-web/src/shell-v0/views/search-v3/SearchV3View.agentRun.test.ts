@@ -29,6 +29,7 @@ import type {
   ToolCall,
 } from '../../controllers/AgentSessionController.js';
 import { AgentSessionController as RealAgentSessionController } from '../../controllers/AgentSessionController.js';
+import { StopAttempt, type RunTerminalOutcome } from '../../state/stopAttempt.js';
 import { ReasoningController } from '../../controllers/ReasoningController.js';
 import type { BudgetUpdate } from '../../controllers/AgentSessionController.js';
 import { SV3_STANDING_STOP_REASON } from './sv3-run.js';
@@ -53,6 +54,8 @@ interface FakeCtrl {
   runPark: { kind: string; sinceEpochMs: number; detail: string } | null;
   /** Tempdoc 859 §D §2.6 — the run's terminal disposition, written only by `onDone`. */
   terminalDisposition: string | null;
+  terminalOutcome: RunTerminalOutcome | null;
+  stopAttempt: StopAttempt;
   /** …and the run it belongs to, which is how the window refuses a previous run's terminal. */
   answerEvidenceRunId: string | null;
   /** Tempdoc 859 §3b — the terminal's grounding claim; empty here, so no evidence is written. */
@@ -88,6 +91,8 @@ function makeCtrl(): FakeCtrl {
     contextGate: null,
     runPark: null,
     terminalDisposition: null,
+    terminalOutcome: null,
+    stopAttempt: new StopAttempt(),
     answerEvidenceRunId: null,
     answerSources: [],
     groundingDeltas: [],
@@ -646,6 +651,8 @@ describe('the run ends in ONE receipt whose counts come from the feed it summari
     await settle(el);
     expect(ctrl.cancelSession).toHaveBeenCalledTimes(1);
 
+    // CANCELLED ends an answerless run without an AgentDone/disposition.
+    ctrl.terminalOutcome = 'cancelled';
     await frame(el, { runInFlight: false, isStreaming: false });
     const main = await region(el, 'jf-sv3-main');
     const receipt = q(main, 'sv3-run-receipt');
@@ -670,6 +677,8 @@ describe('the run ends in ONE receipt whose counts come from the feed it summari
     expect(ctrl.cancelSession).toHaveBeenCalledTimes(1);
 
     // …and the run's own terminal arrives anyway, because it had already been reached.
+    ctrl.stopAttempt.outcome = 'accepted';
+    ctrl.terminalOutcome = 'completed';
     ctrl.terminalDisposition = 'COMPLETED';
     ctrl.answerEvidenceRunId = 'run-1';
     await frame(el, { runInFlight: false, isStreaming: false });

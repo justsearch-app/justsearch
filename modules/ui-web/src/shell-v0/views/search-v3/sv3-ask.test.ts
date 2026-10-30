@@ -22,7 +22,7 @@ import type { RetrievalCitation } from '../../components/chat/citationTypes.js';
 import { sourceGrounding } from '../../components/chat/evidenceProjection.js';
 import { claimsFromRecord, matchesFromRecord } from '../../components/chat/recordEvidence.js';
 import { claimsToCitations } from '../../components/chat/citationResolve.js';
-import { sv3Ask } from './sv3-ask.js';
+import { sv3Ask, sv3StopAsk } from './sv3-ask.js';
 import type { Sv3TurnEvidence } from './sv3-sessions.js';
 
 const DOC = 'docs/lease.md';
@@ -68,6 +68,26 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = realFetch;
+});
+
+describe('S9 Ask Stop keeps delivery outcomes available to the shared attempt vocabulary', () => {
+  it.each([200, 409])('retains the HTTP response for status %s instead of a boolean', async (status) => {
+    fetchMock.mockResolvedValue(Response.json({}, { status }));
+    const response = await sv3StopAsk('', 'conversation', 'turn');
+    expect(response.status).toBe(status);
+    expect(response.ok).toBe(status === 200);
+  });
+
+  it('a lost answer rejects rather than reporting an HTTP refusal', async () => {
+    const lostAnswer = new TypeError('connection lost');
+    fetchMock.mockRejectedValue(lostAnswer);
+    const outcome = await sv3StopAsk('', 'conversation', 'turn').then(
+      (response) => ({ rejected: false, value: response }),
+      (error: unknown) => ({ rejected: true, value: error }),
+    );
+    expect(outcome.rejected).toBe(true);
+    expect(outcome.value).toBe(lostAnswer);
+  });
 });
 
 /** A finished SSE body carrying the two citation events, in the order the backend emits them. */

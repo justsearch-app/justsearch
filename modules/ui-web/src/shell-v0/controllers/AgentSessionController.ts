@@ -65,6 +65,21 @@ import { requestAuthorization, cancelAuthorizationsForRun } from '../operations/
 import { recordEffect, markUndoableOperation } from '../substrates/effects/index.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
 import type { Effect } from '../substrates/effect.js';
+import { StopAttempt, STOP_RESPONSE_WAIT_MS, type RunTerminalOutcome } from '../state/stopAttempt.js';
+
+export interface AgentSessionTransport {
+  request: typeof authorizedFetch;
+  consume: typeof consumeShapeStream;
+  stream: typeof streamViaHost;
+  discover: typeof discoverLiveAgentRunRow;
+}
+
+const defaultTransport: AgentSessionTransport = {
+  request: (...args) => authorizedFetch(...args),
+  consume: (...args) => consumeShapeStream(...args),
+  stream: (...args) => streamViaHost(...args),
+  discover: (...args) => discoverLiveAgentRunRow(...args),
+};
 
 export type ToolRisk = 'LOW' | 'MEDIUM' | 'HIGH';
 export type ToolCallStatus = 'proposed' | 'pending' | 'approved' | 'executing' | 'completed' | 'rejected';
@@ -430,6 +445,12 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   private lastStreamedAnswer = '';
   /** Invalidates private approval reads when this controller concludes a run. */
   private approvalLookupRevision = 0;
+  /** Ceremonies closed by Halt, awaiting a confirmed run end before announcing why. */
+  private stoppedCeremonies = 0;
+  stopObservationLost = false;
+  stopAttempt = new StopAttempt();
+  private stopIdentityTimer: ReturnType<typeof setTimeout> | null = null;
+  terminalOutcome: RunTerminalOutcome | null = null;
   isStreaming = false;
   // Tempdoc 565 §33 — WHICH kind of run is live (null = idle). Only an `agent` run is steerable (§30
   // interject) — a `workflow` run goes through WorkflowShapeRunner (no drain) and a `background` run is
@@ -532,7 +553,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * values, so an unknown disposition discloses nothing rather than quietly claiming success.
    */
   terminalDisposition: string | null = null;
-  /** Explicit local Stop or server terminal; transport failure alone cannot settle a held decision. */
+  /** Server terminal; a Stop request or transport failure cannot settle a held decision. */
   concludedRunId: string | null = null;
   // Tempdoc 550 N1: the tool calls the agent proposed for the CURRENT turn, announced as one
   // batch (tool_batch_proposed) before any per-call gate — lets a surface preview the whole
@@ -604,12 +625,13 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * the session at completion, so offering them on a DONE run silently 404s (observed live).
    */
   get runInFlight(): boolean {
-    return this.abortController !== null;
+    return this.abortController !== null || (this.stopAttempt.intent && this.isStreaming);
   }
 
   // --- Private ---
   private entryIdCounter = 0;
   private abortController: AbortController | null = null;
+  private stoppingReconciliationAbort: AbortController | null = null;
   private availabilityPoll: number | null = null;
   private pendingNotify = false;
   private errorHandledDuringStream = false;
@@ -619,6 +641,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   // True once this stream saw session_started — so a drop is a genuine mid-run drop (a live run to
   // reattach), not an initial POST failure over a stale sessionId. Reset per send.
   private runStartedThisStream = false;
+  // A resumed run can belong to a different conversation than the window is pinned to.
+  runConversationId: string | null = null;
   // Tempdoc 604 — the agent SSE stream has no liveness signal of its own, so a transport-hung stream
   // (e.g. a worker bounce mid-run) would block the FE silently for the backend's 30-min attach latch.
   // The watchdog resets on every received event (incl. the backend `heartbeat`); if it expires, the
@@ -651,7 +675,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    */
   private host_: PluginHostApi | undefined;
 
-  constructor(apiBase: string, onUpdate: () => void) {
+  constructor(apiBase: string, onUpdate: () => void, private readonly transport: AgentSessionTransport = defaultTransport) {
     this.apiBase = apiBase;
     this.onUpdate = onUpdate;
     this.reasoning = new ReasoningController(() => this.notify());
@@ -667,7 +691,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   private async pushAutonomy(level: string): Promise<void> {
     try {
-      await authorizedFetch(`${this.apiBase}/api/chat/agent/autonomy`, {
+      await this.transport.request(`${this.apiBase}/api/chat/agent/autonomy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: this.sessionId, level }),
@@ -686,7 +710,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   async raiseBudget(addTokens: number): Promise<boolean> {
     if (!this.sessionId || !Number.isFinite(addTokens) || addTokens <= 0) return false;
     try {
-      const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/budget`, {
+      const res = await this.transport.request(`${this.apiBase}/api/chat/agent/budget`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: this.sessionId, addTokens }),
@@ -716,7 +740,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     const clientRequestId = crypto.randomUUID();
     let failure: string;
     try {
-      const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/steer`, {
+      const res = await this.transport.request(`${this.apiBase}/api/chat/agent/steer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: this.sessionId, text: trimmed, clientRequestId }),
@@ -823,6 +847,12 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   destroy(): void {
+    this.stoppingReconciliationAbort?.abort();
+    this.stoppingReconciliationAbort = null;
+    if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
+    this.stopIdentityTimer = null;
+    this.stopAttempt = new StopAttempt();
+    this.stoppedCeremonies = 0;
     this.approvalLookupRevision++;
     this.stopPolling();
     if (this.sessionId) cancelAuthorizationsForRun(this.sessionId);
@@ -914,6 +944,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   /** Clears the run-observable state (NOT the roster/tools) so a replay seek re-applies from scratch. */
   private resetRunState(): void {
+    this.stopAttempt = new StopAttempt();
+    this.stoppedCeremonies = 0;
+    this.stopObservationLost = false;
+    this.terminalOutcome = null;
     this.concludedRunId = null;
     this.conversation = [];
     this.unconfirmedSteers = [];
@@ -946,7 +980,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     sessionId: string,
   ): Promise<Array<{ eventType: string; payload: unknown }>> {
     try {
-      const res = await authorizedFetch(
+      const res = await this.transport.request(
         `${this.apiBase}/api/chat/sessions/${encodeURIComponent(sessionId)}/events`,
       );
       if (!res.ok) return [];
@@ -976,6 +1010,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.currentToolBatch = [];
     // 543-fwd #6 — a new turn starts a fresh causation chain.
     this.lastAgentCausationId = null;
+    if (this.stopAttempt.intent) void this.deliverStop();
     if (this.sessionId && this.pendingAutoApprovals.length > 0) {
       const queued = this.pendingAutoApprovals.splice(0);
       for (const callId of queued) void this.approveCall(callId);
@@ -1000,9 +1035,11 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       this.runStartedThisStream = true;
     }
     const conversationId = typeof data.conversationId === 'string' ? data.conversationId : '';
+    if (conversationId.length > 0) this.runConversationId = conversationId;
     if (conversationId.length > 0 && !this.conversationId) {
       this.conversationId = conversationId;
     }
+    if (this.stopAttempt.intent) void this.deliverStop();
     if (this.sessionId && this.pendingAutoApprovals.length > 0) {
       const queued = this.pendingAutoApprovals.splice(0);
       for (const callId of queued) void this.approveCall(callId);
@@ -1075,7 +1112,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     }
     // Tempdoc 585 §D Phase 1 (C1): in replay the tool-call render state is set above, but a finished
     // run's pending gate must NOT re-drive an approval POST or pop the authorization ceremony.
-    if (this.replayMode) {
+    if (this.replayMode || this.stopAttempt.intent) {
       this.notify();
       return;
     }
@@ -1105,11 +1142,11 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     const revision = this.approvalLookupRevision;
     const isCurrent = (): boolean => revision === this.approvalLookupRevision
       && this.toolCalls[callId] === pendingCall && pendingCall?.status === 'pending'
-      && (this.sessionId ?? undefined) === owningRunId && this.isStreaming && !this.replayMode;
+      && (this.sessionId ?? undefined) === owningRunId && this.isStreaming && !this.replayMode && !this.stopAttempt.intent;
     try {
       if (!owningRunId) throw new Error('Approval has no live run identity');
       const query = new URLSearchParams({ sessionId: owningRunId, callId });
-      const response = await authorizedFetch(`${this.apiBase}/api/chat/approval?${query}`, { cache: 'no-store' });
+      const response = await this.transport.request(`${this.apiBase}/api/chat/approval?${query}`, { cache: 'no-store' });
       if (!isCurrent()) return;
       if (!response.ok) throw new Error('Live approval lookup failed');
       const detail = await response.json() as Record<string, unknown>;
@@ -1276,7 +1313,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   onToolCallVirtual(payload: unknown): void {
     // Tempdoc 585 §D Phase 1 (C1): NEVER dispatch a virtual (shell/plugin) tool during replay — it
     // would re-execute a real command and POST a result to a dead session. The most dangerous guard.
-    if (this.replayMode) return;
+    if (this.replayMode || this.stopAttempt.intent) return;
+    const owner = this.stopAttempt;
     const data = payload as Record<string, unknown>;
     const callId = data.callId as string;
     const wireName = data.wireName as string;
@@ -1291,15 +1329,18 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       return;
     }
     void import('../commands/VirtualToolDispatcher.js').then(
-      ({ dispatchVirtualToolCall }) =>
-        dispatchVirtualToolCall(
+      ({ dispatchVirtualToolCall }) => {
+        if (owner !== this.stopAttempt || owner.intent) return;
+        return dispatchVirtualToolCall(
           { sessionId, callId, wireName, arguments: args },
           { apiBase: this.apiBase },
-        ),
+        );
+      },
     );
   }
 
   onDone(payload: CoreAgentRunDonePayload): void {
+    this.terminalOutcome = 'completed';
     this.concludedRunId = this.sessionId;
     this.reasoning.finalize();
     // F2: the run is complete — the turn's proposed batch is no longer pending.
@@ -1365,6 +1406,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   /** Tempdoc 577 Move 2 — the run parked at the budget boundary; the drawer renders the decision. */
   onBudgetGate(payload: unknown): void {
+    if (this.stopAttempt.intent) return;
     const data = payload as Record<string, unknown>;
     this.budgetGate = {
       tokensNeeded: (data.tokensNeeded as number) ?? 0,
@@ -1382,7 +1424,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   async resolveBudgetGate(decision: 'finalize' | 'stop'): Promise<boolean> {
     if (!this.sessionId) return false;
     try {
-      const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/budget-decision`, {
+      const res = await this.transport.request(`${this.apiBase}/api/chat/agent/budget-decision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: this.sessionId, decision }),
@@ -1399,6 +1441,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   /** Tempdoc 577 §2.14 Root II — the run parked at the context-pressure boundary; render the decision. */
   onContextGate(payload: unknown): void {
+    if (this.stopAttempt.intent) return;
     const data = payload as Record<string, unknown>;
     this.contextGate = {
       promptTokens: (data.promptTokens as number) ?? 0,
@@ -1420,7 +1463,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   async resolveContextGate(decision: 'continue' | 'summarize' | 'stop'): Promise<boolean> {
     if (!this.sessionId) return false;
     try {
-      const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/context-decision`, {
+      const res = await this.transport.request(`${this.apiBase}/api/chat/agent/context-decision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: this.sessionId, decision }),
@@ -1464,7 +1507,14 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   onError(payload: unknown): void {
     const data = payload as Record<string, unknown>;
-    if (typeof data.errorCode === 'string') this.concludedRunId = this.sessionId;
+    if (!this.sessionId) {
+      this.stopAttempt = new StopAttempt();
+      this.stopObservationLost = false;
+    }
+    if (typeof data.errorCode === 'string') {
+      this.concludedRunId = this.sessionId;
+      this.terminalOutcome = data.errorCode === 'CANCELLED' ? 'cancelled' : 'failed';
+    }
     this.errorHandledDuringStream = true;
     this.conversation = [
       ...this.conversation,
@@ -1563,7 +1613,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     if (payload.autonomyLevel) {
       this.snapshotAutonomyLevel = payload.autonomyLevel;
     }
-    this.runPark = payload.park ?? null;
+    this.runPark = this.stopAttempt.intent ? null : payload.park ?? null;
     for (const approval of payload.pendingApprovals ?? []) {
       this.adoptSnapshotApproval(approval);
     }
@@ -1950,7 +2000,18 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   /** The existing abort handle owns delivery and cleanup; replacing a view does not cancel its backend run. */
   private beginStream(sessionId: string | null = null, preserveApprovals = false): AbortController {
+    if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
+    this.stopIdentityTimer = null;
     if (!preserveApprovals) {
+      this.stoppingReconciliationAbort?.abort();
+      this.stoppingReconciliationAbort = null;
+      this.runConversationId = this.conversationId;
+      this.reattachedThisRun = false;
+      this.runStartedThisStream = false;
+      this.stopAttempt = new StopAttempt();
+      this.stoppedCeremonies = 0;
+      this.stopObservationLost = false;
+      this.terminalOutcome = null;
       this.approvalLookupRevision++;
       if (this.sessionId) cancelAuthorizationsForRun(this.sessionId);
       this.pendingAutoApprovals = [];
@@ -1973,10 +2034,15 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   private finishStream(stream: AbortController): void {
     if (this.abortController !== stream) return;
+    if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
+    this.stopIdentityTimer = null;
     this.liveWatchdog.clear();
+    if (!this.sessionId && this.stopAttempt.intent && this.terminalOutcome === null) {
+      this.onError({ error: friendlyStreamError(Object.assign(new Error('Stream ended without terminal event'), { code: 'STREAM_INCOMPLETE' })) });
+    }
     this.commitStreamingText();
     this.abortController = null;
-    this.isStreaming = false;
+    if (!this.stopAttempt.intent || this.terminalOutcome !== null) this.isStreaming = false;
     this.notify();
   }
 
@@ -2021,7 +2087,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       // (approve / reject / tool-result / tools / history) remain on
       // /api/chat/agent/* — they are stateful side-channels, not
       // streams, and §11.4 only governs the streaming surface.
-      await streamViaHost({
+      await this.transport.stream({
         host_: this.host_,
         shapeId: 'core.agent-run',
         fallbackUrl: `${this.apiBase}/api/chat/agent`,
@@ -2051,6 +2117,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       });
     } catch (e) {
       if (this.abortController !== stream) return;
+      if (this.stopAttempt.intent && this.sessionId && this.terminalOutcome === null) {
+        await this.reconcileStoppingStream(stream);
+        return;
+      }
       if ((e as Error).name === 'AbortError') {
         if (!this.liveWatchdogFired) {
           this.commitStreamingText();
@@ -2115,7 +2185,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.notify();
 
     try {
-      await streamViaHost({
+      await this.transport.stream({
         host_: this.host_,
         shapeId: 'core.workflow-run',
         fallbackUrl: `${this.apiBase}/api/chat/agent`,
@@ -2128,6 +2198,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       });
     } catch (e) {
       if (this.abortController !== stream) return;
+      if (this.stopAttempt.intent && this.sessionId && this.terminalOutcome === null) {
+        await this.reconcileStoppingStream(stream);
+        return;
+      }
       if ((e as Error).name === 'AbortError') {
         this.commitStreamingText();
         return;
@@ -2150,7 +2224,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     // verdict to the matching backend gate (agent gate by sessionId+callId, else the workflow gate by
     // callId). The FE no longer branches the URL by run shape ("a run is a run" all the way down).
     try {
-      const res = await authorizedFetch(`${this.apiBase}/api/chat/approve`, {
+      const res = await this.transport.request(`${this.apiBase}/api/chat/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, callId }),
@@ -2175,7 +2249,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     const sessionId = runId ?? this.sessionId;
     if (!sessionId) return;
     try {
-      const res = await authorizedFetch(`${this.apiBase}/api/chat/reject`, {
+      const res = await this.transport.request(`${this.apiBase}/api/chat/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, callId, reason }),
@@ -2205,7 +2279,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.approvalLookupRevision++;
     this.pendingAutoApprovals = [];
     if (!runId) return;
-    const denied = cancelAuthorizationsForRun(runId);
+    const deferred = this.terminalOutcome !== null ? this.stoppedCeremonies : 0;
+    if (this.terminalOutcome !== null) this.stoppedCeremonies = 0;
+    const denied = cancelAuthorizationsForRun(runId) + deferred;
     if (denied > 0) {
       emitEphemeralToast({
         message:
@@ -2218,26 +2294,139 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   async cancelSession(): Promise<void> {
-    const sessionId = this.sessionId;
-    this.concludedRunId = sessionId;
+    const retryObservation = this.stopObservationLost && !this.stopAttempt.pending;
+    if (retryObservation) {
+      this.stopAttempt.retry();
+      this.stoppingReconciliationAbort?.abort();
+      this.stoppingReconciliationAbort = null;
+    }
+    this.stopAttempt.latch();
+    if (!this.sessionId && this.stopIdentityTimer === null && this.abortController !== null) {
+      const attempt = this.stopAttempt;
+      const stream = this.abortController;
+      // Admission can hang before there is an address to stop. Bound that wait too, without
+      // looking up another window's run by conversation or claiming that this run was halted.
+      this.stopIdentityTimer = setTimeout(() => {
+        this.stopIdentityTimer = null;
+        if (this.stopAttempt !== attempt || this.abortController !== stream || this.sessionId
+            || this.terminalOutcome !== null || !this.isStreaming) return;
+        this.onError({ error: friendlyStreamError(Object.assign(new Error('Stream ended without terminal event'), { code: 'STREAM_INCOMPLETE' })) });
+        stream.abort();
+        this.finishStream(stream);
+      }, STOP_RESPONSE_WAIT_MS);
+    }
+    this.commitStreamingText();
+    this.budgetGate = null;
+    this.contextGate = null;
+    this.runPark = null;
+    this.approvalLookupRevision++;
+    this.pendingAutoApprovals = [];
+    if (this.sessionId) this.stoppedCeremonies += cancelAuthorizationsForRun(this.sessionId);
+    this.notify();
+    if (retryObservation) void this.reconcileStoppingStream(this.abortController);
+    await this.deliverStop(true);
+  }
+
+  private async deliverStop(retry = false): Promise<void> {
+    const attempt = this.stopAttempt;
+    const runId = this.sessionId;
+    if (!attempt.intent || !runId || this.terminalOutcome !== null) return;
+    if (this.stopIdentityTimer !== null) clearTimeout(this.stopIdentityTimer);
+    this.stopIdentityTimer = null;
+    if (!retry && attempt.attempt > 0) return;
+    const delivery = attempt.deliver((signal) => this.transport.request(
+      `${this.apiBase}/api/chat/sessions/${encodeURIComponent(runId)}`,
+      { method: 'DELETE', signal },
+    ), STOP_RESPONSE_WAIT_MS);
+    this.notify();
+    await delivery;
+    if (this.stopAttempt === attempt) this.notify();
+  }
+
+  /** The record may settle an observation that was lost. Delivery is never terminal evidence. */
+  reconcileRunLifecycle(runId: string, state: string): void {
+    if (runId !== this.sessionId || this.terminalOutcome !== null) return;
+    const outcome = state === 'CANCELLED' ? 'cancelled'
+      : state === 'DONE' ? 'completed' : state === 'ERROR' ? 'failed' : null;
+    if (outcome === null) return;
+    this.terminalOutcome = outcome;
+    this.concludedRunId = runId;
+    this.commitStreamingText();
+    this.reasoning.finalize();
+    this.isStreaming = false;
+    this.runKind = null;
+    this.runPark = null;
+    this.concludeRunCeremonies(runId);
     const stream = this.abortController;
     this.abortController = null;
     stream?.abort();
-    this.commitStreamingText();
-    this.isStreaming = false;
-    this.runKind = null;
     this.liveWatchdog.clear();
-    this.concludeRunCeremonies(sessionId);
     this.notify();
-    if (sessionId) {
+  }
+
+  private async reconcileStoppingStream(stream: AbortController | null): Promise<void> {
+    const attempt = this.stopAttempt;
+    const runId = this.sessionId;
+    // A conversation cannot identify this dispatch: another window can own its live run.
+    if (!attempt.intent || !runId || this.terminalOutcome !== null || this.stoppingReconciliationAbort) return;
+    const abort = new AbortController();
+    this.stoppingReconciliationAbort = abort;
+    const timer = setTimeout(() => abort.abort(), STOP_RESPONSE_WAIT_MS);
+    this.stopObservationLost = true;
+    this.commitStreamingText();
+    this.notify();
+    const conversationId = this.runConversationId ?? this.conversationId;
+    const ownsRun = (): boolean => this.stoppingReconciliationAbort === abort
+      && this.sessionId === runId
+      && this.stopAttempt === attempt && this.terminalOutcome === null;
+    // Race the whole read (including its body) so even a transport ignoring abort cannot hold us.
+    const bounded = async <T>(read: () => Promise<T>): Promise<T | null> => {
+      let onAbort!: () => void;
       try {
-        await authorizedFetch(
-          `${this.apiBase}/api/chat/sessions/${encodeURIComponent(sessionId)}`,
-          { method: 'DELETE' },
-        );
-      } catch {
-        // Local cancellation is complete even when the backend is unreachable.
+        return await Promise.race([
+          read(),
+          new Promise<null>((resolve) => {
+            onAbort = () => resolve(null);
+            abort.signal.addEventListener('abort', onAbort, { once: true });
+            if (abort.signal.aborted) onAbort();
+          }),
+        ]);
+      } catch { return null; }
+      finally { abort.signal.removeEventListener('abort', onAbort); }
+    };
+    let run: LiveRunRow | null;
+    try {
+      const [discovered, record] = await Promise.all([
+        bounded(() => this.transport.discover(this.apiBase, conversationId, abort.signal)),
+        bounded(async (): Promise<unknown> => {
+          const response = await this.transport.request(
+            `${this.apiBase}/api/thread/${encodeURIComponent(conversationId ?? runId)}`,
+            { signal: abort.signal },
+          );
+          return response.ok ? response.json() : null;
+        }),
+      ]);
+      if (!ownsRun()) return;
+      run = discovered;
+      const lifecycles: unknown[] = typeof record === 'object' && record !== null && 'lifecycles' in record
+        && Array.isArray(record.lifecycles) ? record.lifecycles : [];
+      // Conflicting snapshots are settled in terminal precedence, never by response arrival order.
+      for (const state of ['CANCELLED', 'ERROR', 'DONE']) {
+        if (lifecycles.some((row) => typeof row === 'object' && row !== null
+            && 'sessionId' in row && row.sessionId === runId && 'state' in row && row.state === state)) {
+          this.reconcileRunLifecycle(runId, state);
+          return;
+        }
       }
+    } finally {
+      clearTimeout(timer);
+      if (this.stoppingReconciliationAbort === abort) this.stoppingReconciliationAbort = null;
+    }
+    if ((this.abortController === stream || this.abortController === null)
+        && this.sessionId === runId && this.stopAttempt === attempt
+        && this.terminalOutcome === null && run?.runId === runId && !this.reattachedThisRun) {
+      this.reattachedThisRun = true;
+      await this.attachToRun(runId);
     }
   }
 
@@ -2251,7 +2440,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.notify();
 
     try {
-      await consumeShapeStream(
+      await this.transport.consume(
         `${this.apiBase}/api/chat/sessions/${encodeURIComponent(sessionId)}/resume`,
         null,
         (event, payload) => this.dispatchStreamEvent(stream, event, payload),
@@ -2259,6 +2448,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       );
     } catch (e) {
       if (this.abortController !== stream) return;
+      if (this.stopAttempt.intent && this.sessionId && this.terminalOutcome === null) {
+        await this.reconcileStoppingStream(stream);
+        return;
+      }
       if ((e as Error).name === 'AbortError') {
         this.commitStreamingText();
         return;
@@ -2288,7 +2481,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.notify();
 
     try {
-      await consumeShapeStream(
+      await this.transport.consume(
         `${this.apiBase}/api/chat/sessions/${encodeURIComponent(sessionId)}/fork`,
         { editedMessage },
         (event, payload) => this.dispatchStreamEvent(stream, event, payload),
@@ -2296,6 +2489,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       );
     } catch (e) {
       if (this.abortController !== stream) return;
+      if (this.stopAttempt.intent && this.sessionId && this.terminalOutcome === null) {
+        await this.reconcileStoppingStream(stream);
+        return;
+      }
       if ((e as Error).name === 'AbortError') {
         this.commitStreamingText();
         return;
@@ -2334,6 +2531,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     // run-start site: an attach re-joins a run that is already in flight, so prose it committed
     // before this tab started watching is still THIS run's prose, and `done`'s duplicate-answer
     // guard has to be able to see it. Clearing it would make a reattached run re-print its answer.
+    this.stopObservationLost = false;
     this.isStreaming = true;
     this.runKind = 'agent'; // an attached live run is steerable like the run that started it
     this.errorHandledDuringStream = false;
@@ -2342,7 +2540,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
     this.liveWatchdog.kick(); // Tempdoc 604 — detect a reattach that connects but never delivers a frame.
     try {
-      await consumeShapeStream(
+      await this.transport.consume(
         `${this.apiBase}/api/chat/runs/${encodeURIComponent(sessionId)}/observe`,
         null,
         (event, payload) => this.dispatchStreamEvent(stream, event, payload),
@@ -2350,6 +2548,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       );
     } catch (e) {
       if (this.abortController !== stream) return;
+      if (this.stopAttempt.intent && this.terminalOutcome === null) {
+        return;
+      }
       const notFound = (e as { runNotFound?: RunNotFoundDetail }).runNotFound;
       if (notFound) {
         // The managed route's answer to "that run is unknown or retired" — the same outcome the
@@ -2378,6 +2579,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         this.onError({ error: friendlyStreamError(e) });
       }
     } finally {
+      if (this.stopAttempt.intent && this.terminalOutcome === null && this.abortController === stream) {
+        await this.reconcileStoppingStream(stream);
+      }
       this.finishStream(stream);
     }
   }
@@ -2390,6 +2594,12 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * stream's typed 404, which {@link attachToRun} routes here.
    */
   onAttachNotLive(_payload: unknown): void {
+    if (this.stopAttempt.intent && this.terminalOutcome === null) {
+      this.errorHandledDuringStream = true;
+      this.stopObservationLost = true;
+      this.notify();
+      return;
+    }
     this.concludedRunId = this.sessionId;
     this.isStreaming = false;
     this.runKind = null;
@@ -2417,7 +2627,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     // The conversation guard lives in `discoverLiveAgentRun`: a tab pinned to a SPECIFIC
     // conversation must not adopt a run belonging to a different one, while a fresh tab with no
     // conversation of its own still adopts the newest agent run.
-    const run = await discoverLiveAgentRunRow(this.apiBase, this.conversationId);
+    const run = await this.transport.discover(this.apiBase, this.conversationId);
     if (run?.runId == null) return;
     // The first attach notification precedes its primer. Keep the discovered address through it.
     this.conversationId ??= run.conversationId ?? null;
@@ -2428,7 +2638,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
 
   async checkAvailability(): Promise<void> {
     try {
-      const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/tools`);
+      const res = await this.transport.request(`${this.apiBase}/api/chat/agent/tools`);
       if (!res.ok) {
         this.available = false;
         this.tools = [];
@@ -2453,7 +2663,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       // with mount paths that don't inject host_.
       const res = this.host_
         ? await this.host_.data.fetch(`/api/chat/sessions?limit=${SESSIONS_LIMIT}`)
-        : await authorizedFetch(`${this.apiBase}/api/chat/sessions?limit=${SESSIONS_LIMIT}`);
+        : await this.transport.request(`${this.apiBase}/api/chat/sessions?limit=${SESSIONS_LIMIT}`);
       if (!res.ok) return;
       const data = (await res.json()) as { sessions?: Array<Record<string, unknown>> };
       this.sessions = (data.sessions ?? []).map(toSessionListItem);
@@ -2496,7 +2706,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       return;
     }
     try {
-      const res = await authorizedFetch(
+      const res = await this.transport.request(
         `${this.apiBase}/api/action-ledger?originator=agent&correlationId=${encodeURIComponent(
           this.sessionId,
         )}`,
@@ -2524,7 +2734,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    */
   async loadPresence(): Promise<void> {
     try {
-      const res = await authorizedFetch(`${this.apiBase}/api/presence`);
+      const res = await this.transport.request(`${this.apiBase}/api/presence`);
       if (!res.ok) return;
       const data = (await res.json()) as { runs?: PresenceRun[] };
       this.presence = Array.isArray(data.runs) ? data.runs : [];
@@ -2599,7 +2809,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         ...(this.conversationId ? { conversationId: this.conversationId } : {}),
         operationKey,
       });
-      const response = await authorizedFetch(`${this.apiBase}/api/presence/run`, {
+      const response = await this.transport.request(`${this.apiBase}/api/presence/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,

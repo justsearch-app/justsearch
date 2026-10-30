@@ -1,0 +1,627 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T06:34:27.078Z",
+  "revision": "bdb4c8ad4a962692cd45c3ebef6438b5a3e401f7",
+  "tree": "5740d39404351eec0ab9dbdcf181aeee4905d8bd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" \"src/shell-v0/views/search-v3/sv3-ask.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/xylw8iw2/tmp/test-intent-vitest-95-1793342042481.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 11201
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#cancelSession commits streaming text and sends DELETE for session",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b64afd79363b6fa74e9ade54b951d99d326084160261e2117e174315432a1c81",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentSessionController interaction methods cancelSession commits streaming text and sends DELETE for session",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#cancelSession drains the halted run",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b64afd79363b6fa74e9ade54b951d99d326084160261e2117e174315432a1c81",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "605 — run identity + conclude-drain cancelSession drains the halted run",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S1 stopping uses Ask Stop presentation and retains arriving output until the terminal",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S1 stopping uses Ask Stop presentation and retains arriving output until the terminal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S3 refused uses Ask Stop unconfirmed presentation and keeps Stop retryable",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S3 refused uses Ask Stop unconfirmed presentation and keeps Stop retryable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S3 network uses Ask Stop unconfirmed presentation and keeps Stop retryable",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S3 network uses Ask Stop unconfirmed presentation and keeps Stop retryable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 http start failure with Stop true shows a failed receipt and releases the composer without polling",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 http start failure with Stop true shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 network start failure with Stop true shows a failed receipt and releases the composer without polling",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 network start failure with Stop true shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 lost start failure with Stop true shows a failed receipt and releases the composer without polling",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 lost start failure with Stop true shows a failed receipt and releases the composer without polling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#G1 a start that never answers releases the composer at the Stop deadline with a failed receipt and no polling",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record G1 a start that never answers releases the composer at the Stop deadline with a failed receipt and no polling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 early Stop then completion before identity releases the composer without polling",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N2 early Stop then completion before identity releases the composer without polling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N3 resumed known conversation reconciles a later CANCELLED only at its actual address",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N3 resumed known conversation reconciles a later CANCELLED only at its actual address",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N3 resumed unknown conversation reconciles a later CANCELLED only at its actual address",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N3 resumed unknown conversation reconciles a later CANCELLED only at its actual address",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S3 S6 no stop response becomes unconfirmed, keeps output and allows one new attempt",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S3 S6 no stop response becomes unconfirmed, keeps output and allows one new attempt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S4 losing the stream while stopping follows the DONE lifecycle without inventing confirmation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S4 losing the stream while stopping follows the DONE lifecycle without inventing confirmation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S4 losing the stream while stopping follows the READY_FOR_LLM lifecycle without inventing confirmation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S4 losing the stream while stopping follows the READY_FOR_LLM lifecycle without inventing confirmation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S11 stopping closes the held decision and suppresses later automatic budget continuation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S11 stopping closes the held decision and suppresses later automatic budget continuation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S12 one confirmed receipt and announcement retain the final tool count and evidence through refresh",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record S12 one confirmed receipt and announcement retain the final tool count and evidence through refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#R4 discovery and record fetches that never answer are aborted and leave unconfirmed Stop available",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record R4 discovery and record fetches that never answer are aborted and leave unconfirmed Stop available",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#R4 ERROR lifecycle after lost stopping stream produces a failed receipt without a streamed error",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record R4 ERROR lifecycle after lost stopping stream produces a failed receipt without a streamed error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N4 accepted Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N4 accepted Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N4 refused Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N4 refused Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N4 network Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N4 network Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N4 no-answer Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record N4 no-answer Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after pending",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after pending",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after CANCELLED",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after CANCELLED",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after DONE",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b155e56b8074e9d90324faed1847fb8aca4164770ab0bfe7b67370046d37b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delegate Stop reconciles the addressed live turn with the durable record G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after DONE",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#retains the HTTP response for status 200 instead of a boolean",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8f45cc5ef9079c36ff4bf5b85f6c477110ff26c1c65cf61e2a0147382d716eb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S9 Ask Stop keeps delivery outcomes available to the shared attempt vocabulary retains the HTTP response for status 200 instead of a boolean",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#retains the HTTP response for status 409 instead of a boolean",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8f45cc5ef9079c36ff4bf5b85f6c477110ff26c1c65cf61e2a0147382d716eb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S9 Ask Stop keeps delivery outcomes available to the shared attempt vocabulary retains the HTTP response for status 409 instead of a boolean",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#a lost answer rejects rather than reporting an HTTP refusal",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8f45cc5ef9079c36ff4bf5b85f6c477110ff26c1c65cf61e2a0147382d716eb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S9 Ask Stop keeps delivery outcomes available to the shared attempt vocabulary a lost answer rejects rather than reporting an HTTP refusal",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f956fc3f9e",
+    "revision": "f956fc3f9e724af19850fb69e3e336a188003519",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts\" \"src/shell-v0/views/search-v3/sv3-ask.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/xylw8iw2/tmp/test-intent-vitest-95-1793342055561.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 11043,
+        "output": "JSON report written to /home/elias/.cache/am/xylw8iw2/tmp/test-intent-vitest-95-1793342055561.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#cancelSession commits streaming text and sends DELETE for session",
+        "classification": "assertion",
+        "detail": "AgentSessionController interaction methods cancelSession commits streaming text and sends DELETE for session:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:1528:30\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#cancelSession drains the halted run",
+        "classification": "assertion",
+        "detail": "605 — run identity + conclude-drain cancelSession drains the halted run:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"message\": \"A pending action from the previous run was cancelled because the run ended.\",\n        \"severity\": \"warning\",\n      },\n    ]\n\n\nN"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S1 stopping uses Ask Stop presentation and retains arriving output until the terminal",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record S1 stopping uses Ask Stop presentation and retains arriving output until the terminal:  AssertionError: expected '' to contain 'Stopping'\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:188:104\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/node_m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S3 refused uses Ask Stop unconfirmed presentation and keeps Stop retryable",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record S3 refused uses Ask Stop unconfirmed presentation and keeps Stop retryable:  AssertionError: expected undefined to be 'Could not stop this answer — it goes …' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:206:98\n    at file:///home/elias/.cache/am/xylw8iw"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S3 network uses Ask Stop unconfirmed presentation and keeps Stop retryable",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record S3 network uses Ask Stop unconfirmed presentation and keeps Stop retryable:  AssertionError: expected undefined to be 'Could not stop this answer — it goes …' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:206:98\n    at file:///home/elias/.cache/am/xylw8iw"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 http start failure with Stop true shows a failed receipt and releases the composer without polling",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N2 http start failure with Stop true shows a failed receipt and releases the composer without polling:  AssertionError: expected 'halted' to be 'failed' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:233:69\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 network start failure with Stop true shows a failed receipt and releases the composer without polling",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N2 network start failure with Stop true shows a failed receipt and releases the composer without polling:  AssertionError: expected 'halted' to be 'failed' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:233:69\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 lost start failure with Stop true shows a failed receipt and releases the composer without polling",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N2 lost start failure with Stop true shows a failed receipt and releases the composer without polling:  AssertionError: expected 'halted' to be 'failed' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:233:69\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#G1 a start that never answers releases the composer at the Stop deadline with a failed receipt and no polling",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record G1 a start that never answers releases the composer at the Stop deadline with a failed receipt and no polling:  AssertionError: expected 'halted' to be 'failed' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:258:71\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N2 early Stop then completion before identity releases the composer without polling",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N2 early Stop then completion before identity releases the composer without polling:  AssertionError: expected 'halted' to be 'complete' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:274:69\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N3 resumed known conversation reconciles a later CANCELLED only at its actual address",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N3 resumed known conversation reconciles a later CANCELLED only at its actual address:  AssertionError: expected undefined to be 'Could not stop this answer — it goes …' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:296:98\n    at file:///home/elias/.cache/am/xylw8iw"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N3 resumed unknown conversation reconciles a later CANCELLED only at its actual address",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N3 resumed unknown conversation reconciles a later CANCELLED only at its actual address:  AssertionError: expected undefined to be 'Could not stop this answer — it goes …' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:296:98\n    at file:///home/elias/.cache/am/xylw8iw"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S3 S6 no stop response becomes unconfirmed, keeps output and allows one new attempt",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record S3 S6 no stop response becomes unconfirmed, keeps output and allows one new attempt:  AssertionError: expected '' to contain 'Stopping'\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:316:106\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:inter"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S4 losing the stream while stopping follows the DONE lifecycle without inventing confirmation",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record S4 losing the stream while stopping follows the DONE lifecycle without inventing confirmation:  AssertionError: expected 'halted' to be 'complete' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:340:27\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S4 losing the stream while stopping follows the READY_FOR_LLM lifecycle without inventing confirmation",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record S4 losing the stream while stopping follows the READY_FOR_LLM lifecycle without inventing confirmation:  AssertionError: expected 'halted' to be 'streaming' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:340:27\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S11 stopping closes the held decision and suppresses later automatic budget continuation",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record S11 stopping closes the held decision and suppresses later automatic budget continuation:  AssertionError: expected '' to contain 'Stopping'\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:359:104\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/node_m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#S12 one confirmed receipt and announcement retain the final tool count and evidence through refresh",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record S12 one confirmed receipt and announcement retain the final tool count and evidence through refresh:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:381:30\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#R4 discovery and record fetches that never answer are aborted and leave unconfirmed Stop available",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record R4 discovery and record fetches that never answer are aborted and leave unconfirmed Stop available:  AssertionError: expected 1 to be greater than or equal to 2\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:396:35\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#R4 ERROR lifecycle after lost stopping stream produces a failed receipt without a streamed error",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record R4 ERROR lifecycle after lost stopping stream produces a failed receipt without a streamed error:  AssertionError: expected undefined to be 'failed' // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:412:59\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N4 accepted Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N4 accepted Stop without a saved DONE bounds record polling to the five-second grace even after further notifications:  AssertionError: expected 51 to be 11 // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:531:27\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N4 refused Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N4 refused Stop without a saved DONE bounds record polling to the five-second grace even after further notifications:  AssertionError: expected 51 to be 11 // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:531:27\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N4 network Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N4 network Stop without a saved DONE bounds record polling to the five-second grace even after further notifications:  AssertionError: expected 51 to be 11 // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:531:27\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#N4 no-answer Stop without a saved DONE bounds record polling to the five-second grace even after further notifications",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record N4 no-answer Stop without a saved DONE bounds record polling to the five-second grace even after further notifications:  AssertionError: expected 51 to be 11 // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:531:27\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after pending",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after pending:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:585:94\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after CANCELLED",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after CANCELLED:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:585:94\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts#G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after DONE",
+        "classification": "assertion",
+        "detail": "Delegate Stop reconciles the addressed live turn with the durable record G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after DONE:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts:585:94\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#retains the HTTP response for status 200 instead of a boolean",
+        "classification": "assertion",
+        "detail": "S9 Ask Stop keeps delivery outcomes available to the shared attempt vocabulary retains the HTTP response for status 200 instead of a boolean:  AssertionError: expected undefined to be 200 // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts:77:29\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#retains the HTTP response for status 409 instead of a boolean",
+        "classification": "assertion",
+        "detail": "S9 Ask Stop keeps delivery outcomes available to the shared attempt vocabulary retains the HTTP response for status 409 instead of a boolean:  AssertionError: expected undefined to be 409 // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts:77:29\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/node_modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#a lost answer rejects rather than reporting an HTTP refusal",
+        "classification": "assertion",
+        "detail": "S9 Ask Stop keeps delivery outcomes available to the shared attempt vocabulary a lost answer rejects rather than reporting an HTTP refusal:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts:88:30\n    at file:///home/elias/.cache/am/xylw8iw2/tmp/test-intent-before-BJiF3z/modules/ui-web/node_modules"
+      }
+    ]
+  },
+  "digest": "sha256:e37a88ce540a8900b13aad9c14f0c1f88341c8c3958293881868ecba95225773"
+}

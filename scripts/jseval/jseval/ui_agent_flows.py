@@ -224,7 +224,7 @@ async def setup_run_approval_failure(page):
 
 
 async def setup_run_halt(page):
-    """F4 preservation: one DELETE, delayed success, stopped after its answer only."""
+    """F4: accepted DELETE keeps stopping until the CANCELLED terminal."""
     fixture = await start(page)
     await activity(fixture, page, "Running until Halt.")
     path = f"/api/chat/sessions/{fixture.session_id}"
@@ -233,10 +233,94 @@ async def setup_run_halt(page):
     await page.get_by_test_id("sv3-composer-stop").click()
     request = await fixture.wait_request("DELETE", path)
     assert not request.answered.is_set()
-    # No assertion about the UI before the answer: backend confirmation is a known gap.
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
     release.set()
     await asyncio.wait_for(request.answered.wait(), TIMEOUT / 1000)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    await activity(fixture, page, "Output still arrives while stopping.")
+    await fixture.stream.emit("error", {"error": "Session cancelled", "errorCode": "CANCELLED"})
     await expect(page.get_by_test_id("sv3-run-receipt")).to_have_attribute("data-outcome", "halted", timeout=TIMEOUT)
     await expect(page.get_by_test_id("sv3-run-feed")).to_have_count(0)
     assert len(fixture.matching("DELETE", path)) == 1, fixture.requests
     only_run(fixture)
+
+
+async def setup_run_halt_failure(page):
+    """S3: DELETE refusal keeps observing and permits one explicit retry."""
+    fixture = await start(page)
+    await activity(fixture, page, "Running until Halt is refused.")
+    path = f"/api/chat/sessions/{fixture.session_id}"
+    fixture.replies[("DELETE", path)] = fixtures.FixtureReply(status=409)
+    await page.get_by_test_id("sv3-composer-stop").click()
+    request = await fixture.wait_request("DELETE", path)
+    await asyncio.wait_for(request.answered.wait(), TIMEOUT / 1000)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text(
+        "Could not stop this answer — it goes on. Press Stop to try again.")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    await activity(fixture, page, "The answer continues after the refused Stop.")
+    release = asyncio.Event()
+    fixture.replies[("DELETE", path)] = fixtures.FixtureReply(gate=release)
+    await page.get_by_test_id("sv3-composer-stop").click()
+    await fixture.wait_request("DELETE", path, count=2)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    assert len(fixture.matching("DELETE", path)) == 2, fixture.requests
+    only_run(fixture)
+
+
+async def setup_run_halt_timeout(page):
+    """S3 S6: an unanswered DELETE becomes unconfirmed and permits one retry."""
+    fixture = await start(page)
+    await activity(fixture, page, "Running while Stop gets no answer.")
+    path = f"/api/chat/sessions/{fixture.session_id}"
+    release = asyncio.Event()
+    fixture.replies[("DELETE", path)] = fixtures.FixtureReply(gate=release)
+    await page.get_by_test_id("sv3-composer-stop").click()
+    await fixture.wait_request("DELETE", path)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text(
+        "Could not stop this answer — it goes on. Press Stop to try again.", timeout=15_000)
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    await activity(fixture, page, "Output continues after the unanswered Stop.")
+    await page.get_by_test_id("sv3-composer-stop").click()
+    await fixture.wait_request("DELETE", path, count=2)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await expect(page.get_by_test_id("sv3-run-receipt")).to_have_count(0)
+    assert len(fixture.matching("DELETE", path)) == 2, fixture.requests
+    only_run(fixture)
+
+
+async def setup_ask_stop_late_response(page):
+    """R1: Ask keeps waiting past Halt's deadline and accepts the late response."""
+    page.set_default_timeout(TIMEOUT)
+    await page.emulate_media(reduced_motion="reduce")
+    fixture = fixtures.agent_fixture(page.context)
+    await page.locator(S.CSS_SV3_WINDOW).wait_for(state="visible")
+    await page.get_by_test_id("sv3-composer-tier").click()
+    await page.locator('[data-testid="sv3-composer-tier-option"][data-tier="ask"]').click()
+    await send(page, "Explain the fixture documents")
+    dispatch = await fixture.wait_request("POST", DISPATCH)
+    assert dispatch.body["shapeId"] == "core.rag-ask", dispatch
+    path = f"/api/chat/conversations/{dispatch.body['conversationId']}/stop"
+    release = asyncio.Event()
+    fixture.replies[("POST", path)] = fixtures.FixtureReply(
+        gate=release, body={"stopped": True, "pending": False})
+    await fixture.stream.emit("chunk", {"text": "The answer keeps arriving."})
+    await page.get_by_test_id("sv3-composer-stop").click()
+    request = await fixture.wait_request("POST", path)
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await asyncio.sleep(15)
+    assert not request.answered.is_set()
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    release.set()
+    await asyncio.wait_for(request.answered.wait(), TIMEOUT / 1000)
+    await page.get_by_test_id("sv3-composer-stop").click()
+    await expect(page.get_by_test_id("sv3-turn-stopping")).to_have_text("Stopping…")
+    await fixture.stream.emit("error", {"error": "Stopped by the user", "errorCode": "CANCELLED"})
+    # Ask's consumeShapeStream reports the terminal when the response reaches EOF;
+    # unlike the agent controller, it does not settle inside the event callback.
+    await fixture.stream.disconnect()
+    await expect(page.get_by_test_id("sv3-turn")).to_have_attribute("data-status", "halted", timeout=TIMEOUT)
+    assert len(fixture.matching("POST", path)) == 1, fixture.requests

@@ -281,6 +281,7 @@ import {
   subscribeAgentSession,
 } from '../../state/agentSessionStore.js';
 import type { AgentSessionController } from '../../controllers/AgentSessionController.js';
+import { StopAttempt, STOP_RESPONSE_WAIT_MS } from '../../state/stopAttempt.js';
 import {
   directiveAvailable,
   dispatchRunControl,
@@ -1072,7 +1073,7 @@ export class SearchV3View extends JfElement {
   private readonly recordReads = new Map<string, AbortController>();
   /** A local terminal can precede the Engine's journal and checkpoint writes. */
   private readonly pendingRunRecords = new Map<string, {
-    local: Sv3RunLocal; runId: string; doneGraceUntil?: number;
+    local: Sv3RunLocal; runId: string; conversationId: string; doneGraceUntil?: number;
   }>();
   private readonly announcedStops = new Set<string>();
   private recordRetryTimer: number | null = null;
@@ -2404,26 +2405,57 @@ export class SearchV3View extends JfElement {
     const abort = new AbortController();
     this.recordReads.set(conversationId, abort);
     let failed = false;
+    const stopping = this.agentController();
+    const timer = stopping?.stopAttempt?.intent
+      && (stopping.runConversationId ?? stopping.conversationId) === conversationId
+      ? setTimeout(() => abort.abort(), STOP_RESPONSE_WAIT_MS) : undefined;
     const record = await fetchUnifiedThread(this.apiBase, conversationId, abort.signal, () => {
       failed = true;
-    });
+    }).finally(() => clearTimeout(timer));
     // Reads supersede only their own conversation; a pending Stop can settle after navigation.
     if (abort.signal.aborted) return false;
     this.recordReads.delete(conversationId);
     if (this.sessions.activeId === conversationId) this.recordNotice = failed;
     if (!failed) {
+      const ctrl = this.agentController();
+      if (ctrl?.stopAttempt?.intent && (ctrl.runConversationId ?? ctrl.conversationId) === conversationId) {
+        const lifecycle = record.lifecycles.find((row) => row.sessionId === ctrl.sessionId);
+        if (lifecycle) ctrl.reconcileRunLifecycle(lifecycle.sessionId, lifecycle.state);
+      }
+      // Navigation detaches the local handle. Its addressed turn still follows its record.
+      for (const { local, runId, conversationId: recordConversationId } of this.pendingRunRecords.values()) {
+        if (recordConversationId !== conversationId || this.run === local) continue;
+        const state = record.lifecycles.find((row) => row.sessionId === runId)?.state;
+        if (state !== 'CANCELLED' && state !== 'DONE' && state !== 'ERROR') continue;
+        const turn = sessionById(this.sessions, local.sessionId)?.turns.find((t) => t.id === local.turnId);
+        if (turn?.status !== 'streaming') continue;
+        this.sessions = settleAgentTurn(this.sessions, local,
+          state === 'CANCELLED' ? 'halted' : state === 'DONE' ? 'complete' : 'failed',
+          turn.toolCalls, Date.now(), '', turn.disposition);
+      }
+      const failedRun = ctrl?.stopAttempt?.intent && ctrl.terminalOutcome === 'failed'
+        && (ctrl.runConversationId ?? ctrl.conversationId) === conversationId ? this.run : null;
+      const failedTurn = failedRun === null ? undefined
+        : sessionById(this.sessions, failedRun.sessionId)?.turns.find((turn) => turn.id === failedRun.turnId);
       this.sessions = applySv3Record(
         this.sessions,
         conversationId,
         projectSv3RecordTurns(record.events),
       );
+      // The lifecycle can confirm failure before an ERROR item reaches the record. Preserve the
+      // live receipt across that partial snapshot without changing the saved-record projection.
+      if (failedRun !== null && failedTurn?.status === 'failed') {
+        this.sessions = { ...this.sessions, sessions: this.sessions.sessions.map((session) =>
+          session.id !== failedRun.sessionId ? session : { ...session, turns: session.turns.map((turn) =>
+            turn.id !== failedRun.turnId ? turn : { ...turn, status: 'failed', detail: failedTurn.detail }) }) };
+      }
       const stopIds = new Set(record.events
         .filter((e) => sv3RecordItemStopsRun(e.kind.toLowerCase(), e.attributes))
         .map((e) => e.id));
       for (const [id, pending] of this.pendingRunRecords) {
         const { local, runId } = pending;
-        if (local.sessionId !== conversationId) continue;
-        const turn = sessionById(this.sessions, conversationId)?.turns.find((t) => t.id === local.turnId);
+        if (pending.conversationId !== conversationId) continue;
+        const turn = sessionById(this.sessions, local.sessionId)?.turns.find((t) => t.id === local.turnId);
         if (turn === undefined) {
           this.pendingRunRecords.delete(id);
           continue;
@@ -2436,7 +2468,8 @@ export class SearchV3View extends JfElement {
         const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
         if (state === 'DONE' && stop === undefined && !local.haltRequested) {
           pending.doneGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
-        } else {
+        } else if (!local.haltRequested || state === 'DONE') {
+          // Our Halt still needs its saved confirmation when completion wins the race.
           delete pending.doneGraceUntil;
         }
         // A saved Stop can precede the final checkpoint; keep reading through both edges.
@@ -2458,7 +2491,7 @@ export class SearchV3View extends JfElement {
   private retireExpiredRecordReads(): void {
     const now = Date.now();
     for (const [id, pending] of this.pendingRunRecords) {
-      if (!pending.local.haltRequested && pending.doneGraceUntil !== undefined
+      if (pending.doneGraceUntil !== undefined
         && now >= pending.doneGraceUntil) this.pendingRunRecords.delete(id);
     }
   }
@@ -2470,7 +2503,7 @@ export class SearchV3View extends JfElement {
     this.recordRetryTimer = window.setTimeout(() => {
       this.recordRetryTimer = null;
       this.retireExpiredRecordReads();
-      for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+      for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.conversationId))) {
         void this.refreshRecord(id);
       }
     }, 500);
@@ -2547,7 +2580,7 @@ export class SearchV3View extends JfElement {
 
   private retryContextOnReconnect = (): void => {
     this.clearRecordRetry();
-    for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+    for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.conversationId))) {
       void this.refreshRecord(id);
     }
     this.clearContextRetry();
@@ -4656,20 +4689,19 @@ export class SearchV3View extends JfElement {
     // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
     const dispatchId = crypto.randomUUID();
     const reasoning = new ReasoningController(() => this.requestUpdate());
-    let stopAsked = false;
+    const stopAttempt = new StopAttempt();
     const stop = (): void => {
-      if (stopAsked) return;
-      stopAsked = true;
+      if (stopAttempt.pending || stopAttempt.outcome === 'accepted') return;
+      stopAttempt.latch();
       this.revokeHumanTask();
       this.saveRecovery();
       const ask = this.liveAsks.get(ref.sessionId);
       if (ask === undefined) return;
       ask.stopping = { turnId: ref.turnId, state: 'stopping' };
       this.syncActiveAsk();
-      void sv3StopAsk(this.apiBase, ref.sessionId, dispatchId).then((taken) => {
-        if (taken || this.liveAsks.get(ref.sessionId)?.abort !== abort) return;
+      void stopAttempt.deliver((signal) => sv3StopAsk(this.apiBase, ref.sessionId, dispatchId, signal)).then(() => {
+        if (stopAttempt.outcome === 'accepted' || this.liveAsks.get(ref.sessionId)?.abort !== abort) return;
         // Refused or unanswered: the answer goes on, and Stop can be pressed again.
-        stopAsked = false;
         ask.stopping = { turnId: ref.turnId, state: 'failed' };
         this.syncActiveAsk();
       });
@@ -5069,16 +5101,22 @@ export class SearchV3View extends JfElement {
     void dispatchRunControl(ctrl, { kind: 'interject', text });
   }
 
-  /**
-   * The reader's stop. Recorded FIRST and dispatched second, because the record of the decision is
-   * what makes `halted` an honest receipt outcome — and because a stop pressed before the stream
-   * opened cannot be delivered yet (the seam's predicate refuses a halt on a run with no abort handle
-   * yet). Remembering it means the next update delivers it, instead of the decision being dropped.
-   */
+  /** Ask and Halt share the same pending and unconfirmed presentation. */
+  private runStopping(): Sv3StopState | null {
+    const ctrl = this.agentController();
+    const local = this.run;
+    if (!ctrl?.stopAttempt?.intent || ctrl.terminalOutcome !== null || local === null
+        || local.sessionId !== this.sessions.activeId) return null;
+    return { turnId: local.turnId, state: ctrl.stopAttempt.outcome === 'refused'
+      || ctrl.stopAttempt.outcome === 'unknown' || ctrl.stopObservationLost ? 'failed' : 'stopping' };
+  }
+
+  /** Latch before dispatch; the controller keeps observing until the backend ends this run. */
   private haltRun(): void {
     const local = this.run;
     if (local === null) return;
     local.haltRequested = true;
+    local.haltDispatched = false;
     this.deliverHalt();
     this.requestUpdate();
   }
@@ -5087,10 +5125,10 @@ export class SearchV3View extends JfElement {
     const ctrl = this.agentController();
     const local = this.run;
     if (ctrl === null || local === null || local.haltDispatched) return;
+    local.haltDispatched = true;
     void dispatchRunControl(ctrl, { kind: 'halt' }).then((result) => {
-      // Only an ACCEPTED halt closes the door; a lifecycle refusal leaves the request pending so the
-      // next update can try again, and does so without a retry storm.
-      if ((result as RunControlRefusal | undefined)?.refused !== true) local.haltDispatched = true;
+      // A lifecycle refusal may be retried by the next update. HTTP failures require another press.
+      if ((result as RunControlRefusal | undefined)?.refused === true) local.haltDispatched = false;
     });
   }
 
@@ -5194,6 +5232,20 @@ export class SearchV3View extends JfElement {
       // A run this window is already rendering is a run it must never ALSO adopt as presence — the
       // id is only knowable once the server names it, which is here rather than at dispatch.
       if (ctrl.sessionId !== null) this.adoptedRunIds.add(ctrl.sessionId);
+      if (ctrl.stopAttempt?.intent && !local.haltRequested) local.haltRequested = true;
+      const recordConversationId = ctrl.runConversationId ?? ctrl.conversationId;
+      if (local.haltRequested && ctrl.sessionId !== null && ctrl.terminalOutcome === null
+          && recordConversationId !== null) {
+        local.stopRecordGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
+        const pending = this.pendingRunRecords.get(local.turnId);
+        if (!pending && Date.now() < local.stopRecordGraceUntil) {
+          this.pendingRunRecords.set(local.turnId, {
+            local, runId: ctrl.sessionId, conversationId: recordConversationId,
+            doneGraceUntil: local.stopRecordGraceUntil,
+          });
+          void this.refreshRecord(recordConversationId);
+        }
+      }
       const feed = projectSv3RunFeed(ctrl, local.entryStart);
       this.keepUnconfirmedSteerNotes(local.turnId, sv3UnconfirmedSteerNotes(ctrl, local.entryStart, feed));
       const status = sv3RunSessionStatus(ctrl, feed);
@@ -5233,6 +5285,7 @@ export class SearchV3View extends JfElement {
    * gate stays held until the raise lands, so without it one gate would fire a raise per frame.
    */
   private maybeAutoContinue(ctrl: AgentSessionController, local: Sv3RunLocal): void {
+    if (ctrl.stopAttempt?.intent) return;
     if (ctrl.budgetGate === null) {
       // The gate cleared — re-arm for the NEXT one.
       this.budgetGateHandled = false;
@@ -5335,7 +5388,8 @@ export class SearchV3View extends JfElement {
     this.sessions = settleAgentTurn(
       this.sessions,
       { sessionId: local.sessionId, turnId: local.turnId },
-      sv3RunOutcome(feed, local.haltRequested),
+      ctrl?.terminalOutcome === 'failed' ? 'failed' : sv3RunOutcome(feed, ctrl?.terminalOutcome === 'cancelled'
+        || (ctrl?.terminalOutcome === 'completed' && local.haltRequested && ctrl.stopAttempt.outcome === 'accepted' && ctrl.answerEvidenceRunId === ctrl.sessionId)),
       feed.toolCallCount,
       Date.now(),
       '',
@@ -5346,13 +5400,18 @@ export class SearchV3View extends JfElement {
       // cut-short badge.
       terminalBelongsToThisRun && ctrl !== null ? ctrl.terminalDisposition : null,
     );
-    if (local.acknowledged && ctrl?.sessionId != null) {
-      this.pendingRunRecords.set(local.turnId, { local, runId: ctrl.sessionId });
+    const recordConversationId = ctrl?.runConversationId ?? ctrl?.conversationId;
+    if (local.acknowledged && ctrl?.sessionId != null && recordConversationId != null) {
+      this.pendingRunRecords.set(local.turnId, {
+        local, runId: ctrl.sessionId, conversationId: recordConversationId,
+        ...(local.haltRequested
+          ? { doneGraceUntil: Date.now() + COMPLETED_RECORD_GRACE_MS } : {}),
+      });
     }
     // The live feed was ATTENTION; the record is what survives it. Refreshing at the terminal is what
     // makes the yield happen (inventory D1): the settled turn re-renders from the canonical record's
     // interleaved items instead of vanishing with the controller that produced them.
-    void this.refreshRecord(local.sessionId);
+    if (ctrl?.sessionId != null && recordConversationId != null) void this.refreshRecord(recordConversationId);
   }
 
   /** A typed prompt resolved by its OWN control — never by anything typed into the composer. */
@@ -6005,7 +6064,7 @@ export class SearchV3View extends JfElement {
           .continuationVersions=${this.continuationVersions()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
-          .stopping=${this.askStopping}
+          .stopping=${this.askStopping ?? this.runStopping()}
           .checkingTurnId=${this.askCheckingTurnId}
           data-testid="sv3-main"
         ></jf-sv3-main>

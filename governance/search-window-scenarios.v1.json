@@ -686,6 +686,16 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+          "test": "R1 Ask Stop waits beyond the Halt deadline and accepts a late success"
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-ask-stop-late-response",
+          "observes": "Ask Stop keeps Stopping… while its response is held for fifteen seconds, accepts the late success without a second request, and waits for CANCELLED."
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
           "test": "says \"Stopping…\" until the Engine ends the turn, and keeps every word it sent before that"
         },
         {
@@ -916,6 +926,12 @@
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts",
           "test": "a COLD-LOADED grounded answer comes back WITH its sources, note or no note (847 §1.3/§1.7)"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+          "test": "S8 P5 reload projects an existing record with stop_requested before %s as on the baseline",
+          "observes": "Preservation only: reopening a saved conversation keeps today's halted receipt for a recorded Stop, including a completed answer and its disposition; finding a live run resumes observation without restarting it. This does not establish backend-confirmed stopping before live-run discovery answers."
         }
       ]
     },
@@ -1857,36 +1873,161 @@
     },
     {
       "id": "SW-RUN-11",
-      "behavior": "Halt reports a stopped run only after the backend confirms that outcome.",
+      "behavior": "In the live window and other windows already observing the run, Halt reports a stopped run only after the backend confirms that outcome. If an accepted stop is followed by completion, today's halted presentation keeps the completed answer and disposition, appearing only after the completion terminal.",
+      "kind": "works-today",
+      "races": [
+        "late-response",
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+          "test": "S1 keeps observation, prose, reasoning, tools and evidence until CANCELLED"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+          "test": "S3 S6 %s is unconfirmed and permits exactly one explicit retry"
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+          "test": "S4 lost stream reconciles %s from discovery and record"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+          "test": "S1 stopping uses Ask Stop presentation and retains arriving output until the terminal"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+          "test": "S3 %s uses Ask Stop unconfirmed presentation and keeps Stop retryable"
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "These controller and browser checks use a controllable fake backend; no live Engine check binds this guarantee."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-halt",
+          "observes": "Halt shows stopping before and after an accepted DELETE; output continues, and only CANCELLED produces a halted receipt."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-halt-failure",
+          "observes": "A refused DELETE shows the Ask Stop unconfirmed presentation, keeps observation open, and permits one explicit retry without claiming a halted receipt."
+        },
+        {
+          "layer": "real-ui-fixture",
+          "step": "sv3-run-halt-timeout",
+          "observes": "An unanswered DELETE shows the Ask Stop unconfirmed presentation, keeps observation open, and permits one explicit retry without claiming a halted receipt."
+        },
+        {
+          "layer": "controller",
+          "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+          "test": "G1 %s never answers before identity: Stop releases the composer at its deadline without discovering another run"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+          "test": "G1 a start that never answers releases the composer at the Stop deadline with a failed receipt and no polling"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delegateStop.test.ts",
+          "test": "G2 a resumed run adopted into another conversation bounds accepted Stop polling with a nonterminal record after %s"
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-13",
+      "behavior": "A window reloaded while a stop is pending shows the run halted until it finds the live run again.",
+      "kind": "known-gap",
+      "races": [
+        "reload"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The saved conversation treats a recorded Stop as halt evidence before live-run discovery answers. Preserving today's saved-conversation presentation leaves this gap; the reload preservation check does not establish backend-confirmed stopping during that interval."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The saved conversation treats a recorded Stop as halt evidence before live-run discovery answers. Preserving today's saved-conversation presentation leaves this gap; no live backend check establishes backend-confirmed stopping during that interval."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-14",
+      "behavior": "When another part of the app starts a new agent run while an earlier run in the Search window is stopping, the earlier turn’s Stop can reach the newer run and the newer run’s end can settle the earlier turn.",
+      "kind": "known-gap",
+      "races": [
+        "late-response",
+        "second-conversation-or-tab"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "The Search turn can retain its earlier run while the shared agent controller adopts a newer run. Isolating those owners is outside the agreed Stop fix; no check is bound to establish isolation for this case."
+        },
+        {
+          "layer": "live-backend",
+          "binding": null,
+          "reason": "The Search turn can retain its earlier run while the shared agent controller adopts a newer run. Isolating those owners is outside the agreed Stop fix; no check is bound to establish isolation for this case."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-15",
+      "behavior": "A resumed run that is stopped shows its stopped status but not its saved partial output and evidence until reopened.",
       "kind": "known-gap",
       "races": [
         "late-response"
       ],
       "observations": [
         {
-          "layer": "controller",
-          "binding": null,
-          "reason": "Halt concludes locally before the backend reply and ignores connection failure; existing controller checks do not establish backend confirmation."
-        },
-        {
           "layer": "view",
           "binding": null,
-          "reason": "The existing Halt view checks cover narrower terminal and reconciliation cases, not backend-confirmed stopping."
+          "reason": "A resumed run can belong to a different saved conversation from the adopted Search turn. Recovering its partial output and evidence without reopening is outside the agreed Stop fix; no check is bound to establish that recovery."
         },
         {
           "layer": "live-backend",
           "binding": null,
-          "reason": "No live check binds this guarantee; a lost Halt request can leave the backend running."
-        },
-        {
-          "layer": "real-ui-fixture",
-          "step": "sv3-run-halt",
-          "observes": "Preservation only: Halt sends one DELETE for the run; after a delayed successful reply the receipt reports the halted outcome."
-        },
+          "reason": "A resumed run can belong to a different saved conversation from the adopted Search turn. Recovering its partial output and evidence without reopening is outside the agreed Stop fix; no check is bound to establish that recovery."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-16",
+      "behavior": "Stopping a run resumed from the session history shows that it is stopping until the run ends.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
         {
           "layer": "real-ui-fixture",
           "binding": null,
-          "reason": "The clause \"only after the backend confirms\" remains unbound: the preservation flow makes no assertion before the DELETE reply; today Halt can conclude locally before that reply."
+          "reason": "For a run resumed from session history without selecting the conversation it was adopted into, the stop request is sent and the run stays observed, but the window does not show the stopping state; it shows the outcome once the run ends. Selecting that conversation shows the stopping state."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-17",
+      "behavior": "After leaving a run that is stopping, its turn later shows the outcome the backend reports for it.",
+      "kind": "known-gap",
+      "races": [
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "When the window has moved on, the saved record decides the earlier turn's outcome as it did before; a failed run can show as complete, and a recorded stop can show as stopped without a cancelled end."
         }
       ]
     },

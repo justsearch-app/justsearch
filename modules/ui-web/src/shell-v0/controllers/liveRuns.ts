@@ -31,13 +31,14 @@ export type LiveRunRow = NonNullable<LiveRunsResponse['runs']>[number];
 export async function fetchLiveRuns(
   apiBase: string,
   shapeId?: string,
+  signal?: AbortSignal,
 ): Promise<readonly LiveRunRow[]> {
   try {
     // `conversationId` is deliberately NOT sent as a filter: the caller's guard is asymmetric — a run
     // with no conversation of its own is adoptable by anyone, which a server-side equality filter
     // would exclude. Narrowing by shape has no such asymmetry.
     const query = shapeId ? `?shapeId=${encodeURIComponent(shapeId)}` : '';
-    const res = await authorizedFetch(`${apiBase}/api/chat/runs/live${query}`);
+    const res = await authorizedFetch(`${apiBase}/api/chat/runs/live${query}`, { signal });
     if (!res.ok) return [];
     const parsed = liveRunsResponseSchema.safeParse(await res.json());
     if (!parsed.success) return [];
@@ -67,8 +68,9 @@ export async function discoverLiveAgentRun(
 export async function discoverLiveAgentRunRow(
   apiBase: string,
   conversationId?: string | null,
+  signal?: AbortSignal,
 ): Promise<LiveRunRow | null> {
-  const runs = await fetchLiveRuns(apiBase, AGENT_SHAPE_ID);
+  const runs = await fetchLiveRuns(apiBase, AGENT_SHAPE_ID, signal);
   for (const run of runs) {
     // The server honours `?shapeId=`; this re-check is the guarantee, so a backend that ever stopped
     // honouring it degrades to "found nothing" instead of attaching to a workflow run.
