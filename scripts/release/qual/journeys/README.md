@@ -186,24 +186,27 @@ private signing key is needed or used for these tests.
 
 ## GPU host (Ubuntu, supported NVIDIA GPU)
 
-W4c development status: J1/J2 passed again in round four. J3 downloaded and
-activated the Linux GPU plan and invoked Start AI, but acknowledgment probes
-failed to read the Engine's `/proc/<pid>/environ` (permission denied). The lane
-correctly reports infrastructure failure; GPU chat, positive CUDA maps, J4 and
-J9 remain **unverified**. J9 was relevant but never started. No second full run
-was attempted. Root-process accounting after waiting for every descendant
-reported 15,880,499,200 write bytes, within the continuation's 20 GB budget.
-Retained Engine logs also show ONNX using `/home/elias/.justsearch/cache/ort-optimized`
-outside private HOME/XDG roots. Desktop/session isolation and the owner sentinel
-passed, but **state isolation failed**; private HOME alone does not establish
-private JVM cache paths. This needs a separate decision before another run.
-Raw reports and a separate assessment are retained in the W4c round-four evidence.
+W4c development status: full GPU qualification remains unproven. Round seven
+replaces inconsistent process IO sums with the private-root mount device's
+`/proc/diskstats` counter and records structural desktop proof before launch.
+Round seven passed J1/J2 but stopped after candidate launch when the harness
+could not observe the Accept and download control after Install AI. No downloads
+started, and no second run was attempted: the cause is not established as a
+plain harness defect. J3 completion, J4 and J9 remain unverified. The device
+upper bound was 703,193,088 bytes; private-root final allocation before removal
+was 3,084,451,840 bytes. Pre-launch structural desktop proof passed and survived
+shutdown. Owner metadata/sentinel were unchanged. Raw cleanup reported unreadable
+known process environments and transient remaining bubblewrap identity; a later
+identity check found no remaining lane process, root or sentinel. Recovery from
+activated state has unit coverage but was not exercised on this run. The journey
+suite passed 319 tests with three existing skips. Evidence and assessment are
+under W4c round seven.
 
 Use `gpu-host.py` on the owner host; **never use hosted.py, apt install or the
 VM wrapper here**. Prerequisites already on PATH: Python 3 with Pillow, Xvfb,
 xauth, D-Bus, Openbox, xdotool, scrot, taskset, curl, Tesseract, nvidia-smi,
 WebKitWebDriver matching the host WebKitGTK, and tauri-driver 2.0.4. The host
-command installs nothing. Tools may instead be extracted into a private scratch
+command installs nothing. Bubblewrap (`bwrap`) must already be installed. Tools may instead be extracted into a private scratch
 directory from distro `.deb` files using `apt download` and `dpkg-deb -x`.
 Keep their loader paths inside individual tool wrappers; do not export
 LD_LIBRARY_PATH into the candidate. An extracted Openbox needs its own theme
@@ -243,14 +246,29 @@ Uncommitted production changes, a missing source/tag or a failed diff cannot
 produce a skip or pass. The reason and relevant changed paths appear in
 `soakDecision` and `J9-relevance.json`. An irrelevant J9 is `skipped-by-decision`.
 
-The wrapper creates private HOME and XDG data/config/cache/runtime roots, a new
-Xvfb display and a new session bus. It extracts the `.deb` without installing,
+The external wrapper runs the entire lane, including Xvfb, the session bus,
+pack mirror and all candidate processes, inside bubblewrap. A private empty
+read-only directory hides the passwd-derived home; only the source worktree,
+its Git metadata, candidate assets, packs, corpus and extracted harness tools
+are bound back at their original paths, read-only. The extracted candidate is
+also read-only. Private work/state (directly under `/home/elias/dev/justsearch-qual/`) and evidence are writable. `/tmp`,
+`/run/user/<uid>` and the PID namespace (with a matching `/proc`) are private;
+network and GPU devices are shared. Before and after the session, an internal
+assertion checks that home contains only these explicit bindings. The sandbox
+root filesystem retains the host mount semantics for OS interfaces (including
+AppArmor D-Bus policy queries); the owner home remains hidden and only explicit
+lane inputs are restored there.
+
+Private HOME and XDG roots and environment scrubbing remain in place.
+`JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR` explicitly names the private cache and is
+recorded in environment evidence. The `.deb` is extracted without installing,
 retaining `usr/bin/JustSearch` beside `usr/lib/<package>/resources/headless`.
-A curated PATH exposes OS/harness tools and no developer JDK. Inherited Java,
-runtime, native-library and model overrides are absent. Ports for the API and
-both WebDriver endpoints are private. CPU affinity limits all descendants to
-eight available CPUs; native pools and the product's ORT thread setting are
-also capped at eight. No single-instance forwarding enters the owner's bus.
+A curated PATH exposes OS/harness tools without a developer JDK. Ports for the
+API and both WebDriver endpoints are private. CPU affinity and native pools
+are capped at eight. The external 30-second resource guard uses host PID/start
+identities descended from its own bubblewrap process; product ownership and
+CUDA map probes run only inside the private PID namespace. Unreadable unproven
+process entries are skipped by diagnostic enumeration. The runner still requires readable exact product identities for its behavior checks.
 
 Before launch, require MemAvailable >=14 GiB and no outside process using >1 GiB
 of GPU memory. Every 30 seconds, including blocking installation and chat work,
@@ -297,24 +315,49 @@ it; the independent host MemAvailable guard protects native allocations and the
 owner. This does not claim a native/RSS leak test.
 
 `resources.json`, exact session process identities and their private display/bus
-record enforce isolation. The wrapper creates, checks and removes one uniquely
+record enforce isolation. Before and after the run, the external wrapper records
+only paths, mtimes, sizes and modes under the owner’s `~/.justsearch`; no file
+contents or symlink targets there are read. A metadata change fails isolation.
+The wrapper also creates, checks and removes one uniquely
 named sentinel in the **existing** owner's real app-data folder, without reading
-other contents. Every observed app GUI process must use the run-owned Xvfb and
-private bus, with no WAYLAND_DISPLAY; otherwise isolation cannot pass. New JVM
+other contents. Before the runner starts, `sandbox.json` records DISPLAY naming the lane's Xvfb,
+`/tmp/.X11-unix` containing only its socket, the lane's actual D-Bus socket,
+and no owner Wayland, bus or Pulse sockets under the private `/run/user/<uid>`.
+Unreadable diagnostic `/proc` entries cannot fail this structural proof. New JVM
 crash logs are collected only from private state and extracted resources. Native
 coredumps use the shared attribution rules without sudo. As with hosted Linux,
 native crash collection is currently unproven and always adds an
 `owner-validation` row; even otherwise passing results are therefore
 `passed-pending-owner-validation` (exit 2). A crash or unavailable check still
 fails the lane. Screenshots are triage only. Every attempt retains per-journey
-write observations. The top-level `write-volume.json` reads the lane root's
-`/proc/<pid>/io` `write_bytes` after all descendants are waited for. The root
-uses Linux child-subreaper mode so orphaned grandchildren are also accounted
-for. This measures attributed block writes, including cancelled writes; it
-excludes the final accounting-file write, physical device amplification and
-unattributed swap. No global sync is issued on the owner's machine. A 20 GB
-write guard reserves 512 MB for cleanup and checks outstanding process counters
-every second; these live observations may race with process exits. Start AI
+write observations. The top-level `write-volume.json` and live guard use the
+same baseline: resolve the private-root mount's major/minor device with
+`findmnt`, then take the delta of sectors written in `/proc/diskstats`, times
+512 bytes. This is an **upper bound including unrelated host IO** on that
+device, not attribution to lane processes. No global sync is issued; pending
+writeback and the final accounting-file write are outside the final sample.
+`private-root-size.json` records `du -s -B1` before state removal (allocated
+size, not cumulative writes). The 30 GB continuation guard samples every second
+and reserves 512 MB for cleanup.
+
+After downloads and activation, the lane saves a private development checkpoint.
+A later infrastructure failure retains that root with all processes stopped;
+a product failure, resource/budget interruption or completed lane removes it.
+After diagnosing a plain harness failure, continue **only** the remaining
+J3 checks, J4 and J9 using the same package/tools and a new evidence directory:
+
+```sh
+python3 scripts/release/qual/journeys/gpu-host.py \
+  <same assets, package, source, corpus, driver and mirror arguments> \
+  --development-resume-root /home/elias/dev/justsearch-qual/w4c-gpu-<id> \
+  --journeys J3 J4 J9 --evidence /path/to/new-development-evidence
+```
+
+This skips all downloads/activation, restores only the kept lane's facts and
+saved state, and labels the result `development-rerun`, never fresh release
+qualification. The original failed report remains unchanged. The write budget
+retains its original device baseline across recovery. Remove any retained
+root after the development repair sequence ends. Start AI
 must be invoked and its chat intent acknowledged before chat startup failures
 can be classified as product failures.
 

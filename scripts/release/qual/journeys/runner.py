@@ -393,16 +393,22 @@ print(json.dumps({'pid':p.pid,'ticks':Path('/proc/'+str(p.pid)+'/stat').read_tex
         rows = self.json("""
 import json,sys
 from pathlib import Path
-marker=('QUAL_JOURNEY_RUN='+json.loads(sys.argv[1])).encode(); rows=[]
+a=json.loads(sys.argv[1]);marker=('QUAL_JOURNEY_RUN='+a['runId']).encode(); rows=[]
+known={tuple(v) for v in a['known']}
 for path in Path('/proc').glob('[0-9]*/environ'):
+ identity=None
  try:
+  stat=path.with_name('stat').read_text().rsplit(') ',1)[1].split()
+  identity=(int(path.parent.name),stat[19])
   if marker in path.read_bytes().split(b'\\0'):
    rows.append({'pid':int(path.parent.name),'ticks':path.with_name('stat').read_text().split(') ',1)[1].split()[19],
                 'exe':str(path.with_name('exe').resolve()),
                 'ppid':int(path.with_name('stat').read_text().split(') ',1)[1].split()[1])})
+ except PermissionError:
+  if identity in known:raise RuntimeError('Cannot read owned process '+str(identity[0]))
  except (OSError,IndexError): pass
 print(json.dumps(rows))
-""", self.env['QUAL_JOURNEY_RUN'], desktop=False)
+""", {'runId': self.env['QUAL_JOURNEY_RUN'], 'known': list(self.app_processes)}, desktop=False)
         if self.app_binary:
             app_pids = {p['pid'] for p in rows if (p['pid'], p['ticks']) in self.app_processes}
             for _ in range(len(rows) + 1):
@@ -633,7 +639,15 @@ class Run:
     def __init__(self, args, definition):
         self.args, self.definition = args, definition
         self.out = Path(args.evidence).resolve()
-        self.out.mkdir(parents=True, exist_ok=False)
+        try:
+            self.out.mkdir(parents=True, exist_ok=False)
+        except FileExistsError:
+            # The GPU sandbox writes its two proofs before starting the runner.
+            # Accept only that exact preflight, never a previous attempt's data.
+            if (args.lane != 'gpu-linux' or not self.out.is_dir()
+                    or {p.name for p in self.out.iterdir()} != {'sandbox-command.json', 'sandbox.json'}
+                    or any(p.is_symlink() or not p.is_file() for p in self.out.iterdir())):
+                raise
         self.target = Target(args.vm)
         self.target.process_evidence = self.out / 'app-processes.json'
         self.native = Native(self.target, self.out)
@@ -740,8 +754,8 @@ except (AssertionError,FileNotFoundError,ProcessLookupError,KeyError,ValueError,
  print(json.dumps({'status':'product','reason':type(exc).__name__+': '+str(exc)}))
 except urllib.error.URLError as exc:
  print(json.dumps({'status':'infrastructure' if isinstance(exc.reason,TimeoutError) else 'product','reason':str(exc)}))
-except TimeoutError as exc:
- print(json.dumps({'status':'infrastructure','reason':str(exc)}))
+except (TimeoutError,PermissionError) as exc:
+ print(json.dumps({'status':'infrastructure','reason':type(exc).__name__+': '+str(exc)}))
 """, {'data': self.data, 'endpoint': endpoint, 'body': body, 'runId': self.run_id})
         if result['status'] == 'product':
             raise TransientAPI('Installed Engine: ' + result['reason'])
@@ -949,7 +963,8 @@ def main():
     args = parser.parse_args()
     if args.lane.endswith('windows') and args.vm:
         parser.error('Windows adapters execute inside the guest; do not pass --vm')
-    if args.lane == 'gpu-linux' and (args.resume or args.checkpoint or args.predecessor or args.mirror or args.phase != 'candidate'):
+    if args.lane == 'gpu-linux' and (args.checkpoint or args.predecessor or args.mirror or args.phase != 'candidate'
+            or (args.resume and args.resume != Path(os.environ.get('QUAL_GPU_ROOT', '/nonexistent')) / 'activated-checkpoint.json')):
         parser.error('GPU lane accepts fresh extracted candidates only; use gpu-host.py')
     if not args.lane.endswith('windows') and bool(args.vm) != args.lane.startswith('vm-'):
         parser.error('VM lanes require --vm; hosted lane runs inside its own Xvfb session')

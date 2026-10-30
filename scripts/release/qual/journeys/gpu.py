@@ -94,7 +94,7 @@ def resource_sample(owned=(), *, starting=False):
             'available': resources_available(available, processes, set(owned), starting=starting)}
 
 
-def private_environment(source, root, marker):
+def private_environment(source, root, marker, *, resume=False):
     # Allowlist rather than trying to enumerate every native/Java/model override.
     env = {k: source[k] for k in ('USER', 'LOGNAME', 'LANG', 'LC_ALL', 'PATH') if k in source}
     search = os.pathsep.join(p for p in env.get('PATH', '/usr/bin:/bin').split(os.pathsep)
@@ -102,7 +102,7 @@ def private_environment(source, root, marker):
     # This host has /usr/bin/javac as well as a developer JDK directory. Give
     # children only named OS/harness tools; the app must use its bundled JVM.
     bin_dir = root / 'bin'
-    bin_dir.mkdir()
+    bin_dir.mkdir(exist_ok=resume)
     for name in ('sh', 'bash', 'python3', 'git', 'env', 'cat', 'dirname', 'which', 'id', 'grep', 'uname',
                  'sed', 'find', 'readlink', 'realpath', 'hostname', 'dbus-run-session', 'dbus-daemon',
                  'dbus-update-activation-environment', 'gdbus', 'Xvfb', 'xvfb-run', 'xauth', 'openbox', 'taskset',
@@ -110,15 +110,16 @@ def private_environment(source, root, marker):
                  'tauri-driver', 'WebKitWebDriver', 'scrot', 'xdotool', 'tesseract', 'nvidia-smi',
                  'curl', 'xdg-open', 'xdg-settings', 'xdg-mime', 'gio', 'dpkg-deb', 'tar', 'gzip', 'xz', 'zstd', 'coredumpctl'):
         executable = shutil.which(name, path=search)
-        if executable:
+        if executable and not (bin_dir / name).exists():
             (bin_dir / name).symlink_to(executable)
     env['PATH'] = str(bin_dir)
     for key, directory in (('HOME', 'home'), ('XDG_DATA_HOME', 'data'), ('XDG_CONFIG_HOME', 'config'),
                            ('XDG_CACHE_HOME', 'cache'), ('XDG_RUNTIME_DIR', 'runtime')):
         path = root / directory
-        path.mkdir(mode=0o700)
+        path.mkdir(mode=0o700, exist_ok=resume)
         env[key] = str(path)
     env.update(QUAL_GPU_SESSION=marker, OMP_NUM_THREADS='8', OPENBLAS_NUM_THREADS='8',
+               JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR=str(root / 'cache/ort-optimized'),
                RAYON_NUM_THREADS='8', JUSTSEARCH_ORT_INTRA_OP_THREADS='8',
                XDG_SESSION_TYPE='x11', XDG_CURRENT_DESKTOP='Openbox')
     return env
@@ -128,6 +129,15 @@ def free_port():
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))
         return sock.getsockname()[1]
+
+
+def device_writes(device, diskstats=Path('/proc/diskstats')):
+    """Linux diskstats sectors are 512 bytes, independent of sector size."""
+    for line in diskstats.read_text().splitlines():
+        fields = line.split()
+        if ':'.join(fields[:2]) == device:
+            return int(fields[9]) * 512
+    raise Infrastructure('Private-root block device missing from diskstats: ' + device)
 
 
 def soak_relevant(paths):
@@ -260,12 +270,15 @@ class Run(runner.Run):
     def check(self, journey, name, fn):
         def guarded():
             if self.interrupted:
-                raise Unavailable(INTERRUPTED)
+                raise Unavailable('Lane stopped after interruption or failed check')
             value = fn()
             if self.interrupted:
                 raise RunStopped(INTERRUPTED)
             return value
-        return super().check(journey, name, guarded)
+        result = super().check(journey, name, guarded)
+        if journey['checks'][-1]['status'] in ('failed-product', 'failed-infrastructure'):
+            self.interrupted = True
+        return result
 
     def setup(self):
         # Only gpu-host.py may create the isolated session and arm the guard.
@@ -273,7 +286,7 @@ class Run(runner.Run):
         if not root or not os.environ.get('QUAL_GPU_SESSION') or not Path(root, 'guard-armed').is_file():
             raise Infrastructure('Use gpu-host.py: a private display, bus and resource guard are required')
         self.work = root + '/work'
-        Path(self.work).mkdir()
+        Path(self.work).mkdir(exist_ok=True)
         self.data = os.environ['XDG_DATA_HOME'] + '/io.justsearch.shell'
         self.crash_since_ns = time.time_ns()
         # Preserve only the wrapper's private environment. No prepare() hosted
@@ -282,10 +295,20 @@ class Run(runner.Run):
             'HOME', 'USER', 'LOGNAME', 'PATH', 'DISPLAY', 'XAUTHORITY', 'LANG', 'LC_ALL',
             'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS', 'XDG_SESSION_TYPE', 'XDG_CURRENT_DESKTOP',
             'XDG_DATA_HOME', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME', 'QUAL_GPU_SESSION',
-            'OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'RAYON_NUM_THREADS', 'JUSTSEARCH_ORT_INTRA_OP_THREADS')}
+            'OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'RAYON_NUM_THREADS', 'JUSTSEARCH_ORT_INTRA_OP_THREADS',
+            'JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR')}
         private.update(QUAL_JOURNEY_RUN=self.run_id, JUSTSEARCH_API_PORT=str(free_port()))
         self.facts['driverPorts'] = [free_port(), free_port()]
-        if Path(self.data).exists():
+        if self.args.resume:
+            state = json.loads(self.args.resume.read_text())
+            if (state['assets'] != self.facts['assets'] or state['lane'] != 'gpu-linux'
+                    or state['work'] != self.work or state['data'] != self.data):
+                raise Infrastructure('GPU checkpoint does not match private root and candidate assets')
+            self.binary = state['binary']
+            self.facts.update(state['facts'])
+            self.facts['driverPorts'] = [free_port(), free_port()]
+            self.start_ui()
+        elif Path(self.data).exists():
             raise Infrastructure('GPU run inherited existing application state')
         self.evidence('environment', {k: v for k, v in private.items() if k != 'DBUS_SESSION_BUS_ADDRESS'})
         self.facts['soakDecision'] = soak_decision(self.args.source, self.args.last_release)
@@ -296,11 +319,21 @@ class Run(runner.Run):
     def save(self):
         report = super().save()
         report['execution']['releaseQualification'] = not bool(
-            getattr(self.args, 'development_pack_mirror', None) or getattr(self.args, 'journeys', None))
+            getattr(self.args, 'development_pack_mirror', None) or getattr(self.args, 'journeys', None)
+            or getattr(self.args, 'resume', None))
         report['execution']['developmentPackMirror'] = str(self.args.development_pack_mirror) if getattr(self.args, 'development_pack_mirror', None) else None
         report['soakDecision'] = self.facts.get('soakDecision', {'run': None, 'reason': 'setup did not determine relevance'})
         self.evidence('summary', report)
         return report
+
+    def activation_checkpoint(self):
+        # Kept only inside the private root, never in owner state. This is a
+        # development recovery point, not evidence that remaining checks passed.
+        path = Path(os.environ['QUAL_GPU_ROOT']) / 'activated-checkpoint.json'
+        path.write_text(json.dumps({'assets': self.facts['assets'], 'lane': 'gpu-linux',
+            'work': self.work, 'data': self.data, 'binary': self.binary,
+            'facts': {k: v for k, v in self.facts.items()
+                      if k not in ('ui', 'ready', 'preLaunchProcesses')}}) + '\n')
 
     def stop_app(self):
         self.facts.pop('ui', None)
@@ -331,18 +364,18 @@ class Run(runner.Run):
             raise ProductFailure('Bundled JVM crash: ' + json.dumps(rows))
 
     def write_counters(self):
-        # Host whole-device counters include unrelated owner writes. Avoid sync()
-        # on this shared machine. The wrapper also reports waited-for child IO.
-        value = int(dict(line.split(':', 1) for line in Path('/proc/self/io').read_text().splitlines())['write_bytes'])
-        return {'devices': {'lane': value}, 'writtenBytes': value, 'swapWrittenBytes': None,
-                'source': 'runner /proc/self/io including waited-for children; live Engine writes observed separately; no host sync',
-                'swapMeasurement': 'per-process swap write attribution unavailable on this host'}
+        device = os.environ['QUAL_GPU_BLOCK_DEVICE']
+        value = device_writes(device)
+        return {'devices': {device: value}, 'writtenBytes': value, 'swapWrittenBytes': None,
+                'source': 'Private-root mount device /proc/diskstats sectors written * 512; includes unrelated host IO (upper bound); no host sync',
+                'swapMeasurement': 'separate swap attribution unavailable'}
 
 
 def extract_package(run):
     package = run.args.assets.resolve() / run.args.package
     root = Path(run.work) / 'package'
-    run.target.run(['dpkg-deb', '-x', package, root], timeout=180)
+    if not (os.environ.get('QUAL_GPU_EXTRACTED') == str(root) and root.is_dir()):
+        run.target.run(['dpkg-deb', '-x', package, root], timeout=180)
     binaries = list(root.glob('usr/bin/JustSearch'))
     if len(binaries) != 1:
         raise ProductFailure('Candidate has no unique packaged JustSearch executable')
@@ -404,6 +437,9 @@ def first_run(run):
 
 
 def gpu_install(run):
+    if run.args.resume:
+        run.require('gpuInstalled')
+        return gpu_installed_checks(run)
     run.require('ui')
     run.require('folder')
     run.nav('AI Brain')
@@ -440,7 +476,17 @@ def gpu_install(run):
             return install
     installed = wait_for(activated, 'Default GPU AI activation', seconds=900, interval=5)
     run.facts['gpuInstalled'] = installed
-    start_chat(run)
+    run.activation_checkpoint()
+    return gpu_installed_checks(run, preview)
+
+
+def gpu_installed_checks(run, preview=None):
+    installed = run.require('gpuInstalled')
+    if run.facts.get('chatStart', {}).get('acknowledged'):
+        wait_chat_ready(run, 'J3')
+    else:
+        start_chat(run)
+    run.activation_checkpoint()
     retrieval = linux.semantic_search(run)
     runtime = run.api('/api/ai/runtime/status')
     run.evidence('J3-gpu-runtime', runtime)
