@@ -20,7 +20,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 - Search lists documents, filters by folder, date and size, and understands exact phrases, exclusions, `title:` and `author:`; Structured mode extracts schema-checked JSON (#805, #911, #1011, #1012, #1014)
 - Recent searches and conversations open from the search bar; conversation branches show their original and let you return to it (#912, #1009)
 - Pause indexing from its status controls, keep it paused across restarts, or set indexing hours and pause on battery; Search stays available (#904, #918, #1033)
-- Forget a file or folder from the Library and keep it out of search and assistant reads across rescans and restarts; review and forget assistant memories from Search (#935, #998)
+- Forget indexed files or folders from a Search result’s menu; permitted folders and files inside watched folders stay excluded until their exclusion is removed, while files outside watched folders can return after an explicit add or import; original files, saved answers, logs and backups remain; review and forget assistant memories from Search (#935, #998)
 - Settings can delete local data while keeping downloaded AI models; Alt+Shift+Space summons Search on Windows and Linux X11, with `--focus-search` as the Wayland alternative (#821)
 - Turn off automatic update checks with `JUSTSEARCH_AUTO_UPDATE_CHECK=false`; administrators can forbid all app-update checks and downloads with `appUpdatesEnabled` in policy (#856)
 
@@ -35,6 +35,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 
 ### Removed
 - The pins panel and the old window’s automatic search-history events and pin-run updates; existing history and pins stay, and plugins can still read pins (#1005)
+- Open file no longer opens files without an extension or with an unsupported extension; use Show in folder to access them instead (#833)
 - `/api/mcp/token` and stdout token emission; `/api/inference/reload` gives way to `core.reconfigure`, and `POST /api/worker/restart` returns HTTP 410: use `POST /api/engine/components/index/recover` (#727, #825)
 
 ### Fixed
