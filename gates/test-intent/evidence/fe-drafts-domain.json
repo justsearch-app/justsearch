@@ -1,0 +1,408 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-30T17:10:46.116Z",
+  "revision": "f9730e4010f1abd72a4fe6dc8a0b5a2d6f3a8870",
+  "tree": "bb6e6d02982a40482efc5b091fc4bbd39e48f3e0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.preparationAck.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/fe-drafts-domain/tmp/ui-checks/scratch/test-intent-vitest-5-1793380240720.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5394
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.preparationAck.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.preparationAck.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d19bc1337ead78a7e017e049ee5bec84a0c380b7f3c4c003f21b1a6b9aa433f1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "'tier' attachment readback: edits reject preparation; refused departures keep their place and apply preparation ('edit')",
+          "status": "passed"
+        },
+        {
+          "name": "'tier' attachment readback: edits reject preparation; refused departures keep their place and apply preparation ('place')",
+          "status": "passed"
+        },
+        {
+          "name": "'schema' attachment readback: edits reject preparation; refused departures keep their place and apply preparation ('edit')",
+          "status": "passed"
+        },
+        {
+          "name": "'schema' attachment readback: edits reject preparation; refused departures keep their place and apply preparation ('place')",
+          "status": "passed"
+        },
+        {
+          "name": "'card scope' attachment readback: edits reject preparation; refused departures keep their place and apply preparation ('edit')",
+          "status": "passed"
+        },
+        {
+          "name": "'card scope' attachment readback: edits reject preparation; refused departures keep their place and apply preparation ('place')",
+          "status": "passed"
+        },
+        {
+          "name": "'scope clear' attachment readback: edits reject preparation; refused departures keep their place and apply preparation ('edit')",
+          "status": "passed"
+        },
+        {
+          "name": "'scope clear' attachment readback: edits reject preparation; refused departures keep their place and apply preparation ('place')",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.forgetRetention.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:622700c7a1095b314a2eff21404b09c4caf836baa673d8f4b5ad250393fbedc3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "confirmed Forget immediately republishes the live choice [ '/docs/sub/report\\[1].txt ' ]",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget immediately republishes the live choice [ '/docs/sub/report\\[1].txt ', …(1) ]",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed FILE Forget prunes a kept draft across reload and navigation",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed FOLDER Forget prunes a kept draft across reload and navigation",
+          "status": "passed"
+        },
+        {
+          "name": "forgetting the last kept file requires reselection rather than granting all-file scope",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget preserves saved turn scopes while pruning a live prepared Ask",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget prunes a retained submission without rewriting its saved turn",
+          "status": "passed"
+        },
+        {
+          "name": "confirmed Forget prunes an incoming handoff selection and its kept file preparation",
+          "status": "passed"
+        },
+        {
+          "name": "a confirmed card Forget arriving after navigation prunes the kept draft without replacing current text",
+          "status": "passed"
+        },
+        {
+          "name": "a live kept Ask losing its final file stays blocked when returning without reload",
+          "status": "passed"
+        },
+        {
+          "name": "a live Structured draft losing its final file keeps its schema and requires reselection",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1578209bca3476b455a2164c44eab928e14b4c2e832678b7aaad461cd6380659",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO1 HO2 a cold address query arrives intact and is consumed from the address",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.summarize prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.extract prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO5 HO9 a selection is local to its prepared turn",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO5 the real Explain sender with empty docIds sends the ranking trace",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 editing Explain instructions keeps its model trace inspectable in the submitted turn",
+          "status": "passed"
+        },
+        {
+          "name": "HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 two arrivals replace preparation without sending",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 an incoming query replaces typed Search without creating a conversation place",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 HO8 cold third-snapshot intake refuses without replacing the raw or typed draft",
+          "status": "passed"
+        },
+        {
+          "name": "HO11 an answer link ignores agent affordance and conversation and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 an empty file hand-off cannot widen to the whole index",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary Retry menu names the original summary inputs",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary retry states its missing inputs and never sends an all-files Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary edit states its missing inputs and never sends an all-files Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 an outgoing conversation keeps its unsent draft and files one click away",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 abandoning a prepared selection cannot attach it to another mode send",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 abandoning a hand-off for an unvisited conversation clears its file scope",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 leaving the window retires prepared context while a layout reparent keeps it",
+          "status": "passed"
+        },
+        {
+          "name": "HO10 unavailable chat still shows the prepared task and chosen files",
+          "status": "passed"
+        },
+        {
+          "name": "HO12 an incoming task puts keyboard focus in the composer",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 malformed selection data is refused visibly without a crash",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a streaming Ask stays live and keeps its draft and files across a hand-off",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a held real controller keeps its decision and reopens from the sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a locked conversation is left intact by incoming preparation",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: identical assignment",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: A-B-A",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: newer input",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: composition start",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 a refused unreadable-document hand-off keeps the instruction and files",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 D7 a Structured hand-off with no files uses typed text and waits for send",
+          "status": "passed"
+        },
+        {
+          "name": "HO12 keyboard palette search after a hand-off returns focus to the composer",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 a reloaded Explain Retry menu states its actual restoration limit",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 HO5 a reloaded Explain retry refuses before fork and preserves unrelated B",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 HO5 a reloaded Explain edit refuses before fork and preserves unrelated B",
+          "status": "passed"
+        },
+        {
+          "name": "merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
+          "status": "passed"
+        },
+        {
+          "name": "merge an unscoped Summarize input failure is not a no-matching-files result",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'inline trace'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'shortened'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'different question'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'emptied'",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 transfers the legacy draft durably once and never resurrects it after Clear",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 defers legacy transfer for an explicit arrival until a later clean mount",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 a failed durable write leaves the legacy draft recoverable",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.rag-ask prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.free-chat prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.extract prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a workflow compatibility mount announces its unavailable disposition",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"mode\":[\"ask\",\"search\"]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"forceShapeId\":[]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"docIds\":[\"\",\"chosen.md\"]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return",
+          "status": "passed"
+        },
+        {
+          "name": "C8 W3 a workflow answer link stays unprepared and announces its unavailable disposition",
+          "status": "passed"
+        },
+        {
+          "name": "C7 C8 an outgoing compatibility view cannot consume the main window arrival",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 a shared line passage is highlighted without inventing a missing citation position",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 changing the address place keeps the shared reader until explicitly closed",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 allows two whole same-text proposals, refusing a third before replacement or a request",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 ordinary compatibility model tier changes retain the actual no-retrieval proposal before any leave",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 rejected fresh hash intake preserves live conversation B and both snapshots before traversal clearing",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 bare history restoration cannot retire live B when both existing recovery slots are needed",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 bare history restoration cannot retire review B when both existing recovery slots are needed",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 one-slot automatic hero navigation retains B at its origin while explicit New retires current B",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cb0c5f6b4111f913f6e276b081da0ccc7fec564ef2e5bbaa9cd0b976d284dd63"
+}

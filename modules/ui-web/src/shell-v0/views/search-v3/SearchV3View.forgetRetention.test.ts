@@ -173,13 +173,13 @@ it('confirmed Forget prunes an incoming handoff selection and its kept file prep
     .handle({ kind: 'navigate', target: 'core.search-v3-surface',
       state: { query: 'Incoming question', forceShapeId: 'core.summarize', docIds: [target, other] } });
   await pump(view);
-  const initialHandoff = (view as unknown as { preparedHandoff: object }).preparedHandoff;
+  const initialHandoff = (view as unknown as { draftDomain: { preparedHandoff: object } }).draftDomain.preparedHandoff;
   complete(view, '/docs/unrelated.txt');
-  expect((view as unknown as { preparedHandoff: object }).preparedHandoff).toBe(initialHandoff);
+  expect((view as unknown as { draftDomain: { preparedHandoff: object } }).draftDomain.preparedHandoff).toBe(initialHandoff);
   expect(controller(view).pendingScope?.paths).toEqual([target, other]);
   complete(view);
   expect(controller(view).pendingScope?.paths).toEqual([other]);
-  const handoff = (view as unknown as { preparedHandoff: { selection: unknown } }).preparedHandoff;
+  const handoff = (view as unknown as { draftDomain: { preparedHandoff: { selection: unknown } } }).draftDomain.preparedHandoff;
   expect(handoff.selection).toEqual({ kind: 'result-set', items: [{ id: other, kind: 'doc' }] });
   expect(recovery().drafts.find(draft => draft.text === 'Incoming question')?.preparation)
     .toEqual({ kind: 'summarize', scope: { kind: 'files', paths: [other] } });
@@ -216,7 +216,7 @@ it('a live kept Ask losing its final file stays blocked when returning without r
   const { view } = await mount(); view.tier = 'ask'; controller(view).prepare({ paths: [target] });
   await restoreActiveConversation('other-conversation'); await pump(view);
   expect(view.sessions.activeId).toBe('other-conversation'); complete(view);
-  const kept = (view as unknown as { placeDrafts: Map<string, { review: boolean; preparation: unknown }> }).placeDrafts.get('\u0000results');
+  const kept = (view as unknown as { draftDomain: { placeDrafts: Map<string, { review: boolean; preparation: unknown }> } }).draftDomain.placeDrafts.get('\u0000results');
   expect(kept).toEqual({ text: 'report', review: true, preparation: { kind: 'ask', scope: { kind: 'reselect', paths: [] } } });
   expect(controller(view).hasPlace).toBe(true);
   restoreActiveConversation(null); await pump(view);
@@ -233,7 +233,7 @@ it('a live Structured draft losing its final file keeps its schema and requires 
   const composer = await region(view, 'jf-sv3-composer');
   composer.dispatchEvent(new CustomEvent('sv3-schema-change', { bubbles: true, composed: true, detail: { text: schema } }));
   await pump(view);
-  expect((view as unknown as { schemaDraft: string }).schemaDraft).toBe(schema);
+  expect((view as unknown as { draftDomain: { schemaDraft: string } }).draftDomain.schemaDraft).toBe(schema);
   complete(view); await pump(view);
   expect(recovery().drafts[0]?.preparation)
     .toEqual({ kind: 'structured', schema, scope: { kind: 'reselect', paths: [] } });
