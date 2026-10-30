@@ -51,6 +51,32 @@ from a changeset under the test-intent rules. The ceiling script self-test is to
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structured.test.ts"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Contract checks for the view-side composer adapter: a replacement composer element with equal text and equal draft version makes an earlier capture stale; the same element reused across reconnect keeps an unedited capture valid; a capture taken before first render follows the view's pre-render seed contract. Removing the adapter's identity check makes these checks fail. The file is not isolated because an existing Ask test in the same folder reads every sibling test source, so it is listed here instead of being exempt.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261029-fs993c request, 2026-10-30",
+          "quote": "proceed with step 4"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed with step 4",
+          "delegationLocation": "task t-20261029-fs993c request, 2026-10-30",
+          "delegationScope": "Step 4 of the agreed frontend restructuring: move the Search view's areas out one at a time, nothing the user sees changes, under the same safety net of scenario checks",
+          "choice": "The agent adds direct checks of the composer adapter's identity rules (replacement element, reconnect of the same element, capture before first render), which an independent review found were only covered indirectly.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/composer-port-adapter.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts"
+      ]
     }
   ]
 }
