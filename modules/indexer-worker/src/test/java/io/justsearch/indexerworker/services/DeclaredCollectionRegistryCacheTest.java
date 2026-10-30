@@ -24,11 +24,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.ObjectMapper;
 
+@ExtendWith(NoVolumeIdentityExtension.class)
 final class DeclaredCollectionRegistryCacheTest {
   @TempDir Path data;
 
@@ -54,6 +56,10 @@ final class DeclaredCollectionRegistryCacheTest {
       var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
           base, layout.activeGenerationPath(), candidate, serving, null, 0L);
       service.setDeclaredRootsDirectory(data);
+      boolean recorded = ((RootWitness) service.rootCheck()).recordAdded(root);
+      if (NoVolumeIdentityExtension.volumeIdentityAvailable(root)) {
+        assertTrue(recorded, "precondition: the person's add records the root's volume");
+      }
       var registry = new RootWatcherRegistry();
       assertTrue(registry.watch(root.toString(), null).watching());
       service.setRootWatcherRegistry(registry);

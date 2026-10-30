@@ -168,6 +168,8 @@ the parsed-registry cache policy too. Its prior acceptance must be refreshed by 
   (K3): reconcile 64 new files on a default subscription using the composed ingest service,
   generation manager and real SQLite queue/journal. Count actual `WatchedRootsFormat.declaredCollections`
   calls with a scoped static counting wrapper which calls the real parser; require exactly one.
+  The fixture records the declared root's volume through the worker's deliberate-add witness.
+  The scoped volume-identity extension exercises this precondition even without host UUID lookup.
 - `DeclaredCollectionRegistryCacheTest#watcherAndSingleFileAdmissionsReuseParseAndSeeRegistryChanges`
   (K4): independently exercise 64 watcher admissions and 64 single-file batch requests. Require one
   actual parse per unchanged registry; atomically replace A with equal-length B at the same mtime,
