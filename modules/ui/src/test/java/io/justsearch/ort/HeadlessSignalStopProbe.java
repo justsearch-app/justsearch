@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.IntConsumer;
 
 /** One isolated JVM, fake native call, real session leases/admission and real Unix signal delivery. */
+@SuppressWarnings("PMD.DoNotTerminateVM") // An isolated child JVM whose exit status is the result under test.
 public final class HeadlessSignalStopProbe {
   private HeadlessSignalStopProbe() {}
 
@@ -112,7 +113,7 @@ public final class HeadlessSignalStopProbe {
           write(dir, "drained", "yes");
           return "GRACEFUL";
         })), System::exit, code -> Runtime.getRuntime().halt(code),
-        () -> handle.retirementStatus() == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED
+        () -> handle.retirementStatus() == SessionHandle.RetirementStatus.RETIRED
             ? NativeQuiescence.QUIESCED : NativeQuiescence.UNQUIESCED, ignored -> {},
         (reason, detail, code) -> {
           write(dir, "self-intent", reason.name());
