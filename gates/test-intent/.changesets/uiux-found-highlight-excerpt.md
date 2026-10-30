@@ -22,8 +22,8 @@ into a shared clone with plain npm ci in that clone. This prevents repository me
 shared dependency trees. No checks or expectations are changed by the launcher.
 VITEST_MAX_WORKERS=2 and TZ=UTC apply to all evidence commands. The launcher's source, exact
 invocation and raw command output are retained in tmp/verify for independent inspection.
-The producer's aggregate exit is 1 because the three preservation checks pass before; per-check
-classification distinguishes those passes from the eight repaired assertion failures.
+The producer's aggregate exit is 1 because the five preservation checks pass before; per-check
+classification distinguishes those passes from the nine repaired assertion failures.
 
 Evidence exercises Lit component DOM with happy-dom, not an installed Engine or browser.
 Copy actions and full document text are outside this helper and were not independently exercised.
@@ -135,3 +135,14 @@ The unchanged full suite provides narrower regression coverage; no live-system c
 ## Acceptance records
 
 Pending independent verifier acceptance; the builder does not accept its own expectations.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18c4f-9c92-7100-9787-b6729499762d",
+  "verdict": "accept",
+  "digest": "sha256:0d69b691152edd59056f250a03205e01a7dc3834930d2dad91cabe5ff69bf268",
+  "note": "Codex verifier-3 on 1ae9105b00: A1-A4 pass; B passes within narrowed B1 (ASCII identifier keys; comment, quoted, numeric, dotted and non-ASCII keys shown as on main). Classifications and evidence accepted (nine baseline assertion failures, five preservation passes, audited digest sha256:1727a3e8c5...). Recorded by the orchestrator after the verifier's requested count correction (prose only)."
+}
+```
