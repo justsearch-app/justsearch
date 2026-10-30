@@ -75,3 +75,13 @@ author-session: fe-run-domain
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-0w9fvdv7",
+  "verdict": "accept",
+  "digest": "sha256:de7bc943835470af0ac3de76328f0ae29a98eb535c0ec99d9607481c2ebacc6f"
+}
+```
