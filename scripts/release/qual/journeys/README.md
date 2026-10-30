@@ -464,13 +464,21 @@ guest evidence directory, since stopped checkpoints retain previous evidence.
 Use `--session hosted` without predecessor/mirror arguments for a local hosted
 equivalent in a fresh Windows VM. This executes `windows-hosted.py`, the same
 entry point as Actions. Prepare its tools snapshot with that same session first.
-The local hosted-equivalent rehearsal remains unqualified: an elevated interactive
-run installed the candidate and opened its normal window with a ready Engine,
-but creating the harness's WebDriver session timed out with a matching driver.
-The session failure is infrastructure; dependent journeys remain unavailable.
-The same candidate completed the VM lane in its limited interactive context.
-The cause of the hosted timeout is unresolved; the actual GitHub workflow has
-only been read, parsed and policy-checked here, never dispatched.
+Elevated WebView2 hosts [ignore environment browser overrides](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags),
+including EdgeDriver's `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`. This caused the
+hosted session timeout: the app received `--remote-debugging-port=0` in its
+environment but its browser process had no debugging port. The hosted entry now
+sets that flag in the supported HKLM WebView2 `AdditionalBrowserArguments`
+policy for `JustSearch.exe` only, while running the journeys elevated. It
+restores the prior value on success or failure; limited callers use the normal
+driver environment. The installed app and its normal profile are unchanged.
+The actual GitHub workflow has only been read, parsed and policy-checked here,
+never dispatched.
+The local elevated rehearsal passed J1–J4 and J6 install-over-itself with this
+repair. The hosted lane remains unqualified: J6 uninstall/retain/reinstall hit
+a separate harness error hashing the uninstaller after it deleted itself, and
+reinstall was never reached. The following live MCP check lacked its ready-app
+prerequisite.
 To continue from an installed checkpoint, supply `--mode rerun --snapshot
 /path/to/new-j1-evidence/selected/snapshot --journeys J2`. Each development
 rerun selects one journey, restores its prerequisite checkpoint and seals the

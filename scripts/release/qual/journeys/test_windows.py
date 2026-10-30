@@ -892,6 +892,49 @@ class WindowsInstallationTests(unittest.TestCase):
 
 
 class WindowsEnvironmentTests(unittest.TestCase):
+    def test_hosted_elevated_webdriver_policy_is_app_scoped_and_restored(self):
+        import importlib.util
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+        spec = importlib.util.spec_from_file_location('windows_hosted', Path(__file__).with_name('windows-hosted.py'))
+        hosted = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(hosted)
+        for previous in (None, ('--disable-gpu', 1)):
+            for failure in (False, True):
+                with self.subTest(previous=previous, failure=failure):
+                    values = {} if previous is None else {'JustSearch.exe': previous}
+                    registry = SimpleNamespace(HKEY_LOCAL_MACHINE='HKLM', REG_SZ=1, KEY_QUERY_VALUE=1, KEY_SET_VALUE=2)
+                    registry.CreateKeyEx = MagicMock()
+                    def query(key, name):
+                        if name not in values:
+                            raise FileNotFoundError(name)
+                        return values[name]
+                    registry.QueryValueEx = query
+                    registry.SetValueEx = lambda key, name, reserved, kind, value: values.update({name: (value, kind)})
+                    registry.DeleteValue = lambda key, name: values.pop(name)
+                    with patch.dict(sys.modules, winreg=registry):
+                        try:
+                            with hosted.elevated_webdriver(True):
+                                flags = values['JustSearch.exe'][0]
+                                self.assertEqual(flags, ('--disable-gpu ' if previous else '') + '--remote-debugging-port=0')
+                                if failure:
+                                    raise RuntimeError('runner failed')
+                        except RuntimeError as exc:
+                            self.assertEqual(str(exc), 'runner failed')
+                    self.assertEqual(values, {} if previous is None else {'JustSearch.exe': previous})
+                    registry.CreateKeyEx.assert_called_once_with('HKLM',
+                        r'SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments', 0, 3)
+        registry.QueryValueEx = lambda key, name: (42, 4)
+        registry.SetValueEx = MagicMock()
+        with patch.dict(sys.modules, winreg=registry), self.assertRaisesRegex(Infrastructure, 'must be a string'):
+            with hosted.elevated_webdriver(True):
+                self.fail('Invalid existing policy was accepted')
+        registry.SetValueEx.assert_not_called()
+        with patch.dict(sys.modules, winreg=None):
+            with hosted.elevated_webdriver(False):
+                pass  # Limited callers never import winreg or change machine policy.
+
     def test_driver_receipt_pins_supplied_binary_without_a_nonexistent_version_switch(self):
         with tempfile.TemporaryDirectory() as temp:
             path=Path(temp)/'tauri-driver.exe';path.write_bytes(b'qualification tooling')
