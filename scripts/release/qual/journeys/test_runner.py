@@ -212,13 +212,16 @@ class RunnerTests(unittest.TestCase):
         run.args.phase = 'predecessor'
         run.args.predecessor.name = 'JustSearch_0.3.0_amd64.deb'
         run.work = '/tmp/own-run'
-        run.facts = {}
+        bookmark = {'id': 'authored'}
+        state = {'savedFiles': {'files': {'models/embedding.onnx': 'sha'}, 'savedViews': [bookmark]}}
+        run.facts = {'ai': {'state': 'completed'}, 'authored': True, 'bookmark': bookmark, 'beforeState': state}
         run.require.side_effect = lambda key: '0.3.1' if key == 'initialVersion' else {}
         run.target.run.side_effect = [types.SimpleNamespace(stdout='0.3.0'),
                                       types.SimpleNamespace(stdout='', returncode=0)]
         run.wd.execute.side_effect = [{'text': 'JustSearch 0.3.1 is available. Review and install', 'repair': False}, True]
         with patch.object(linux, 'installed_version', return_value='0.3.0'), \
-             patch.object(linux, 'digest', return_value='package-hash'):
+             patch.object(linux, 'digest', return_value='package-hash'), \
+             patch.object(linux, 'snapshot', return_value=state):
             linux.update_prepare(run)
         run.nav.assert_not_called()
         self.assertEqual(run.wd.click.call_args_list[0].args,

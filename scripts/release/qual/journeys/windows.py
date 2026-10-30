@@ -1179,14 +1179,29 @@ def remove_reinstall(run):
     uninstaller = Path(entry['location']) / 'uninstall.exe'
     if not uninstaller.is_file() or ntpath.normcase(entry['uninstaller'].strip('"')) != ntpath.normcase(str(uninstaller)):
         raise ProductFailure('Per-user uninstall entry does not name its installed uninstaller')
+    root = Path(entry['location'])
+    product_paths = {'app': Path(run.binary),
+                     'runtime': Path(run.require('bundledJava')).parents[1],
+                     'engine': Path(run.require('engineJar'))}
+    if any(not p.is_relative_to(root) or not p.exists() for p in product_paths.values()):
+        raise Unavailable('Pre-uninstall installed shell, runtime and Engine paths are not present under install location')
+    run.evidence('J6-installed-product-paths', {name: str(p) for name, p in product_paths.items()})
     removed = run_installer(run, uninstaller)
     wait_for(lambda: run.installed_version() is None, 'Per-user uninstall registration removed', seconds=60, error=ProductFailure)
+    def payload_removed():
+        remaining = {name: str(p) for name, p in product_paths.items() if p.exists()}
+        run.evidence('J6-uninstalled-product-paths', {'remaining': remaining,
+            'checked': {name: str(p) for name, p in product_paths.items()}})
+        return not remaining
+    wait_for(payload_removed, 'Installed product files remain after uninstall; see J6-uninstalled-product-paths.json',
+             seconds=60, error=ProductFailure)
     after = retained_files(Path(run.data))
     assert before == after, 'Uninstall changed retained user model/settings bytes'
     result = run_installer(run, run.args.assets / run.args.package)
     verify_install(run, run.require('initialVersion'))
     run.start_ui()
-    return {'uninstall': removed, 'reinstall': result, 'retainedFiles': after, 'state': assert_state(run)}
+    return {'uninstall': removed, 'removedProductPaths': {name: str(p) for name, p in product_paths.items()},
+            'reinstall': result, 'retainedFiles': after, 'state': assert_state(run)}
 
 
 def retained_files(root):
@@ -1243,12 +1258,14 @@ def invoke_nsis(run, installation, button_id):
 
 
 def update_prepare(run):
-    from linux import open_update_offer
+    from linux import open_update_offer, require_predecessor_state
+    for key in ('updateOffered', 'updateCancelled'):
+        run.facts.pop(key, None)
     if not run.args.predecessor or not run.args.mirror:
         raise Unavailable('J5 needs a parent NSIS build and descriptor v2 mirror with identical test trust pins')
     if run.args.phase != 'predecessor':
         raise Infrastructure('J5 requires a fresh predecessor overlay')
-    run.require('beforeState')
+    require_predecessor_state(run)
     if run.installed_version()['version'] != installer_version(run.args.predecessor):
         raise ProductFailure('J5 did not start with the parent package')
     # The owning host wrapper sets the guest-local HTTPS mirror after J3's

@@ -19,7 +19,7 @@ import threading
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import vm
-from runner import Infrastructure, RunStopped, digest, verify_assets, preparation_failure, summarize, full_selection, report_exit_code, wait_for
+from runner import predecessor_preparation, Infrastructure, RunStopped, digest, verify_assets, preparation_failure, summarize, full_selection, report_exit_code, wait_for
 from windows import ps_value, verify_driver_receipt, memory_counters
 
 spec = importlib.util.spec_from_file_location('linux_vm_wrapper', HERE / 'vm-run.py')
@@ -346,7 +346,7 @@ def prepare_setup(args, out, source=None):
     volumes = []
     try:
         vm.wait_free(28800)
-        wait_for(lambda: common.ports_available([vm.OS['windows']['ssh'], vm.OS['windows']['qmp']]),
+        wait_for(lambda: common.ports_available([vm.OS['windows']['ssh']]),
                  'Stopped Windows ports bindable', seconds=90, interval=2, error=Infrastructure)
         if source:
             start_snapshot(source)
@@ -374,7 +374,7 @@ def prepare_setup(args, out, source=None):
         if not vm.stop():
             raise Infrastructure('Guest settings reboot required a forced stop')
         volumes[-1]['overlayGrowthBytes'] = max(0, Path(started['disk']).stat().st_blocks * 512 - volumes[-1]['overlayInitialBytes'])
-        wait_for(lambda: common.ports_available([vm.OS['windows']['ssh'], vm.OS['windows']['qmp']]),
+        wait_for(lambda: common.ports_available([vm.OS['windows']['ssh']]),
                  'Reboot ports bindable', seconds=90, interval=2, error=Infrastructure)
         vm.wait_host_memory()
         with vm.locked() as lease:
@@ -588,7 +588,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
             raise Infrastructure('Windows journeys require --setup-snapshot; provision once before running journeys')
         shutil.copyfile(snapshot / 'quiet-verify.json', out / 'quiet-verify.json')
         vm.wait_free(28800)
-        wait_for(lambda: common.ports_available([vm.OS['windows']['ssh'], vm.OS['windows']['qmp']]),
+        wait_for(lambda: common.ports_available([vm.OS['windows']['ssh']]),
                  'Stopped Windows ports bindable', seconds=90, interval=2, error=Infrastructure)
         if snapshot:
             start_snapshot(snapshot)
@@ -661,9 +661,9 @@ def combine(args, out, sources):
     rows = []
     for name, source in sources.items():
         for original in source['journeys']:
-            if name.startswith('predecessor') and original['id'] in ('J1', 'J2', 'J3', 'J4'):
-                continue
             row = json.loads(json.dumps(original))
+            if name.startswith('predecessor') and row['id'] in ('J1', 'J2', 'J3', 'J4'):
+                predecessor_preparation(row, source.get('predecessorVersion') or 'unknown (see source evidence)')
             for check in row['checks']:
                 check['evidence'] = [name + '/evidence/' + p for p in check['evidence']]
             rows.append(row)

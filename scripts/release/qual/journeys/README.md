@@ -77,7 +77,7 @@ lane runs J1 only. Omit `--predecessor` and `--mirror`; X11 J1 uses the same
 For the hosted equivalent locally without installing anything on the host, use the
 same wrapper with `--session hosted` and omit `--predecessor`/`--mirror`. This
 runs the exact hosted entry point under Xvfb and D-Bus in a fresh Ubuntu VM.
-The default VM runs use QMP through the existing `screen.py`; the hosted run
+The default VM runs use host-only Unix-socket QMP through the existing `screen.py`; the hosted run
 uses xdotool-class input under X11. By the round-two decision, the hosted lane
 adds the corpus through the production HTTP API and records the native picker
 as skipped by decision. The Wayland VM exercises the system picker.
@@ -320,6 +320,24 @@ the shared VM data, a display, running app,
 network service or installed package. The compositor query unit tests evaluate
 JavaScript with the existing Node tool. Before-state tests belong in a shared
 clone under `$TMPDIR`; do not stash or revert the worktree for a baseline check.
+
+Combined Linux and Windows VM summaries retain predecessor J1–J4 rows as
+`predecessor-J1` through `predecessor-J4`, with `scope: predecessor-preparation`,
+the predecessor version, original statuses and evidence paths. They cannot fill
+candidate check slots. A predecessor product failure becomes `owner-validation`
+with its version, failed check, original failure and evidence for final owner
+validation; it never counts as a pass. Unavailable and infrastructure failures
+remain failures. J5 first requires successful AI preparation, model bytes and
+UI-authored records in the checkpoint, then observes that those models and records
+are still present before offering the update. Missing preparation makes dependent
+J5 checks unavailable. Installed-only checkpoints remain useful for development
+reruns such as J6; they do not establish J5 readiness.
+
+Windows J6 checks removal of the installed shell, the entire bundled runtime
+directory and the Engine jar before it reinstalls. It records the exact paths
+and any remnants in `J6-uninstalled-product-paths.json`; a disappearing uninstall
+registration alone cannot pass. Actual retained model/settings bytes must still
+match across uninstall.
 
 ## Windows journeys
 

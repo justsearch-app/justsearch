@@ -167,6 +167,19 @@ def require_disposable_host():
     raise Infrastructure('Hosted lane requires GITHUB_ACTIONS=true and RUNNER_ENVIRONMENT=github-hosted or the VM guest marker')
 
 
+def predecessor_preparation(row, version):
+    """Keep preparation evidence outside the candidate's journey identity."""
+    row.update(id='predecessor-' + row['id'], scope='predecessor-preparation',
+               predecessorVersion=version)
+    for check in row['checks']:
+        check['originalStatus'] = check['status']
+        check['reason'] = (f"Predecessor {version} preparation {row['id']}/{check['name']} "
+                           f"({check['status']}): " + check.get('reason', ''))
+        if check['status'] == 'failed-product':
+            check['status'] = 'owner-validation'
+    return row
+
+
 def full_selection(journeys, lane, definition=None):
     if definition is None:
         definition = json.loads((HERE / 'journeys.json').read_text())
@@ -184,8 +197,10 @@ def summarize(journeys, full_selection=True):
                 raise ValueError(f"Unknown check status: {check['status']}")
             counts[check['status']] += 1
     pending = [{'journey': j['id'], 'check': c['name'],
+                **({'reason': c['reason'], 'predecessorVersion': j['predecessorVersion']}
+                   if j.get('scope') == 'predecessor-preparation' else {}),
                 **({'evidence': c.get('evidence', [])}
-                   if j['id'] in ('guest-crashes-owner-validation', 'hosted-crashes', 'windows-crashes') else
+                   if j.get('scope') == 'predecessor-preparation' or j['id'] in ('guest-crashes-owner-validation', 'hosted-crashes', 'windows-crashes') else
                    {'screenshots': [p for p in c.get('evidence', []) if p.endswith('.png')]})}
                for j in journeys for c in j['checks'] if c['status'] == 'owner-validation']
     failed = any(counts[s] for s in ('failed-product', 'failed-infrastructure', 'unavailable'))
@@ -655,6 +670,7 @@ class Run:
         report = {'schemaVersion': 1, 'lane': self.args.lane, 'runId': self.run_id,
                   'scenarios': self.definition['scenarios'], 'assets': self.facts.get('assets', {}),
                   'scope': self.definition.get('scope', {}),
+                  'predecessorVersion': (self.facts.get('predecessorPackage') or self.facts.get('initialPackage', {})).get('version') if getattr(self.args, 'phase', 'candidate') == 'predecessor' else None,
                   'journeys': self.results, **summarize(self.results,
                       full_selection(self.results, self.args.lane, self.definition)),
                   'execution': {'mode': 'development-rerun' if getattr(self.args, 'resume', None) else 'fresh',

@@ -64,14 +64,14 @@ def package_install(run):
     target = run.work + '/' + initial.name
     if initial != candidate:
         run.target.copy(initial, target)
-    run.facts['initialPackage'] = {'name': initial.name, 'sha256': digest(initial)}
+    expected = run.target.run(['dpkg-deb', '-f', target, 'Version']).stdout.strip()
+    run.facts['initialPackage'] = {'name': initial.name, 'sha256': digest(initial), 'version': expected}
     apt(run, 'install', target)
     paths = run.target.run(['dpkg-query', '-L', 'just-search']).stdout.splitlines()
     run.facts['engineWorkingDirectories'] = sorted({str(Path(p).parent) for p in paths if p.endswith('/ui-headless.jar')})
     binaries = [p for p in paths if p.endswith('/JustSearch') and '/bin/' in p]
     assert len(binaries) == 1, 'Package has no unique installed executable'
     run.binary = binaries[0]
-    expected = run.target.run(['dpkg-deb', '-f', target, 'Version']).stdout.strip()
     assert installed_version(run) == expected, 'Installed package version differs from the selected bytes'
     verify = run.target.run(['dpkg', '--verify', 'just-search'], check=False)
     assert verify.returncode == 0 and not verify.stdout.strip(), 'Installed payload differs from dpkg checksums'
@@ -535,10 +535,33 @@ return entry ? {label:entry.querySelector('.item-label').textContent.trim(),url:
             error=AssertionError if corroborated else Infrastructure)
 
 
+def require_predecessor_state(run):
+    # A checkpoint can be useful for development after a failed J3. It does
+    # not certify the models/records which J5 promises to preserve.
+    missing = [key for key in ('ai', 'authored', 'bookmark', 'beforeState') if not run.facts.get(key)]
+    before = run.facts.get('beforeState', {}).get('savedFiles', {})
+    models = {p: checksum for p, checksum in before.get('files', {}).items()
+              if Path(p).suffix in ('.onnx', '.gguf', '.safetensors')}
+    if not models:
+        missing.append('prepared model bytes')
+    if not before.get('savedViews') or run.facts.get('bookmark') not in before.get('savedViews', []):
+        missing.append('prepared authored bookmark')
+    if missing:
+        raise Unavailable('Predecessor preparation unavailable: ' + ', '.join(missing))
+    current = snapshot(run)['savedFiles']
+    run.evidence('J5-predecessor-state', {'prepared': before, 'observed': current})
+    if (any(current.get('files', {}).get(p) != checksum for p, checksum in models.items())
+            or current.get('savedViews') != before['savedViews']):
+        raise Unavailable('Predecessor preparation unavailable: prepared models or authored records missing/changed; see J5-predecessor-state.json')
+    return current
+
+
 def update_prepare(run):
+    for key in ('updateOffered', 'updateCancelled'):
+        run.facts.pop(key, None)
     if not run.args.predecessor or not run.args.mirror:
         raise Unavailable('Update requires --predecessor and --mirror with the same test pins')
-    run.require('beforeState')
+    require_predecessor_state(run)
     if run.args.phase != 'predecessor':
         raise Infrastructure('J5 requires its own fresh predecessor overlay')
     predecessor = run.work + '/' + run.args.predecessor.name

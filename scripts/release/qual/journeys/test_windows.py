@@ -12,6 +12,124 @@ import windows
 
 
 class WindowsEvidenceTests(unittest.TestCase):
+    def test_j5_requires_prepared_models_and_authored_records_on_both_platforms(self):
+        from unittest.mock import Mock, patch
+        from contextlib import ExitStack
+        import linux
+        from runner import Unavailable, Run as SharedRun
+        state = {'savedFiles': {'files': {'models/embedding.onnx': 'digest'},
+                                'savedViews': [{'id': 'bookmark'}]}}
+        complete = {'initialPackage': {'version': '0.3.0'}, 'initialVersion': '0.3.1',
+                    'ai': {'state': 'completed'}, 'authored': True, 'bookmark': {'id': 'bookmark'},
+                    'beforeState': state}
+        cases = [dict(complete, ai=None), dict(complete, authored=False),
+                 dict(complete, bookmark={}), dict(complete, beforeState={'savedFiles': {'files': {},
+                        'savedViews': [{'id': 'bookmark'}]}}),
+                 dict(complete, beforeState={'savedFiles': {'files': {'models/embedding.onnx': 'digest'},
+                        'savedViews': []}})]
+        for adapter in (windows, linux):
+            for original in cases:
+                facts = dict(original)
+                with self.subTest(platform=adapter.__name__, facts=facts), ExitStack() as stack:
+                    run = Mock(facts=facts, work='work')
+                    run.args.phase='predecessor'
+                    run.args.predecessor=__import__('pathlib').Path('parent.exe')
+                    run.require.side_effect=lambda key: SharedRun.require(run, key)
+                    run.installed_version.return_value={'version': '0.3.0'}
+                    stack.enter_context(patch.object(linux, 'snapshot', return_value=state))
+                    stack.enter_context(patch.object(linux, 'open_update_offer'))
+                    stack.enter_context(patch.object(linux, 'installed_version', return_value='0.3.0'))
+                    stack.enter_context(patch.object(windows, 'installer_version', return_value='0.3.0'))
+                    stack.enter_context(patch.object(windows.Path, 'is_file', return_value=True))
+                    stack.enter_context(patch.object(linux, 'digest', return_value='digest'))
+                    run.target.run.side_effect=lambda argv, **kw: Mock(returncode=0,
+                        stdout='0.3.0' if argv[0] == 'dpkg-deb' else '')
+                    with self.assertRaisesRegex(Unavailable, 'Predecessor preparation unavailable'):
+                        adapter.update_prepare(run)
+                    run.start_ui.assert_not_called()
+                    self.assertNotIn('updateOffered', facts)
+                    for dependent in (adapter.cancel_update, adapter.update_success):
+                        with self.assertRaises(Unavailable):
+                            dependent(run)
+
+    def test_j5_rechecks_prepared_model_bytes_and_bookmarks_before_update(self):
+        from pathlib import Path
+        from unittest.mock import Mock, patch
+        from runner import Unavailable
+        import linux
+        bookmark = {'id': 'authored'}
+        before = {'savedFiles': {'files': {'models/embedding.onnx': 'sha'}, 'savedViews': [bookmark]}}
+        cases = [(before, True),
+                 ({'savedFiles': {'files': {}, 'savedViews': [bookmark]}}, False),
+                 ({'savedFiles': {'files': {'models/embedding.onnx': 'changed'}, 'savedViews': [bookmark]}}, False),
+                 ({'savedFiles': {'files': {'models/embedding.onnx': 'sha'}, 'savedViews': []}}, False)]
+        for current, ready in cases:
+            with self.subTest(current=current):
+                run = Mock(facts={'ai': {'state': 'completed'}, 'authored': True,
+                                  'bookmark': bookmark, 'beforeState': before,
+                                  'initialPackage': {'version': '0.3.0'}, 'initialVersion': '0.3.1'})
+                if not ready:
+                    run.facts.update(updateOffered=True, updateCancelled=True)
+                run.args.phase='predecessor'; run.args.predecessor=Path('parent.exe')
+                run.require.side_effect=lambda key: run.facts[key]
+                run.installed_version.return_value={'version': '0.3.0'}
+                with patch.object(linux, 'snapshot', return_value=current), \
+                     patch.object(linux, 'open_update_offer'), \
+                     patch.object(windows, 'installer_version', return_value='0.3.0'), \
+                     patch.object(Path, 'is_file', return_value=True):
+                    if ready:
+                        windows.update_prepare(run)
+                        self.assertIs(run.facts['updateOffered'], True)
+                    else:
+                        with self.assertRaisesRegex(Unavailable, 'Predecessor preparation unavailable'):
+                            windows.update_prepare(run)
+                        run.start_ui.assert_not_called()
+                        self.assertNotIn('updateOffered', run.facts)
+                    self.assertNotIn('updateCancelled', run.facts)
+
+    def test_uninstall_that_only_unregisters_never_reinstalls_or_passes(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import Mock, patch
+        from runner import Unavailable
+        for leftover in ('JustSearch.exe', 'resources/runtime/bin/javaw.exe',
+                         'resources/runtime/lib/modules', 'resources/ui-headless.jar', None):
+            with self.subTest(leftover=leftover), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'JustSearch'; root.mkdir()
+                payload = ['JustSearch.exe', 'resources/runtime/bin/javaw.exe',
+                           'resources/runtime/lib/modules', 'resources/ui-headless.jar', 'uninstall.exe']
+                for name in payload:
+                    path=root/name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(b'installed')
+                data=Path(temp)/'data'; (data/'models').mkdir(parents=True)
+                (data/'models/real-model.onnx').write_bytes(b'retained model')
+                entry={'location':str(root), 'version':'0.3.1', 'uninstaller':str(root/'uninstall.exe')}
+                facts={'beforeState':{}, 'initialVersion':'0.3.1',
+                       'bundledJava':str(root/'resources/runtime/bin/javaw.exe'),
+                       'engineJar':str(root/'resources/ui-headless.jar')}
+                run=Mock(data=str(data), facts=facts, binary=str(root/'JustSearch.exe'))
+                run.args.assets=Path(temp); run.args.package='candidate.exe'
+                run.require.side_effect=lambda key: facts[key]
+                run.installed_version.side_effect=[entry, None]
+                def uninstall(*args):
+                    for path in sorted(root.rglob('*'), reverse=True):
+                        if path.is_file() and path.relative_to(root).as_posix() != leftover: path.unlink()
+                        elif path.is_dir() and not any(path.iterdir()): path.rmdir()
+                    return {'exitCode':0}
+                def immediate(fn, description, **kw):
+                    if not fn(): raise kw.get('error', AssertionError)(description)
+                    return True
+                with patch.object(windows, 'run_installer', side_effect=uninstall) as installer, \
+                     patch.object(windows, 'wait_for', side_effect=immediate), \
+                     patch.object(windows, 'verify_install'), patch('linux.assert_state', return_value={'kept':True}):
+                    if leftover:
+                        with self.assertRaisesRegex(ProductFailure, 'Installed product files remain'):
+                            windows.remove_reinstall(run)
+                        self.assertEqual(installer.call_count,1, 'reinstall concealed a broken uninstall')
+                    else:
+                        result=windows.remove_reinstall(run)
+                        self.assertEqual(installer.call_count,2)
+                        self.assertEqual(result['retainedFiles'], {str(Path('models')/'real-model.onnx'): windows.digest(data/'models/real-model.onnx')})
+
     def test_cached_downloads_resume_only_from_positive_acquisition_evidence(self):
         from unittest.mock import Mock, patch
         required = ('embedding', 'splade', 'reranker', 'ner', 'citation-scorer')
@@ -820,10 +938,18 @@ class WindowsUpdateAndCrashTests(unittest.TestCase):
     def test_retained_data_reinstall_calls_uninstaller_and_checks_unmodified_downloads(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);app=root/'app';app.mkdir();uninstaller=app/'uninstall.exe';uninstaller.write_bytes(b'MZuninstall')
-            run=Mock(data=str(root/'data'),facts={},args=SimpleNamespace(assets=root,package='candidate.exe'))
-            run.require.side_effect=lambda k:{'initialVersion':'0.3.2','beforeState':{'saved':'state'}}[k]
+            binary=app/'JustSearch.exe';binary.write_bytes(b'shell')
+            java=app/'runtime/bin/javaw.exe';java.parent.mkdir(parents=True);java.write_bytes(b'java')
+            engine=app/'ui-headless.jar';engine.write_bytes(b'engine')
+            run=Mock(data=str(root/'data'),binary=str(binary),facts={},args=SimpleNamespace(assets=root,package='candidate.exe'))
+            run.require.side_effect=lambda k:{'initialVersion':'0.3.2','beforeState':{'saved':'state'},
+                                             'bundledJava':str(java),'engineJar':str(engine)}[k]
+            def uninstall(*args):
+                import shutil
+                shutil.rmtree(app)
+                return {'exitCode':0}
             run.installed_version.side_effect=[{'version':'0.3.2','location':str(app),'uninstaller':'"'+str(uninstaller)+'"'},None]
-            with patch.object(windows,'retained_files',return_value={'model':'sha'}),patch.object(windows,'run_installer',return_value={'exitCode':0}) as install,patch.object(windows,'verify_install'),patch.object(linux,'assert_state',return_value={'retained':True}),patch.object(windows,'wait_for',once):
+            with patch.object(windows,'retained_files',return_value={'model':'sha'}),patch.object(windows,'run_installer',side_effect=lambda *args: uninstall() if app.exists() else {'exitCode':0}) as install,patch.object(windows,'verify_install'),patch.object(linux,'assert_state',return_value={'retained':True}),patch.object(windows,'wait_for',once):
                 self.assertEqual(windows.remove_reinstall(run)['state'],{'retained':True})
             self.assertEqual(install.call_count,2)
             self.assertEqual(install.call_args_list[0].args[1],uninstaller)
