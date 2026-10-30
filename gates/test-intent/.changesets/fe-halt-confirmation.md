@@ -547,3 +547,13 @@ the two script-produced evidence artifacts below. No acceptance record is author
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18b9d-c3c8-7763-95de-4ef1197ebe02",
+  "verdict": "accept",
+  "digest": "sha256:b8ebf3ca2b086b317bfe8041023ffea18b52d6b4d6c309a8a0873cf78cd692aa"
+}
+```
