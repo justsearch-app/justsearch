@@ -164,6 +164,49 @@ final class JobBatchExtractorForcedPathTest {
    * failed count read as 0, the batch was treated as "first index of an empty index", the unchanged
    * check was skipped and every unchanged file was extracted and written again.
    */
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  @org.junit.jupiter.api.Timeout(45)
+  void recoveredChildSourceIoReachesRetryableQueueOutcome(boolean symlink) throws Exception {
+    Path target = Files.writeString(tempDir.resolve("source.txt"), "Readable source document content");
+    Path submitted = symlink ? Files.createSymbolicLink(tempDir.resolve("link.txt"), target) : target;
+    Path resolved = submitted.toRealPath();
+    Set<String> forced = ConcurrentHashMap.newKeySet();
+    forced.add(forcedKey(resolved));
+    Harness h = newHarness(forced);
+    var observed = new java.util.concurrent.atomic.AtomicReference<IOException>();
+    var policy = TikaExtractionPolicy.defaults();
+    try (var real = io.justsearch.indexerworker.extract.ExtractionSandboxFactory.create(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
+        io.justsearch.indexerworker.extract.ExtractionSandboxFactory.Mode.PROCESS, policy,
+        java.time.Duration.ofSeconds(20), null,
+        io.justsearch.indexerworker.extract.ExtractionSandboxCommand.defaultCommand(policy, "256m"))) {
+      doAnswer(call -> {
+        Files.delete(target);
+        try { return real.extractArtifact(call.getArgument(0)); }
+        catch (IOException failure) { observed.set(failure); throw failure; }
+        finally { Files.writeString(target, "Readable source document content"); }
+      }).when(h.contentExtractor()).extractArtifact(any());
+      when(h.journal().outcome(any(), any(), any(), any())).thenCallRealMethod();
+      org.mockito.Mockito.doCallRealMethod().when(h.journal()).recordOutcomeSafely(any(), any(), any());
+      var claim = rootedJob(resolved, null);
+      h.extractor().extractAll(List.of(claim));
+      assertTrue(Files.isReadable(submitted), "source recovered before parent failure classification");
+      var outcome = org.mockito.ArgumentCaptor.forClass(io.justsearch.indexerworker.ingest.IngestionOutcome.class);
+      verify(h.jobQueue()).markClaimFailed(eq(claim), outcome.capture(), any());
+      assertEquals(io.justsearch.indexerworker.ingest.IngestionOutcomeClass.IO_FAILED,
+          outcome.getValue().outcomeClass());
+      assertEquals(io.justsearch.indexerworker.ingest.IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+          outcome.getValue().retryPolicy());
+      assertTrue(outcome.getValue().diagnosticSummary().contains("NoSuchFileException"));
+      assertTrue(BatchServiceFailures.sourceFailure(observed.get(), submitted, resolved));
+      org.junit.jupiter.api.Assertions.assertFalse(BatchServiceFailures.sourceFailure(
+          new ContentExtractor.ExtractionException("parser"), submitted, target));
+    }
+  }
+
   @Test
   void anUnreadableCountKeepsTheUnchangedCheck() throws Exception {
     Path file = Files.writeString(tempDir.resolve("unreadable-count.txt"), "same");

@@ -21,6 +21,38 @@ class StructuredExtractionIntegrationTest {
 
   @TempDir Path tempDir;
 
+  @Test
+  void pdfPageEdgesWithLongCommonPrefixesRetainUniqueSuffixes() throws Exception {
+    Path pdf = tempDir.resolve("unique-edges.pdf");
+    try (var document = new org.apache.pdfbox.pdmodel.PDDocument()) {
+      for (int page = 0; page < 3; page++) {
+        var item = new org.apache.pdfbox.pdmodel.PDPage(
+            new org.apache.pdfbox.pdmodel.common.PDRectangle(1000, 1000));
+        document.addPage(item);
+        try (var content = new org.apache.pdfbox.pdmodel.PDPageContentStream(document, item)) {
+          content.beginText();
+          content.setFont(new org.apache.pdfbox.pdmodel.font.PDType1Font(
+              org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA), 5);
+          content.newLineAtOffset(10, 950);
+          content.showText("h".repeat(200) + "HeaderSecret" + page);
+          content.newLineAtOffset(0, -450);
+          content.showText("Interior paragraph " + page);
+          content.newLineAtOffset(0, -450);
+          content.showText("f".repeat(200) + "FooterSecret" + page);
+          content.endText();
+        }
+      }
+      document.save(pdf.toFile());
+    }
+    try (var extractor = new StructuredContentExtractor()) {
+      String text = extractor.extract(pdf).content();
+      for (int page = 0; page < 3; page++) {
+        assertTrue(text.contains("HeaderSecret" + page));
+        assertTrue(text.contains("FooterSecret" + page));
+      }
+    }
+  }
+
   @Nested
   class DocxFixture {
 

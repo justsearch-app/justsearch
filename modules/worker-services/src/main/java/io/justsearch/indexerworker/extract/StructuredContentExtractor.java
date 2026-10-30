@@ -39,12 +39,6 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   /** Default maximum content length (10MB of text). */
   private static final int DEFAULT_MAX_CONTENT_LENGTH = 10 * 1024 * 1024;
 
-  /** Maximum file size to attempt extraction (100MB). */
-  private static final long MAX_FILE_SIZE = 100 * 1024 * 1024;
-
-  /** Maximum file size for Office documents (30MB). POI OOM risk. */
-  private static final long MAX_OFFICE_FILE_SIZE = 30 * 1024 * 1024;
-
   private final PreparedExtractionInput.Factory inputFactory;
   private final AutoDetectParser parser;
   private final Tika tika; // for detectMimeType only
@@ -132,7 +126,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           file.getFileName(),
           e);
       Metadata metadata = input.metadata();
-      try (var flat = new ContentExtractor(maxContentLength)) {
+      try (var flat = new ContentExtractor(maxContentLength, policy, new PreparedExtractionInput.Factory())) {
         var result = flat.extract(input, context, budget, metadata);
         return new StructuredExtractionResult(result, context.get(ParseRecord.class).isWriteLimitReached(),
             StructuredDocumentSummary.empty(), budget.resources(), budget.maxDepth(),
@@ -145,16 +139,16 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
       throws IOException, ContentExtractor.ExtractionException {
     Path file = input.source();
     long fileSize = input.size();
-    if (fileSize > MAX_FILE_SIZE) {
+    if (fileSize > policy.maxInputBytes()) {
       log.warn("File too large for extraction: {} ({} bytes)", file, fileSize);
-      throw new ContentExtractor.ExtractionException(
-          "File too large: " + fileSize + " bytes (max: " + MAX_FILE_SIZE + ")");
+      throw new ContentExtractor.BudgetExceededException(
+          "File too large: " + fileSize + " bytes (max: " + policy.maxInputBytes() + ")", "INPUT_TOO_LARGE");
     }
 
-    if (fileSize > MAX_OFFICE_FILE_SIZE && input.isOfficeForLimits(tika)) {
+    if (fileSize > policy.maxOfficeInputBytes() && input.isOfficeForLimits(tika)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
-      throw new ContentExtractor.ExtractionException(
-          "Office file too large: " + fileSize + " bytes (max: " + MAX_OFFICE_FILE_SIZE + ")");
+      throw new ContentExtractor.BudgetExceededException(
+          "Office file too large: " + fileSize + " bytes (max: " + policy.maxOfficeInputBytes() + ")", "OFFICE_INPUT_TOO_LARGE");
     }
   }
 

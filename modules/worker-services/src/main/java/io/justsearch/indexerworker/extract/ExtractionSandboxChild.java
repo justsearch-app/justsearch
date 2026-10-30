@@ -9,6 +9,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -58,7 +59,7 @@ public final class ExtractionSandboxChild {
     while ((frame = SandboxFrames.read(in, SandboxFrames.MAX_FRAME_BYTES)) != null) {
       SandboxExtractionRequest request =
           MAPPER.readValue(new String(frame, StandardCharsets.UTF_8), SandboxExtractionRequest.class);
-      SandboxFrames.write(protocolOut, MAPPER.writeValueAsBytes(handle(request, cache)));
+      SandboxFrames.write(protocolOut, MAPPER.writeValueAsBytes(handle(request, cache).withOcrMetrics(cache.drainMetrics())));
     }
     }
   }
@@ -79,6 +80,10 @@ public final class ExtractionSandboxChild {
     } catch (ContentExtractor.BudgetExceededException e) {
       return SandboxExtractionResponse.failed(
           request.requestId(), ExtractionStatus.BUDGET_EXCEEDED, policy, "sandbox-child", "Budget exceeded", e.reasonCode());
+    } catch (SourceIOException e) {
+      return SandboxExtractionResponse.failed(
+          request.requestId(), ExtractionStatus.FAILED, policy, "sandbox-child",
+          e.getCause().toString(), SandboxExtractionResponse.SOURCE_IO);
     } catch (Exception e) {
       boolean unavailable = e instanceof IngestionServiceUnavailableException;
       return SandboxExtractionResponse.failed(
@@ -98,11 +103,19 @@ public final class ExtractionSandboxChild {
     private TikaExtractionPolicy policy;
     private OcrRoutingConfig ocrConfig;
     private PolicyDrivenTikaExtractor extractor;
+    private final java.util.ArrayList<OcrMetricCatalog.Event> metrics = new java.util.ArrayList<>();
+    private final OcrMetricCatalog catalog = OcrMetricCatalog.recording(metrics::add);
+
+    List<OcrMetricCatalog.Event> drainMetrics() {
+      List<OcrMetricCatalog.Event> result = List.copyOf(metrics);
+      metrics.clear();
+      return result;
+    }
 
     PolicyDrivenTikaExtractor extractor(TikaExtractionPolicy p, OcrRoutingConfig o) {
       if (extractor == null || !Objects.equals(policy, p) || !Objects.equals(ocrConfig, o)) {
         close();
-        extractor = new PolicyDrivenTikaExtractor(ExtractionSandboxChild::openOcrPool, p, o);
+        extractor = new PolicyDrivenTikaExtractor(ExtractionSandboxChild::openOcrPool, p, o, catalog);
         policy = p;
         ocrConfig = o;
       }

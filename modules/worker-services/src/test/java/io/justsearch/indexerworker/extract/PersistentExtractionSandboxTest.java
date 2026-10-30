@@ -68,6 +68,91 @@ final class PersistentExtractionSandboxTest {
   }
 
   @Test
+  @Timeout(40)
+  void realChildSourceIoKeepsCauseAndRemainsReusableAfterSourceRecovery() throws Exception {
+    Path source = tempDir.resolve("temporarily-missing.txt");
+    try (var sandbox = sandbox(javaCommand(ExtractionSandboxChild.class), Duration.ofSeconds(15));
+        var timebox = new TimeboxedContentExtractor(
+            io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), sandbox,
+            Duration.ofSeconds(30), null)) {
+      var failure = assertThrows(java.io.IOException.class, () -> timebox.extractArtifact(source));
+      Files.writeString(source, "Recovered source readable content");
+      assertTrue(Files.isReadable(source));
+      var sourceFailure = org.junit.jupiter.api.Assertions.assertInstanceOf(
+          java.nio.file.FileSystemException.class, failure);
+      assertEquals(source.toAbsolutePath().toString(), sourceFailure.getFile());
+      assertTrue(failure.getCause().getMessage().contains("NoSuchFileException"), failure.toString());
+      long first = sandbox.firstChildPid();
+      assertTrue(timebox.extractArtifact(source).result().content().contains("Recovered source"));
+      assertEquals(first, sandbox.firstChildPid(), "valid source IO is not a protocol failure");
+    }
+  }
+
+  @Test
+  @Timeout(60)
+  void autoOcrMetricsAreRequestLocalAcrossChildReuseAndRecycling() throws Exception {
+    Path executable = NativeTesseractFixture.write(tempDir.resolve("ocr-fixture"),
+        "Readable searchable OCR fixture text that covers the whole image", true);
+    Path image = tempDir.resolve("scan.png");
+    javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(32, 32,
+        java.awt.image.BufferedImage.TYPE_BYTE_GRAY), "png", image.toFile());
+    Path oversized = tempDir.resolve("large.png");
+    javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(128, 128,
+        java.awt.image.BufferedImage.TYPE_BYTE_GRAY), "png", oversized.toFile());
+    var config = new OcrRoutingConfig(true, List.of("eng"), 10_000, 10, 64, 4096, 72, 1);
+    try (var metrics = new TestMetricRegistry(OcrMetricCatalog.DEFINITIONS);
+        var extractor = ExtractionSandboxFactory.create(
+            io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
+            io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+            io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
+            ExtractionSandboxFactory.Mode.AUTO, TikaExtractionPolicy.defaults(), config,
+            Duration.ofSeconds(20), null, new OcrMetricCatalog(metrics),
+            javaCommand(ExtractionSandboxChild.class, "-Djustsearch.tesseract.path=" + executable),
+            new ExtractionSandboxFactory.PoolSettings(1, 4))) {
+      assertTrue(extractor.extractArtifact(image).result().content().contains("searchable OCR fixture"));
+      assertEquals(1, metrics.counterValue(OcrMetricCatalog.SUCCEEDED_TOTAL,
+          OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE)));
+      assertEquals(1, metrics.histogramCount(OcrMetricCatalog.TIME_MS,
+          OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE)));
+      extractor.extractArtifact(oversized);
+      assertEquals(1, metrics.counterValue(OcrMetricCatalog.SKIPPED_TOTAL,
+          OcrTags.OcrSkipTags.of(OcrSkipReason.SIZE)));
+      assertEquals(1, metrics.counterValue(OcrMetricCatalog.SUCCEEDED_TOTAL,
+          OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE)));
+      Path helperLog = executable.getParent().resolve("launches.log");
+      Files.delete(helperLog);
+      Files.createDirectory(helperLog);
+      extractor.extractArtifact(image);
+      assertEquals(1, metrics.counterValue(OcrMetricCatalog.FAILED_TOTAL,
+          OcrTags.OcrFailureTags.of(OcrRoutingConfig.ENGINE, "OcrEngineFailure")));
+      assertEquals(2, metrics.histogramCount(OcrMetricCatalog.TIME_MS,
+          OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE)));
+      Files.delete(helperLog);
+      extractor.extractArtifact(image);
+      extractor.extractArtifact(image);
+      assertEquals(3, metrics.counterValue(OcrMetricCatalog.SUCCEEDED_TOTAL,
+          OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE)));
+      assertEquals(4, metrics.histogramCount(OcrMetricCatalog.TIME_MS,
+          OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE)));
+      assertEquals(1, metrics.counterValue(OcrMetricCatalog.FAILED_TOTAL,
+          OcrTags.OcrFailureTags.of(OcrRoutingConfig.ENGINE, "OcrEngineFailure")));
+      assertEquals(1, metrics.counterValue(OcrMetricCatalog.SKIPPED_TOTAL,
+          OcrTags.OcrSkipTags.of(OcrSkipReason.SIZE)));
+      Path pdf = tempDir.resolve("scan.pdf");
+      try (var document = new org.apache.pdfbox.pdmodel.PDDocument()) {
+        document.addPage(new org.apache.pdfbox.pdmodel.PDPage(
+            new org.apache.pdfbox.pdmodel.common.PDRectangle(32, 32)));
+        document.save(pdf.toFile());
+      }
+      assertEquals(OcrRoutingConfig.PARSER_ID, extractor.extractArtifact(pdf).parserId());
+      assertEquals(4, metrics.counterValue(OcrMetricCatalog.SUCCEEDED_TOTAL,
+          OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE)));
+      assertEquals(5, metrics.histogramCount(OcrMetricCatalog.TIME_MS,
+          OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE)));
+    }
+  }
+
+  @Test
   @Timeout(20)
   void registrationPersistenceFailureReapsTheJustSpawnedChild() throws Exception {
     java.util.concurrent.atomic.AtomicReference<ManagedChild> attempted =
@@ -415,7 +500,7 @@ final class PersistentExtractionSandboxTest {
         sandbox(javaCommand(ExtractionSandboxChild.class), Duration.ofSeconds(30))) {
       ExtractionArtifact artifact = sandbox.extract(file("sandbox.txt"));
 
-      assertEquals("tika-default-v7", artifact.policyId());
+      assertEquals("tika-default-v8", artifact.policyId());
       assertTrue(artifact.result().content().contains("sandbox child content"));
     }
   }
@@ -1079,7 +1164,7 @@ final class PersistentExtractionSandboxTest {
           response = response.replace("\"requestId\":\"" + request.requestId() + "\",", "");
         }
         if (name.contains("legacy-schema")) {
-          response = response.replace("\"schemaVersion\":2", "\"schemaVersion\":1");
+          response = response.replace("\"schemaVersion\":" + SandboxExtractionRequest.CURRENT_SCHEMA_VERSION, "\"schemaVersion\":1");
         }
         byte[] payload = response.getBytes(StandardCharsets.UTF_8);
         SandboxFrames.write(protocolOut, payload);

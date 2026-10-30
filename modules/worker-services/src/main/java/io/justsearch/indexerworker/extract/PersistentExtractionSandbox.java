@@ -106,6 +106,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   private final List<String> command;
   private final TikaExtractionPolicy policy;
   private final OcrRoutingConfig ocrConfig;
+  private final OcrMetricCatalog ocrMetricCatalog;
   private final Duration timeout;
   private final int maxResponseBytes;
   private final int maxStderrBytes;
@@ -200,9 +201,28 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       int maxResponseBytes,
       int maxStderrBytes,
       ChildControl control) {
+    this(readerRegistration, command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild,
+        catalog, maxResponseBytes, maxStderrBytes, control, OcrMetricCatalog.noop());
+  }
+
+  public PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration, List<String> command,
+      TikaExtractionPolicy policy, OcrRoutingConfig ocrConfig, Duration timeout, int poolSize,
+      int maxRequestsPerChild, ExtractionMetricCatalog catalog, ChildControl control,
+      OcrMetricCatalog ocrMetricCatalog) {
+    this(readerRegistration, command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild,
+        catalog, responseByteCeiling(policy), DEFAULT_MAX_STDERR_BYTES, control, ocrMetricCatalog);
+  }
+
+  private PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration, List<String> command,
+      TikaExtractionPolicy policy, OcrRoutingConfig ocrConfig, Duration timeout, int poolSize,
+      int maxRequestsPerChild, ExtractionMetricCatalog catalog, int maxResponseBytes,
+      int maxStderrBytes, ChildControl control, OcrMetricCatalog ocrMetricCatalog) {
     if (command == null || command.isEmpty()) {
       throw new IllegalArgumentException("Sandbox command must not be empty");
     }
+    this.ocrMetricCatalog = ocrMetricCatalog == null ? OcrMetricCatalog.noop() : ocrMetricCatalog;
     this.command = List.copyOf(command);
     this.policy = policy == null ? TikaExtractionPolicy.defaults() : policy;
     this.ocrConfig = ocrConfig == null ? OcrRoutingConfig.disabled() : ocrConfig;
@@ -430,7 +450,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       log.debug("Sandbox child stderr (success path): {}", stderrTail);
     }
     try {
-      return decode(responseBytes, requestId);
+      return decode(responseBytes, requestId, file);
     } catch (SandboxServiceUnavailableException unavailable) {
       // A valid response about shared storage does not corrupt the protocol or retire its owner.
       throw unavailable;
@@ -439,8 +459,8 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
   }
 
-  private ExtractionArtifact decode(byte[] responseBytes, String requestId)
-      throws ContentExtractor.ExtractionException {
+  private ExtractionArtifact decode(byte[] responseBytes, String requestId, Path file)
+      throws IOException, ContentExtractor.ExtractionException {
     try {
       SandboxExtractionResponse response =
           MAPPER.readValue(responseBytes, SandboxExtractionResponse.class);
@@ -452,6 +472,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
         throw new IllegalArgumentException("Sandbox response requestId does not match request");
       }
       ExtractionArtifact artifact = response.toArtifact();
+      if (response.status() == ExtractionStatus.SUCCESS_FULL
+          || response.status() == ExtractionStatus.SUCCESS_PARTIAL
+          || response.status() == ExtractionStatus.SUCCESS_EMPTY) {
+        artifact.validateContentBoundsOnly(policy.maxExtractedChars());
+      }
+      response.ocrMetrics().forEach(ocrMetricCatalog::publish);
       if (response.status() == ExtractionStatus.BUDGET_EXCEEDED) {
         throw new ContentExtractor.BudgetExceededException(
             "Sandbox extraction budget exceeded",
@@ -462,12 +488,15 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
             "Sandbox parser timed out", null);
       }
       if (response.status() == ExtractionStatus.FAILED) {
+        if (SandboxExtractionResponse.SOURCE_IO.equals(response.reasonCode())) {
+          throw new SourceIOException(file, new IOException(response.errorMessage()));
+        }
         if (SandboxExtractionResponse.SERVICE_UNAVAILABLE.equals(response.reasonCode())) {
           throw new SandboxServiceUnavailableException("Sandbox storage or service is unavailable", null);
         }
         throw new ContentExtractor.ExtractionException("Sandbox parser failed");
       }
-      return artifact.validateContentBoundsOnly(policy.maxExtractedChars());
+      return artifact;
     } catch (ContentExtractor.ExtractionException e) {
       throw e;
     } catch (RuntimeException e) {

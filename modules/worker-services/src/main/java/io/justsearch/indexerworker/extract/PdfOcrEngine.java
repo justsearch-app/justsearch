@@ -206,7 +206,10 @@ final class PdfOcrEngine implements AutoCloseable {
       String text = page.text();
       boolean truncated = false;
       if (maxOcrChars >= 0 && text.length() > maxOcrChars) {
-        text = text.substring(0, Math.max(0, maxOcrChars));
+        int end = Math.max(0, maxOcrChars);
+        if (end > 0 && Character.isHighSurrogate(text.charAt(end - 1))
+            && Character.isLowSurrogate(text.charAt(end))) end--;
+        text = text.substring(0, end);
         truncated = true;
       }
       if (text.isBlank()) {
@@ -238,6 +241,7 @@ final class PdfOcrEngine implements AutoCloseable {
     StringBuilder merged = new StringBuilder();
     List<OcrConfidenceExtractor.Summary> confidences = new ArrayList<>();
     int pagesProcessed = 0;
+    Set<Integer> coveredPages = new java.util.HashSet<>();
     try {
       work = beginDocument();
       ExecutorService executionPool = pagePool();
@@ -306,22 +310,32 @@ final class PdfOcrEngine implements AutoCloseable {
 
       for (PageTask task : tasks) {
         long remaining = remainingBudgetMs(deadlineNanos);
-        if (remaining <= 0) {
+        if (remaining <= 0 && !task.future().isDone()) {
           truncated = true;
           sawTimeout = true;
-          break;
+          continue;
         }
         try {
-          PageOcr page = task.future().get(remaining, TimeUnit.MILLISECONDS);
+          PageOcr page = task.future().get(Math.max(0, remaining), TimeUnit.MILLISECONDS);
+          if (page.failureReason() != null) truncated = true;
           if (page.failureReason() == OcrSkipReason.TIMEOUT) {
             sawTimeout = true;
           } else if (page.failureReason() != null) {
             spawnFailure = page.failureReason();
           }
           if (page.text() != null && !page.text().isBlank()) {
+            int before = merged.length();
             boolean pageTruncated = appendPage(merged, page.text(), task.pageIndex(), maxOcrChars);
-            confidences.add(page.confidence());
-            pagesProcessed++;
+            String marker = "\n\n--- OCR page " + (task.pageIndex() + 1) + " ---\n";
+            int textStart = before + marker.length();
+            if (merged.length() > textStart) {
+              confidences.add(page.confidence());
+              pagesProcessed++;
+              if (merged.length() - textStart >= page.text().length()
+                  || VisualPageEvidencePolicy.hasReadableText(merged.substring(textStart))) {
+                coveredPages.add(task.pageIndex());
+              }
+            }
             if (pageTruncated) {
               truncated = true;
               break;
@@ -331,11 +345,11 @@ final class PdfOcrEngine implements AutoCloseable {
           task.future().cancel(true);
           truncated = true;
           sawTimeout = true;
-          break;
         } catch (ExecutionException e) {
           EngineFutures.rethrowExecutorRefusal(e);
           rethrowFatal(e);
           spawnFailure = OcrSkipReason.UNKNOWN;
+          truncated = true;
         }
       }
     } catch (InterruptedException e) {
@@ -347,6 +361,7 @@ final class PdfOcrEngine implements AutoCloseable {
       rethrowFatal(e);
       log.debug("PDF OCR failed for {}: {}", pdf.getFileName(), e.getMessage());
       spawnFailure = OcrSkipReason.UNKNOWN;
+      truncated = true;
     } finally {
       if (work != null) work.finishCaller();
     }
@@ -377,7 +392,8 @@ final class PdfOcrEngine implements AutoCloseable {
         OcrConfidenceExtractor.aggregate(confidences),
         truncated,
         failure,
-        pagesProcessed);
+        pagesProcessed,
+        Set.copyOf(coveredPages));
   }
 
   private static void rethrowFatal(Throwable failure) {
@@ -456,6 +472,8 @@ final class PdfOcrEngine implements AutoCloseable {
       return true;
     }
     if (block.length() > remaining) {
+      if (remaining > 0 && Character.isHighSurrogate(block.charAt(remaining - 1))
+          && Character.isLowSurrogate(block.charAt(remaining))) remaining--;
       target.append(block, 0, remaining);
       return true;
     }
@@ -829,7 +847,13 @@ final class PdfOcrEngine implements AutoCloseable {
       OcrConfidenceExtractor.Summary confidence,
       boolean truncated,
       OcrSkipReason failureReason,
-      int pagesProcessed) {
+      int pagesProcessed,
+      Set<Integer> coveredPages) {
+    OcrEngineResult(String text, OcrConfidenceExtractor.Summary confidence, boolean truncated,
+        OcrSkipReason failureReason, int pagesProcessed) {
+      this(text, confidence, truncated, failureReason, pagesProcessed, Set.of());
+    }
+
     static OcrEngineResult failed(OcrSkipReason reason) {
       return new OcrEngineResult("", OcrConfidenceExtractor.Summary.empty(), false, reason, 0);
     }

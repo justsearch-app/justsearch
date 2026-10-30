@@ -209,7 +209,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
             : refusal instanceof PdfOcrEngine.OcrCapacityException capacity
                 ? capacity.reason().name() : "QUEUE_LIMIT";
         ocrEvidence.skip(OcrSkipReason.UNKNOWN);
-        ocrMetricCatalog.failedTotal.increment(OcrTags.OcrFailureTags.of(OcrRoutingConfig.ENGINE, reason));
+        ocrMetricCatalog.failed(reason);
         log.warn("OCR capacity refused for {} ({}); preserving structured extraction",
             file.getFileName(), reason);
       }
@@ -271,7 +271,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     // structured extraction does not also get to start an OCR pass.
     boolean dropout = ExtractionDropoutPolicy.isDropout(content);
     if (!fallbackBudget.permitsTierNow(1, elapsedMs)) {
-      ocrMetricCatalog.skippedTotal.increment(OcrTags.OcrSkipTags.of(OcrSkipReason.BUDGET));
+      ocrMetricCatalog.skipped(OcrSkipReason.BUDGET);
       log.debug(
           "Skipping OCR for {}: per-document fallback budget spent (elapsedMs={}, budget={})",
           file.getFileName(),
@@ -281,12 +281,12 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     }
     int pageCount = summary == null ? 0 : summary.pageCount();
     if (ocrConfig.maxPages() != null && ocrConfig.maxPages() > 0 && pageCount > ocrConfig.maxPages()) {
-      ocrMetricCatalog.skippedTotal.increment(OcrTags.OcrSkipTags.of(OcrSkipReason.SIZE));
+      ocrMetricCatalog.skipped(OcrSkipReason.SIZE);
       log.debug("Skipping OCR for {}: page count {} exceeds limit {}", file.getFileName(), pageCount, ocrConfig.maxPages());
       return OcrAttemptDecision.skip(OcrSkipReason.SIZE);
     }
     if (!imageWithinConfiguredGuards(file, detectedMime, input)) {
-      ocrMetricCatalog.skippedTotal.increment(OcrTags.OcrSkipTags.of(OcrSkipReason.SIZE));
+      ocrMetricCatalog.skipped(OcrSkipReason.SIZE);
       log.debug("Skipping OCR for {}: image dimensions exceed configured OCR guards", file.getFileName());
       return OcrAttemptDecision.skip(OcrSkipReason.SIZE);
     }
@@ -302,14 +302,14 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       return OcrAttemptDecision.skip(OcrSkipReason.TEXTUAL);
     }
     if (!ocrConfig.enabled()) {
-      ocrMetricCatalog.skippedTotal.increment(OcrTags.OcrSkipTags.of(OcrSkipReason.DISABLED));
+      ocrMetricCatalog.skipped(OcrSkipReason.DISABLED);
       log.debug("Skipping OCR for {}: OCR config is disabled", file.getFileName());
       return OcrAttemptDecision.skip(OcrSkipReason.DISABLED);
     }
     String blockedReason = TikaOcrRuntime.blockedReason(ocrConfig);
     if (!blockedReason.isBlank()) {
       OcrSkipReason reason = OcrSkipReason.fromBlockedReason(blockedReason);
-      ocrMetricCatalog.skippedTotal.increment(OcrTags.OcrSkipTags.of(reason));
+      ocrMetricCatalog.skipped(reason);
       log.debug("Skipping OCR for {}: {}", file.getFileName(), blockedReason);
       return OcrAttemptDecision.skip(reason);
     }
@@ -413,7 +413,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     int maxOcrChars = Math.max(0, policy.maxExtractedChars() - baselineText.length());
     PdfOcrEngine.OcrEngineResult ocr = ocrEngine.ocrPdf(file, maxOcrChars);
     long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos);
-    ocrMetricCatalog.timeMs.record(elapsedMs, OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE));
+    ocrMetricCatalog.time(elapsedMs);
 
     int pages = Math.max(1, baselineSummary == null ? 1 : baselineSummary.pageCount());
     double baselineQuality = TextQualityAnalyzer.computeQualityScore(baseline.content(), pages);
@@ -422,25 +422,15 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       String merged = baselineText + engineText;
       double mergedQuality = TextQualityAnalyzer.computeQualityScore(merged, pages);
       if (mergedQuality >= baselineQuality) {
-        ocrMetricCatalog.succeededTotal.increment(OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE));
+        ocrMetricCatalog.succeeded();
         ocrEvidence.truncated(ocr.truncated());
         ExtractionResult result =
             new ExtractionResult(
                 merged, baseline.title(), baseline.mimeType(), baseline.author(), baseline.frontmatterMetadata());
-        StructuredDocumentSummary summary =
-            new StructuredDocumentSummary(
-                pages,
-                merged.length(),
-                pages,
-                0,
-                baselineSummary == null ? 0 : baselineSummary.headingCount(),
-                baselineSummary == null ? 0 : baselineSummary.paragraphCount(),
-                baselineSummary == null ? 0 : baselineSummary.tableCount(),
-                baselineSummary == null ? 0 : baselineSummary.listCount(),
-                baselineSummary == null ? 0 : baselineSummary.imagePageCount());
-        summary = ocrCoveredPdfSummary(file, summary, merged);
+        StructuredDocumentSummary summary = ocrCoveredPdfSummary(file, baselineSummary, merged, ocr);
         return withVisualEvidence(
-            ExtractionArtifact.full(result, policy, OcrRoutingConfig.PARSER_ID, ocr.truncated()),
+            ExtractionArtifact.full(result, policy, OcrRoutingConfig.PARSER_ID,
+                ocr.truncated() || summary.pagesMissingReadableText() > 0),
             summary,
             "ocr_full",
             true,
@@ -460,14 +450,14 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     long startedAtNanos = System.nanoTime();
     PdfOcrEngine.OcrEngineResult ocr = ocrEngine.ocrImage(file, policy.maxExtractedChars());
     long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos);
-    ocrMetricCatalog.timeMs.record(elapsedMs, OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE));
+    ocrMetricCatalog.time(elapsedMs);
 
     double baselineQuality = TextQualityAnalyzer.computeQualityScore(baseline.content());
     String directText = ocr.text();
     if (directText != null && !directText.isBlank()) {
       double directQuality = TextQualityAnalyzer.computeQualityScore(directText, 1);
       if (directQuality >= baselineQuality) {
-        ocrMetricCatalog.succeededTotal.increment(OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE));
+        ocrMetricCatalog.succeeded();
         ocrEvidence.fallback(OCR_FALLBACK_DIRECT_TESSERACT);
         ocrEvidence.truncated(ocr.truncated());
         ExtractionResult result =
@@ -498,15 +488,14 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       Path file, OcrSkipReason engineFailure, double baselineQuality, OcrEvidenceBuilder ocrEvidence) {
     if (engineFailure == OcrSkipReason.UNKNOWN) {
       ocrEvidence.skip(OcrSkipReason.UNKNOWN);
-      ocrMetricCatalog.failedTotal.increment(
-          OcrTags.OcrFailureTags.of(OcrRoutingConfig.ENGINE, "OcrEngineFailure"));
+      ocrMetricCatalog.failed("OcrEngineFailure");
       log.debug("OCR engine failed for {}", file.getFileName());
       return null;
     }
     OcrSkipReason reason =
         engineFailure != null ? engineFailure : OcrOutcomeClassifier.classifyNoImprovement(baselineQuality);
     ocrEvidence.skip(reason);
-    ocrMetricCatalog.skippedTotal.increment(OcrTags.OcrSkipTags.of(reason));
+    ocrMetricCatalog.skipped(reason);
     log.debug("OCR did not improve extraction for {} (reason={})", file.getFileName(), reason);
     return null;
   }
@@ -527,7 +516,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     java.util.Collections.sort(missingPages);
     PdfOcrEngine.OcrEngineResult ocr = ocrEngine.ocrPdfPages(file, missingPages, maxOcrChars);
     long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos);
-    ocrMetricCatalog.timeMs.record(elapsedMs, OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE));
+    ocrMetricCatalog.time(elapsedMs);
 
     double baselineQuality =
         TextQualityAnalyzer.computeQualityScore(baseline.content(), baselineSummary.pageCount());
@@ -539,24 +528,15 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       double mergedQuality =
           TextQualityAnalyzer.computeQualityScore(merged, baselineSummary.pageCount());
       if (mergedQuality >= baselineQuality) {
-        ocrMetricCatalog.succeededTotal.increment(OcrTags.OcrEngineTags.of(OcrRoutingConfig.ENGINE));
+        ocrMetricCatalog.succeeded();
         ExtractionResult mergedResult =
             new ExtractionResult(
                 merged, baseline.title(), baseline.mimeType(), baseline.author(), baseline.frontmatterMetadata());
-        StructuredDocumentSummary mergedSummary =
-            new StructuredDocumentSummary(
-                baselineSummary.pageCount(),
-                merged.length(),
-                baselineSummary.pageCount(),
-                0,
-                baselineSummary.headingCount(),
-                baselineSummary.paragraphCount(),
-                baselineSummary.tableCount(),
-                baselineSummary.listCount(),
-                baselineSummary.imagePageCount());
+        StructuredDocumentSummary mergedSummary = ocrCoveredPdfSummary(file, baselineSummary, merged, ocr);
         return withVisualEvidence(
             ExtractionArtifact.full(
-                mergedResult, policy, OcrRoutingConfig.PARSER_ID, ocr.truncated()),
+                mergedResult, policy, OcrRoutingConfig.PARSER_ID,
+                ocr.truncated() || mergedSummary.pagesMissingReadableText() > 0),
             mergedSummary,
             "ocr_selective",
             true,
@@ -571,16 +551,19 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
   }
 
   private static StructuredDocumentSummary ocrCoveredPdfSummary(
-      Path file, StructuredDocumentSummary base, String content) {
+      Path file, StructuredDocumentSummary base, String content, PdfOcrEngine.OcrEngineResult ocr) {
     StructuredDocumentSummary summary = base == null ? StructuredDocumentSummary.empty() : base;
     PdfVisualAnalyzer.PdfPageEvidence evidence = PdfVisualAnalyzer.analyze(file);
     int pages = Math.max(1, Math.max(summary.pageCount(), evidence == null ? 0 : evidence.pageCount()));
     int imagePages = evidence == null ? summary.imagePageCount() : evidence.imagePages().size();
+    java.util.Set<Integer> covered = new java.util.HashSet<>(ocr.coveredPages());
+    if (evidence != null) covered.addAll(evidence.readablePages());
+    int readablePages = Math.min(pages, covered.size());
     return new StructuredDocumentSummary(
         pages,
         content == null ? summary.textCharCount() : content.length(),
-        pages,
-        0,
+        readablePages,
+        pages - readablePages,
         summary.headingCount(),
         summary.paragraphCount(),
         summary.tableCount(),

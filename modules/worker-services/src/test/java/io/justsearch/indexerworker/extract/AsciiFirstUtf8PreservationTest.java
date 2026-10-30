@@ -115,11 +115,11 @@ class AsciiFirstUtf8PreservationTest {
       Metadata copied = new Metadata();
       for (String key : root.names()) for (String value : root.getValues(key)) copied.add(key, value);
       byte[] bytes = ("a".repeat(16_384) + "é").getBytes(StandardCharsets.UTF_8);
-      assertEquals(Charset.forName("windows-1252"), detector.detect(new ByteArrayInputStream(bytes), copied));
+      assertEquals(StandardCharsets.UTF_8, detector.detect(new ByteArrayInputStream(bytes), copied));
       try (var input = prepared.openStream()) {
         detector.detect(new java.io.BufferedInputStream(input), root);
       }
-      assertEquals(Charset.forName("windows-1252"),
+      assertEquals(StandardCharsets.UTF_8,
           detector.detect(new ByteArrayInputStream(bytes), new Metadata()));
       assertEquals(Charset.forName("windows-1252"), detector.detect(
           new ByteArrayInputStream("ASCII".getBytes(StandardCharsets.US_ASCII)), new Metadata()));
@@ -151,17 +151,17 @@ class AsciiFirstUtf8PreservationTest {
       }
       var results = executor.invokeAll(tasks);
       for (int i = 0; i < results.size(); i++) {
-        // A fresh ordinary Metadata must keep the old decision even beside a valid root.
-        assertEquals(Charset.forName("windows-1252"), detector.detect(new ByteArrayInputStream(
+        // Ordinary metadata must derive its decision from its own stream.
+        assertEquals(StandardCharsets.UTF_8, detector.detect(new ByteArrayInputStream(
             ("a".repeat(16_384) + "é").getBytes(StandardCharsets.UTF_8)), new Metadata()));
-        assertEquals(Charset.forName("windows-1252"), results.get(i).get());
+        assertEquals(StandardCharsets.UTF_8, results.get(i).get());
       }
     }
   }
 
-  @ParameterizedTest(name = "embeddedBodiesKeepTodaysText({0})")
+  @ParameterizedTest(name = "embeddedBodiesKeepOriginalText({0})")
   @ValueSource(strings = {"zip", "attachment", "plain", "html"})
-  void embeddedBodiesKeepTodaysText(String kind) throws Exception {
+  void embeddedBodiesKeepOriginalText(String kind) throws Exception {
     String text = "a".repeat(16_384) + "é";
     Path file;
     if ("zip".equals(kind)) {
@@ -195,10 +195,49 @@ class AsciiFirstUtf8PreservationTest {
     try (var flat = new ContentExtractor(); var structured = new StructuredContentExtractor()) {
       for (var extractor : List.<ContentExtractorProvider>of(flat, structured)) {
         String content = extractor.extract(file).content();
-        assertTrue(content.contains("a".repeat(16_384) + ("attachment".equals(kind) ? "��" : "Ã©")),
+        assertTrue(content.contains(text),
             () -> kind + " output tail: " + content.substring(Math.max(0, content.length() - 80)));
       }
     }
+  }
+
+  @Test
+  void nestedAndSiblingResourcesUseTheirOwnEncodingBytesOnRepeatedExtraction() throws Exception {
+    String prefix = "a".repeat(16_384);
+    String utf8 = prefix + "ספרים";
+    String legacy = prefix + "Grüße déjà café";
+    var nestedBytes = new java.io.ByteArrayOutputStream();
+    try (var zip = new ZipOutputStream(nestedBytes)) {
+      stored(zip, "nested.txt", utf8.getBytes(StandardCharsets.UTF_8));
+    }
+    Path file = tempDir.resolve("siblings.zip");
+    try (var zip = new ZipOutputStream(Files.newOutputStream(file))) {
+      stored(zip, "utf8.txt", utf8.getBytes(StandardCharsets.UTF_8));
+      stored(zip, "legacy.txt", legacy.getBytes(Charset.forName("windows-1252")));
+      stored(zip, "nested.zip", nestedBytes.toByteArray());
+    }
+    try (var flat = new ContentExtractor(); var structured = new StructuredContentExtractor()) {
+      for (var extractor : List.<ContentExtractorProvider>of(flat, structured)) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+          String content = extractor.extract(file).content();
+          assertTrue(content.contains(utf8));
+          assertTrue(content.contains(legacy));
+          assertTrue(content.indexOf("ספרים") != content.lastIndexOf("ספרים"));
+        }
+      }
+    }
+  }
+
+  private static void stored(ZipOutputStream zip, String name, byte[] bytes) throws IOException {
+    var entry = new ZipEntry(name);
+    entry.setMethod(ZipEntry.STORED);
+    entry.setSize(bytes.length);
+    var crc = new java.util.zip.CRC32();
+    crc.update(bytes);
+    entry.setCrc(crc.getValue());
+    zip.putNextEntry(entry);
+    zip.write(bytes);
+    zip.closeEntry();
   }
 
   @ParameterizedTest(name = "rootCarrierDoesNotDisplaceDeclarationsOrBoms({0})")
@@ -374,7 +413,7 @@ class AsciiFirstUtf8PreservationTest {
       }
     }) {
       assertEquals("capture failed", assertThrows(IOException.class,
-          () -> factory.prepare(file, TikaExtractionPolicy.defaults())).getMessage());
+          () -> factory.prepare(file, TikaExtractionPolicy.defaults())).getCause().getMessage());
       assertEquals(1, snapshots.size());
       assertFalse(Files.exists(snapshots.getFirst()));
     }

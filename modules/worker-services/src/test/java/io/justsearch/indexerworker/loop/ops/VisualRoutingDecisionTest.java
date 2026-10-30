@@ -11,6 +11,43 @@ import org.junit.jupiter.api.Test;
 
 final class VisualRoutingDecisionTest {
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {".tif", ".tiff", ".TIF", ".TIFF"})
+  void tiffAliasesPersistEquivalentFallbackDemand(String suffix) throws Exception {
+    var artifact = io.justsearch.indexerworker.extract.ExtractionArtifact.full(
+        new ExtractionResult("", null, "image/tiff"),
+        io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults(), "tika-policy-structured", false);
+    var doc = IndexingDocumentOps.buildDocument(Path.of("scan" + suffix), artifact.validate(
+        io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults(), null),
+        null, null, null, false, null, null, (stage, elapsed, reason) -> {},
+        org.slf4j.LoggerFactory.getLogger(VisualRoutingDecisionTest.class), null, null, "tiff-test");
+    assertEquals(SchemaFields.VDU_STATUS_PENDING, doc.fields().get(SchemaFields.VDU_STATUS));
+    assertEquals(SchemaFields.VDU_DEMAND_KIND_BASELINE_TEXT, doc.fields().get(SchemaFields.VDU_DEMAND_KIND));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {
+      "\"pagesMissingReadableText\":1", "\"contentTruncated\":true"})
+  void highConfidencePartialFullPdfOcrPersistsFallbackDemand(String partial) throws Exception {
+    String text = "Readable OCR text ".repeat(30);
+    String evidence = "{\"schemaVersion\":1,\"ocrMeanConfidence\":0.99,"
+        + "\"ocrLowConfidenceWordCount\":0,\"ocrWordCount\":90,\"mixedPdf\":false," + partial + "}";
+    var artifact = io.justsearch.indexerworker.extract.ExtractionArtifact.full(
+        new ExtractionResult(text, null, "application/pdf"),
+        io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults(),
+        io.justsearch.indexerworker.extract.OcrRoutingConfig.PARSER_ID, true)
+        .withVisualExtractionEvidenceJson(evidence);
+    var doc = IndexingDocumentOps.buildDocument(Path.of("partial.pdf"), artifact.validate(
+        io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults(), null),
+        null, null, null, false, null, null, (stage, elapsed, reason) -> {},
+        org.slf4j.LoggerFactory.getLogger(VisualRoutingDecisionTest.class), null, null, "partial-test");
+    assertEquals(SchemaFields.VDU_STATUS_PENDING, doc.fields().get(SchemaFields.VDU_STATUS));
+    assertEquals(SchemaFields.VDU_DEMAND_KIND_BASELINE_TEXT, doc.fields().get(SchemaFields.VDU_DEMAND_KIND));
+    var capped = VisualRoutingDecision.decide(Path.of("partial.pdf"), artifact.result(),
+        SchemaFields.EXTRACTION_METHOD_OCR_TIKA, evidence, 0.3, new ExtractionFallbackBudget(1, 30_000));
+    assertEquals(SchemaFields.VDU_STATUS_NOT_NEEDED, capped.status());
+  }
+
   @Test
   void highConfidencePlainOcrDoesNotQueueVdu() {
     VisualRoutingDecision decision =

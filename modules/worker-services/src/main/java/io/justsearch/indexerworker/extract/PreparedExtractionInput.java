@@ -125,6 +125,8 @@ final class PreparedExtractionInput implements AutoCloseable {
     return metadata instanceof RootMetadata root && root.nonAsciiUtf8;
   }
 
+  static boolean hasUtf8Fact(Metadata metadata) { return metadata instanceof RootMetadata; }
+
   private static final class RootMetadata extends Metadata {
     private static final long serialVersionUID = 1L;
     private final boolean nonAsciiUtf8;
@@ -310,9 +312,9 @@ final class PreparedExtractionInput implements AutoCloseable {
       boolean zipCandidate = false;
       boolean retained = false;
       var utf8 = new Utf8Validator();
-      try (InputStream input = openSource(source)) {
+      try (InputStream input = sourceInput(source)) {
         // Files.size is only an early refusal, never the accounting authority.
-        if (Files.size(source) > policy.maxInputBytes()) throw tooLarge();
+        if (sourceSize(source) > policy.maxInputBytes()) throw tooLarge();
         byte[] buffer = new byte[8192];
         int read;
         while ((read = input.read(buffer, 0, (int) Math.min(buffer.length,
@@ -355,6 +357,23 @@ final class PreparedExtractionInput implements AutoCloseable {
           if (!retained && snapshot != null) Files.deleteIfExists(snapshot);
         }
       }
+    }
+
+    private InputStream sourceInput(Path source) throws IOException {
+      InputStream input;
+      try { input = openSource(source); }
+      catch (IOException failure) { throw new SourceIOException(source, failure); }
+      return new java.io.FilterInputStream(input) {
+        @Override public int read(byte[] bytes, int offset, int length) throws IOException {
+          try { return in.read(bytes, offset, length); }
+          catch (IOException failure) { throw new SourceIOException(source, failure); }
+        }
+      };
+    }
+
+    private static long sourceSize(Path source) throws IOException {
+      try { return Files.size(source); }
+      catch (IOException failure) { throw new SourceIOException(source, failure); }
     }
 
     private static ContentExtractor.BudgetExceededException tooLarge() {

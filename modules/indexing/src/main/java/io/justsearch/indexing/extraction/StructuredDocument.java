@@ -234,11 +234,11 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
         List<String> row = t.rows().get(r);
         // Use first column as row identifier if available
         String rowId = !row.isEmpty() ? row.getFirst().strip() : "";
-        for (int c = 0; c < headers.size() && c < row.size(); c++) {
-          String colHeader = headers.get(c).strip();
+        for (int c = 0; c < row.size(); c++) {
+          String colHeader = c < headers.size() ? headers.get(c).strip() : "";
           String cellValue = row.get(c).strip();
           if (cellValue.isEmpty()) continue;
-          if (!rowId.isEmpty() && c > 0) {
+          if (c < headers.size() && !rowId.isEmpty() && c > 0) {
             sb.append(rowId).append(", ");
           }
           if (!colHeader.isEmpty()) {
@@ -365,6 +365,6 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
   private static String normalizeForComparison(String text) {
     if (text == null) return null;
     String trimmed = text.strip().toLowerCase(java.util.Locale.ROOT);
-    return trimmed.length() > 200 ? trimmed.substring(0, 200) : trimmed;
+    return trimmed;
   }
 }

@@ -47,7 +47,7 @@ public final class FormatCapabilityExpectedState {
       Set<FailureClass> failureClasses,
       String exactAnnotatedText) {}
 
-  private static final String DEFAULT_POLICY = "tika-default-v7";
+  private static final String DEFAULT_POLICY = "tika-default-v8";
   private static final String STRUCTURED_ADAPTER = "tika-policy-structured";
 
   private static final Map<FormatId, ExpectedState> EXPECTED =
@@ -169,8 +169,10 @@ public final class FormatCapabilityExpectedState {
               FailureClass.STRUCTURE_FLATTENED,
               "# Merged headers\n\n"
                   + "Quarterly revenue = Q1\n"
+                  + "Q2\n"
                   + "Region = North\n"
-                  + "North, Quarterly revenue = JUSTSEARCH_XLSX_MERGED_MARKER"),
+                  + "North, Quarterly revenue = JUSTSEARCH_XLSX_MERGED_MARKER\n"
+                  + "20"),
           FormatId.XLSX_TYPED_CELLS,
           state(
               "xlsx-numeric-date-formula-v1",

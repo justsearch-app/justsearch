@@ -112,6 +112,63 @@ final class PdfOcrEngineTest {
 
   @Test
   @Timeout(30)
+  void submissionExpiryRetainsCompletedPagesAndPoolCanBeReused() throws Exception {
+    var config = new OcrRoutingConfig(true, List.of("eng"), 1_000, null, null, null, null, null);
+    var starts = new AtomicInteger();
+    try (var engine = engine(config, 2, command -> {
+      starts.incrementAndGet();
+      return succeedStub(command, new long[] {0L, 5_000L, 5_000L, 5_000L});
+    })) {
+      var result = engine.ocrPdf(blankPdf(6), Integer.MAX_VALUE);
+      assertTrue(result.text().contains("PAGEWORD0"), result.text());
+      assertTrue(result.truncated());
+      assertTrue(starts.get() < 6, "budget must stop further OCR pages");
+      var next = engine.ocrPdf(blankPdf(1), Integer.MAX_VALUE);
+      assertTrue(next.text().contains("PAGEWORD0"));
+      assertFalse(next.truncated());
+    }
+  }
+
+  @Test
+  @Timeout(30)
+  void slowFirstPageCannotHideCompletedLaterPages() throws Exception {
+    var config = new OcrRoutingConfig(true, List.of("eng"), 1_000, null, null, null, null, null);
+    try (var engine = engine(config, 3,
+        command -> succeedStub(command, new long[] {5_000L, 0L, 0L}))) {
+      var result = engine.ocrPdf(blankPdf(3), Integer.MAX_VALUE);
+      assertFalse(result.text().contains("PAGEWORD0"));
+      assertTrue(result.text().contains("PAGEWORD1"), result.text());
+      assertTrue(result.text().contains("PAGEWORD2"), result.text());
+      assertTrue(result.text().indexOf("PAGEWORD1") < result.text().indexOf("PAGEWORD2"));
+      assertTrue(result.truncated());
+      assertEquals(2, result.pagesProcessed());
+      assertTrue(result.confidence().present());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"exit", "spawn", "timeout", "execution"})
+  @Timeout(30)
+  void oneFailedPageMakesUsefulOcrPartial(String mode) throws Exception {
+    var config = new OcrRoutingConfig(true, List.of("eng"), 1_000, null, null, null, null, null);
+    try (var engine = engine(config, 2, command -> {
+      if (pageIndexOf(command) == 0) return succeedStub(command, new long[] {0L});
+      return switch (mode) {
+        case "spawn" -> throw new IOException("temporary spawn failure");
+        case "execution" -> throw new IllegalStateException("temporary execution failure");
+        case "timeout" -> new StubProcess(0, 5_000L);
+        default -> new StubProcess(1, 0L);
+      };
+    })) {
+      var result = engine.ocrPdf(blankPdf(2), Integer.MAX_VALUE);
+      assertTrue(result.text().contains("PAGEWORD0"));
+      assertEquals(1, result.pagesProcessed());
+      assertTrue(result.truncated(), mode);
+    }
+  }
+
+  @Test
+  @Timeout(30)
   void timeoutWithZeroCompletedPagesReportsTimeout() throws Exception {
     Path pdf = blankPdf(2);
     OcrRoutingConfig budgeted = new OcrRoutingConfig(true, List.of("eng"), 1_000, null, null, null, null, null);

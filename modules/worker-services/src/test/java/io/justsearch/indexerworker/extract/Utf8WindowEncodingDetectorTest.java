@@ -88,7 +88,7 @@ class Utf8WindowEncodingDetectorTest {
   }
 
   @Test
-  void asciiEmptyAndCutFirstMultibyteSequenceKeepDefault() throws Exception {
+  void asciiAndIncompleteSequencesKeepDefaultButCompleteStreamUsesUtf8() throws Exception {
     assertDefault(new byte[0]);
     assertDefault("ASCII only".getBytes(StandardCharsets.UTF_8));
     assertDefault("a".repeat(WINDOW + 20).getBytes(StandardCharsets.UTF_8));
@@ -96,7 +96,7 @@ class Utf8WindowEncodingDetectorTest {
       int width = character.getBytes(StandardCharsets.UTF_8).length;
       for (int prefix = 1; prefix < width; prefix++) {
         byte[] bytes = ("a".repeat(WINDOW - prefix) + character + HEBREW).getBytes(StandardCharsets.UTF_8);
-        assertDefault(bytes);
+        assertUtf8(bytes);
         assertDefault(Arrays.copyOf(bytes, WINDOW));
       }
     }

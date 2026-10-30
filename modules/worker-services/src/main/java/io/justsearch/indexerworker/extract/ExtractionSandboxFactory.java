@@ -182,7 +182,8 @@ public final class ExtractionSandboxFactory {
             effectivePool.poolSize(),
             effectivePool.maxRequestsPerChild(),
             catalog,
-            childControl);
+            childControl,
+            ocrMetricCatalog);
     // The sandbox owns the deadline; the timebox is only a backstop for a sandbox that itself
     // wedges. See PROCESS_TIMEBOX_GRACE.
     Duration backstop = effectiveTimeout.plus(PROCESS_TIMEBOX_GRACE);
