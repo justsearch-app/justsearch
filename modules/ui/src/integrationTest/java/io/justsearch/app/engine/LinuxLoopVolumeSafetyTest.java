@@ -4,14 +4,17 @@ package io.justsearch.app.engine;
 import static io.justsearch.app.engine.LinuxLoopVolume.OwnerState.*;
 import static io.justsearch.app.engine.LinuxLoopVolume.SweepDecision.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -24,9 +27,119 @@ import org.junit.jupiter.api.io.TempDir;
 final class LinuxLoopVolumeSafetyTest {
   @TempDir Path directory;
   private static final Path IMAGES = Path.of("/checkout/modules/ui/build/drive-return-images");
-  private static final Path IMAGE = IMAGES.resolve("drive-return-123-456-789.img");
+  private static final Path IMAGE = IMAGES.resolve("drive-return-123-456-789-8-1-11.img");
   private static final LinuxLoopVolume.FileIdentity BACKING = new LinuxLoopVolume.FileIdentity(11, "8:1");
   private static final LinuxLoopVolume.FileIdentity REPLACEMENT = new LinuxLoopVolume.FileIdentity(12, "8:1");
+
+  @BeforeEach void setUserIdentity() throws Exception {
+    var uid = LinuxLoopVolume.class.getDeclaredField("uid");
+    uid.setAccessible(true);
+    uid.setInt(null, ((Number) Files.getAttribute(Path.of("/proc/self"), "unix:uid")).intValue());
+  }
+
+  @Test void unprivilegedAssociationUsesSysfsWithoutLoopStatus() throws Exception {
+    Path file = Files.writeString(directory.resolve("own.img"), "owned");
+    var identityMethod = LinuxLoopVolume.class.getDeclaredMethod("fileIdentity", Path.class);
+    identityMethod.setAccessible(true);
+    var identity = (LinuxLoopVolume.FileIdentity) identityMethod.invoke(null, file);
+    Path backing = Path.of("/sys/class/block/loop999999/loop/backing_file");
+    // An ordinary user gets no BACK-INO/BACK-MAJ:MIN values. The stub leaves the output
+    // file empty, and construction mocking prevents any native command from executing.
+    Process process = mock(Process.class);
+    when(process.waitFor(anyLong(), eq(TimeUnit.NANOSECONDS))).thenReturn(true);
+    when(process.exitValue()).thenReturn(0);
+    when(process.descendants()).thenAnswer(ignored -> java.util.stream.Stream.empty());
+    try (var builders = mockConstruction(ProcessBuilder.class, withSettings().defaultAnswer(RETURNS_SELF),
+        (builder, context) -> when(builder.start()).thenReturn(process));
+        var snapshots = mockStatic(Files.class, invocation -> {
+          if (invocation.getMethod().getName().equals("readString") && invocation.getArgument(0).equals(backing)) {
+            return file.toString();
+          }
+          return invocation.callRealMethod();
+        })) {
+      assertAssociation(file, identity);
+      snapshots.verify(() -> Files.readString(backing), times(2));
+      assertTrue(builders.constructed().isEmpty(), "association identity requires no root-only loop query");
+    }
+  }
+
+  private static void assertAssociation(Path file, LinuxLoopVolume.FileIdentity identity) throws Exception {
+    var method = LinuxLoopVolume.class.getDeclaredMethod("checkAssociation", String.class,
+        Path.class, LinuxLoopVolume.FileIdentity.class);
+    method.setAccessible(true);
+    try { method.invoke(null, "/dev/loop999999", file, identity); }
+    catch (InvocationTargetException failure) {
+      if (failure.getCause() instanceof Exception cause) throw cause;
+      throw failure;
+    }
+  }
+
+  @Test void associationRejectsReusedPathAndAChangeDuringTheRead() throws Exception {
+    Path file = LinuxLoopVolume.createImage(directory, false);
+    var identity = LinuxLoopVolume.recordedIdentity(file);
+    Path backing = Path.of("/sys/class/block/loop999999/loop/backing_file");
+    var reads = new java.util.concurrent.atomic.AtomicInteger();
+    try (var snapshots = mockStatic(Files.class, invocation -> {
+      if (invocation.getMethod().getName().equals("readString") && invocation.getArgument(0).equals(backing)) {
+        return file + (reads.getAndIncrement() == 0 ? "" : " (deleted)");
+      }
+      return invocation.callRealMethod();
+    })) {
+      assertThrows(IOException.class, () -> assertAssociation(file, identity), "read/stat/read closes the sysfs race");
+      snapshots.verify(() -> Files.readString(backing), times(2));
+    }
+    Files.move(file, directory.resolve("original"));
+    Files.writeString(file, "replacement");
+    try (var snapshots = mockStatic(Files.class, invocation -> {
+      if (invocation.getMethod().getName().equals("readString") && invocation.getArgument(0).equals(backing)) {
+        return file.toString();
+      }
+      return invocation.callRealMethod();
+    })) {
+      assertThrows(IOException.class, () -> assertAssociation(file, identity));
+      snapshots.verify(() -> Files.readString(backing));
+    }
+    try (var snapshots = mockStatic(Files.class, invocation -> {
+      if (invocation.getMethod().getName().equals("readString") && invocation.getArgument(0).equals(backing)) {
+        return file + " (deleted)";
+      }
+      return invocation.callRealMethod();
+    })) {
+      assertAssociation(file, identity); // Deleted backings authorize detach only.
+      snapshots.verify(() -> Files.readString(backing), times(2));
+    }
+    assertEquals("replacement", Files.readString(file));
+  }
+
+  @Test void orphanSweepDeletesOnlyDeadUnreferencedIdentityMatchingImages() throws Exception {
+    for (boolean decoy : List.of(false, true)) {
+      Path file = LinuxLoopVolume.createImage(directory, decoy);
+      var identityMethod = LinuxLoopVolume.class.getDeclaredMethod("fileIdentity", Path.class);
+      identityMethod.setAccessible(true);
+      assertEquals(identityMethod.invoke(null, file), LinuxLoopVolume.recordedIdentity(file));
+      assertEquals(new LinuxLoopVolume.Owner(ProcessHandle.current().pid(),
+          LinuxLoopVolume.processStart(Files.readString(Path.of("/proc/self/stat")))), LinuxLoopVolume.owner(file));
+      for (var state : List.of(ALIVE, UNKNOWN)) {
+        LinuxLoopVolume.deleteOrphan(directory, file, state, false);
+        assertTrue(Files.exists(file));
+      }
+      LinuxLoopVolume.deleteOrphan(directory, file, DEAD, true);
+      assertTrue(Files.exists(file), "a referenced image is left for loop cleanup");
+      LinuxLoopVolume.deleteOrphan(directory, file, DEAD, false);
+      assertFalse(Files.exists(file));
+    }
+    Path file = LinuxLoopVolume.createImage(directory, false);
+    Files.move(file, directory.resolve("original-orphan"));
+    Files.writeString(file, "replacement");
+    LinuxLoopVolume.deleteOrphan(directory, file, DEAD, false);
+    assertEquals("replacement", Files.readString(file));
+    Path legacy = Files.writeString(directory.resolve("drive-return-123-456-789.img"), "unknown identity");
+    LinuxLoopVolume.deleteOrphan(directory, legacy, DEAD, false);
+    assertTrue(Files.exists(legacy));
+    Path unrelated = Files.writeString(directory.resolve("outside.img"), "unrelated");
+    LinuxLoopVolume.deleteOrphan(directory, unrelated, DEAD, false);
+    assertTrue(Files.exists(unrelated));
+  }
 
   @Test void deletedBackingNeverUnlinksItsReplacement() {
     assertEquals(DETACH, LinuxLoopVolume.decide(IMAGES, IMAGE, true, BACKING, REPLACEMENT, true, true, DEAD, false));
@@ -63,8 +176,8 @@ final class LinuxLoopVolumeSafetyTest {
 
   @Test void unrelatedOrUnprovenAssociationsArePreserved() {
     for (Path file : List.of(IMAGES.resolve("outside-pattern-decoy.img"),
-        Path.of("/another-worktree/build/drive-return-images/drive-return-123-456-789.img"),
-        IMAGES.resolve("../drive-return-123-456-789.img"))) {
+        Path.of("/another-worktree/build/drive-return-images/drive-return-123-456-789-8-1-11.img"),
+        IMAGES.resolve("../drive-return-123-456-789-8-1-11.img"))) {
       assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, file, false, BACKING, BACKING, true, true, DEAD, false));
     }
     assertEquals(LEAVE, LinuxLoopVolume.decide(IMAGES, IMAGE, false, BACKING, BACKING, true, false, DEAD, false));
@@ -91,7 +204,7 @@ final class LinuxLoopVolumeSafetyTest {
         "sleep 60 &\nchild=$!\nprintf '%s %s' \"$$\" \"$child\" > \"$1\"\nwait\n");
     var constructor = LinuxLoopVolume.class.getDeclaredConstructor(Path.class);
     constructor.setAccessible(true);
-    var volumeMonitor = constructor.newInstance(Files.createFile(directory.resolve("unattached.img")));
+    var volumeMonitor = constructor.newInstance(LinuxLoopVolume.createImage(directory, false));
     Thread test = new Thread(() -> {
       synchronized (LinuxLoopVolume.class) {
         synchronized (volumeMonitor) {

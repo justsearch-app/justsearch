@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: drive-return-safety
 author-role: builder
-author-session: codex-drive-return-safety-builder-round2-20261030
+author-session: codex-drive-return-safety-builder-round3-20261030
 ---
 
 # Disposable drive-test ownership and descriptor baseline
@@ -59,11 +59,11 @@ reporting unknown ownership. PID reuse is recognized by a different start time. 
 cleanup is limited to its registered images and their recorded identities. The initial udisks
 availability check still precedes every startup sweep.
 
-Read-only `losetup --list --noheadings --raw --output NAME,BACK-INO,BACK-MAJ:MIN` supplies backing
-identity. Detachment checks both pathname and backing device/inode; deleting an existing image
-additionally checks its current device/inode, regular-file type and UID. A deleted backing
-association is detached without unlinking its pathname. Formatting, labeling and attaching also
-check the registered image identity. Unknown or changed associations remain untouched.
+Round 2 obtained backing identity from read-only `losetup --list`. The native run exposed that
+BACK-INO and BACK-MAJ:MIN are empty for the desktop user without access to root:disk loop nodes,
+so its own cleanup refused detachment in seven cases. Round 3 removes that dependency entirely;
+the replacement and evidence are recorded below. Formatting, labeling and attaching still check
+the registered image identity. Unknown or changed associations remain untouched.
 
 The shutdown hook cancels tracked commands and their descendants, rejects further ordinary
 commands, and launches cleanup without class or volume monitors. Cleanup commands get at most
@@ -96,6 +96,46 @@ Native S1-S5 and independent acceptance are still required; the existing accepta
 is deliberately left unchanged and stale. The gate is rerun against e580368790 and its actual
 result is in `tmp/drive-return-safety-round2-gate.log`.
 
+
+Round 3 records each image's creation identity before attach by statting the newly created file
+and renaming it in the same directory to
+`drive-return-<pid>-<proc-start-ticks>-<random>-<dev-major>-<dev-minor>-<inode>[-decoy].img`.
+The volume and decoy retain that recorded identity rather than adopting a later file's identity.
+Detachment uses the readable sysfs backing_file d_path, a current file identity check for linked
+backings, and a second sysfs read to reject a change during the read/stat interval. It does not
+open /dev/loopN or invoke losetup. Deleted backings authorize detach only; the final association
+check also prevents the sweep from unlinking a backing that became deleted during cleanup.
+Startup additionally removes unreferenced images only for a provably dead PID/start-time owner
+and a matching recorded device/inode, regular-file type and UID. Live/unknown owners, referenced
+images, replacements, and legacy filenames without recorded identity remain untouched. In
+particular, the seven orphan images from the failed round-2 host run have no durable creation
+identity and are not adopted or deleted by this repair.
+
+Mount-free fail-before proof: shared clone at b97c3eb4f6 inside the supplied session TMPDIR,
+with its own build directory. Only the new unprivileged regression and its fixture were added
+to the original safety test; production helper source was unchanged. Files mocks provide a
+sysfs pathname while ProcessBuilder construction mocks prevent native command execution and
+leave the command output without loop identity. Eight tests ran, seven passed, and only
+`unprivilegedAssociationUsesSysfsWithoutLoopStatus` failed with
+`IOException: Refusing to detach a changed association`. Evidence:
+`tmp/drive-return-safety-round3-before.log` and `tmp/drive-return-safety-round3-before.xml`.
+
+The candidate's ten tests passed with no skips in
+`tmp/drive-return-safety-round3-gradle-final.log` and `tmp/drive-return-safety-round3-after.xml`.
+They retain all seven earlier counterexamples and add actual association-check execution without
+loop status, a sysfs change during read/stat/read, a reused path, and real temporary-file orphan
+cleanup for both volume and decoy names. Orphan checks cover dead/live/unknown owners, loop
+references, replacement identities, legacy names and unrelated files. The first candidate run
+passed all tests but PMD found an obsolete parameter and unused mock handles; the parameter was
+removed and the snapshots now assert the association reads. The final required Gradle run also
+passed integration-test compilation, Spotless and PMD. No `.agents/preflight` exists.
+The host script changes only its filename matcher and S4's identity-named loop sweep evidence;
+`bash -n` passes. Native drive commands, mounts and the drive class were not run, and no developer
+apps were used. Shared resources touched: the prescribed Gradle slot/daemon and dependency caches.
+The test-intent gate against e580368790 is recorded in
+`tmp/drive-return-safety-round3-gate.log`; independent acceptance remains pending and its old
+record is deliberately unchanged.
+
 ```json
 {
   "entries": [
@@ -109,10 +149,10 @@ result is in `tmp/drive-return-safety-round2-gate.log`.
       "class": "Incidental",
       "assessment": {
         "purpose": "Keep the real drive-return product oracle intact while making mounts an explicit opt-in, reclaiming only owned test associations after interruption, and observing telemetry's one-time retained RRD open before the descriptor baseline.",
-        "callersAndStateOwners": "JvmBaseConventionsPlugin configures every Test task including UI integrationTest. The tagged class creates LinuxLoopVolume resources. Each JVM owns PID/start-time-named volume and decoy images with recorded device/inode identities, tracked commands and a bounded shutdown hook. Udisks owns loop and mount associations. Recovery requires a provably dead process owner, a checkout-local recognized path, backing identity and SetupByUID. Current-process cleanup additionally requires a registered image and its recorded identity.",
-        "indirectBehaviours": "Ordinary Test tasks exclude real-drives; integrationTest tasks log -PincludeRealDrives=true. Opt-in retains every invocation. SIGTERM cancels in-flight commands and cleans registered associations without taking test-thread monitors; images remain on failure. SIGKILL recovery inspects only process-owned image names in this checkout's directory and leaves live or unknown owners alone even after build-directory removal. Existing files require matching backing device/inode before deletion; deleted backings never authorize unlinking a reused pathname. Unrelated loops are preserved. The descriptor fixture contributes its short telemetry interval before configuration build, without mutating system properties; all other fixtures keep 60 seconds. External commands have 30 seconds normally and 5 seconds during shutdown within the hook's 20-second bound. Descriptor and watcher-thread inequalities are unchanged; all other assertions and test budgets are unchanged.",
-        "evidence": "Native evidence must be produced by tmp/drive-return-host-check.sh: s1-default.log and the absent s1-udisks-invocations.txt; s2-opted-xml (19 passed, zero skipped); s3-after loop/mount inventory; s4-leftovers and s4-after inventories plus s4-recovery-xml and outside-pattern decoy preservation; s5-lazy-xml with the original retained-handles assertion and metrics.rrd, and s5-leak-xml with the repaired retained-handles assertion. These checks fail on invocation, leftovers, unrelated association removal, skipped cases, unexpected mutation success or a different failure. Native checks are not run inside the sandbox because its udisks caller identity is wrong. Device-free baseline reproduction and seven passing LinuxLoopVolumeSafetyTest cases are recorded in tmp/drive-return-safety-before.log and tmp/drive-return-safety-round2-gradle.log; the native host matcher recognizes PID/start-time image names.",
-        "unresolvedRisks": "Host evidence for S1-S5 and independent acceptance remain pending. Shutdown cannot guarantee physical detachment when udisks refuses or stalls; the hook is bounded to 20 seconds and retains identifiable backing images so the next opted-in run can recover. The sweep is local to this checkout's image directory and does not adopt legacy images without process ownership, including old drive-return-<random>.img and generic JUnit volume.img files. These unknown owners are reported and left alone. Device-free checks do not establish real udisks behavior; native SIGTERM, SIGKILL and concurrent-JVM verification remain pending."
+        "callersAndStateOwners": "JvmBaseConventionsPlugin configures every Test task including UI integrationTest. The tagged class creates LinuxLoopVolume resources. Each JVM owns PID/start-time-named volume and decoy images carrying their creation device/inode identities, tracked commands and a bounded shutdown hook. Udisks owns loop and mount associations. Recovery requires a provably dead process owner, a checkout-local recognized path, sysfs backing_file evidence, recorded creation identity and SetupByUID; unreferenced orphan images require the same owner and file identity without an associated loop. Current-process cleanup additionally requires a registered image and its recorded identity.",
+        "indirectBehaviours": "Ordinary Test tasks exclude real-drives; integrationTest tasks log -PincludeRealDrives=true. Opt-in retains every invocation. SIGTERM cancels in-flight commands and cleans registered associations without taking test-thread monitors; images remain on failure. SIGKILL recovery inspects only process-owned image names in this checkout's directory and leaves live or unknown owners alone even after build-directory removal. Existing files require matching recorded creation device/inode and a linked sysfs backing path before loop cleanup deletes them; deleted backings never authorize unlinking a reused pathname. Orphan image recovery also checks recorded identity and leaves referenced files alone. No losetup query or privileged loop-node access is needed. Unrelated loops are preserved. The descriptor fixture contributes its short telemetry interval before configuration build, without mutating system properties; all other fixtures keep 60 seconds. External commands have 30 seconds normally and 5 seconds during shutdown within the hook's 20-second bound. Descriptor and watcher-thread inequalities are unchanged; all other assertions and test budgets are unchanged.",
+        "evidence": "Native evidence must be produced by tmp/drive-return-host-check.sh: s1-default.log and the absent s1-udisks-invocations.txt; s2-opted-xml (19 passed, zero skipped); s3-after loop/mount inventory; s4-leftovers and s4-after inventories plus s4-recovery-xml and outside-pattern decoy preservation; s5-lazy-xml with the original retained-handles assertion and metrics.rrd, and s5-leak-xml with the repaired retained-handles assertion. These checks fail on invocation, leftovers, unrelated association removal, skipped cases, unexpected mutation success or a different failure. Native checks are not run inside the sandbox because its udisks caller identity is wrong. Device-free baseline reproduction and seven passing LinuxLoopVolumeSafetyTest cases are recorded in tmp/drive-return-safety-before.log and tmp/drive-return-safety-round2-gradle.log; the native host matcher recognizes PID/start-time and creation-identity image names. Round-3 evidence: tmp/drive-return-safety-round3-before.log and before.xml show only the new unprivileged regression failing against b97c3eb4f6; tmp/drive-return-safety-round3-gradle-final.log and after.xml show all ten tests, compilation, Spotless and PMD passing. The baseline cannot obtain a loop identity from the stub, while the candidate uses linked sysfs path plus creation identity. No native commands execute in the new regression.",
+        "unresolvedRisks": "Host evidence for S1-S5 and independent acceptance remain pending. Shutdown cannot guarantee physical detachment when udisks refuses or stalls; the hook is bounded to 20 seconds and retains identifiable backing images so the next opted-in run can recover. The sweep is local to this checkout's image directory and does not adopt legacy images without process ownership and recorded creation identity, including round-2 PID/start-time names, old drive-return-<random>.img and generic JUnit volume.img files. The seven round-2 host orphan images are therefore preserved. These unknown owners are reported and left alone. Device-free checks do not establish real udisks behavior; native SIGTERM, SIGKILL and concurrent-JVM verification remain pending."
       },
       "sources": [
         {

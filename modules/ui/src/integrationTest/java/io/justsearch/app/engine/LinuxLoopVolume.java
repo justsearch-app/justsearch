@@ -10,9 +10,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Assumptions;
@@ -21,7 +20,8 @@ import org.junit.jupiter.api.Assumptions;
 final class LinuxLoopVolume implements AutoCloseable {
   // Names retain the owning process identity even when build output is removed during a run.
   private static final Path IMAGES = Path.of("build/drive-return-images").toAbsolutePath().normalize();
-  private static final Pattern IMAGE_NAME = Pattern.compile("drive-return-([0-9]+)-([0-9]+)-[0-9]+(-decoy)?\\.img");
+  private static final Pattern IMAGE_NAME = Pattern.compile(
+      "drive-return-([0-9]+)-([0-9]+)-[0-9]+(?:-([0-9]+)-([0-9]+)-([0-9]+))?(-decoy)?\\.img");
   private static final List<LinuxLoopVolume> OWNED = new java.util.concurrent.CopyOnWriteArrayList<>();
   private static final Commands COMMANDS = new Commands();
   private static int uid;
@@ -31,11 +31,13 @@ final class LinuxLoopVolume implements AutoCloseable {
   private FileIdentity decoyIdentity;
   private String loop;
   private String decoy;
+  private Path decoyImage;
   private Path mounted;
 
   private LinuxLoopVolume(Path image) throws IOException {
     this.image = image;
-    identity = fileIdentity(image);
+    identity = recordedIdentity(image);
+    checkImage(image, identity);
   }
 
   private static synchronized void prepare() throws Exception {
@@ -64,9 +66,7 @@ final class LinuxLoopVolume implements AutoCloseable {
 
   static synchronized LinuxLoopVolume create(Path directory) throws Exception {
     prepare();
-    long pid = ProcessHandle.current().pid();
-    long start = processStart(Files.readString(Path.of("/proc/self/stat")));
-    var result = new LinuxLoopVolume(Files.createTempFile(IMAGES, "drive-return-" + pid + "-" + start + "-", ".img"));
+    var result = new LinuxLoopVolume(createImage(IMAGES, false));
     OWNED.add(result); // Register before any external operation, including a partial attach.
     try {
       try (var file = Files.newByteChannel(result.image, StandardOpenOption.WRITE)) {
@@ -145,22 +145,27 @@ final class LinuxLoopVolume implements AutoCloseable {
     return Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) && owned(file);
   }
 
-  private static Map<String, FileIdentity> loopIdentities(boolean cleanup) throws Exception {
-    // Read only: never ask losetup to create or detach anything.
-    String output = COMMANDS.run(cleanup, "losetup", "--list", "--noheadings", "--raw", "--output", "NAME,BACK-INO,BACK-MAJ:MIN");
-    var result = new HashMap<String, FileIdentity>();
-    for (String line : output.lines().toList()) {
-      String[] fields = line.strip().split("\\s+");
-      if (fields.length == 3 && fields[0].matches("/dev/loop[0-9]+") && fields[1].matches("[0-9]+")
-          && fields[2].matches("[0-9]+:[0-9]+")) {
-        result.put(fields[0], new FileIdentity(Long.parseLong(fields[1]), fields[2]));
-      }
-    }
-    return result;
+  static Path createImage(Path images, boolean decoy) throws IOException {
+    long pid = ProcessHandle.current().pid();
+    long start = processStart(Files.readString(Path.of("/proc/self/stat")));
+    Path temporary = Files.createTempFile(images, "drive-return-" + pid + "-" + start + "-", ".img");
+    FileIdentity identity = fileIdentity(temporary);
+    Path file = temporary.resolveSibling(temporary.getFileName().toString().replace(".img",
+        "-" + identity.device().replace(':', '-') + "-" + identity.inode() + (decoy ? "-decoy" : "") + ".img"));
+    Files.move(temporary, file); // The identity is durable in the name before any loop can attach.
+    checkImage(file, identity);
+    return file;
+  }
+
+  static FileIdentity recordedIdentity(Path file) {
+    var match = IMAGE_NAME.matcher(file.getFileName().toString());
+    if (!match.matches() || match.group(3) == null) return null;
+    try { return new FileIdentity(Long.parseLong(match.group(5)), match.group(3) + ":" + match.group(4)); }
+    catch (NumberFormatException invalid) { return null; }
   }
 
   private static void sweep(LinuxLoopVolume volume, boolean cleanup) throws Exception {
-    Map<String, FileIdentity> identities = loopIdentities(cleanup);
+    var referenced = new HashSet<Path>();
     try (var devices = Files.list(Path.of("/sys/block"))) {
       for (Path device : devices.filter(p -> p.getFileName().toString().matches("loop[0-9]+")).toList()) {
         Path backing = device.resolve("loop/backing_file");
@@ -170,8 +175,9 @@ final class LinuxLoopVolume implements AutoCloseable {
         if (deleted) value = value.substring(0, value.length() - " (deleted)".length());
         if (value.isEmpty()) continue;
         Path file = Path.of(value);
+        referenced.add(file);
         if (!IMAGES.equals(file.getParent())) continue;
-        boolean tracked = volume != null && (file.equals(volume.image) || file.equals(volume.decoyImage()));
+        boolean tracked = volume != null && (file.equals(volume.image) || file.equals(volume.decoyImage));
         if (volume != null && !tracked) continue;
         OwnerState state = ownerState(file);
         if (state != OwnerState.DEAD && !tracked) {
@@ -181,7 +187,7 @@ final class LinuxLoopVolume implements AutoCloseable {
         String loopDevice = "/dev/" + device.getFileName();
         String info = COMMANDS.run(cleanup, "udisksctl", "info", "-b", loopDevice);
         boolean setupByUs = Pattern.compile("(?m)^\\s+SetupByUID:\\s+" + uid + "\\s*$").matcher(info).find();
-        FileIdentity identity = identities.get(loopDevice);
+        FileIdentity identity = recordedIdentity(file);
         if (tracked && !java.util.Objects.equals(identity,
             file.equals(volume.image) ? volume.identity : volume.decoyIdentity)) {
           throw new IOException("Changed backing identity: " + file);
@@ -195,9 +201,28 @@ final class LinuxLoopVolume implements AutoCloseable {
           continue;
         }
         System.out.println("Drive return sweep: " + loopDevice + " " + file);
-        detach(loopDevice, file, identity, cleanup);
-        if (decision == SweepDecision.DETACH_AND_DELETE) deleteImage(file, identity);
+        boolean linked = detach(loopDevice, file, identity, cleanup);
+        if (linked && decision == SweepDecision.DETACH_AND_DELETE) deleteImage(file, identity);
       }
+    }
+    // SIGKILL can leave an image after detach, or before setup ever attached it.
+    if (volume == null) {
+      try (var files = Files.list(IMAGES)) {
+        for (Path file : files.toList()) {
+          deleteOrphan(IMAGES, file, ownerState(file), referenced.contains(file));
+        }
+      }
+    }
+  }
+
+  static void deleteOrphan(Path images, Path file, OwnerState state, boolean referenced) throws IOException {
+    FileIdentity identity = recordedIdentity(file);
+    boolean safe = safeFile(file);
+    FileIdentity current = safe ? fileIdentity(file) : null;
+    if (!referenced && decide(images, file, false, identity, current, safe, true, state, false)
+        == SweepDecision.DETACH_AND_DELETE) {
+      deleteImage(file, identity);
+      System.out.println("Drive return orphan image sweep: " + file);
     }
   }
 
@@ -237,21 +262,30 @@ final class LinuxLoopVolume implements AutoCloseable {
     }
   }
 
-  private static void checkAssociation(String device, Path image, FileIdentity identity, boolean cleanup) throws Exception {
+  private static boolean checkAssociation(String device, Path image, FileIdentity identity) throws Exception {
     Path backing = Path.of("/sys/class/block", Path.of(device).getFileName().toString(), "loop/backing_file");
-    String actual = Files.readString(backing).strip().replaceFirst(" \\(deleted\\)$", "");
-    if (!actual.equals(image.toString()) || !identity.equals(loopIdentities(cleanup).get(device))) {
+    String value = Files.readString(backing).strip();
+    boolean deleted = value.endsWith(" (deleted)");
+    String actual = deleted ? value.substring(0, value.length() - " (deleted)".length()) : value;
+    if (!actual.equals(image.toString()) || identity == null) {
       throw new IOException("Refusing to detach a changed association: " + device + " " + actual);
     }
+    // A linked d_path identifies the file currently at that path without opening /dev/loopN.
+    // The creation identity rejects pathname reuse; the second read closes the read/stat race.
+    if (!deleted) checkImage(image, identity);
+    if (!value.equals(Files.readString(backing).strip())) {
+      throw new IOException("Backing changed while checking association: " + device);
+    }
+    return !deleted;
   }
 
-  private static void detach(String device, Path expectedImage, FileIdentity identity, boolean cleanup) throws Exception {
-    checkAssociation(device, expectedImage, identity, cleanup);
+  private static boolean detach(String device, Path expectedImage, FileIdentity identity, boolean cleanup) throws Exception {
+    checkAssociation(device, expectedImage, identity);
     // Unmount even after a partial mount response, but never ignore a real unmount failure.
     long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
     while (isMounted(device)) {
       try {
-        checkAssociation(device, expectedImage, identity, cleanup);
+        checkAssociation(device, expectedImage, identity);
         COMMANDS.run(cleanup, "udisksctl", "unmount", "--no-user-interaction", "-b", device);
         break;
       } catch (IOException failure) {
@@ -261,8 +295,9 @@ final class LinuxLoopVolume implements AutoCloseable {
         Thread.sleep(100);
       }
     }
-    checkAssociation(device, expectedImage, identity, cleanup);
+    boolean linked = checkAssociation(device, expectedImage, identity);
     COMMANDS.run(cleanup, "udisksctl", "loop-delete", "--no-user-interaction", "-b", device);
+    return linked;
   }
 
   private static boolean isMounted(String device) throws IOException {
@@ -280,21 +315,18 @@ final class LinuxLoopVolume implements AutoCloseable {
   synchronized void holdDecoy() throws Exception {
     if (COMMANDS.stopping) throw new IOException("Drive test JVM is stopping");
     if (decoy != null) throw new IllegalStateException("Decoy already held");
-    Path file = decoyImage();
-    Files.write(file, new byte[4096], StandardOpenOption.CREATE_NEW);
-    decoyIdentity = fileIdentity(file);
-    decoy = attach(file, decoyIdentity);
-  }
-
-  private Path decoyImage() {
-    return image.resolveSibling(image.getFileName().toString().replace(".img", "-decoy.img"));
+    decoyImage = createImage(IMAGES, true);
+    decoyIdentity = recordedIdentity(decoyImage);
+    checkImage(decoyImage, decoyIdentity);
+    Files.write(decoyImage, new byte[4096], StandardOpenOption.WRITE);
+    decoy = attach(decoyImage, decoyIdentity);
   }
 
   synchronized void releaseDecoy() throws Exception {
     if (decoy != null) {
-      detach(decoy, decoyImage(), decoyIdentity, false);
+      detach(decoy, decoyImage, decoyIdentity, false);
       decoy = null;
-      deleteImage(decoyImage(), decoyIdentity);
+      deleteImage(decoyImage, decoyIdentity);
       decoyIdentity = null;
     }
   }
@@ -380,7 +412,7 @@ final class LinuxLoopVolume implements AutoCloseable {
     // Also finds a setup whose command response was interrupted, without acquiring a volume monitor.
     sweep(this, shutdown);
     deleteImage(image, identity);
-    if (decoyIdentity != null) deleteImage(decoyImage(), decoyIdentity);
+    if (decoyIdentity != null) deleteImage(decoyImage, decoyIdentity);
     OWNED.remove(this);
   }
 
