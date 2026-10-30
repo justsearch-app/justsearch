@@ -13,7 +13,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 
 ## [Unreleased]
 
-## [0.3.1] - 2026-10-30
+## [0.3.2] - 2026-10-30
 
 ### Added
 - Linux desktop support: an x86_64 `.deb` for Ubuntu 24.04 and later, with a desktop launcher, tray and `justsearch://` links (#761, #986)
