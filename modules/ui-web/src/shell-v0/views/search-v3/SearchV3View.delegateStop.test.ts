@@ -17,6 +17,8 @@ const STOP = 'You stopped this run';
 const RUN = 'run-1';
 let events: unknown[];
 let threadReads: number;
+let threadAddresses: string[];
+let startFailure: 'http' | 'network' | undefined;
 let runState: string;
 let discoveredRuns: unknown[];
 let discoveryGate: Promise<void> | undefined;
@@ -43,7 +45,7 @@ beforeEach(() => {
   localStorage.clear(); sessionStorage.clear();
   __resetAgentSessionStore(); __resetConversationListForTest(); __resetAiStateForTest();
   __resetDraftProvidersForTest(); __resetDraftKeptForTest();
-  events = []; threadReads = 0; runState = 'READY_FOR_LLM'; discoveredRuns = []; discoveryGate = undefined; threadFailure = false; observeFails = false; conversationId = ''; pendingControl = undefined;
+  events = []; threadReads = 0; threadAddresses = []; startFailure = undefined; runState = 'READY_FOR_LLM'; discoveredRuns = []; discoveryGate = undefined; threadFailure = false; observeFails = false; conversationId = ''; pendingControl = undefined;
   deleteStatus = 200; deleteNetworkFailure = false; deleteResolvers = [];
   finishDelete = () => {}; close = () => {};
   announcements = [];
@@ -57,7 +59,9 @@ beforeEach(() => {
       return Response.json({ ok: deleteStatus === 200 }, { status: deleteStatus });
     }
     if (url.includes('/observe') && observeFails) return new Response('{}', { status: 500 });
-    if (url.includes('/api/chat/dispatch') || url.endsWith('/api/chat/agent') || url.includes('/observe')) {
+    if (url.includes('/api/chat/dispatch') || url.endsWith('/api/chat/agent') || url.includes('/observe') || url.endsWith('/resume')) {
+      if (startFailure === 'http') return new Response('{}', { status: 503 });
+      if (startFailure === 'network') throw new Error('connection lost');
       const body = new ReadableStream<Uint8Array>({ start(controller) {
         let closed = false;
         emit = (event, payload) => {
@@ -69,7 +73,8 @@ beforeEach(() => {
       return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
     }
     if (url.includes('/api/thread/')) {
-      threadReads++;
+      threadReads++; threadAddresses.push(url);
+      if (!url.endsWith(`/api/thread/${conversationId}`)) return Response.json({ events: [], lifecycles: [] });
       if (threadFailure) return new Response('{}', { status: 503 });
       return Response.json({ conversationId, events, lifecycles: [{ sessionId: RUN, state: runState, actor: 'primary', turns: 1, iterations: 1, toolCalls: 0, actors: [], budget: { initial: 100, consumed: 0, remaining: 100, overBudget: false } }] });
     }
@@ -198,20 +203,70 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('complete');
   });
 
-  it('R1 unidentified lost stream shows an unconfirmed Stop with discovery retry and no halted receipt', async () => {
-    const el = await mount(); await start(el, false);
-    clickStop(el); await settle(); close(); await settle();
+  it.each(['http', 'network', 'lost'].flatMap((failure) => [false, true].map((stopping) => [failure, stopping] as const)))('N2 %s start failure with Stop %s shows a failed receipt and releases the composer without polling', async (failure, stopping) => {
+    const el = await mount();
+    // Hold the original admission until the reader has pressed Stop.
+    if (failure !== 'lost') {
+      const originalFetch = fetch;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        if (String(input).includes('/api/chat/dispatch') || String(input).endsWith('/api/chat/agent')) await held;
+        return originalFetch(input, init);
+      }));
+      await start(el, false); if (stopping) clickStop(el); await settle();
+      events = []; startFailure = failure as 'http' | 'network'; release();
+    } else {
+      await start(el, false); if (stopping) clickStop(el); await settle(); events = []; close();
+    }
+    await settle();
     const ctrl = getAgentSessionController('');
     expect(ctrl.isStreaming).toBe(false); expect(ctrl.runInFlight).toBe(false);
+    expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('failed');
+    expect(main(el).shadowRoot!.querySelector('[data-testid="sv3-turn-stopping"]')).toBeNull();
+    expect(el.shadowRoot!.querySelector('jf-sv3-composer')!.shadowRoot!.querySelector('[data-testid="sv3-composer-stop"]')).toBeNull();
+    expect(noteCount(el)).toBe(0); if (stopping) expect(threadReads).toBe(0);
+    expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(0);
+  });
+
+  it('N2 early Stop then completion before identity releases the composer without polling', async () => {
+    const el = await mount(); await start(el, false); clickStop(el); await settle();
+    emit('done', { finalResponse: 'Finished answer', disposition: 'COMPLETED' }); close(); await settle();
+    const ctrl = getAgentSessionController('');
+    expect(ctrl.isStreaming).toBe(false); expect(ctrl.runInFlight).toBe(false);
+    expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('complete');
+    expect(main(el).shadowRoot!.querySelector('[data-testid="sv3-turn-stopping"]')).toBeNull();
+    expect(el.shadowRoot!.querySelector('jf-sv3-composer')!.shadowRoot!.querySelector('[data-testid="sv3-composer-stop"]')).toBeNull();
+    expect(noteCount(el)).toBe(0); expect(threadReads).toBe(0);
+  });
+
+  it.each(['known', 'unknown'] as const)('N3 resumed %s conversation reconciles a later CANCELLED only at its actual address', async (address) => {
+    const el = await mount();
+    const ctrl = getAgentSessionController('');
+    pendingControl = dispatchRunControl(ctrl, { kind: 'resume', sessionId: 'prior-run', resumable: true });
+    await settle();
+    const adopted = el.sessions.sessions[0]!.id;
+    el.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-select', {
+      detail: { id: adopted }, bubbles: true, composed: true,
+    }));
+    await settle();
+    threadAddresses = [];
+    conversationId = address === 'known' ? 'actual-conversation' : '';
+    emit('run_started', { runId: RUN, ...(conversationId ? { conversationId } : {}) });
+    emit('session_started', { sessionId: RUN }); await settle();
+    clickStop(el); await settle(); finishDelete(); await settle();
+    observeFails = true; close(); await settle();
     expect(main(el).shadowRoot!.querySelector('[data-testid="sv3-turn-stopping"]')?.textContent).toBe(TURN_STOP_FAILED);
-    expect(el.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('streaming');
-    expect(noteCount(el)).toBe(0);
-    const discoveries = (): number => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/api/chat/runs/live')).length;
-    const before = discoveries(); clickStop(el); await settle();
-    expect(discoveries()).toBe(before + 1);
-    expect(ctrl.isStreaming).toBe(false); expect(ctrl.concludedRunId).toBeNull();
-    expect(main(el).shadowRoot!.querySelector('[data-testid="sv3-turn-stopping"]')?.textContent).toBe(TURN_STOP_FAILED);
-    expect(noteCount(el)).toBe(0);
+    if (address === 'known') {
+      expect(threadAddresses.some((url) => url.endsWith('/api/thread/actual-conversation'))).toBe(true);
+      await saveStop();
+      await expect.poll(() => el.sessions.sessions.flatMap((s) => s.turns)[0]?.status, { timeout: 1800 }).toBe('halted');
+    } else {
+      expect(threadAddresses.every((url) => url.endsWith('/api/thread/run-1'))).toBe(true);
+      const deletes = (): number => vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'DELETE').length;
+      expect(deletes()).toBe(1); clickStop(el); await settle(); expect(deletes()).toBe(2);
+      expect(el.sessions.sessions.flatMap((s) => s.turns)[0]?.status).toBe('streaming');
+    }
   });
 
   it('S3 S6 no stop response becomes unconfirmed, keeps output and allows one new attempt', async () => {
@@ -373,24 +428,47 @@ describe('Delegate Stop reconciles the addressed live turn with the durable reco
     }
   });
 
-  it('DS3 DS4 this window own Halt still waits beyond the clean-DONE grace', async () => {
+  it.each(['refused', 'network', 'no-answer'] as const)('N4 %s Stop bounds record polling to the five-second grace even after further notifications', async (outcome) => {
+    const owner = await mount(); await start(owner);
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    try {
+      deleteStatus = outcome === 'refused' ? 409 : 200; deleteNetworkFailure = outcome === 'network';
+      clickStop(owner); await vi.advanceTimersByTimeAsync(0);
+      if (outcome !== 'no-answer') { finishDelete(); await vi.advanceTimersByTimeAsync(0); }
+      const initialReads = threadReads;
+      await vi.advanceTimersByTimeAsync(4900);
+      expect(threadReads).toBeGreaterThan(initialReads);
+      await vi.advanceTimersByTimeAsync(100);
+      const atGraceEnd = threadReads;
+      getAgentSessionController('').onProgress({ phase: 'heartbeat', message: '' });
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(threadReads).toBe(atGraceEnd);
+      expect(noteCount(owner)).toBe(0);
+      expect(owner.sessions.sessions.flatMap((s) => s.turns)[0]!.status).toBe('streaming');
+    } finally {
+      owner.remove(); await vi.advanceTimersByTimeAsync(0);
+      vi.clearAllTimers(); vi.useRealTimers();
+    }
+  });
+
+  it('N4 preservation an accepted Halt keeps waiting beyond the clean-DONE grace for its saved confirmation', async () => {
     const owner = await mount(); await start(owner);
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     try {
       runState = 'DONE';
       events = [prompt(), wire('2', 'ASSISTANT_MESSAGE', 'Finished answer', { disposition: 'COMPLETED', shapeId: 'core.agent-run' })];
       clickStop(owner); await vi.advanceTimersByTimeAsync(0);
+      finishDelete(); await vi.advanceTimersByTimeAsync(0);
       const initialReads = threadReads;
       await vi.advanceTimersByTimeAsync(20_000);
       expect(threadReads).toBeGreaterThan(initialReads);
       expect(noteCount(owner)).toBe(0);
-      await saveStop(true); finishDelete();
+      await saveStop(true);
       await vi.advanceTimersByTimeAsync(500);
       expect(noteCount(owner)).toBe(1);
       expect(owner.sessions.sessions.flatMap((s) => s.turns)[0]!.disposition).toBe('COMPLETED');
     } finally {
-      owner.remove();
-      await vi.advanceTimersByTimeAsync(0);
+      owner.remove(); await vi.advanceTimersByTimeAsync(0);
       vi.clearAllTimers(); vi.useRealTimers();
     }
   });

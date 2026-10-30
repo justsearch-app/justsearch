@@ -179,59 +179,36 @@ describe('Halt follows the backend across windows and reloads', () => {
     backend.terminal('run-1', 'CANCELLED');
   });
 
-  it('R1 case 2 discovers a live run after Stop and stream loss before identity, then delivers once', async () => {
+  it.each(['http', 'network', 'lost'] as const)('N1 N2 early Stop then %s failure matches the no-Stop outcome without discovering another window', async (failure) => {
+    const control = await start(false);
+    const error = failure === 'http' ? Object.assign(new Error('HTTP 503'), { status: 503 })
+      : failure === 'network' ? new Error('connection lost')
+      : Object.assign(new Error('Stream ended without terminal event'), { code: 'STREAM_INCOMPLETE' });
+    backend.observations[0]!.lose(error); await flush();
+    const expectedError = control.conversation.find((entry) => entry.type === 'error')?.content;
+    expect(expectedError).toBeTruthy();
     const ctrl = await start(false); tasks.push(ctrl.cancelSession());
-    backend.observations[0]!.lose(); await flush();
-    expect(backend.discoveries).toBe(1);
-    expect(backend.observations).toHaveLength(2);
-    expect(ctrl.sessionId).toBe('run-1');
-    expect(backend.responses.filter((response) => response.init?.method === 'DELETE')).toHaveLength(1);
-    backend.identity(); await flush();
-    expect(backend.responses.filter((response) => response.init?.method === 'DELETE')).toHaveLength(1);
-    backend.terminal('run-1', 'CANCELLED'); await flush();
-    expect(ctrl.terminalOutcome).toBe('cancelled'); expect(ctrl.isStreaming).toBe(false);
-  });
-
-  it.each(['missing', 'CANCELLED', 'DONE'] as const)('R1 case 2 unidentified %s run settles unconfirmed with discovery retry and no phantom stream', async (state) => {
-    const ctrl = await start(false); tasks.push(ctrl.cancelSession());
-    if (state === 'missing') backend.runs.delete('run-1');
-    else backend.terminal('run-1', state, false);
-    backend.observations[0]!.lose(); await flush();
-    expect(backend.discoveries).toBe(1);
-    // Without a run identity a record's earlier runs cannot safely conclude this attempt.
-    expect(ctrl.terminalOutcome).toBeNull(); expect(ctrl.concludedRunId).toBeNull();
+    // A separate window's live run shares the conversation but is never this dispatch's identity.
+    const other = await start();
+    expect(other.sessionId).toBe('run-3');
+    backend.observations[1]!.lose(error); await flush();
+    expect(ctrl.conversation.find((entry) => entry.type === 'error')?.content).toBe(expectedError);
     expect(ctrl.isStreaming).toBe(false); expect(ctrl.runInFlight).toBe(false);
-    expect(ctrl.stopObservationLost).toBe(true);
-    expect(directiveAvailable(ctrl, { kind: 'halt' })).toBe(true);
-    tasks.push(dispatchRunControl(ctrl, { kind: 'halt' })); await flush();
-    expect(backend.discoveries).toBe(2); expect(ctrl.isStreaming).toBe(false);
-    expect(backend.responses).toHaveLength(0);
-    expect(projectSv3RunPrompts(ctrl, projectSv3RunFeed(ctrl, 0))).toEqual([]);
+    expect(ctrl.stopAttempt.intent).toBe(false); expect(ctrl.stopObservationLost).toBe(false);
+    expect(ctrl.terminalOutcome).not.toBe('cancelled');
+    expect(directiveAvailable(ctrl, { kind: 'halt' })).toBe(false);
+    expect(backend.discoveries).toBe(0);
+    expect(backend.requests).toEqual([]);
+    backend.terminal('run-3', 'DONE');
   });
 
-  it('R1 case 2 discovery arriving after replacement cannot stop or adopt its run', async () => {
+  it('N2 early Stop then completion before identity releases the composer and offers no permanent Stop', async () => {
     const ctrl = await start(false); tasks.push(ctrl.cancelSession());
-    backend.holdResponses.add('/api/chat/runs/live');
-    backend.observations[0]!.lose(); await flush();
-    expect(backend.responses[0]?.path).toBe('/api/chat/runs/live');
-    tasks.push(ctrl.send('Replacement')); await flush(); backend.identity();
-    backend.responses[0]!.release(); await flush();
-    expect(ctrl.sessionId).toBe('run-2'); expect(ctrl.stopAttempt.intent).toBe(false);
-    expect(backend.observations).toHaveLength(2);
-    expect(backend.responses.filter((response) => response.init?.method === 'DELETE')).toHaveLength(0);
-    backend.terminal('run-2', 'DONE');
-  });
-
-  it.each(['http', 'network'] as const)('R1 case 3 failed %s start clears stopping and reports the existing start failure', async (failure) => {
-    const ctrl = await start(false); tasks.push(ctrl.cancelSession());
-    backend.runs.delete('run-1');
-    // The real host reports failed admission as an error frame; the legacy transport throws HTTP errors.
-    if (failure === 'network') { backend.emit('error', { kind: 'transport-error', detail: 'network lost' }); backend.observations[0]!.close(); }
-    else backend.observations[0]!.lose(Object.assign(new Error('HTTP 503'), { status: 503 }));
-    await flush();
+    backend.terminal('run-1', 'DONE'); await flush();
+    expect(ctrl.terminalOutcome).toBe('completed');
     expect(ctrl.isStreaming).toBe(false); expect(ctrl.runInFlight).toBe(false);
-    expect(ctrl.stopAttempt.intent).toBe(false); expect(backend.responses).toHaveLength(0);
-    expect(ctrl.conversation.some((entry) => entry.type === 'error')).toBe(true);
+    expect(directiveAvailable(ctrl, { kind: 'halt' })).toBe(false);
+    expect(backend.requests).toEqual([]);
   });
 
   it('R1 case 4 discovery network failure leaves an identified stop unconfirmed and retryable', async () => {
@@ -378,12 +355,12 @@ describe('Halt follows the backend across windows and reloads', () => {
         if (response === 'refused') deletes[0]?.release(409);
         await vi.advanceTimersByTimeAsync(STOP_RESPONSE_WAIT_MS + 1); await flush();
         expect(ctrl.stopAttempt.pending).toBe(false);
-        if (scenario === 1 || scenario === 5 || (scenario === 2 && state === 'live')) {
+        if (scenario === 1 || scenario === 5) {
           // A late terminal still wins after an unanswered request's deadline.
           backend.terminal('run-1', scenario === 5 || state !== 'DONE' ? 'CANCELLED' : 'DONE'); await flush();
           expect(ctrl.isStreaming).toBe(false);
           expect(ctrl.terminalOutcome).toBe(scenario === 5 || state !== 'DONE' ? 'cancelled' : 'completed');
-        } else if (scenario === 3) {
+        } else if (scenario === 2 || scenario === 3) {
           expect(ctrl.isStreaming).toBe(false); expect(ctrl.runInFlight).toBe(false);
           expect(ctrl.stopAttempt.intent).toBe(false);
         } else if (scenario === 6) {

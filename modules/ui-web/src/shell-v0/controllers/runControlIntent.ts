@@ -59,8 +59,7 @@ export function directiveAvailable(
     case 'initiate':
       return true;
     case 'halt':
-      return ctrl.runInFlight || (ctrl.stopAttempt?.intent === true
-        && ctrl.stopObservationLost && ctrl.terminalOutcome === null);
+      return ctrl.runInFlight;
     case 'interject':
     case 'raise-budget':
       // These act on the LIVE run; the backend evicts finished sessions.

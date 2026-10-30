@@ -512,6 +512,8 @@ export interface Sv3RunLocal {
    * IS live, instead of dropping the reader's decision on the floor or firing it every frame.
    */
   haltDispatched: boolean;
+  /** A stop without a saved confirmation must not keep record polling alive indefinitely. */
+  stopRecordGraceUntil?: number;
   /**
    * Tempdoc 859 §D §2.5 — the reader said "don't ask me again for this run", and the amount they
    * chose when they said it. PER RUN by construction (it lives on this object, which a new dispatch

@@ -1073,7 +1073,7 @@ export class SearchV3View extends JfElement {
   private readonly recordReads = new Map<string, AbortController>();
   /** A local terminal can precede the Engine's journal and checkpoint writes. */
   private readonly pendingRunRecords = new Map<string, {
-    local: Sv3RunLocal; runId: string; doneGraceUntil?: number;
+    local: Sv3RunLocal; runId: string; conversationId: string; doneGraceUntil?: number;
   }>();
   private readonly announcedStops = new Set<string>();
   private recordRetryTimer: number | null = null;
@@ -2414,16 +2414,16 @@ export class SearchV3View extends JfElement {
     if (this.sessions.activeId === conversationId) this.recordNotice = failed;
     if (!failed) {
       const ctrl = this.agentController();
-      if (ctrl?.stopAttempt?.intent && ctrl.conversationId === conversationId) {
+      if (ctrl?.stopAttempt?.intent && (ctrl.runConversationId ?? ctrl.conversationId) === conversationId) {
         const lifecycle = record.lifecycles.find((row) => row.sessionId === ctrl.sessionId);
         if (lifecycle) ctrl.reconcileRunLifecycle(lifecycle.sessionId, lifecycle.state);
       }
       // Navigation detaches the local handle. Its addressed turn still follows its record.
-      for (const { local, runId } of this.pendingRunRecords.values()) {
-        if (local.sessionId !== conversationId || this.run === local) continue;
+      for (const { local, runId, conversationId: recordConversationId } of this.pendingRunRecords.values()) {
+        if (recordConversationId !== conversationId || this.run === local) continue;
         const state = record.lifecycles.find((row) => row.sessionId === runId)?.state;
         if (state !== 'CANCELLED' && state !== 'DONE' && state !== 'ERROR') continue;
-        const turn = sessionById(this.sessions, conversationId)?.turns.find((t) => t.id === local.turnId);
+        const turn = sessionById(this.sessions, local.sessionId)?.turns.find((t) => t.id === local.turnId);
         if (turn?.status !== 'streaming') continue;
         this.sessions = settleAgentTurn(this.sessions, local,
           state === 'CANCELLED' ? 'halted' : state === 'DONE' ? 'complete' : 'failed',
@@ -2439,8 +2439,8 @@ export class SearchV3View extends JfElement {
         .map((e) => e.id));
       for (const [id, pending] of this.pendingRunRecords) {
         const { local, runId } = pending;
-        if (local.sessionId !== conversationId) continue;
-        const turn = sessionById(this.sessions, conversationId)?.turns.find((t) => t.id === local.turnId);
+        if (pending.conversationId !== conversationId) continue;
+        const turn = sessionById(this.sessions, local.sessionId)?.turns.find((t) => t.id === local.turnId);
         if (turn === undefined) {
           this.pendingRunRecords.delete(id);
           continue;
@@ -2453,7 +2453,7 @@ export class SearchV3View extends JfElement {
         const state = record.lifecycles.find((r) => r.sessionId === runId)?.state;
         if (state === 'DONE' && stop === undefined && !local.haltRequested) {
           pending.doneGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
-        } else {
+        } else if (!local.haltRequested || (ctrl?.sessionId === runId && ctrl.stopAttempt?.outcome === 'accepted')) {
           delete pending.doneGraceUntil;
         }
         // A saved Stop can precede the final checkpoint; keep reading through both edges.
@@ -2475,7 +2475,7 @@ export class SearchV3View extends JfElement {
   private retireExpiredRecordReads(): void {
     const now = Date.now();
     for (const [id, pending] of this.pendingRunRecords) {
-      if (!pending.local.haltRequested && pending.doneGraceUntil !== undefined
+      if (pending.doneGraceUntil !== undefined
         && now >= pending.doneGraceUntil) this.pendingRunRecords.delete(id);
     }
   }
@@ -2487,7 +2487,7 @@ export class SearchV3View extends JfElement {
     this.recordRetryTimer = window.setTimeout(() => {
       this.recordRetryTimer = null;
       this.retireExpiredRecordReads();
-      for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+      for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.conversationId))) {
         void this.refreshRecord(id);
       }
     }, 500);
@@ -2564,7 +2564,7 @@ export class SearchV3View extends JfElement {
 
   private retryContextOnReconnect = (): void => {
     this.clearRecordRetry();
-    for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.local.sessionId))) {
+    for (const id of new Set([...this.pendingRunRecords.values()].map((p) => p.conversationId))) {
       void this.refreshRecord(id);
     }
     this.clearContextRetry();
@@ -5217,10 +5217,19 @@ export class SearchV3View extends JfElement {
       // id is only knowable once the server names it, which is here rather than at dispatch.
       if (ctrl.sessionId !== null) this.adoptedRunIds.add(ctrl.sessionId);
       if (ctrl.stopAttempt?.intent && !local.haltRequested) local.haltRequested = true;
-      if (local.haltRequested && ctrl.sessionId !== null && ctrl.terminalOutcome === null) {
-        if (!this.pendingRunRecords.has(local.turnId)) {
-          this.pendingRunRecords.set(local.turnId, { local, runId: ctrl.sessionId });
-          void this.refreshRecord(local.sessionId);
+      const recordConversationId = ctrl.runConversationId ?? ctrl.conversationId;
+      if (local.haltRequested && ctrl.sessionId !== null && ctrl.terminalOutcome === null
+          && recordConversationId !== null) {
+        local.stopRecordGraceUntil ??= Date.now() + COMPLETED_RECORD_GRACE_MS;
+        const accepted = ctrl.stopAttempt.outcome === 'accepted';
+        const pending = this.pendingRunRecords.get(local.turnId);
+        if (pending && accepted) delete pending.doneGraceUntil;
+        if (!pending && (accepted || Date.now() < local.stopRecordGraceUntil)) {
+          this.pendingRunRecords.set(local.turnId, {
+            local, runId: ctrl.sessionId, conversationId: recordConversationId,
+            ...(accepted ? {} : { doneGraceUntil: local.stopRecordGraceUntil }),
+          });
+          void this.refreshRecord(recordConversationId);
         }
       }
       const feed = projectSv3RunFeed(ctrl, local.entryStart);
@@ -5366,8 +5375,7 @@ export class SearchV3View extends JfElement {
       this.sessions,
       { sessionId: local.sessionId, turnId: local.turnId },
       sv3RunOutcome(feed, ctrl?.terminalOutcome === 'cancelled'
-        || (ctrl?.terminalOutcome === 'completed' && local.haltRequested && ctrl.stopAttempt.outcome === 'accepted' && ctrl.answerEvidenceRunId === ctrl.sessionId)
-        || (local.haltRequested && ctrl?.stopAttempt?.intent !== true)),
+        || (ctrl?.terminalOutcome === 'completed' && local.haltRequested && ctrl.stopAttempt.outcome === 'accepted' && ctrl.answerEvidenceRunId === ctrl.sessionId)),
       feed.toolCallCount,
       Date.now(),
       '',
@@ -5378,13 +5386,18 @@ export class SearchV3View extends JfElement {
       // cut-short badge.
       terminalBelongsToThisRun && ctrl !== null ? ctrl.terminalDisposition : null,
     );
-    if (local.acknowledged && ctrl?.sessionId != null) {
-      this.pendingRunRecords.set(local.turnId, { local, runId: ctrl.sessionId });
+    const recordConversationId = ctrl?.runConversationId ?? ctrl?.conversationId;
+    if (local.acknowledged && ctrl?.sessionId != null && recordConversationId != null) {
+      this.pendingRunRecords.set(local.turnId, {
+        local, runId: ctrl.sessionId, conversationId: recordConversationId,
+        ...(local.haltRequested && ctrl.stopAttempt?.outcome !== 'accepted'
+          ? { doneGraceUntil: Date.now() + COMPLETED_RECORD_GRACE_MS } : {}),
+      });
     }
     // The live feed was ATTENTION; the record is what survives it. Refreshing at the terminal is what
     // makes the yield happen (inventory D1): the settled turn re-renders from the canonical record's
     // interleaved items instead of vanishing with the controller that produced them.
-    void this.refreshRecord(local.sessionId);
+    if (ctrl?.sessionId != null && recordConversationId != null) void this.refreshRecord(recordConversationId);
   }
 
   /** A typed prompt resolved by its OWN control — never by anything typed into the composer. */
