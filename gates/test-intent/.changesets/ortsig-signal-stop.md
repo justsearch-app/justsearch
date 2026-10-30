@@ -127,3 +127,16 @@ Independent acceptance is left to the verifier; this builder does not author an 
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18d28-c68c-71b2-917b-2b2044c53c30",
+  "verdict": "accept",
+  "digest": "sha256:6ae53490410fea9d4e900761220a2d2e0722221371b1b8d6a17bfa6ec8a886f3",
+  "note": "Codex verifier-3 (final round) on 9b4bf16f26: PASS S1-S7, S9, S11 (5 real crash-free cycles; earlier rounds 30+10, base 5/5 SIGSEGV); S6 18/18 match base; classifications and disclosures honest. S8/S10 unverified (named limits)."
+}
+```
