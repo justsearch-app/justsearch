@@ -140,6 +140,7 @@ public final class KnowledgeServer implements Closeable {
   private Path activeIndexPath;
   private Path buildingIndexPath;
   private volatile IndexGenerationManager indexGenerationManager;
+  private volatile List<RootBinding> frozenCollectionRoots = List.of();
   private IndexGenerationManager.BootOwnership generationBootOwnership;
   private volatile IndexGenerationManager.BootDisposition generationBootDisposition;
   /** Replay settlement is valid only for this exact active generation. */
@@ -1352,6 +1353,7 @@ public final class KnowledgeServer implements Closeable {
       }
       this.recordedCandidate = candidate.orElse(null);
 
+
       genManager.reconcileActiveRecoveryOwnership(activeGenerationPath -> {
         if (!IndexRecoveryMarker.exists(activeGenerationPath)) {
           IndexRecoveryMarker.write(activeGenerationPath, "interrupted_backup_first");
@@ -1399,6 +1401,14 @@ public final class KnowledgeServer implements Closeable {
       IndexGenerationManager.IndexLayout layout = boot.layout();
       this.generationBootOwnership = bootOwnership;
       this.generationBootDisposition = boot.disposition();
+      if (bootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded) {
+        frozenCollectionRoots = recordedIngestionLifecycle.recordedRootPlan(recorded.operationKey())
+            .map(plan -> plan.roots().stream().map(root -> new RootBinding(root.path(), root.collection())).toList())
+            .orElse(List.of());
+      }
+      sqliteQueue.useFrozenCollectionRoots(() ->
+          generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING
+              ? frozenCollectionRoots : List.of());
       this.indexGenerationManager = genManager;
       this.indexBasePath = layout.basePath();
       this.activeIndexPath = layout.activeGenerationPath();
@@ -1408,6 +1418,22 @@ public final class KnowledgeServer implements Closeable {
       this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
       this.persistedMigrationProgressSnapshot = this.migrationProgressStore.readBestEffort();
       IndexGenerationManager.State state = layout.state();
+      if (unfinishedMigration && !(bootOwnership instanceof IndexGenerationManager.BootOwnership.Fenced)) {
+        String replayGeneration = state == null ? null : state.building_generation() == null
+            ? state.active_generation() : state.building_generation();
+        String operationKey = bootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+            ? recorded.operationKey() : IndexGenerationManager.isRecordedGenerationIdentity(replayGeneration)
+                ? replayGeneration.substring(2) : null;
+        var frozen = operationKey == null
+            ? java.util.Optional.<io.justsearch.app.api.operations.RecordedRootPlan>empty()
+            : recordedIngestionLifecycle.recordedRootPlan(operationKey);
+        if (replayGeneration != null) {
+          sqliteQueue.recoverLegacyCollections(replayGeneration,
+              KnowledgeServerMigrationOps.loadMigrationRootDeclarations(dataDir, rc.collections(), JSON).stream()
+                  .map(source -> new RootBinding(source.path(), source.collection())).toList(),
+              frozen.orElse(null));
+        }
+      }
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
           && jobQueue instanceof SqliteJobQueue) {
         release030Recovery = ((SqliteJobQueue)jobQueue).release030RecoveryState();
@@ -9471,6 +9497,10 @@ public final class KnowledgeServer implements Closeable {
             operationKey, ownership);
         return false;
       }
+      var frozenRoots = operationKey == null ? List.<RootBinding>of()
+          : recordedIngestionLifecycle.recordedRootPlan(operationKey)
+              .map(plan -> plan.roots().stream().map(root -> new RootBinding(root.path(), root.collection())).toList())
+              .orElse(List.of());
       var accepted = operationKey == null
           ? java.util.Optional.<RecordedIngestionLifecycle.RecordedCandidate>empty()
           : recordedIngestionLifecycle.recordedCandidate(operationKey);
@@ -9562,6 +9592,7 @@ public final class KnowledgeServer implements Closeable {
               old.releaseModelSets();
             };
             generationBootOwnership = ownership;
+            frozenCollectionRoots = frozenRoots;
             generationBootDisposition = IndexGenerationManager.BootDisposition.BUILDING;
             recordedCandidate = accepted.orElse(null);
             recordedCandidateFingerprint = captured;

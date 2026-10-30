@@ -44,6 +44,36 @@ final class SyncDirectoryOps {
   private static final int SYNC_WALK_THROTTLE_EVERY_N_FILES = 100;
   private static final int SYNC_ENQUEUE_BATCH_SIZE = 2_000;
 
+  private java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> declaredCollectionRoots = List::of;
+
+  void useDeclaredCollectionRoots(
+      java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> roots) {
+    declaredCollectionRoots = roots;
+  }
+
+  /** A walk reads declarations only if an unchanged, non-reserved file needs comparison. */
+  private final class CollectionSnapshot {
+    private List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> roots;
+
+    private List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> roots() {
+      if (roots == null) roots = declaredCollectionRoots.get();
+      return roots;
+    }
+  }
+
+  private static boolean collectionMatches(IndexedFileStamp indexed, Path file, String collection,
+      CollectionSnapshot declared) {
+    if (io.justsearch.app.api.knowledge.IngestCollectionPolicy.isReserved(indexed.collection())) return true;
+    var owner = io.justsearch.app.api.knowledge.IngestCollectionPolicy.owningRoot(file, declared.roots());
+    if (owner == null) return true;
+    String expected = collection == null || collection.isBlank() ? owner.collection() : collection;
+    return java.util.Objects.equals(normalizeCollection(expected), normalizeCollection(indexed.collection()));
+  }
+
+  private static String normalizeCollection(String collection) {
+    return collection == null || collection.isBlank() ? null : collection;
+  }
+
   /**
    * Guardrail: max indexed paths for force=false "missing file" detection. Above this the
    * delete-detection scan is too expensive to run inline, so it is skipped — but tempdoc 626 §Axis-B
@@ -244,6 +274,7 @@ final class SyncDirectoryOps {
     try {
       identityLease.requireCurrent();
       var budget = new PathBudget(pathCharCap);
+      var declared = new CollectionSnapshot();
       Map<String, IndexedFileStamp> indexedFiles = getIndexedPathsUnderPrefixStrict(root.toString(), budget, cancelled, scope);
       indexedFiles.keySet().removeIf(scope::excludes);
       Set<String> seenDiskPaths = new HashSet<>();
@@ -299,7 +330,7 @@ final class SyncDirectoryOps {
                 // as the separately retained normalized disk key.
                 budget.retain(2L * file.toString().length());
                 IndexedFileStamp indexed = indexedFiles.get(normalized);
-                if (force || indexed == null || !indexed.matches(attrs)) {
+                if (force || indexed == null || !indexed.matches(attrs) || !collectionMatches(indexed, file, collection, declared)) {
                   eligibleFiles.add(file.toAbsolutePath().normalize());
                 }
               }
@@ -393,7 +424,10 @@ final class SyncDirectoryOps {
    * the upgrade seeding's evidence). A missing
    * size or time is {@code -1}.
    */
-  record IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs) {
+  record IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs, String collection) {
+    IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs) {
+      this(path, sizeBytes, modifiedAtMs, null);
+    }
     boolean matches(BasicFileAttributes attrs) {
       return sizeBytes >= 0 && modifiedAtMs >= 0 && attrs.isRegularFile()
           && attrs.size() == sizeBytes && attrs.lastModifiedTime().toMillis() == modifiedAtMs;
@@ -437,7 +471,7 @@ final class SyncDirectoryOps {
           query, prefixScopeFactory.apply(root).excludedSubtrees());
       var result = readPathOps.search(scopedQuery, limit,
           Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID,
-              SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT),
+              SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT, SchemaFields.COLLECTION),
           LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, null);
       if (result == null) throw new IOException("Serving index sample returned no result");
       List<IndexedFileStamp> sample = new ArrayList<>();
@@ -454,7 +488,7 @@ final class SyncDirectoryOps {
         }
         sample.add(new IndexedFileStamp(Path.of(path),
             longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
-            longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT))));
+            longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION)));
       }
       return sample;
     } catch (IOException incomplete) {
@@ -500,7 +534,7 @@ final class SyncDirectoryOps {
         checkCancelled(cancelled);
         var result = readPathOps.search(scopedQuery, 256,
             Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID,
-                SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT),
+                SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT, SchemaFields.COLLECTION),
             LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, cursor);
         if (result == null) throw new IOException("Serving index path scan returned no result");
         if (result.totalHits() > pathScanCap) {
@@ -524,7 +558,7 @@ final class SyncDirectoryOps {
           }
           if (paths.put(canonical, new IndexedFileStamp(Path.of(canonical),
               longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
-              longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)))) == null) {
+              longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION))) == null) {
             budget.retain(canonical.length());
           }
           requireBelowCap(paths.size(), "index");
@@ -908,6 +942,7 @@ final class SyncDirectoryOps {
       boolean[] walkInterrupted = {false};
       boolean[] walkIncomplete = {false};
       final Map<String, IndexedFileStamp> indexedPathsFinal = indexedPaths;
+      var declared = new CollectionSnapshot();
 
       Files.walkFileTree(
           root,
@@ -977,7 +1012,7 @@ final class SyncDirectoryOps {
               // Retirement replay retains its separate ownership and current-byte proof.
               if (force || indexed == null
                   || ((admissionMode == AdmissionMode.DEFAULT || admissionMode == AdmissionMode.MAINTENANCE)
-                      && !indexed.matches(attrs))) {
+                      && (!indexed.matches(attrs) || !collectionMatches(indexed, file, collection, declared)))) {
                 // 813 Slice B: the walk already holds the size — no extra stat.
                 if (stopped()) return FileVisitResult.TERMINATE;
                 spool.add(file, attrs.size());
@@ -1193,7 +1228,7 @@ final class SyncDirectoryOps {
             readPathOps.search(
                 scopedQuery,
                 batchSize,
-                Set.of(SchemaFields.DOC_ID, SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT),
+                Set.of(SchemaFields.DOC_ID, SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT, SchemaFields.COLLECTION),
                 LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC,
                 cursor);
 
@@ -1203,7 +1238,7 @@ final class SyncDirectoryOps {
           if (path != null) {
             if (paths.put(path, new IndexedFileStamp(Path.of(path),
                 longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
-                longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)))) == null) pathChars += path.length();
+                longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION))) == null) pathChars += path.length();
             if (paths.size() >= MAX_INDEXED_PATHS_FOR_MISSING_SCAN
                 || pathChars >= MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN) {
               return null;

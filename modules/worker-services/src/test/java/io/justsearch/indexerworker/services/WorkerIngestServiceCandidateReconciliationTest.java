@@ -594,6 +594,7 @@ final class WorkerIngestServiceCandidateReconciliationTest {
       var fields = new java.util.HashMap<String, String>(Map.of(SchemaFields.PATH, path));
       Path file = Path.of(path);
       if (Files.isRegularFile(file)) {
+        fields.put(SchemaFields.COLLECTION, "research");
         fields.put(SchemaFields.SIZE_BYTES, String.valueOf(Files.size(file)));
         fields.put(SchemaFields.MODIFIED_AT, String.valueOf(Files.getLastModifiedTime(file).toMillis()));
       }
