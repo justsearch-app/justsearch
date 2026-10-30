@@ -2004,6 +2004,34 @@
       ]
     },
     {
+      "id": "SW-RUN-16",
+      "behavior": "Stopping a run resumed from the session history shows that it is stopping until the run ends.",
+      "kind": "known-gap",
+      "races": [],
+      "observations": [
+        {
+          "layer": "real-ui-fixture",
+          "binding": null,
+          "reason": "For a resumed run the stop request is sent and the run stays observed, but the window does not show the stopping state; it shows the outcome once the run ends."
+        }
+      ]
+    },
+    {
+      "id": "SW-RUN-17",
+      "behavior": "After leaving a run that is stopping, its turn later shows the outcome the backend reports for it.",
+      "kind": "known-gap",
+      "races": [
+        "screen-switch"
+      ],
+      "observations": [
+        {
+          "layer": "view",
+          "binding": null,
+          "reason": "When the window has moved on, the saved record decides the earlier turn's outcome as it did before; a failed run can show as complete, and a recorded stop can show as stopped without a cancelled end."
+        }
+      ]
+    },
+    {
       "id": "SW-DRFT-01",
       "behavior": "Drafts remain associated with their own conversation or search place when the user moves elsewhere.",
       "kind": "works-today",
