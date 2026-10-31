@@ -54,6 +54,7 @@ it('the first live merge uses the dispatch identity without borrowing another wr
   expect(merged).toHaveLength(2);
   expect(merged.find(t => t.id === live.id)?.status).toBe('streaming');
   expect(merged.find(t => t.id === live.id)?.question).toBe('identical');
+  expect(merged.find(t => t.id === live.id)?.recordId).toBe('idx-2');
   expect(merged.find(t => t.recordId === 'idx-1')?.answer).toBe('B answer');
 });
 

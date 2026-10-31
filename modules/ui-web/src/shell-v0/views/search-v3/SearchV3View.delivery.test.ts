@@ -333,6 +333,41 @@ it('S15 a slow record read survives polling ticks and can settle its own attempt
   expect(dispatches()).toHaveLength(1);
 });
 
+it.each(['stalled', 'old snapshot'] as const)('S15 bounds an opening read started before recovery restoration: %s', async outcome => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'same words');
+  const original = target();
+  el.remove();
+  __resetConversationListForTest(); // A cold reload keeps storage, not the in-memory active pointer.
+  const fallback = http.getMockImplementation()!;
+  let release!: (r: Response) => void;
+  let signal!: AbortSignal;
+  http.mockImplementation((url: unknown, init?: RequestInit) => {
+    if (String(url).includes('/api/thread/') && !release) {
+      signal = init!.signal!;
+      return new Promise<Response>(r => { release = r; });
+    }
+    return fallback(url, init);
+  });
+  el = await mount();
+  expect(release).toBeTypeOf('function');
+  expect(retained().payload.task).not.toBeNull();
+  expect(el.shadowRoot!.textContent).toContain('Delivery unknown');
+  saveOutcome();
+  await vi.advanceTimersByTimeAsync(29000); await settle(el);
+  expect(retained().payload.task).toBeNull();
+  expect(signal.aborted).toBe(true);
+  expect(el.shadowRoot!.textContent).not.toContain('Delivery unknown');
+  expect(answer(el)).toContain('Saved answer');
+  if (outcome === 'old snapshot') {
+    await vi.advanceTimersByTimeAsync(2000);
+    release(json({ conversationId: original, events: [], lifecycles: [] })); await settle(el);
+    expect(answer(el)).toContain('Saved answer');
+    expect(retained().payload.task).toBeNull();
+  }
+  expect(dispatches()).toHaveLength(1);
+});
+
 it('S15 a timed-out abort-ignoring read cannot stop checking or override a newer result', async () => {
   vi.useFakeTimers();
   const el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
@@ -395,6 +430,29 @@ it('S15 an empty view without a retained attempt never starts automatic record r
   const before = recordReads().length;
   await vi.advanceTimersByTimeAsync(60000); await settle(el);
   expect(recordReads()).toHaveLength(before);
+  expect(dispatches()).toHaveLength(0);
+});
+
+it('S15 leaves an unrelated opening read unbounded without a retained attempt', async () => {
+  vi.useFakeTimers();
+  const el = await mount();
+  const fallback = http.getMockImplementation()!;
+  let release!: (r: Response) => void;
+  let signal!: AbortSignal;
+  http.mockImplementation((url: unknown, init?: RequestInit) => {
+    if (String(url).includes('/api/thread/')) {
+      signal = init!.signal!;
+      return new Promise<Response>(r => { release = r; });
+    }
+    return fallback(url, init);
+  });
+  restoreActiveConversation('unrelated'); await settle(el);
+  expect(release).toBeTypeOf('function');
+  const before = recordReads().length;
+  await vi.advanceTimersByTimeAsync(31000); await settle(el);
+  expect(signal.aborted).toBe(false);
+  expect(recordReads()).toHaveLength(before);
+  release(json({ conversationId: 'unrelated', events: [], lifecycles: [] })); await settle(el);
   expect(dispatches()).toHaveLength(0);
 });
 

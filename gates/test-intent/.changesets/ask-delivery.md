@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261031-unsent-work
 author-role: builder
-author-session: builder-3
+author-session: builder-4
 ---
 
 # Test-intent entries
@@ -11,6 +11,21 @@ Stage 1 only. The unfinished snapshot projection and its existing test stay unch
 All new tests are durable. Fixture-only edits preserve the prior behavioral oracles.
 Execution evidence was produced in an isolated shared candidate clone; the evidence runner's
 own before worktree belongs to that clone, never to the source repository.
+
+Follow-up to stage 1 (0cfdf23226): the retained checker now bounds an opening record read
+that started before recovery restoration or while the stream owned the attempt. The cold-reload
+regression covers an abort-ignoring stall and a late old snapshot; both must resolve the exact
+saved outcome before the 30-second budget expires without a second dispatch. An unrelated
+opening read keeps its existing lifetime. Additional execution evidence against stage 1 is in
+`gates/test-intent/evidence/ask-delivery-opening-read.json`.
+
+The first-live-merge test now requires live A's own saved question ID. The Java model-input
+contract additionally consumes stamped persisted historical question/answer rows and requires
+both contents to reach the model without their turnId metadata. Existing assertions remain.
+Scratch mutations assigning B's saved question ID to live A and adding turnId to the LLM
+message allowlist fail independently of the original pre-stage-1 failure evidence:
+`idx-1` instead of `idx-2`, and “persisted dispatch stamps must not reach model input”
+(expected true, received false), respectively. The unmutated candidate passes both contracts.
 
 ```json
 {
@@ -103,7 +118,7 @@ own before worktree belongs to that clone, never to the source repository.
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-dispatch-record.test.ts"
       ],
       "class": "New",
-      "behaviour": "Live ownership suppresses false uncertainty; exact saved outcomes retire only their retained attempt with storage ACK and preserved draft review. Correlation separates interleaved writers, forks, legacy rows, synthetic incomplete errors, history mapping, export and companion context. Read timeouts and budgets preserve uncertainty, support explicit rearming and isolate navigation/deletion.",
+      "behaviour": "Live ownership suppresses false uncertainty; exact saved outcomes retire only their retained attempt with storage ACK and preserved draft review. Correlation separates interleaved writers, forks, legacy rows, synthetic incomplete errors, history mapping, export and companion context. Read timeouts and budgets preserve uncertainty, support explicit rearming and isolate navigation/deletion. Reads begun before recovery restoration are bounded on adoption, late old snapshots cannot undo resolution, and unrelated reads retain their lifetime. The first live merge must attach the live dispatch to its own saved question ID.",
       "sources": [
         {
           "kind": "owner-words",
@@ -133,7 +148,7 @@ own before worktree belongs to that clone, never to the source repository.
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/DispatchCorrelationTest.java"
       ],
       "class": "New",
-      "behaviour": "The current prompt and its saved successful/error/stopped outcome share the dispatch turnId across store reopen, branch inheritance and the real history/thread HTTP readers. Forwarded prompts and LLM input remain unstamped; intermediate invalid extraction output remains unaccepted. Existing Stop contracts remain unchanged.",
+      "behaviour": "The current prompt and its saved successful/error/stopped outcome share the dispatch turnId across store reopen, branch inheritance and the real history/thread HTTP readers. Forwarded prompts and LLM input remain unstamped, including when earlier persisted question and answer rows carry historical dispatch stamps; intermediate invalid extraction output remains unaccepted. Existing Stop contracts remain unchanged.",
       "sources": [
         {
           "kind": "owner-words",

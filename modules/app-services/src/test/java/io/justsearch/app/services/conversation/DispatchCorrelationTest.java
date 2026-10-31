@@ -49,6 +49,19 @@ final class DispatchCorrelationTest {
     store.branchFrom("chat", String.valueOf(history.get(3).get("id")), "child");
     assertEquals(history, new FileConversationStore(dir).loadHistory("child"), "inherited IDs and stamps remain historical identity");
     assertEquals(hash, new FileConversationStore(dir).loadHistory("child").get(2).get("hash"));
+
+    store.createSession("stamped-chat", FreeChatShape.ID.value());
+    store.appendMessage("stamped-chat", FreeChatShape.ID.value(),
+        Map.of("role", "user", "content", "persisted prior question", "turnId", "historical-dispatch"));
+    store.appendMessage("stamped-chat", FreeChatShape.ID.value(),
+        Map.of("role", "assistant", "content", "persisted prior answer", "turnId", "historical-dispatch"));
+    engine(ai, store).run(FreeChatShape.ID,
+        Map.of("sessionId", "stamped-chat", "prompt", "follow-up", "turnId", "dispatch-B"),
+        Audience.USER, event -> {}, io.justsearch.app.services.TestEngineContexts.internal());
+    assertTrue(request.get().messages().stream().anyMatch(m -> "persisted prior question".equals(m.get("content"))));
+    assertTrue(request.get().messages().stream().anyMatch(m -> "persisted prior answer".equals(m.get("content"))));
+    assertTrue(request.get().messages().stream().noneMatch(m -> m.containsKey("turnId")),
+        "persisted dispatch stamps must not reach model input");
   }
 
   @Test void savedGenerationFailureNamesItsDispatch() {
