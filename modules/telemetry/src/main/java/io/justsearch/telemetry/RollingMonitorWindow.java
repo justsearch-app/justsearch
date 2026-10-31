@@ -20,11 +20,11 @@ public final class RollingMonitorWindow {
   /** If samples are sparser than this, the monitor resets its window and reports UNKNOWN. */
   public static final long MAX_GAP_MS = 600_000;
 
-  /**
-   * Cap on retained samples. Must be {@code >= WINDOW_MS / minSamplePeriodMs + 1} for the
-   * fastest sampler that feeds a consumer (the worker throughput poller at 2s: 91 minimum).
-   */
-  public static final int MAX_SAMPLES = 100;
+  /** Coalesce polling bursts so retention is bounded independently of request rate. */
+  public static final long MIN_SAMPLE_MS = 1_000;
+
+  /** Horizon plus one sample on either side of its cutoff. */
+  public static final int MAX_SAMPLES = (int) (WINDOW_MS / MIN_SAMPLE_MS) + 2;
 
   private RollingMonitorWindow() {}
 }

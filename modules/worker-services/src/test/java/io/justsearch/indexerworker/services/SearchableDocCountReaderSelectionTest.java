@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
@@ -93,7 +95,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
   }
 
   @Test
-  @DisplayName("a reader IOException falls back to the unscoped count, never a hard 0")
+  @DisplayName("a failed filtered read is unknown until that population has been observed")
   void ioExceptionFallsBackInsteadOfReportingZero() throws Exception {
     IndexCountOps failing = mock(IndexCountOps.class);
     when(failing.docCount()).thenReturn(12L);
@@ -101,16 +103,15 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
     // The real IndexCountOps answers the throwing and non-throwing count forms alike when its
     // reader is healthy; the parent count is read through the throwing form (t-20261013-ef3c41).
     when(failing.docCountOrThrow()).thenReturn(12L);
+    parentSnapshotReturns(failing, 10L);
     when(failing.countByFieldOrThrow(anyString(), anyString())).thenReturn(2);
     when(failing.countQueryOrThrow(any())).thenThrow(new IOException("reader unavailable"));
 
     CoreStatus core = buildStatus(failing, null).getCore();
 
-    assertEquals(
-        10,
-        core.getSearchableDocCount(),
-        "a transient reader error must yield the fallback (12 docs - 2 chunks), not 0 — the FE"
-            + " renders a known 0 as the empty-index CTA");
+    assertEquals(0, core.getSearchableDocCount());
+    org.junit.jupiter.api.Assertions.assertTrue(core.getDocCountUnknown(),
+        "An unfiltered parent count cannot certify the default search population");
   }
 
   @Test
@@ -122,6 +123,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
     // The real IndexCountOps answers the throwing and non-throwing count forms alike when its
     // reader is healthy; the parent count is read through the throwing form (t-20261013-ef3c41).
     when(healthy.docCountOrThrow()).thenReturn(12L);
+    parentSnapshotReturns(healthy, 10L);
     when(healthy.countByFieldOrThrow(anyString(), anyString())).thenReturn(2);
     when(healthy.countQueryOrThrow(any())).thenReturn(7);
 
@@ -133,7 +135,65 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
         "the scoped count wins when it is available — the fallback is not the normal path");
   }
 
+  @Test
+  void parentCountsDoNotSubtractIndependentReaderObservations() throws Exception {
+    serving = open("serving");
+    index(serving, doc("p1", "/docs/one", null));
+    index(serving, doc("p2", "/docs/two", null));
+    commit(serving);
+    var counts = spy(serving.indexCountOps());
+    doReturn(3L).when(counts).docCountOrThrow();
+    doReturn(4).when(counts).countByFieldOrThrow(SchemaFields.IS_CHUNK, "true");
+    assertEquals(2, buildStatus(counts, null).getCore().getDocCount(),
+        "a refresh between legacy reads must not fabricate a parent population");
+  }
+
+  @Test
+  void aReadOnlyServingReaderReportsFinishedEnrichmentAfterReopen() throws Exception {
+    Path path = tempDir.resolve("short-only");
+    var catalogFields = new java.util.ArrayList<>(FieldCatalogDef.forChunkTesting(4).fields());
+    for (String stage : java.util.List.of(SchemaFields.SPLADE_STATUS, SchemaFields.NER_STATUS)) {
+      catalogFields.add(new FieldCatalogDef.FieldDef(stage, "keyword", true, true,
+          java.util.List.of("filter"), null, null, false));
+    }
+    var catalog = new FieldCatalogDef("short-library", catalogFields);
+    serving = IndexSchema.fromCatalog(catalog).atPath(path)
+        .withExecutorRegistrations(testLuceneExecutors()).open();
+    Map<String, Object> fields = new HashMap<>();
+    fields.put(SchemaFields.DOC_ID, "short");
+    fields.put(SchemaFields.DOC_UID, "short#0");
+    fields.put(SchemaFields.PATH, "/docs/short.txt");
+    fields.put(SchemaFields.CONTENT, "short");
+    fields.put(SchemaFields.CONTENT_SHA256, io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex("short"));
+    fields.put(SchemaFields.VECTOR, new float[] {1, 0, 0, 0});
+    fields.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED);
+    fields.put(SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_COMPLETED_EMPTY);
+    fields.put(SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_COMPLETED_EMPTY);
+    io.justsearch.indexerworker.rag.ChunkDocumentWriter.declare(fields,
+        io.justsearch.indexerworker.rag.ChunkDocumentWriter.plan("short", "text/plain", "text"));
+    index(serving, new IndexDocument(fields));
+    commit(serving);
+    serving.close();
+    serving = IndexSchema.fromCatalog(catalog).atPath(path)
+        .withExecutorRegistrations(testLuceneExecutors()).open();
+    var status = buildStatus(null, serving.indexCountOps());
+    assertEquals(1, status.getEnrichment().getEmbedding().getCompletedCount());
+    assertEquals(1, status.getEnrichment().getCompletedNerCount());
+    assertEquals(0, status.getEnrichment().getChunk().getDocCount());
+    var field = status.getEnrichment().getChunk().getDescriptorForType().findFieldByName("chunking_not_required");
+    org.junit.jupiter.api.Assertions.assertNotNull(field);
+    assertEquals(Boolean.TRUE, status.getEnrichment().getChunk().getField(field));
+  }
+
   // ---- fixture ----------------------------------------------------------------
+
+  private static void parentSnapshotReturns(IndexCountOps counts, long value) throws Exception {
+    try {
+      IndexCountOps.class.getMethod("parentDocCountOrThrow").invoke(doReturn(value).when(counts));
+    } catch (NoSuchMethodException beforeSnapshotCount) {
+      // The baseline reads total and chunk counts separately.
+    }
+  }
 
   private RunningRuntime open(String name) throws Exception {
     return IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0))

@@ -135,6 +135,17 @@ public final class LifecycleSnapshotTap {
             ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "component.recovery_exhausted"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
 
+    for (String reason : List.of("index.rebuild_brake_exhausted", "index.rebuild_brake_unreadable")) {
+      MAPPING_TABLE.put(new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", reason),
+          new ConditionMapping("index.unavailable", "worker", Severity.ERROR, List.of(),
+              Optional.of(io.justsearch.agent.api.registry.OperationInvocation.of(
+                  new io.justsearch.agent.api.registry.OperationRef("core.rebuild-index")))));
+    }
+    for (String reason : List.of("chunk_embedding.not_ready", "chunk_embedding.in_progress")) {
+      MAPPING_TABLE.put(new MappingKey(ReadinessDimension.CHUNK_EMBEDDING, "DEGRADED", reason),
+          new ConditionMapping("embedding.not-ready", "worker.chunk-embedding", Severity.WARNING));
+    }
+
     // ----- INDEX_SERVING: worker availability + throughput. -----
     MAPPING_TABLE.put(
         new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_CONFIGURED", "index.unavailable"),
@@ -451,6 +462,7 @@ public final class LifecycleSnapshotTap {
 
   private void reconcileDim(ReadinessDimension dim, ReadinessComponentView component,
       java.util.function.Function<String, Optional<String>> messageForReason) {
+    if (dim == ReadinessDimension.CHUNK_EMBEDDING && component != null && component.stale()) return;
     boolean healthy = isHealthy(component);
     ConditionMapping target = healthy ? null : lookupMapping(dim, component);
     boolean unmappedUnhealthy = !healthy && target == null;

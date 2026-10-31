@@ -22,6 +22,36 @@ import org.mockito.ArgumentCaptor;
 final class WorkerStatusCacheContextTest {
 
   @Test
+  void alternateStatusKeepsUnknownEnrichmentAndTheOriginalCountAge() {
+    try (var readyCapability = ReadyCapability.create()) {
+      KnowledgeClient client = mock(KnowledgeClient.class);
+      var status = StatusResponse.newBuilder()
+          .putCountObservations("active", io.justsearch.ipc.CountObservation.newBuilder()
+              .setState("stale").setObservedAtMs(1234).build())
+          .setEnrichment(io.justsearch.ipc.EnrichmentCoverage.newBuilder().setCompletenessKnown(false)
+              .setEmbedding(io.justsearch.ipc.FeatureCoverage.newBuilder().setCoveragePercent(-1))
+              .setSplade(io.justsearch.ipc.FeatureCoverage.newBuilder().setCoveragePercent(-1))
+              .setChunk(io.justsearch.ipc.ChunkCoverage.newBuilder().setDocCount(-1)
+                  .setPendingCount(-1).setCoveragePercent(-1).setSpladePendingCount(-1))
+              .setPendingNerCount(-1).setCompletedNerCount(-1))
+          .build();
+      when(client.getStatus(org.mockito.ArgumentMatchers.any())).thenReturn(status);
+      var cache = new WorkerStatusCache(readyBootstrap(client));
+      cache.setWorkerCapability(readyCapability.view());
+      var extras = cache.status(TestEngineContexts.mcp()).extras();
+      org.junit.jupiter.api.Assertions.assertEquals(-1.0, extras.get("embeddingCoveragePercent"));
+      org.junit.jupiter.api.Assertions.assertEquals(-1.0, extras.get("spladeCoveragePercent"));
+      org.junit.jupiter.api.Assertions.assertEquals(-1L, ((Number) extras.get("pendingNerCount")).longValue());
+      org.junit.jupiter.api.Assertions.assertEquals(-1L, extras.get("chunkEmbeddingPendingCount"));
+      org.junit.jupiter.api.Assertions.assertEquals(Boolean.FALSE, extras.get("completenessKnown"));
+      var observations = (java.util.Map<?, ?>) extras.get("countObservations");
+      var active = (io.justsearch.app.api.status.CountObservationView) observations.get("active");
+      org.junit.jupiter.api.Assertions.assertEquals("stale", active.state());
+      org.junit.jupiter.api.Assertions.assertEquals(1234, active.observedAtMs());
+    }
+  }
+
+  @Test
   void synchronousStatusMissForwardsTheSuppliedCallerContext() {
     try (var readyCapability = ReadyCapability.create()) {
       KnowledgeClient client = mock(KnowledgeClient.class);

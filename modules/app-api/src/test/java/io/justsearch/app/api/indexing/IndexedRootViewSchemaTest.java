@@ -49,6 +49,7 @@ final class IndexedRootViewSchemaTest {
     SchemaGeneratorConfig config =
         new SchemaGeneratorConfigBuilder(SchemaVersion.DRAFT_2020_12, OptionPreset.PLAIN_JSON)
             .with(jacksonModule)
+            .with(com.github.victools.jsonschema.generator.Option.MAP_VALUES_AS_ADDITIONAL_PROPERTIES)
             .build();
     schemaGenerator = new SchemaGenerator(config);
     Path cursor = Path.of("").toAbsolutePath();

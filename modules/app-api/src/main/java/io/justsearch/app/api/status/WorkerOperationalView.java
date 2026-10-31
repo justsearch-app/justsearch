@@ -18,6 +18,7 @@ import io.soabase.recordbuilder.core.RecordBuilder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record WorkerOperationalView(
     CoreIndexView core,
+    java.util.Map<String, CountObservationView> countObservations,
     FailureTrackingView failure,
     MigrationGenerationView migration,
     CompatibilityStatusView compatibility,

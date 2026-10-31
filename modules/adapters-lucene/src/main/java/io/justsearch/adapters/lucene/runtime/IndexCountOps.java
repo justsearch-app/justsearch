@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FloatVectorValues;
 import org.apache.lucene.index.KnnVectorValues;
 import org.apache.lucene.index.LeafReaderContext;
@@ -49,31 +48,24 @@ public final class IndexCountOps {
   private static final Logger log = LoggerFactory.getLogger(IndexCountOps.class);
 
   private final SearcherBridge bridge;
+  private final ChunkSetCompleteness chunkCompleteness;
   private final Object corpusProfileLock = new Object();
-  private volatile CachedCorpusProfile cachedProfile;
+  private record Cached<T>(IndexReader reader, T value) {}
 
-  private record CachedCorpusProfile(long readerVersion, CorpusProfile profile) {}
-  // Tempdoc 717: artifact-truthful chunk-vector presence, reader-version cached like the corpus
-  // profile so the per-query serve-time gate does not re-iterate vectors on every search.
-  private volatile ChunkVectorPresence cachedChunkVectorPresence;
-  private volatile long cachedChunkVectorPresenceVersion = -1L;
-  // Tempdoc 821 §3-C3: the completeness auditor's counts are refreshed on every /api/status poll
-  // (jseval polls at 2s through the indexing window), so they get the same reader-version cache as
-  // the corpus profile rather than re-issuing 16 counts per poll.
-  private volatile StageCompletenessCounts cachedStageCompleteness;
-  private volatile long cachedStageCompletenessVersion = -1L;
-  // Tempdoc 813 §13: per-root coverage is refreshed on the Library live tick (seconds), so it gets
-  // the same reader-version cache as the corpus profile — keyed by prefix because there is one
-  // entry per watched root. Bounded so a caller passing unbounded distinct prefixes (an ad-hoc
-  // path, a removed root) cannot grow this map without limit.
+  private volatile Cached<CorpusProfile> cachedProfile;
+  private volatile Cached<ChunkVectorPresence> cachedChunkVectorPresence;
+  private volatile Cached<StageCompletenessCounts> cachedStageCompleteness;
   private static final int MAX_CACHED_COVERAGE_PREFIXES = 64;
-  private final ConcurrentHashMap<String, CachedCoverage> cachedRootCoverage =
+  private final ConcurrentHashMap<String, Cached<RootCoverageCounts>> cachedRootCoverage =
       new ConcurrentHashMap<>();
 
-  private record CachedCoverage(long readerVersion, RootCoverageCounts counts) {}
-
   IndexCountOps(SearcherBridge bridge) {
+    this(bridge, new ChunkSetCompleteness());
+  }
+
+  IndexCountOps(SearcherBridge bridge, ChunkSetCompleteness chunkCompleteness) {
     this.bridge = bridge;
+    this.chunkCompleteness = chunkCompleteness;
   }
 
   /**
@@ -135,6 +127,13 @@ public final class IndexCountOps {
   public long docCountOrThrow() throws IOException {
     return bridge.withSearcher(searcher -> (long) searcher.getIndexReader().numDocs());
   }
+
+  /** Counts live non-chunk documents within a single acquired reader. */
+  public long parentDocCountOrThrow() throws IOException {
+    return bridge.withSearcher(searcher -> searcher.getIndexReader().numDocs()
+        - (long) searcher.count(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true"))));
+  }
+
 
   /**
    * Counts documents matching a specific field value.
@@ -353,9 +352,9 @@ public final class IndexCountOps {
 
         return new ChunkEmbeddingCounts(total, completed, pending, failed);
       });
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       log.debug("Failed to query chunk embedding counts: {}", e.getMessage());
-      return new ChunkEmbeddingCounts(0, 0, 0, 0);
+      return new ChunkEmbeddingCounts(-1, -1, -1, -1);
     }
   }
 
@@ -370,15 +369,19 @@ public final class IndexCountOps {
    * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
    */
   public ChunkVectorPresence queryChunkVectorPresenceCount() {
-    long currentVersion = getReaderVersion();
-    ChunkVectorPresence cached = cachedChunkVectorPresence;
-    if (cached != null && cachedChunkVectorPresenceVersion == currentVersion) {
-      return cached;
+    try {
+      return bridge.withSearcher(searcher -> {
+        IndexReader reader = searcher.getIndexReader();
+        Cached<ChunkVectorPresence> cached = cachedChunkVectorPresence;
+        if (cached != null && cached.reader() == reader) return cached.value();
+        ChunkVectorPresence computed = computeChunkVectorPresence(searcher);
+        cachedChunkVectorPresence = new Cached<>(reader, computed);
+        return computed;
+      });
+    } catch (IOException | RuntimeException e) {
+      log.debug("Failed to count chunk vector presence: {}", e.getMessage());
+      return new ChunkVectorPresence(-1, -1);
     }
-    ChunkVectorPresence computed = computeChunkVectorPresence();
-    cachedChunkVectorPresence = computed;
-    cachedChunkVectorPresenceVersion = currentVersion;
-    return computed;
   }
 
   /**
@@ -389,32 +392,26 @@ public final class IndexCountOps {
    * docs, so a doc carrying it is a live chunk doc with a vector. Same complexity class as the
    * status {@code TermQuery} counts (walks only vector-bearing docs per segment, not all docs).
    */
-  private ChunkVectorPresence computeChunkVectorPresence() {
-    try {
-      return bridge.withSearcher(searcher -> {
-        int totalChunks = searcher.count(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")));
-        int vectorsPresent = 0;
-        for (LeafReaderContext leaf : searcher.getIndexReader().leaves()) {
-          FloatVectorValues values = leaf.reader().getFloatVectorValues(SchemaFields.CHUNK_VECTOR);
-          if (values == null) {
-            continue; // this segment indexed no chunk_vector
-          }
-          Bits liveDocs = leaf.reader().getLiveDocs();
-          KnnVectorValues.DocIndexIterator iter = values.iterator();
-          for (int doc = iter.nextDoc();
-              doc != DocIdSetIterator.NO_MORE_DOCS;
-              doc = iter.nextDoc()) {
-            if (liveDocs == null || liveDocs.get(doc)) {
-              vectorsPresent++;
-            }
-          }
+  private ChunkVectorPresence computeChunkVectorPresence(IndexSearcher searcher) throws IOException {
+    int totalChunks = searcher.count(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")));
+    int vectorsPresent = 0;
+    for (LeafReaderContext leaf : searcher.getIndexReader().leaves()) {
+      FloatVectorValues values = leaf.reader().getFloatVectorValues(SchemaFields.CHUNK_VECTOR);
+      if (values == null) {
+        continue; // this segment indexed no chunk_vector
+      }
+      Bits liveDocs = leaf.reader().getLiveDocs();
+      KnnVectorValues.DocIndexIterator iter = values.iterator();
+      for (int doc = iter.nextDoc();
+          doc != DocIdSetIterator.NO_MORE_DOCS;
+          doc = iter.nextDoc()) {
+        if (liveDocs == null || liveDocs.get(doc)) {
+          vectorsPresent++;
         }
-        return new ChunkVectorPresence(totalChunks, vectorsPresent);
-      });
-    } catch (IOException e) {
-      log.debug("Failed to count chunk vector presence: {}", e.getMessage());
-      return new ChunkVectorPresence(0, 0);
+      }
     }
+    return new ChunkVectorPresence(totalChunks, vectorsPresent,
+        totalChunks == 0 && chunkCompleteness.allParentsDeclareZeroChunks(searcher));
   }
 
   /**
@@ -462,9 +459,9 @@ public final class IndexCountOps {
 
         return new EmbeddingCounts(total, completed, pending, failed);
       });
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       log.debug("Failed to query embedding counts: {}", e.getMessage());
-      return new EmbeddingCounts(0, 0, 0, 0);
+      return new EmbeddingCounts(-1, -1, -1, -1);
     }
   }
 
@@ -508,9 +505,9 @@ public final class IndexCountOps {
             .build();
         return (long) searcher.count(joint);
       });
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       log.debug("Failed to count embedded-and-sparse documents: {}", e.getMessage());
-      return 0L;
+      return -1L;
     }
   }
 
@@ -572,9 +569,9 @@ public final class IndexCountOps {
 
         return new SpladeFeatureCounts(total, completed, pending, failed);
       });
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       log.debug("Failed to query SPLADE feature counts: {}", e.getMessage());
-      return new SpladeFeatureCounts(0, 0, 0, 0);
+      return new SpladeFeatureCounts(-1, -1, -1, -1);
     }
   }
 
@@ -612,9 +609,9 @@ public final class IndexCountOps {
             SchemaFields.SPLADE_STATUS_FAILED);
         return new SpladeFeatureCounts(total, completed, pending, failed);
       });
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       log.debug("Failed to query chunk SPLADE counts: {}", e.getMessage());
-      return new SpladeFeatureCounts(0, 0, 0, 0);
+      return new SpladeFeatureCounts(-1, -1, -1, -1);
     }
   }
 
@@ -654,75 +651,78 @@ public final class IndexCountOps {
       return RootCoverageCounts.EMPTY;
     }
     String normalized = QueryFilterBuilder.normalizePathPrefix(pathPrefix);
-    long currentVersion = getReaderVersion();
-    CachedCoverage cached = cachedRootCoverage.get(normalized);
-    if (cached != null && cached.readerVersion() == currentVersion) {
-      return cached.counts();
-    }
-    RootCoverageCounts computed = computeRootCoverage(normalized);
-    if (computed == null) {
-      // The query failed; report absence and leave the cache alone.
-      return RootCoverageCounts.EMPTY;
-    }
-    if (cachedRootCoverage.size() >= MAX_CACHED_COVERAGE_PREFIXES
-        && !cachedRootCoverage.containsKey(normalized)) {
-      // Coarse bound: watched roots number in the tens, so eviction is a cold-path event. Dropping
-      // the whole map costs one recompute per live root instead of carrying an LRU.
-      cachedRootCoverage.clear();
-    }
-    cachedRootCoverage.put(normalized, new CachedCoverage(currentVersion, computed));
-    return computed;
-  }
-
-  /** @return the counts, or {@code null} when the query failed (never a zeroed stand-in). */
-  private RootCoverageCounts computeRootCoverage(String normalizedPrefix) {
     try {
       return bridge.withSearcher(searcher -> {
-        Query prefixQuery = new PrefixQuery(new Term(SchemaFields.PATH, normalizedPrefix));
-        Query isChunk = new TermQuery(new Term(SchemaFields.IS_CHUNK, "true"));
-
-        Query parentDocs = new BooleanQuery.Builder()
-            .add(prefixQuery, BooleanClause.Occur.FILTER)
-            .add(isChunk, BooleanClause.Occur.MUST_NOT)
-            .build();
-
-        Query chunkDocs = new BooleanQuery.Builder()
-            .add(prefixQuery, BooleanClause.Occur.FILTER)
-            .add(isChunk, BooleanClause.Occur.FILTER)
-            .build();
-
-        // Each stage's denominator is the documents that CARRY its status field — an absent
-        // status field means the stage does not apply to that document (post-798), and a
-        // document the backfill can never select must not sit in a denominator forever.
-        int embeddingTotal = countWithField(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS);
-        int spladeTotal = countWithField(searcher, parentDocs, SchemaFields.SPLADE_STATUS);
-        int nerTotal = countWithField(searcher, parentDocs, SchemaFields.NER_STATUS);
-        int chunkTotal = countWithField(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS);
-
-        // embedding_status has no COMPLETED_EMPTY member (SchemaFields declares PENDING /
-        // COMPLETED / FAILED only), so its terminal set is two-valued; splade_status and
-        // ner_status both add COMPLETED_EMPTY as a terminal success.
-        int parentEmbedding = countSettled(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS,
-            SchemaFields.EMBEDDING_STATUS_COMPLETED, SchemaFields.EMBEDDING_STATUS_FAILED);
-        int parentSplade = countSettled(searcher, parentDocs, SchemaFields.SPLADE_STATUS,
-            SchemaFields.SPLADE_STATUS_COMPLETED, SchemaFields.SPLADE_STATUS_COMPLETED_EMPTY,
-            SchemaFields.SPLADE_STATUS_FAILED);
-        int parentNer = countSettled(searcher, parentDocs, SchemaFields.NER_STATUS,
-            SchemaFields.NER_STATUS_COMPLETED, SchemaFields.NER_STATUS_COMPLETED_EMPTY,
-            SchemaFields.NER_STATUS_FAILED);
-        int chunkSettled = countSettled(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS,
-            SchemaFields.EMBEDDING_STATUS_COMPLETED, SchemaFields.EMBEDDING_STATUS_FAILED);
-
-        return new RootCoverageCounts(
-            embeddingTotal, parentEmbedding,
-            spladeTotal, parentSplade,
-            nerTotal, parentNer,
-            chunkTotal, chunkSettled);
+        IndexReader reader = searcher.getIndexReader();
+        Cached<RootCoverageCounts> cached = cachedRootCoverage.get(normalized);
+        if (cached != null && cached.reader() == reader) return cached.value();
+        RootCoverageCounts computed = computeRootCoverage(searcher, normalized);
+        if (cachedRootCoverage.size() >= MAX_CACHED_COVERAGE_PREFIXES
+            && !cachedRootCoverage.containsKey(normalized)) cachedRootCoverage.clear();
+        cachedRootCoverage.put(normalized, new Cached<>(reader, computed));
+        return computed;
       });
-    } catch (IOException e) {
-      log.debug("Failed to compute root coverage counts: {}", e.getMessage());
-      return null;
+    } catch (IOException | RuntimeException e) {
+      log.debug("Failed to count root coverage: {}", e.getMessage());
+      return new RootCoverageCounts(-1, -1, -1, -1, -1, -1, -1, -1);
     }
+  }
+
+  private RootCoverageCounts computeRootCoverage(IndexSearcher searcher, String normalizedPrefix) throws IOException {
+    Query prefixQuery = new PrefixQuery(new Term(SchemaFields.PATH, normalizedPrefix));
+    Query isChunk = new TermQuery(new Term(SchemaFields.IS_CHUNK, "true"));
+
+    Query parentDocs = new BooleanQuery.Builder()
+        .add(prefixQuery, BooleanClause.Occur.FILTER)
+        .add(isChunk, BooleanClause.Occur.MUST_NOT)
+        .build();
+
+    Query chunkDocs = new BooleanQuery.Builder()
+        .add(prefixQuery, BooleanClause.Occur.FILTER)
+        .add(isChunk, BooleanClause.Occur.FILTER)
+        .build();
+
+    // Each stage's denominator is the documents that CARRY its status field — an absent
+    // status field means the stage does not apply to that document (post-798), and a
+    // document the backfill can never select must not sit in a denominator forever.
+    int embeddingTotal = countWithField(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS);
+    int spladeTotal = countWithField(searcher, parentDocs, SchemaFields.SPLADE_STATUS);
+    int nerTotal = countWithField(searcher, parentDocs, SchemaFields.NER_STATUS);
+    int chunkTotal = countWithField(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS);
+
+    // embedding_status has no COMPLETED_EMPTY member (SchemaFields declares PENDING /
+    // COMPLETED / FAILED only), so its terminal set is two-valued; splade_status and
+    // ner_status both add COMPLETED_EMPTY as a terminal success.
+    int parentEmbedding = countSettled(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS,
+        SchemaFields.EMBEDDING_STATUS_COMPLETED, SchemaFields.EMBEDDING_STATUS_FAILED);
+    int parentSplade = countSettled(searcher, parentDocs, SchemaFields.SPLADE_STATUS,
+        SchemaFields.SPLADE_STATUS_COMPLETED, SchemaFields.SPLADE_STATUS_COMPLETED_EMPTY,
+        SchemaFields.SPLADE_STATUS_FAILED);
+    int parentNer = countSettled(searcher, parentDocs, SchemaFields.NER_STATUS,
+        SchemaFields.NER_STATUS_COMPLETED, SchemaFields.NER_STATUS_COMPLETED_EMPTY,
+        SchemaFields.NER_STATUS_FAILED);
+    int chunkSettled = countSettled(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS,
+        SchemaFields.EMBEDDING_STATUS_COMPLETED, SchemaFields.EMBEDDING_STATUS_FAILED);
+
+    return new RootCoverageCounts(
+        embeddingTotal, parentEmbedding,
+        spladeTotal, parentSplade,
+        nerTotal, parentNer,
+        chunkTotal, chunkSettled, Map.of(
+            "embedding", countSettled(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_FAILED) > 0,
+            "splade", countSettled(searcher, parentDocs, SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_FAILED) > 0,
+            "ner", countSettled(searcher, parentDocs, SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_FAILED) > 0,
+            "chunkVectors", countSettled(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_FAILED) > 0), Map.of(
+            "embedding", countMissingCompletedArtifact(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS, SchemaFields.VECTOR) > 0,
+            "chunkVectors", countMissingCompletedArtifact(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.CHUNK_VECTOR) > 0));
+  }
+
+  private static int countMissingCompletedArtifact(
+      IndexSearcher searcher, Query scope, String statusField, String artifactField) throws IOException {
+    return searcher.count(new BooleanQuery.Builder()
+        .add(scope, BooleanClause.Occur.FILTER)
+        .add(new TermQuery(new Term(statusField, SchemaFields.EMBEDDING_STATUS_COMPLETED)), BooleanClause.Occur.FILTER)
+        .add(new FieldExistsQuery(artifactField), BooleanClause.Occur.MUST_NOT).build());
   }
 
   /**
@@ -753,81 +753,73 @@ public final class IndexCountOps {
    *
    * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
    *
-   * @return the counts, or {@link StageCompletenessCounts#EMPTY} when the reader could not be read
+   * @return the counts, or {@code null} when the reader could not be read
    */
   public StageCompletenessCounts queryStageCompletenessCounts() {
-    long currentVersion = getReaderVersion();
-    StageCompletenessCounts cached = cachedStageCompleteness;
-    if (cached != null && cachedStageCompletenessVersion == currentVersion) {
-      return cached;
-    }
-    StageCompletenessCounts computed = computeStageCompleteness();
-    if (computed == null) {
-      // The query failed; report absence without poisoning the entry for this reader version.
-      return StageCompletenessCounts.EMPTY;
-    }
-    cachedStageCompleteness = computed;
-    cachedStageCompletenessVersion = currentVersion;
-    return computed;
-  }
-
-  /** @return the counts, or {@code null} when the query failed (never a zeroed stand-in). */
-  private StageCompletenessCounts computeStageCompleteness() {
     try {
       return bridge.withSearcher(searcher -> {
-        Query isChunk = new TermQuery(new Term(SchemaFields.IS_CHUNK, "true"));
-        Query parentDocs = new BooleanQuery.Builder()
-            .add(new MatchAllDocsQuery(), BooleanClause.Occur.FILTER)
-            .add(isChunk, BooleanClause.Occur.MUST_NOT)
-            .build();
-        Query chunkDocs = new BooleanQuery.Builder()
-            .add(new MatchAllDocsQuery(), BooleanClause.Occur.FILTER)
-            .add(isChunk, BooleanClause.Occur.FILTER)
-            .build();
-
-        // embedding_status has no COMPLETED_EMPTY member (SchemaFields declares PENDING /
-        // COMPLETED / FAILED only), so its terminal-success set is one-valued; splade_status and
-        // ner_status both add COMPLETED_EMPTY as a terminal success.
-        StageCounts embedding = new StageCounts(
-            countWithField(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS),
-            countSettled(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS,
-                SchemaFields.EMBEDDING_STATUS_COMPLETED),
-            countSettled(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS,
-                SchemaFields.EMBEDDING_STATUS_FAILED),
-            countArtifactPresent(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS,
-                SchemaFields.EMBEDDING_STATUS_FAILED, SchemaFields.VECTOR));
-        StageCounts splade = new StageCounts(
-            countWithField(searcher, parentDocs, SchemaFields.SPLADE_STATUS),
-            countSettled(searcher, parentDocs, SchemaFields.SPLADE_STATUS,
-                SchemaFields.SPLADE_STATUS_COMPLETED, SchemaFields.SPLADE_STATUS_COMPLETED_EMPTY),
-            countSettled(searcher, parentDocs, SchemaFields.SPLADE_STATUS,
-                SchemaFields.SPLADE_STATUS_FAILED),
-            // No countable artifact: the `splade` field is a postings/feature field with
-            // docValues:false (fields.v1.json), so FieldExistsQuery cannot see it. The consumer
-            // declares the weaker STATUS tier rather than implying a verification it cannot do.
-            0);
-        StageCounts ner = new StageCounts(
-            countWithField(searcher, parentDocs, SchemaFields.NER_STATUS),
-            countSettled(searcher, parentDocs, SchemaFields.NER_STATUS,
-                SchemaFields.NER_STATUS_COMPLETED, SchemaFields.NER_STATUS_COMPLETED_EMPTY),
-            countSettled(searcher, parentDocs, SchemaFields.NER_STATUS,
-                SchemaFields.NER_STATUS_FAILED),
-            0); // NER writes no countable per-document artifact.
-        StageCounts chunkEmbedding = new StageCounts(
-            countWithField(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS),
-            countSettled(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS,
-                SchemaFields.EMBEDDING_STATUS_COMPLETED),
-            countSettled(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS,
-                SchemaFields.EMBEDDING_STATUS_FAILED),
-            countArtifactPresent(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS,
-                SchemaFields.EMBEDDING_STATUS_FAILED, SchemaFields.CHUNK_VECTOR));
-
-        return new StageCompletenessCounts(embedding, splade, ner, chunkEmbedding);
+        IndexReader reader = searcher.getIndexReader();
+        Cached<StageCompletenessCounts> cached = cachedStageCompleteness;
+        if (cached != null && cached.reader() == reader) return cached.value();
+        StageCompletenessCounts computed = computeStageCompleteness(searcher);
+        cachedStageCompleteness = new Cached<>(reader, computed);
+        return computed;
       });
-    } catch (IOException e) {
-      log.debug("Failed to compute stage completeness counts: {}", e.getMessage());
+    } catch (IOException | RuntimeException e) {
+      log.debug("Failed to count stage completeness: {}", e.getMessage());
       return null;
     }
+  }
+
+  private StageCompletenessCounts computeStageCompleteness(IndexSearcher searcher) throws IOException {
+    Query isChunk = new TermQuery(new Term(SchemaFields.IS_CHUNK, "true"));
+    Query parentDocs = new BooleanQuery.Builder()
+        .add(new MatchAllDocsQuery(), BooleanClause.Occur.FILTER)
+        .add(isChunk, BooleanClause.Occur.MUST_NOT)
+        .build();
+    Query chunkDocs = new BooleanQuery.Builder()
+        .add(new MatchAllDocsQuery(), BooleanClause.Occur.FILTER)
+        .add(isChunk, BooleanClause.Occur.FILTER)
+        .build();
+
+    // embedding_status has no COMPLETED_EMPTY member (SchemaFields declares PENDING /
+    // COMPLETED / FAILED only), so its terminal-success set is one-valued; splade_status and
+    // ner_status both add COMPLETED_EMPTY as a terminal success.
+    StageCounts embedding = new StageCounts(
+        countWithField(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS),
+        countSettled(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_COMPLETED),
+        countSettled(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_FAILED),
+        countArtifactPresent(searcher, parentDocs, SchemaFields.EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_FAILED, SchemaFields.VECTOR));
+    StageCounts splade = new StageCounts(
+        countWithField(searcher, parentDocs, SchemaFields.SPLADE_STATUS),
+        countSettled(searcher, parentDocs, SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_COMPLETED, SchemaFields.SPLADE_STATUS_COMPLETED_EMPTY),
+        countSettled(searcher, parentDocs, SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_FAILED),
+        // No countable artifact: the `splade` field is a postings/feature field with
+        // docValues:false (fields.v1.json), so FieldExistsQuery cannot see it. The consumer
+        // declares the weaker STATUS tier rather than implying a verification it cannot do.
+        0);
+    StageCounts ner = new StageCounts(
+        countWithField(searcher, parentDocs, SchemaFields.NER_STATUS),
+        countSettled(searcher, parentDocs, SchemaFields.NER_STATUS,
+            SchemaFields.NER_STATUS_COMPLETED, SchemaFields.NER_STATUS_COMPLETED_EMPTY),
+        countSettled(searcher, parentDocs, SchemaFields.NER_STATUS,
+            SchemaFields.NER_STATUS_FAILED),
+        0); // NER writes no countable per-document artifact.
+    StageCounts chunkEmbedding = new StageCounts(
+        countWithField(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS),
+        countSettled(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_COMPLETED),
+        countSettled(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_FAILED),
+        countArtifactPresent(searcher, chunkDocs, SchemaFields.CHUNK_EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_FAILED, SchemaFields.CHUNK_VECTOR));
+
+    return new StageCompletenessCounts(embedding, splade, ner, chunkEmbedding);
   }
 
   /**
@@ -888,51 +880,29 @@ public final class IndexCountOps {
   /**
    * Returns the cached corpus profile, recomputing when the index version changes.
    *
-   * <p>Uses {@link DirectoryReader#getVersion()} for O(1) staleness detection — the profile is
+   * <p>Uses acquired reader identity for O(1) staleness detection — the profile is
    * automatically invalidated after any commit without requiring explicit cache clearing.
    *
    * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
    */
   public CorpusProfile getOrComputeCorpusProfile() {
-    long currentVersion = getReaderVersion();
-    CachedCorpusProfile cached = cachedProfile;
-    if (cached != null && cached.readerVersion() == currentVersion) {
-      return cached.profile();
-    }
-    synchronized (corpusProfileLock) {
-      // Re-read after waiting: another request may already have profiled the refreshed reader.
-      currentVersion = getReaderVersion();
-      cached = cachedProfile;
-      if (cached != null && cached.readerVersion() == currentVersion) {
-        return cached.profile();
-      }
-      try {
-        return bridge.withSearcher(
-            searcher -> {
-              long version =
-                  searcher.getIndexReader() instanceof DirectoryReader dr ? dr.getVersion() : -1L;
-              CorpusProfile profile = computeCorpusProfile(searcher);
-              cachedProfile = new CachedCorpusProfile(version, profile);
-              return profile;
-            });
-      } catch (IOException e) {
-        log.debug("Failed to compute corpus profile: {}", e.getMessage());
-        return CorpusProfile.EMPTY;
-      }
-    }
-  }
-
-  private long getReaderVersion() {
     try {
-      return bridge.withSearcher(
-          s -> {
-            if (s.getIndexReader() instanceof DirectoryReader dr) {
-              return dr.getVersion();
-            }
-            return -1L;
-          });
-    } catch (IOException e) {
-      return -1L;
+      IndexReader reader = bridge.withSearcher(searcher -> searcher.getIndexReader());
+      Cached<CorpusProfile> cached = cachedProfile;
+      if (cached != null && cached.reader() == reader) return cached.value();
+      synchronized (corpusProfileLock) {
+        reader = bridge.withSearcher(searcher -> searcher.getIndexReader());
+        cached = cachedProfile;
+        if (cached != null && cached.reader() == reader) return cached.value();
+        return bridge.withSearcher(searcher -> {
+          CorpusProfile computed = computeCorpusProfile(searcher);
+          cachedProfile = new Cached<>(searcher.getIndexReader(), computed);
+          return computed;
+        });
+      }
+    } catch (IOException | RuntimeException e) {
+      log.debug("Failed to compute corpus profile: {}", e.getMessage());
+      return CorpusProfile.EMPTY;
     }
   }
 

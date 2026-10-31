@@ -149,7 +149,8 @@ export function projectAvailability(
   // is `chat && docs>0`; here chat is already true, so the only remaining gap is zero docs.
   if (affordance === 'documents') {
     const docs = s.index?.documentCount;
-    if (docs !== undefined && isKnown(docs) && docs.value === 0) {
+    if (docs !== undefined && isKnown(docs) && docs.value === 0
+        && s.status?.worker?.countObservations?.active?.state !== 'stale') {
       // Tempdoc 596 §16.4 — condition-based `availableWhen`. If indexing is in flight the documents
       // WILL appear, so this is a TRANSIENT, forward-looking gap ("available once indexing finishes"),
       // not the settled "No documents indexed yet" dead-end. The resolving condition is known to the FE

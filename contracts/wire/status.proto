@@ -250,7 +250,13 @@ message WorkerOperationalView {
   // Distribution content hash for stale-JVM detection (slice 371).
   string build_stamp = 11 [json_name = "buildStamp"];
   VisualExtractionView visual_extraction = 12 [json_name = "visualExtraction"];
+  map<string, CountObservationView> count_observations = 13 [json_name = "countObservations"];
   // aiReady / embeddingReady are @JsonIgnore on the facade; not on wire.
+}
+
+message CountObservationView {
+  string state = 1;
+  int64 observed_at_ms = 2 [json_name = "observedAtMs"];
 }
 
 message VisualExtractionView {
@@ -411,6 +417,7 @@ message EnrichmentProgressView {
   bool embedding_available = 26 [json_name = "embeddingAvailable"];
   bool splade_available = 27 [json_name = "spladeAvailable"];
   bool ner_available = 28 [json_name = "nerAvailable"];
+  optional bool completeness_known = 29 [json_name = "completenessKnown"];
 }
 
 message StageCompletenessView {
@@ -440,6 +447,9 @@ message ChunkCoverageView {
   int64 chunk_splade_completed_count = 8 [json_name = "chunkSpladeCompletedCount"];
   int64 chunk_splade_pending_count = 9 [json_name = "chunkSpladePendingCount"];
   double chunk_splade_coverage_percent = 10 [json_name = "chunkSpladeCoveragePercent"];
+  bool chunking_not_required = 11 [json_name = "chunkingNotRequired"];
+  int64 chunk_splade_doc_count = 12 [json_name = "chunkSpladeDocCount"];
+  int64 chunk_splade_failed_count = 13 [json_name = "chunkSpladeFailedCount"];
 }
 
 message BatchTimingView {

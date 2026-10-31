@@ -159,6 +159,10 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
 
     // Include embedding compatibility status in extras
     Map<String, Object> extras = indexingExtras();
+    extras.put("countObservations", s.getCountObservationsMap().entrySet().stream().collect(
+        java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,
+            entry -> new io.justsearch.app.api.status.CountObservationView(
+                entry.getValue().getState(), entry.getValue().getObservedAtMs()))));
     extras.put("embeddingCompatState", s.getCompatibility().getEmbeddingCompatState());
     extras.put("embeddingCompatReason", s.getCompatibility().getEmbeddingCompatReason());
     extras.put("embeddingFingerprintCurrent", s.getCompatibility().getEmbeddingFingerprintCurrent());
@@ -178,10 +182,13 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
     extras.put("chunkEmbeddingFailedCount", s.getEnrichment().getChunk().getFailedCount());
     extras.put("chunkVectorCoveragePercent", s.getEnrichment().getChunk().getCoveragePercent());
     extras.put("chunkVectorsReady", s.getEnrichment().getChunk().getVectorsReady());
+    extras.put("chunkingNotRequired", s.getEnrichment().getChunk().getChunkingNotRequired());
 
     // Tempdoc 931 §E item 8: chunk-SPLADE coverage (chunk documents only — the spladeCoveragePercent
     // below counts parents) plus the flag that says whether zero coverage means "off" or "behind".
     extras.put("chunkSpladeEnabled", s.getEnrichment().getChunk().getSpladeEnabled());
+    extras.put("chunkSpladeDocCount", s.getEnrichment().getChunk().getSpladeDocCount());
+    extras.put("chunkSpladeFailedCount", s.getEnrichment().getChunk().getSpladeFailedCount());
     extras.put(
         "chunkSpladeCompletedCount", s.getEnrichment().getChunk().getSpladeCompletedCount());
     extras.put("chunkSpladePendingCount", s.getEnrichment().getChunk().getSpladePendingCount());
@@ -196,6 +203,7 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
     // 366: Doc-level enrichment coverage for MCP status (agent discoverability)
     extras.put("embeddingCoveragePercent", s.getEnrichment().getEmbedding().getCoveragePercent());
     extras.put("spladeCoveragePercent", s.getEnrichment().getSplade().getCoveragePercent());
+    extras.put("completenessKnown", !s.getEnrichment().hasCompletenessKnown() || s.getEnrichment().getCompletenessKnown());
     extras.put("pendingNerCount", s.getEnrichment().getPendingNerCount());
     extras.put("completedNerCount", s.getEnrichment().getCompletedNerCount());
 

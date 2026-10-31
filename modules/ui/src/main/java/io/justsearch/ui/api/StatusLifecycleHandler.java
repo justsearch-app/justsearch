@@ -2054,8 +2054,23 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       }
 
       case CHUNK_EMBEDDING -> {
+        if (!workerView.enrichment().embeddingEnabled()) {
+          yield readinessComponent(READINESS_READY, null, dim.source(), observedAt);
+        }
         // DEGRADED-capped: emit DEGRADED (not NOT_CONFIGURED) so the retrieval
         // composite stays DEGRADED rather than NOT_CONFIGURED, which would block consumers.
+        if (workerView.enrichment().chunk().chunkDocCount() < 0
+            || workerView.enrichment().chunk().chunkVectorCoveragePercent() < 0) {
+          yield readinessComponent(READINESS_UNKNOWN, null, dim.source(), observedAt);
+        }
+        var activeCount = workerView.countObservations() == null ? null
+            : workerView.countObservations().get("active");
+        if (workerView.enrichment().chunk().chunkDocCount() == 0
+            && !workerView.enrichment().chunk().chunkingNotRequired()
+            && (workerView.core().indexedDocumentsUnknown()
+                || activeCount != null && !"fresh".equals(activeCount.state()))) {
+          yield readinessComponent(READINESS_UNKNOWN, null, dim.source(), observedAt);
+        }
         boolean chunkReady = workerView.enrichment().chunk().chunkVectorsReady();
         double chunkCoverage = workerView.enrichment().chunk().chunkVectorCoveragePercent();
         String state;
@@ -2070,8 +2085,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         // #758: an index the Worker could not count is not an empty one, so the
         // exemption needs a document count that was actually read as 0.
         if (workerView.enrichment().chunk().chunkDocCount() == 0
-            && workerView.core().indexedDocuments() == 0
-            && !workerView.core().indexedDocumentsUnknown()) {
+            && (workerView.enrichment().chunk().chunkingNotRequired()
+                || workerView.core().indexedDocuments() == 0
+                    && !workerView.core().indexedDocumentsUnknown())) {
           state = READINESS_READY;
           reason = null;
         } else if (chunkReady) {

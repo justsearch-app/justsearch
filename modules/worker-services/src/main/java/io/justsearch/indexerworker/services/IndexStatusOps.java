@@ -328,12 +328,13 @@ final class IndexStatusOps {
     // #758: a count that has never been read successfully is unknown, not 0. The
     // numeric fields keep carrying 0 there for readers that predate doc_count_unknown, and the flag
     // tells every newer reader that the 0 is not a count.
+    Map<String, io.justsearch.ipc.CountObservation> countObservations = new java.util.HashMap<>();
     long activeDocCount = 0;
     boolean activeDocCountUnknown = false;
     IndexCountOps activeCountOps = searchCountOps != null ? searchCountOps : ingestCountOps;
     if (activeCountOps != null) {
       java.util.OptionalLong active =
-          parentDocCountOrLastKnown(activeCountOps, lastKnownActiveDocCount);
+          parentDocCountOrLastKnown(activeCountOps, lastKnownActiveDocCount, countObservations, "active");
       activeDocCountUnknown = active.isEmpty();
       activeDocCount = active.orElse(0L);
     }
@@ -353,7 +354,7 @@ final class IndexStatusOps {
               activeCountOps,
               activeDocCountUnknown
                   ? java.util.OptionalLong.empty()
-                  : java.util.OptionalLong.of(activeDocCount));
+                  : java.util.OptionalLong.of(activeDocCount), countObservations);
     } else {
       searchable =
           docCountUnknown ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(docCount);
@@ -363,9 +364,12 @@ final class IndexStatusOps {
 
     long buildingDocCount = 0;
     if (ingestCountOps != null && ingestCountOps != activeCountOps) {
-      buildingDocCount = parentDocCountOrLastKnown(ingestCountOps, lastKnownWrittenDocCount).orElse(0L);
+      buildingDocCount = parentDocCountOrLastKnown(ingestCountOps, lastKnownWrittenDocCount, countObservations, "building").orElse(0L);
     }
 
+    for (String key : java.util.List.of("active", "building", "searchable")) {
+      countObservations.putIfAbsent(key, io.justsearch.ipc.CountObservation.newBuilder().setState("unknown").build());
+    }
     boolean loopFailed = indexingLoop != null && indexingLoop.hasFailed();
     long outagePauseUntilMs = indexingLoop == null ? 0L : indexingLoop.serviceOutagePausedUntilMs();
     boolean tragicWriter = writerTragic.getAsBoolean();
@@ -395,6 +399,7 @@ final class IndexStatusOps {
 
     // --- Build sub-messages ---
     return StatusResponse.newBuilder()
+        .putAllCountObservations(countObservations)
         .setCore(
             buildCore(
                 queueDepth,
@@ -472,20 +477,25 @@ final class IndexStatusOps {
    *     default scope always contributes the two exclusions — but a zero would be a silent lie if
    *     that ever changed)
    */
-  private static java.util.OptionalLong countDefaultScopeDocs(
-      IndexCountOps countOps, java.util.OptionalLong fallback) {
+  private java.util.OptionalLong countDefaultScopeDocs(
+      IndexCountOps countOps, java.util.OptionalLong fallback,
+      Map<String, io.justsearch.ipc.CountObservation> observations) {
     Query defaultScope = QueryFilterBuilder.buildFilterQueryOnly(null);
     if (defaultScope == null) {
+      observations.put("searchable", observations.get("active"));
       return fallback;
     }
     try {
-      return java.util.OptionalLong.of(countOps.countQueryOrThrow(defaultScope));
-    } catch (IOException e) {
-      // A transient reader IO error must not report a hard 0: the FE renders a known 0 as the
-      // "nothing indexed yet" empty-state CTA. Fall back to the unscoped count — an over-count
-      // during a blip is honest about the corpus existing; a 0 is not.
-      log.debug("Default-scope count failed; falling back to the unscoped count: {}", e.getMessage());
-      return fallback;
+      long count = countOps.countQueryOrThrow(defaultScope);
+      CountReading reading = new CountReading(countOps, count, System.currentTimeMillis());
+      lastKnownSearchableDocCount.set(reading);
+      observations.put("searchable", observation("fresh", reading));
+      return java.util.OptionalLong.of(count);
+    } catch (IOException | RuntimeException e) {
+      CountReading previous = lastKnownSearchableDocCount.get();
+      boolean sameGeneration = previous != null && previous.ops() == countOps;
+      observations.put("searchable", observation(sameGeneration ? "stale" : "unknown", sameGeneration ? previous : null));
+      return sameGeneration ? java.util.OptionalLong.of(previous.count()) : java.util.OptionalLong.empty();
     }
   }
 
@@ -549,7 +559,12 @@ final class IndexStatusOps {
     // generation a query can actually reach, not of a half-built rebuild generation.
     IndexCountOps activeCountOps = searchCountOps != null ? searchCountOps : ingestCountOps;
     if (activeCountOps != null) {
-      b.setIndexMaxDoc(activeCountOps.maxDoc()).setIndexNumDocs(activeCountOps.docCount());
+      try {
+        b.setIndexMaxDoc(activeCountOps.maxDoc()).setIndexNumDocs(activeCountOps.docCount());
+      } catch (RuntimeException unreadable) {
+        b.setIndexMaxDoc(-1L).setIndexNumDocs(-1L);
+        log.debug("Merge counters unreadable: {}", unreadable.getMessage());
+      }
     }
     for (long v : recentJobQueueDepthTrend()) {
       b.addRecentJobQueueDepth(v);
@@ -785,31 +800,32 @@ final class IndexStatusOps {
   }
 
   private EnrichmentCoverage buildEnrichment() {
+    IndexCountOps countOps = ingestCountOps != null ? ingestCountOps : searchCountOps;
     LuceneRuntimeTypes.EmbeddingCounts emb =
-        ingestCountOps != null ? ingestCountOps.queryEmbeddingCounts() : null;
+        countOps != null ? countOps.queryEmbeddingCounts() : null;
     LuceneRuntimeTypes.SpladeFeatureCounts spl =
-        ingestCountOps != null ? ingestCountOps.querySpladeFeatureCounts() : null;
+        countOps != null ? countOps.querySpladeFeatureCounts() : null;
     LuceneRuntimeTypes.ChunkEmbeddingCounts chk =
-        ingestCountOps != null ? ingestCountOps.queryChunkEmbeddingCounts() : null;
+        countOps != null ? countOps.queryChunkEmbeddingCounts() : null;
     // Tempdoc 717: coverage/readiness must verify the actual chunk_vector artifact, not the
     // chunk_embedding_status bookkeeping field (which can read COMPLETED while the vector is
     // absent — the F-032 "status lies" class). completed/pending/failed below stay status-derived
     // as enrichment-progress telemetry; the divergence between "completed" and "coverage" is the
     // diagnostic signal.
     LuceneRuntimeTypes.ChunkVectorPresence chkVec =
-        ingestCountOps != null ? ingestCountOps.queryChunkVectorPresenceCount() : null;
+        countOps != null ? countOps.queryChunkVectorPresenceCount() : null;
     // Tempdoc 931 §E item 8: the chunk-SPLADE stage, over CHUNK documents only. The `splade`
     // FeatureCoverage below counts parents, so this is the only number that describes what the
     // chunk-SPLADE retrieval leg has to score against.
     LuceneRuntimeTypes.SpladeFeatureCounts chkSplade =
-        ingestCountOps != null ? ingestCountOps.queryChunkSpladeCounts() : null;
+        countOps != null ? countOps.queryChunkSpladeCounts() : null;
     boolean chunkSpladeEnabled = chunkSpladeEnabled();
     // Tempdoc 821 §3-C3: the auditor projection. `expected` is the field-carrying denominator
     // (an absent status field means the stage does not apply, post-798), so a stage that lost a
     // sub-population reads `missing > 0` instead of hiding inside a coverage percentage that
     // divides by every document.
     LuceneRuntimeTypes.StageCompletenessCounts queried =
-        ingestCountOps == null ? null : ingestCountOps.queryStageCompletenessCounts();
+        countOps == null ? null : countOps.queryStageCompletenessCounts();
     // Absence is the zero shape, never a NullPointerException on the status path — the same
     // null-tolerance every count above already applies, so a count source that yields nothing
     // degrades this one surface instead of failing the whole StatusResponse.
@@ -817,7 +833,7 @@ final class IndexStatusOps {
         queried == null ? LuceneRuntimeTypes.StageCompletenessCounts.EMPTY : queried;
     // Spec E step E0b: the S5 unit, one joint count (never derived from the per-stage counters).
     long embeddedAndSparse =
-        ingestCountOps != null ? ingestCountOps.queryEmbeddedAndSparseCount() : 0L;
+        countOps != null ? countOps.queryEmbeddedAndSparseCount() : 0L;
     // Spec E step E1 (§1.7): live per-stage availability, read from the loop's own checks. No loop
     // (a deferred or read-only service set) means no stage can drain anything.
     BackfillScheduler.StageAvailability available =
@@ -829,33 +845,36 @@ final class IndexStatusOps {
     return EnrichmentCoverage.newBuilder()
         .setEmbedding(
             FeatureCoverage.newBuilder()
-                .setDocCount(emb == null ? 0L : emb.total())
-                .setCompletedCount(emb == null ? 0L : emb.completed())
-                .setPendingCount(emb == null ? 0L : emb.pending())
-                .setFailedCount(emb == null ? 0L : emb.failed())
-                .setCoveragePercent(emb == null ? 0.0 : emb.coveragePercent())
+                .setDocCount(emb == null ? (countOps == null ? 0L : -1L) : emb.total())
+                .setCompletedCount(emb == null ? (countOps == null ? 0L : -1L) : emb.completed())
+                .setPendingCount(emb == null ? (countOps == null ? 0L : -1L) : emb.pending())
+                .setFailedCount(emb == null ? (countOps == null ? 0L : -1L) : emb.failed())
+                .setCoveragePercent(emb == null ? (countOps == null ? 0.0 : -1.0) : emb.coveragePercent())
                 .build())
         .setSplade(
             FeatureCoverage.newBuilder()
-                .setDocCount(spl == null ? 0L : spl.total())
-                .setCompletedCount(spl == null ? 0L : spl.completed())
-                .setPendingCount(spl == null ? 0L : spl.pending())
-                .setFailedCount(spl == null ? 0L : spl.failed())
-                .setCoveragePercent(spl == null ? 0.0 : spl.coveragePercent())
+                .setDocCount(spl == null ? (countOps == null ? 0L : -1L) : spl.total())
+                .setCompletedCount(spl == null ? (countOps == null ? 0L : -1L) : spl.completed())
+                .setPendingCount(spl == null ? (countOps == null ? 0L : -1L) : spl.pending())
+                .setFailedCount(spl == null ? (countOps == null ? 0L : -1L) : spl.failed())
+                .setCoveragePercent(spl == null ? (countOps == null ? 0.0 : -1.0) : spl.coveragePercent())
                 .build())
         .setChunk(
             ChunkCoverage.newBuilder()
-                .setDocCount(chk == null ? 0L : chk.total())
-                .setCompletedCount(chk == null ? 0L : chk.completed())
-                .setPendingCount(chk == null ? 0L : chk.pending())
-                .setFailedCount(chk == null ? 0L : chk.failed())
+                .setDocCount(chk == null ? (countOps == null ? 0L : -1L) : chk.total())
+                .setCompletedCount(chk == null ? (countOps == null ? 0L : -1L) : chk.completed())
+                .setPendingCount(chk == null ? (countOps == null ? 0L : -1L) : chk.pending())
+                .setFailedCount(chk == null ? (countOps == null ? 0L : -1L) : chk.failed())
                 // Presence-truthful coverage/readiness (tempdoc 717), not status-derived.
-                .setCoveragePercent(chkVec == null ? 0.0 : chkVec.coveragePercent())
+                .setCoveragePercent(chkVec == null ? (countOps == null ? 0.0 : -1.0) : chkVec.coveragePercent())
                 .setVectorsReady(chkVec != null && chkVec.isReady(VECTOR_READY_PERCENT))
+                .setChunkingNotRequired(chkVec != null && chkVec.chunkingNotRequired())
                 .setSpladeEnabled(chunkSpladeEnabled)
-                .setSpladeCompletedCount(chkSplade == null ? 0L : chkSplade.completed())
-                .setSpladePendingCount(chkSplade == null ? 0L : chkSplade.pending())
-                .setSpladeCoveragePercent(chkSplade == null ? 0.0 : chkSplade.coveragePercent())
+                .setSpladeDocCount(chkSplade == null ? (countOps == null ? 0L : -1L) : chkSplade.total())
+                .setSpladeFailedCount(chkSplade == null ? (countOps == null ? 0L : -1L) : chkSplade.failed())
+                .setSpladeCompletedCount(chkSplade == null ? (countOps == null ? 0L : -1L) : chkSplade.completed())
+                .setSpladePendingCount(chkSplade == null ? (countOps == null ? 0L : -1L) : chkSplade.pending())
+                .setSpladeCoveragePercent(chkSplade == null ? (countOps == null ? 0.0 : -1.0) : chkSplade.coveragePercent())
                 .build())
         // Tempdoc 821 §3-C3 — the two thresholds the auditor owns, published so off-process
         // oracles read them instead of mirroring the Java constants.
@@ -863,27 +882,16 @@ final class IndexStatusOps {
         .setVectorReadyPercent(VECTOR_READY_PERCENT)
         // ARTIFACT tier: `present` is the artifact count, taken over the SAME status-carrying
         // population as `expected` and with FAILED excluded, so the three buckets partition.
-        .addCompleteness(
-            stageCompleteness(BatchTimingKeys.EMBED, TIER_ARTIFACT, stages.embedding()))
-        .addCompleteness(
-            stageCompleteness(STAGE_CHUNK_EMBED, TIER_ARTIFACT, stages.chunkEmbedding()))
-        // STATUS tier: no artifact is countable, so `present` can only be the bookkeeping field's
-        // terminal-success count.
-        .addCompleteness(stageCompleteness(BatchTimingKeys.SPLADE, TIER_STATUS, stages.splade()))
-        .addCompleteness(stageCompleteness(BatchTimingKeys.NER, TIER_STATUS, stages.ner()))
-        .setPendingNerCount(
-            countPendingByStatus(SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_PENDING))
-        // NER's terminal-success vocabulary is two-valued: COMPLETED (entities found) and
-        // COMPLETED_EMPTY (ran fine, found none). Both are "NER is done for this document", so the
-        // progress counter must sum them — counting only COMPLETED would make NER look permanently
-        // unfinished to every readiness gate reading this field once pending hits zero.
-        .setCompletedNerCount(
-            countPendingByStatus(SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_COMPLETED)
-                + countPendingByStatus(
-                    SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_COMPLETED_EMPTY))
-        // Tempdoc 821 §3-C3 — NER reported only pending/completed; the other three stages have
-        // carried a failed count since 354, so a stalled NER population was invisible here.
-        .setFailedNerCount(stages.ner().failed())
+        .setCompletenessKnown(queried != null)
+        .addAllCompleteness(queried == null ? java.util.List.of() : java.util.List.of(
+            stageCompleteness(BatchTimingKeys.EMBED, TIER_ARTIFACT, stages.embedding()),
+            stageCompleteness(STAGE_CHUNK_EMBED, TIER_ARTIFACT, stages.chunkEmbedding()),
+            stageCompleteness(BatchTimingKeys.SPLADE, TIER_STATUS, stages.splade()),
+            stageCompleteness(BatchTimingKeys.NER, TIER_STATUS, stages.ner())))
+        .setPendingNerCount(queried == null ? -1 : stages.ner().expected()
+            - stages.ner().settledSuccess() - stages.ner().failed())
+        .setCompletedNerCount(queried == null ? -1 : stages.ner().settledSuccess())
+        .setFailedNerCount(queried == null ? -1 : stages.ner().failed())
         .setEmbeddingEnabled(embeddingEnabled)
         .setSpladeEnabled(spladeEnabled)
         .setNerEnabled(nerEnabled)
@@ -1138,8 +1146,10 @@ final class IndexStatusOps {
       indexSizeObservedAtMs = System.currentTimeMillis();
       return;
     }
-    try (Stream<Path> stream = Files.walk(indexPath)) {
-      long size =
+    try {
+      long size;
+      try (Stream<Path> stream = Files.walk(indexPath)) {
+        size =
           stream
               .filter(Files::isRegularFile)
               .mapToLong(
@@ -1147,13 +1157,14 @@ final class IndexStatusOps {
                     try {
                       return Files.size(p);
                     } catch (IOException e) {
-                      return 0;
+                      throw new java.io.UncheckedIOException(e);
                     }
                   })
               .sum();
+      }
       cachedIndexSizeBytes = size;
       indexSizeObservedAtMs = System.currentTimeMillis();
-    } catch (IOException e) {
+    } catch (IOException | java.io.UncheckedIOException | java.nio.file.DirectoryIteratorException e) {
       log.debug("Failed to calculate index size: {}", e.getMessage());
       // Don't update indexSizeObservedAtMs on failure so the next call retries sooner.
     }
@@ -1252,23 +1263,36 @@ final class IndexStatusOps {
    * doc_count_unknown} instead of a 0 that reads as an empty index.
    */
   private static java.util.OptionalLong parentDocCountOrLastKnown(
-      IndexCountOps ops, java.util.concurrent.atomic.AtomicReference<CountReading> lastKnown) {
+      IndexCountOps ops, java.util.concurrent.atomic.AtomicReference<CountReading> lastKnown,
+      Map<String, io.justsearch.ipc.CountObservation> observations, String key) {
     try {
       long count =
-          ops.docCountOrThrow() - ops.countByFieldOrThrow(SchemaFields.IS_CHUNK, "true");
-      lastKnown.set(new CountReading(ops, count));
+          ops.parentDocCountOrThrow();
+      CountReading reading = new CountReading(ops, count, System.currentTimeMillis());
+      lastKnown.set(reading);
+      observations.put(key, observation("fresh", reading));
       return java.util.OptionalLong.of(count);
     } catch (IOException | RuntimeException e) {
       CountReading previous = lastKnown.get();
       log.debug("Document count unreadable, reporting the last known count: {}", e.getMessage());
-      return previous != null && previous.ops() == ops
+      boolean sameGeneration = previous != null && previous.ops() == ops;
+      observations.put(key, observation(sameGeneration ? "stale" : "unknown", sameGeneration ? previous : null));
+      return sameGeneration
           ? java.util.OptionalLong.of(previous.count())
           : java.util.OptionalLong.empty();
     }
   }
 
   /** A successful count, tied to the reader that produced it. */
-  private record CountReading(IndexCountOps ops, long count) {}
+  private record CountReading(IndexCountOps ops, long count, long observedAtMs) {}
+
+  private static io.justsearch.ipc.CountObservation observation(String state, CountReading reading) {
+    return io.justsearch.ipc.CountObservation.newBuilder().setState(state)
+        .setObservedAtMs(reading == null ? 0 : reading.observedAtMs()).build();
+  }
+
+  private final java.util.concurrent.atomic.AtomicReference<CountReading> lastKnownSearchableDocCount =
+      new java.util.concurrent.atomic.AtomicReference<>();
 
   private final java.util.concurrent.atomic.AtomicReference<CountReading> lastKnownActiveDocCount =
       new java.util.concurrent.atomic.AtomicReference<>();

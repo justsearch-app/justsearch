@@ -469,6 +469,35 @@ final class StatusLifecycleHandlerTest {
   }
 
   @Test
+  void disabledEmbeddingDoesNotAssertUnfinishedPassages() {
+    var base = withChunkCoverage(compatWorkerView(CompatibilityStatusView.empty()), 1,
+        new ChunkCoverageView(7, 0, 7, 0, 0.0, false, false, 0, 0, 0.0));
+    var view = WorkerOperationalViewBuilder.builder(base).enrichment(
+        EnrichmentProgressViewBuilder.builder(base.enrichment()).embeddingEnabled(false).build()).build();
+    var envelope = readinessEnvelope(newHandler(), view, readyProjection(), freshContact(), false);
+    assertEquals("READY", envelope.components().get("chunkEmbedding").state());
+    assertNull(envelope.components().get("chunkEmbedding").reasonCode());
+  }
+
+  @Test
+  void completedShortOnlyLibraryHasNoUnfinishedPassageWarning() throws Exception {
+    var components = ChunkCoverageView.class.getRecordComponents();
+    Class<?>[] types = new Class<?>[components.length];
+    Object[] values = new Object[components.length];
+    for (int i = 0; i < components.length; i++) {
+      types[i] = components[i].getType();
+      if (types[i] == boolean.class) values[i] = components[i].getName().equals("chunkingNotRequired");
+      else if (types[i] == double.class) values[i] = 0.0;
+      else values[i] = 0L;
+    }
+    var chunks = ChunkCoverageView.class.getDeclaredConstructor(types).newInstance(values);
+    var view = withChunkCoverage(compatWorkerView(CompatibilityStatusView.empty()), 1, chunks);
+    var env = readinessEnvelope(newHandler(), view, readyProjection(), freshContact(), false);
+    assertEquals("READY", env.components().get("chunkEmbedding").state());
+    assertFalse(env.composites().get("retrieval").reasonCodes().contains("chunk_embedding.not_ready"));
+  }
+
+  @Test
   @DisplayName("804 §D1: a NON-empty corpus with 0% chunk coverage still emits chunk_embedding.not_ready")
   void nonEmptyCorpusStillClaimsChunkEmbeddingNotReady() {
     StatusLifecycleHandler handler = newHandler();

@@ -39,6 +39,45 @@ final class ChunkSetCompleteness {
   // applied from the assessing reader's own live docs. Close listeners release cores promptly.
   private final Map<IndexReader.CacheKey, CoreRows> cores = new WeakHashMap<>();
 
+  private final Map<IndexReader.CacheKey, Boolean> zeroDeclarations = new WeakHashMap<>();
+
+  /** Reuses admission's segment metadata; unchanged leaf readers need no further scan or IO. */
+  synchronized boolean allParentsDeclareZeroChunks(IndexSearcher searcher) throws IOException {
+    for (var context : searcher.getIndexReader().leaves()) {
+      var leaf = context.reader();
+      var helper = leaf.getReaderCacheHelper();
+      var key = helper == null ? null : helper.getKey();
+      Boolean cached = key == null ? null : zeroDeclarations.get(key);
+      if (cached != null) {
+        if (!cached) return false;
+        continue;
+      }
+      var metadata = rows(leaf).parents;
+      var live = leaf.getLiveDocs();
+      boolean allZero = true;
+      for (int doc = 0; doc < leaf.maxDoc(); doc++) {
+        if (live != null && !live.get(doc)) continue;
+        var record = metadata.get(doc);
+        if (record == null) {
+          // An older reader can still see a parent deleted when its core was first prepared.
+          record = SearchResultFormatter.extractFromStoredFields(leaf.storedFields(), doc, false,
+              Set.of(SchemaFields.CHUNK_TOTAL, SchemaFields.CHUNK_PARENT_CONTENT_SHA256,
+                  SchemaFields.CONTENT_SHA256, SchemaFields.PARENT_DOC_ID));
+        }
+        String revision = record.get(SchemaFields.CHUNK_PARENT_CONTENT_SHA256);
+        if (record.containsKey(SchemaFields.PARENT_DOC_ID)
+            || !"0".equals(record.get(SchemaFields.CHUNK_TOTAL)) || revision == null
+            || revision.isBlank() || !revision.equals(record.get(SchemaFields.CONTENT_SHA256))) {
+          allZero = false;
+          break;
+        }
+      }
+      if (key != null) zeroDeclarations.put(key, allZero);
+      if (!allZero) return false;
+    }
+    return true;
+  }
+
   private static final Set<String> CHILD_FIELDS = Set.of(SchemaFields.PARENT_DOC_ID,
       SchemaFields.CHUNK_INDEX, SchemaFields.CHUNK_TOTAL, SchemaFields.CHUNK_PARENT_CONTENT_SHA256);
 

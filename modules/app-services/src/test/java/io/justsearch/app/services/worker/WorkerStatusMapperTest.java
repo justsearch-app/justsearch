@@ -21,6 +21,33 @@ import org.junit.jupiter.api.Test;
 final class WorkerStatusMapperTest {
 
   @Test
+  void unknownEnrichmentAndCountAgeReachTheStatusView() {
+    var status = StatusResponse.newBuilder()
+        .putCountObservations("active", io.justsearch.ipc.CountObservation.newBuilder()
+            .setState("stale").setObservedAtMs(1234).build())
+        .setEnrichment(EnrichmentCoverage.newBuilder().setCompletenessKnown(false)
+            .setEmbedding(io.justsearch.ipc.FeatureCoverage.newBuilder()
+                .setDocCount(-1).setPendingCount(-1).setCoveragePercent(-1))
+            .setSplade(io.justsearch.ipc.FeatureCoverage.newBuilder()
+                .setDocCount(-1).setPendingCount(-1).setCoveragePercent(-1))
+            .setChunk(io.justsearch.ipc.ChunkCoverage.newBuilder()
+                .setDocCount(-1).setPendingCount(-1).setCoveragePercent(-1)
+                .setSpladeDocCount(-1).setSpladePendingCount(-1).setSpladeCoveragePercent(-1))
+            .setPendingNerCount(-1).setCompletedNerCount(-1))
+        .build();
+    var view = WorkerStatusMapper.toUiStatusMap(status);
+    assertEquals(-1, view.enrichment().embeddingPendingCount());
+    assertEquals(-1, view.enrichment().spladePendingCount());
+    assertEquals(-1, view.enrichment().chunk().chunkEmbeddingPendingCount());
+    assertEquals(-1, view.enrichment().chunk().chunkSpladePendingCount());
+    assertEquals(-1, view.enrichment().pendingNerCount());
+    assertFalse(view.enrichment().completenessKnown());
+    assertTrue(view.enrichment().completeness().isEmpty());
+    assertEquals("stale", view.countObservations().get("active").state());
+    assertEquals(1234, view.countObservations().get("active").observedAtMs());
+  }
+
+  @Test
   void retiredEntityBoostCannotLeakFromAnOlderWorker() {
     StatusResponse status =
         StatusResponse.newBuilder()

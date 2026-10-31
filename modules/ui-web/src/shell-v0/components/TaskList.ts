@@ -143,6 +143,7 @@ const STAGE_LABELS: Record<EnrichingStageRow['id'], string> = {
   splade: 'Keyword expansion',
   ner: 'Entity recognition',
   chunkVectors: 'Passage vectors',
+  chunkSplade: 'Keyword expansion',
 };
 
 /** The empty projection this component starts from, before the first `/api/status` poll lands. */
@@ -244,14 +245,14 @@ export class TaskList extends JfElement {
   private applyProgress(next: IndexingProgress): void {
     const wasActive = isActivePhase(this.progress.phase);
     this.progress = next;
-    if (wasActive && isTerminalPhase(next.phase)) {
+    if (wasActive && isTerminalPhase(next.phase) && next.activity.confirmed) {
       this.clearReadyTimer();
       this.showingReady = true;
       this.readyTimer = setTimeout(() => {
         this.readyTimer = null;
         this.showingReady = false;
       }, READY_DISMISS_MS);
-    } else if ((isActivePhase(next.phase) || next.pause || next.phase === 'waiting' || next.phase === 'error') && this.showingReady) {
+    } else if ((!isTerminalPhase(next.phase) || !next.activity.confirmed) && this.showingReady) {
       // Work resumed inside the window — the completion claim is no longer true, so withdraw it.
       this.clearReadyTimer();
       this.showingReady = false;
@@ -479,7 +480,7 @@ export class TaskList extends JfElement {
   private contentEmpty(): boolean {
     return (
       this.tasks.length === 0 && !(this.queueCounts &&
-        (this.queueCounts.queued + this.queueCounts.processing + this.queueCounts.failed > 0)) && !this.progress.pause && !isActivePhase(this.progress.phase) && this.progress.phase !== 'waiting' && this.progress.phase !== 'error' && !this.showingReady
+        (this.queueCounts.queued + this.queueCounts.processing + this.queueCounts.failed > 0)) && !this.progress.pause && !isActivePhase(this.progress.phase) && this.progress.phase !== 'waiting' && this.progress.phase !== 'error' && !(this.progress.phase === 'blocked' && this.progress.enrichingStages.some(row => row.pending > 0)) && !this.showingReady
     );
   }
 
@@ -553,7 +554,7 @@ export class TaskList extends JfElement {
         >
           <div class="counts" data-testid="task-aggregate-counts">
             ${blocked
-              ? `Indexed and keyword-searchable — ${ENRICHMENT_BLOCKED_BODY}.`
+              ? p.activity.detail ?? `Indexed and keyword-searchable — ${ENRICHMENT_BLOCKED_BODY}.`
               : 'Everything is indexed and enriched.'}
           </div>
         </div>
@@ -645,7 +646,7 @@ export class TaskList extends JfElement {
     // Collapse the `queued` bulk to a count only (the flood cure); list the rest, capped.
     const detail = this.tasks.filter((t) => t.status !== 'queued');
     const { shown, overflow } = capWithOverflow(detail, MAX_DETAIL_ROWS);
-    const speaks = this.showingReady || isActivePhase(this.progress.phase) || this.progress.phase === 'waiting' || this.progress.phase === 'error';
+    const speaks = this.showingReady || isActivePhase(this.progress.phase) || this.progress.phase === 'waiting' || this.progress.phase === 'error' || this.progress.phase === 'blocked';
     // 813 §20 — what the disclosure has to show: per-file rows, per-stage enrichment detail, or the
     // denominator-less extraction backlog. Any one of them makes the affordance meaningful.
     const stageRows = this.progress.enrichingStages;
@@ -791,7 +792,7 @@ function renderStageRow(row: EnrichingStageRow): TemplateResult {
     <div class="stage" data-testid="task-stage-${row.id}">
       <span class="stage-label">${STAGE_LABELS[row.id]}</span>
       <span class="stage-count"
-        >${formatCount(settled)} / ${formatCount(row.total)}${row.pending === 0 ? ' ✓' : ''}</span
+        >${formatCount(settled)} / ${formatCount(row.total)}${row.failed ? ` · ${formatCount(row.failed)} failed` : ''}${row.missing ? ` · ${formatCount(row.missing)} missing` : ''}${row.pending === 0 && !row.failed && !row.missing ? ' ✓' : ''}</span
       >
     </div>
   `;

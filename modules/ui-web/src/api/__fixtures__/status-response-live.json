@@ -127,7 +127,10 @@
         "chunkSpladeEnabled" : false,
         "chunkSpladeCompletedCount" : 0,
         "chunkSpladePendingCount" : 0,
-        "chunkSpladeCoveragePercent" : 0.0
+        "chunkSpladeCoveragePercent" : 0.0,
+        "chunkingNotRequired" : false,
+        "chunkSpladeDocCount" : 0,
+        "chunkSpladeFailedCount" : 0
       },
       "embeddingDocCount" : 0,
       "embeddingCompletedCount" : 0,
@@ -143,6 +146,7 @@
       "completedNerCount" : 0,
       "failedNerCount" : 0,
       "completeness" : [ ],
+      "completenessKnown" : null,
       "chunkMinChars" : 0,
       "vectorReadyPercent" : 0.0,
       "enrichmentCompleted" : { },
