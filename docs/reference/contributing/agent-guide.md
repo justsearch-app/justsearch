@@ -682,7 +682,11 @@ Four `gh` CLI quirks (tempdoc 695, 930) worth knowing at merge/wait time:
 - **Waiting on a PR's CI completion** uses `node scripts/dev/run-gh.mjs
   run-wait-sha <head-sha> --workflow CI --branch <pr-branch> --event pull_request`
   in the background. It waits for registration of the CI run for that exact
-  head SHA and event, emits only transitions, and has a bounded timeout.
+  head SHA, branch and event, emits only transitions, and has a bounded timeout.
+  It selects a run, not a pull request: it assumes the branch has one open pull
+  request (against `main`). If `ensure-ci-on-sha` had to dispatch the run, wait
+  with `--event workflow_dispatch` instead, since that run is not a
+  `pull_request` run.
   To merge, use `node scripts/dev/run-gh.mjs shepherd <N>` or `enqueue <N>`
   followed by its printed `merge-wait` command, as described below.
   For a specific landed commit, use
