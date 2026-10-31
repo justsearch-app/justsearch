@@ -1606,9 +1606,7 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
   includeEmptyDirs = false
   into(tauriHeadlessResourcesDir)
   finalizedBy(verifySidecarLegalResources)
-  from(rootProject.layout.projectDirectory.file("LICENSE"),
-      rootProject.layout.projectDirectory.file("NOTICE"),
-      rootProject.layout.projectDirectory.file("THIRD_PARTY_NOTICES")) {
+  from(rootProject.files("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES")) {
     into("legal")
   }
   from(rootProject.layout.projectDirectory.file("modules/ui-web/src/shell-v0/views/search-v3/THIRD-PARTY-NOTICES.md")) {
