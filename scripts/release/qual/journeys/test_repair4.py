@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -133,6 +134,23 @@ class Repair4Tests(unittest.TestCase):
             with self.assertRaisesRegex(runner.Infrastructure, 'Hosted lane requires'):
                 hosted.main()
             command.assert_not_called(); spawn.assert_not_called()
+
+    def test_hosted_result_survives_unremovable_portal_mount(self):
+        class Storage:
+            def __init__(self, prefix, ignore_cleanup_errors=False):
+                self.temp = tempfile.mkdtemp(prefix=prefix); self.ignore = ignore_cleanup_errors
+            def __enter__(self): return self.temp
+            def __exit__(self, *exc):
+                shutil.rmtree(self.temp)
+                if not self.ignore:
+                    raise PermissionError(1, 'Operation not permitted', self.temp + '/runtime/doc')
+        with patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'fake', 'GITHUB_ACTIONS': 'true',
+                                     'RUNNER_ENVIRONMENT': 'github-hosted'}, clear=True), \
+             patch.object(hosted.subprocess, 'run', return_value=SimpleNamespace(returncode=0)), \
+             patch.object(hosted.subprocess, 'Popen') as spawn, patch('sys.argv', ['hosted.py']), \
+             patch.object(hosted.tempfile, 'TemporaryDirectory', Storage):
+            spawn.return_value.poll.return_value = 0
+            self.assertEqual(hosted.main(), 0)
 
     def test_direct_local_apt_refuses_developer_host(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True), \

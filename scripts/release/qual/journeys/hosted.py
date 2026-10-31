@@ -26,7 +26,9 @@ def main():
     if options.state_root:
         options.state_root.mkdir(parents=True, exist_ok=True)
     storage = (contextlib.nullcontext(str(options.state_root.resolve())) if options.state_root
-               else tempfile.TemporaryDirectory(prefix='justsearch-hosted-'))
+               # The document portal's FUSE mount under runtime/doc cannot be
+               # removed; the disposable runner is discarded anyway.
+               else tempfile.TemporaryDirectory(prefix='justsearch-hosted-', ignore_cleanup_errors=True))
     with storage as temp:
         env = {key: value for key, value in os.environ.items()
                if not key.startswith(('JUSTSEARCH_', 'JAVA_', 'JDK_', 'LD_', 'CUDA_', 'TAURI_'))}

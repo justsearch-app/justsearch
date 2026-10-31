@@ -45,6 +45,7 @@ update(tauri, /"copyright"\s*:\s*"[^"]*"/g, `"copyright": "JustSearch ${version}
 update(cargo, /^(\s*version\s*=\s*")[^"]+("\s*)$/gm, `$1${version}$2`);
 
 update('modules/shell/src-tauri/Cargo.lock', /(name = "shell"\r?\nversion = ")[^"]+(")/, `$1${version}$2`);
+update('THIRD_PARTY_NOTICES', /^(  shell )\S+( — )/m, `$1${version}$2`);
 const lockPath = 'modules/shell/package-lock.json';
 const lockOriginal = fs.readFileSync(path.join(root, lockPath), 'utf8');
 const lock = JSON.parse(lockOriginal);

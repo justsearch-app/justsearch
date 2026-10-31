@@ -23,10 +23,7 @@ STATUSES = ('passed', 'failed-product', 'failed-infrastructure', 'skipped-by-dec
 
 
 def phase_journeys(phase, lane=None):
-    selected = {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'} if phase == 'predecessor' else {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'}
-    if lane == 'vm-windows':
-        selected.add('J6') # Also develop retention against the installed candidate.
-    return selected
+    return {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'} if phase == 'predecessor' else {'J1', 'J2', 'J3', 'J4', 'J6', 'J7', 'J8'}
 
 
 class Infrastructure(Exception):
@@ -114,22 +111,42 @@ def collect_hosted_crashes(out, since):
     """Fold systemd-coredump observations into the completed hosted report."""
     out = Path(out)
     report = json.loads((out / 'summary.json').read_text())
+    collection_errors = []
     try:
-        result = subprocess.run(['sudo', '-n', 'coredumpctl', '--json=short', '--no-pager',
-                                 '--since', since, 'list'], capture_output=True, text=True)
-        (out / 'coredumpctl.stderr.txt').write_text(result.stderr)
-        # coredumpctl returns 1 for an empty journal, as well as for real errors.
-        if result.returncode and not (result.returncode == 1
-                and result.stderr.strip() == 'No coredumps found.'
-                and result.stdout.strip() in ('', '[]')):
-            raise Infrastructure('coredumpctl collection failed: ' + result.stderr)
-        entries = json.loads(result.stdout) if result.stdout.strip() else []
-        if not isinstance(entries, list):
-            raise Infrastructure('coredumpctl did not return a JSON array')
+        observations = []
+        entries = []
+        def collect():
+            result = subprocess.run(['sudo', '-n', 'env', 'LC_ALL=C', 'coredumpctl', '--json=short', '--no-pager',
+                                     '--since', since, 'list'], capture_output=True, text=True, timeout=30)
+            observations.append({'returncode': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr})
+            (out / 'coredumpctl.json').write_text(json.dumps(observations, indent=2) + '\n')
+            (out / 'coredumpctl.stderr.txt').write_text(result.stderr)
+            # systemd appends this notice to stdout even with --json=short.
+            payload, running = re.subn(r'(?m)^-- Notice: \d+ systemd-coredump@\.service units? (?:is|are) running, output may be incomplete\.$', '', result.stdout.strip())
+            observed = json.loads(payload) if payload.strip() else []
+            if not isinstance(observed, list):
+                raise Infrastructure('coredumpctl did not return a JSON array')
+            # Retain every observation: a later empty result or an unfinished
+            # collector must never erase an already observed product crash.
+            for entry in observed:
+                if entry not in entries:
+                    entries.append(entry)
+            return None if running else result
+        try:
+            result = wait_for(collect, 'Hosted coredump collectors finished', seconds=60,
+                              interval=1, error=Infrastructure)
+            # coredumpctl returns 1 for an empty journal, as well as for real errors.
+            if result.returncode and not (result.returncode > 0
+                    and result.stderr.strip() == 'No coredumps found.'
+                    and result.stdout.strip() in ('', '[]')):
+                raise Infrastructure('coredumpctl collection failed: ' + result.stderr)
+        except Exception as exc:
+            collection_errors.append(exc)
         (out / 'coredumps.json').write_text(json.dumps(entries, indent=2) + '\n')
         paths = subprocess.run(['dpkg-query', '-L', 'just-search'], capture_output=True, text=True)
         if paths.returncode not in (0, 1):
-            raise Infrastructure('Installed package paths unavailable for crash attribution')
+            # Attribution still uses package and process evidence without the paths.
+            collection_errors.append(Infrastructure('Installed package paths unavailable for crash attribution'))
         process_record = out / 'app-processes.json'
         processes = json.loads(process_record.read_text()) if process_record.exists() else []
         crashes = []
@@ -150,9 +167,11 @@ def collect_hosted_crashes(out, since):
                     'name': attribution, 'status': status, 'reason': json.dumps(found),
                     'evidence': ['coredumps.json', 'hosted-crashes.json', 'app-processes.json']}]})
     except Exception as exc:
+        collection_errors.append(exc)
+    for exc in collection_errors:
         report['journeys'].append({'id': 'hosted-crashes', 'checks': [{
             'name': 'collection', 'status': 'failed-infrastructure', 'reason': str(exc),
-            'evidence': ['coredumpctl.stderr.txt']}]})
+            'evidence': ['coredumpctl.json', 'coredumpctl.stderr.txt']}]})
     report['journeys'].append({'id': 'hosted-crashes', 'checks': [{
         'name': 'hosted crash collection unproven', 'status': 'owner-validation',
         'reason': 'Hosted crash collection is not proven armed or finished; owner validation is required',
@@ -411,7 +430,15 @@ for path in Path('/proc').glob('[0-9]*/environ'):
                 'exe':str(path.with_name('exe').resolve()),
                 'ppid':int(path.with_name('stat').read_text().split(') ',1)[1].split()[1])})
  except PermissionError:
-  if identity in known:raise RuntimeError('Cannot read owned process '+str(identity[0]))
+  if identity in known:
+   # The process can enter exit/zombie state after the first stat read. Its
+   # environment then becomes unreadable; that is retirement, not lost access
+   # to a live owned process. Keep persistent permission failures fail-closed.
+   try:
+    current=path.with_name('stat').read_text().rsplit(') ',1)[1].split()
+    if current[0] == 'Z' or current[19] != identity[1]:continue
+   except (FileNotFoundError,ProcessLookupError):continue
+   raise RuntimeError('Cannot read owned process '+str(identity[0]))
  except (OSError,IndexError): pass
 print(json.dumps(rows))
 """, {'runId': self.env['QUAL_JOURNEY_RUN'], 'known': list(self.app_processes)}, desktop=False)
@@ -692,6 +719,140 @@ class Run:
     def evidence(self, name, value):
         (self.out / (name + '.json')).write_text(json.dumps(redact(value), indent=2) + '\n')
 
+    def collect_app_logs(self, name):
+        """Snapshot logs on the app's target without changing the check verdict."""
+        folder = self.out / name
+        errors = []
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            if self.data is None:
+                raise Infrastructure('App data directory is not available')
+            snapshot = self.target.json('''
+import json,os,stat,sys
+from pathlib import Path
+root=Path(json.loads(sys.argv[1]))/'logs'
+files=[];errors=[];pending=[root];visited=0
+def alias(path):
+ return path.is_symlink() or (hasattr(path,'is_junction') and path.is_junction())
+if alias(root):raise RuntimeError('App logs directory is an alias: '+str(root))
+while pending and visited<4096:
+ base=pending.pop()
+ try:
+  if alias(base):raise RuntimeError('App log directory became an alias: '+str(base))
+  with os.scandir(base) as entries:
+   for entry in entries:
+    if visited>=4096:
+     errors.append('Traversal limit 4096 entries reached; remaining entries omitted')
+     break
+    visited+=1
+    path=Path(entry.path)
+    if alias(path):
+     errors.append(str(path)+': alias omitted');continue
+    info=entry.stat(follow_symlinks=False)
+    if stat.S_ISDIR(info.st_mode):pending.append(path)
+    elif stat.S_ISREG(info.st_mode):
+     files.append((info.st_mtime_ns,path.relative_to(root).as_posix()))
+ except Exception as exc:errors.append(str(base)+': '+str(exc))
+if pending:errors.append('Traversal limit 4096 entries reached; remaining directories omitted')
+files.sort(key=lambda item:(-item[0],item[1]))
+if len(files)>64:errors.append('File limit 64 reached; '+str(len(files)-64)+' older files omitted')
+print(json.dumps({'files':[name for _,name in files[:64]],'errors':errors}))
+''', self.data, timeout=30)
+            errors.extend(snapshot['errors'])
+            # Reserve space for omission diagnostics within the collection's 32 MB.
+            remaining = 32_000_000 - 64_000
+            # One budget for every snapshot of the run keeps the whole evidence
+            # archive within the VM extractor's 100 MB and 1000-member limits.
+            budget = self.__dict__.setdefault('log_budget', {'bytes': 40_000_000, 'files': 192})
+            for relative in snapshot['files']:
+                if remaining <= 0:
+                    errors.append('Collection limit 32 MB reached; remaining older files omitted')
+                    break
+                if budget['bytes'] <= 0 or budget['files'] <= 0:
+                    errors.append('Run log budget (40 MB, 192 files) reached; remaining older files omitted')
+                    break
+                try:
+                    result = self.target.json(r'''
+import codecs,gzip,json,re,stat,sys
+from collections import deque
+from pathlib import Path
+a=json.loads(sys.argv[1]);root=Path(a['data'])/'logs';path=root/a['relative']
+# Recheck every component: a directory may have rotated since enumeration.
+for part in [path,*path.parents]:
+ if part.is_symlink() or (hasattr(part,'is_junction') and part.is_junction()):
+  raise RuntimeError('App log path is an alias: '+str(part))
+ if part==root:break
+if not stat.S_ISREG(path.lstat().st_mode):raise RuntimeError('App log is not a regular file')
+cap=a['cap'];blocks=deque();size=0;pending='';redacting=False
+key='"sessionToken"';header=re.compile(re.escape(key)+r'\s*:\s*"')
+incomplete=re.compile(re.escape(key)+r'\s*(?::\s*)?$')
+def emit(text):
+ global size
+ if not text:return
+ block=text.encode('utf-8');blocks.append(block);size+=len(block)
+ # A little lookbehind lets the final cut avoid a partial redaction marker.
+ while blocks and size-len(blocks[0])>=cap+16:size-=len(blocks.popleft())
+def consume(text,final=False):
+ global pending,redacting
+ pending+=text
+ while pending:
+  if redacting:
+   end=pending.find('"')
+   if end<0:pending='';break
+   pending=pending[end:];redacting=False
+  start=pending.find(key)
+  if start<0:
+   keep=0 if final else min(len(pending),len(key)-1)
+   emit(pending[:len(pending)-keep]);pending=pending[len(pending)-keep:];break
+  emit(pending[:start]);pending=pending[start:]
+  match=header.match(pending)
+  if match:
+   emit(match.group()+'<redacted>');pending=pending[match.end():];redacting=True
+  elif not final and incomplete.fullmatch(pending):
+   if len(pending)>65536:raise RuntimeError('Oversized sessionToken header; file omitted')
+   break
+  else:emit(pending[:1]);pending=pending[1:]
+decoder=codecs.getincrementaldecoder('utf-8')(errors='replace')
+with path.open('rb') as raw:
+ with (gzip.GzipFile(fileobj=raw) if path.suffix=='.gz' else raw) as stream:
+  while True:
+   chunk=stream.read(65536)
+   if not chunk:break
+   consume(decoder.decode(chunk))
+consume(decoder.decode(b'',final=True),final=True)
+content=b''.join(blocks);offset=max(0,len(content)-cap)
+marker=content.find(b'<redacted>',max(0,offset-9),offset+9)
+if 0<=marker<offset<marker+10:offset=marker+10
+content=content[offset:].decode('utf-8',errors='ignore')
+print(json.dumps({'content':content,'truncated':offset>0}))
+''', {'data': self.data, 'relative': relative, 'cap': min(4_000_000, remaining, budget['bytes'])}, timeout=60)
+                    content = result['content']
+                    if result['truncated']:
+                        errors.append(relative + ': text tail truncated to saved-byte limit')
+                    destination = folder / (relative + '.txt' if relative.endswith('.gz') else relative)
+                    if destination.exists():
+                        raise Infrastructure('Evidence path already exists; file omitted: ' + relative)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_text(content, encoding='utf-8', newline='')
+                    remaining -= len(content.encode('utf-8'))
+                    budget['bytes'] -= len(content.encode('utf-8'))
+                    budget['files'] -= 1
+                except Exception as exc:
+                    errors.append(relative + ': ' + str(exc))
+        except Exception as exc:
+            errors.append(str(exc))
+        if errors:
+            try:
+                folder.mkdir(parents=True, exist_ok=True)
+                content = re.sub(r'("sessionToken"\s*:\s*")[^"]+', r'\1<redacted>', '\n'.join(errors))
+                content = (content + '\n').encode('utf-8')
+                if len(content) > 64_000:
+                    content = content[:63_900].decode('utf-8', errors='ignore').encode('utf-8') + b'\nFurther collection diagnostics omitted\n'
+                (folder / 'collection-error.txt').write_bytes(content)
+            except Exception:
+                # Even an unwritable evidence directory must not replace the failure.
+                print('App log collection error could not be recorded in ' + str(folder), file=sys.stderr)
+
     def save(self):
         report = {'schemaVersion': 1, 'lane': self.args.lane, 'runId': self.run_id,
                   'scenarios': self.definition['scenarios'], 'assets': self.facts.get('assets', {}),
@@ -715,18 +876,17 @@ class Run:
             row.update(status='passed', reason='assertions completed')
             if value is not None:
                 self.evidence(journey['id'] + '-' + name, value)
-        except OwnerValidation as exc:
-            row.update(status='owner-validation', reason=str(exc))
-        except SkippedByDecision as exc:
-            row.update(status='skipped-by-decision', reason=str(exc))
         except Exception as exc:
-            row.update(status=classify(exc), reason=str(exc))
-            (self.out / f"{journey['id']}-{name}.error.txt").write_text(traceback.format_exc())
-            if not isinstance(exc, Unavailable):
-                try:
-                    self.native.shot(journey['id'] + '-' + name + '-failure')
-                except Exception:
-                    pass
+            row.update(status='owner-validation' if isinstance(exc, OwnerValidation) else classify(exc),
+                       reason=str(exc))
+            self.collect_app_logs(journey['id'] + '-' + name + '-logs')
+            if not isinstance(exc, (OwnerValidation, SkippedByDecision)):
+                (self.out / f"{journey['id']}-{name}.error.txt").write_text(traceback.format_exc())
+                if not isinstance(exc, Unavailable):
+                    try:
+                        self.native.shot(journey['id'] + '-' + name + '-failure')
+                    except Exception:
+                        pass
         row['seconds'] = round(time.monotonic() - start, 3)
         row['evidence'] = sorted(p.name for p in set(self.out.iterdir()) - before if p.name != 'summary.json')
         print(f"{journey['id']} {name}: {row['status']} — {row['reason']}", flush=True)
@@ -799,6 +959,10 @@ except (TimeoutError,PermissionError) as exc:
     def stop_app(self):
         self.facts.pop('ui', None)
         self.facts.pop('ready', None)
+        # Closing WebDriver retires its Engine. Capture marked identities while
+        # /proc/environ is still readable; stop() rechecks PID/start ticks and
+        # excludes zombies, so shutdown cannot turn into a discovery failure.
+        identities = self.target.owned()
         if self.wd:
             try:
                 self.wd.close()
@@ -806,7 +970,6 @@ except (TimeoutError,PermissionError) as exc:
                 pass
             self.wd = None
         # Only identities observed with our inherited marker are eligible.
-        identities = self.target.owned()
         self.facts['preLaunchProcesses'] = identities
         paths = self.target.run(['dpkg-query', '-L', 'just-search']).stdout.splitlines()
         self.target.stop([row for row in identities if row['exe'].removesuffix(' (deleted)') in paths
@@ -912,6 +1075,7 @@ print(json.dumps(rows))
             raise ProductFailure('Bundled JVM crash: ' + ', '.join(c['file'] for c in crashes))
 
     def finish(self):
+        self.collect_app_logs('app-logs')
         errors = []
         try:
             logs = [(name, self.work + '/' + name) for name in
@@ -1005,7 +1169,9 @@ def main():
         for journey in definition['journeys']:
             if args.journeys and journey['id'] not in args.journeys:
                 continue
-            if journey['id'] not in phase_journeys(args.phase, args.lane) and (args.vm or args.lane == 'vm-windows') and args.lane != 'vm-linux-x11':
+            outside_phase = (journey['id'] not in phase_journeys(args.phase, args.lane)
+                             and (args.vm or args.lane == 'vm-windows') and args.lane != 'vm-linux-x11')
+            if outside_phase and not args.journeys:
                 continue
             row = {'id': journey['id'], 'title': journey['title'], 'scenarioIds': journey['scenarioIds'], 'checks': []}
             run.results.append(row)
@@ -1019,6 +1185,14 @@ def main():
                 if args.lane not in check['lanes']:
                     row['checks'].append({'name': check['id'], 'status': 'skipped-by-decision',
                                           'reason': check['applicability'], 'evidence': []})
+                elif outside_phase:
+                    reason = (f"{journey['id']} cannot run in the {args.phase} phase; requires the candidate phase")
+                    if journey['id'] == 'J5':
+                        reason = ("J5 requires a fresh valid signed predecessor and authenticated --mirror; "
+                                  + ('none supplied' if not args.predecessor or not args.mirror else
+                                     'run the predecessor phase to exercise the update'))
+                    row['checks'].append({'name': check['id'], 'status': 'unavailable',
+                                          'reason': reason, 'evidence': []})
                 elif setup_error:
                     row['checks'].append({'name': check['id'], 'status': classify(setup_error),
                                           'reason': 'setup: ' + str(setup_error), 'evidence': []})

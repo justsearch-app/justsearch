@@ -11,12 +11,15 @@ GPU host lane and conditional J9 to the same runner.
 The scenario wording is copied verbatim into every summary and checked by tests.
 This suite changes no product code and enables no application test-build feature.
 
-The hosted workflow is `qualify-release-linux.yml` (`workflow_dispatch`, `tag`).
-It requires an existing **draft**, downloads its `.deb`, MCPB and `SHA256SUMS`,
-and checks both executable assets before using either. It fetches the registry's
-`server.json` from that same tag. It has `contents: read`, no signing secrets,
-and uploads observations even when preparation fails. Dispatching it does not
-publish a release. Do not rebuild the downloaded app to qualify it.
+Dispatch `qualify-release-linux.yml` and `qualify-release-windows.yml` on main with
+`-f tag="$TAG"`. Each requires an existing **draft**. A fetch-only job uses
+`contents: write` to download its platform package, MCPB and `SHA256SUMS`, plus
+the registry's `server.json` from that same tag. The journey job has `contents: read`
+and checks both executable assets before using either. Neither workflow uses signing
+secrets or publishes a release. Both upload observations even when preparation fails.
+Read `summary.json` in `linux-release-journeys-$TAG` / `windows-release-journeys-$TAG`:
+inspect check statuses, evidence and `ownerValidation`, not just the workflow conclusion.
+Do not rebuild the downloaded app to qualify it.
 
 ## Running on disposable Ubuntu machines
 
@@ -38,7 +41,7 @@ adapter enforces this too, including direct runner invocations.
 ```sh
 xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
   python3 scripts/release/qual/journeys/hosted.py \
-    --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+    --assets /path/to/draft-assets --package JustSearch_0.3.3_amd64.deb \
     --registry /path/to/tagged/server.json --evidence /path/to/new-evidence
 ```
 
@@ -65,9 +68,9 @@ export QUAL_OWNER=w4a
 python3 scripts/release/qual/vm.py status
 python3 scripts/release/qual/journeys/vm-run.py \
   --session wayland \
-  --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+  --assets /path/to/draft-assets --package JustSearch_0.3.3_amd64.deb \
   --registry /path/to/tagged/server.json \
-  --predecessor /path/to/parent/JustSearch_0.3.0_amd64.deb \
+  --predecessor /path/to/parent/JustSearch_0.3.2_amd64.deb \
   --mirror /path/to/signed-mirror-tree \
   --driver /path/to/tauri-driver --evidence /path/to/new-wayland-evidence
 ```
@@ -92,6 +95,33 @@ the predecessor. Each overlay retains its own summary; the wrapper combines the
 candidate observations and predecessor update/retention observations into one
 Wayland summary. Predecessor preparation remains separately recorded.
 
+When no valid signed predecessor and matching authenticated mirror are available,
+omit `--predecessor` and `--mirror`. Wayland runs the candidate journeys, including
+J6 retention, and records J5 as **unavailable** with that reason. This also applies
+to explicit subsets: missing J5 coverage remains visible, and the subset is not
+complete qualification. A supplied predecessor/mirror still selects the fresh
+predecessor preparation and mandatory J5 update path in a default run. No older
+package or fabricated predecessor substitutes for the missing signed release.
+Explicitly requested journeys outside the active phase appear as unavailable
+(or a documented applicability skip), rather than disappearing from the summary.
+
+J2 Linux selects the fixture by its exact path in the settled result card, after
+quick results and semantic refinement finish; ranking cannot choose another file.
+Windows already selects the exact fixture path. Ubuntu provisioning overrides the
+delayed `update-notifier` desktop autostart, disables release-upgrade prompts, and
+restarts the login session to remove dialogs already started before provisioning.
+The crash reporter remains enabled. Every Linux SCP input is rehashed in the guest
+and compared with the host file before use.
+
+Hosted crash collection waits up to 60 seconds when systemd reports collectors
+still running. `coredumpctl.json` retains each raw exit code, stdout and stderr;
+the exact empty-journal response is not an infrastructure failure. Collection
+errors or a collector that does not finish still fail. The existing requirement
+for owner validation of crash collection remains in force. Process discovery
+captures owned identities before WebDriver shutdown and rechecks a process that
+loses environment access during exit; a live owned process with persistently
+unreadable identity evidence remains an infrastructure failure.
+
 Fresh qualification (`--mode fresh`, the default) starts from the clean OS
 base and uses production downloads. After J1–J3 (J1–J4 for the predecessor),
 the wrapper stops the guest cleanly and renames its overlay into a setup
@@ -110,9 +140,9 @@ arguments and **explicit** journey IDs, for example:
 python3 scripts/release/qual/journeys/vm-run.py \
   --session wayland --mode rerun --journeys J7 \
   --snapshot /path/to/fresh-evidence/candidate-setup/snapshot \
-  --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+  --assets /path/to/draft-assets --package JustSearch_0.3.3_amd64.deb \
   --registry /path/to/tagged/server.json \
-  --predecessor /path/to/JustSearch_0.3.0_amd64.deb --mirror /path/to/mirror \
+  --predecessor /path/to/JustSearch_0.3.2_amd64.deb --mirror /path/to/mirror \
   --driver /path/to/tauri-driver --evidence /path/to/new-rerun-evidence
 ```
 
@@ -150,7 +180,9 @@ linking `coredumps.json` and `hosted-crashes.json`. Even an empty journal cannot
 yield better than `passed-pending-owner-validation` (exit 2); a product crash
 still fails the lane. CoreDump bytes are skipped while scanning, so later diagnostic fields are retained.
 Installed package paths are read and every report is attributed
-before reports move aside, so a lookup failure leaves reports available for retry.
+before reports move aside. A lookup failure is reported as infrastructure, attribution
+continues on package and process evidence, and the reports are still recorded in
+`guest-crashes.json` and moved to `/var/crash/qualification-recorded-*`.
 A report naming Package: just-search, an installed package executable, a bundled
 JVM or a WebKit subprocess is a product finding, as is a report belonging to the
 observed app process tree. Process observations retain PID/start identities and
@@ -174,7 +206,10 @@ unlike qcow2 allocated size. Shutdown writes are outside the measured interval;
 unavailable measurements are explicit. Use one driver at a time and reuse
 setup snapshots for infrastructure reruns instead of redoing full sets.
 
-For release qualification, use the production predecessor and unchanged draft mirror in [Cut a JustSearch release](../../../../docs/how-to/cut-a-release.md#3-qualify-the-drafts-exact-bytes-without-rebuilding); the local test-build procedure below is **development-only**.
+For release qualification, use the production predecessor and unchanged draft mirror in [Cut a JustSearch release](../../../../docs/how-to/cut-a-release.md#3-qualify-the-drafts-exact-bytes-without-rebuilding).
+Record J5 unavailable only when no published v2 release and no signed rehearsal draft
+exists (the rehearsal run itself); run the remaining applicable journeys as explicit subsets
+without predecessor/mirror arguments. Never fabricate a predecessor. The local test-build procedure below is **development-only**.
 
 For local test builds, build the predecessor from the candidate's **parent** in
 a shared clone inside `$TMPDIR`, with a separate build directory. Use the same
@@ -237,7 +272,7 @@ downloads start in empty private state, never in the owner's model cache.
 python3 scripts/release/qual/journeys/corpus.py --soak \
   /path/to/reusable-soak-corpus > /path/to/soak-corpus-manifest.json
 python3 scripts/release/qual/journeys/gpu-host.py \
-  --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+  --assets /path/to/draft-assets --package JustSearch_0.3.3_amd64.deb \
   --source /path/to/exact-tagged-source --last-release v0.3.0 \
   --soak-corpus /path/to/reusable-soak-corpus \
   --driver /path/to/tauri-driver-2.0.4 --evidence /path/to/new-gpu-evidence
@@ -632,6 +667,10 @@ so a later recovery cannot turn that observation into a pass. Only transient API
 failures are retried; a product API failure seen during the deadline retains its
 attribution if the last observation is an infrastructure error.
 
+Explicit `--journeys` subsets report `status: incomplete` and exit 1 even when
+every selected check passed; a Wayland subset without predecessor inputs reports
+`failed` instead, because it adds J5 `unavailable` rows. Inspect the individual
+check statuses.
 A complete lane without failed or unavailable checks reports `status: passed`
 only when every executed result is automatically proven. Any owner-validation
 rows change it to `passed-pending-owner-validation`; `ownerValidation` lists
@@ -647,7 +686,20 @@ check fails); it cannot qualify the full release. Empty reports cannot pass.
 
 `summary.json` includes asset hashes, exact scenario wording, scope and all
 check outcomes. JSON observations redact credentials. Logs, source/corpus
-hashes, screenshots and exception traces remain alongside it. The VM wrapper
+hashes, screenshots and exception traces remain alongside it. Every check that
+raises a non-pass result immediately snapshots regular files under the app's
+data-directory `logs/` into `<journey-id>-<check-id>-logs/` (for example,
+`J3-cpu-ai-logs/`), preserving nested paths before later journeys can restart the
+app. At finish, `app-logs/` retains the same bounded log tree; the existing
+top-level `engine.log` copy remains available. Each collection scans at most 4096
+entries without following symlinks or junctions, selects at most 64 files newest
+first, and transfers one file at a time. Gzip archives are stream-decompressed on
+the target and saved as readable text with `.txt` appended to the archive name.
+Each snapshot file keeps at most 4 MB of UTF-8 text after decoding and redacting
+`sessionToken` values; a tail cut never splits a character or redaction marker.
+The total collection is capped at 32 MB, including 64 KB reserved for diagnostics.
+Omissions, truncation and collection failures are recorded in that folder's
+`collection-error.txt` without changing the check's status. The VM wrapper
 also retains provisioning logs and hosted evidence as `evidence.tar`. A green
 Linux lane does not qualify Windows, GPU or J9 work.
 
@@ -685,10 +737,11 @@ match across uninstall.
 The Windows implementation is experimental. Fixture tests and tooling probes do
 not qualify an installed app. `windows.py` is a platform adapter used by the same
 `runner.py`, result classification, crash rules and exit codes as Linux.
-`qualify-release-windows.yml` is an advisory, read-only `workflow_dispatch` lane
-for an existing draft. It verifies the NSIS/MCPB hashes before use and reads
-`server.json` from the draft tag. No signing secret, release creation or publication
-is involved. Its first step rejects a non-GitHub-hosted runner.
+`qualify-release-windows.yml` is an advisory `workflow_dispatch` lane for an existing
+draft, with the fetch-only job and result artifacts described above. It verifies
+the NSIS/MCPB hashes before use and reads `server.json` from the draft tag.
+Its first step rejects a non-GitHub-hosted runner. Windows covers J1–J6 and J8;
+J7 desktop integration is Linux-only and not applicable on Windows.
 
 The guest/hosted tooling script is `windows-tools.ps1`. It requires a disposable
 runner or the VM marker and runs elevated during provisioning. It installs Python
@@ -715,10 +768,10 @@ build tooling stays on a separate build overlay, never the clean journey overlay
 export QUAL_OWNER=w4b
 python3 scripts/release/qual/vm.py status
 windows_inputs=( \
-  --assets /path/to/windows-assets --package JustSearch_0.3.2_x64-setup.exe \
+  --assets /path/to/windows-assets --package JustSearch_0.3.3_x64-setup.exe \
   --registry /path/to/candidate/server.json \
   --driver /path/to/windows/tauri-driver.exe \
-  --predecessor /path/to/parent/JustSearch_0.3.1_x64-setup.exe \
+  --predecessor /path/to/parent/JustSearch_0.3.2_x64-setup.exe \
   --mirror /path/to/signed-test-mirror )
 # Once: tools, cached pinned Inspector, driver, corpus and release/mirror staging.
 python3 scripts/release/qual/journeys/vm-windows.py "${windows_inputs[@]}" \

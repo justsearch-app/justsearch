@@ -135,8 +135,9 @@ class UpdateTests(unittest.TestCase):
 class ClassificationTests(unittest.TestCase):
     def test_viewer_exact_fixture_needs_no_ocr_or_second_app_launch(self):
         run = Mock(binary=BINARY, work='/tmp/isolated', facts={})
+        run.require.return_value = '/tmp/isolated/corpus'
         run.wd.text.return_value = linux.OPEN_FILE
-        run.wd.element.return_value = {'element-6066-11e4-a52e-4f735466cecf':'fixture'}
+        run.wd.element.return_value = run.wd.execute.return_value = {'element-6066-11e4-a52e-4f735466cecf':'fixture'}
         run.native.screen_text.return_value = ''
         viewer = {'pid':123,'ticks':'456','exe':'/usr/bin/mousepad'}
         with patch.object(linux,'search_api',return_value={}), \
@@ -148,8 +149,9 @@ class ClassificationTests(unittest.TestCase):
 
     def test_viewer_return_never_spawns_an_unchecked_second_shell(self):
         run=Mock(binary=BINARY,work='/tmp/isolated',facts={})
+        run.require.return_value = '/tmp/isolated/corpus'
         run.wd.text.return_value=linux.OPEN_FILE
-        run.wd.element.return_value={'element-6066-11e4-a52e-4f735466cecf':'fixture'}
+        run.wd.element.return_value=run.wd.execute.return_value={'element-6066-11e4-a52e-4f735466cecf':'fixture'}
         run.native.screen_text.return_value='File Edit Document'
         with patch.object(linux,'search_api',return_value={}), \
              patch.object(linux,'receiving_viewer',return_value={'pid':123,'ticks':'456','exe':'/usr/bin/mousepad'}), \

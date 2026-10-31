@@ -228,9 +228,17 @@ def search_open(run):
     run.wd.click('button[data-tier="search"]')
     selector = 'textarea[data-testid="sv3-composer-input"]'
     run.wd.keys(selector, QUERY + '\ue007')
-    wait_for(lambda: OPEN_FILE in run.wd.text(), 'Fixture visible in search UI', seconds=45)
+    fixture = run.require('corpus') + '/' + OPEN_FILE
+    hit = wait_for(lambda: run.wd.execute("""
+const card=all(document,'jf-results-card').find(e=>{
+ const s=e.snapshot, r=e.getBoundingClientRect();
+ return r.width>0 && r.height>0 && s?.query===arguments[1] &&
+  !s.isSearching && !s.isRefining && s.passStage!=='quick';
+});
+return card?.shadowRoot ? all(card.shadowRoot,'[data-testid="search-result-row"]').find(e=>
+ e.getAttribute('data-addressable-id')===arguments[0] && e.getBoundingClientRect().height>0) || null : null;
+""", [fixture, QUERY]), 'Exact fixture row after search refinement', seconds=45)
     # WebDriver's real secondary mouse click opens the result's context menu.
-    hit = run.wd.element('[data-testid="search-result-row"]', seconds=5)
     hit_key = hit['element-6066-11e4-a52e-4f735466cecf']
     run.wd.call(f'/session/{run.wd.session}/actions', {'actions': [{'type': 'pointer', 'id': 'mouse',
         'parameters': {'pointerType': 'mouse'}, 'actions': [

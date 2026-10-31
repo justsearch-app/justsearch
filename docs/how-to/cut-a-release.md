@@ -51,18 +51,26 @@ gh run view "$RUN" --json headSha,event,status,jobs
 packaging evidence. Selection and triage are agent work; `release-candidate.mjs admit`
 checks release identity and keys, not this CI selection policy.
 
+Inspect the latest packaging-smoke result; a fresh run at the candidate SHA is not required
+for a version/changelog-only PR. Require the release workflow's packaged smoke to pass on
+the tagged bytes before qualifying the draft.
+
 Create the release branch at that SHA. Edit only the canonical `version` in
 `gradle.properties`, then sync the app, Cargo/npm app lock identities, MCPB manifest,
-registry version, URL and bundle hash. Root/frontend npm package versions identify tooling,
-not the shipped application. Add user-facing entries under `CHANGELOG.md`'s Unreleased section.
-For example, with `VERSION` set to the new `X.Y.Z`:
+registry version, URL, bundle hash and the `shell` crate line in `THIRD_PARTY_NOTICES`.
+Root/frontend npm package versions identify tooling, not the shipped application.
+Add user-facing entries under `CHANGELOG.md`'s Unreleased section.
+Before opening the PR, run these checks and the applicable
+[subject checks](../reference/contributing/pre-merge-checks.md), with `VERSION` set to the new `X.Y.Z`:
 
 ```bash
 node scripts/ci/sync-version.mjs --require-release-semver
 node scripts/ci/sync-version.mjs --check
+node --test scripts/ci/sync-version.test.mjs
 node scripts/release/release-changelog.mjs prepare --version "$VERSION" --date "$(date -u +%F)" --write
 node scripts/release/release-changelog.mjs check
 node scripts/ci/check-mcpb-consistency.mjs --release-version "$VERSION"
+node scripts/governance/gates/test-intent/cli.mjs
 ```
 
 Merge one PR containing the version projections and changelog through the normal main checks.
@@ -101,7 +109,10 @@ are downloadable from this public repository before promotion, until they expire
 release stays a private draft; nothing is promoted or put on the update feed before
 `publish-release.yml`.
 
-A failed candidate is never re-tagged. Fix on main and use `vX.Y.(Z+1)`.
+A failed tag build is never re-tagged, even if it failed before signing. Fix on main and use
+the next patch version. Move the failed tag's changelog entries back to Unreleased, remove
+its section and comparison link, then prepare the next version in the new release PR.
+Keep published changelog sections intact and leave the failed tag unchanged.
 For an upload-only failure, **Re-run failed jobs** on the same run reuses immutable signed
 outputs; existing assets must match byte for byte. A partial draft remains private.
 Artifacts expire after 14 days; abandon an incomplete candidate after expiry.
@@ -125,14 +136,18 @@ gh workflow run qualify-release-windows.yml --ref main -f tag="$TAG"
 gh workflow run qualify-release-linux.yml --ref main -f tag="$TAG"
 ```
 
-Require `isDraft=true` and candidate identity matching the tag/merge commit. The two hosted
-workflows have the single input `tag` and read-only release access; they upload observations
-on every outcome. They do not publish. Watch each run to completion, including failures/stalls.
+Require `isDraft=true` and candidate identity matching the tag/merge commit. Dispatch both hosted
+workflows with `tag` as above. Their fetch-only jobs use `contents: write` to download the draft;
+journey jobs have `contents: read`. They do not publish. Watch each run to completion, including
+failures/stalls. Download `linux-release-journeys-$TAG` and `windows-release-journeys-$TAG` from
+their respective runs. Read `summary.json` in each artifact: inspect individual check statuses,
+reasons, evidence and `ownerValidation` items, not just the workflow conclusion.
 
 Keep the test list short:
 
-- **J1–J8:** install/launch; add a folder, index, search and open; default Install AI;
+- **Linux J1–J8; Windows J1–J6 and J8:** install/launch; add a folder, index, search and open; default Install AI;
   restart/persistence; update/recovery; uninstall/reinstall retention; desktop integration; MCP.
+  J7 desktop integration is Linux-only and not applicable on Windows. J5 requires a signed v2 predecessor.
 - **GPU:** private Linux host lane with the draft's unchanged registry and production pack URLs.
   J9 is a 60-minute soak only when indexing, enrichment or inference changed.
 - **Exploration:** one exploring agent per clean VM, using its screen, at most 45 minutes each.
@@ -144,17 +159,25 @@ for tools and evidence inputs. Their test-key/rebuild procedure is **development
 release qualification uses the production-trusting packages and mirror below. Do not rebuild,
 re-sign, generate test signing keys or enable `JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE`.
 
-Both full VM lanes (Ubuntu Wayland and Windows) need a **lower-version, production-pinned,
-production-signed predecessor** for J5. Use the previous published release when it speaks
-descriptor v2 on both targets. For the first release after 0.3.0, the **never-published
-signing-rehearsal draft** is the intended predecessor: for example, rehearsal `v0.3.1`, real
-candidate `v0.3.2`. The release producer covers the candidate's current store register as well
-as the last published release's register, including retired predecessor stores. This lets a
-rehearsal built from the same register, or an earlier subset, serve as the v2 predecessor
-when the candidate can read every installed store's format and its identity matches.
-Keep the rehearsal's original packages and signing/build evidence; never publish it or use
-0.3.0 as the v2 predecessor. For later releases, use the published v2 predecessor as above.
-Download the selected predecessor separately and hash-check it:
+J5 on Ubuntu Wayland and Windows needs a **lower-version, production-pinned,
+production-signed descriptor v2 predecessor**. Use the previous published v2 release.
+For the first release after 0.3.0, the **never-published signing-rehearsal draft** is the
+intended predecessor: rehearsal `v0.3.2`, real candidate `v0.3.3`. The earlier `v0.3.1`
+failed before signing and was never re-tagged. The release producer covers the candidate's
+current store register as well as the last published release's register, including retired
+predecessor stores. This lets a rehearsal built from the same register, or an earlier subset,
+serve as the v2 predecessor when the candidate can read every installed store's format and
+its identity matches. Keep the rehearsal's original packages and signing/build evidence;
+never publish it or use 0.3.0 as the v2 predecessor. For later releases, use the published
+v2 predecessor as above.
+
+Record J5 **unavailable** only when no published v2 release and no signed rehearsal draft
+exists (the rehearsal run itself). Never substitute 0.3.0, an unsigned failed build or
+fabricated metadata. Run the remaining applicable journeys as explicit subsets without
+predecessor/mirror arguments. A fresh Wayland subset reports `failed` (exit 1) only because
+of its added J5 **unavailable** rows; the Windows subset omits J5 and reports `incomplete`
+(exit 1). Confirm every other check passed and record the J5 gap in the
+release evidence. When a predecessor exists, download it separately and hash-check it:
 
 ```bash
 # PREDECESSOR_TAG is the selected published v2 release or never-published rehearsal tag.
@@ -190,7 +213,7 @@ These checks do not certify a particular package pair; qualify the selected byte
 If a pin, target, compatibility entry or sequence prevents the update, report J5 blocked
 with that exact mismatch; never edit signed metadata to make it pass.
 
-Populate `MIRROR="$QUAL/mirror"` from the **candidate draft's own hash-checked downloads**.
+For J5, populate `MIRROR="$QUAL/mirror"` from the **candidate draft's own hash-checked downloads**.
 Use their exact filenames and the paths in the signed descriptor's production URLs:
 
 ```text
@@ -221,7 +244,10 @@ cmp "$NSIS" "$VERSIONED/$(basename "$NSIS")" || exit 1
 The VM's generated test CA stands in **only for github.com TLS**. The mirror serves the
 unchanged production-signed metadata and packages; no release private key is needed.
 Run the lanes sequentially with separately prepared Linux/Windows tauri-driver tooling
-from the journey README (`LINUX_DRIVER`/`WINDOWS_DRIVER` below):
+from the journey README (`LINUX_DRIVER`/`WINDOWS_DRIVER` below). These full-lane commands
+require the predecessor. Without one, omit `--predecessor`/`--mirror` from both lane inputs,
+add `--journeys J1 J2 J3 J4 J6 J7 J8` to the Wayland run and
+`--journeys J1 J2 J3 J4 J6 J8` to the Windows journey run (not `--mode prepare`):
 
 ```bash
 export QUAL_OWNER=release-qualification
@@ -251,7 +277,10 @@ PREVIOUS_TAG=$(gh release view --repo "$REPO" --json tagName --jq .tagName)
 ```
 
 **Never pass `--development-pack-mirror`** for release qualification. The runner decides
-J9 relevance from that source's release diff. Development subsets/resume results are not full acceptance.
+J9 relevance from that source's release diff. Explicit `--journeys` subsets report
+`status: incomplete` and exit 1 even when every selected check passed; a Wayland subset
+without predecessor inputs reports `failed` instead, because it adds J5 **unavailable**
+rows. Inspect each check's status; keep subset/resume evidence separate from full acceptance.
 
 **Coverage limits:** the journey implementations remain experimental; their READMEs record
 unqualified paths. Hosted crash coverage can cap an otherwise successful run at pending
@@ -298,7 +327,14 @@ the corpus**. Finish those actions through the screen before inviting validation
 currently no automated restore of qualified application snapshots into this owner view.
 
 Give the owner one page: version, what changed, journey results, what was not tested and
-known issues. Update the draft's notes from that summary, filling `Not tested` and `Known issues`;
+known issues. Include every `ownerValidation` item and its evidence:
+
+- J1 first-run text: review each lane's `J1-desktop-first-run.png` for readable, correct text.
+- Linux J7 cold deep link: review `J7-deep-link-cold.png` for the intended destination.
+- Hosted crash collection unproven: review `coredumps.json`/`hosted-crashes.json` and the lane's
+  crash records; record the collection gap even when no crash was found. This item has no screenshot.
+
+Update the draft's notes from that summary, filling `Not tested` and `Known issues`;
 retain the hidden candidate-identity marker. The owner tries the result for about **10 minutes**
 and replies **"publish"** or names what is wrong. Agents handle preparation, evidence and
 triage. Estimate: 15–30 minutes preparation per VM plus indexing/download time.

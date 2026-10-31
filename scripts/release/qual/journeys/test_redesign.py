@@ -371,6 +371,90 @@ class PollingTests(unittest.TestCase):
 
 
 class CrashTests(unittest.TestCase):
+    def test_failed_path_lookup_preserves_product_and_infrastructure_verdicts(self):
+        self.assert_collection_verdicts(lookup='failed')
+
+    def test_path_lookup_timeout_preserves_product_and_infrastructure_verdicts(self):
+        self.assert_collection_verdicts(lookup='timeout')
+
+    def test_report_move_failure_preserves_product_and_infrastructure_verdicts(self):
+        self.assert_collection_verdicts(lookup='ok', move_fails=True)
+
+    def test_report_move_and_lookup_failures_preserve_all_verdicts(self):
+        for lookup in ('failed', 'timeout'):
+            with self.subTest(lookup=lookup):
+                self.assert_collection_verdicts(lookup=lookup, move_fails=True)
+
+    def assert_collection_verdicts(self, *, lookup, move_fails=False):
+        from test_repair5 import Round2Tests
+        for during_setup in (False, True):
+            for attribution in ('package', 'process'):
+                with self.subTest(during_setup=during_setup, attribution=attribution), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'crash'; root.mkdir()
+                    out = Path(temp) / 'out'
+                    disk = Path(temp) / 'disk'; disk.touch()
+                    started = {'pid': os.getpid(), 'disk': str(disk)}
+                    args = NS(session='wayland', memory_mib=8192, memory_reason=None, mirror=None, mode='rerun')
+                    fields = 'Package: just-search\n' if attribution == 'package' else 'ProcStatus:\n Pid: 78\n PPid: 77\n'
+                    (root / 'app.crash').write_text('ExecutablePath: /tmp/unknown\nSignal: 11\n' + fields)
+                    original = Round2Tests().crash_ssh(root)
+                    def ssh(_, command, **kw):
+                        if command == 'dpkg-query -L just-search':
+                            if lookup == 'timeout':
+                                raise subprocess.TimeoutExpired(command, 30, output='/tmp/unknown\n')
+                            # Partial stdout from a failed lookup must not be trusted.
+                            return NS(returncode=0 if lookup == 'ok' else 2,
+                                      stdout='' if lookup == 'ok' else '/tmp/unknown\n')
+                        return original(_, command, **kw)
+                    def guest_root(_, command):
+                        if command.startswith('mkdir '):
+                            self.assertTrue((out / 'guest-crashes.json').is_file())
+                            if move_fails:
+                                raise subprocess.CalledProcessError(1, command, stderr='mv: Permission denied')
+                            subprocess.run(['sh', '-c', command.replace('/var/crash', str(root))], check=True)
+                    def prepare(args, out):
+                        (out / 'run').mkdir()
+                        (out / 'run/app-processes.json').write_text(json.dumps([SHELL]))
+                        if during_setup:
+                            wrapper.crash_evidence(out)
+                    def execute(args, out, *a):
+                        (out / 'summary.json').write_text(json.dumps({'journeys': [], 'fullSelection': True}))
+                        return 0
+                    with patch.object(wrapper, 'pins'), patch.object(wrapper.vm, 'wait_free'), \
+                         patch.object(wrapper, 'ports_available', return_value=True), patch.object(wrapper.vm, 'start'), \
+                         patch.object(wrapper.vm, 'require_owner', return_value=started), patch.object(wrapper.vm, 'wait_ssh'), \
+                         patch.object(wrapper.vm, 'guest_root', side_effect=guest_root), patch.object(wrapper, 'provision'), \
+                         patch.object(wrapper, 'prepare_desktop', side_effect=prepare), \
+                         patch.object(wrapper, 'execute', side_effect=execute), \
+                         patch.object(wrapper.vm, 'ssh', side_effect=ssh), \
+                         patch.object(wrapper.vm, 'config', return_value={'password': 'guest'}), \
+                         patch.object(wrapper.vm, 'read_state', return_value=started), \
+                         patch.object(wrapper.vm, 'stop', return_value=True), patch.object(wrapper, 'Target') as target:
+                        target.return_value.json.side_effect = runner.Infrastructure('No VM counters in this test')
+                        wrapper.run_overlay(args, out, 'candidate', ['J7'])
+                    report = json.loads((out / 'summary.json').read_text())
+                    # A failed move leaves the report for the final sweep to collect again.
+                    sweeps = 2 if during_setup and move_fails else 1
+                    self.assertEqual(report['counts']['failed-product'], sweeps)
+                    self.assertEqual(report['counts']['failed-infrastructure'],
+                                     sweeps * ((lookup != 'ok') + move_fails))
+                    checks = [c for j in report['journeys'] for c in j['checks']]
+                    reasons = [c['reason'] for c in checks if c['status'] == 'failed-infrastructure']
+                    if lookup != 'ok':
+                        lookup_reason = 'timed out' if lookup == 'timeout' else 'package paths unavailable'
+                        self.assertEqual(sum(lookup_reason in r for r in reasons), sweeps)
+                    if move_fails:
+                        self.assertEqual(sum('mv --' in r for r in reasons), sweeps)
+                    crashes = json.loads((out / 'guest-crashes.json').read_text())
+                    self.assertEqual(len(crashes), sweeps)
+                    for crash in crashes:
+                        self.assertEqual(crash['attribution'], 'product')
+                        self.assertEqual(crash['fields']['Signal'], '11')
+                    self.assertEqual(report['guestCrashes'], crashes)
+                    self.assertEqual((root / 'app.crash').exists(), move_fails)
+                    self.assertEqual(len(list(root.glob('qualification-recorded-*/app.crash'))),
+                                     0 if move_fails else 1)
+
     def test_attribution_is_completed_before_reports_move(self):
         from test_repair5 import Round2Tests
         with tempfile.TemporaryDirectory() as temp:
@@ -391,18 +475,43 @@ class CrashTests(unittest.TestCase):
                  self.assertRaisesRegex(AssertionError,'Product crash'):
                 wrapper.crash_evidence(out)
 
-    def test_failed_path_lookup_keeps_crashes_in_place_for_retry(self):
+    def test_failed_path_lookup_records_and_moves_unattributed_crashes(self):
         from test_repair5 import Round2Tests
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)/'crash';root.mkdir();out=Path(temp)/'out';out.mkdir()
             (root/'app.crash').write_text('ExecutablePath: /tmp/unknown\n')
             original=Round2Tests().crash_ssh(root)
             def ssh(_,command,**kw):
-                return NS(returncode=2,stdout='') if command=='dpkg-query -L just-search' else original(_,command,**kw)
-            with patch.object(wrapper.vm,'ssh',ssh),patch.object(wrapper.vm,'guest_root') as move, \
+                return NS(returncode=2,stdout='/tmp/unknown\n') if command=='dpkg-query -L just-search' else original(_,command,**kw)
+            def move(_,command):
+                subprocess.run(['sh','-c',command.replace('/var/crash',str(root))],check=True)
+            with patch.object(wrapper.vm,'ssh',ssh),patch.object(wrapper.vm,'guest_root',side_effect=move) as moved, \
                  patch.object(wrapper.vm,'config',return_value={'password':'guest'}),self.assertRaises(runner.Infrastructure):
                 wrapper.crash_evidence(out)
-            move.assert_not_called()
+            moved.assert_called_once()
+            self.assertEqual(json.loads((out/'guest-crashes.json').read_text())[0]['attribution'],'unattributed')
+            self.assertFalse((root/'app.crash').exists())
+            self.assertEqual(len(list(root.glob('qualification-recorded-*/app.crash'))),1)
+
+    def test_failed_lookup_and_move_both_reach_unattributed_or_before_install_errors(self):
+        from test_repair5 import Round2Tests
+        for before_install in (False, True):
+            with self.subTest(before_install=before_install), tempfile.TemporaryDirectory() as temp:
+                root=Path(temp)/'crash';root.mkdir();out=Path(temp)/'out';out.mkdir()
+                (root/'app.crash').write_text('ExecutablePath: /tmp/unknown\n')
+                original=Round2Tests().crash_ssh(root)
+                def ssh(_,command,**kw):
+                    return NS(returncode=2,stdout='') if command=='dpkg-query -L just-search' else original(_,command,**kw)
+                def move(_,command):
+                    raise subprocess.CalledProcessError(1,command,stderr='mv: Permission denied')
+                with patch.object(wrapper.vm,'ssh',ssh),patch.object(wrapper.vm,'guest_root',side_effect=move), \
+                     patch.object(wrapper.vm,'config',return_value={'password':'guest'}), \
+                     self.assertRaises(runner.Infrastructure) as raised:
+                    wrapper.crash_evidence(out,before_install=before_install)
+                self.assertIn('package paths unavailable',str(raised.exception))
+                secondary=getattr(raised.exception,'collection_errors',[])
+                self.assertEqual(len(secondary),1)
+                self.assertIn('mv --',str(secondary[0]))
 
     def test_unattributed_crash_is_listed_in_combined_summary_without_product_failure(self):
         crash={'file':'/var/crash/helper.crash','attribution':'unattributed','fields':{'ExecutablePath':'/tmp/helper'}}

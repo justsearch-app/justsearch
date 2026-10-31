@@ -636,8 +636,18 @@ def guest_root(os_name, command):
 def copy_in(os_name, src, dst):
     require_owner(os_name)
     cfg = config()
+    if os_name == 'ubuntu':
+        checksum = hashlib.sha256()
+        with Path(src).open('rb') as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b''):
+                checksum.update(block)
     run('scp', *ssh_args(os_name), '-P', str(OS[os_name]['ssh']), src,
         f"{cfg['user']}@127.0.0.1:{dst}")
+    if os_name == 'ubuntu':
+        result = ssh(os_name, 'sha256sum -- ' + shlex.quote(str(dst)),
+                     capture_output=True, text=True, check=True, timeout=120)
+        if result.stdout.split(maxsplit=1)[:1] != [checksum.hexdigest()]:
+            raise RuntimeError('Guest copy SHA-256 differs from host file: ' + str(dst))
 
 
 def wait_ssh(os_name, timeout=600):

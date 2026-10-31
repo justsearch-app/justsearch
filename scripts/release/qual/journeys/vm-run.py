@@ -79,8 +79,6 @@ def parse_args():
         parser.error('Fresh qualification cannot inherit a setup snapshot')
     if args.memory_mib != vm.MEMORY_MIB and not args.memory_reason:
         parser.error('Nondefault memory requires --memory-reason with journey evidence')
-    if args.session == 'wayland' and args.mode == 'fresh' and (not args.predecessor or not args.mirror):
-        parser.error('VM desktop lanes require --predecessor and --mirror for J5')
     return args
 
 
@@ -140,6 +138,14 @@ def provision(args, out):
     vm.guest_root('ubuntu', 'systemctl mask --now snapd.service snapd.socket '
                   'fwupd.service fwupd-refresh.timer apt-daily.service apt-daily.timer '
                   'apt-daily-upgrade.service apt-daily-upgrade.timer unattended-upgrades.service')
+    # update-notifier is a delayed XDG desktop autostart, not an apt service.
+    # Its user override survives package installs; release checking is separately
+    # disabled. Restart GDM below to retire dialogs already started at login.
+    vm.guest_root('ubuntu', "set -eu; install -d -o qual -g qual /home/qual/.config/autostart; "
+                  "printf '[Desktop Entry]\\nType=Application\\nName=Update Notifier\\nHidden=true\\n' "
+                  "> /home/qual/.config/autostart/update-notifier.desktop; "
+                  "chown qual:qual /home/qual/.config/autostart/update-notifier.desktop; "
+                  "sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades")
     with (out / 'provision.log').open('wb') as log:
         command = ('env DEBIAN_FRONTEND=noninteractive apt-get update && '
                    'env DEBIAN_FRONTEND=noninteractive apt-get install -y '
@@ -163,8 +169,8 @@ def provision(args, out):
                   + node + '/bin/npm /usr/local/bin/npm; ln -s ' + node + '/bin/npx /usr/local/bin/npx')
     if args.session == 'x11':
         vm.guest_root('ubuntu', r"sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm3/custom.conf; "
-                      "sed -i 's/^Session=.*/Session=ubuntu-xorg/;s/^XSession=.*/XSession=ubuntu-xorg/' /var/lib/AccountsService/users/qual; "
-                      'systemctl restart gdm3')
+                      "sed -i 's/^Session=.*/Session=ubuntu-xorg/;s/^XSession=.*/XSession=ubuntu-xorg/' /var/lib/AccountsService/users/qual")
+    vm.guest_root('ubuntu', 'systemctl restart gdm3')
 
 
 def crash_evidence(out, *, before_install=False):
@@ -226,10 +232,17 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
                         row['fields'][key] = value.strip()
                 fields.append(row)
         # Resolve attribution while the original reports are still present.
-        installed = vm.ssh('ubuntu', 'dpkg-query -L just-search', capture_output=True, text=True, timeout=30)
-        if installed.returncode not in (0, 1):
-            raise Infrastructure('Installed package paths unavailable for crash attribution; reports retained in place')
-        paths = set(installed.stdout.splitlines()) if installed.returncode == 0 else set()
+        collection_errors = []
+        paths = set()
+        try:
+            installed = vm.ssh('ubuntu', 'dpkg-query -L just-search', capture_output=True, text=True, timeout=30)
+            if installed.returncode not in (0, 1):
+                raise Infrastructure('Installed package paths unavailable for crash attribution')
+            if installed.returncode == 0:
+                paths = set(installed.stdout.splitlines())
+        except Exception as exc:
+            # Package and process evidence can still identify a product crash.
+            collection_errors.append(exc)
         process_record = out / ('evidence' if (out / 'evidence').is_dir() else 'run') / 'app-processes.json'
         processes = json.loads(process_record.read_text()) if process_record.exists() else []
         if before_install:
@@ -241,11 +254,19 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
         previous = json.loads(record.read_text()) if record.exists() else []
         record.write_text(json.dumps(previous + fields, indent=2) + '\n')
         recorded = '/var/crash/qualification-recorded-' + str(time.time_ns())
-        vm.guest_root('ubuntu', 'mkdir ' + shlex.quote(recorded) + '; mv -- '
-                      + shlex.join('/var/crash/' + n for n in names) + ' ' + shlex.quote(recorded) + '/')
+        try:
+            vm.guest_root('ubuntu', 'mkdir ' + shlex.quote(recorded) + '; mv -- '
+                          + shlex.join('/var/crash/' + n for n in names) + ' ' + shlex.quote(recorded) + '/')
+        except Exception as exc:
+            collection_errors.append(exc)
         product = [r for r in fields if r['attribution'] == 'product']
         if product:
-            raise AssertionError('Product crash in guest: ' + json.dumps(product))
+            failure = AssertionError('Product crash in guest: ' + json.dumps(product))
+            failure.collection_errors = collection_errors
+            raise failure
+        if collection_errors:
+            collection_errors[0].collection_errors = collection_errors[1:]
+            raise collection_errors[0]
 
 
 def record_unattributed_crashes(report, out):
@@ -415,7 +436,11 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         if isinstance(exc, AssertionError):
             report['journeys'][0]['checks'][0].update(status='failed-product',
                 evidence=['../guest-crashes.json', '../guest-crashes.tar'])
-            report.update(summarize(report['journeys'], report.get('fullSelection', False)))
+        for error in getattr(exc, 'collection_errors', []):
+            report['journeys'].append({'id': 'guest-crashes', 'checks': [{
+                'name': 'collection', 'status': 'failed-infrastructure', 'reason': str(error),
+                'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
+        report.update(summarize(report['journeys'], report.get('fullSelection', False)))
         (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
         (out / 'wrapper-error.txt').write_text(repr(exc) + '\n')
         return 1
@@ -425,10 +450,11 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
                 crash_evidence(out)
             except Exception as exc:
                 report = json.loads((out / 'summary.json').read_text())
-                report['journeys'].append({'id': 'guest-crashes', 'checks': [{
-                    'name': 'guest-crashes', 'status': 'failed-product' if isinstance(exc, AssertionError)
-                    else 'failed-infrastructure', 'reason': str(exc),
-                    'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
+                for error in [exc, *getattr(exc, 'collection_errors', [])]:
+                    report['journeys'].append({'id': 'guest-crashes', 'checks': [{
+                        'name': 'guest-crashes', 'status': 'failed-product' if isinstance(error, AssertionError)
+                        else 'failed-infrastructure', 'reason': str(error),
+                        'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
                 report.update(summarize(report['journeys'], report.get('fullSelection', False)))
                 (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
             report = json.loads((out / 'summary.json').read_text())
@@ -504,17 +530,23 @@ def main():
             raise Infrastructure('J1/J2 require fresh setup; use --mode fresh --journeys with explicit prerequisites')
         stage('rerun', manifest['pins']['phase'], args.journeys, args.snapshot)
     elif args.journeys:
-        stage('selected', 'candidate', args.journeys, seal=True)
+        selected = list(args.journeys)
+        if args.session == 'wayland' and (not args.predecessor or not args.mirror) and 'J5' not in selected:
+            selected.append('J5')  # Record missing update coverage even for diagnostic subsets.
+        stage('selected', 'candidate', selected, seal=True)
     elif args.session == 'x11':
         stage('candidate', 'candidate', ['J1'])
     else:
-        phases = ['candidate', 'predecessor'] if args.session == 'wayland' else ['candidate']
+        update_available = args.session == 'wayland' and args.predecessor and args.mirror
+        phases = ['candidate', 'predecessor'] if update_available else ['candidate']
         for phase in phases:
             setup = ['J1', 'J2', 'J3'] + (['J4'] if phase == 'predecessor' else [])
             name = phase + '-setup'
             stage(name, phase, setup, seal=True)
             snapshot = out / name / 'snapshot'
             remaining = ['J5', 'J6'] if phase == 'predecessor' else ['J4', 'J7', 'J8']
+            if args.session == 'wayland' and not update_available:
+                remaining = ['J4', 'J5', 'J6', 'J7', 'J8']
             if args.session == 'hosted':
                 remaining = ['J4', 'J5', 'J6', 'J7', 'J8']  # Retain explicit VM-only decision skips.
             if snapshot.exists():
