@@ -48,18 +48,36 @@ beforeEach(() => {
   __feedForTest({ inference: { mode: 'online', available: true } as never,
     status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot });
   __feedContactForTest(); terminal = 'done';
-  fetchMock = vi.fn(async (url: unknown) => {
+  const saved = new Map<string, typeof messages>([['mixed', messages]]);
+  fetchMock = vi.fn(async (url: unknown, init?: RequestInit) => {
     const href = String(url);
     const reply = (body: unknown): object => ({ ok: true, status: 200, json: async () => body });
-    if (href.endsWith('/api/chat/dispatch')) return new Response(terminal === 'empty'
+    if (href.endsWith('/api/chat/dispatch')) {
+      const body = JSON.parse(String(init?.body)) as { conversationId: string; prompt: string; shapeId: string };
+      if (terminal === 'done') {
+        const previous = saved.get(body.conversationId) ?? [];
+        saved.set(body.conversationId, [...previous,
+          { id: crypto.randomUUID(), role: 'user', content: body.prompt, shapeId: body.shapeId },
+          { id: crypto.randomUUID(), role: 'assistant', content: '{"text":"JSON"}', shapeId: body.shapeId },
+        ]);
+      }
+      return new Response(terminal === 'empty'
       ? 'event: error\ndata: {"errorCode":"NO_CONTENT","error":"No matching documents found in the index"}\n\n'
       : 'event: done\ndata: {"finalResponse":"{\\"text\\":\\"JSON\\"}"}\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+    }
     if (href.includes('/branch?')) return reply({ sessionId: 'fork' });
-    if (href.includes('/history')) return reply({ sessionId: href.includes('/mixed/') ? 'mixed' : 'fork', messages: href.includes('/mixed/') ? messages : [] });
-    if (href.includes('/api/thread/')) return reply({ conversationId: 'mixed', events: href.endsWith('/mixed')
-      ? messages.map((m, i) => ({ id: m.id, occurredAt: `2026-10-23T00:00:0${i}Z`,
+    if (href.includes('/history')) {
+      const id = decodeURIComponent(href.split('/conversations/')[1]!.split('/')[0]!);
+      return reply({ sessionId: id, messages: saved.get(id) ?? [] });
+    }
+    if (href.includes('/api/thread/')) {
+      const id = decodeURIComponent(href.split('/api/thread/')[1]!);
+      return reply({ conversationId: id, events: (saved.get(id) ?? []).map((m, i) => ({
+        id: m.id, occurredAt: `2026-10-23T00:00:0${i}Z`,
         kind: m.role === 'user' ? 'USER_MESSAGE' : m.terminalError ? 'ERROR' : 'ASSISTANT_MESSAGE',
-        content: m.content, originator: m.role, attributes: { ...m } })) : [] });
+        content: m.content, originator: m.role, attributes: { ...m },
+      })) });
+    }
     if (href.endsWith('/api/chat/conversations')) return reply({ sessions: [{ sessionId: 'mixed', createdAtMs: 1,
       lastActiveAtMs: 2, messageCount: messages.length, firstUserMessage: question, shapeId: 'core.rag-ask' }] });
     return reply({});
@@ -116,14 +134,21 @@ it.each(['retry', 'edit'])('DS1 cold Structured %s refuses before fork with B ke
   expect(view.shadowRoot!.textContent).toContain('original schema or summary input is not available');
 });
 it('remembered Structured Retry reuses its schema without becoming a model answer', async () => {
-  const view = await mount(true);
-  const main = part(view, 'jf-sv3-main');
-  const turnId = main.shadowRoot!.querySelectorAll('[data-testid="sv3-turn-question"]')[2]!.getAttribute('data-item-id')!.replace(/:q$/, '');
-  (view as unknown as { askDomain: { structuredInputs: Map<string, unknown> } }).askDomain.structuredInputs = new Map([[turnId, { schema, scope: null }]]);
-  main.dispatchEvent(new CustomEvent('sv3-branch-action', { bubbles: true, composed: true, detail: { action: 'retry', turnId } }));
+  const view = await mount();
+  const scope = { paths: ['docs/original.md'] };
+  const selection = { kind: 'result-set', items: [{ id: 'docs/original.md', kind: 'search-hit' }] };
+  await (view as unknown as { askDomain: { runAsk(text: string, scope: { paths: string[] }, schema: string): Promise<void> } })
+    .askDomain.runAsk('extract', scope, schema);
   await settle(view);
   expect(dispatches()).toHaveLength(1);
-  expect(dispatches()[0]).toMatchObject({ shapeId: 'core.extract', schema });
+  expect(dispatches()[0]).toMatchObject({ shapeId: 'core.extract', schema, selection });
+  const main = part(view, 'jf-sv3-main');
+  const turnId = main.shadowRoot!.querySelector('[data-testid="sv3-turn-question"]')!.getAttribute('data-item-id')!.replace(/:q$/, '');
+  main.dispatchEvent(new CustomEvent('sv3-branch-action', { bubbles: true, composed: true, detail: { action: 'retry', turnId } }));
+  await settle(view);
+  const reruns = dispatches().slice(1);
+  expect(reruns).toHaveLength(1);
+  expect(reruns[0]).toMatchObject({ shapeId: 'core.extract', schema, selection });
 });
 
 it.each(['ask', 'structured', 'model-only'] as const)('X8 %s sends operator characters as prompt text', async mode => {

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-10-31T01:40:12.926Z",
-  "revision": "9233210d09798316a1d7f793a46ac31d28b10a8a",
-  "tree": "cbd340485efedf05e868fb35ab10922484b70d80",
+  "createdAt": "2026-10-31T02:45:17.036Z",
+  "revision": "8def52f703da865f4d6c8cb850493fd282daa38d",
+  "tree": "a028c017530206c6f4da3959adb4c2db81d9c669",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.askPreservation.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/wqei01dr/tmp/test-intent-vitest-3-1793410801213.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.askPreservation.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/h1qiwnzp/tmp/test-intent-vitest-3-1793414703089.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 11711
+      "durationMs": 13943
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.askPreservation.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.askPreservation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:cfd9439809facf05217896baaf600e8f3e722862d83017625d0fbeb10d7cf46a",
+      "contentDigest": "sha256:30013bd414af667045430b332e38e03f67593be8a95b6eb27c3df4179b1b7d08",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,6 +57,18 @@
         {
           "name": "rejects invalid Structured schema [] before issuance and preserves its draft",
           "status": "passed"
+        },
+        {
+          "name": "the Ask owner rejects invalid Structured schema { at the submit-event boundary and keeps its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the Ask owner rejects invalid Structured schema null at the submit-event boundary and keeps its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the Ask owner rejects invalid Structured schema [] at the submit-event boundary and keeps its draft",
+          "status": "passed"
         }
       ]
     },
@@ -64,7 +76,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:3a878a516709675cc9d7919819e15bf57e07686837d8069449d8438185a78600",
+      "contentDigest": "sha256:522b6829dd1157430f4bd835c5120e4a73cd05c7c16caae0ba74cf0a2d298f1e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -219,7 +231,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f45c03a4f49de50daca4a4e33076d70fe30243f6ee87d43418e3f05cff14a6b4",
+      "contentDigest": "sha256:eaaf939f8b632ecc6de849fcb37905c84905ab122df76fde5eaabd5170ddb373",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -351,5 +363,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:14e084b1fc975788a45c7f155a967194ab228d6cf8dd0574bbf5f29078c698bc"
+  "digest": "sha256:20b08ac21109e420b8e442e463f74f9e6f5da19ac267958afe110eb691e64101"
 }

@@ -10,6 +10,7 @@ import { resetSearchState } from '../../state/searchState.js';
 import { setLastViewedConversation } from '../../controllers/lastViewedConversation.js';
 import type { ThreadEvent } from '../unifiedThreadProjection.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
+import { parkSearchV3Handoff } from '../../utils/compose.js';
 
 type Region = HTMLElement & { updateComplete: Promise<unknown> };
 const accepted = '{"city":"Paris"}';
@@ -164,9 +165,19 @@ it('XT3 recorded accepted Structured output renders identically after remount', 
 it.each(['core.rag-ask', 'core.free-chat', 'core.summarize'])('XT3 ordinary %s retains streamed partial text on an empty terminal', async shapeId => {
   const view = document.createElement('jf-sv3-window') as SearchV3View;
   document.body.append(view); await settle(view); chunks = ['Ordinary streamed prose']; terminal = { finalResponse: '' };
-  await (view as unknown as { askDomain: { runAsk(text: string, scope: null, schema?: string, model?: boolean, shape?: 'core.summarize'): Promise<void> } })
-    .askDomain.runAsk('ordinary', null, undefined, shapeId === 'core.free-chat', shapeId === 'core.summarize' ? 'core.summarize' : undefined);
+  if (shapeId === 'core.summarize') {
+    parkSearchV3Handoff({ query: 'ordinary', forceShapeId: 'core.summarize', docIds: ['docs/a.md'] });
+    await settle(view);
+    const composer = view.shadowRoot!.querySelector('jf-sv3-composer') as Region;
+    await composer.updateComplete;
+    composer.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="sv3-composer-send"]')!.click();
+  } else {
+    await (view as unknown as { askDomain: { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void> } })
+      .askDomain.runAsk('ordinary', null, undefined, shapeId === 'core.free-chat');
+  }
   await settle(view);
+  expect(requests).toHaveLength(1);
+  expect(requests[0]).toMatchObject({ shapeId });
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as Region; await main.updateComplete;
   const markdown = main.shadowRoot!.querySelector('jf-markdown-block') as HTMLElement & { text: string };
   expect(markdown?.text).toBe('Ordinary streamed prose');

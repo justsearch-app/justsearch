@@ -127,3 +127,22 @@ it.each(['{', 'null', '[]'])(
     expect(composer(view).shadowRoot!.textContent).toContain('Enter a JSON schema object.');
   },
 );
+
+it.each(['{', 'null', '[]'])(
+  'the Ask owner rejects invalid Structured schema %s at the submit-event boundary and keeps its draft', async invalid => {
+    const view = await mount();
+    emit(view, 'sv3-tier-change', { tier: 'structured' });
+    emit(view, 'sv3-schema-change', { text: invalid });
+    await drain(view);
+    field(view).value = 'Extract A';
+    field(view).dispatchEvent(new Event('input'));
+    await drain(view);
+    // The composer validates Send independently; exercise the owner's guard via its emitted event.
+    emit(view, 'sv3-composer-submit', { query: 'Extract A', tier: 'structured' });
+    await drain(view);
+    expect(composer(view).shadowRoot!.textContent).toContain('Enter a JSON schema object.');
+    expect(requests).toEqual([]);
+    expect(field(view).value).toBe('Extract A');
+    expect(composer(view).shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid="sv3-composer-schema"]')!.value).toBe(invalid);
+  },
+);
