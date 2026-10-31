@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.1.x (alpha) | Yes |
+| 0.3.x | Yes |
 | Older/unreleased versions | No |
 
 ## Reporting a Vulnerability
@@ -12,9 +12,7 @@
 If you discover a security vulnerability in JustSearch, please report it privately.
 **Do not disclose it as a public issue.**
 
-**Preferred:** Use GitHub's [private vulnerability reporting](https://github.com/justsearch-app/justsearch/security/advisories/new) to submit a security advisory.
-
-**Alternative:** Email security concerns to the repository owner via their GitHub profile.
+Use GitHub's [private vulnerability reporting](https://github.com/justsearch-app/justsearch/security/advisories/new) to submit a security advisory.
 
 ### What to expect
 
@@ -27,7 +25,7 @@ If you discover a security vulnerability in JustSearch, please report it private
 
 ### Scope
 
-JustSearch is a local-first desktop application. All network communication is loopback-only (`127.0.0.1`). The following are in scope:
+JustSearch is a local-first desktop application. The local API and MCP server bind to loopback (`127.0.0.1`); the app's outbound network paths are listed in [README's Privacy section](README.md#privacy). The following are in scope:
 
 - Local privilege escalation via the application.
 - Data exposure through the local API (bound to loopback).

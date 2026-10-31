@@ -10,22 +10,25 @@ related: docs/how-to/cut-a-release.md; README.md
 # Verify your JustSearch download
 
 JustSearch installers are **Authenticode-signed as of v0.2.0**; the expected publisher is
-**Elias Justus**. Releases provide a Windows x86_64 NSIS installer and a Linux x86_64 `.deb`
-for Ubuntu 24.04 or newer. Check the release hash and GitHub build attestation on either platform,
-and the Authenticode signature on Windows. You can also build from source. A valid signature proves publisher identity and byte integrity; it is not a claim that the
+**Elias Justus**. For the verification steps below, **v0.3.0 provides only the Windows x86_64 NSIS
+installer and `SHA256SUMS`**. The Linux x86_64 `.deb` for Ubuntu 24.04 or newer and
+`provenance.sigstore.json` apply to releases after v0.3.0. Check the release hash and, for releases
+after v0.3.0, GitHub build attestation; check the Authenticode signature on Windows. You can also
+build from source. A valid signature proves publisher identity and byte integrity; it is not a claim that the
 software is bug-free or that Windows reputation warnings can never appear.
 
 ## 1. Check the SHA-256 hash
 
-Download the package for your platform, `SHA256SUMS`, and `provenance.sigstore.json` from
-**the same release**. Example package names:
+Download the package for your platform and `SHA256SUMS` from **the same release**. For releases
+after v0.3.0, also download `provenance.sigstore.json`. Example package names (Linux applies only
+to releases after v0.3.0):
 
 | Platform | Asset |
 |---|---|
 | Windows x86_64 | `JustSearch_<version>_x64-setup.exe` |
 | Linux x86_64 | `JustSearch_<version>_amd64.deb` |
 
-`SHA256SUMS` covers every release asset except itself, including both packages, updater metadata
+For releases after v0.3.0, `SHA256SUMS` covers every release asset except itself, including both packages, updater metadata
 and signatures, MCP bundle, packaged check reports and the saved provenance bundle. The
 [two-platform candidate producer](../../scripts/release/release-candidate.mjs) generates it from
 the exact draft bytes later promoted for publication.
@@ -48,10 +51,13 @@ sha256sum --ignore-missing -c SHA256SUMS
 Confirm the package you downloaded has a matching line and says **OK**. `SHA256SUMS` also lists the MCP bundle and updater assets;
 `--ignore-missing` skips files you did not download.
 
-A matching hash checks consistency with `SHA256SUMS`. Verify provenance as well to establish
-which repository and workflow produced those bytes.
+A matching hash checks consistency with `SHA256SUMS`. For releases after v0.3.0, verify provenance
+as well to establish which repository and workflow produced those bytes.
 
 ## 2. Verify GitHub build provenance (Windows and Linux)
+
+This step applies only to releases after v0.3.0. For v0.3.0, skip to step 3; it has no
+`provenance.sigstore.json` bundle.
 
 With [GitHub CLI](https://cli.github.com/manual/gh_attestation_verify) installed, run the command
 for your downloaded package (replace `<version>` with the release version):
