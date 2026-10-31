@@ -21,14 +21,14 @@
       ]
     },
     {
-      "id": "surface-catalog-parity",
+      "id": "surface-catalog-composition",
       "pathIncludes": [
         "CoreSurfaceCatalog.java"
       ],
-      "region": "the Java surface catalog (FE↔Java parity)",
+      "region": "the Java surface catalog (host/member integrity)",
       "docs": [],
       "recipe": [
-        "Editing CoreSurfaceCatalog.java — run node scripts/ci/check-surface-composition.mjs. Tempdoc 852 S0 gave that gate a parity leg: a surface id declared in BOTH this file and modules/ui-web/src/shell-v0/plugin-api/CorePlugin.ts must agree on audience and placement. No other gate can see a one-sided change — the interaction-surface gate parses this file only, check-window-cutover reads CorePlugin.ts only — so moving one side alone ships a broken or duplicated USER window with every gate green. The ui-web-gates recipe already covers the CorePlugin.ts direction; this row covers the Java one.",
+        "Editing CoreSurfaceCatalog.java — run node scripts/ci/check-surface-composition.mjs. It checks host/member one-home integrity: no rail member, duplicate host, dangling member or self-membership. Frontend contributions participate in member resolution; generated metadata freshness is checked by CoreSurfacesTsGenerationTest.",
         "Also run node scripts/governance/run.mjs --gate surface-altitude --mode gate (a surface's altitude is DERIVED from the authorities it consumes, so a new or changed Surface(...) can create a derivation conflict)."
       ]
     },
