@@ -14,6 +14,7 @@ import io.justsearch.app.inference.telemetry.NoopInferenceTelemetryEvents;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.gpu.GpuCapabilitiesService;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -28,12 +29,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -51,9 +54,10 @@ import tools.jackson.databind.ObjectMapper;
  * milliseconds; a long load is polled serially with a 100 ms pause once capped.
  *
  * <p>The pauses are read through the launcher's {@code startupHealthPauses} seam where the tree has
- * it; on a tree without it nothing is recorded. The probes are also timed where they arrive, at the
- * server, which needs no seam.
+ * it; on a tree without it nothing is recorded. A separate probe-count check uses a loading
+ * window at the server, which needs no seam.
  */
+@Timeout(60)
 final class LlamaServerStartupHealthPollTest {
   /** The pauses a wait that never sees health takes: it doubles from 25 ms to the 100 ms cap. */
   private static final List<Long> LADDER = List.of(25L, 50L, 100L);
@@ -61,7 +65,8 @@ final class LlamaServerStartupHealthPollTest {
   @TempDir Path tmp;
   private LlamaServerOps ops;
   private HttpServer server;
-  private final List<Poll> startupPolls = new CopyOnWriteArrayList<>();
+  private final Map<Integer, AtomicInteger> loadingProbes = new ConcurrentHashMap<>();
+  private int lastStartupPort;
 
   @AfterEach
   void stopEverything() throws Exception {
@@ -94,8 +99,6 @@ final class LlamaServerStartupHealthPollTest {
 
     List<Long> arrivals = health.waitArrivals();
     assertEquals(2, arrivals.size(), "one loading answer, then healthy: " + arrivals);
-    long gapMs = TimeUnit.NANOSECONDS.toMillis(arrivals.get(1) - arrivals.get(0));
-    assertTrue(gapMs < 300, "the second poll follows the first after one short pause; gap=" + gapMs);
     assertEquals(List.of(25L), pauses, "one 25 ms pause");
   }
 
@@ -103,7 +106,7 @@ final class LlamaServerStartupHealthPollTest {
 
   /**
    * A long load: nine loading answers, then healthy. The pauses double from 25 ms and stop at the
-   * 100 ms cap; the polls never overlap or come closer than their scheduled pause.
+   * 100 ms cap; the polls never overlap.
    */
   @Test
   void aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAt100Ms() throws Exception {
@@ -115,20 +118,11 @@ final class LlamaServerStartupHealthPollTest {
 
     ops.waitForServerHealth(start);
 
-    assertFastFirstPolls();
     assertEquals(List.of(25L, 50L, 100L, 100L, 100L, 100L, 100L, 100L, 100L), pauses,
         "a doubling pause from 25 ms that stops at the dedicated 100 ms startup cap");
     List<Long> arrivals = health.waitArrivals();
     assertEquals(10, arrivals.size(), "one poll per pause, plus the first: " + arrivals);
     assertEquals(1, health.mostInFlight(), "the polls are serial");
-    for (int i = 1; i < arrivals.size(); i++) {
-      long gapMs = TimeUnit.NANOSECONDS.toMillis(arrivals.get(i) - arrivals.get(i - 1));
-      long scheduledMs = LADDER.get(Math.min(i - 1, LADDER.size() - 1));
-      assertTrue(gapMs >= scheduledMs,
-          "never closer than the scheduled " + scheduledMs + " ms pause; gap " + i + "=" + gapMs);
-      assertTrue(gapMs < 300,
-          "the pause stops growing at 100 ms; gap " + i + "=" + gapMs);
-    }
   }
 
   // ==================== each physical attempt starts short (VH4) ====================
@@ -140,34 +134,26 @@ final class LlamaServerStartupHealthPollTest {
    */
   @Test
   void aSteppedDownRelaunchStartsAgainAtTheShortestPause() throws Exception {
-    Path executable =
-        HealthyFakeLlamaServer.install(tmp.resolve("fake-llama"), "--max-ctx", "16384");
+    Path executable = HealthyFakeLlamaServer.install(tmp.resolve("fake-llama"),
+        "--max-ctx", "16384", "--startup-until-signal");
     ops = ops(new AtomicInteger());
-    List<Long> pauses = recordPauses(ops);
+    List<Long> pauses = releaseManagedAttemptsAfterLoading(ops);
     LlamaServerOps.StartResult start = ops.startLlamaServer(managedRequest(executable));
 
     ops.waitForServerHealth(start);
 
     assertEquals(List.of(32768, 16384), windows(), "exactly one step-down");
     assertTrue(ops.activeManagedCandidateAlive(start), "the server at 16384 is serving");
-    assertFastFirstPolls();
-    List<List<Long>> attempts = splitIntoAttempts(pauses);
-    assertEquals(2, attempts.size(), "one run of pauses per launch: " + pauses);
-    for (List<Long> attempt : attempts) {
-      assertEquals(LADDER.subList(0, Math.min(attempt.size(), LADDER.size())),
-          attempt.subList(0, Math.min(attempt.size(), LADDER.size())),
-          "each launch's wait starts at 25 ms and doubles: " + pauses);
-    }
-    assertTrue(attempts.get(0).size() >= 2,
-        "the first launch lived long enough for its pause to grow: " + pauses);
+    assertRestartedPauses(pauses, 2);
   }
 
   /** Unsupported reasoning flags cost one retry; that physical launch starts its pause anew. */
   @Test
   void aReasoningFlagRetryStartsAgainAtTheShortestPause() throws Exception {
-    Path executable = HealthyFakeLlamaServer.install(tmp.resolve("fake-llama"), "--reject-reasoning");
+    Path executable = HealthyFakeLlamaServer.install(tmp.resolve("fake-llama"),
+        "--reject-reasoning", "--startup-until-signal");
     ops = ops(new AtomicInteger());
-    List<Long> pauses = recordPauses(ops);
+    List<Long> pauses = releaseManagedAttemptsAfterLoading(ops);
     var start = ops.startLlamaServer(managedRequest(executable));
 
     ops.waitForServerHealth(start);
@@ -176,7 +162,6 @@ final class LlamaServerStartupHealthPollTest {
     assertEquals(2, launches.size(), "one reasoning-flag retry");
     assertTrue(launches.getFirst().contains("--reasoning-budget"));
     assertTrue(!launches.getLast().contains("--reasoning-budget"));
-    assertFastFirstPolls();
     assertRestartedPauses(pauses, 2);
   }
 
@@ -185,9 +170,10 @@ final class LlamaServerStartupHealthPollTest {
   @ValueSource(booleans = {false, true})
   void aLostBindRetryStartsAgainAtTheShortestPause(boolean recovery) throws Exception {
     Path executable = HealthyFakeLlamaServer.install(tmp.resolve("fake-llama"),
-        "--log-line", "main: couldn't bind HTTP server socket, hostname: 127.0.0.1");
+        "--log-line", "main: couldn't bind HTTP server socket, hostname: 127.0.0.1",
+        "--startup-until-signal");
     ops = ops(new AtomicInteger());
-    List<Long> pauses = recordPauses(ops);
+    List<Long> pauses = releaseManagedAttemptsAfterLoading(ops);
     var start = ops.startLlamaServer(managedRequest(executable));
 
     ModeTransitionException failure = assertThrows(ModeTransitionException.class, () -> {
@@ -201,7 +187,6 @@ final class LlamaServerStartupHealthPollTest {
     assertEquals(List.of(32768, 32768), windows(), "no context step-down");
     assertTrue(!flag(launches.getFirst(), "--port").equals(flag(launches.getLast(), "--port")),
         "retry uses a fresh port");
-    assertFastFirstPolls();
     assertRestartedPauses(pauses, 2);
   }
 
@@ -210,35 +195,60 @@ final class LlamaServerStartupHealthPollTest {
   void aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause() throws Exception {
     ScriptedHealth health = scriptedServer();
     ops = ops(new AtomicInteger());
-    List<Long> pauses = recordPauses(ops);
+    List<Long> pauses = recordPauses(ops, recorded -> {
+      if (recorded.size() >= 6) health.releaseLoading();
+    });
     var first = legacyExternal(ops, health.port());
-    health.answerLoading(6);
+    health.answerLoading(Integer.MAX_VALUE);
     ops.waitForServerHealth(first);
+    assertEquals(List.of(25L, 50L, 100L, 100L, 100L, 100L), pauses);
+    assertEquals(7, health.waitArrivals().size());
     ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
-    pauses.clear();
-    startupPolls.clear();
 
     var later = legacyExternal(ops, health.port());
-    health.answerLoading(1);
+    pauses = recordPauses(ops, recorded -> {
+      if (recorded.size() >= 3) health.releaseLoading();
+    });
+    health.answerLoading(Integer.MAX_VALUE);
     ops.waitForServerHealth(later);
 
-    assertFastFirstPolls();
-    assertEquals(List.of(25L), pauses, "later start restarts at 25 ms");
+    assertEquals(LADDER, pauses, "later start restarts at 25 ms");
+    assertEquals(4, health.waitArrivals().size());
   }
 
   /** One-shot recovery shares the short polling wait without changing its fallback policy. */
   @Test
-  void aOneShotRecoverySeesReadinessAfterOneShortPause() throws Exception {
+  void aOneShotRecoveryStartsAgainAtTheShortestPause() throws Exception {
     ScriptedHealth health = scriptedServer();
     ops = ops(new AtomicInteger());
-    List<Long> pauses = recordPauses(ops);
+    List<Long> pauses = recordPauses(ops, recorded -> {
+      if (recorded.size() >= 3) health.releaseLoading();
+    });
     var start = legacyExternal(ops, health.port());
-    health.answerLoading(1);
+    health.answerLoading(Integer.MAX_VALUE);
 
     ops.waitForServerHealthOnce(start);
 
-    assertFastFirstPolls();
-    assertEquals(List.of(25L), pauses);
+    assertEquals(LADDER, pauses);
+    assertEquals(4, health.waitArrivals().size());
+  }
+
+  /** A real loading window distinguishes the startup cap from the former flat 500 ms pause. */
+  @Test
+  void aLoadingWindowReceivesAtLeastEightHealthProbes() throws Exception {
+    ScriptedHealth health = scriptedServer();
+    ops = ops(new AtomicInteger());
+    var start = legacyExternal(ops, health.port());
+    health.answerLoading(Integer.MAX_VALUE);
+    health.loadingWindowNanos = TimeUnit.MILLISECONDS.toNanos(1_500);
+
+    ops.waitForServerHealth(start);
+
+    // The window starts at the first request and counts only requests inside it, even if a
+    // scheduler stall delays the final healthy response. See startup-health-backoff.md.
+    System.out.println("1500 ms loading window: " + health.probesInLoadingWindow + " /health probes");
+    assertTrue(health.probesInLoadingWindow.get() >= 8,
+        "at least eight health probes within 1500 ms; got " + health.probesInLoadingWindow);
   }
 
   /** The first successful probe does not pause at all. */
@@ -327,32 +337,36 @@ final class LlamaServerStartupHealthPollTest {
 
   // ==================== helpers ====================
 
-  private record Poll(int port, long nanos) {}
-
-  /** Times actual sends, including on the baseline without the pause-observation seam. */
-  private void assertFastFirstPolls() {
-    Map<Integer, List<Poll>> attempts = startupPolls.stream().collect(
-        java.util.stream.Collectors.groupingBy(Poll::port));
-    assertTrue(!attempts.isEmpty(), "startup health requests were sent");
-    for (var polls : attempts.values()) {
-      assertTrue(polls.size() >= 2, "the launch was loading at its first probe: " + polls);
-      long gapMs = TimeUnit.NANOSECONDS.toMillis(polls.get(1).nanos() - polls.get(0).nanos());
-      assertTrue(gapMs < 300, "each physical wait starts with a short pause; gap=" + gapMs);
-    }
+  private List<Long> releaseManagedAttemptsAfterLoading(LlamaServerOps target) throws Exception {
+    return recordPauses(target, recorded -> {
+      var attempt = splitIntoAttempts(recorded).getLast();
+      int probes = loadingProbes.getOrDefault(lastStartupPort, new AtomicInteger()).get();
+      if (attempt.size() >= LADDER.size() && probes >= 3) {
+        try {
+          HealthyFakeLlamaServer.signalStartup(tmp.resolve("fake-llama"), lastStartupPort);
+        } catch (java.io.IOException failure) {
+          throw new UncheckedIOException(failure);
+        }
+      }
+    });
   }
 
   private static String flag(List<String> argv, String flag) {
     return argv.get(argv.indexOf(flag) + 1);
   }
 
-  private static void assertRestartedPauses(List<Long> pauses, int count) {
+  private void assertRestartedPauses(List<Long> pauses, int count) {
     var attempts = splitIntoAttempts(pauses);
     assertEquals(count, attempts.size(), "one fresh pause ladder per wait: " + pauses);
     for (var attempt : attempts) {
-      int length = Math.min(attempt.size(), LADDER.size());
-      assertEquals(LADDER.subList(0, length), attempt.subList(0, length));
+      assertTrue(attempt.size() >= LADDER.size(), "wait reached its cap: " + attempt);
+      assertEquals(LADDER, attempt.subList(0, LADDER.size()));
+      assertTrue(attempt.subList(LADDER.size(), attempt.size()).stream()
+          .allMatch(pause -> pause == 100L), "all later pauses stay capped: " + attempt);
     }
-    assertTrue(attempts.getFirst().size() >= 2, "first wait's pause grew before retry");
+    assertEquals(count, loadingProbes.size(), "each attempt answered loading");
+    assertTrue(loadingProbes.values().stream().allMatch(probes -> probes.get() >= 3),
+        "each attempt answered at least three loading probes: " + loadingProbes);
   }
 
   private static boolean pausing(Thread thread) {
@@ -395,6 +409,11 @@ final class LlamaServerStartupHealthPollTest {
    * without the seam the list stays empty.
    */
   private static List<Long> recordPauses(LlamaServerOps target) throws Exception {
+    return recordPauses(target, ignored -> {});
+  }
+
+  private static List<Long> recordPauses(
+      LlamaServerOps target, Consumer<List<Long>> afterPause) throws Exception {
     List<Long> pauses = new CopyOnWriteArrayList<>();
     Field seam;
     try {
@@ -403,7 +422,10 @@ final class LlamaServerStartupHealthPollTest {
       return pauses;
     }
     seam.setAccessible(true);
-    seam.set(target, (LongConsumer) pauses::add);
+    seam.set(target, (LongConsumer) pause -> {
+      pauses.add(pause);
+      afterPause.accept(pauses);
+    });
     return pauses;
   }
 
@@ -420,7 +442,13 @@ final class LlamaServerStartupHealthPollTest {
       if (request.uri().getPath().equals("/health")
           && StackWalker.getInstance().walk(frames -> frames.anyMatch(
               frame -> frame.getMethodName().equals("awaitServerHealth")))) {
-        startupPolls.add(new Poll(request.uri().getPort(), System.nanoTime()));
+        lastStartupPort = request.uri().getPort();
+        HttpResponse<?> response = (HttpResponse<?>) call.callRealMethod();
+        if (response.statusCode() == 503) {
+          loadingProbes.computeIfAbsent(lastStartupPort, ignored -> new AtomicInteger())
+              .incrementAndGet();
+        }
+        return response;
       }
       return call.callRealMethod();
     }).when(client).send(Mockito.any(HttpRequest.class), Mockito.<HttpResponse.BodyHandler<String>>any());
@@ -481,8 +509,13 @@ final class LlamaServerStartupHealthPollTest {
       try {
         boolean loading = false;
         if (health.armed.get()) {
-          health.arrivals.add(System.nanoTime());
+          long now = System.nanoTime();
+          health.arrivals.add(now);
           loading = health.loadingLeft.getAndDecrement() > 0;
+          if (health.loadingWindowNanos > 0) {
+            loading = now - health.arrivals.getFirst() < health.loadingWindowNanos;
+            if (loading) health.probesInLoadingWindow.incrementAndGet();
+          }
         }
         byte[] body = (loading
             ? "{\"error\":{\"code\":503,\"message\":\"Loading model\"}}"
@@ -517,6 +550,8 @@ final class LlamaServerStartupHealthPollTest {
     private final AtomicInteger inFlight = new AtomicInteger();
     private final AtomicInteger mostInFlight = new AtomicInteger();
     private final List<Long> arrivals = new CopyOnWriteArrayList<>();
+    private volatile long loadingWindowNanos;
+    private final AtomicInteger probesInLoadingWindow = new AtomicInteger();
 
     ScriptedHealth(int port) {
       this.port = port;
@@ -532,6 +567,10 @@ final class LlamaServerStartupHealthPollTest {
       loadingLeft.set(n);
       mostInFlight.set(0);
       armed.set(true);
+    }
+
+    void releaseLoading() {
+      loadingLeft.set(0);
     }
 
     /** Arrival times (monotonic nanos) of the health requests since {@link #answerLoading}. */

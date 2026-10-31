@@ -26,7 +26,8 @@ import java.util.concurrent.TimeUnit;
  * 503 until {@link #signalReady}. {@code --spawn-lingerer} starts one more process once serving,
  * which outlives the server (as a crash reporter or a wrapper's child can) until {@link
  * #releaseLingerers}, or 90 s. {@code --exit-after-health MS} exits (code 1) MS ms after the
- * first healthy {@code /health} answer.
+ * first healthy {@code /health} answer. {@code --startup-until-signal} first serves 503 on the
+ * launch's port until {@link #signalStartup}, then follows its configured success/failure path.
  */
 public final class HealthyFakeLlamaServer {
   private static final String HOME_PROPERTY = "fake.llama.home";
@@ -53,6 +54,11 @@ public final class HealthyFakeLlamaServer {
    */
   static void signalOutOfMemory(Path dir) throws IOException {
     Files.writeString(dir.resolve(OOM_SIGNAL), "oom", StandardCharsets.US_ASCII);
+  }
+
+  /** Releases only the physical launch using {@code port}, including configured failures. */
+  static void signalStartup(Path dir, int port) throws IOException {
+    Files.writeString(dir.resolve("startup-release-" + port), "release", StandardCharsets.US_ASCII);
   }
 
   private HealthyFakeLlamaServer() {}
@@ -233,6 +239,9 @@ public final class HealthyFakeLlamaServer {
           StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE,
           java.nio.file.StandardOpenOption.APPEND);
     }
+    if (behaviour.contains("--startup-until-signal")) {
+      awaitStartupSignal(Path.of(home), Integer.parseInt(value(args, "--port", "-1")), launcher);
+    }
     if (behaviour.contains("--reject-reasoning") && List.of(args).contains("--reasoning-budget")) {
       System.out.println("error while handling argument \"--reasoning-budget\": invalid stoi argument");
       Thread.sleep(500);
@@ -396,6 +405,32 @@ public final class HealthyFakeLlamaServer {
     }
     server.stop(0);
     System.exit(0);
+  }
+
+  /** Holds a launch loading until the test has observed enough probes and scheduled pauses. */
+  private static void awaitStartupSignal(Path home, int port, ProcessHandle launcher)
+      throws Exception {
+    HttpServer loading =
+        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
+    loading.createContext("/health", exchange -> {
+      byte[] body = "{\"error\":{\"code\":503,\"message\":\"Loading model\"}}"
+          .getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(503, body.length);
+      exchange.getResponseBody().write(body);
+      exchange.close();
+    });
+    loading.start();
+    try {
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
+      while (!Files.exists(home.resolve("startup-release-" + port))) {
+        if (launcher == null || !launcher.isAlive() || System.nanoTime() >= deadline) {
+          throw new IOException("startup signal not received for port " + port);
+        }
+        Thread.sleep(10);
+      }
+    } finally {
+      loading.stop(0);
+    }
   }
 
   /** {@code --exit-after-health MS}: the server exits (code 1) MS ms after its first 200 health. */

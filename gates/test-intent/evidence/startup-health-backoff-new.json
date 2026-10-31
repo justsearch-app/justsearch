@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-10-31T13:44:33.342Z",
-  "revision": "3970b187bc6f095ec5e9bec55d6b28f2e3e56104",
-  "tree": "80a82cd2977fc3d545b9401a54d489f8edd0eb62",
+  "createdAt": "2026-10-31T16:17:23.639Z",
+  "revision": "8f0ef5b237bf8c71b265c850b41e87493892d028",
+  "tree": "b7d7138fa2d4d6aa8630a559476bc90ac813b80a",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAt100Ms\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aSteppedDownRelaunchStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aReasoningFlagRetryStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLostBindRetryStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aOneShotRecoverySeesReadinessAfterOneShortPause\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "command": "./gradlew :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAt100Ms\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aSteppedDownRelaunchStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aReasoningFlagRetryStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLostBindRetryStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aOneShotRecoveryStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLoadingWindowReceivesAtLeastEightHealthProbes\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 17545
+      "durationMs": 15620
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e8058ad943fe956a99009593081606110338d4b8d716e243a02509eaadb4d3b3",
+      "contentDigest": "sha256:b3106219a1dc84086f241e948c1518905559039eea26c125d40aeb33aa5b7239",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAt100Ms",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e8058ad943fe956a99009593081606110338d4b8d716e243a02509eaadb4d3b3",
+      "contentDigest": "sha256:b3106219a1dc84086f241e948c1518905559039eea26c125d40aeb33aa5b7239",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aSteppedDownRelaunchStartsAgainAtTheShortestPause",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e8058ad943fe956a99009593081606110338d4b8d716e243a02509eaadb4d3b3",
+      "contentDigest": "sha256:b3106219a1dc84086f241e948c1518905559039eea26c125d40aeb33aa5b7239",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aReasoningFlagRetryStartsAgainAtTheShortestPause",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e8058ad943fe956a99009593081606110338d4b8d716e243a02509eaadb4d3b3",
+      "contentDigest": "sha256:b3106219a1dc84086f241e948c1518905559039eea26c125d40aeb33aa5b7239",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLostBindRetryStartsAgainAtTheShortestPause",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e8058ad943fe956a99009593081606110338d4b8d716e243a02509eaadb4d3b3",
+      "contentDigest": "sha256:b3106219a1dc84086f241e948c1518905559039eea26c125d40aeb33aa5b7239",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,7 +108,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e8058ad943fe956a99009593081606110338d4b8d716e243a02509eaadb4d3b3",
+      "contentDigest": "sha256:b3106219a1dc84086f241e948c1518905559039eea26c125d40aeb33aa5b7239",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -120,21 +120,36 @@
       ]
     },
     {
-      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aOneShotRecoverySeesReadinessAfterOneShortPause",
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aOneShotRecoveryStartsAgainAtTheShortestPause",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e8058ad943fe956a99009593081606110338d4b8d716e243a02509eaadb4d3b3",
+      "contentDigest": "sha256:b3106219a1dc84086f241e948c1518905559039eea26c125d40aeb33aa5b7239",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "aOneShotRecoverySeesReadinessAfterOneShortPause()",
+          "name": "aOneShotRecoveryStartsAgainAtTheShortestPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLoadingWindowReceivesAtLeastEightHealthProbes",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3106219a1dc84086f241e948c1518905559039eea26c125d40aeb33aa5b7239",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLoadingWindowReceivesAtLeastEightHealthProbes()",
           "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:39f198486d641a6773fa9705a25c32ca81da492375bdbe28788e96d27b81c485"
+  "digest": "sha256:9a8595c33478396ba468da9d5c2a37b4d0f928431184b5f77b902fd6fee4a01a"
 }
