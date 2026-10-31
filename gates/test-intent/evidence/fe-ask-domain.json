@@ -1,0 +1,367 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T02:45:17.036Z",
+  "revision": "8def52f703da865f4d6c8cb850493fd282daa38d",
+  "tree": "a028c017530206c6f4da3959adb4c2db81d9c669",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.askPreservation.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/h1qiwnzp/tmp/test-intent-vitest-3-1793414703089.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 13943
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.askPreservation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.askPreservation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:30013bd414af667045430b332e38e03f67593be8a95b6eb27c3df4179b1b7d08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps questions and streaming answers interleaved in actual transcript DOM order",
+          "status": "passed"
+        },
+        {
+          "name": "a subsequent Ask receives no rejected Structured output after CANCELLED",
+          "status": "passed"
+        },
+        {
+          "name": "a subsequent Ask receives no rejected Structured output after INTERRUPTED",
+          "status": "passed"
+        },
+        {
+          "name": "rejects invalid Structured schema { before issuance and preserves its draft",
+          "status": "passed"
+        },
+        {
+          "name": "rejects invalid Structured schema null before issuance and preserves its draft",
+          "status": "passed"
+        },
+        {
+          "name": "rejects invalid Structured schema [] before issuance and preserves its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the Ask owner rejects invalid Structured schema { at the submit-event boundary and keeps its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the Ask owner rejects invalid Structured schema null at the submit-event boundary and keeps its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the Ask owner rejects invalid Structured schema [] at the submit-event boundary and keeps its draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:522b6829dd1157430f4bd835c5120e4a73cd05c7c16caae0ba74cf0a2d298f1e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XT3 accepted terminal JSON replaces rejected streamed attempts in mounted Search",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 missing terminal output fails honestly live",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 explicitly empty terminal output fails honestly live",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 non-string terminal output fails honestly live",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 missing terminal output fails honestly reloaded",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 explicitly empty terminal output fails honestly reloaded",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 non-string terminal output fails honestly reloaded",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 accepted output alone enters {bad} follow-up context in structured",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 accepted output alone enters {bad} follow-up context in ask",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 accepted output alone enters {\"city\":42,\"fact\":\"REJECTED_ROME_OLD\"} follow-up context in structured",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 accepted output alone enters {\"city\":42,\"fact\":\"REJECTED_ROME_OLD\"} follow-up context in ask",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 failed output contributes nothing to follow-up context (undefined)",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 failed output contributes nothing to follow-up context ()",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 interrupted/exhausted Structured output accepts no attempt: connection lost",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 interrupted/exhausted Structured output accepts no attempt: Extraction validation exhausted",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 terminal-only ephemeral Structured output renders accepted JSON without a store record",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 recorded accepted Structured output renders identically after remount",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 ordinary core.rag-ask retains streamed partial text on an empty terminal",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 ordinary core.free-chat retains streamed partial text on an empty terminal",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 ordinary core.summarize retains streamed partial text on an empty terminal",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Structured connection discards partial attempts through the real stream reader",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Structured eof discards partial attempts through the real stream reader",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Structured timeout discards partial attempts through the real stream reader",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 ordinary partial answer survives connection loss (model=false)",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 ordinary partial answer survives connection loss (model=true)",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 branch inherits only the accepted output after {bad}",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 branch inherits only the accepted output after {\"city\":42}",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 model follow-up keeps the persistent conversation without injecting rejected client context",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 an existing conversation keeps prior prose and terminal-only recorded JSON",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 an existing conversation keeps prior prose and terminal-only ephemeral JSON",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 a terminal-only answer counts as server content before enumeration catches up",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 mounted Search follows a new result unless the reader scrolled back (reader=false)",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 mounted Search follows a new result unless the reader scrolled back (reader=true)",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 a Structured dispatch with no chunks and no terminal output shows a failure",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 failed saved output contributes nothing after branching (undefined)",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 failed saved output contributes nothing after branching ()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.modelStructured.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:eaaf939f8b632ecc6de849fcb37905c84905ab122df76fde5eaabd5170ddb373",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps schema third and model choice fourth, with distinct request and live turn identities",
+          "status": "passed"
+        },
+        {
+          "name": "never classifies a live Structured NO_CONTENT as no-evidence or offers the model action",
+          "status": "passed"
+        },
+        {
+          "name": "cold retry keeps the model turn a persistent model answer",
+          "status": "passed"
+        },
+        {
+          "name": "cold edit keeps the model turn a persistent model answer",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 cold Structured retry refuses before fork with B kept and no model answer",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 cold Structured edit refuses before fork with B kept and no model answer",
+          "status": "passed"
+        },
+        {
+          "name": "remembered Structured Retry reuses its schema without becoming a model answer",
+          "status": "passed"
+        },
+        {
+          "name": "X8 ask sends operator characters as prompt text",
+          "status": "passed"
+        },
+        {
+          "name": "X8 structured sends operator characters as prompt text",
+          "status": "passed"
+        },
+        {
+          "name": "X8 model-only sends operator characters as prompt text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:48aebf68cf577eb6a343ffbed6d422930e08c0ce305ee2836cd4686999f77768",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S2 Ask fallback wording survives a live done terminal",
+          "status": "passed"
+        },
+        {
+          "name": "S2 Ask fallback wording survives a live error terminal",
+          "status": "passed"
+        },
+        {
+          "name": "D-T44 live document-too-small fallback explains its retrieval mode",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders complete with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders early stop with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders partial stop with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders model with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders document fallback with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 terminal reload renders no evidence with its own wording and content",
+          "status": "passed"
+        },
+        {
+          "name": "S2 reloaded bulk-reindex refusal remains expanded, self-contained and occurs once",
+          "status": "passed"
+        },
+        {
+          "name": "S2 failed refresh notice clears on success without replacing the transcript with an empty state",
+          "status": "passed"
+        },
+        {
+          "name": "S2 confirmed deletion cannot be resurrected by a late thread response",
+          "status": "passed"
+        },
+        {
+          "name": "S2 confirmed deletion cannot be resurrected by a late history response",
+          "status": "passed"
+        },
+        {
+          "name": "S2 null or incomplete status never unlocks a locked transcript; disconnect tears down delivery",
+          "status": "passed"
+        },
+        {
+          "name": "S2 refused Structured Stop keeps streaming and permits a successful retry naming the same turn",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 activity cancellation coalesces repeated Structured Stop presses",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a record-only conversation renders without companion messages and an empty record keeps Search usable",
+          "status": "passed"
+        },
+        {
+          "name": "S2 reloaded no-evidence and its model answer retain separate outcome frames in one conversation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:20b08ac21109e420b8e442e463f74f9e6f5da19ac267958afe110eb691e64101"
+}

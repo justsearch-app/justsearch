@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
+import type { Sv3AskDomain } from './sv3-ask-domain.js';
 import type { Sv3ContextDomain } from './sv3-context-domain.js';
 import { __feedContactForTest, getAiState, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
 import { __resetConversationListForTest, loadConversations } from '../../state/conversationListStore.js';
@@ -15,7 +16,7 @@ import type { ThreadEvent } from '../unifiedThreadProjection.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
 
 type Region = HTMLElement & { updateComplete: Promise<unknown> };
-type View = Omit<SearchV3View, 'runAsk' | 'contextDomain'> & { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void>; contextDomain: Sv3ContextDomain };
+type View = Omit<SearchV3View, 'askDomain' | 'contextDomain'> & { askDomain: Sv3AskDomain; contextDomain: Sv3ContextDomain };
 let records: ThreadEvent[];
 let failed: boolean;
 let gone: boolean;
@@ -81,7 +82,7 @@ afterEach(async () => {
 });
 it.each(['done', 'error'])('S2 Ask fallback wording survives a live %s terminal', async terminal => {
   frames = [['rag.meta', fallback], ...(terminal === 'done' ? [['chunk', { text: 'The keyword answer.' }] as [string, unknown]] : []), [terminal, terminal === 'done' ? {} : { error: 'No matching documents found in the index', errorCode: 'NO_CONTENT' }]];
-  const view = await mount(); await view.runAsk('What do the documents say?', null); await settle(view);
+  const view = await mount(); await view.askDomain.runAsk('What do the documents say?', null); await settle(view);
   const root = main(view).shadowRoot!;
   expect(root.textContent).toContain('semantic search did not answer in time');
   expect(root.textContent).toContain('search models still loading');
@@ -90,7 +91,7 @@ it.each(['done', 'error'])('S2 Ask fallback wording survives a live %s terminal'
 });
 it('D-T44 live document-too-small fallback explains its retrieval mode', async () => {
   frames = [['rag.meta', { retrieval_mode: 'FULLTEXT_FALLBACK' }], ['chunk', { text: 'Ada built it.' }], ['done', {}]];
-  const view = await mount(); await view.runAsk('Who built it?', null); await settle(view);
+  const view = await mount(); await view.askDomain.runAsk('Who built it?', null); await settle(view);
   expect(main(view).shadowRoot!.textContent).toContain('document too small for chunking');
   expect((main(view).shadowRoot!.querySelector('jf-markdown-block') as HTMLElement & { text: string }).text).toBe('Ada built it.');
 });
@@ -154,7 +155,7 @@ it('S2 null or incomplete status never unlocks a locked transcript; disconnect t
 });
 it('S2 refused Structured Stop keeps streaming and permits a successful retry naming the same turn', async () => {
   finish = () => {}; frames = [['chunk', { text: '{bad}' }]];
-  const view = await mount(); const sending = view.runAsk('extract', null, schema); await settle(view);
+  const view = await mount(); const sending = view.askDomain.runAsk('extract', null, schema); await settle(view);
   const composer = view.shadowRoot!.querySelector('jf-sv3-composer') as Region;
   const stop = (): void => { composer.dispatchEvent(new CustomEvent('sv3-composer-stop', { bubbles: true, composed: true })); };
   stopStatus = 503; stop(); await settle(view);
@@ -170,7 +171,7 @@ it('S2 refused Structured Stop keeps streaming and permits a successful retry na
 
 it('XT7 activity cancellation coalesces repeated Structured Stop presses', async () => {
   finish = () => {}; frames = [['chunk', { text: '{bad}' }]];
-  const view = await mount(); const sending = view.runAsk('extract', null, schema); await settle(view);
+  const view = await mount(); const sending = view.askDomain.runAsk('extract', null, schema); await settle(view);
   const cancel = getAiState().activity.cancel;
   expect(cancel, 'the real activity authority exposes Stop').toEqual(expect.any(Function));
   cancel!(); cancel!(); await sending; await settle(view);

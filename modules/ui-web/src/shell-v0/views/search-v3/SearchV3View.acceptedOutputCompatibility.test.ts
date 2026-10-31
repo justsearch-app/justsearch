@@ -10,6 +10,7 @@ import { resetSearchState } from '../../state/searchState.js';
 import { setLastViewedConversation } from '../../controllers/lastViewedConversation.js';
 import type { ThreadEvent } from '../unifiedThreadProjection.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
+import { parkSearchV3Handoff } from '../../utils/compose.js';
 
 type Region = HTMLElement & { updateComplete: Promise<unknown> };
 const accepted = '{"city":"Paris"}';
@@ -130,7 +131,7 @@ for (const plane of ['live', 'reloaded'] as const) {
 it.each(['{bad}', '{"city":42,"fact":"REJECTED_ROME_OLD"}'].flatMap(rejected => ['structured', 'ask'].map(mode => [rejected, mode])))('XT10 accepted output alone enters %s follow-up context in %s', async (rejected, mode) => {
   chunks = [rejected, accepted]; terminal = { finalResponse: accepted }; await sendStructured();
   const view = document.querySelector('jf-sv3-window') as SearchV3View;
-  await (view as unknown as { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void> }).runAsk('use the city', null, mode === 'structured' ? schema : undefined, mode === 'model');
+  await (view as unknown as { askDomain: { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void> } }).askDomain.runAsk('use the city', null, mode === 'structured' ? schema : undefined, mode === 'model');
   await settle(view);
   expect(requests).toHaveLength(2);
   expect(requests[1]!.shapeId).toBe(mode === 'structured' ? 'core.extract' : mode === 'model' ? 'core.free-chat' : 'core.rag-ask');
@@ -141,7 +142,7 @@ it.each([undefined, ''])('D-T43 failed output contributes nothing to follow-up c
   chunks = ['{bad}']; terminal = output === undefined ? {} : { finalResponse: output }; await sendStructured();
   const view = document.querySelector('jf-sv3-window') as SearchV3View;
   terminal = { finalResponse: accepted };
-  await (view as unknown as { runAsk(text: string, scope: null, schema?: string): Promise<void> }).runAsk('new extraction', null, schema);
+  await (view as unknown as { askDomain: { runAsk(text: string, scope: null, schema?: string): Promise<void> } }).askDomain.runAsk('new extraction', null, schema);
   expect(requests).toHaveLength(2);
   expect(requests[1]).not.toHaveProperty('context');
 });
@@ -164,9 +165,19 @@ it('XT3 recorded accepted Structured output renders identically after remount', 
 it.each(['core.rag-ask', 'core.free-chat', 'core.summarize'])('XT3 ordinary %s retains streamed partial text on an empty terminal', async shapeId => {
   const view = document.createElement('jf-sv3-window') as SearchV3View;
   document.body.append(view); await settle(view); chunks = ['Ordinary streamed prose']; terminal = { finalResponse: '' };
-  await (view as unknown as { runAsk(text: string, scope: null, schema?: string, model?: boolean, shape?: 'core.summarize'): Promise<void> })
-    .runAsk('ordinary', null, undefined, shapeId === 'core.free-chat', shapeId === 'core.summarize' ? 'core.summarize' : undefined);
+  if (shapeId === 'core.summarize') {
+    parkSearchV3Handoff({ query: 'ordinary', forceShapeId: 'core.summarize', docIds: ['docs/a.md'] });
+    await settle(view);
+    const composer = view.shadowRoot!.querySelector('jf-sv3-composer') as Region;
+    await composer.updateComplete;
+    composer.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="sv3-composer-send"]')!.click();
+  } else {
+    await (view as unknown as { askDomain: { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void> } })
+      .askDomain.runAsk('ordinary', null, undefined, shapeId === 'core.free-chat');
+  }
   await settle(view);
+  expect(requests).toHaveLength(1);
+  expect(requests[0]).toMatchObject({ shapeId });
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as Region; await main.updateComplete;
   const markdown = main.shadowRoot!.querySelector('jf-markdown-block') as HTMLElement & { text: string };
   expect(markdown?.text).toBe('Ordinary streamed prose');
@@ -184,7 +195,7 @@ it.each(['connection', 'eof', 'timeout'] as const)('XT7 Structured %s discards p
 it.each([false, true])('XN1 ordinary partial answer survives connection loss (model=%s)', async model => {
   const view = document.createElement('jf-sv3-window') as SearchV3View;
   document.body.append(view); await settle(view); chunks = ['Ordinary partial answer']; transportFailure = 'connection';
-  await (view as unknown as { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void> }).runAsk('ordinary', null, undefined, model);
+  await (view as unknown as { askDomain: { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void> } }).askDomain.runAsk('ordinary', null, undefined, model);
   await settle(view);
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as Region; await main.updateComplete;
   expect((main.shadowRoot!.querySelector('jf-markdown-block') as HTMLElement & { text: string }).text).toBe('Ordinary partial answer');
@@ -194,9 +205,9 @@ it.each(['{bad}', '{"city":42}'])('XN1 branch inherits only the accepted output 
   chunks = [rejected, accepted]; terminal = { finalResponse: accepted }; await sendStructured();
   records = loadedRows(accepted); await mountSaved();
   const view = document.querySelector('jf-sv3-window') as SearchV3View;
-  const branch = view as unknown as { branchInto(id: string, message: string, resend: null, tier: string): Promise<boolean>; runAsk(text: string, scope: null, schema?: string): Promise<void> };
+  const branch = view as unknown as { branchInto(id: string, message: string, resend: null, tier: string): Promise<boolean>; askDomain: { runAsk(text: string, scope: null, schema?: string): Promise<void> } };
   expect(await branch.branchInto('saved', 'answer', null, 'structured')).toBe(true);
-  await branch.runAsk('use inherited city', null, schema); await settle(view);
+  await branch.askDomain.runAsk('use inherited city', null, schema); await settle(view);
   expect(branched, 'the real branch endpoint was used').toBe(true);
   expect(requests.at(-1)).toMatchObject({ conversationId: 'accepted-branch', context: [{ role: 'user', content: 'extract city' }, { role: 'assistant', content: accepted }] });
   expect(JSON.stringify(requests.at(-1))).not.toContain(rejected);
@@ -205,7 +216,7 @@ it.each(['{bad}', '{"city":42}'])('XN1 branch inherits only the accepted output 
 it('XN1 model follow-up keeps the persistent conversation without injecting rejected client context', async () => {
   chunks = ['{bad}', accepted]; terminal = { finalResponse: accepted }; await sendStructured();
   const view = document.querySelector('jf-sv3-window') as SearchV3View;
-  await (view as unknown as { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void> }).runAsk('use the city', null, undefined, true);
+  await (view as unknown as { askDomain: { runAsk(text: string, scope: null, schema?: string, model?: boolean): Promise<void> } }).askDomain.runAsk('use the city', null, undefined, true);
   expect(requests).toHaveLength(2);
   expect(requests[1]).toMatchObject({ shapeId: 'core.free-chat', conversationId: requests[0]!.conversationId });
   expect(requests[1]).not.toHaveProperty('context');
@@ -216,7 +227,7 @@ it.each(['recorded', 'ephemeral'])('XT3 an existing conversation keeps prior pro
   const view = document.querySelector('jf-sv3-window') as SearchV3View;
   if (storage === 'recorded') records = [...records, ...loadedRows(accepted).map(r => ({ ...r, id: r.id + '-extract', occurredAt: r.occurredAt.replace('00:00:', '00:01:') }))];
   chunks = []; terminal = { finalResponse: accepted };
-  await (view as unknown as { runAsk(text: string, scope: null, schema?: string): Promise<void> }).runAsk('extract city', null, schema); await settle(view);
+  await (view as unknown as { askDomain: { runAsk(text: string, scope: null, schema?: string): Promise<void> } }).askDomain.runAsk('extract city', null, schema); await settle(view);
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as Region; await main.updateComplete;
   expect(main.shadowRoot!.querySelectorAll('[data-testid="sv3-turn"]')).toHaveLength(2);
   expect(main.shadowRoot!.querySelector('[data-testid="sv3-turn-json"]')?.textContent).toBe(accepted);
@@ -242,7 +253,7 @@ it.each([false, true])('XT3 mounted Search follows a new result unless the reade
   expect(scroller.scrollTop).toBe(2000);
   if (reader) { scroller.scrollTop = 100; scroller.dispatchEvent(new Event('scroll')); }
   const view = document.querySelector('jf-sv3-window') as SearchV3View;
-  await (view as unknown as { runAsk(text: string, scope: null, schema?: string): Promise<void> }).runAsk('another extraction', null, schema);
+  await (view as unknown as { askDomain: { runAsk(text: string, scope: null, schema?: string): Promise<void> } }).askDomain.runAsk('another extraction', null, schema);
   height = 3000; (main as Region & { requestUpdate(): void }).requestUpdate(); await main.updateComplete;
   expect(main.shadowRoot!.querySelectorAll('[data-testid="sv3-turn-json"]')).toHaveLength(2);
   expect(scroller.scrollTop).toBe(reader ? 100 : 3000);
@@ -254,9 +265,9 @@ it('XT3 a Structured dispatch with no chunks and no terminal output shows a fail
 it.each([undefined, ''])('D-T43 failed saved output contributes nothing after branching (%s)', async output => {
   records = loadedRows(output); await mountSaved();
   const view = document.querySelector('jf-sv3-window') as SearchV3View;
-  const branch = view as unknown as { branchInto(id: string, message: string, resend: null, tier: string): Promise<boolean>; runAsk(text: string, scope: null, schema?: string): Promise<void> };
+  const branch = view as unknown as { branchInto(id: string, message: string, resend: null, tier: string): Promise<boolean>; askDomain: { runAsk(text: string, scope: null, schema?: string): Promise<void> } };
   expect(await branch.branchInto('saved', 'question', null, 'structured')).toBe(true);
-  terminal = { finalResponse: accepted }; await branch.runAsk('new extraction', null, schema);
+  terminal = { finalResponse: accepted }; await branch.askDomain.runAsk('new extraction', null, schema);
   expect(branched).toBe(true);
   expect(requests).toHaveLength(1);
   expect(requests[0]).toMatchObject({ conversationId: 'accepted-branch', shapeId: 'core.extract' });
