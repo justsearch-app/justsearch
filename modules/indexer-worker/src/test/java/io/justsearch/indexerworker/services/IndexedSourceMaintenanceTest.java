@@ -65,6 +65,47 @@ final class IndexedSourceMaintenanceTest extends LuceneExecutorTestBase {
     }
   }
 
+  @Test
+  void C10CommittedBootKeepsAbsentRowsWithoutVolumeProofAndRetriesWhenProven() throws Exception {
+    Path base = directory.resolve("base");
+    var layout = new IndexGenerationManager(base).initializeOrLoad();
+    Path root = Files.createDirectory(directory.resolve("root"));
+    Path missing = root.resolve("missing.txt");
+    try (var queue = new SqliteJobQueue(directory.resolve("jobs.db"));
+        var runtime = open(layout.activeGenerationPath())) {
+      queue.open();
+      String key = seed(runtime, missing, "original");
+      var binding = new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, "docs");
+      var registry = new RootWatcherRegistry();
+      var service = service(queue, runtime, base, DocumentIdentityStore.UNAVAILABLE);
+      service.setRootWatcherRegistry(registry);
+      try {
+        try (var ignored = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
+          assertThrows(java.io.IOException.class, () -> service.reconcileCommittedBootRoot(binding),
+              "an incomplete absence reconciliation must be retried, never certified");
+          runtime.commitOps().commitAndTrack();
+          runtime.commitOps().maybeRefreshBlocking();
+          assertEquals(2, runtime.indexCountOps().countByIdAndChunksStrict(key),
+              "unknown current and recorded volumes preserve the whole family");
+        }
+        assertTrue(((RootWitness) service.rootCheck()).recordAdded(root));
+        // A fresh service is the next boot attempt, without the negative witness cache.
+        var retry = service(queue, runtime, base, DocumentIdentityStore.UNAVAILABLE);
+        registry.unwatch(root.toString());
+        retry.setRootWatcherRegistry(registry);
+        assertTrue(retry.reconcileCommittedBootRoot(binding));
+        runtime.commitOps().commitAndTrack();
+        runtime.commitOps().maybeRefreshBlocking();
+        assertEquals(0, runtime.indexCountOps().countByIdAndChunksStrict(key));
+      } finally {
+        registry.unwatch(root.toString());
+      }
+    }
+    try (var runtime = open(layout.activeGenerationPath())) {
+      assertEquals(0, runtime.indexCountOps().docCount(), "the proven retry is durable");
+    }
+  }
+
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void D15CompletedAdHocDeletionAndExternalRenameReconcileAfterRestartWithNoWatchedRoots(boolean externalRename) throws Exception {

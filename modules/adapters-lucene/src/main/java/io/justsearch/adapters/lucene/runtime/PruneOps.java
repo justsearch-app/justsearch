@@ -11,6 +11,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,6 +23,7 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
@@ -30,6 +32,8 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.automaton.Operations;
+import org.apache.lucene.util.automaton.RegExp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -766,26 +770,45 @@ public final class PruneOps {
       List<String> excludedSubtrees) throws IOException {
     String normalized = ownershipPrefix(prefix);
     var excluded = excludedSubtrees.stream().map(PruneOps::ownershipPrefix).toList();
-    var paths = new ArrayList<BytesRef>();
-    var pathlessIds = new ArrayList<BytesRef>();
-    var blankPaths = new ArrayList<BytesRef>();
+    var paths = new LinkedHashSet<BytesRef>();
+    var pathlessIds = new LinkedHashSet<BytesRef>();
+    var blankPaths = new LinkedHashSet<BytesRef>();
+    var owners = new LinkedHashSet<BytesRef>();
     var stored = searcher.storedFields();
-    org.apache.lucene.search.ScoreDoc after = null;
-    while (true) {
-      var page = searcher.searchAfter(after, new org.apache.lucene.search.MatchAllDocsQuery(), 1024);
-      if (page.scoreDocs.length == 0) break;
-      for (var hit : page.scoreDocs) {
-        Row row = Row.read(searcher, stored, hit.doc, idField);
-        if (row == null) continue;
-        String backing = ownershipPrefix(row.filePath());
-        if (backing.startsWith(normalized) && excluded.stream().noneMatch(backing::startsWith)) {
-          if (row.path() == null || row.path().isBlank()) {
-            pathlessIds.add(new BytesRef(row.docId()));
-            if (row.path() != null) blankPaths.add(new BytesRef(row.path()));
-          } else paths.add(new BytesRef(row.path()));
+    // Indexed paths find current rows; filesystem IDs and parent IDs find pathless legacy rows,
+    // including children whose parent is no longer indexed. Resolve opaque owners in a second
+    // pass, so unrelated collections and chunks never need their stored fields decoded.
+    Query direct = new BooleanQuery.Builder()
+        .add(ownershipPrefixQuery(SchemaFields.PATH, normalized), BooleanClause.Occur.SHOULD)
+        .add(ownershipPrefixQuery(idField, normalized), BooleanClause.Occur.SHOULD)
+        .add(ownershipPrefixQuery(SchemaFields.PARENT_DOC_ID, normalized), BooleanClause.Occur.SHOULD)
+        .setMinimumNumberShouldMatch(1).build();
+    Query candidates = direct;
+    for (int pass = 0; pass < 2; pass++) {
+      org.apache.lucene.search.ScoreDoc after = null;
+      while (true) {
+        var page = searcher.searchAfter(after, candidates, 1024);
+        if (page.scoreDocs.length == 0) break;
+        for (var hit : page.scoreDocs) {
+          Row row = Row.read(searcher, stored, hit.doc, idField);
+          if (row == null) continue;
+          String backing = ownershipPrefix(row.filePath());
+          if (backing.startsWith(normalized) && excluded.stream().noneMatch(backing::startsWith)) {
+            if (row.path() == null || row.path().isBlank()) {
+              pathlessIds.add(new BytesRef(row.docId()));
+              if (row.path() != null) blankPaths.add(new BytesRef(row.path()));
+            } else {
+              paths.add(new BytesRef(row.path()));
+              if (pass == 0) owners.add(new BytesRef(row.docId()));
+            }
+          }
         }
+        after = page.scoreDocs[page.scoreDocs.length - 1];
       }
-      after = page.scoreDocs[page.scoreDocs.length - 1];
+      if (owners.isEmpty()) break;
+      candidates = new BooleanQuery.Builder()
+          .add(new TermInSetQuery(SchemaFields.PARENT_DOC_ID, owners), BooleanClause.Occur.FILTER)
+          .add(direct, BooleanClause.Occur.MUST_NOT).build();
     }
     // Bind explicit backing paths to the rows themselves. An older hidden version with the
     // same ID must not pull a live row at a different backing path into this removal.
@@ -802,6 +825,22 @@ public final class PruneOps {
     return new BooleanQuery.Builder()
         .add(new TermInSetQuery(SchemaFields.PATH, paths), BooleanClause.Occur.SHOULD)
         .add(legacyRows, BooleanClause.Occur.SHOULD).setMinimumNumberShouldMatch(1).build();
+  }
+
+  /** Matches the literal normalized prefix in either separator spelling, using indexed terms. */
+  private static Query ownershipPrefixQuery(String field, String prefix) {
+    var pattern = new StringBuilder();
+    prefix.substring(0, prefix.length() - 1).codePoints().forEach(ch -> {
+      if (ch == '/' || ch == '\\') pattern.append("[/\\\\]");
+      else {
+        if (".?+*|{}[]()\"".indexOf(ch) >= 0) pattern.append('\\');
+        pattern.appendCodePoint(ch);
+      }
+    });
+    pattern.append("([/\\\\].*)?");
+    return new RegexpQuery(new Term(field, pattern.toString()), RegExp.NONE,
+        io.justsearch.configuration.PlatformPaths.isWindows() ? RegExp.CASE_INSENSITIVE : 0,
+        Operations.DEFAULT_DETERMINIZE_WORK_LIMIT);
   }
 
   private static String ownershipPrefix(String path) {

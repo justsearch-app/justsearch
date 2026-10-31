@@ -190,6 +190,25 @@ final class WorkerIngestServiceCandidateReconciliationTest {
   }
 
   @Test
+  void candidateReconciliationKeepsAbsentRowsWithoutRecordedOrCurrentVolume() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("unproven-candidate"));
+    String deleted = PathNormalizer.normalizeKey(root.resolve("deleted.txt"));
+    try (var ignored = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
+      Fixture fixture = fixture(deleted);
+      RootWatcherRegistry registry = watch(fixture, root);
+      try {
+        assertThrows(WorkerServiceException.class,
+            () -> fixture.service.syncDirectory(request(root), CallContext.none()));
+        verify(fixture.servingWriter, never()).deleteByIdAndChunks(any());
+        verify(fixture.candidateWriter, never()).deleteByIdAndChunks(any());
+        assertFalse(fixture.admission.replayCertain(), "uncertain absence cannot certify cutover");
+      } finally {
+        registry.unwatch(root.toString());
+      }
+    }
+  }
+
+  @Test
   void migratingRootUsesServingDiscoveryAndExactCandidateWatcherRoutes() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("root"));
     Path added = Files.writeString(root.resolve("added.txt"), "added");

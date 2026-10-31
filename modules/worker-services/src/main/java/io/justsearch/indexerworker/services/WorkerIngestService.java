@@ -955,18 +955,9 @@ public final class WorkerIngestService {
         log.debug("Watcher delete skipped: absence of {} no longer confirmed", normalizedPath);
         return false;
       }
-      if (requireConfirmedAbsence) {
-        Path path;
-        try {
-          path = Path.of(normalizedPath);
-        } catch (InvalidPathException invalid) {
-          throw WorkerServiceException.unavailable(
-              "Candidate reconciliation found an invalid indexed path");
-        }
-        if (!Files.notExists(path)) {
-          throw WorkerServiceException.unavailable(
-              "Candidate reconciliation could not confirm file absence");
-        }
+      if (requireConfirmedAbsence && !confirmedAbsent(normalizedPath, requiredRoot)) {
+        throw WorkerServiceException.unavailable(
+            "Candidate reconciliation lacks proven absence on its recorded volume");
       }
       Path root = requiredRoot == null ? Path.of(normalizedPath).getParent() : requiredRoot;
       if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
@@ -3237,8 +3228,8 @@ public final class WorkerIngestService {
           SyncDirectoryOps.checkCancelled(cancelled);
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
-          if (!Files.notExists(Path.of(path))) {
-            throw new IOException("Committed boot delete lost its absence proof");
+          if (!confirmedAbsent(path, root)) {
+            throw new IOException("Committed boot delete lacks proven absence on its recorded volume");
           }
           ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(path);
           confirmedDeletionMarker.markIfAbsent(path);
@@ -4320,6 +4311,8 @@ public final class WorkerIngestService {
         var ignoredMutation = mutationLease()) {
       String rootPath = request.getRootPath();
       Object collectionAtStart = collectionRemoval(request.getCollection());
+      boolean untagged = request.getCollection().isBlank();
+      var removalsAtStart = untagged ? Map.copyOf(collectionRemovals) : Map.of();
       if (rootPath.isBlank()) {
         throw WorkerServiceException.invalidArgument("ScanRootRequest.root_path is required");
       }
@@ -4376,7 +4369,8 @@ public final class WorkerIngestService {
       // RootLifecycleOps removes the watched root mid-scan).
       java.util.function.LongSupplier queueDepth = jobQueue::queueDepth;
       java.util.function.BooleanSupplier isCancelled = () -> ctx.cancelled()
-          || collectionAtStart != collectionRemoval(request.getCollection());
+          || collectionAtStart != collectionRemoval(request.getCollection())
+          || untagged && !removalsAtStart.equals(collectionRemovals);
       try {
         // Tempdoc 821 §3-C3 — a FORCE_REINDEX scan marks its admitted paths through the SAME
         // forced-path set submitBatch's force_reindex flag feeds (see #submitBatch above).
