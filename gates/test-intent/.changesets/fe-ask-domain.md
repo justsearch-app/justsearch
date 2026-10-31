@@ -137,3 +137,13 @@ Production code remains unchanged by this test-quality round. These are mounted 
 Independent acceptance is left to the verifier.
 
 Tests added or rewritten: all four named files are durable product checks. The retirement adaptation retains its oracle. The three strengthened test files preserve existing assertions and add direct witnesses of owner validation, Summarize dispatch and recorded Structured inputs. Controlled HTTP, saved-message fixtures and drain helpers are local scaffolding. No test-only helper file or controller catalog observation was added.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a18fe2-d9ad-7591-a147-14fc3f58b3dc",
+  "verdict": "accept",
+  "digest": "sha256:1081b01232e2cee7ed8614f80bad4bbf6b9227c56dfd1ca1a6610fd1f667dcfb"
+}
+```
