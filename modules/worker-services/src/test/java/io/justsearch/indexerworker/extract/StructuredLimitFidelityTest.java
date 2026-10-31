@@ -4,13 +4,41 @@ package io.justsearch.indexerworker.extract;
 import static org.junit.jupiter.api.Assertions.*;
 import io.justsearch.indexing.extraction.StructuredDocument;
 import io.justsearch.indexing.extraction.StructuredDocument.Table;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.xml.sax.helpers.AttributesImpl;
 
 class StructuredLimitFidelityTest {
+  @TempDir Path tempDir;
+
+  @Test
+  void completeBlankBodyTableKeepsBaselineOutput() throws Exception {
+    assertCompleteTableOutput(
+        "<tr><td> </td><td></td></tr>", "Prefix\n\n\nSuffix");
+  }
+
+  @Test
+  void completeMixedBodyTableKeepsBaselineOutput() throws Exception {
+    assertCompleteTableOutput(
+        "<tr><td>Value</td><td> </td></tr><tr><td></td><td></td></tr>",
+        "Prefix\n\nHeaderA = Value\n\nSuffix");
+  }
+
+  private void assertCompleteTableOutput(String bodyRows, String expected) throws Exception {
+    Path html = tempDir.resolve("complete-table.html");
+    Files.writeString(html, "<html><body><p>Prefix</p><table>"
+        + "<tr><th>HeaderA</th><th>HeaderB</th></tr>" + bodyRows
+        + "</table><p>Suffix</p></body></html>");
+    try (var extractor = new StructuredContentExtractor()) {
+      assertEquals(expected, extractor.extract(html).content());
+    }
+  }
+
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"h2", "ul", "ol", "table"})
   void activeStructureRetainsPrefixAndFinalizesOnce(String kind) throws Exception {
     for (boolean exact : List.of(true, false)) {

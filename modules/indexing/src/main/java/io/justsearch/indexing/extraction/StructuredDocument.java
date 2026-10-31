@@ -245,7 +245,6 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
 
     if (t.hasHeaders()) {
       List<String> headers = t.rows().getFirst();
-      boolean emittedValue = false;
       boolean[] emittedHeaders = t.partial() ? new boolean[headers.size()] : null;
       for (int r = 1; r < t.rows().size(); r++) {
         List<String> row = t.rows().get(r);
@@ -255,7 +254,6 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
           String colHeader = c < headers.size() ? headers.get(c).strip() : "";
           String cellValue = row.get(c).strip();
           if (cellValue.isEmpty()) continue;
-          emittedValue = true;
           if (emittedHeaders != null && c < headers.size()) emittedHeaders[c] = true;
           if (c < headers.size() && !rowId.isEmpty() && c > 0) {
             sb.append(rowId).append(", ");
@@ -267,9 +265,9 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
           sb.append('\n');
         }
       }
-      if (!emittedValue || t.partial()) {
+      if (t.partial()) {
         for (int c = 0; c < headers.size(); c++) {
-          if (emittedHeaders != null && emittedHeaders[c]) continue;
+          if (emittedHeaders[c]) continue;
           String header = headers.get(c);
           if (!header.isBlank()) sb.append(header.strip()).append('\n');
         }

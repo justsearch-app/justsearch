@@ -348,7 +348,7 @@ by `run-evidence.mjs` at the named path; acceptance belongs to another session.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java"
       ],
       "class": "Defect pin",
-      "behaviour": "Pin retained active prefixes for headings, ordered/unordered lists and tables at an exact character boundary and inside a character event; completed table/list members precede the active prefix. Repeated getDocument and later closing/text events must not duplicate or admit text; bounded annotated serialization stays within its limit and reports truncation. Supplementary characters crossing the boundary must not leave a split surrogate in headings, lists, tables or paragraphs, whether the pair arrives in one event or two.",
+      "behaviour": "Pin retained active prefixes for headings, ordered/unordered lists and tables at an exact character boundary and inside a character event; completed table/list members precede the active prefix. Repeated getDocument and later closing/text events must not duplicate or admit text; bounded annotated serialization stays within its limit and reports truncation. Supplementary characters crossing the boundary must not leave a split surrogate in headings, lists, tables or paragraphs, whether the pair arrives in one event or two. Complete uniform-width HTML tables with blank or mixed blank/nonblank body cells retain exact baseline output, including surrounding paragraphs; unrepresented headers are retained only for tables actually cut by the character limit.",
       "defectSource": {
         "kind": "defect-source",
         "reproduction": "Feed a ten-character StructuredContentHandler an open h2, ul, ol or table containing UniqueSecr or UniqueSecretLater, then finalize before closing the structure. Before the repair buffered text is abandoned. Also finish a Done list/table member before the active Unique prefix, and put an emoji after ab under a three-character limit with whole/split SAX events; require retained ordered text, idempotent finalization and no half-surrogate.",
@@ -395,7 +395,9 @@ by `run-evidence.mjs` at the named path; acceptance belongs to another session.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#completedMembersAndActivePrefixSurvive",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#supplementaryCharactersAreNotSplitAtTheBoundary",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#limitInsideBlankBodyCellKeepsCompletedHeader",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#limitInsideLaterBlankCellKeepsItsHeaderAfterEarlierValue"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#limitInsideLaterBlankCellKeepsItsHeaderAfterEarlierValue",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#completeBlankBodyTableKeepsBaselineOutput",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#completeMixedBodyTableKeepsBaselineOutput"
       ]
     },
     {
