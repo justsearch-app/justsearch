@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-10-31T04:16:40.135Z",
-  "revision": "c678e421e9c51436a658085f4e9aed6777f18987",
-  "tree": "01459a09373ac0b95c35e8cc6ec37983ae5262b9",
+  "createdAt": "2026-10-31T05:17:20.050Z",
+  "revision": "8fc630d7a4fe2b4c3993c96ede86b1b5f8663669",
+  "tree": "5d1c57c0209dac53c1049752af1e216453aa3289",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.sessionNavigation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9k_6o1yo/tmp/test-intent-vitest-2-1793420196477.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.sessionNavigation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6udlstbr/tmp/test-intent-vitest-4-1793423834113.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3657
+      "durationMs": 5932
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessionNavigation.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessionNavigation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b7627d124e4841798a8c636a04b0bc945fd4aeaba01cdeb632c84e7ce83b6d3f",
+      "contentDigest": "sha256:3a8be4787223bf3cd53f2c3c8ae44486172459e655e8bfb0d92ebba93a1d8a24",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,12 +87,20 @@
           "status": "passed"
         },
         {
+          "name": "opening B from A claims the shared conversation and reload pointer before either record read starts",
+          "status": "passed"
+        },
+        {
           "name": "A to B to A restores each conversation draft, tier, schema and file scope without sending",
+          "status": "passed"
+        },
+        {
+          "name": "A to B to A restores fallback tiers and file scopes for reviewed raw drafts with no retained preparation",
           "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:419bbe1dba94c9036a9d4fdb0a6462ab1aa0f7196ce3697a5e46ba0df2ab5a7e"
+  "digest": "sha256:a3a8f6a4cc63663edd392fc0736e5822ee4cc191618ef4862a00774675a9fd39"
 }
