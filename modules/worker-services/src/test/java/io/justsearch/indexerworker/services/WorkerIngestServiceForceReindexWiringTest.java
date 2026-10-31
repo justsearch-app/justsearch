@@ -60,7 +60,7 @@ final class WorkerIngestServiceForceReindexWiringTest {
   }
 
   @Test
-  @DisplayName("a FORCE_REINDEX scan admits force atomically")
+  // "a FORCE_REINDEX scan admits force atomically"
   void forceReindexScanAdmitsForceAtomically() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("forced"));
     Path a = Files.writeString(root.resolve("a.txt"), "alpha");
@@ -75,7 +75,7 @@ final class WorkerIngestServiceForceReindexWiringTest {
   }
 
   @Test
-  @DisplayName("submitBatch(force_reindex) admits force atomically")
+  // "submitBatch(force_reindex) admits force atomically"
   void submitBatchAdmitsForceAtomically() throws Exception {
     Path file = Files.writeString(tempDir.resolve("b.txt"), "beta");
     IndexingLoop loop = mock(IndexingLoop.class);
@@ -89,7 +89,7 @@ final class WorkerIngestServiceForceReindexWiringTest {
   }
 
   @Test
-  @DisplayName("submitBatch without force_reindex marks nothing")
+  // "submitBatch without force_reindex marks nothing"
   void submitBatchWithoutForceReindexMarksNothing() throws Exception {
     Path file = Files.writeString(tempDir.resolve("b.txt"), "beta");
     IndexingLoop loop = mock(IndexingLoop.class);
@@ -104,7 +104,7 @@ final class WorkerIngestServiceForceReindexWiringTest {
   }
 
   @Test
-  @DisplayName("an INITIAL scan marks nothing — and does not even touch the indexing loop")
+  // "an INITIAL scan marks nothing — and does not even touch the indexing loop"
   void initialScanDoesNotMarkAnything() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("plain"));
     Files.writeString(root.resolve("a.txt"), "alpha");

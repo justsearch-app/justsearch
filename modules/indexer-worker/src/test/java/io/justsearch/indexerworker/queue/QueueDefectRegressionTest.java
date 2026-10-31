@@ -316,7 +316,7 @@ final class QueueDefectRegressionTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.CsvSource({"IO_FAILED,NONE", "IO_FAILED,RETRY_WITH_BACKOFF",
       "IO_FAILED,RETRY_UNTIL_AVAILABLE", "PARSER_TIMEOUT,RETRY_WITH_BACKOFF"})
   void maintenanceNoopPreservesEverySavedFieldAndActualEnqueueCounters(String type, String policy) throws Exception {

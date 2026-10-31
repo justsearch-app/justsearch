@@ -25,7 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
 final class WorkerWatcherRestoredMtimeTest {
   @TempDir Path temporary;
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void methvinModifyDeduplicationKeepsEditsWithRestoredMtime(boolean equalSize) throws Exception {
     Path file = Files.writeString(temporary.resolve("file.txt"), "old");

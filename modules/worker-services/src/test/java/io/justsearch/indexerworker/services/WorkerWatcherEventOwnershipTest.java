@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -253,8 +254,10 @@ final class WorkerWatcherEventOwnershipTest {
           .thenReturn(io.justsearch.indexerworker.loop.SourceContentHash.sha256(file));
       org.mockito.Mockito.clearInvocations(queue);
       service.acceptWatcherUpsert(registry.subscription(root), "docs", file);
-      org.mockito.Mockito.verify(queue, org.mockito.Mockito.never()).enqueueEntries(any(), any());
-      org.mockito.Mockito.verify(queue, org.mockito.Mockito.never()).enqueueMaintenanceScanEntries(any(), any(), any());
+      assertDoesNotThrow(() -> {
+        org.mockito.Mockito.verify(queue, org.mockito.Mockito.never()).enqueueEntries(any(), any());
+        org.mockito.Mockito.verify(queue, org.mockito.Mockito.never()).enqueueMaintenanceScanEntries(any(), any(), any());
+      }, "proven unchanged watcher events must leave queue ownership intact");
       Files.writeString(file, content);
       Files.setLastModifiedTime(file, stamp);
       service.acceptWatcherUpsert(registry.subscription(root), "docs", file);

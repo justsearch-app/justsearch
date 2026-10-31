@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -58,7 +59,7 @@ final class WorkerSelectedForceCompatibilityTest extends LuceneExecutorTestBase 
   @AfterEach
   void clearFingerprint() { EmbeddingFingerprint.invalidate(); }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"false,recorded", "true,recorded", "false,ordinary", "true,ordinary", "false,refused", "true,refused"})
   void selectedForceCannotAttestToUntouchedVectors(boolean mismatch, String kind) throws Exception {
     EmbeddingFingerprint.setForTesting(CURRENT_FP);
@@ -99,7 +100,7 @@ final class WorkerSelectedForceCompatibilityTest extends LuceneExecutorTestBase 
       var service = new WorkerIngestService(admissionQueue, loop, null,
           IndexingPacing.unthrottled(), base, layout.activeGenerationPath(), runtime, runtime, null, 0L);
       service.setEmbeddingCompatController(ecc);
-      admit(kind, source, service, queue, layout.activeGenerationId(), loop);
+      assertDoesNotThrow(() -> admit(kind, source, service, queue, layout.activeGenerationId(), loop));
 
       assertEquals(expected, ecc.state(), "selected admission or refusal must not transition compatibility");
       assertFalse(ecc.checkRebuildCompletion(queue.queueDepth(), count(runtime, SchemaFields.EMBEDDING_STATUS_PENDING)),

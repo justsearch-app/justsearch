@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import io.justsearch.indexerworker.loop.SourceContentHash;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
@@ -14,11 +15,47 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 final class ReleasedRevisionWatcherAdmissionTest {
   @TempDir Path temporary;
+
+  @Test
+  void failedAdmissionHashCannotCertifyUnchangedReleasedFailure() throws Exception {
+    Path root = Files.createDirectory(temporary.resolve("sources"));
+    Path file = Files.writeString(root.resolve("source.txt"), "unchanged metadata");
+    Path db = temporary.resolve("failed-hash.db");
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root)), "docs");
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+          var statement = connection.createStatement()) {
+        statement.executeUpdate("UPDATE jobs SET state='FAILED',attempts=5,"
+            + "unit_revision='release030/job/123/abc',planned_source_sha256=NULL,"
+            + "content_hash=NULL");
+        if (row(db).containsKey("admitted_source_sha256")) {
+          statement.executeUpdate("UPDATE jobs SET admitted_source_sha256=NULL");
+        }
+      }
+      var before = row(db);
+      var metadata = Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes.class);
+      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+        hashes.when(() -> SourceContentHash.admissionIdentity(file, root)).thenReturn(null);
+        // The watcher uses maintenance admission; isolate it from the old watcher's ordinary enqueue.
+        queue.enqueueMaintenanceScanEntries(
+            List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root)), "docs", null);
+      }
+      assertEquals(metadata.size(), Files.size(file));
+      assertEquals(metadata.lastModifiedTime(), Files.getLastModifiedTime(file));
+      var after = row(db);
+      assertEquals("PENDING", after.get("state"),
+          "failed hashing supplies no observation that can preserve a legacy terminal failure");
+      assertNotEquals(before.get("unit_revision"), after.get("unit_revision"));
+      assertEquals(file, queue.pollPending(1).getFirst().path(), "uncertain source must remain claimable");
+    }
+  }
 
   @ParameterizedTest
   @CsvSource({"release030/job/123/abc,unchanged", "release030/job/123/abc,size",

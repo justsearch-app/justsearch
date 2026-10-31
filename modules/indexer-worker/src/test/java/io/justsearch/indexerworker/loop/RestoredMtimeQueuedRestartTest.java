@@ -144,7 +144,7 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
     replaceAndProcess(file, stamp, "newwombattoken ".repeat(300), "newbadgertoken", "newwombattoken");
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void forcedPendingAndProcessingAdmissionsSurviveRestart(boolean processing) throws Exception {
     Path file = seed("unchangedpanda ".repeat(300), false);
@@ -176,7 +176,7 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void sourceHashFailureRetriesWithoutAcknowledgingUnchangedOrConsumingForce(boolean forced) throws Exception {
     Path file = seed("unchangedpanda ".repeat(300), false);
@@ -227,7 +227,7 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.CsvSource({"false,false", "true,false", "false,true", "true,true"})
   void reconciliationDuringSlowPublicationPreservesOnlyTheSameSource(boolean candidate, boolean changed)
       throws Exception {
@@ -301,7 +301,7 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void immediateConsumptionSeesForceAtTheAdmissionBoundary(boolean scan) throws Exception {
     Path file = seed("unchangedpanda ".repeat(300), false);
