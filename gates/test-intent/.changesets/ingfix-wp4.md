@@ -28,6 +28,13 @@ and the legacy-schema injection in `PersistentExtractionSandboxTest` are
 adaptations within files that also contain repair checks; their unchanged
 preservation expectations still require independent review.
 
+The two complete-table checks added for the P1/R3 repair are preservation checks: they pass on
+the before-state and on the candidate, and are included as `--check` arguments in the same
+evidence capture without a fail-before requirement:
+
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#completeBlankBodyTableKeepsBaselineOutput`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#completeMixedBodyTableKeepsBaselineOutput`
+
 No execution or acceptance is claimed by this changeset. Evidence must be written
 by `run-evidence.mjs` at the named path; acceptance belongs to another session.
 
@@ -395,9 +402,7 @@ by `run-evidence.mjs` at the named path; acceptance belongs to another session.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#completedMembersAndActivePrefixSurvive",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#supplementaryCharactersAreNotSplitAtTheBoundary",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#limitInsideBlankBodyCellKeepsCompletedHeader",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#limitInsideLaterBlankCellKeepsItsHeaderAfterEarlierValue",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#completeBlankBodyTableKeepsBaselineOutput",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#completeMixedBodyTableKeepsBaselineOutput"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredLimitFidelityTest.java#limitInsideLaterBlankCellKeepsItsHeaderAfterEarlierValue"
       ]
     },
     {
