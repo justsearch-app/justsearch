@@ -70,7 +70,7 @@ final class QueueUncommittedResyncRegressionTest {
       }).when(observed).createStatement();
       var rollbackFailure = new SQLException("rollback unavailable");
       doThrow(rollbackFailure).when(observed).rollback();
-      QueueDefectRegressionTest.connection(queue, observed);
+      connection(queue, observed);
       var connectionField = IndexingJobsChangeStream.class.getDeclaredField("conn");
       connectionField.setAccessible(true);
       connectionField.set(feed, observed);
@@ -138,5 +138,11 @@ final class QueueUncommittedResyncRegressionTest {
         resync.items().forEach(row -> rows.put(row.pathHash(), row));
       }
     }
+  }
+
+  private static void connection(SqliteJobQueue queue, Connection conn) throws Exception {
+    var field = SqliteJobQueue.class.getDeclaredField("connection");
+    field.setAccessible(true);
+    field.set(queue, conn);
   }
 }
