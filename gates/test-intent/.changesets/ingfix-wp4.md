@@ -647,3 +647,14 @@ by `run-evidence.mjs` at the named path; acceptance belongs to another session.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19045-4b72-7413-81e7-9318e53acf1a",
+  "verdict": "accept",
+  "digest": "sha256:4fe10dca2d2959e53add7192a2cbf32911c9331dfc12292986db5b094f783676",
+  "note": "Transcribed by the orchestrator from verifier session 01a19045-4b72-7413-81e7-9318e53acf1a (verdict: accept entries 1-12, overall accept; per-entry reasons in its evidence test-intent-verdicts.md); the verifier sandbox does not write records."
+}
+```
