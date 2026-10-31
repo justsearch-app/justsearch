@@ -11,7 +11,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'js-version-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const rel of ['gradle.properties', 'modules/shell/package.json', 'modules/shell/package-lock.json',
+  for (const rel of ['gradle.properties', 'THIRD_PARTY_NOTICES', 'modules/shell/package.json', 'modules/shell/package-lock.json',
     'modules/shell/src-tauri/tauri.conf.json', 'modules/shell/src-tauri/Cargo.toml', 'modules/shell/src-tauri/Cargo.lock',
     'scripts/ci/pack-mcpb.mjs', 'packaging/mcpb']) {
     const dest = path.join(root, rel);
@@ -55,6 +55,30 @@ test('Linux sync stamps app, Windows branding and both MCPB versions, URL and ha
   // The temporary fixture is removed by t.after; the working tree is never bumped.
 });
 
+test('sync stamps only the shell crate notice; check rejects notice-only drift without writing', (t) => {
+  const root = fixture(t);
+  const notice = read(root, 'THIRD_PARTY_NOTICES');
+  setVersion(root, '1.2.3-rc.2');
+  const result = sync(root, '--require-release-semver');
+  assert.equal(result.status, 0, result.stderr);
+  const expected = notice.replace(/^  shell \S+(?= — )/m, '  shell 1.2.3-rc.2');
+  const stamped = read(root, 'THIRD_PARTY_NOTICES');
+  assert.equal(stamped.match(/^  shell .+$/m)?.[0], '  shell 1.2.3-rc.2 — Apache-2.0');
+  assert.equal(stamped, expected, 'other notice content must stay byte-identical');
+  assert.equal(sync(root, '--check').status, 0);
+
+  fs.writeFileSync(path.join(root, 'THIRD_PARTY_NOTICES'), notice);
+  const check = sync(root, '--check');
+  assert.equal(check.status, 1, check.stderr);
+  assert.match(check.stderr, /Version projections differ.*THIRD_PARTY_NOTICES/);
+  assert.equal(read(root, 'THIRD_PARTY_NOTICES'), notice, 'check must not write');
+  assert.equal(sync(root, '--what-if').status, 0);
+  assert.equal(read(root, 'THIRD_PARTY_NOTICES'), notice, 'WhatIf must not write');
+  assert.equal(sync(root).status, 0);
+  assert.equal(read(root, 'THIRD_PARTY_NOTICES'), expected);
+  assert.equal(sync(root, '--check').status, 0);
+});
+
 test('WhatIf leaves every projection unchanged; release mode rejects SNAPSHOT before writing', (t) => {
   const root = fixture(t);
   const before = read(root, 'modules/shell/src-tauri/tauri.conf.json');
@@ -79,6 +103,7 @@ test('check rejects every divergent projection without repairing it; sync restor
   assert.equal(sync(root).status, 0);
   assert.equal(sync(root, '--check').status, 0);
   const mutations = [
+    ['THIRD_PARTY_NOTICES', value => value.replace(/^  shell \S+(?= — )/m, '  shell 9.9.9')],
     ['modules/shell/package.json', value => value.replace('"version": "0.3.0"', '"version": "9.9.9"')],
     ['modules/shell/package-lock.json', value => value.replace('"version": "0.3.0"', '"version": "9.9.9"')],
     ['modules/shell/package-lock.json', value => value.replace(/("": \{\s*"name": "shell",\s*"version": ")[^"]+/, '$19.9.9')],

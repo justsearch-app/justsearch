@@ -11,12 +11,15 @@ GPU host lane and conditional J9 to the same runner.
 The scenario wording is copied verbatim into every summary and checked by tests.
 This suite changes no product code and enables no application test-build feature.
 
-The hosted workflow is `qualify-release-linux.yml` (`workflow_dispatch`, `tag`).
-It requires an existing **draft**, downloads its `.deb`, MCPB and `SHA256SUMS`,
-and checks both executable assets before using either. It fetches the registry's
-`server.json` from that same tag. It has `contents: read`, no signing secrets,
-and uploads observations even when preparation fails. Dispatching it does not
-publish a release. Do not rebuild the downloaded app to qualify it.
+Dispatch `qualify-release-linux.yml` and `qualify-release-windows.yml` on main with
+`-f tag="$TAG"`. Each requires an existing **draft**. A fetch-only job uses
+`contents: write` to download its platform package, MCPB and `SHA256SUMS`, plus
+the registry's `server.json` from that same tag. The journey job has `contents: read`
+and checks both executable assets before using either. Neither workflow uses signing
+secrets or publishes a release. Both upload observations even when preparation fails.
+Read `summary.json` in `linux-release-journeys-$TAG` / `windows-release-journeys-$TAG`:
+inspect check statuses, evidence and `ownerValidation`, not just the workflow conclusion.
+Do not rebuild the downloaded app to qualify it.
 
 ## Running on disposable Ubuntu machines
 
@@ -201,7 +204,10 @@ unlike qcow2 allocated size. Shutdown writes are outside the measured interval;
 unavailable measurements are explicit. Use one driver at a time and reuse
 setup snapshots for infrastructure reruns instead of redoing full sets.
 
-For release qualification, use the production predecessor and unchanged draft mirror in [Cut a JustSearch release](../../../../docs/how-to/cut-a-release.md#3-qualify-the-drafts-exact-bytes-without-rebuilding); the local test-build procedure below is **development-only**.
+For release qualification, use the production predecessor and unchanged draft mirror in [Cut a JustSearch release](../../../../docs/how-to/cut-a-release.md#3-qualify-the-drafts-exact-bytes-without-rebuilding).
+Record J5 unavailable only when no published v2 release and no signed rehearsal draft
+exists (the rehearsal run itself); run the remaining applicable journeys as explicit subsets
+without predecessor/mirror arguments. Never fabricate a predecessor. The local test-build procedure below is **development-only**.
 
 For local test builds, build the predecessor from the candidate's **parent** in
 a shared clone inside `$TMPDIR`, with a separate build directory. Use the same
@@ -659,6 +665,8 @@ so a later recovery cannot turn that observation into a pass. Only transient API
 failures are retried; a product API failure seen during the deadline retains its
 attribution if the last observation is an infrastructure error.
 
+Explicit `--journeys` subsets report `status: incomplete` and exit 1 even when
+every selected check passed; inspect the individual check statuses.
 A complete lane without failed or unavailable checks reports `status: passed`
 only when every executed result is automatically proven. Any owner-validation
 rows change it to `passed-pending-owner-validation`; `ownerValidation` lists
@@ -725,10 +733,11 @@ match across uninstall.
 The Windows implementation is experimental. Fixture tests and tooling probes do
 not qualify an installed app. `windows.py` is a platform adapter used by the same
 `runner.py`, result classification, crash rules and exit codes as Linux.
-`qualify-release-windows.yml` is an advisory, read-only `workflow_dispatch` lane
-for an existing draft. It verifies the NSIS/MCPB hashes before use and reads
-`server.json` from the draft tag. No signing secret, release creation or publication
-is involved. Its first step rejects a non-GitHub-hosted runner.
+`qualify-release-windows.yml` is an advisory `workflow_dispatch` lane for an existing
+draft, with the fetch-only job and result artifacts described above. It verifies
+the NSIS/MCPB hashes before use and reads `server.json` from the draft tag.
+Its first step rejects a non-GitHub-hosted runner. Windows covers J1–J6 and J8;
+J7 desktop integration is Linux-only and not applicable on Windows.
 
 The guest/hosted tooling script is `windows-tools.ps1`. It requires a disposable
 runner or the VM marker and runs elevated during provisioning. It installs Python
