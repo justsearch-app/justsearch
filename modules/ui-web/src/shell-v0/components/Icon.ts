@@ -6,6 +6,7 @@
  * side uses via lucide-react) so Lit templates have a CSS-stylable
  * <svg>-returning helper without pulling lucide-react into the
  * non-React boot graph.
+ * Attribution: packaging/legal/LUCIDE-LICENSE.txt, shipped as legal/LUCIDE-LICENSE.txt.
  *
  * Adding an icon: copy the SVG body (path/circle/etc. children) from
  * https://lucide.dev/icons/<name> as the value. Keep the surrounding

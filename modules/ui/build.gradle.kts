@@ -1582,6 +1582,21 @@ val stageTrimmedOnnxRuntimeGpu by tasks.registering(Jar::class) {
   archiveFileName.set("onnxruntime_gpu-trimmed.jar")
 }
 
+val verifySidecarLegalResources by tasks.registering {
+  group = "verification"
+  description = "Require the legal notices shipped alongside the headless Engine"
+  val headlessDir = tauriHeadlessResourcesDir
+  doLast {
+    listOf("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "T3-CODE-NOTICE.md", "LUCIDE-LICENSE.txt")
+        .forEach { name ->
+          val legalNotice = headlessDir.asFile.resolve("legal/$name")
+          if (!legalNotice.isFile) {
+            throw GradleException("Missing required bundle legal file: ${legalNotice.absolutePath}")
+          }
+        }
+  }
+}
+
 val bundleSidecarResources by tasks.registering(Sync::class) {
   group = "distribution"
   description = "Stage headless jar, libs, and custom runtime into the Tauri shell resources"
@@ -1590,6 +1605,17 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
       stageOrtCudaVariant, verifyTesseractRuntime, stageTrimmedOnnxRuntimeGpu)
   includeEmptyDirs = false
   into(tauriHeadlessResourcesDir)
+  finalizedBy(verifySidecarLegalResources)
+  from(rootProject.files("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES")) {
+    into("legal")
+  }
+  from(rootProject.layout.projectDirectory.file("modules/ui-web/src/shell-v0/views/search-v3/THIRD-PARTY-NOTICES.md")) {
+    into("legal")
+    rename { "T3-CODE-NOTICE.md" }
+  }
+  from(rootProject.layout.projectDirectory.file("packaging/legal/LUCIDE-LICENSE.txt")) {
+    into("legal")
+  }
   // Lane F stage A item A13: ONE classpath. The bundle used to carry the Engine's `lib/` plus a
   // second, near-identical copy of the index half under `lib/worker/` — the Worker distribution
   // the deleted WorkerSpawner launched. Since item A6 the index half is composed in this JVM and
