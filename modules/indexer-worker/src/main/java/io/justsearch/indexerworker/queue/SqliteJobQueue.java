@@ -3123,6 +3123,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       if (before == null) return null;
       String hash = io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(
           entry.path(), entry.ingestionRoot());
+      if (hash == null) return null;
       var source = new AdmissionSource(before, hash);
       return source.stillCurrent(entry.path()) ? source : null;
     } catch (IOException | SecurityException unavailable) {
