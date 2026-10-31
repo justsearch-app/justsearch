@@ -637,6 +637,21 @@ public final class IndexingCoordinator {
     }
   }
 
+  /** File-scoped retirement for callers that already hold their file-mutation fence. */
+  public int pruneFile(String filePath, java.nio.file.Path boundary, PruneOps.PresenceGuard guard) {
+    if (session.pruneOps == null) throw new IndexWriterUnavailableException("File pruning is unavailable");
+    try {
+      int pruned = session.pruneOps.pruneFile(filePath, boundary, guard, PruneOps.WriterFence.NONE);
+      session.commitOps.maybeRefreshBlocking();
+      if (session.indexCountOps.countOwnedFileStrict(filePath) != 0) {
+        throw new IllegalStateException("File-scoped retirement is incomplete: " + filePath);
+      }
+      return pruned;
+    } catch (IOException unknown) {
+      throw IndexRuntimeIOException.fromIndexOperation(unknown, "File retirement could not be verified");
+    }
+  }
+
   public void deleteChunksForParentDocId(String parentDocId) {
     acquireReadLockTimed();
     try {

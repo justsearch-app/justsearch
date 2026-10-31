@@ -30,6 +30,64 @@ final class RootLifecycleOpsConcurrencyTest {
   @TempDir Path tempDir;
 
   @Test
+  void directoryLinkCannotBecomeAHealthyEmptyWatchedRoot() throws Exception {
+    Path target = Files.createDirectory(tempDir.resolve("target"));
+    Files.writeString(target.resolve("notes.txt"), "target content");
+    Path link = Files.createSymbolicLink(tempDir.resolve("link"), target);
+    var roots = new ConcurrentHashMap<Path, Instant>();
+    var state = new WatchedRootsState(roots, new WatchedRootsStore(tempDir.resolve("links.json"), null));
+    Set<String> watchers = ConcurrentHashMap.newKeySet();
+    var operations = ops(roots, state, watcher(watchers, path -> {}), (path, owned) -> deleted());
+    org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+        () -> operations.addWatchedRoot("docs", link, TestEngineContexts.internal()));
+    org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+        () -> operations.addWatchedPath(link, TestEngineContexts.internal()));
+    assertTrue(roots.isEmpty());
+    assertTrue(watchers.isEmpty());
+  }
+
+  @Test
+  void heldScanAllowsRemovalOfAnUnrelatedRoot() throws Exception {
+    Path a = Files.createDirectory(tempDir.resolve("a"));
+    Path b = Files.createDirectory(tempDir.resolve("b"));
+    var roots = new ConcurrentHashMap<Path, Instant>();
+    var state = new WatchedRootsState(roots, new WatchedRootsStore(tempDir.resolve("unrelated.json"), null));
+    state.register(a, "a", false);
+    state.register(b, "b", false);
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var queued = new java.util.ArrayList<java.util.function.Consumer<EngineContext>>();
+    var observedRoot = new java.util.concurrent.atomic.AtomicReference<Path>();
+    var scanning = new RootLifecycleOps(roots, state, ExcludeMatcher::empty,
+        (path, collection, mode, globs, progress, context) -> {
+          observedRoot.set(Path.of(path));
+          entered.countDown();
+          await(release);
+          return io.justsearch.ipc.ScanRootProgress.newBuilder().setComplete(true).build();
+        }, watcher(ConcurrentHashMap.newKeySet(), path -> {}),
+        (path, context) -> deleted(), (id, context) -> null,
+        mock(SyncOps.class), mock(ExecutorService.class), (body, context) -> queued.add(body));
+    var context = TestEngineContexts.internal();
+    scanning.reindexWatchedRoots(true, context);
+    var removing = ops(roots, state, watcher(ConcurrentHashMap.newKeySet(), path -> {}),
+        (path, owned) -> deleted());
+    var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      var scan = executor.submit(() -> queued.getFirst().accept(context));
+      assertTrue(entered.await(2, TimeUnit.SECONDS));
+      Path unrelated = observedRoot.get().equals(a) ? b : a;
+      var removal = executor.submit(() -> removing.removeWatchedPath(unrelated, context));
+      assertEquals(1, removal.get(2, TimeUnit.SECONDS).intValue());
+      release.countDown();
+      scan.get(2, TimeUnit.SECONDS);
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(2, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
   void retainedAncestorPreservesDocumentsWhenLegacyChildRegistrationIsRemoved() throws Exception {
     Path parent = Files.createDirectories(tempDir.resolve("ancestor"));
     Path nested = Files.createDirectories(parent.resolve("nested"));
@@ -110,7 +168,7 @@ final class RootLifecycleOpsConcurrencyTest {
         scanThread.start();
         assertTrue(entered.await(2, TimeUnit.SECONDS));
         removeThread.start();
-        assertBlocked(removeThread);
+        assertAwaitingOwner(removeThread);
         assertFalse(remove.isDone(), "an active producer owns the cleanup fence");
         release.countDown();
         scan.get(2, TimeUnit.SECONDS);
@@ -176,7 +234,7 @@ final class RootLifecycleOpsConcurrencyTest {
         reconcileThread.start();
         assertTrue(entered.await(2, TimeUnit.SECONDS));
         removeThread.start();
-        assertBlocked(removeThread);
+        assertAwaitingOwner(removeThread);
         release.countDown();
         reconcile.get(2, TimeUnit.SECONDS);
         assertEquals(1, remove.get(2, TimeUnit.SECONDS).intValue());
@@ -365,7 +423,7 @@ final class RootLifecycleOpsConcurrencyTest {
       addThread.start();
       assertTrue(entered.await(2, TimeUnit.SECONDS));
       removeThread.start();
-      assertBlocked(removeThread);
+      assertAwaitingOwner(removeThread);
       assertFalse(remove.isDone());
       release.countDown();
       add.get(2, TimeUnit.SECONDS);
@@ -412,7 +470,7 @@ final class RootLifecycleOpsConcurrencyTest {
       removeThread.start();
       assertTrue(entered.await(2, TimeUnit.SECONDS));
       addThread.start();
-      assertBlocked(addThread);
+      assertAwaitingOwner(addThread);
       assertFalse(roots.containsKey(nested), "registration must wait for removal to complete");
       release.countDown();
       assertEquals(1, remove.get(2, TimeUnit.SECONDS).intValue());
@@ -428,13 +486,14 @@ final class RootLifecycleOpsConcurrencyTest {
     }
   }
 
-  private static void assertBlocked(Thread thread) throws InterruptedException {
+  private static void assertAwaitingOwner(Thread thread) throws InterruptedException {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-    while (thread.isAlive() && thread.getState() != Thread.State.BLOCKED
+    while (thread.isAlive() && thread.getState() != Thread.State.BLOCKED && thread.getState() != Thread.State.WAITING
         && System.nanoTime() < deadline) {
       Thread.sleep(1);
     }
-    assertEquals(Thread.State.BLOCKED, thread.getState(), "lifecycle must await the owning operation");
+    assertTrue(thread.getState() == Thread.State.BLOCKED || thread.getState() == Thread.State.WAITING,
+        "lifecycle must await the owning operation");
   }
 
   @Test

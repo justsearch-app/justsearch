@@ -68,6 +68,41 @@ final class RootWatcherRegistryTest {
     assertTrue(registry.isCurrentAndActive(second));
   }
 
+
+  @Test
+  void initialRegistrationFailureRetainsCollectionAndRetryOwnership() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("retry"));
+    WorkerMethvinWatcher watcher = mock(WorkerMethvinWatcher.class);
+    when(watcher.registerRoot(any(RootWatcherRegistry.Subscription.class))).thenReturn(false, true);
+    when(watcher.activateRoot(any())).thenReturn(true);
+    var registry = new RootWatcherRegistry(watcher);
+    assertFalse(registry.watch(root.toString(), "documents").watching());
+    assertTrue(registry.recoveryRoots().contains(root));
+    assertNull(registry.subscription(root));
+    assertTrue(registry.resumeAwaitingVolume(root));
+    assertEquals("documents", registry.subscription(root).collection());
+  }
+
+  @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void recreatedDirectoryOnRecordedVolumeGetsANewWatcherIdentity() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("recreated"));
+    var oldLookup = RootIdentity.VOLUME_IDENTITY_LOOKUP;
+    try {
+      RootIdentity.VOLUME_IDENTITY_LOOKUP = ignored -> "test-volume:1";
+      var registry = new RootWatcherRegistry();
+      assertTrue(registry.watch(root.toString(), "documents").watching());
+      var prior = registry.subscription(root);
+      Files.move(root, tempDir.resolve("retired"));
+      Files.createDirectory(root);
+      assertTrue(registry.watch(root.toString(), "documents").watching());
+      assertFalse(registry.isCurrentAndActive(prior));
+      assertEquals("documents", registry.subscription(root).collection());
+    } finally {
+      RootIdentity.VOLUME_IDENTITY_LOOKUP = oldLookup;
+    }
+  }
+
   @Test
   void failedPhysicalRegistrationIsNotPublished() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("failed-registration"));

@@ -260,13 +260,13 @@ final class RootLifecycleOps {
      * instead of reading as indexed while its files fail one by one.
      */
     private static boolean isListableDirectory(Path root) {
-        if (!Files.isDirectory(root)) {
+        if (!Files.isDirectory(root, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
             return false;
         }
         try (var entries = Files.newDirectoryStream(root)) {
             // Reading the first entry is what proves the folder can be enumerated; empty is fine.
             boolean firstEntryRead = entries.iterator().hasNext();
-            return firstEntryRead || Files.isDirectory(root);
+            return firstEntryRead || Files.isDirectory(root, java.nio.file.LinkOption.NOFOLLOW_LINKS);
         } catch (java.io.IOException | SecurityException | java.nio.file.DirectoryIteratorException e) {
             return false;
         }
@@ -289,6 +289,7 @@ final class RootLifecycleOps {
             return;
         }
         Path normalized = path.toAbsolutePath().normalize();
+        if (Files.isSymbolicLink(normalized)) throw new IllegalArgumentException("Watched root must not be a symbolic link");
         if (watchedRootsState.isRemovalIncomplete(normalized)) return;
         // Register root so the fenced walk's membership check doesn't abort the walk.
         // No label reaches this entry point — the contract calls it "primary collection"
@@ -418,7 +419,7 @@ final class RootLifecycleOps {
             WatchedRootsState.RootProducerFence fence, Object ticket) {}
 
     private WatchInitialization prepareWatchedRoot(String collection, Path path) {
-        if (path == null || !Files.isDirectory(path) || !Files.isReadable(path)) {
+        if (path == null || !Files.isDirectory(path, java.nio.file.LinkOption.NOFOLLOW_LINKS) || !Files.isReadable(path)) {
             throw new IllegalArgumentException("Path is not an accessible directory: " + path);
         }
 
@@ -595,6 +596,7 @@ final class RootLifecycleOps {
         // Keep durable-store failures visible to the caller, as before.
         String previousWalkError = watchedRootsState.getWalkError(normalized);
         watchedRootsState.beginRemoval(normalized);
+        watchedRootsState.drainRootProducers(normalized);
         int deletedJobs = 0;
         try {
             // Independently declared descendants retain their watchers and documents.

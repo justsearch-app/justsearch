@@ -2,6 +2,8 @@
 package io.justsearch.indexerworker.loop;
 
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.adapters.lucene.runtime.PathPresence;
+import io.justsearch.adapters.lucene.runtime.PruneOps;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.services.ConfirmedDeletionMarker;
 import io.justsearch.indexerworker.util.PathNormalizer;
@@ -52,11 +54,36 @@ public final class StaleSourceHandler {
    *     {@code indexedSinceCommit} counter so the commit driver sees pending work);
    *     failures propagate so the queue obligation can be retried.
    */
-  public int deleteMissingSource(Path filePath) {
-    String normalizedPath = PathNormalizer.normalizePath(filePath.toAbsolutePath().toString());
+  public int deleteMissingSource(Path filePath, Path root, SourcePresence.RootCheck rootCheck) {
+    Path file = filePath.toAbsolutePath().normalize();
+    boolean rooted = SourcePresence.answersAsRoot(file, root);
+    Path boundary = rooted ? root.toAbsolutePath().normalize() : file.getParent();
+    var guard = new PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() {
+        return rooted ? rootCheck.vouches(boundary) : rootCheck.vouchesForFile(boundary);
+      }
+      @Override public PathPresence presence(Path source) {
+        try {
+          SourceAccess.requireSafeAncestors(source, boundary);
+          if (!rootCheck.sourceStorageAvailable(source, root)) return PathPresence.UNKNOWN;
+          PathPresence presence = PathPresence.probeSource(source, boundary);
+          return presence == PathPresence.ABSENT
+              ? PathPresence.absentBeneathListableFolder(source, boundary, null) : presence;
+        } catch (java.io.IOException | SecurityException unknown) {
+          return PathPresence.UNKNOWN;
+        }
+      }
+    };
+    if (!guard.rootCurrent() || guard.presence(file) != PathPresence.ABSENT) {
+      throw new IllegalStateException("Source retirement no longer has confirmed absence");
+    }
+    String normalizedPath = PathNormalizer.normalizeKey(file);
     IndexingCoordinator active = activeLexicalSource.get();
-    if (active != null) active.deleteByIdAndChunks(normalizedPath); // A before Green, as writes
-    indexingCoordinator.deleteByIdAndChunks(normalizedPath);
+    if (active != null) active.pruneFile(normalizedPath, boundary, guard);
+    indexingCoordinator.pruneFile(normalizedPath, boundary, guard);
+    if (!guard.rootCurrent() || guard.presence(file) != PathPresence.ABSENT) {
+      throw new IllegalStateException("Source retirement could not confirm absence after pruning");
+    }
     // Tempdoc 931 §C.6 — a confirmed deletion point: the document left the index because its
     // source is gone. The marker re-verifies absence, so the DELETED classification that reaches
     // here from an IOException on stat (unreadable, not absent) records nothing.

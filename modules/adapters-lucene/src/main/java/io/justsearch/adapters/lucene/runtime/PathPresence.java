@@ -46,6 +46,46 @@ public enum PathPresence {
     }
   }
 
+  /** Presence of the indexed regular source; replacement links and directories retire old text. */
+  public static PathPresence probeSource(Path path, Path boundary) {
+    try {
+      Path normalized = path.toAbsolutePath().normalize();
+      Path stop = boundary.toAbsolutePath().normalize();
+      if (!normalized.startsWith(stop)) return UNKNOWN;
+      Path current = stop;
+      Path parent = normalized.getParent();
+      Path realRoot = null;
+      if (!normalized.equals(stop)) {
+        for (;;) {
+          BasicFileAttributes attrs;
+          try {
+            attrs = Files.readAttributes(current, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+          } catch (NoSuchFileException absent) {
+            return ABSENT;
+          }
+          if (current.equals(stop) && attrs.isSymbolicLink()) return UNKNOWN;
+          Path real;
+          try {
+            real = current.toRealPath();
+          } catch (IOException unavailableAncestor) {
+            return UNKNOWN;
+          }
+          if (realRoot == null) realRoot = real;
+          if (!real.startsWith(realRoot)) return UNKNOWN;
+          if (!Files.isDirectory(current)) return ABSENT;
+          if (current.equals(parent)) break;
+          current = current.resolve(stop.relativize(parent).getName(current.getNameCount() - stop.getNameCount()));
+        }
+      }
+      BasicFileAttributes attrs = Files.readAttributes(normalized, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      return attrs.isRegularFile() ? PRESENT : ABSENT;
+    } catch (NoSuchFileException absent) {
+      return ABSENT;
+    } catch (IOException | RuntimeException unknown) {
+      return UNKNOWN;
+    }
+  }
+
   /** Probes a stored path string; a string that is not a valid path cannot be judged. */
   public static PathPresence probe(String path) {
     if (path == null || path.isBlank()) {

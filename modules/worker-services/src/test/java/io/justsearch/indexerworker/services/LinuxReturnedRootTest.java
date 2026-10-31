@@ -149,11 +149,12 @@ final class LinuxReturnedRootTest {
 
       assertEquals(WorkerIngestService.BufferedDeleteReplay.SETTLED,
           service.replayBufferedFileDelete(runtime, receipt));
-      verify(runtime.indexingCoordinator()).deleteByIdAndChunks(absent.toString());
+      verify(runtime.pruneOps()).pruneFile(eq(absent.toString()), eq(root), any(), any());
       Files.writeString(absent, "recreated content");
       assertEquals(WorkerIngestService.BufferedDeleteReplay.SETTLED,
           service.replayBufferedFileDelete(runtime, receipt));
-      verify(runtime.indexingCoordinator(), times(1)).deleteByIdAndChunks(absent.toString());
+      verify(runtime.pruneOps(), times(1)).pruneFile(eq(absent.toString()), eq(root), any(), any());
+      verify(runtime.indexingCoordinator(), never()).deleteByIdAndChunks(any());
       verify(queue).enqueueReappearedFile(any(), nullable(String.class));
     } finally { Files.deleteIfExists(root.resolve("gone.txt")); Files.delete(root); }
   }

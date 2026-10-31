@@ -39,6 +39,27 @@ import tools.jackson.databind.ObjectMapper;
 final class MigrationEnumerationCompletenessTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
+
+  @Test
+  void enumerationSkipsLinksAndPrunesExcludedSubtrees(@TempDir Path directory) throws Exception {
+    Path root = Files.createDirectory(directory.resolve("root"));
+    Path included = Files.writeString(root.resolve("notes.txt"), "included");
+    Files.createSymbolicLink(root.resolve("link"), included);
+    Files.writeString(Files.createDirectory(root.resolve("node_modules")).resolve("built.txt"), "built");
+    Files.writeString(Files.createDirectory(root.resolve("vendor")).resolve("excluded.txt"), "excluded");
+    Counters counters = new Counters();
+    JobQueue queue = acceptingQueue();
+    var excludes = io.justsearch.configuration.excludes.ExclusionPatterns.fromPatterns(List.of("vendor/**"));
+    try (var policy = org.mockito.Mockito.mockStatic(
+        io.justsearch.configuration.excludes.ExclusionPatterns.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      policy.when(io.justsearch.configuration.excludes.ExclusionPatterns::current).thenReturn(excludes);
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
+          context(List.of(root), queue, counters, () -> true)));
+    }
+    assertEquals(1, counters.rootsDone.get());
+    assertEquals(1, counters.filesSeen.get());
+  }
+
   @Test
   void absentRegistryAndEmptyConfigurationAreAnEmptyMigration(@TempDir Path dataDir)
       throws Exception {
@@ -514,9 +535,9 @@ final class MigrationEnumerationCompletenessTest {
     createSymbolicLinkOrSkip(root.resolve("link.txt"), target);
     Counters counters = new Counters();
     JobQueue queue = acceptingQueue();
-    assertThrows(IOException.class, () -> KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
+    assertEquals(0, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
         context(List.of(root), queue, counters, () -> true)));
-    assertEquals(0, counters.rootsDone.get());
+    assertEquals(1, counters.rootsDone.get());
     verify(queue, never()).enqueueEntries(anyList());
   }
 

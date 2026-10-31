@@ -82,6 +82,16 @@ final class WorkerScanOps {
     throw WorkerServiceException.unavailable("RECORDED_GENERATION_GUARD_REQUIRED");
   }
 
+  private java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
+  private java.util.function.BiPredicate<Path, Path> directoryExclusions =
+      (dir, root) -> io.justsearch.configuration.excludes.ExclusionPatterns.current().isExcludedDirectory(root, dir);
+
+  void setUserExclusions(java.util.function.BiPredicate<Path, Path> files,
+      java.util.function.BiPredicate<Path, Path> directories) {
+    userExclusions = Objects.requireNonNull(files);
+    directoryExclusions = Objects.requireNonNull(directories);
+  }
+
   /** Production constructor — uses the real cloud-placeholder detector and no-op pacing hooks. */
   WorkerScanOps(JobQueue jobQueue) {
     this(
@@ -202,8 +212,7 @@ final class WorkerScanOps {
     Objects.requireNonNull(progressEmitter, "progressEmitter");
     String scanId = request.scanId();
     Path root = request.root();
-    LinkOption[] linkOptions = request.recordedEpoch() == null
-        ? new LinkOption[0] : new LinkOption[] {LinkOption.NOFOLLOW_LINKS};
+    LinkOption[] linkOptions = {LinkOption.NOFOLLOW_LINKS};
     if (request.singleFile() ? !Files.isRegularFile(root, linkOptions) : !Files.isDirectory(root, linkOptions)) {
       ScanRootProgress terminal =
           ScanRootProgress.newBuilder()
@@ -221,6 +230,7 @@ final class WorkerScanOps {
     String[] currentDir = new String[] {root.toString()};
     List<JobQueue.EnqueueEntry> batch = new ArrayList<>(ENQUEUE_BATCH_SIZE);
     boolean[] cancelled = {false};
+    boolean[] incomplete = {false};
     String collection = request.collection();
     // Tempdoc 821 §3-C3: a FORCE_REINDEX scan marks every path it admits forced, so the batch
     // extractor bypasses its unchanged-check and actually re-runs extraction + enrichment.
@@ -252,7 +262,14 @@ final class WorkerScanOps {
             }
             if (excludedByOwnership(request, dir)) return FileVisitResult.SKIP_SUBTREE;
             String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
-            if (!dir.equals(root) && IngestionSkipPolicy.isSkippedDirectoryName(name)) {
+            if ((!dir.equals(root) && IngestionSkipPolicy.isSkippedDirectoryName(name))
+                || excludes.isExcludedDirectory(root, dir)
+                || directoryExclusions.test(dir, root)) {
+              return FileVisitResult.SKIP_SUBTREE;
+            }
+            if (!Files.isReadable(dir)) {
+              if (request.recordedEpoch() != null) throw new IOException("Recorded directory is unreadable");
+              incomplete[0] = true;
               return FileVisitResult.SKIP_SUBTREE;
             }
             currentDir[0] = displayDirectory(dir, root);
@@ -274,64 +291,89 @@ final class WorkerScanOps {
               return FileVisitResult.TERMINATE;
             }
             counters[0]++; // walked
-            if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
-                || excludedByOwnership(request, file)
-                || (request.recordedEpoch() != null && matchesAny(excludes, root, file))) {
-              counters[2]++;
-              return FileVisitResult.CONTINUE;
-            }
-            if (attrs.isRegularFile() && !Files.isReadable(file) && request.recordedEpoch() != null) {
-              throw new IOException("Recorded member is unreadable");
-            }
-            if (!attrs.isRegularFile() || !Files.isReadable(file)) {
-              counters[2]++;
-              return FileVisitResult.CONTINUE;
-            }
-            if (isCloudPlaceholder.test(file)) {
-              if (request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED) {
-                throw new IOException("Captured bulk member is a cloud placeholder");
+            try {
+              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
+                  || userExclusions.test(file, root)
+                  || excludedByOwnership(request, file)
+                  || matchesAny(excludes, root, file)) {
+                counters[2]++;
+                return FileVisitResult.CONTINUE;
               }
-              cloudPlaceholderRecorder.record(file, collection, request.provenance());
-              counters[2]++;
-              return FileVisitResult.CONTINUE;
-            }
-            if (matchesAny(excludes, root, file)) {
-              counters[2]++;
-              return FileVisitResult.CONTINUE;
-            }
-            // 813 Slice B: the walk already holds the size — no extra stat.
-            String sourceHash = request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED
-                ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(file) : null;
-            batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance(), sourceHash)
-                .withinRoot(root));
-            if (batch.size() >= ENQUEUE_BATCH_SIZE) {
-              if (!awaitAdmissionCapacity(request) || isCancelled.getAsBoolean()) {
-                cancelled[0] = true;
-                return FileVisitResult.TERMINATE;
+              if (!attrs.isRegularFile()) {
+                counters[2]++;
+                return FileVisitResult.CONTINUE;
               }
-              flushBatch(batch, collection, enqueueScanId, request.recordedEpoch(), mode, counters, bytes);
-              if (isCancelled.getAsBoolean()) {
-                cancelled[0] = true;
-                return FileVisitResult.TERMINATE;
+              if (isCloudPlaceholder.test(file)) {
+                if (request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED) {
+                  throw new IOException("Captured bulk member is a cloud placeholder");
+                }
+                cloudPlaceholderRecorder.record(file, collection, request.provenance());
+                counters[2]++;
+                return FileVisitResult.CONTINUE;
+              }
+              if (!Files.isReadable(file)) {
+                if (request.recordedEpoch() != null) throw new IOException("Recorded member is unreadable");
+                incomplete[0] = true;
+                counters[2]++;
+                return FileVisitResult.CONTINUE;
+              }
+              // 813 Slice B: the walk already holds the size — no extra stat.
+              String sourceHash = request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED
+                  ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(file, root) : null;
+              batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance(), sourceHash)
+                  .withinRoot(root));
+              if (batch.size() >= ENQUEUE_BATCH_SIZE) {
+                if (!awaitAdmissionCapacity(request) || isCancelled.getAsBoolean()) {
+                  cancelled[0] = true;
+                  return FileVisitResult.TERMINATE;
+                }
+                flushBatch(batch, collection, enqueueScanId, request.recordedEpoch(), mode, counters, bytes);
+                if (isCancelled.getAsBoolean()) {
+                  cancelled[0] = true;
+                  return FileVisitResult.TERMINATE;
+                }
+              }
+              return FileVisitResult.CONTINUE;
+            } finally {
+              if (counters[0] % PROGRESS_EMIT_EVERY_N_FILES == 0) {
+                progressEmitter.accept(inFlightProgress(counters, bytes[0], currentDir[0], false, "", scanId));
               }
             }
-            if (counters[0] % PROGRESS_EMIT_EVERY_N_FILES == 0) {
-              progressEmitter.accept(
-                  inFlightProgress(counters, bytes[0], currentDir[0], false, "", scanId));
+          }
+
+          @Override
+          public FileVisitResult postVisitDirectory(Path dir, IOException failure) throws IOException {
+            if (failure != null) {
+              if (request.recordedEpoch() != null) throw failure;
+              incomplete[0] = true;
             }
             return FileVisitResult.CONTINUE;
           }
 
           @Override
           public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-            if (request.recordedEpoch() != null) {
-              throw exc != null ? exc : new IOException("Recorded enumeration could not visit a member");
+            if (isCancelled.getAsBoolean()) {
+              cancelled[0] = true;
+              return FileVisitResult.TERMINATE;
             }
-            log.debug(
-                "scan: skipping inaccessible path {} ({})",
-                file,
-                exc != null ? exc.getMessage() : "unknown");
+            counters[0]++;
             counters[2]++;
+            boolean directory = Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS);
+            boolean excluded = excludedByOwnership(request, file)
+                || (directory && (excludes.isExcludedDirectory(root, file)
+                    || directoryExclusions.test(file, root)
+                    || (!file.equals(root) && file.getFileName() != null
+                        && IngestionSkipPolicy.isSkippedDirectoryName(file.getFileName().toString()))))
+                || (Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
+                    && (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
+                        || userExclusions.test(file, root) || excludes.isExcludedPath(root, file)));
+            if (!excluded) {
+              if (request.recordedEpoch() != null) throw exc;
+              incomplete[0] = true;
+            }
+            if (counters[0] % PROGRESS_EMIT_EVERY_N_FILES == 0) {
+              progressEmitter.accept(inFlightProgress(counters, bytes[0], currentDir[0], false, "", scanId));
+            }
             return FileVisitResult.CONTINUE;
           }
         });
@@ -345,7 +387,7 @@ final class WorkerScanOps {
       }
     }
 
-    String terminalReason = cancelled[0] ? "CLIENT_CANCELLED" : "";
+    String terminalReason = cancelled[0] ? "CLIENT_CANCELLED" : incomplete[0] ? "INCOMPLETE_COVERAGE" : "";
     ScanRootProgress terminal =
         inFlightProgress(counters, bytes[0], root.toString(), true, terminalReason, scanId);
     progressEmitter.accept(terminal);

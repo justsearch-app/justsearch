@@ -62,6 +62,62 @@ final class JobBatchExtractorForcedPathTest {
 
   @TempDir Path tempDir;
 
+  @Test
+  void queuedPlaceholderDefersWithoutExtractionOrAnAttempt() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("cloud.txt"), "cloud fixture");
+    var h = newHarness(Set.of(PathNormalizer.normalizeKey(file)));
+    var claim = rootedJob(file, "docs");
+    org.mockito.Mockito.doCallRealMethod().when(h.journal()).recordOutcomeSafely(any(), any(), any());
+    try (var detector = org.mockito.Mockito.mockStatic(
+        io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.class);
+        var hashes = org.mockito.Mockito.mockStatic(SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      detector.when(() -> io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(file))
+          .thenReturn(true);
+      assertEquals(List.of(), h.extractor().extractAll(List.of(claim)));
+      verify(h.contentExtractor(), never()).extractArtifact(any());
+      hashes.verifyNoInteractions();
+      verify(h.jobQueue()).deferClaim(eq(claim),
+          org.mockito.ArgumentMatchers.argThat(outcome ->
+              io.justsearch.indexerworker.ingest.IngestionReasonCodes.CLOUD_PLACEHOLDER.equals(outcome.reasonCode())
+                  && outcome.retryPolicy() == io.justsearch.indexerworker.ingest.IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT),
+          any());
+      verify(h.jobQueue(), never()).markClaimFailed(any(), any(), any());
+    }
+  }
+
+  @Test
+  void replacedAncestorNeverReachesExtraction() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("root"));
+    Path parent = Files.createDirectory(root.resolve("parent"));
+    Path file = Files.writeString(parent.resolve("notes.txt"), "inside");
+    Path outside = Files.createDirectory(tempDir.resolve("outside"));
+    Files.writeString(outside.resolve("notes.txt"), "outside");
+    Files.delete(file);
+    Files.delete(parent);
+    Files.createSymbolicLink(parent, outside);
+    var h = newHarness(Set.of(PathNormalizer.normalizeKey(file)));
+    var claim = new JobQueue.IndexJob(file, null, null, null, null, null, false, null, root);
+    org.mockito.Mockito.doCallRealMethod().when(h.journal()).recordOutcomeSafely(any(), any(), any());
+    assertEquals(List.of(), h.extractor().extractAll(List.of(claim)));
+    verify(h.contentExtractor(), never()).extractArtifact(any());
+    verify(h.jobQueue()).markClaimFailed(eq(claim), any(), any());
+  }
+
+  @Test
+  void parentHopThroughALinkCannotOpenADifferentFileThanTheNormalizedClaim() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("raw-boundary"));
+    Files.writeString(root.resolve("notes.txt"), "inside");
+    Path outside = Files.createDirectory(tempDir.resolve("outside-raw"));
+    Path child = Files.createDirectory(outside.resolve("child"));
+    Files.writeString(outside.resolve("notes.txt"), "outside");
+    Files.createSymbolicLink(root.resolve("jump"), child);
+    Path raw = root.resolve("jump/../notes.txt");
+    var h = newHarness(Set.of(PathNormalizer.normalizeKey(raw)));
+    var claim = new JobQueue.IndexJob(raw, null, null, null, null, null, false, null, root);
+    assertEquals(List.of(), h.extractor().extractAll(List.of(claim)));
+    verify(h.contentExtractor(), never()).extractArtifact(any());
+  }
+
   /** Everything the extractor needs, with the forced set as the single variable under test. */
   private record Harness(
       JobBatchExtractor extractor,

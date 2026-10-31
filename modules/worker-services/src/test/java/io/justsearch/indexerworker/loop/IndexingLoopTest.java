@@ -92,7 +92,7 @@ class IndexingLoopTest {
     assertEquals(List.of(io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
             file.toAbsolutePath().toString())),
         deletesOn(activeWrites), "A no longer serves the deleted source");
-    verify(queue.indexingCoordinator).deleteByIdAndChunks(anyString());
+    verify(queue.indexingCoordinator).pruneFile(anyString(), any(), any());
   }
 
   // task a5fbcb round 7, F2: a folder that replaced the source retires its text from A too
@@ -126,7 +126,7 @@ class IndexingLoopTest {
 
   private static List<Object> deletesOn(IndexingCoordinator writes) {
     return mockingDetails(writes).getInvocations().stream()
-        .filter(call -> "deleteByIdAndChunks".equals(call.getMethod().getName()))
+        .filter(call -> "pruneFile".equals(call.getMethod().getName()))
         .map(call -> call.getArgument(0))
         .toList();
   }
@@ -732,7 +732,7 @@ class IndexingLoopTest {
       assertEquals(IngestionOutcomeClass.STALE_SOURCE, queue.lastOutcome.outcomeClass());
       assertEquals(IngestionReasonCodes.DELETED_OR_MISSING, queue.lastOutcome.reasonCode());
       assertTrue(queue.done);
-      verify(queue.indexingCoordinator).deleteByIdAndChunks(anyString());
+      verify(queue.indexingCoordinator).pruneFile(anyString(), any(), any());
     }
 
     @Test
@@ -868,7 +868,7 @@ class IndexingLoopTest {
       assertEquals(IngestionOutcomeClass.STALE_SOURCE, queue.lastOutcome.outcomeClass());
       assertEquals(IngestionReasonCodes.DELETED_AFTER_SNAPSHOT, queue.lastOutcome.reasonCode());
       assertTrue(queue.done);
-      verify(queue.indexingCoordinator).deleteByIdAndChunks(anyString());
+      verify(queue.indexingCoordinator).pruneFile(anyString(), any(), any());
     }
 
     @Test
@@ -1596,17 +1596,19 @@ class IndexingLoopTest {
       StaleSourceHandler okHandler =
           new StaleSourceHandler(successCoordinator);
       Path file = Files.writeString(Files.createTempFile("js-stale-ok", ".txt"), "body");
-      assertEquals(1, okHandler.deleteMissingSource(file),
-          "Successful coordinator.deleteByIdAndChunks must surface as 1 so the caller bumps "
+      Files.delete(file);
+      var proof = addedFolder(file.getParent());
+      assertEquals(1, okHandler.deleteMissingSource(file, file.getParent(), proof),
+          "Successful file-scoped retirement must surface as 1 so the caller bumps "
               + "indexedSinceCommit. The cross-seam contract Appendix A.1 named.");
-      verify(successCoordinator).deleteByIdAndChunks(anyString());
+      verify(successCoordinator).pruneFile(anyString(), any(), any());
 
       IndexingCoordinator throwingCoordinator = mock(IndexingCoordinator.class);
       doThrow(new RuntimeException("simulated lucene failure"))
-          .when(throwingCoordinator).deleteByIdAndChunks(anyString());
+          .when(throwingCoordinator).pruneFile(anyString(), any(), any());
       StaleSourceHandler failHandler =
           new StaleSourceHandler(throwingCoordinator);
-      assertThrows(RuntimeException.class, () -> failHandler.deleteMissingSource(file),
+      assertThrows(RuntimeException.class, () -> failHandler.deleteMissingSource(file, file.getParent(), proof),
           "A failed delete must retain a recoverable queue obligation");
     }
 
@@ -1669,13 +1671,14 @@ class IndexingLoopTest {
               mock(IndexingCoordinator.class), recorder);
 
       Path stillThere = Files.writeString(Files.createTempFile("js-stale-present", ".txt"), "body");
-      assertEquals(1, handler.deleteMissingSource(stillThere));
+      assertThrows(IllegalStateException.class, () -> handler.deleteMissingSource(
+          stillThere, stillThere.getParent(), addedFolder(stillThere.getParent())));
       assertTrue(
           marked.isEmpty(),
           "the source is present, so the index delete is not evidence of a deletion");
 
       Path gone = Files.createTempDirectory("js-stale-gone").resolve("gone.txt");
-      assertEquals(1, handler.deleteMissingSource(gone));
+      assertEquals(1, handler.deleteMissingSource(gone, gone.getParent(), addedFolder(gone.getParent())));
       assertEquals(
           List.of(
               DocumentIdentityStore.pathHash(

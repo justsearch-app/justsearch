@@ -35,6 +35,10 @@ final class WorkerIngestionAuthority {
     this.rootCheck = java.util.Objects.requireNonNull(check, "check");
   }
 
+  SourcePresence.RootCheck rootCheck() {
+    return rootCheck;
+  }
+
   /** What can be said about {@code source} under {@code root}, with this authority's root check. */
   SourcePresence.Verdict presence(Path source, Path root) {
     return SourcePresence.classify(source, root, rootCheck);
@@ -85,6 +89,12 @@ final class WorkerIngestionAuthority {
     // the root that holds it is present — retires the source and its indexed content.
     FileFreshnessSnapshot freshness;
     try {
+      SourceAccess.requireSafeAncestors(filePath, root);
+    } catch (IOException | SecurityException unsafeAncestor) {
+      return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
+          sourceUnreadable(filePath, unsafeAncestor));
+    }
+    try {
       freshness = FileFreshnessSnapshot.capture(filePath);
     } catch (IOException notCaptured) {
       return switch (presence(filePath, root)) {
@@ -113,7 +123,7 @@ final class WorkerIngestionAuthority {
     boolean rooted = SourcePresence.answersAsRoot(normalizedFile, root);
     boolean exactRecovery = !rooted && rootCheck.isRelease030ExactFile(normalizedFile);
     boolean admitted = exactRecovery || (rooted ? rootCheck.admits(answering) : rootCheck.admitsFile(answering));
-    if (!admitted) {
+    if (!admitted || !rootCheck.observeSourceStorage(root)) {
       return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
     }
 
@@ -123,7 +133,7 @@ final class WorkerIngestionAuthority {
             sourceUnreadable(filePath, null));
       }
       boolean canRetire = rooted ? rootCheck.vouches(answering) : rootCheck.vouchesForFile(answering);
-      if (!canRetire || io.justsearch.adapters.lucene.runtime.PathPresence.absentBeneathListableFolder(
+      if (!canRetire || !rootCheck.sourceStorageAvailable(normalizedFile, root) || io.justsearch.adapters.lucene.runtime.PathPresence.absentBeneathListableFolder(
           normalizedFile, answering, null) == io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN) {
         return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
       }
@@ -139,6 +149,11 @@ final class WorkerIngestionAuthority {
               "Source is not a regular file"));
     }
 
+    if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(filePath)) {
+      return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
+          outcome(IngestionOutcomeClass.DEFERRED_POLICY, IngestionReasonCodes.CLOUD_PLACEHOLDER,
+              IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, "Cloud-only placeholder"));
+    }
     if (!Files.isReadable(filePath)) {
       return SourceAdmission.terminal(
           SourceAdmissionAction.RETRYABLE_FAILURE, sourceUnreadable(filePath, null));

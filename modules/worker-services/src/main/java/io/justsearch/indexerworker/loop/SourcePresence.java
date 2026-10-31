@@ -35,6 +35,10 @@ public final class SourcePresence {
      */
     boolean vouches(Path folder);
 
+    default boolean sourceStorageAvailable(Path source, Path root) { return true; }
+
+    default boolean observeSourceStorage(Path root) { return true; }
+
     /**
      * True while content beneath {@code folder} may be added or updated: a present, listable folder
      * on the volume recorded for it; a root with nothing recorded is unproven (round 8). A folder
@@ -79,10 +83,18 @@ public final class SourcePresence {
       return Verdict.SOURCE_UNREADABLE;
     }
     Path file = source.toAbsolutePath().normalize();
+    if (root != null) {
+      try {
+        SourceAccess.requireSafeAncestors(file, root);
+      } catch (java.io.IOException | SecurityException unsafeAncestor) {
+        return Verdict.SOURCE_UNREADABLE;
+      }
+    }
     PathPresence first = PathPresence.probe(file);
     if (first == PathPresence.PRESENT) {
       return Verdict.PRESENT;
     }
+    if (!rootCheck.sourceStorageAvailable(file, root)) return Verdict.ROOT_UNAVAILABLE;
     boolean rooted = answersAsRoot(file, root);
     if (!rooted && rootCheck.isRelease030ExactFile(file)) return Verdict.SOURCE_UNREADABLE;
     Path folder = vouchingFolder(file, root);

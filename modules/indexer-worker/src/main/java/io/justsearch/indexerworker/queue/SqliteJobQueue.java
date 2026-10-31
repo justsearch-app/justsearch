@@ -302,7 +302,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       for (EnqueueEntry entry : entries) {
         String hash = entry.plannedSourceSha256() == null
-            ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
+            ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot())
             : entry.plannedSourceSha256();
         witnessedEntries.add(new EnqueueEntry(
             entry.path(), entry.sizeBytes(), entry.provenance(), hash, entry.ingestionRoot()));
@@ -2858,7 +2858,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           if (exact) {
             try {
               admitted = new JobQueue.EnqueueEntry(entry.path(), entry.sizeBytes(), entry.provenance(),
-                  io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(), cancelled),
+                  io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot(), cancelled),
                   entry.ingestionRoot());
             } catch (IOException failure) {
               throw new IllegalStateException("Retirement sync source witness unavailable", failure);
@@ -2941,7 +2941,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             boolean exact=refreshable.contains(path);
             JobQueue.EnqueueEntry admitted=entry;
             if(exact&&!replay) {
-              String source=io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(),cancelled);
+              String source=io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot(), cancelled);
               admitted=new JobQueue.EnqueueEntry(entry.path(),entry.sizeBytes(),entry.provenance(),source,entry.ingestionRoot());
             }
             String admittedUnit = exact && !replay ? null : root.retirementRootUnit();
@@ -3227,8 +3227,21 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       declared = !enumeration && (collection == null || collection.isBlank())
           ? declaredCollectionRoots.get() : List.of();
       for (JobQueue.EnqueueEntry entry : entries) {
+        if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(entry.path())) {
+          recordIngestionEvent(entry.path(), IngestionOutcome.of(
+              IngestionOutcomeClass.DEFERRED_POLICY,
+              io.justsearch.indexerworker.ingest.IngestionReasonCodes.CLOUD_PLACEHOLDER,
+              io.justsearch.indexerworker.ingest.IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT,
+              "Cloud-only placeholder"), new JobQueue.IngestionLedgerEntry(
+                  sha256(normalizePath(entry.path())), collection, null, null, "CLOUD_PLACEHOLDER",
+                  "NOT_CREATED", "n/a", "n/a",
+                  entry.provenance() == null ? null : entry.provenance().originator(),
+                  entry.provenance() == null ? null : entry.provenance().transport()));
+          return 0;
+        }
+        io.justsearch.indexerworker.loop.SourceAccess.requireContained(entry.path(), entry.ingestionRoot());
         String hash = entry.plannedSourceSha256() == null
-            ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
+            ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot())
             : entry.plannedSourceSha256();
         JobQueue.EnqueueProvenance provenance = enumeration
             ? new JobQueue.EnqueueProvenance("system", "MIGRATION_ENUMERATOR")
@@ -3253,7 +3266,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           admitted = new ArrayList<>(witnessedEntries.size());
           for (JobQueue.EnqueueEntry entry : witnessedEntries) {
             if (enumerationSupersededByAcceptedMutation(
-                generation, normalizePath(entry.path()), entry.plannedSourceSha256(), normalizedCollection)) {
+                generation, normalizePath(entry.path()), entry.plannedSourceSha256(), normalizedCollection, entry.ingestionRoot())) {
               superseded++;
             } else {
               admitted.add(entry);
@@ -3283,7 +3296,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   /** The baseline walk cannot replace an accepted foreground mutation. */
   private boolean enumerationSupersededByAcceptedMutation(
-      String generation, String path, String sourceSha256, String sourceCollection)
+      String generation, String path, String sourceSha256, String sourceCollection, Path ingestionRoot)
       throws SQLException {
     List<String> deletedCollections = new ArrayList<>();
     try (PreparedStatement query = connection.prepareStatement(
@@ -3314,7 +3327,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               // enumerator still witnesses the current source; otherwise retain the accepted work.
               try {
                 if (!sourceSha256.equals(
-                    io.justsearch.indexerworker.loop.SourceContentHash.sha256(Path.of(path)))) return true;
+                    io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(Path.of(path), ingestionRoot))) return true;
               } catch (IOException unreadable) {
                 throw new SQLException("Cannot establish current enumeration source", unreadable);
               }

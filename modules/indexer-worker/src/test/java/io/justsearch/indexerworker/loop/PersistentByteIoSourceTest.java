@@ -144,8 +144,19 @@ final class PersistentByteIoSourceTest extends LuceneExecutorTestBase {
     assertTrue(Files.isReadable(source));assertTrue(Files.isReadable(submitted));
     var still=assertThrows(java.io.IOException.class,()->{try(var stream=new java.io.FileInputStream((mode.equals("captured-byte-eio")?source:submitted).toFile())){stream.read();}});
     System.out.println("OWN persistent byte read still fails after classification: "+still);
-    assertEquals(0,own.attempts(),"byte-only EIO with readable metadata defers during a shared outage");
-    assertEquals("DEFER_WITHOUT_ATTEMPT",own.policy());
+    if(mode.equals("persistent-byte-eio")) {
+     assertFalse(submitted.toRealPath().startsWith(temp.toRealPath()), "the ancestor replacement escapes the admitting root");
+     assertEquals(1,own.attempts(),"an escaped source requires its own availability retry");
+     assertEquals("RETRY_WITH_BACKOFF",own.policy(),"the ancestor changes during the already admitted Lucene write");
+     try(var connection=java.sql.DriverManager.getConnection("jdbc:sqlite:"+h.db);
+         var query=connection.prepareStatement("SELECT last_reason_code FROM jobs WHERE path=?")) {
+      query.setString(1,own.path());
+      try(var result=query.executeQuery()){assertTrue(result.next());assertEquals("WRITE_FAILED",result.getString(1));}
+     }
+    }else {
+     assertEquals(0,own.attempts(),"byte-only EIO with readable metadata defers during a shared outage");
+     assertEquals("DEFER_WITHOUT_ATTEMPT",own.policy());
+    }
    }
    assertEquals(0,peer.attempts(),"a genuinely unreadable source does not charge its healthy peer");
    assertEquals("DEFER_WITHOUT_ATTEMPT",peer.policy());

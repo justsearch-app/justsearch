@@ -42,6 +42,47 @@ import org.junit.jupiter.api.io.TempDir;
 final class OriginBoundaryAdmissionTest {
   @TempDir Path tempDir;
 
+  @Test
+  void runningLoopRejectsAQueuedAncestorReplacementBeforeOpeningContent() throws Exception {
+    var fixture = new PipelineTestFixture();
+    fixture.temp = tempDir;
+    try {
+      fixture.init();
+      fixture.openStore(false);
+      Path root = Files.createDirectory(tempDir.resolve("root"));
+      Path parent = Files.createDirectory(root.resolve("parent"));
+      Path file = Files.writeString(parent.resolve("notes.txt"), "inside");
+      assertEquals(1, fixture.queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root))));
+      Path outside = Files.createDirectory(tempDir.resolve("outside"));
+      Files.writeString(outside.resolve("notes.txt"), "outside content");
+      Files.delete(file);
+      Files.delete(parent);
+      Files.createSymbolicLink(parent, outside);
+      var content = mock(TimeboxedContentExtractor.class);
+      when(content.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
+      when(content.extractArtifact(org.mockito.ArgumentMatchers.any())).thenAnswer(call ->
+          io.justsearch.indexerworker.extract.ExtractionArtifact.full(
+              new io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult(
+                  Files.readString(call.getArgument(0)), null, "text/plain"),
+              TikaExtractionPolicy.defaults(), "boundary-test", false));
+      fixture.loop = PipelineTestFixture.withExtractor(fixture, content);
+      fixture.loop.start();
+      fixture.awaitPolicy(10);
+      fixture.stopLoopForOtherAssertions();
+      verify(content, org.mockito.Mockito.never())
+          .extractArtifact(org.mockito.ArgumentMatchers.any());
+      assertEquals("PENDING", fixture.rows().getFirst().state());
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + fixture.db);
+          var statement = connection.createStatement();
+          var row = statement.executeQuery("SELECT last_reason_code FROM jobs")) {
+        assertTrue(row.next());
+        assertEquals("SOURCE_UNREADABLE", row.getString(1));
+      }
+    } finally {
+      fixture.close();
+    }
+  }
+
   @AfterEach
   void resetPolicy() {
     IngestionSkipPolicy.resetToDefaults();

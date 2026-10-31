@@ -113,6 +113,19 @@ final class WorkerIngestServiceForceReindexWiringTest {
         "the key must be the one JobBatchExtractor looks the path up by");
   }
 
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void consecutiveDotsInsideNamesAreAdmitted(boolean force) throws Exception {
+    Path folder = Files.createDirectory(tempDir.resolve("version..notes"));
+    Path file = Files.writeString(folder.resolve("release..notes.txt"), "text");
+    IndexingLoop loop = mock(IndexingLoop.class);
+    RecordingQueue queue = new RecordingQueue();
+    submit(serviceWith(queue, loop), file, force);
+    assertEquals(List.of(file), queue.enqueuedPaths);
+    if (force) verify(loop).markForced(List.of(PathNormalizer.normalizeKey(file)));
+  }
+
   @Test
   @DisplayName("submitBatch without force_reindex marks nothing")
   void submitBatchWithoutForceReindexMarksNothing() throws Exception {

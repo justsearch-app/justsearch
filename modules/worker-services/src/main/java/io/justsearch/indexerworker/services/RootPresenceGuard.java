@@ -28,11 +28,15 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
   private final Path root;
   private final RootIdentity baseline;
   private final RootIdentity registered;
+  private final RootVolumeLedger volumes;
+  private volatile java.util.Map<Path, String> childVolumes;
 
-  private RootPresenceGuard(Path root, RootIdentity baseline, RootIdentity registered) {
+  private RootPresenceGuard(Path root, RootIdentity baseline, RootIdentity registered, RootVolumeLedger volumes) throws IOException {
     this.root = root;
     this.baseline = baseline;
     this.registered = registered;
+    this.volumes = volumes;
+    this.childVolumes = volumes.descendantVolumes(root);
   }
 
   /**
@@ -50,7 +54,8 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
    * As {@link #capture(Path, RootIdentity)}, and the root must also be on the volume {@code
    * volumes} recorded for it (or for the nearest recorded folder above it), so a different volume
    * at the same path, even after a restart, vouches for nothing. Round 8: a root with nothing
-   * recorded is unproven and never vouches; nothing is recorded here. An unreadable ledger is
+   * recorded is unproven and never vouches. Mounted child storage is remembered before pruning;
+   * this never establishes the declared root's volume. An unreadable ledger is
    * "cannot tell": the guard never vouches. This is the same question {@link RootWitness} asks for
    * every other path that can end in a deletion.
    */
@@ -68,7 +73,8 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
         registered.requireSame(baseline, normalized);
       }
       RootWitness.requireDeletionVolume(volumes, normalized, baseline);
-      return new RootPresenceGuard(normalized, baseline, registered);
+      volumes.observeDescendantMounts(normalized);
+      return new RootPresenceGuard(normalized, baseline, registered, volumes);
     } catch (IOException unavailableOrChanged) {
       log.warn(
           "Root {} is unavailable or no longer the registered volume/folder; it cannot vouch for"
@@ -80,11 +86,18 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
   }
 
   @Override
+  public PathPresence presence(Path file) {
+    return RootVolumeLedger.sourceStorageAvailable(file, childVolumes)
+        ? PathPresence.probeSource(file, root) : PathPresence.UNKNOWN;
+  }
+
+  @Override
   public boolean rootCurrent() {
     if (!PathPresence.isReadableDirectory(root)) {
       return false;
     }
     try {
+      childVolumes = volumes.descendantVolumes(root);
       RootIdentity current = RootIdentity.capture(root);
       baseline.requireSame(current, root);
       if (registered != null) {

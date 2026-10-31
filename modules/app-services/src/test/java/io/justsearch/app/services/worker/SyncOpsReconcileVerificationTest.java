@@ -74,6 +74,17 @@ final class SyncOpsReconcileVerificationTest {
     } finally { ops.stopPeriodicSync(); }
   }
 
+
+  @Test
+  void forcedIncompleteSyncRecordsUnverifiedEvenWhenSkipped() {
+    List<Call> calls = new CopyOnWriteArrayList<>();
+    var response = SyncDirectoryResponse.newBuilder().setSkipped(true)
+        .setDeleteDetectionUnverified(true).build();
+    syncOpsReturning(response, calls).syncDirectory(root.toString(), true,
+        io.justsearch.app.services.TestEngineContexts.durableInternal());
+    assertEquals(List.of(new Call(root, true)), calls);
+  }
+
   @Test
   void capSkippedReconcileMarksUnverified() {
     List<Call> calls = new CopyOnWriteArrayList<>();

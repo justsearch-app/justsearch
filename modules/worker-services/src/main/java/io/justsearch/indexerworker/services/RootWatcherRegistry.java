@@ -44,6 +44,17 @@ public final class RootWatcherRegistry {
     return false;
   }
 
+  boolean isUserExcludedDirectory(Path directory) {
+    var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.current();
+    if (patterns.isEmpty()) return false;
+    Path normalized = directory.toAbsolutePath().normalize();
+    for (Path root = normalized.getParent(); root != null; root = root.getParent()) {
+      if ((subscriptions.containsKey(root) || awaitingVolume.containsKey(root))
+          && patterns.isExcludedDirectory(root, normalized)) return true;
+    }
+    return false;
+  }
+
   /** Captured outside file/publication ownership; retained return identities are not policy roots. */
   synchronized PolicyRoots policyRoots() {
     if (successor != null) return successor.policyRoots();
@@ -121,14 +132,19 @@ public final class RootWatcherRegistry {
     } catch (InvalidPathException e) {
       return new WatchResult(false, "WatchRootRequest.root_path is not a valid path: " + e.getMessage());
     }
-    if (!Files.isDirectory(normalized)) {
-      return new WatchResult(false, "WatchRootRequest.root_path is not a directory: " + normalized);
+    if (Files.isSymbolicLink(normalized)) {
+      return new WatchResult(false, "WatchRootRequest.root_path is a symbolic link: " + normalized);
     }
     String coll = collection == null || collection.isBlank() ? null : collection;
+    awaitingVolume.put(normalized, new AwaitingVolume(coll == null ? "" : coll));
+    removedRoots.remove(normalized);
+    if (!Files.isDirectory(normalized, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      return new WatchResult(false, "WatchRootRequest.root_path is not a directory: " + normalized);
+    }
     RootIdentity expected = io.justsearch.configuration.PlatformPaths.isLinux()
         ? returnIdentities.get(normalized) : null;
     try {
-      if (expected != null && !expected.sameReturnedFolder(RootIdentity.capture(normalized))) {
+      if (expected != null && !expected.sameReturnedVolume(RootIdentity.capture(normalized))) {
         return new WatchResult(false, "Watched root is another folder now: " + normalized);
       }
     } catch (IOException unavailable) {
@@ -144,7 +160,7 @@ public final class RootWatcherRegistry {
     Object watcherEpoch = new Object();
     Subscription candidate;
     try (RootIdentityLease identityLease = RootIdentity.hold(normalized)) {
-      if (expected != null && !expected.sameReturnedFolder(identityLease.identity())) {
+      if (expected != null && !expected.sameReturnedVolume(identityLease.identity())) {
         throw new IOException("Watched root changed before watcher registration");
       }
       candidate = new Subscription(normalized, coll, watcherEpoch, identityLease.identity());

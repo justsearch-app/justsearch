@@ -73,6 +73,49 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"missing", "directory", "link", "dangling"})
+  void retiredSourcePreservesChunksBackedByAnotherLiveFile(String replacement) throws Exception {
+    try (var f = new Fixture()) {
+      Path gone = f.file("gone.txt", "old text");
+      Path kept = f.file("kept.txt", "live text");
+      f.index(gone, "notes");
+      f.index(kept, "notes");
+      for (String id : List.of("own-chunk", "legacy-chunk", "cross-file-chunk")) {
+        var fields = new java.util.HashMap<String, Object>(Map.of(
+            SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id,
+            SchemaFields.PARENT_DOC_ID, gone.toString(), SchemaFields.IS_CHUNK, "true",
+            SchemaFields.CONTENT, id, SchemaFields.COLLECTION, "notes"));
+        if (!id.equals("legacy-chunk")) fields.put(SchemaFields.PATH,
+            id.equals("cross-file-chunk") ? kept.toString() : gone.toString());
+        f.runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
+      }
+      f.runtime.commitOps().commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.DRAIN);
+      f.debt();
+      Files.delete(gone);
+      if (replacement.equals("directory")) {
+        Files.createDirectory(gone);
+        Files.writeString(gone.resolve("new.txt"), "new descendant");
+      } else if (!replacement.equals("missing")) {
+        Files.createSymbolicLink(gone, replacement.equals("link")
+            ? Files.writeString(temporary.resolve("outside.txt"), "outside text")
+            : temporary.resolve("absent"));
+      }
+      var prepared = f.prepare();
+      f.runtime.commitOps().maybeRefreshBlocking();
+      assertEquals("cross-file-chunk", f.runtime.documentFieldOps()
+          .getDocumentField("cross-file-chunk", SchemaFields.CONTENT));
+      assertTrue(prepared.isPresent(), "Scoped retirement must certify the absent source");
+      assertNull(f.content(gone));
+      assertNull(f.runtime.documentFieldOps().getDocumentField("own-chunk", SchemaFields.CONTENT));
+      assertNull(f.runtime.documentFieldOps().getDocumentField("legacy-chunk", SchemaFields.CONTENT));
+      assertEquals("live text", f.content(kept));
+      if (replacement.equals("directory")) assertEquals("new descendant", f.content(gone.resolve("new.txt")));
+      assertTrue(KnowledgeServerMigrationOps.finishPromotedSwitchReplay(f.queue, prepared.orElseThrow()));
+      assertTrue(f.queue.listSwitchBufferOpsStrict().isEmpty());
+    }
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"recreated", "modified", "same-stamp"})
   void debtAloneConvergesCurrentBytesWithoutACompanionDelete(String change) throws Exception {
     try (var f = new Fixture()) {
@@ -109,7 +152,11 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       Files.delete(gone);
       Path displaced = temporary.resolve("displaced");
       if (invalid.equals("offline")) Files.move(f.root, displaced);
-      if (invalid.equals("incomplete")) Files.createSymbolicLink(f.root.resolve("unresolved"), temporary.resolve("absent"));
+      if (invalid.equals("incomplete")) {
+        Path unreadable = Files.createDirectory(f.root.resolve("unresolved"));
+        Files.writeString(unreadable.resolve("document.txt"), "unreadable member");
+        Files.setPosixFilePermissions(unreadable, java.util.Set.of());
+      }
       if (invalid.equals("unreadable")) Files.setPosixFilePermissions(f.root, java.util.Set.of());
       if (invalid.equals("volume")) RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(true);
       if (invalid.equals("membership")) f.roots = List.of();
@@ -121,6 +168,8 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       } finally {
         RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(false);
         if (invalid.equals("unreadable")) Files.setPosixFilePermissions(f.root,
+            java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+        if (invalid.equals("incomplete")) Files.setPosixFilePermissions(f.root.resolve("unresolved"),
             java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
       }
     }

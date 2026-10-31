@@ -3679,10 +3679,11 @@ public final class KnowledgeServerMigrationOps {
     if (context.jobQueue() instanceof SwitchBufferCapableQueue queue) {
       scopeLegacyPrefixes(queue, null, publisher);
     }
-    int total = 0;
+    int[] total = {0};
     int batchSize = 2_000;
     ArrayList<JobQueue.EnqueueEntry> batch = new ArrayList<>(batchSize);
-    long lastPersistMs = 0L;
+    long[] lastPersistMs = {0L};
+    var excludes = io.justsearch.configuration.excludes.ExclusionPatterns.current();
 
     for (ResolvedConfig.FileSource source : roots) {
       Path root = source.path();
@@ -3705,15 +3706,36 @@ public final class KnowledgeServerMigrationOps {
       requireEnumerationRunning(context);
       requireMigrationRoot(root);
       context.log().info("Migration enumerator scanning root: {}", root);
-      try (Stream<Path> walk = Files.walk(root, help ? 1 : Integer.MAX_VALUE)) {
-        var iterator = walk.iterator();
-        while (iterator.hasNext()) {
-          Path path = iterator.next();
+      Files.walkFileTree(root, java.util.EnumSet.noneOf(java.nio.file.FileVisitOption.class),
+          help ? 1 : Integer.MAX_VALUE, new java.nio.file.SimpleFileVisitor<Path>() {
+        @Override public java.nio.file.FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+            throws IOException {
           requireEnumerationRunning(context);
-          if (scope.excludes(path.toAbsolutePath().normalize().toString())) continue;
-          BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-          if (attributes.isDirectory()) continue;
-          if (help && !path.toString().endsWith(".md")) continue;
+          if (!dir.equals(root) && (scope.excludes(dir.toAbsolutePath().normalize().toString())
+              || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.isSkippedDirectoryName(dir.getFileName().toString())
+              || excludes.isExcludedDirectory(root, dir)
+              || publisher != null && publisher.isUserExcludedDirectory(dir, root))) return java.nio.file.FileVisitResult.SKIP_SUBTREE;
+          if (!Files.isReadable(dir)) throw new IOException("Unreadable migration directory: " + dir);
+          return java.nio.file.FileVisitResult.CONTINUE;
+        }
+        @Override public java.nio.file.FileVisitResult visitFile(Path path, BasicFileAttributes attributes)
+            throws IOException {
+          requireEnumerationRunning(context);
+          if (scope.excludes(path.toAbsolutePath().normalize().toString())) return java.nio.file.FileVisitResult.CONTINUE;
+          if (!attributes.isRegularFile()) return java.nio.file.FileVisitResult.CONTINUE;
+          if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
+              || excludes.isExcludedPath(root, path)
+              || publisher != null && publisher.isUserExcluded(path, root)) return java.nio.file.FileVisitResult.CONTINUE;
+          if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(path)) {
+            context.jobQueue().recordIngestionEvent(path,
+                io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                    io.justsearch.indexerworker.ingest.IngestionOutcomeClass.DEFERRED_POLICY,
+                    io.justsearch.indexerworker.ingest.IngestionReasonCodes.CLOUD_PLACEHOLDER,
+                    io.justsearch.indexerworker.ingest.IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT,
+                    "Cloud-only placeholder"), null);
+            return java.nio.file.FileVisitResult.CONTINUE;
+          }
+          if (help && !path.toString().endsWith(".md")) return java.nio.file.FileVisitResult.CONTINUE;
           if (!attributes.isRegularFile() || !Files.isReadable(path)) {
             throw new IOException("Unreadable migration file: " + path);
           }
@@ -3727,8 +3749,8 @@ public final class KnowledgeServerMigrationOps {
           MigrationProgressStore store = context.migrationProgressStoreSupplier().get();
           if (store != null) {
             long now = System.currentTimeMillis();
-            if (now - lastPersistMs >= 1_000L) {
-              lastPersistMs = now;
+            if (now - lastPersistMs[0] >= 1_000L) {
+              lastPersistMs[0] = now;
               persistMigrationProgressSnapshot(context, store);
 
               while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
@@ -3751,19 +3773,28 @@ public final class KnowledgeServerMigrationOps {
           requireEnumerationRunning(context);
           batch.add(new JobQueue.EnqueueEntry(path, attributes.size()).withinRoot(root));
           if (batch.size() >= batchSize) {
-            total += acceptMigrationBatch(context, batch, source.collection());
+            total[0] += acceptMigrationBatch(context, batch, source.collection());
           }
+          return java.nio.file.FileVisitResult.CONTINUE;
         }
-      }
-      if (!batch.isEmpty()) total += acceptMigrationBatch(context, batch, source.collection());
+        @Override public java.nio.file.FileVisitResult visitFileFailed(Path path, IOException failure) throws IOException {
+          requireEnumerationRunning(context);
+          if (scope.excludes(path.toAbsolutePath().normalize().toString())
+              || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
+              || excludes.isExcludedDirectory(root, path)
+              || publisher != null && publisher.isUserExcludedDirectory(path, root)) return java.nio.file.FileVisitResult.CONTINUE;
+          throw failure;
+        }
+      });
+      if (!batch.isEmpty()) total[0] += acceptMigrationBatch(context, batch, source.collection());
       requireEnumerationRunning(context);
       context.migrationEnumeratorRootsDone().incrementAndGet();
 
       MigrationProgressStore store = context.migrationProgressStoreSupplier().get();
       if (store != null) {
         long now = System.currentTimeMillis();
-        if (now - lastPersistMs >= 250L) {
-          lastPersistMs = now;
+        if (now - lastPersistMs[0] >= 250L) {
+          lastPersistMs[0] = now;
           persistMigrationProgressSnapshot(context, store);
         }
       }
@@ -3774,7 +3805,7 @@ public final class KnowledgeServerMigrationOps {
       persistMigrationProgressSnapshot(context, store);
     }
     requireEnumerationRunning(context);
-    return total;
+    return total[0];
   }
 
   public static MigrationProgressSnapshot migrationProgressSnapshot(

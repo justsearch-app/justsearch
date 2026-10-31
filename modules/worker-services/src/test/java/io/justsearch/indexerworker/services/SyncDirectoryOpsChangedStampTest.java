@@ -23,6 +23,51 @@ import org.junit.jupiter.params.provider.ValueSource;
 final class SyncDirectoryOpsChangedStampTest {
   @TempDir Path temporary;
 
+
+  @org.junit.jupiter.api.Test
+  void failedLaterCensusPageWithholdsVerificationAndStillWalksDisk() throws Exception {
+    Path added = Files.writeString(temporary.resolve("added.txt"), "new");
+    var reads = mock(ReadPathOps.class);
+    when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenReturn(new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0, "next"))
+        .thenThrow(new IllegalStateException("later page unavailable"));
+    var queue = mock(JobQueue.class);
+    when(queue.enqueueEntries(anyList())).thenAnswer(call -> ((List<?>) call.getArgument(0)).size());
+    var ops = new SyncDirectoryOps(reads, null, null, queue, IndexingPacing.unthrottled());
+    var result = ops.execute(temporary.toString(), false, null, () -> false, null);
+    assertEquals("", result.getError());
+    assertTrue(result.getDeleteDetectionUnverified());
+    assertEquals(1, result.getFilesAdded());
+    verify(queue).enqueueEntries(argThat(entries -> entries.size() == 1 && entries.getFirst().path().equals(added)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"paths", "characters"})
+  void censusCapsStillAllowPeriodicRecoveryOfAdditionsAndEdits(String cap) throws Exception {
+    Path changed = Files.writeString(temporary.resolve("changed.txt"), "changed bytes");
+    Path added = Files.writeString(temporary.resolve("added.txt"), "new");
+    var hits = new ArrayList<LuceneRuntimeTypes.SearchHit>();
+    hits.add(new LuceneRuntimeTypes.SearchHit(changed.toString(), 1f,
+        java.util.Map.of(SchemaFields.SIZE_BYTES, "1", SchemaFields.MODIFIED_AT, "0")));
+    hits.add(new LuceneRuntimeTypes.SearchHit(temporary.resolve("old.txt").toString(), 1f, java.util.Map.of()));
+    var reads = mock(ReadPathOps.class);
+    when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenReturn(new LuceneRuntimeTypes.SearchResult(hits, 2, 0));
+    var queue = mock(JobQueue.class);
+    when(queue.enqueueEntries(anyList())).thenAnswer(call -> ((List<?>) call.getArgument(0)).size());
+    var ops = new SyncDirectoryOps(reads, null, null, queue, IndexingPacing.unthrottled(), null,
+        cap.equals("paths") ? 1 : 200_000, cap.equals("characters") ? changed.toString().length() : 16 * 1024 * 1024);
+    for (int attempt = 0; attempt < 2; attempt++) {
+      var result = ops.execute(temporary.toString(), false, null, () -> false, null);
+      assertEquals("", result.getError());
+      assertTrue(result.getDeleteDetectionUnverified());
+      assertEquals(2, result.getFilesAdded());
+    }
+    verify(queue, times(2)).enqueueEntries(argThat(entries ->
+        entries.stream().map(JobQueue.EnqueueEntry::path).collect(java.util.stream.Collectors.toSet())
+            .equals(java.util.Set.of(added, changed))));
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"size", "mtime", "missing-size"})
   void ordinaryReconciliationAdmitsChangedIndexedFiles(String change) throws Exception {

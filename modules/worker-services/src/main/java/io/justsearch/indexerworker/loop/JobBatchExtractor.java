@@ -226,7 +226,8 @@ public final class JobBatchExtractor {
         admission = ingestionAuthority.admit(claim);
         if (admission.action() == SourceAdmissionAction.STALE_DONE) {
           if (!jobQueue.ownsClaimForPublication(claim)) return null;
-          bestEffortDeleteMissingSource(filePath);
+          indexedDelta.accept(staleSourceHandler.deleteMissingSource(
+              filePath, claim.ingestionRoot(), ingestionAuthority.rootCheck()));
         }
       } finally {
         fileMutationFence.unlock();
@@ -235,6 +236,14 @@ public final class JobBatchExtractor {
         log.debug("File not found, treating as delete: {}", filePath);
         journal.enqueueTransition(new JobQueue.IngestionLedgerTransition(
             claim, ledgerEntry(filePath, collection, provenance)), admission.outcome());
+        batchStats.recordSkipped();
+        return null;
+      }
+
+      if (admission.action() == SourceAdmissionAction.RETRYABLE_FAILURE
+          && admission.outcome().retryPolicy() == IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT) {
+        journal.recordOutcomeSafely(filePath, admission.outcome().outcomeClass().name(),
+            () -> jobQueue.deferClaim(claim, admission.outcome(), ledgerEntry(filePath, collection, provenance)));
         batchStats.recordSkipped();
         return null;
       }
@@ -331,9 +340,10 @@ public final class JobBatchExtractor {
       extractSpan.setAttribute("doc.path", filePath.toString());
       long extractStart = System.currentTimeMillis();
       ValidatedExtractionArtifact artifact;
-      String sourceSha256 = SourceContentHash.sha256(filePath);
+      String sourceSha256 = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       try {
         // W1.5 — inlined what used to be extractContent + validateArtifact wrappers.
+        SourceAccess.requireContained(filePath, claim.ingestionRoot());
         ExtractionArtifact rawArtifact = contentExtractor.extractArtifact(filePath);
         String sourcePathHash = envelope != null ? envelope.pathHash() : null;
         artifact = rawArtifact.validate(contentExtractor.extractionPolicy(), sourcePathHash);
@@ -344,7 +354,7 @@ public final class JobBatchExtractor {
 
       String sourceSha256AfterExtraction;
       try {
-        sourceSha256AfterExtraction = SourceContentHash.sha256(filePath);
+        sourceSha256AfterExtraction = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       } catch (IOException changedDuringExtraction) {
         if (staleResolver.tryHandleStale(
             filePath, envelope, collection, artifact, "after extraction", provenance, claim)) {
@@ -519,10 +529,6 @@ public final class JobBatchExtractor {
     } catch (IOException | SecurityException | UnsupportedOperationException unreadable) {
       return false;
     }
-  }
-
-  private void bestEffortDeleteMissingSource(Path filePath) {
-    indexedDelta.accept(staleSourceHandler.deleteMissingSource(filePath));
   }
 
   private Span maybeSpan(String name) {
