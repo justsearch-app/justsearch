@@ -156,7 +156,7 @@ final class AdversarialCorpusIngestionTest {
   }
 
   @Test
-  @DisplayName("directory (non-regular source) is admission-skipped without parser invocation")
+  // directory (non-regular source) is admission-skipped without parser invocation
   void directoryIsAdmissionSkipped() throws Exception {
     Path dir = Files.createDirectory(tempDir.resolve("a-directory"));
     var witness = io.justsearch.indexerworker.services.RootWitness.inMemory();

@@ -53,7 +53,7 @@ final class EngineForgetMovePublicationTest {
   private static final JsonMapper JSON = JsonMapper.builder().build();
   @TempDir Path directory;
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void C21AcceptedPhysicalMoveReplacesHistoricOrRacingDestinationFamily(boolean race) throws Exception {
     Path folder = Files.createDirectory(directory.resolve("root"));

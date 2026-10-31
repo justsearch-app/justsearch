@@ -373,7 +373,8 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     order.verify(fixture.queue).deleteByPathPrefix(prefix);
     order.verify(fixture.servingCommit).commitAndTrack(
         io.justsearch.adapters.lucene.runtime.CommitReason.GRPC_DELETE_BY_PATH);
-    verify(fixture.servingCommit, times(2)).maybeRefreshBlocking();
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> verify(fixture.servingCommit, times(2)).maybeRefreshBlocking());
     order.verify(fixture.queue).deleteByCollection(collection);
     order.verify(fixture.queue).putSwitchBufferForGeneration(
         fixture.buildingGeneration, "collection:" + collection, "DELETE_COLLECTION", collection);

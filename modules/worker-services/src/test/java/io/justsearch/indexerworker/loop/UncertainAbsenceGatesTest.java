@@ -227,7 +227,8 @@ final class UncertainAbsenceGatesTest {
         file, envelope, "default", null, "before publish", null, rooted(file, root)));
 
     verify(resolver.staleSourceHandler()).deleteMissingSource(file);
-    verify(resolver.jobQueue(), never()).markClaimDone(any(), any(), any());
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> verify(resolver.jobQueue(), never()).markClaimDone(any(), any(), any()));
     verify(resolver.journal()).enqueueTransition(any(), any());
   }
 

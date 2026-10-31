@@ -1,0 +1,30 @@
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
+index acc46d328b..0065ba494d 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
+@@ -1152,6 +1152,9 @@ public interface JobQueue extends Closeable {
+     return deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, survivorPaths);
+   }
+ 
++  /** Compatibility signature only: the before-state does not cancel collection jobs. */
++  default void deleteByCollection(String collection) {}
++
+   /**
+    * Deletes the job with exactly the given path, regardless of state.
+    *
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionOutcomeJournal.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionOutcomeJournal.java
+index 99fdee350e..3726ddc79a 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionOutcomeJournal.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IngestionOutcomeJournal.java
+@@ -77,6 +77,11 @@ public final class IngestionOutcomeJournal {
+ 
+   // ---- transition queue ----
+ 
++  /** Compatibility overload retaining the before-state transition semantics. */
++  public void enqueueTransition(JobQueue.IngestionLedgerTransition transition, IngestionOutcome outcome) {
++    enqueueTransition(transition);
++  }
++
+   /** Enqueues a successful write's ledger transition for drain after the next commit. */
+   public void enqueueTransition(JobQueue.IngestionLedgerTransition transition) {
+     java.util.Objects.requireNonNull(transition.claim(), "Committed transitions require their processing claim");

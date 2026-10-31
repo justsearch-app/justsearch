@@ -13,7 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 final class RootVolumeUnknownIdentityTest {
   @TempDir Path temp;
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void C10UnrecordedFolderCannotProveAbsenceWithoutVolumeIdentity(boolean declared) throws Exception {
     Path folder = Files.createDirectory(temp.resolve("ad-hoc"));
@@ -28,7 +28,7 @@ final class RootVolumeUnknownIdentityTest {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void C10PreviouslyPositiveProofCannotSurviveLossOfCurrentVolumeIdentity(boolean declared) throws Exception {
     Path folder = Files.createDirectory(temp.resolve("previously-proven"));
