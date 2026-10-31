@@ -643,6 +643,10 @@ def _status_body(variant: str) -> str:
         # the dense leg is rebuilding. The reason code, not the migration
         # source, licenses the notice in the Lit search window.
         d = json.loads(_BODY_STATUS)
+        # This scenario asserts a current capability limitation. The captured worker
+        # timestamp is historical; a stale observation correctly shows "unconfirmed"
+        # instead of licensing the present-tense semantic-search explanation.
+        d["meta"]["workerRpcAtMs"] = int(datetime.now(timezone.utc).timestamp() * 1000)
         d["worker"]["migration"].update({
             "migrationState": "SWITCHING",
             "migrationSource": "embedding_model_change",
@@ -651,7 +655,10 @@ def _status_body(variant: str) -> str:
             "servingSearchGenerationId": "g2",
             "servingIngestGenerationId": "g2",
         })
-        d["worker"]["core"]["indexedDocuments"] = 1
+        # SERVING in the historical payload is not a worker-reported index state.
+        # Model the readable keyword index this scenario requires, rather than the
+        # fallback/unconfirmed core projection that masks its readiness notice.
+        d["worker"]["core"].update({"indexState": "IDLE", "indexHealthy": True, "indexedDocuments": 1})
         d["worker"]["compatibility"]["embeddingCompatState"] = "INITIALIZING"
         d["components"]["encoders"]["state"] = "RELOADING"
         d["readiness"]["engineComponents"]["encoders"]["state"] = "RELOADING"
