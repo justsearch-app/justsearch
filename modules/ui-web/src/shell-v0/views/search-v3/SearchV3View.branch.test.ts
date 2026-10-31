@@ -1935,3 +1935,110 @@ it('S16.1 S16.2 waits for branch lineage before presenting a fork count', async 
   expect([...(main.shadowRoot?.querySelectorAll('[data-testid="sv3-version-count"]') ?? [])]
     .map(n => n.textContent?.trim())).toEqual(['2 / 2', '1 / 2']);
 });
+
+/* Extraction preservation: observe acknowledgements and waits at the existing HTTP boundary. */
+it('reserves and saves the rerun before POST and waits for the claimed child history before dispatch', async () => {
+  twoTurnConversation(); knownModelForkInputs();
+  const el = await mount();
+  await openConversation(el);
+  const starts: Array<{ path: string; active: string | null; task: unknown }> = [];
+  const serve = fetchMock.getMockImplementation() as (url: unknown, init: unknown) => unknown;
+  fetchMock.mockImplementation((url: unknown, init: unknown) => {
+    const path = new URL(String(url), 'http://engine.test').pathname;
+    starts.push({ path, active: getConversationListState().activeId,
+      task: JSON.parse(sessionStorage.getItem('justsearch.draft.attachment.v1.search-v3.main') ?? '{}').payload?.task });
+    return serve(url, init);
+  });
+  backend.holdHistoryFor.add('uc-branch-branch-1');
+  try {
+    await chooseFromTurnMenu(el, 1, BRANCH_MENU_RETRY);
+    const post = starts.find(read => read.path.endsWith('/branch'));
+    expect(post).toMatchObject({ active: 'uc-branch', task: {
+      target: 'uc-branch', shape: 'core.free-chat', record: storedId(1), delivery: 'unaccepted',
+    } });
+    expect(backend.branches).toHaveLength(1);
+    expect(backend.heldHistories.has('uc-branch-branch-1')).toBe(true);
+    expect(starts.filter(read => read.path === '/api/thread/uc-branch-branch-1'
+      || read.path === '/api/chat/conversations/uc-branch-branch-1/history').map(read => read.active))
+      .toEqual(['uc-branch-branch-1', 'uc-branch-branch-1']);
+    expect(backend.dispatches).toEqual([]);
+  } finally {
+    backend.heldHistories.get('uc-branch-branch-1')?.();
+    await settle(el);
+  }
+  expect(backend.dispatches).toEqual([{ conversationId: 'uc-branch-branch-1', question: 'and the second one?' }]);
+});
+
+it.each(['unavailable', 'unacknowledged'])('a %s rerun reservation leaves the rewrite and makes no branch POST', async fault => {
+  twoTurnConversation(); knownModelForkInputs();
+  const el = await mount();
+  await openConversation(el);
+  const storage = sessionStorage;
+  const set = storage.setItem.bind(storage);
+  const descriptor = Object.getOwnPropertyDescriptor(storage, 'setItem')
+    ?? { configurable: true, writable: true, value: set };
+  Object.defineProperty(storage, 'setItem', { ...descriptor, value: (key: string, value: string) => {
+    if (key.startsWith('justsearch.draft.attachment.') && JSON.parse(value).payload?.task != null) {
+      if (fault === 'unavailable') throw new DOMException('unavailable', 'QuotaExceededError');
+      return;
+    }
+    set(key, value);
+  } });
+  try {
+    await editTurn(el, 1, 'retain this rewrite');
+    expect(backend.branches).toEqual([]);
+    expect(backend.dispatches).toEqual([]);
+    expect(el.sessions.activeId).toBe('uc-branch');
+    expect((await region(el, 'jf-sv3-main')).shadowRoot?.querySelector<HTMLTextAreaElement>(
+      '[data-testid="sv3-turn-edit-input"]')?.value).toBe('retain this rewrite');
+  } finally {
+    Object.defineProperty(storage, 'setItem', descriptor);
+  }
+});
+
+it('one reserved rerun excludes a concurrent Retry while its branch response is pending', async () => {
+  twoTurnConversation(); knownModelForkInputs();
+  const el = await mount();
+  await openConversation(el);
+  const turnId = el.sessions.sessions.find(session => session.id === 'uc-branch')!.turns[1]!.id;
+  let release!: () => void;
+  backend.branchGate = new Promise<void>(resolve => { release = resolve; });
+  try {
+    await chooseFromTurnMenu(el, 1, BRANCH_MENU_RETRY);
+    (await region(el, 'jf-sv3-main')).dispatchEvent(new CustomEvent('sv3-branch-action', {
+      detail: { action: 'retry', turnId }, bubbles: true, composed: true,
+    }));
+    await settle(el);
+    expect(backend.branches).toHaveLength(1);
+    expect(backend.dispatches).toEqual([]);
+  } finally {
+    release();
+    await settle(el);
+  }
+  expect(backend.dispatches).toEqual([{ conversationId: 'uc-branch-branch-1', question: 'and the second one?' }]);
+});
+
+it('a rerun abandoned by leaving the screen cannot claim or resend its late fork after reload', async () => {
+  twoTurnConversation(); knownModelForkInputs();
+  const el = await mount();
+  await openConversation(el);
+  let release!: () => void;
+  backend.branchGate = new Promise<void>(resolve => { release = resolve; });
+  await chooseFromTurnMenu(el, 1, BRANCH_MENU_RETRY);
+  expect(backend.branches).toHaveLength(1);
+  el.remove();
+  const reloaded = await mount();
+  try {
+    expect(reloaded.sessions.activeId).toBe('uc-branch');
+    release();
+    await settle(reloaded);
+    expect(backend.minted).toBe(1);
+    expect(backend.dispatches).toEqual([]);
+    expect(reloaded.sessions.activeId).toBe('uc-branch');
+    expect(getConversationListState().activeId).toBe('uc-branch');
+    expect(backend.historyReads).not.toContain('uc-branch-branch-1');
+  } finally {
+    release();
+    await settle(reloaded);
+  }
+});

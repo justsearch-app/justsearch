@@ -205,8 +205,8 @@ it.each(['{bad}', '{"city":42}'])('XN1 branch inherits only the accepted output 
   chunks = [rejected, accepted]; terminal = { finalResponse: accepted }; await sendStructured();
   records = loadedRows(accepted); await mountSaved();
   const view = document.querySelector('jf-sv3-window') as SearchV3View;
-  const branch = view as unknown as { branchInto(id: string, message: string, resend: null, tier: string): Promise<boolean>; askDomain: { runAsk(text: string, scope: null, schema?: string): Promise<void> } };
-  expect(await branch.branchInto('saved', 'answer', null, 'structured')).toBe(true);
+  const branch = view as unknown as { branchDomain: { branchInto(id: string, message: string, resend: null, tier: string): Promise<boolean> }; askDomain: { runAsk(text: string, scope: null, schema?: string): Promise<void> } };
+  expect(await branch.branchDomain.branchInto('saved', 'answer', null, 'structured')).toBe(true);
   await branch.askDomain.runAsk('use inherited city', null, schema); await settle(view);
   expect(branched, 'the real branch endpoint was used').toBe(true);
   expect(requests.at(-1)).toMatchObject({ conversationId: 'accepted-branch', context: [{ role: 'user', content: 'extract city' }, { role: 'assistant', content: accepted }] });
@@ -265,8 +265,8 @@ it('XT3 a Structured dispatch with no chunks and no terminal output shows a fail
 it.each([undefined, ''])('D-T43 failed saved output contributes nothing after branching (%s)', async output => {
   records = loadedRows(output); await mountSaved();
   const view = document.querySelector('jf-sv3-window') as SearchV3View;
-  const branch = view as unknown as { branchInto(id: string, message: string, resend: null, tier: string): Promise<boolean>; askDomain: { runAsk(text: string, scope: null, schema?: string): Promise<void> } };
-  expect(await branch.branchInto('saved', 'question', null, 'structured')).toBe(true);
+  const branch = view as unknown as { branchDomain: { branchInto(id: string, message: string, resend: null, tier: string): Promise<boolean> }; askDomain: { runAsk(text: string, scope: null, schema?: string): Promise<void> } };
+  expect(await branch.branchDomain.branchInto('saved', 'question', null, 'structured')).toBe(true);
   terminal = { finalResponse: accepted }; await branch.askDomain.runAsk('new extraction', null, schema);
   expect(branched).toBe(true);
   expect(requests).toHaveLength(1);
