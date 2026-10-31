@@ -174,8 +174,9 @@ v2 predecessor as above.
 Record J5 **unavailable** only when no published v2 release and no signed rehearsal draft
 exists (the rehearsal run itself). Never substitute 0.3.0, an unsigned failed build or
 fabricated metadata. Run the remaining applicable journeys as explicit subsets without
-predecessor/mirror arguments; they report `failed` (exit 1) only because of the added J5
-**unavailable** rows. Confirm every other check passed and record the J5 gap in the
+predecessor/mirror arguments. A fresh Wayland subset reports `failed` (exit 1) only because
+of its added J5 **unavailable** rows; the Windows subset omits J5 and reports `incomplete`
+(exit 1). Confirm every other check passed and record the J5 gap in the
 release evidence. When a predecessor exists, download it separately and hash-check it:
 
 ```bash
