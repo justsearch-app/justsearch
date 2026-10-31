@@ -9,10 +9,23 @@ import argparse
 import contextlib
 from pathlib import Path
 import re
+import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+
+
+@contextlib.contextmanager
+def disposable_storage():
+    temp = tempfile.mkdtemp(prefix='justsearch-hosted-')
+    try:
+        yield temp
+    finally:
+        # The document portal's FUSE mount under runtime/doc cannot be removed,
+        # and TemporaryDirectory's permission reset raises on it even when told
+        # to ignore cleanup errors. The disposable runner is discarded anyway.
+        shutil.rmtree(temp, ignore_errors=True)
 
 
 def main():
@@ -26,9 +39,7 @@ def main():
     if options.state_root:
         options.state_root.mkdir(parents=True, exist_ok=True)
     storage = (contextlib.nullcontext(str(options.state_root.resolve())) if options.state_root
-               # The document portal's FUSE mount under runtime/doc cannot be
-               # removed; the disposable runner is discarded anyway.
-               else tempfile.TemporaryDirectory(prefix='justsearch-hosted-', ignore_cleanup_errors=True))
+               else disposable_storage())
     with storage as temp:
         env = {key: value for key, value in os.environ.items()
                if not key.startswith(('JUSTSEARCH_', 'JAVA_', 'JDK_', 'LD_', 'CUDA_', 'TAURI_'))}
