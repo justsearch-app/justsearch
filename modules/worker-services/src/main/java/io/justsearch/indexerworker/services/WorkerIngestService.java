@@ -3226,13 +3226,19 @@ public final class WorkerIngestService {
         }
         for (String path : difference.deletions()) {
           SyncDirectoryOps.checkCancelled(cancelled);
-          requireCandidateSubscription(registry, root, subscription);
-          difference.requireCurrentRootIdentity();
-          if (!confirmedAbsent(path, root)) {
-            throw new IOException("Committed boot delete lacks proven absence on its recorded volume");
+          var fileFence = fileMutationFence();
+          if (fileFence != null) fileFence.lock();
+          try {
+            requireCandidateSubscription(registry, root, subscription);
+            difference.requireCurrentRootIdentity();
+            if (!confirmedAbsent(path, root)) {
+              throw new IOException("Committed boot delete lacks proven absence on its recorded volume");
+            }
+            ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(path);
+            confirmedDeletionMarker.markIfAbsent(path);
+          } finally {
+            if (fileFence != null) fileFence.unlock();
           }
-          ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(path);
-          confirmedDeletionMarker.markIfAbsent(path);
         }
         SyncDirectoryOps.checkCancelled(cancelled);
         requireCandidateSubscription(registry, root, subscription);

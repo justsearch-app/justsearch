@@ -41,6 +41,105 @@ import tools.jackson.databind.ObjectMapper;
 final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
+  @Test
+  void C11ReturnedRootRechecksAbsenceUnderThePublicationFence() throws Exception {
+    try (var f = new Fixture()) {
+      Path file = f.root.resolve("returned.txt");
+      String key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
+      String pathHash = io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(key);
+      String uid = f.identities.resolve(pathHash, System.currentTimeMillis()).docUid();
+      var coordinator = f.runtime.indexingCoordinator();
+      coordinator.indexSingle(new io.justsearch.indexing.api.IndexDocument(java.util.Map.of(
+          SchemaFields.DOC_ID, key, SchemaFields.DOC_UID, uid, SchemaFields.PATH, key,
+          SchemaFields.CONTENT, "obsolete", SchemaFields.COLLECTION, "notes")));
+      coordinator.indexSingle(new io.justsearch.indexing.api.IndexDocument(java.util.Map.of(
+          SchemaFields.DOC_ID, key + "#old", SchemaFields.DOC_UID, uid + "#old",
+          SchemaFields.PARENT_DOC_ID, key, SchemaFields.PATH, key,
+          SchemaFields.IS_CHUNK, "true", SchemaFields.COLLECTION, "notes")));
+      f.runtime.commitOps().commitAndTrack();
+      f.runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(2, f.runtime.indexCountOps().countByIdAndChunksStrict(key));
+
+      var observedRuntime = org.mockito.Mockito.spy(f.runtime);
+      var observedLoop = org.mockito.Mockito.spy(f.loop);
+      var fence = f.loop.fileMutationFence();
+      var observedFence = org.mockito.Mockito.spy(fence);
+      org.mockito.Mockito.doReturn(observedFence).when(observedLoop).fileMutationFence();
+      var service = new WorkerIngestService(f.queue, observedLoop, null,
+          IndexingPacing.unthrottled(), temporary, temporary.resolve("target"),
+          observedRuntime, observedRuntime, null, 0L);
+      service.setDocumentIdentityStore(f.identities);
+      Object owner = new Object();
+      service.setMutationAdmission(new WorkerMutationAdmission(owner), owner);
+      var registry = new RootWatcherRegistry();
+      service.setRootWatcherRegistry(registry);
+      assertTrue(((RootWitness) service.rootCheck()).recordAdded(f.root));
+      var binding = new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(f.root, "notes");
+      long removalMark = registry.removalMark();
+      var applying = new java.util.concurrent.CountDownLatch(1);
+      var resume = new java.util.concurrent.CountDownLatch(1);
+      org.mockito.stubbing.Answer<Object> pause = call -> {
+        applying.countDown();
+        assertTrue(resume.await(5, TimeUnit.SECONDS), "reconciliation application was not released");
+        return call.callRealMethod();
+      };
+      // The old path reaches the writer after its final absence check. The repaired path
+      // waits to enter the real shared fence before making that final check.
+      org.mockito.Mockito.doAnswer(pause).when(observedRuntime).indexingCoordinator();
+      org.mockito.Mockito.doAnswer(pause).when(observedFence).lock();
+      java.util.concurrent.CompletableFuture<java.io.IOException> reconciliation = null;
+      fence.lock();
+      try {
+        reconciliation = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+          try {
+            assertTrue(service.reconcileReturnedBootRoot(binding, removalMark, () -> false));
+            return null;
+          } catch (java.io.IOException incomplete) {
+            return incomplete;
+          }
+        });
+        assertTrue(applying.await(5, TimeUnit.SECONDS), "returned-root reconciliation did not reach application");
+        Files.writeString(file, "current bytes");
+        f.loop.withFileMutationFence(() -> {
+          coordinator.deleteByIdAndChunks(key);
+          coordinator.indexSingle(new io.justsearch.indexing.api.IndexDocument(java.util.Map.of(
+              SchemaFields.DOC_ID, key, SchemaFields.DOC_UID, uid, SchemaFields.PATH, key,
+              SchemaFields.CONTENT, "current bytes", SchemaFields.COLLECTION, "notes")));
+          coordinator.indexSingle(new io.justsearch.indexing.api.IndexDocument(java.util.Map.of(
+              SchemaFields.DOC_ID, key + "#current", SchemaFields.DOC_UID, uid + "#current",
+              SchemaFields.PARENT_DOC_ID, key, SchemaFields.PATH, key,
+              SchemaFields.IS_CHUNK, "true", SchemaFields.COLLECTION, "notes")));
+          return true;
+        });
+      } finally {
+        resume.countDown();
+        fence.unlock();
+        if (reconciliation != null) {
+          var incomplete = reconciliation.get(5, TimeUnit.SECONDS);
+          if (incomplete != null) assertTrue(incomplete.getMessage().contains("lacks proven absence"));
+        }
+        registry.unwatch(f.root.toString());
+      }
+      f.runtime.commitOps().commitAndTrack();
+      f.runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(2, f.runtime.indexCountOps().countByIdAndChunksStrict(key),
+          "obsolete reconciliation must preserve the republished parent and chunks");
+      assertEquals("current bytes", f.runtime.documentFieldOps().getDocumentField(key, SchemaFields.CONTENT));
+      assertEquals(uid + "#current", f.runtime.documentFieldOps().getDocumentField(key + "#current", SchemaFields.DOC_UID));
+      assertNull(f.identities.lookup(pathHash).orElseThrow().deletedAtMs(),
+          "an obsolete deletion must not start the replacement identity's grace clock");
+      // Read the committed source independently, including the exact surviving child identity.
+      try (var directory = org.apache.lucene.store.FSDirectory.open(temporary.resolve("target"));
+           var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+        var searcher = new org.apache.lucene.search.IndexSearcher(reader);
+        assertEquals(1, searcher.count(new org.apache.lucene.search.TermQuery(
+            new org.apache.lucene.index.Term(SchemaFields.DOC_ID, key))));
+        assertEquals(1, searcher.count(new org.apache.lucene.search.TermQuery(
+            new org.apache.lucene.index.Term(SchemaFields.DOC_ID, key + "#current"))));
+      }
+    }
+  }
+
   @ParameterizedTest(name = "unavailablePredecessorConvergesThroughTheProductionExtractor({arguments})")
   @ValueSource(strings = {"modified", "same-stamp", "pristine"})
   void unavailablePredecessorConvergesThroughTheProductionExtractor(String change) throws Exception {

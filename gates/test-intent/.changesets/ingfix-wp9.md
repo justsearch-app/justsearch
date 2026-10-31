@@ -436,13 +436,16 @@ Named newChecks are assertion fail-before checks only; supplementary preservatio
         "input re-encoding"
       ],
       "whatMoved": "Supply stable volume identity for deletion fixtures and record roots/explicit folders as a person's deliberate add does (RootWitness.recordAdded or the existing in-memory admission path), including restart/crash drivers. Persist the service base path where the fixture needs its recorded ledger. Share the existing scoped known-volume seam in EngineTestHarness and restore it on cleanup. RootPresenceGuard receives the recorded ledger explicitly. Assertions, fault injection and guarded outcomes remain unchanged. These are adaptations to the volume rule: deleting fixture content needs matching recorded/current volume evidence, whereas present-file admission remains independent. Supplementary preservation checks: modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aPresentRootVouchesUntilItIsRenamedAway; modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#theFreshnessCheckKeepsTheDocumentWhenTheRootWasRenamedAway.",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#C11ReturnedRootRechecksAbsenceUnderThePublicationFence"
+      ],
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "Admission of files that are present and readable (adding, ingesting, re-ingesting) keeps today's rule: a folder with no recorded volume and no current volume identity is admitted. Any decision that infers absence and removes or prunes indexed content requires proof: a recorded volume equal to the current identity, or a declared root's recorded volume; no record, no current identity, or a different volume means unproven, and the rows stay (retry later).",
+          "choice": "Admission of files that are present and readable (adding, ingesting, re-ingesting) keeps today's rule: a folder with no recorded volume and no current volume identity is admitted. Any decision that infers absence and removes or prunes indexed content requires proof: a recorded volume equal to the current identity, or a declared root's recorded volume; no record, no current identity, or a different volume means unproven, and the rows stay (retry later). C11. D15/D33 — a returning or republished source must defeat an obsolete deletion: pause maintenance before application, recreate or publish the source, and verify the current family survives.",
           "label": "agent choice"
         }
       ]
