@@ -26,6 +26,46 @@ final class RediscoveryAdmissionTest {
   @TempDir Path temporary;
 
   @ParameterizedTest
+  @ValueSource(strings = {"unchanged", "size", "mtime", "planned-hash", "collection", "root"})
+  void legacyFailuresKeepWaitsOnlyWithoutEvidenceOfChange(String change) throws Exception {
+    Path root = Files.createDirectory(temporary.resolve("sources"));
+    Path file = Files.writeString(root.resolve("legacy.txt"), "old!");
+    Path db = temporary.resolve("legacy.db");
+    var stamp = Files.getLastModifiedTime(file);
+    try (var queue = open(db)) {
+      queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(temporary)), "docs");
+    }
+    sql(db, "UPDATE jobs SET state='FAILED',attempts=5,retry_after=9999999999999");
+    if (change.equals("planned-hash")) {
+      sql(db, "UPDATE jobs SET planned_source_sha256='" + SourceContentHash.sha256(file) + "'");
+    }
+    sql(db, "ALTER TABLE jobs DROP COLUMN force_reindex");
+    sql(db, "ALTER TABLE jobs DROP COLUMN admitted_source_sha256");
+    sql(db, "PRAGMA user_version=25");
+    switch (change) {
+      case "size" -> Files.writeString(file, "repaired larger source");
+      case "mtime" -> Files.setLastModifiedTime(file,
+          java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 10_000));
+      case "planned-hash" -> {
+        Files.writeString(file, "new!");
+        Files.setLastModifiedTime(file, stamp);
+      }
+      default -> { }
+    }
+    try (var queue = open(db)) {
+      var before = row(db);
+      var entry = JobQueue.EnqueueEntry.stat(file).withinRoot(change.equals("root") ? root : temporary);
+      boolean changed = !change.equals("unchanged");
+      assertEquals(changed ? 1 : 0, queue.enqueueMaintenanceScanEntries(
+          List.of(entry), change.equals("collection") ? "other" : "docs", null));
+      if (changed) {
+        assertEquals("PENDING", row(db).get("state"));
+        assertNotEquals(before.get("unit_revision"), row(db).get("unit_revision"));
+      } else assertEquals(before, row(db), "missing new fields alone must preserve legacy retry history");
+    }
+  }
+
+  @ParameterizedTest
   @CsvSource({"PENDING,SANDBOX_FAILED,600000", "PENDING,SANDBOX_FAILED,-1000", "PENDING,PARSER_FAILED,-1000",
       "PENDING,IO_FAILED,-1000", "PENDING,PARSER_TIMEOUT,600000",
       "PENDING,WRITE_FAILED,600000", "FAILED,SANDBOX_FAILED,0",

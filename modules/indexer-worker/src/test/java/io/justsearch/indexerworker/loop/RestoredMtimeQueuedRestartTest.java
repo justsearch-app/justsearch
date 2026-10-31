@@ -44,6 +44,63 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
   @Test
+  void upgradedV25FailureBecomesRunnableThroughWatcherAfterSizeChange() throws Exception {
+    Path root = Files.createDirectory(temporary.resolve("sources"));
+    Path file = Files.writeString(root.resolve("source.txt"), "broken");
+    Path database = temporary.resolve("queue.db");
+    try (var queue = new SqliteJobQueue(database)) {
+      queue.open();
+      queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root)));
+    }
+    // V25 has exactly the current layout without the two V26 admission columns.
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
+        var sql = connection.createStatement()) {
+      sql.executeUpdate("UPDATE jobs SET state='FAILED',attempts=6");
+      sql.executeUpdate("ALTER TABLE jobs DROP COLUMN force_reindex");
+      sql.executeUpdate("ALTER TABLE jobs DROP COLUMN admitted_source_sha256");
+      sql.executeUpdate("PRAGMA user_version=25");
+    }
+    Files.writeString(file, "repairedwatchertoken ".repeat(300));
+    try (var queue = new SqliteJobQueue(database)) {
+      queue.open();
+      assertEquals(1, queue.jobStateCounts().failedCount(), "upgrade keeps the legacy job");
+      var service = new io.justsearch.indexerworker.services.WorkerIngestService(queue,
+          mock(IndexingLoop.class), null, IndexingPacing.unthrottled(), null, null, null, null, null, 0L);
+      var registry = new io.justsearch.indexerworker.services.RootWatcherRegistry();
+      service.setRootWatcherRegistry(registry);
+      assertTrue(service.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+          .setRootPath(root.toString()).setRootAdded(true).build(),
+          io.justsearch.indexerworker.services.CallContext.none()).getWatching());
+      var subscription = registry.getClass().getDeclaredMethod("subscription", Path.class);
+      subscription.setAccessible(true);
+      service.acceptWatcherUpsert((io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription)
+          subscription.invoke(registry, root), null, file);
+      assertEquals(1, queue.jobStateCounts().pendingCount(), "changed legacy failure must be runnable");
+      assertEquals(1, processAccepted(queue, false, true, new HashSet<>()));
+    }
+    try (var runtime = open()) {
+      assertTrue(hits(runtime, SchemaFields.CONTENT, "repairedwatchertoken") > 0);
+      assertTrue(hits(runtime, SchemaFields.CHUNK_CONTENT, "repairedwatchertoken") > 0);
+    }
+  }
+
+  @Test
+  void missingStoredSourceHashRepairsEqualMetadataEditOnce() throws Exception {
+    Path file = seed("oldquokkatoken ".repeat(300), false, true);
+    var stamp = Files.getLastModifiedTime(file);
+    Files.writeString(file, "newbadgertoken ".repeat(300));
+    Files.setLastModifiedTime(file, stamp);
+    assertEquals(1, process(file), "missing source proof cannot certify unchanged bytes");
+    try (var runtime = open()) {
+      assertEquals(0, hits(runtime, SchemaFields.CONTENT, "oldquokkatoken"));
+      assertTrue(hits(runtime, SchemaFields.CONTENT, "newbadgertoken") > 0);
+      assertEquals(SourceContentHash.sha256(file), runtime.documentFieldOps()
+          .getDocumentField(PathNormalizer.normalizeKey(file), SchemaFields.SOURCE_SHA256));
+    }
+    assertEquals(0, process(file), "persisted source proof skips the identical second admission");
+  }
+
+  @Test
   void shrinkAndSecondChangeAfterRestartReplaceParentAndChunkSearchResults() throws Exception {
     Path file = seed("obsoletequokka ".repeat(1500), false);
     FileTime stamp = Files.getLastModifiedTime(file);
@@ -337,6 +394,10 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
   }
 
   private Path seed(String content, boolean omitSize) throws Exception {
+    return seed(content, omitSize, false);
+  }
+
+  private Path seed(String content, boolean omitSize, boolean omitSourceHash) throws Exception {
     Path file = Files.writeString(Files.createDirectories(temporary.resolve("sources")).resolve("source.txt"), content);
     try (var runtime = open(); var parser = new ContentExtractor()) {
       var policy = TikaExtractionPolicy.defaults();
@@ -346,6 +407,7 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
           new IndexingDocumentOps.SourceFileMetadata(Files.size(file), Files.getLastModifiedTime(file).toMillis(), SourceContentHash.sha256(file)), "stable-uid");
       var fields = new HashMap<>(document.fields());
       if (omitSize) fields.remove(SchemaFields.SIZE_BYTES);
+      if (omitSourceHash) fields.remove(SchemaFields.SOURCE_SHA256);
       runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
       refresh(runtime);
       String id = PathNormalizer.normalizeKey(file);

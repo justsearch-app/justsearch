@@ -2575,6 +2575,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
     var declared = !exactCollection && unitRevision == null && (collection == null || collection.isBlank())
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
+    var sources = unitRevision == null ? observeAdmissionSources(entries) : Map.<JobQueue.EnqueueEntry, AdmissionSource>of();
     lockTimed();
     try {
       ensureOpen();
@@ -2604,7 +2605,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       CandidateFileBatch result = inTransaction(
           () -> enqueueEntriesInTransaction(
-              entries, col, scan, now, exactCollection, unitRevision, preserveRetryWaits, declared));
+              entries, col, scan, now, exactCollection, unitRevision, preserveRetryWaits, declared, sources));
 
       meters.recordEnqueued(result.enqueued());
       log.debug("Covered {} jobs (collection={}, scanId={})", result.covered(), col, scan);
@@ -3083,10 +3084,54 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  private record AdmissionSource(long size, long modified, Object fileKey, String sha256) {
+    private boolean stillCurrent(Path path) {
+      try {
+        var current = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
+            LinkOption.NOFOLLOW_LINKS);
+        return current.isRegularFile() && size == current.size()
+            && modified == current.lastModifiedTime().toMillis()
+            && Objects.equals(fileKey, current.fileKey());
+      } catch (IOException | SecurityException unavailable) {
+        return false;
+      }
+    }
+  }
+
+  private static AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry) {
+    if (entry == null || entry.path() == null || entry.plannedSourceSha256() != null) return null;
+    try {
+      var attrs = Files.readAttributes(entry.path(), java.nio.file.attribute.BasicFileAttributes.class,
+          LinkOption.NOFOLLOW_LINKS);
+      if (!attrs.isRegularFile()) return null;
+      String hash = io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(
+          entry.path(), entry.ingestionRoot());
+      var source = new AdmissionSource(attrs.size(), attrs.lastModifiedTime().toMillis(), attrs.fileKey(), hash);
+      return source;
+    } catch (IOException | SecurityException unavailable) {
+      return null;
+    }
+  }
+
+  private static Map<JobQueue.EnqueueEntry, AdmissionSource> observeAdmissionSources(
+      List<JobQueue.EnqueueEntry> entries) {
+    Map<JobQueue.EnqueueEntry, AdmissionSource> sources = new HashMap<>();
+    for (var entry : entries) {
+      var source = observeAdmissionSource(entry);
+      if (source != null) sources.put(entry, source);
+    }
+    return sources;
+  }
+
   private boolean preservesMaintenanceWork(JobQueue.EnqueueEntry entry, String collection, boolean exactCollection,
-      String sourceIdentity, long now) throws SQLException {
+      String sourceIdentity, AdmissionSource source, long now) throws SQLException {
     try (var query = connection.prepareStatement(
-        "SELECT state,collection,admitted_source_sha256,planned_source_sha256,unit_revision,ingestion_root FROM jobs WHERE path=?")) {
+        "SELECT state,collection,admitted_source_sha256,planned_source_sha256,unit_revision,ingestion_root,"
+            + "size_bytes,last_updated,CASE WHEN admitted_source_sha256 IS NULL AND planned_source_sha256 IS NULL "
+            + "THEN (SELECT source_modified_at FROM ingestion_ledger l "
+            + "WHERE l.operation_key=jobs.scan_id AND l.unit_revision=jobs.unit_revision "
+            + "ORDER BY l.id DESC LIMIT 1) END AS source_modified_at "
+            + "FROM jobs WHERE path=?")) {
       query.setString(1, normalizePath(entry.path()));
       try (var row = query.executeQuery()) {
         if (!row.next() || STATE_DONE.equals(row.getString(1))) return false;
@@ -3095,11 +3140,21 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             || revision.startsWith("root1:") || revision.startsWith("root2:"))) {
           return preservesMaintenanceRetryWait(entry.path(), now);
         }
-        if (row.getString(3) == null && preservesMaintenanceRetryWait(entry.path(), now)) return true;
         if ((exactCollection || collection != null) && !Objects.equals(collection, row.getString(2))) return false;
         if (!Objects.equals(PathNormalizer.normalizeKey(entry.ingestionRoot()), row.getString(6))) return false;
         String prior = row.getString(3) == null ? row.getString(4) : row.getString(3);
         if (sourceIdentity != null && prior != null) return sourceIdentity.equals(prior);
+        long priorSize = row.getLong("size_bytes");
+        boolean knownSize = !row.wasNull();
+        long observedSize = source == null ? entry.sizeBytes() : source.size();
+        if (knownSize && observedSize >= 0 && priorSize != observedSize) return false;
+        if (source != null) {
+          if (!source.stillCurrent(entry.path())) return false;
+          long modified = row.getLong("source_modified_at");
+          if (!row.wasNull()) {
+            if (modified != source.modified()) return false;
+          } else if (source.modified() > row.getLong("last_updated")) return false;
+        }
         // Missing legacy evidence or an unreadable source cannot establish changed work.
         // Keep the accepted revision and retry history until a change can be proved.
         return prior == null || sourceIdentity == null;
@@ -3120,6 +3175,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       boolean exactCollection, String unitRevision, boolean preserveRetryWaits,
       List<IngestCollectionPolicy.RootBinding> declared)
       throws SQLException {
+    return enqueueEntriesInTransaction(entries, collection, scanId, now, exactCollection,
+        unitRevision, preserveRetryWaits, declared, Map.of());
+  }
+
+  private CandidateFileBatch enqueueEntriesInTransaction(
+      List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
+      boolean exactCollection, String unitRevision, boolean preserveRetryWaits,
+      List<IngestCollectionPolicy.RootBinding> declared,
+      Map<JobQueue.EnqueueEntry, AdmissionSource> sources) throws SQLException {
     String sql = """
         INSERT INTO jobs
           (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root, force_reindex, admitted_source_sha256)
@@ -3145,9 +3209,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             PathNormalizer.normalizePath(entry.path().toAbsolutePath().toString());
         boolean ordinaryAdmission = unitRevision == null
             && (releaseRecovery == null || !releaseRecovery.retiringBuild());
+        var source = sources.get(entry);
         String sourceIdentity = !ordinaryAdmission ? null
             : entry.plannedSourceSha256() != null ? entry.plannedSourceSha256()
-                : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot());
+                : source != null && source.stillCurrent(entry.path()) ? source.sha256() : null;
         sealBeforeMaintenance(normalizedPath);
         var membership =
             SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scanId);
@@ -3174,7 +3239,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         }
         if (preserveRetryWaits && !entry.forceReindex()
             && (ordinaryAdmission
-                ? preservesMaintenanceWork(entry, effectiveCollection, exact, sourceIdentity, now)
+                ? preservesMaintenanceWork(entry, effectiveCollection, exact, sourceIdentity, source, now)
                 : preservesMaintenanceRetryWait(entry.path(), now))) {
           accepted++;
           continue;
@@ -4181,6 +4246,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.warn("Refusing to re-enqueue {}: insufficient free disk space", entry.path());
       return new JobQueue.ReenqueueResult(0, null);
     }
+    var source = observeAdmissionSource(entry);
     lockTimed();
     try {
       ensureOpen();
@@ -4237,7 +4303,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               write.setString(12, PathNormalizer.normalizeKey(entry.ingestionRoot()));
               write.setString(13, normalizedPath);
               write.setString(14, entry.plannedSourceSha256() != null ? entry.plannedSourceSha256()
-                  : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot()));
+                  : source != null && source.stillCurrent(entry.path()) ? source.sha256() : null);
               write.setInt(15, entry.forceReindex() ? 1 : 0);
               accepted = executeMutation(write::executeUpdate) > 0 ? 1 : 0;
             }
@@ -6616,6 +6682,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public boolean enqueueReappearedFile(JobQueue.EnqueueEntry entry, String collection) {
     var declared = collection == null || collection.isBlank()
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
+    var sources = observeAdmissionSources(List.of(entry));
     lock.lock();
     try {
       ensureOpen();
@@ -6630,7 +6697,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         return enqueueEntriesInTransaction(List.of(entry), collection, null,
-            System.currentTimeMillis(), false, null, false, declared).covered() == 1;
+            System.currentTimeMillis(), false, null, false, declared, sources).covered() == 1;
       });
     } catch (SQLException failure) {
       log.warn("Cannot admit recreated file {}", entry.path(), failure);

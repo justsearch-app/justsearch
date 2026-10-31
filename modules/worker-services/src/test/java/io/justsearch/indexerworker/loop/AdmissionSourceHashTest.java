@@ -14,6 +14,17 @@ final class AdmissionSourceHashTest {
   @TempDir Path temporary;
 
   @Test
+  void interruptedAdmissionProvidesNoSourceProof() throws Exception {
+    Path file = Files.writeString(temporary.resolve("cancelled.txt"), "source");
+    Thread.currentThread().interrupt();
+    try {
+      assertNull(SourceContentHash.admissionIdentity(file, temporary));
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
   void cloudPlaceholdersAreDeferredBeforeAnyContentRead() throws Exception {
     Path file = Files.writeString(temporary.resolve("cloud.txt"), "placeholder");
     try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
@@ -23,6 +34,7 @@ final class AdmissionSourceHashTest {
       assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, admission.action());
       assertEquals(IngestionReasonCodes.CLOUD_PLACEHOLDER, admission.outcome().reasonCode());
       hashes.verify(() -> SourceContentHash.sha256(file), never());
+      hashes.verify(() -> SourceContentHash.sha256(eq(file), any()), never());
     }
   }
 

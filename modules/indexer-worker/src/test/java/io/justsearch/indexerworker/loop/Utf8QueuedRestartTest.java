@@ -84,6 +84,7 @@ class Utf8QueuedRestartTest extends LuceneExecutorTestBase {
           "text/plain; charset=GB18030");
       var fields = new HashMap<>(buildDocument(file, extraction).fields());
       fields.put(SchemaFields.DOC_UID, "stable-uid");
+      fields.put(SchemaFields.SOURCE_SHA256, SourceContentHash.sha256(file));
       fields.put(SchemaFields.EXTRACTION_POLICY_ID, "tika-default-v3");
       fields.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(legacy));
       runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));

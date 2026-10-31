@@ -605,7 +605,7 @@ public final class DocumentFieldOps {
     return isUnmodified(docId, currentLastModified, currentSizeBytes, null);
   }
 
-  /** An explicitly admitted source must also match its stored byte identity, when available. */
+  /** An explicitly admitted source must also match its stored byte identity. */
   public boolean isUnmodified(String docId, long currentLastModified, long currentSizeBytes,
       String sourceSha256) {
     return isUnmodified(docId, currentLastModified, Long.valueOf(currentSizeBytes), sourceSha256);
@@ -641,7 +641,7 @@ public final class DocumentFieldOps {
               }
               if (sourceSha256 != null) {
                 String storedHash = searcher.storedFields().document(docNum).get(SchemaFields.SOURCE_SHA256);
-                if (storedHash != null && !sourceSha256.equals(storedHash)) return false;
+                if (!sourceSha256.equals(storedHash)) return false;
               }
               var assessment = session.chunkCompleteness.assess(searcher, docNum, docId);
               boolean unchanged = assessment.complete();

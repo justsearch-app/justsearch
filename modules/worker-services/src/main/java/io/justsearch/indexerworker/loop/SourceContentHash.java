@@ -42,7 +42,7 @@ public final class SourceContentHash {
     try {
       var before = FileFreshnessSnapshot.capture(path);
       if (!before.regularFile()) return null;
-      String hash = sha256(path);
+      String hash = sha256(path, () -> Thread.currentThread().isInterrupted());
       return before.validateNow() == FileFreshnessSnapshot.SourceValidationResult.FRESH ? hash : null;
     } catch (IOException | SecurityException unreadable) {
       return null;
