@@ -566,3 +566,14 @@ than escaping before the outcome assertions.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1902b-916d-7872-8358-6c0078acec48",
+  "verdict": "accept",
+  "digest": "sha256:e17638a163d7ebbed4f90613eb81196c4a45543071e8ffa746362d477be44e48",
+  "note": "Transcribed by the orchestrator from verifier session 01a1902b-916d-7872-8358-6c0078acec48 (verdict: accept all 13 entries, per-entry reasons in its evidence test-intent-verdicts.md); the verifier sandbox cannot run cli.mjs. Changeset unchanged since that verdict."
+}
+```
