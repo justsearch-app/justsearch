@@ -41,7 +41,7 @@ adapter enforces this too, including direct runner invocations.
 ```sh
 xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
   python3 scripts/release/qual/journeys/hosted.py \
-    --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+    --assets /path/to/draft-assets --package JustSearch_0.3.3_amd64.deb \
     --registry /path/to/tagged/server.json --evidence /path/to/new-evidence
 ```
 
@@ -68,9 +68,9 @@ export QUAL_OWNER=w4a
 python3 scripts/release/qual/vm.py status
 python3 scripts/release/qual/journeys/vm-run.py \
   --session wayland \
-  --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+  --assets /path/to/draft-assets --package JustSearch_0.3.3_amd64.deb \
   --registry /path/to/tagged/server.json \
-  --predecessor /path/to/parent/JustSearch_0.3.0_amd64.deb \
+  --predecessor /path/to/parent/JustSearch_0.3.2_amd64.deb \
   --mirror /path/to/signed-mirror-tree \
   --driver /path/to/tauri-driver --evidence /path/to/new-wayland-evidence
 ```
@@ -140,9 +140,9 @@ arguments and **explicit** journey IDs, for example:
 python3 scripts/release/qual/journeys/vm-run.py \
   --session wayland --mode rerun --journeys J7 \
   --snapshot /path/to/fresh-evidence/candidate-setup/snapshot \
-  --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+  --assets /path/to/draft-assets --package JustSearch_0.3.3_amd64.deb \
   --registry /path/to/tagged/server.json \
-  --predecessor /path/to/JustSearch_0.3.0_amd64.deb --mirror /path/to/mirror \
+  --predecessor /path/to/JustSearch_0.3.2_amd64.deb --mirror /path/to/mirror \
   --driver /path/to/tauri-driver --evidence /path/to/new-rerun-evidence
 ```
 
@@ -270,7 +270,7 @@ downloads start in empty private state, never in the owner's model cache.
 python3 scripts/release/qual/journeys/corpus.py --soak \
   /path/to/reusable-soak-corpus > /path/to/soak-corpus-manifest.json
 python3 scripts/release/qual/journeys/gpu-host.py \
-  --assets /path/to/draft-assets --package JustSearch_0.3.1_amd64.deb \
+  --assets /path/to/draft-assets --package JustSearch_0.3.3_amd64.deb \
   --source /path/to/exact-tagged-source --last-release v0.3.0 \
   --soak-corpus /path/to/reusable-soak-corpus \
   --driver /path/to/tauri-driver-2.0.4 --evidence /path/to/new-gpu-evidence
@@ -764,10 +764,10 @@ build tooling stays on a separate build overlay, never the clean journey overlay
 export QUAL_OWNER=w4b
 python3 scripts/release/qual/vm.py status
 windows_inputs=( \
-  --assets /path/to/windows-assets --package JustSearch_0.3.2_x64-setup.exe \
+  --assets /path/to/windows-assets --package JustSearch_0.3.3_x64-setup.exe \
   --registry /path/to/candidate/server.json \
   --driver /path/to/windows/tauri-driver.exe \
-  --predecessor /path/to/parent/JustSearch_0.3.1_x64-setup.exe \
+  --predecessor /path/to/parent/JustSearch_0.3.2_x64-setup.exe \
   --mirror /path/to/signed-test-mirror )
 # Once: tools, cached pinned Inspector, driver, corpus and release/mirror staging.
 python3 scripts/release/qual/journeys/vm-windows.py "${windows_inputs[@]}" \
