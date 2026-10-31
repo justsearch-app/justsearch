@@ -153,7 +153,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
   }
 
   @Test
-  void failedPreservationWithholdsEntireUpdateAndKeepsOldPostings() throws Exception {
+  void failedPreservationPublishesEmbeddingAndResetsSplade() throws Exception {
     EmbeddingProvider embedding = mock(EmbeddingProvider.class);
     SpladeEncoder splade = mock(SpladeEncoder.class);
     when(embedding.isAvailable()).thenReturn(true);
@@ -173,15 +173,15 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     CombinedEnrichmentBackfillOps.processCombinedBackfill(context(embedding, splade, null));
     refresh();
 
-    assertTrue(hasSparseHit("old", docId), "failed preservation must leave existing postings intact");
+    assertFalse(hasSparseHit("old", docId), "failed preservation uses the baseline reset lane");
     assertEquals(
-        SchemaFields.EMBEDDING_STATUS_PENDING,
+        SchemaFields.EMBEDDING_STATUS_COMPLETED,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.EMBEDDING_STATUS));
     assertEquals(
-        SchemaFields.SPLADE_STATUS_COMPLETED,
+        SchemaFields.SPLADE_STATUS_PENDING,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_STATUS));
     assertEquals(
-        null,
+        "1",
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_RETRY_COUNT));
   }
 

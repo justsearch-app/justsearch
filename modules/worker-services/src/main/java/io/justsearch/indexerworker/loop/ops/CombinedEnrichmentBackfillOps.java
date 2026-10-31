@@ -235,8 +235,7 @@ public final class CombinedEnrichmentBackfillOps {
    *     forever. Tempdoc 798 renamed it from {@code anyWorkDone} because that name invited exactly
    *     one wrong use: driving a loop's continue-condition (a 20-minute ingest livelock, zero
    *     diagnostics). It selects combined-vs-individual mode and feeds logging/sleep selection —
-   *     it must NEVER be a loop's continue-condition. Use {@link #progressed()} or
-   *     {@link #excludedDocuments()} for that.
+   *     it must NEVER be a loop's continue-condition. Use {@link #progressed()} for that.
    *     Mode selection also keeps combined mode when {@link #recordTiming()} is true: selected
    *     work may have deferred its write to protect completed SPLADE postings.
    * @param progressed whether the whole submitted RMW batch succeeded and at least one document
@@ -254,9 +253,6 @@ public final class CombinedEnrichmentBackfillOps {
    *     mutation of a document's update map in {@link #processCombinedBackfill} increments some
    *     stage counter, so "the write was non-empty" and "a counter moved" would coincide, and the
    *     distinction this field exists to draw would collapse.
-   * @param excludedDocuments whether withholding preservation updates added documents to the
-   *     per-cycle exclusion set. The scheduler can select another batch without revisiting these
-   *     documents, even when this batch published nothing. This is not stage completion credit.
    * @param aborted whether this batch stopped starting new enrichment work before its document set
    *     was exhausted (tempdoc 809 finding 3) — either because the caller's stop signal came up
    *     (shutdown / user activity / GPU yield / pending ingest / cycle budget) or because a bulk
@@ -282,7 +278,6 @@ public final class CombinedEnrichmentBackfillOps {
   public record CombinedOutcome(
       boolean wroteAnything,
       boolean progressed,
-      boolean excludedDocuments,
       boolean aborted,
       boolean recordTiming,
       int embedProcessed,
@@ -298,7 +293,7 @@ public final class CombinedEnrichmentBackfillOps {
 
     /** No pending work / interrupted before any stage ran — nothing to record. */
     public static CombinedOutcome none() {
-      return new CombinedOutcome(false, false, false, false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      return new CombinedOutcome(false, false, false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
   }
 
@@ -309,7 +304,7 @@ public final class CombinedEnrichmentBackfillOps {
    *
    * @return the batch outcome; {@code outcome.wroteAnything()} replaces the pre-Move-2 boolean
    *     return for backfillDidWork/mode selection, and {@code outcome.progressed()} is what any
-   *     loop over this method continues on, along with newly excluded documents (tempdoc 798).
+   *     loop over this method continues on (tempdoc 798).
    */
   public static CombinedOutcome processCombinedBackfill(BackfillContext context) {
     return processCombinedBackfill(context, BulkPacePolicy.DEFAULTS);
@@ -1199,47 +1194,6 @@ public final class CombinedEnrichmentBackfillOps {
             if (context.spladeEncoderSupplier().get() != encoder || SpladeBackfillOps.isSystemicFailure(failure)) {
               systemicSpladeFailure = true;
               context.spladeBackfillResult().accept(false);
-            } else if (preserving) {
-              for (String id : sliceIds) {
-                if (updatesByDocId.get(id).containsKey(SchemaFields.SPLADE)) continue;
-                if (context.hardStopRequestedSupplier().getAsBoolean()
-                    || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection) {
-                  aborted = true;
-                  break;
-                }
-                if (!context.spladeAllowedSupplier().getAsBoolean()) break;
-                if (context.spladeEncoderSupplier().get() != encoder) {
-                  systemicSpladeFailure = true;
-                  context.spladeBackfillResult().accept(false);
-                  break;
-                }
-                pacer.beforeUnit(1);
-                try {
-                  List<Map<String, Float>> vectors =
-                      encoder.encodeBatch(List.of(contentByDocId.get(id)));
-                  if (vectors == null || vectors.size() != 1) {
-                    throw new IllegalStateException("SPLADE batch result size mismatch");
-                  }
-                  Map<String, Float> vector = vectors.get(0);
-                  Map<String, Object> updates = updatesByDocId.get(id);
-                  updates.put(SchemaFields.SPLADE, vector);
-                  updates.put(SchemaFields.SPLADE_STATUS, SpladeBackfillOps.spladeStatusFor(vector));
-                  updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
-                  stageAdvancedDocIds.add(id);
-                } catch (Exception individualFailure) {
-                  context.log().warn("Combined backfill: SPLADE preservation failed for {}: {}",
-                      id, individualFailure.getMessage());
-                  if (context.spladeEncoderSupplier().get() != encoder
-                      || SpladeBackfillOps.isSystemicFailure(individualFailure)) {
-                    systemicSpladeFailure = true;
-                    context.spladeBackfillResult().accept(false);
-                    break;
-                  }
-                } finally {
-                  pacer.afterUnit(1);
-                  unitsDone++;
-                }
-              }
             } else {
               for (String id : sliceIds) {
                 if (updatesByDocId.get(id).containsKey(SchemaFields.SPLADE)) continue;
@@ -1263,14 +1217,14 @@ public final class CombinedEnrichmentBackfillOps {
       }
       if (attemptedSplade && !systemicSpladeFailure) context.spladeBackfillResult().accept(true);
       spladeMs = (System.nanoTime() - tSplade) / 1_000_000;
-      boolean excludedDocuments = false;
       for (String id : preservationIds) {
         Map<String, Object> updates = updatesByDocId.get(id);
-        if (!updates.containsKey(SchemaFields.SPLADE)) {
+        // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: an attempted
+        // non-systemic failure uses the writer's reset lane with the other earned outcomes.
+        // Systemic failures, backoff and unattempted preservation still defer publication.
+        if (!updates.containsKey(SchemaFields.SPLADE)
+            && !updates.containsKey(SchemaFields.SPLADE_RETRY_COUNT)) {
           updates.clear();
-          // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: defer this parent
-          // until the next idle cycle so it cannot crowd out healthy pending documents.
-          excludedDocuments |= context.publishedDocIds().add(id);
         }
       }
 
@@ -1422,7 +1376,6 @@ public final class CombinedEnrichmentBackfillOps {
               && batchUpdates.stream()
                   .map(Map.Entry::getKey)
                   .anyMatch(stageAdvancedDocIds::contains),
-          excludedDocuments,
           aborted,
           recordTiming,
           embedProcessed,
@@ -1443,7 +1396,6 @@ public final class CombinedEnrichmentBackfillOps {
               false,
               // The batch aborted before its single write, so nothing landed: no doc advanced a
               // stage durably, whatever the in-flight stage counters say (tempdoc 798).
-              false,
               false,
               // Carries whatever an earlier stage already decided; the exception itself does not
               // set it — a crash says nothing about whether the caller wants backfill to yield,
