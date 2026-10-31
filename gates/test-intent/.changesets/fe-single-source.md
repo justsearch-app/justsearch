@@ -123,3 +123,13 @@ Preservation and declaration-generation work for frontend structure step 5. Inde
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a191bd-5e1d-7ce2-b24e-f2604bcd0436",
+  "verdict": "accept",
+  "digest": "sha256:a1fc1c0417ee65f72cfc0a2d0c0a147b4ada025955a9cc68b77ca518155af36b"
+}
+```
