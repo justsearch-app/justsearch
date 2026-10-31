@@ -179,22 +179,22 @@ const wireEvent = (id: string, kind: string, content: string): Record<string, un
 const storedId = (n: number): string => `11111111-2222-4333-8444-${String(n).padStart(12, '0')}`;
 
 /** The record a completed ask leaves behind: the question and the answer, both store-minted. */
-function recordTurn(conversationId: string, question: string, answer: string): void {
+function recordTurn(conversationId: string, question: string, answer: string, turnId?: unknown): void {
   const thread = backend.threads[conversationId] ?? { conversationId, events: [] };
   const n = thread.events.length;
   const userId = storedId(Object.keys(backend.threads).length * 100 + n);
   const answerId = storedId(Object.keys(backend.threads).length * 100 + n + 1);
   thread.events = [
     ...thread.events,
-    wireEvent(userId, 'USER_MESSAGE', question),
-    wireEvent(answerId, 'ASSISTANT_MESSAGE', answer),
+    { ...wireEvent(userId, 'USER_MESSAGE', question), attributes: { turnId } },
+    { ...wireEvent(answerId, 'ASSISTANT_MESSAGE', answer), attributes: { turnId } },
   ];
   backend.threads[conversationId] = thread;
   const history = backend.histories[conversationId] ?? { sessionId: conversationId, messages: [] };
   history.messages = [
     ...history.messages,
-    { role: 'user', content: question, id: userId },
-    { role: 'assistant', content: answer, id: answerId },
+    { role: 'user', content: question, id: userId, turnId },
+    { role: 'assistant', content: answer, id: answerId, turnId },
   ];
   backend.histories[conversationId] = history;
   if (!backend.conversations.some((c) => c.sessionId === conversationId)) {
@@ -292,7 +292,7 @@ function stubFetch(): void {
 async function answerLatest(el: Mounted, answer = 'It is in the lease.'): Promise<void> {
   const stream = backend.streams.at(-1);
   if (!stream) throw new Error('nothing was dispatched');
-  recordTurn(String(stream.body.conversationId), String(stream.body.question ?? ''), answer);
+  recordTurn(String(stream.body.conversationId), String(stream.body.question ?? ''), answer, stream.body.turnId);
   stream.emit('chunk', { text: answer });
   stream.emit('done', {});
   stream.end();

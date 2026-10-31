@@ -48,17 +48,17 @@ beforeEach(() => {
   __feedForTest({ inference: { mode: 'online', available: true } as never,
     status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot });
   __feedContactForTest(); terminal = 'done';
-  const saved = new Map<string, typeof messages>([['mixed', messages]]);
+  const saved = new Map<string, Array<(typeof messages)[number] & { turnId?: string }>>([['mixed', messages]]);
   fetchMock = vi.fn(async (url: unknown, init?: RequestInit) => {
     const href = String(url);
     const reply = (body: unknown): object => ({ ok: true, status: 200, json: async () => body });
     if (href.endsWith('/api/chat/dispatch')) {
-      const body = JSON.parse(String(init?.body)) as { conversationId: string; prompt: string; shapeId: string };
+      const body = JSON.parse(String(init?.body)) as { conversationId: string; prompt: string; shapeId: string; turnId?: string };
       if (terminal === 'done') {
         const previous = saved.get(body.conversationId) ?? [];
         saved.set(body.conversationId, [...previous,
-          { id: crypto.randomUUID(), role: 'user', content: body.prompt, shapeId: body.shapeId },
-          { id: crypto.randomUUID(), role: 'assistant', content: '{"text":"JSON"}', shapeId: body.shapeId },
+          { id: crypto.randomUUID(), role: 'user', content: body.prompt, shapeId: body.shapeId, turnId: body.turnId },
+          { id: crypto.randomUUID(), role: 'assistant', content: '{"text":"JSON"}', shapeId: body.shapeId, turnId: body.turnId },
         ]);
       }
       return new Response(terminal === 'empty'

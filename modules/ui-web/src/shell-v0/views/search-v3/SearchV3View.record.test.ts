@@ -734,8 +734,8 @@ describe('the transcript projects from the canonical record (D1)', () => {
     backend.threads[id] = {
       conversationId: id,
       events: [
-        wireEvent('r1', 'USER_MESSAGE', 'why did the renewal fail?'),
-        wireEvent('r2', 'ASSISTANT_MESSAGE', 'The record’s answer.'),
+        wireEvent('r1', 'USER_MESSAGE', 'why did the renewal fail?', { turnId: el.sessions.sessions[0]!.turns[0]!.dispatchTurnId }),
+        wireEvent('r2', 'ASSISTANT_MESSAGE', 'The record’s answer.', { turnId: el.sessions.sessions[0]!.turns[0]!.dispatchTurnId }),
       ],
     };
     stream.emit('chunk', { text: 'The live answer.' });

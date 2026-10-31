@@ -157,14 +157,15 @@ export async function loadConversationExport(apiBase: string, session: Sv3Sessio
     let index = -1;
     for (let i = turns.length - 1; i >= 0; i--) {
       const saved = turns[i]!;
-      if (!used.has(i) && (local.recordId !== null ? saved.recordId === local.recordId
-        : local.status !== 'refused' && saved.question === local.question
+      if (!used.has(i) && (local.dispatchTurnId !== undefined ? saved.dispatchTurnId === local.dispatchTurnId
+        : local.recordId !== null ? saved.recordId === local.recordId
+        : saved.dispatchTurnId === undefined && local.status !== 'refused' && saved.question === local.question
           && (local.status === 'streaming' || saved.answer === local.answer))) { index = i; break; }
     }
     if (index < 0) { pending.unshift(local); continue; }
     used.add(index);
     const saved = turns[index]!;
-    if (local.status !== 'complete') {
+    if (local.status !== 'complete' && !saved.savedOutcome) {
       turns[index] = { ...saved, status: local.status, detail: local.detail };
     }
     // The live terminal can precede its persistence; don't replace a received answer with silence.

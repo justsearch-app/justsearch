@@ -23,6 +23,7 @@ interface ContextHost {
   setContextUsage(id: string, usage: Sv3ContextUsage): void;
   contextWindow(): number | null;
   recordReadWait(id: string): number | undefined;
+  retainedAttempt?(): { target: string; key: string } | null;
   recordArrival(id: string, record: ThreadResponse): void;
   scheduleRecordRetry(): void;
   clearRecordRetry(): void;
@@ -55,7 +56,10 @@ const sv3HistoryOf = (history: ResumedConversation): Sv3SessionHistory => ({
 
 export class Sv3ContextDomain {
   /** Reads supersede only the same conversation, including Stop reconciliation after navigation. */
-  private readonly recordReads = new Map<string, AbortController>();
+  private readonly recordReads = new Map<string, { controller: AbortController; bound(): void }>();
+  private retainedCheck: { target: string; key: string; until: number } | null = null;
+  private retainedTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly forgotten = new Set<string>();
   private readonly historyReads = new Map<string, AbortController>();
   /** A write includes its response AND saved-history refresh; later controls queue behind it. */
   private readonly contextWrites = new Map<string, Promise<void>>();
@@ -96,12 +100,16 @@ export class Sv3ContextDomain {
   }
 
   forgetConversation(id: string): void {
-    this.recordReads.get(id)?.abort();
+    this.forgotten.add(id);
+    if (this.retainedCheck?.target === id) this.clearRetainedTimer();
+    this.recordReads.get(id)?.controller.abort();
     this.recordReads.delete(id);
   }
 
   disconnect(): void {
-    for (const read of this.recordReads.values()) read.abort();
+    this.clearRetainedTimer();
+    this.retainedCheck = null;
+    for (const read of this.recordReads.values()) read.controller.abort();
     this.recordReads.clear();
     this.host.clearRecordRetry();
     for (const [id, read] of this.historyReads) {
@@ -122,27 +130,75 @@ export class Sv3ContextDomain {
    * caller's live state, which is right and was also completely silent. `onFailure` is the out-of-band
    * signal; the notice is raised and the merge is SKIPPED, so a failure never re-renders the thread.
    */
-  async refreshRecord(conversationId: string): Promise<boolean> {
-    if (!this.host.connected()) return false;
-    this.recordReads.get(conversationId)?.abort();
+  async refreshRecord(conversationId: string, automatic = false): Promise<boolean> {
+    if (!this.host.connected() || this.forgotten.has(conversationId)) return false;
+    if (!automatic && this.host.retainedAttempt?.()?.target === conversationId) this.checkRetainedAttempt(true);
+    this.recordReads.get(conversationId)?.controller.abort();
     const abort = new AbortController();
-    this.recordReads.set(conversationId, abort);
     let failed = false;
-    const wait = this.host.recordReadWait(conversationId);
-    const timer = wait === undefined ? undefined : setTimeout(() => abort.abort(), wait);
-    const record = await this.transport.fetchRecord(conversationId, abort.signal, () => {
-      failed = true;
-    }).finally(() => clearTimeout(timer));
-    // Reads supersede only their own conversation; a pending Stop can settle after navigation.
-    if (abort.signal.aborted) return false;
-    this.recordReads.delete(conversationId);
-    if (this.host.activeConversationId() === conversationId) this.recordNotice = failed;
-    if (!failed) {
-      this.host.recordArrival(conversationId, record);
+    const watching = this.host.retainedAttempt?.()?.target === conversationId;
+    const wait = this.host.recordReadWait(conversationId) ?? (watching ? 10000 : undefined);
+    // Race the signal as well as passing it to fetch: a stalled/abort-ignoring transport must not
+    // hold the checker forever. Its eventual response has no authority after this read retires.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cancelled = new Promise<undefined>(resolve => {
+      abort.signal.addEventListener('abort', () => resolve(undefined), { once: true });
+      if (wait !== undefined) timer = setTimeout(() => abort.abort(), wait);
+    });
+    const read = { controller: abort, bound: () => {
+      if (timer === undefined) timer = setTimeout(() => abort.abort(), 10000);
+    } };
+    this.recordReads.set(conversationId, read);
+    try {
+      const record = await Promise.race([
+        this.transport.fetchRecord(conversationId, abort.signal, () => { failed = true; })
+          .catch(() => { failed = true; return undefined; }),
+        cancelled,
+      ]);
+      if (abort.signal.aborted || this.recordReads.get(conversationId) !== read || record === undefined) return false;
+      if (this.host.activeConversationId() === conversationId) this.recordNotice = failed;
+      if (!failed) this.host.recordArrival(conversationId, record);
+      return !failed;
+    } finally {
+      clearTimeout(timer);
+      if (this.recordReads.get(conversationId) === read) this.recordReads.delete(conversationId);
+      this.host.scheduleRecordRetry();
+      this.checkRetainedAttempt();
     }
-    this.host.scheduleRecordRetry();
-    return !failed;
   }
+
+  private clearRetainedTimer(): void {
+    if (this.retainedTimer !== null) clearTimeout(this.retainedTimer);
+    this.retainedTimer = null;
+  }
+
+  /** Only read records. A finite budget never changes delivery state or grants sending authority. */
+  checkRetainedAttempt(rearm = false): void {
+    const attempt = this.host.retainedAttempt?.();
+    if (!this.host.connected() || !attempt || this.forgotten.has(attempt.target)) {
+      this.clearRetainedTimer(); this.retainedCheck = null; return;
+    }
+    if (rearm || this.retainedCheck?.key !== attempt.key) {
+      this.clearRetainedTimer();
+      this.retainedCheck = { ...attempt, until: Date.now() + 30000 };
+    }
+    // Opening reads can predate recovery, or start while the stream still owns the attempt.
+    // Bound them on adoption without extending an existing deadline or timing out other reads.
+    this.recordReads.get(attempt.target)?.bound();
+    if (this.retainedTimer !== null || Date.now() >= this.retainedCheck!.until) return;
+    this.retainedTimer = setTimeout(() => {
+      this.retainedTimer = null;
+      const pending = this.retainedCheck;
+      if (!pending || this.host.retainedAttempt?.()?.key !== pending.key) { this.checkRetainedAttempt(); return; }
+      if (Date.now() >= pending.until) { this.host.requestUpdate(); return; }
+      // An opening/manual read already in flight gets its bounded wait; ticks never supersede it.
+      if (this.recordReads.has(pending.target)) { this.checkRetainedAttempt(); return; }
+      void this.refreshRecord(pending.target, true);
+    }, Math.min(500, this.retainedCheck!.until - Date.now()));
+  }
+
+  /** A saved outcome can arrive after cached context. Force a companion history read before send. */
+  invalidateContext(sessionId: string): void { this.markContextUnconfirmed(sessionId); }
 
   /**
    * Read saved context without claiming the shared pointer. A later read of this conversation
@@ -214,6 +270,7 @@ export class Sv3ContextDomain {
   }
 
   retryContextOnReconnect = (): void => {
+    this.checkRetainedAttempt(true);
     this.host.retryRecords();
     this.clearContextRetry();
     this.contextRetryDelay = 1000;

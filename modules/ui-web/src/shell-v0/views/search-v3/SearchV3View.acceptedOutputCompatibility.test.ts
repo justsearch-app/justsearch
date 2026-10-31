@@ -46,6 +46,7 @@ beforeEach(() => {
       return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
     }
     requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    records = records.map(r => r.id.endsWith('-extract') ? { ...r, attributes: { ...r.attributes, turnId: requests.at(-1)!.turnId } } : r);
     if (transportFailure) {
       let reads = 0;
       return new Response(new ReadableStream<Uint8Array>({ pull(controller) {

@@ -1400,9 +1400,9 @@ describe('the "Interpreted as" note survives a cold reload (S2.1)', () => {
     stream.emit('chunk', { text: 'A third lock.' });
     // The record the backend now holds for this turn: the note rides on the answer row.
     backend.threads['uc-ctx']!.events.push(
-      wireEvent(storedId(6), 'USER_MESSAGE', 'and the third?'),
+      wireEvent(storedId(6), 'USER_MESSAGE', 'and the third?', { turnId: backend.dispatches.at(-1)?.turnId }),
       wireEvent(storedId(7), 'ASSISTANT_MESSAGE', 'A third lock.', {
-        standaloneQuestion: 'Why did the third renewal fail?',
+        standaloneQuestion: 'Why did the third renewal fail?', turnId: backend.dispatches.at(-1)?.turnId,
       }),
     );
     stream.emit('done', {});

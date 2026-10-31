@@ -45,7 +45,7 @@ type DraftSearch = Pick<Sv3SearchController, 'showing' | 'pendingScope' | 'query
   | 'prepare' | 'show' | 'type' | 'reset' | 'scopeFromSelection' | 'prepareFromSelection' | 'reconcileForgotten'>;
 type DraftStore = Pick<DraftPersistence, 'restoreUnavailable' | 'adoptLegacy' | 'openSessionAttachment'
   | 'saveSessionAttachment' | 'retireRawDraft'>;
-type DraftContext = Pick<Sv3ContextDomain, 'clearRefusedQuestion' | 'followUpContextOf' | 'hasPendingWrite'>;
+type DraftContext = Pick<Sv3ContextDomain, 'clearRefusedQuestion' | 'followUpContextOf' | 'hasPendingWrite' | 'checkRetainedAttempt'>;
 
 interface DraftHost {
   connected(): boolean;
@@ -288,7 +288,7 @@ export class Sv3DraftDomain {
       if (this.draftHasInputs(snapshot) && !(retired && this.sameDraft(snapshot, retired))
         && !drafts.some(d => this.sameDraft(d, snapshot))) drafts.push(snapshot);
     }
-    const payload: Sv3Recovery = { version: 2, task: previous.task, drafts };
+    const payload: Sv3Recovery = { version: 3, task: previous.task, drafts };
     if (!this.saveRecoveryPayload(payload)) return false;
     if (!this.host.connected() || !draft.port.isCurrent(draft)
       || this.preparationRevision !== revision || this.humanPlace() !== place || this.composer.read() !== text) {
@@ -387,7 +387,7 @@ export class Sv3DraftDomain {
       const snapshot = { ...draft, preparation: draft.preparation ?? null };
       if (this.draftHasInputs(snapshot) && !drafts.some(d => this.sameDraft(d, snapshot))) drafts.push(snapshot);
     }
-    return { version: 2, task: task?.saved ?? null, drafts };
+    return { version: 3, task: task?.saved ?? null, drafts };
   }
 
   private saveRecoveryPayload(payload: Sv3Recovery): boolean {
@@ -474,6 +474,8 @@ export class Sv3DraftDomain {
         draft: this.composer.snapshot(), epoch: this.humanEpoch, ownsComposer: false, revoked: true, abandoned: true,
         restored: true, context: null, refusal: null, retryAt: 0,
       };
+      // Recovery can finish after connect, with the attempt's target outside the displayed place.
+      this.contextDomain.checkRetainedAttempt();
     }
     this.host.requestUpdate();
   }

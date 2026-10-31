@@ -719,11 +719,11 @@ describe('the model\'s thinking is its own block, never mixed into the answer', 
     const recorded = projectSv3RecordTurns([
       {
         id: turnId, occurredAt: '2026-01-01T00:00:01Z', kind: 'USER_MESSAGE',
-        originator: 'user', content: 'why did the renewal fail?', attributes: {},
+        originator: 'user', content: 'why did the renewal fail?', attributes: { turnId: el.sessions.sessions[0]!.turns[0]!.dispatchTurnId },
       },
       {
         id: 'a1', occurredAt: '2026-01-01T00:00:02Z', kind: 'ASSISTANT_MESSAGE',
-        originator: 'agent', content: 'It expired.', attributes: {},
+        originator: 'agent', content: 'It expired.', attributes: { turnId: el.sessions.sessions[0]!.turns[0]!.dispatchTurnId },
       },
     ]);
     el.sessions = applySv3Record(el.sessions, sessionId, recorded);

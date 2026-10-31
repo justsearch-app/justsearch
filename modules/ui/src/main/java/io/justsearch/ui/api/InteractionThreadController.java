@@ -391,6 +391,9 @@ public final class InteractionThreadController {
     Object calibration = msg.get("calibration");
     Object claimMatches = msg.get("claimMatches");
     Map<String, Object> attributes = new LinkedHashMap<>();
+    if (msg.get("turnId") instanceof String turnId && !turnId.isBlank()) {
+      attributes.put("turnId", turnId);
+    }
     if (kind == InteractionEventKind.ERROR && msg.get("errorCode") instanceof String code) {
       attributes.put("errorCode", code);
     }

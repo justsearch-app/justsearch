@@ -637,7 +637,7 @@ public final class ConversationEngine {
         try {
           conversationStore.createSession(retrievalRecordId, shape.id().value());
           conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+          persistRetrievalError(retrievalRecordId, shape, body, injectorRun.retrievalMetadata, standalone,
               String.valueOf(injectorRun.terminalError.payload().getOrDefault("error", "Retrieval failed")),
               injectorRun.terminalError.payload().get("errorCode"), null);
         } finally {
@@ -651,8 +651,14 @@ public final class ConversationEngine {
     // for PERSISTENT shapes so the conversation store has the full thread.
     if (sessionId != null && conversationStore != null && !injectorRun.messages.isEmpty()) {
       conversationStore.createSession(sessionId, shape.id().value());
+      // Forwarded history is not this dispatch. Only the last newly injected user prompt owns it.
+      Map<String, Object> prompt = null;
       for (Map<String, Object> msg : injectorRun.messages) {
-        conversationStore.appendMessage(sessionId, shape.id().value(), msg);
+        if ("user".equals(msg.get("role"))
+            && injectorRun.forwarded.stream().noneMatch(prior -> prior == msg)) prompt = msg;
+      }
+      for (Map<String, Object> msg : injectorRun.messages) {
+        conversationStore.appendMessage(sessionId, shape.id().value(), msg == prompt ? correlated(body, msg) : msg);
       }
     } else if (threadId != null && conversationStore != null) {
       // Tempdoc 561 P-A/P-B: record the CLEAN user turn (the user's actual question), NOT the
@@ -679,7 +685,7 @@ public final class ConversationEngine {
     OnlineAiService ai = onlineAiSupplier.get();
     if (ai == null || !ai.isAvailable()) {
       emitError(sink, "AI service unavailable", "AI_OFFLINE");
-      persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+      persistRetrievalError(retrievalRecordId, shape, body, injectorRun.retrievalMetadata, standalone,
           "AI service unavailable", "AI_OFFLINE", null);
       return;
     }
@@ -722,7 +728,7 @@ public final class ConversationEngine {
                 .budgetFor(onlineAiSupplier, ctx).inputBudget()) {
           String reason = "Extraction input exceeds the model context budget; shorten the instruction, schema or inputs.";
           emitError(sink, reason, "INPUT_TOO_LARGE");
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+          persistRetrievalError(retrievalRecordId, shape, body, injectorRun.retrievalMetadata, standalone,
               reason, "INPUT_TOO_LARGE", null);
           return;
         }
@@ -743,7 +749,7 @@ public final class ConversationEngine {
             return;
           }
           emitError(sink, e.getMessage(), e.errorCode);
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+          persistRetrievalError(retrievalRecordId, shape, body, injectorRun.retrievalMetadata, standalone,
               e.getMessage(), e.errorCode, null);
           return;
         } catch (RuntimeException failure) {
@@ -751,7 +757,7 @@ public final class ConversationEngine {
           // saving the model attempt just as we save an asynchronous stream failure.
           if (failure instanceof io.justsearch.app.api.EngineWorkCancelledException
               || refusalEvent(failure) != null) throw failure;
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+          persistRetrievalError(retrievalRecordId, shape, body, injectorRun.retrievalMetadata, standalone,
               failure.getMessage() == null ? failure.toString() : failure.getMessage(), "LLM_ERROR", null);
           throw failure;
         }
@@ -772,7 +778,7 @@ public final class ConversationEngine {
             if (stoppedByUser(work)) checkWork(work);
             LOG.warn("StreamConsumer {} onDone threw; emitting error event", consumer.id(), e);
             emitError(sink, "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
-            persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+            persistRetrievalError(retrievalRecordId, shape, body, injectorRun.retrievalMetadata, standalone,
                 "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR", mergedDoneEntries.get("claimMatches"));
             return;
           }
@@ -820,7 +826,7 @@ public final class ConversationEngine {
         } catch (Exception e) {
           LOG.warn("IterationController {} threw; treating as STOP_ERROR", controller.id(), e);
           emitError(sink, "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+          persistRetrievalError(retrievalRecordId, shape, body, injectorRun.retrievalMetadata, standalone,
               "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR", mergedDoneEntries.get("claimMatches"));
           return;
         }
@@ -836,12 +842,12 @@ public final class ConversationEngine {
           conversationStore.appendMessage(
               sessionId,
               shape.id().value(),
-              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
+              correlated(body, persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone)));
         } else if (accepted && threadId != null && conversationStore != null) {
           conversationStore.appendMessage(
               threadId,
               shape.id().value(),
-              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
+              correlated(body, persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone)));
         }
         answerRecorded = accepted;
 
@@ -854,7 +860,7 @@ public final class ConversationEngine {
           case STOP_ERROR -> {
             String reason = String.valueOf(ctx.attributes().getOrDefault("validation.reason", "Conversation terminated with error"));
             emitError(sink, reason, "CONTROLLER_STOP");
-            persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+            persistRetrievalError(retrievalRecordId, shape, body, injectorRun.retrievalMetadata, standalone,
                 reason, "CONTROLLER_STOP", mergedDoneEntries.get("claimMatches"));
             return;
           }
@@ -867,7 +873,7 @@ public final class ConversationEngine {
       checkWork(work);
       if ("core.extract".equals(shape.id().value())) {
         emitError(sink, "Extraction validation retry limit reached", "CONTROLLER_STOP");
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+        persistRetrievalError(retrievalRecordId, shape, body, injectorRun.retrievalMetadata, standalone,
             "Extraction validation retry limit reached", "CONTROLLER_STOP", mergedDoneEntries.get("claimMatches"));
       } else {
         emitDone(sink, accumulatedFinalText, hardCap, mergedDoneEntries);
@@ -1318,7 +1324,7 @@ public final class ConversationEngine {
       Map<String, Object> retrievalMetadata, List<Map<String, Object>> citations,
       SseEvent terminalError) {}
 
-  private void persistRetrievalError(String recordId, ConversationShape shape,
+  private void persistRetrievalError(String recordId, ConversationShape shape, Map<String, Object> body,
       Map<String, Object> retrievalMetadata, String standaloneQuestion, String message,
       Object errorCode, Object claimMatches) {
     if (recordId == null || conversationStore == null) {
@@ -1334,7 +1340,7 @@ public final class ConversationEngine {
     // The "Interpreted as" note belongs to the turn whatever its outcome: a rewrite that was followed
     // by a failed retrieval, a failed generation or a Stop was still shown live, so the record keeps it.
     putIfPresent(error, "standaloneQuestion", standaloneQuestion);
-    conversationStore.appendMessage(recordId, shape.id().value(), error);
+    conversationStore.appendMessage(recordId, shape.id().value(), correlated(body, error));
   }
 
   /**
@@ -1357,7 +1363,7 @@ public final class ConversationEngine {
       outcome.put("disposition", STOPPED_DISPOSITION);
       putIfPresent(outcome, "claimMatches", claimMatches);
       conversationStore.appendMessage(recordId, shape.id().value(),
-          persistedAssistant(assistantMessage(text), outcome, reasoning, standaloneQuestion));
+          correlated(body, persistedAssistant(assistantMessage(text), outcome, reasoning, standaloneQuestion)));
     }
     emitError(sink, "Stopped by the user", STOPPED_DISPOSITION);
   }
@@ -1532,7 +1538,15 @@ public final class ConversationEngine {
         && selection.get("kind") instanceof String kind && !kind.isBlank()) {
       m.put("selectionKind", kind);
     }
-    return m;
+    return correlated(body, m);
+  }
+
+  /** Dispatch metadata belongs to stored transcript copies, never the model context. */
+  private static Map<String, Object> correlated(Map<String, Object> body, Map<String, Object> message) {
+    if (!(body.get(TURN_ID_KEY) instanceof String turnId) || turnId.isBlank()) return message;
+    var saved = new LinkedHashMap<String, Object>(message);
+    saved.put(TURN_ID_KEY, turnId);
+    return saved;
   }
 
   /** The content of the last {@code role:"user"} entry of an OpenAI-shaped message list. */
