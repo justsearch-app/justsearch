@@ -61,3 +61,16 @@ Faults were introduced one at a time in a separate shared candidate clone under 
 | Make row selection async and await both record reads before `claimConversation(id)`, removing the later duplicate reads | `opening B from A` | `AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]`; both `/api/thread/b` and `/api/chat/conversations/b/history` observed `activeId: 'a', pointer: 'a'`, expected `'b'` for each |
 
 Moving just the two read-method calls before the synchronous claim survived: their authorization path defers the actual fetch until after the claim. The last fault above waits for the reads before claiming, and therefore exercises the required wrong fetch-start ordering on the real fetch seam. Scratch production files were restored; production files in the candidate were never modified.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19065-a870-7730-a7bb-5c4e2991b232",
+  "verdict": "accept",
+  "digest": "sha256:b185d222ab70b02d67536ec9a374a36c1cb42ce28466f99cf2ecb88df926b737",
+  "note": "All 16 preservation cases pass before/after; five mutations fail assertions. Initial diff exposure preceded prescribed reading order; subsequent source/class review completed."
+}
+```
