@@ -64,7 +64,7 @@ class EmbeddingBackfillOpsTest {
             .map(outage -> org.junit.jupiter.params.provider.Arguments.of(chunk, outage)));
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.MethodSource("fallbackOutages")
   void fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean chunk, String outage) throws Exception {
     BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, !chunk, java.util.Set.of());
@@ -100,7 +100,8 @@ class EmbeddingBackfillOpsTest {
         writesAllowed::get, 100, LoggerFactory.getLogger(EmbeddingBackfillOpsTest.class));
     if (chunk) EmbeddingBackfillOps.processChunkEmbeddingBackfill(ctx);
     else EmbeddingBackfillOps.processEmbeddingBackfill(ctx);
-    verify(indexingCoordinator, never()).updateDocumentIf(anyString(), any(DocumentFieldOps.EnrichmentInput.class), anyMap());
+    assertDoesNotThrow(() -> verify(indexingCoordinator, never()).updateDocumentIf(
+        anyString(), any(DocumentFieldOps.EnrichmentInput.class), anyMap()));
     verify(embeddingProvider, never()).embedDocument(eq("later content"), any(InferenceRequest.class));
 
     failing.set(false);

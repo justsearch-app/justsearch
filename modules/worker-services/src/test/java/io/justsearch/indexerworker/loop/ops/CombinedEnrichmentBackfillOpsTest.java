@@ -508,7 +508,6 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName("malformed embedding batch reaches individual escalation")
   void embedBatchSizeMismatch_fallsBackToIndividualAttempts() {
     seedDoc("doc-x", "content x", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING"));
     seedDoc("doc-y", "content y", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING"));
@@ -557,8 +556,6 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName(
-      "a misaligned SPLADE batch cannot publish positional results")
   void spladeBatchPartialResult_escalatesOnlyTheAttemptedSlice() throws Exception {
     seedDoc(
         "doc-a",
@@ -706,8 +703,6 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName(
-      "a deadline after embedding still publishes its required SPLADE preservation")
   void completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes() throws Exception {
     seedDoc(
         "parent-stop",
@@ -739,7 +734,6 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName("SPLADE preservation follows the NER outcome it must preserve")
   void completedParentSplade_preservationFollowsNerOutcome() throws Exception {
     seedDoc(
         "parent-stop-ner",
@@ -921,7 +915,6 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName("a parent SPLADE preservation failure withholds the whole update")
   void completedParentSplade_encoderFailure_withholdsEntireUpdate() throws Exception {
     seedDoc(
         "parent-failure",
@@ -935,7 +928,8 @@ class CombinedEnrichmentBackfillOpsTest {
 
     CombinedEnrichmentBackfillOps.processCombinedBackfill(context(true, true, false));
 
-    verify(spladeEncoder, times(2)).encodeBatch(List.of("parent content"));
+    assertDoesNotThrow(
+        () -> verify(spladeEncoder, times(2)).encodeBatch(List.of("parent content")));
     Map<String, Object> state = fakeIndex.get("parent-failure");
     assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING, state.get(SchemaFields.EMBEDDING_STATUS));
     assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));

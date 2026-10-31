@@ -747,7 +747,7 @@ class BackfillSchedulerSlowBatchTest {
         anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(ints = {0, BATCH_DOCS})
   void wholeBatchOfFailingPreservationDoesNotStarveFollowingHealthyParents(int leadingHealthy)
       throws Exception {
@@ -869,7 +869,7 @@ class BackfillSchedulerSlowBatchTest {
     assertEquals("COMPLETED_EMPTY", state.get("ner-only").get(SchemaFields.NER_STATUS));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void deferredPreservationNeverFallsThroughToIndividualEmbeddingIncludingBackoff(boolean encoderRetires) throws Exception {
     Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
@@ -901,7 +901,7 @@ class BackfillSchedulerSlowBatchTest {
     assertEquals("COMPLETED", state.get("doc").get(SchemaFields.SPLADE_STATUS));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void systemicSpladeFailureBacksOffBothPathsWithoutDocumentRetries(boolean arenaOom) throws Exception {
     Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
