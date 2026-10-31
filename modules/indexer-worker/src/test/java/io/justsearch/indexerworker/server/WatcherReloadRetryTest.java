@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Real Lucene/SQLite swap failures; only model/service construction is substituted. */
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class WatcherReloadRetryTest extends LuceneExecutorTestBase {
   @TempDir Path temp;
 

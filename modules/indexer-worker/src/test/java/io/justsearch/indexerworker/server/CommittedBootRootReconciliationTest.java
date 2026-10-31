@@ -35,6 +35,7 @@ import org.junit.jupiter.api.io.TempDir;
 /** Boot-level proof for committed B root replay and predecessor retention. */
 @Timeout(180)
 @DisplayName("Committed boot root reconciliation")
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class CommittedBootRootReconciliationTest {
 
   private KnowledgeServer server;

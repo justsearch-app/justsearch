@@ -40,7 +40,7 @@ final class LinuxRootVolumeSafetyTest {
   }
 
   @Test
-  void tmpfsHasNoIdentityAndOnlyTheVolumeComparisonIsSkipped() throws Exception {
+  void tmpfsAdmitsPresentSourcesButCannotProveAbsence() throws Exception {
     org.junit.jupiter.api.Assumptions.assumeTrue(Files.isDirectory(Path.of("/dev/disk/by-uuid")),
         "real Linux UUID lookup requires /dev/disk/by-uuid");
     Path root = Files.createTempDirectory(Path.of("/dev/shm"), "justsearch-root-unknown-");
@@ -49,8 +49,8 @@ final class LinuxRootVolumeSafetyTest {
       RootWitness witness = RootWitness.inMemory();
       assertFalse(witness.refusesRoot(root));
       assertTrue(witness.admits(root));
-      assertTrue(witness.vouches(root));
-      assertTrue(RootPresenceGuard.capture(root, null).rootCurrent());
+      assertFalse(witness.vouches(root));
+      assertFalse(RootPresenceGuard.capture(root, null).rootCurrent());
     } finally {
       Files.delete(root);
     }
@@ -80,7 +80,7 @@ final class LinuxRootVolumeSafetyTest {
   }
 
   @Test
-  void missingLookupSkipsOnlyTheVolumeComparisonForAnOwnedRoot() throws Exception {
+  void missingLookupAdmitsPresentSourcesButCannotProveAbsence() throws Exception {
     Path root = Files.createDirectory(temp.resolve("unknown-volume"));
     var evidence = NoVolumeIdentityExtension.withVolumeIdentity(false);
     try (evidence) {
@@ -88,8 +88,8 @@ final class LinuxRootVolumeSafetyTest {
       RootWitness witness = RootWitness.inMemory();
       assertFalse(witness.refusesRoot(root));
       assertTrue(witness.admits(root));
-      assertTrue(witness.vouches(root));
-      assertTrue(RootPresenceGuard.capture(root, null).rootCurrent());
+      assertFalse(witness.vouches(root));
+      assertFalse(RootPresenceGuard.capture(root, null).rootCurrent());
     } finally {
       Files.delete(root);
     }

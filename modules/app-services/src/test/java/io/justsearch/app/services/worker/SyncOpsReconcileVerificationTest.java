@@ -46,6 +46,35 @@ final class SyncOpsReconcileVerificationTest {
   }
 
   @Test
+  void D15PeriodicMaintenanceRevisitsIndexedSourcesWithZeroWatchedRoots() {
+    var registry = org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
+    var registration = org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.Registration.class);
+    var scheduler = org.mockito.Mockito.mock(java.util.concurrent.ScheduledExecutorService.class);
+    org.mockito.Mockito.when(registry.limits(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(new io.justsearch.core.execution.EngineExecutorRegistry.Limits(4, 64));
+    org.mockito.Mockito.when(registry.register(org.mockito.ArgumentMatchers.any())).thenReturn(registration);
+    org.mockito.Mockito.when(registration.openScheduled(org.mockito.ArgumentMatchers.any())).thenReturn(scheduler);
+    var scheduled = new java.util.concurrent.atomic.AtomicReference<Runnable>();
+    org.mockito.Mockito.doAnswer(call -> { scheduled.set(call.getArgument(0)); return null; })
+        .when(scheduler).scheduleAtFixedRate(org.mockito.ArgumentMatchers.any(Runnable.class),
+            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.any(java.util.concurrent.TimeUnit.class));
+    var operations = new java.util.ArrayList<String>();
+    IngestRpcExecutor rpc = new IngestRpcExecutor() {
+      @Override @SuppressWarnings("unchecked") public <T> T execute(String operation,
+          KnowledgeClient.RpcDeadlineCategory category, java.util.function.Function<IngestServiceCalls, T> call,
+          io.justsearch.core.context.EngineContext context) {
+        operations.add(operation); return (T) io.justsearch.ipc.PruneResponse.getDefaultInstance();
+      }
+    };
+    var ops = new SyncOps(registry, rpc, new ConcurrentHashMap<>());
+    try {
+      ops.startPeriodicSync(); assertTrue(scheduled.get() != null); scheduled.get().run();
+      assertEquals(List.of("reconcileIndexedSources"), operations);
+    } finally { ops.stopPeriodicSync(); }
+  }
+
+  @Test
   void capSkippedReconcileMarksUnverified() {
     List<Call> calls = new CopyOnWriteArrayList<>();
     SyncDirectoryResponse resp =

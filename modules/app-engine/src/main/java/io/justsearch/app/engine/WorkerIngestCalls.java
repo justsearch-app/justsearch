@@ -31,6 +31,16 @@ final class WorkerIngestCalls implements IngestServiceCalls {
   }
 
   @Override
+  public long scanIndexedSources(java.util.function.Consumer<String> consumer) {
+    return service.scanIndexedSources(consumer, ctx);
+  }
+
+  @Override
+  public io.justsearch.ipc.PruneResponse reconcileIndexedSources() {
+    return service.reconcileIndexedSources(ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.BatchResponse submitBatch(io.justsearch.ipc.BatchRequest request) {
     return service.submitBatch(request, ctx);
   }

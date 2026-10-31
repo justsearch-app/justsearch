@@ -1173,10 +1173,10 @@ final class SyncDirectoryOps {
               return recoveryAdmission.applyAsInt(() -> jobQueue.enqueueUpgradeRecoveryEntries(admitted, collection));
             }
             if (admissionMode == AdmissionMode.MAINTENANCE) {
-              return jobQueue.enqueueMaintenanceScanEntries(admitted, collection, null);
+              return admitWhileCurrent(cancelled, () -> jobQueue.enqueueMaintenanceScanEntries(admitted, collection, null));
             }
-            return admitted.isEmpty() ? 0 : collection == null
-                ? jobQueue.enqueueEntries(admitted) : jobQueue.enqueueEntries(admitted, collection);
+            return admitWhileCurrent(cancelled, () -> admitted.isEmpty() ? 0 : collection == null
+                ? jobQueue.enqueueEntries(admitted) : jobQueue.enqueueEntries(admitted, collection));
           });
       walkInterrupted[0] |= Thread.currentThread().isInterrupted();
       if (!walkInterrupted[0] && !cancelled.getAsBoolean() && filesAdded > 0) {
@@ -1184,6 +1184,16 @@ final class SyncDirectoryOps {
       }
       return new SyncWalkPhaseResult(filesAdded, walkInterrupted[0], walkIncomplete[0]);
     }
+  }
+
+  private int admitWhileCurrent(java.util.function.BooleanSupplier cancelled,
+      java.util.function.IntSupplier admission) {
+    int[] accepted = {0};
+    pruneWriterFence.hold(() -> {
+      if (!cancelled.getAsBoolean()) accepted[0] = admission.getAsInt();
+      return true;
+    });
+    return accepted[0];
   }
 
   // ==================== Index path query ====================

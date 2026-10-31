@@ -34,6 +34,7 @@ import org.junit.jupiter.api.io.TempDir;
  * with no root check at all, so a folder renamed or a drive unplugged pruned every document under
  * it. The root is really renamed away; nothing is injected.
  */
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class PruneMissingUncertainRootTest
     extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 

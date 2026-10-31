@@ -50,6 +50,7 @@ import tools.jackson.databind.ObjectMapper;
  * uncertain, so nothing is admitted and A keeps the file's text. With a listable parent the same
  * folder is a confirmed non-regular source, and A's normal policy removes the text as before.
  */
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class RefusedCleanupConditionalDeleteTest extends LuceneExecutorTestBase {
   @TempDir Path temp;
 

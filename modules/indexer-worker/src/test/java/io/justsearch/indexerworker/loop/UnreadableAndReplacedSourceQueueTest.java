@@ -51,6 +51,7 @@ import org.junit.jupiter.api.io.TempDir;
  * and admission handle it, and the real queue records what happens next. Only the index side is
  * stubbed, so "the old text leaves the index" is read as a call to the stale-source handler.
  */
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class UnreadableAndReplacedSourceQueueTest {
   private static final boolean WINDOWS =
       System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
@@ -178,7 +179,11 @@ final class UnreadableAndReplacedSourceQueueTest {
     IngestionOutcomeJournal journal = new IngestionOutcomeJournal(queue,
         mock(io.justsearch.indexerworker.metrics.OperationalMetrics.class),
         mockCounter(), () -> false);
-    JobBatchExtractor extractor = new JobBatchExtractor(new WorkerIngestionAuthority(),
+    var witness = io.justsearch.indexerworker.services.RootWitness.inMemory();
+    assertTrue(witness.admits(tempDir));
+    var authority = new WorkerIngestionAuthority();
+    authority.useRootCheck(witness);
+    JobBatchExtractor extractor = new JobBatchExtractor(authority,
         journal, queue, content, fields, counts,
         mock(BatchStats.class), mock(StaleSnapshotResolver.class), staleSourceHandler,
         IndexingPacing.unthrottled(), new AtomicBoolean(true), new java.util.HashSet<>(),

@@ -41,10 +41,12 @@ final class EnginePruneReappearedFileTest {
 
   @TempDir static Path tempDir;
   private static EngineTestHarness harness;
+  private static AutoCloseable volumeEvidence;
   private static Path root;
 
   @BeforeAll
   static void startEngine() throws Exception {
+    volumeEvidence = EngineTestHarness.knownVolume();
     root = Files.createDirectories(tempDir.resolve("reappear-root"));
     harness = EngineTestHarness.start(tempDir.resolve("data"));
     assertTrue(harness.client().isHealthy(TestEngineContexts.FOREGROUND));
@@ -52,9 +54,11 @@ final class EnginePruneReappearedFileTest {
   }
 
   @AfterAll
-  static void stopEngine() {
-    if (harness != null) {
-      harness.close();
+  static void stopEngine() throws Exception {
+    try {
+      if (harness != null) harness.close();
+    } finally {
+      if (volumeEvidence != null) volumeEvidence.close();
     }
   }
 

@@ -75,6 +75,7 @@ import tools.jackson.databind.ObjectMapper;
  * replayed prune. The writer is the loop's real {@code JobBatchWriter}, held inside the fence.
  */
 @Timeout(180)
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
   private static final String GREEN = "green";
   private static final Logger LOG = LoggerFactory.getLogger(PrunePrefixReplayFenceTest.class);

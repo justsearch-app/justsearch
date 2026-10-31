@@ -356,6 +356,9 @@ public final class DocumentFieldOps {
         String parentId = fields.get(SchemaFields.PARENT_DOC_ID);
         Map<String, String> parent = Map.of();
         String content = fields.get(SchemaFields.CONTENT);
+        if ("true".equals(fields.get(SchemaFields.IS_CHUNK)) && (parentId == null || parentId.isBlank())) {
+          content = null;
+        }
         if (parentId != null && !parentId.isBlank()) {
           if (!parents.containsKey(parentId)) {
             parents.put(parentId, enrichmentFields(searcher, storedFields, parentId, PARENT_REVISION_FIELDS));
@@ -396,7 +399,7 @@ public final class DocumentFieldOps {
       int start = Integer.parseInt(fields.getOrDefault(SchemaFields.CHUNK_START_CHAR, "-1"));
       int end = Integer.parseInt(fields.getOrDefault(SchemaFields.CHUNK_END_CHAR, "-1"));
       String revision = fields.get(SchemaFields.CHUNK_PARENT_CONTENT_SHA256);
-      return start >= 0 && end >= start ? new ChunkSlice(parentDocId, start, end, revision) : null;
+      return start >= 0 && end > start ? new ChunkSlice(parentDocId, start, end, revision) : null;
     } catch (NumberFormatException ignored) {
       return null;
     }
@@ -764,6 +767,42 @@ public final class DocumentFieldOps {
         }
         return docIds;
       });
+  }
+
+  /** An indexed row's own backing source, including a child left by a partial deletion. */
+  public record IndexedSource(String docId, String path, String docUid) {}
+
+  /** Streams the existing ownership evidence; no queue history or separate source list is needed. */
+  public long scanIndexedSources(int batchSize, Consumer<List<IndexedSource>> consumer) {
+    if (batchSize <= 0) throw new IllegalArgumentException("batchSize must be positive");
+    java.util.Objects.requireNonNull(consumer, "consumer");
+    try {
+      maybeRefreshBlockingIfCommittedSinceRefresh();
+      return bridge.withSearcher(searcher -> {
+        long skipped = 0;
+        var stored = searcher.storedFields();
+        var batch = new ArrayList<IndexedSource>(batchSize);
+        for (var leaf : searcher.getIndexReader().leaves()) {
+          var uids = DocValues.getSorted(leaf.reader(), SchemaFields.DOC_UID);
+          var live = leaf.reader().getLiveDocs();
+          for (int doc = 0; doc < leaf.reader().maxDoc(); doc++) {
+            if (live != null && !live.get(doc)) continue;
+            var row = PruneOps.Row.read(searcher, stored, leaf.docBase + doc, idField);
+            if (row == null) { skipped++; continue; }
+            String uid = uids.advanceExact(doc) ? uids.lookupOrd(uids.ordValue()).utf8ToString() : null;
+            batch.add(new IndexedSource(row.docId(), row.filePath(), uid));
+            if (batch.size() == batchSize) {
+              consumer.accept(List.copyOf(batch)); batch.clear();
+            }
+          }
+        }
+        if (!batch.isEmpty()) consumer.accept(List.copyOf(batch));
+        return skipped;
+      });
+    } catch (IOException failure) {
+      throw new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DISK_IO,
+          "Could not enumerate indexed sources", failure);
+    }
   }
 
   /** Accounting for one identity recovery scan. */

@@ -4,7 +4,6 @@ package io.justsearch.indexerworker.server.ops;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -397,7 +396,7 @@ final class CommittedNativeEffectsTest {
     var runtime = mock(RunningRuntime.class);
     var commits = mock(CommitOps.class);
     var fields = mock(DocumentFieldOps.class);
-    var counts = mock(IndexCountOps.class);
+    var counts = countsFor(fixture);
     var indexing = mock(IndexingCoordinator.class);
     when(runtime.commitOps()).thenReturn(commits);
     when(runtime.documentFieldOps()).thenReturn(fields);
@@ -406,20 +405,28 @@ final class CommittedNativeEffectsTest {
     when(queue.listSwitchBufferOpsStrict()).thenReturn(selected, afterRemoval);
     when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString(), anyString()))
         .thenReturn(true);
-    when(counts.countPathPrefixExcludingAcceptedSurvivorsStrict(
-        anyString(), anyList(), anyList())).thenCallRealMethod();
-    when(counts.countPathPrefixExcludingAcceptedSurvivorsStrict(
-        anyString(), anyList(), anyList(), anyList())).thenCallRealMethod();
-    when(counts.countCollectionExcludingAcceptedSurvivorsStrict(
-        anyString(), anyList(), anyList())).thenCallRealMethod();
-    when(counts.countByIdAndChunksStrict(anyString())).thenCallRealMethod();
     when(fields.getDocumentField(anyString(), anyString())).thenAnswer(invocation ->
         fixture.field(invocation.getArgument(0), invocation.getArgument(1)));
     when(fields.getDocumentFieldOrThrow(anyString(), anyString())).thenAnswer(invocation ->
         fixture.field(invocation.getArgument(0), invocation.getArgument(1)));
-    when(counts.countQueryOrThrow(any(Query.class))).thenAnswer(invocation ->
-        fixture.count(invocation.getArgument(0)));
     return new Harness(queue, runtime, commits, indexing, fields, counts);
+  }
+
+  private static IndexCountOps countsFor(LuceneFixture fixture) throws ReflectiveOperationException {
+    Class<?> bridgeType = Class.forName("io.justsearch.adapters.lucene.runtime.SearcherBridge");
+    Class<?> operationType = Class.forName("io.justsearch.adapters.lucene.runtime.ReadPathOps$SearcherOperation");
+    var execute = operationType.getDeclaredMethod("execute", IndexSearcher.class);
+    execute.setAccessible(true);
+    Object bridge = mock(bridgeType, call -> {
+      if (call.getMethod().getName().equals("withSearcher")) {
+        try { return execute.invoke(call.getArgument(0), fixture.searcher); }
+        catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+      }
+      return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
+    });
+    var constructor = IndexCountOps.class.getDeclaredConstructor(bridgeType);
+    constructor.setAccessible(true);
+    return org.mockito.Mockito.spy((IndexCountOps) constructor.newInstance(bridge));
   }
 
   private static SwitchBufferCapableQueue.SwitchBufferOp fileUpsert(

@@ -27,6 +27,7 @@ import tools.jackson.databind.ObjectMapper;
  * {@code PRUNE_PREFIX} replayed while its folder is not there removes nothing and stays buffered,
  * to be retried once the folder answers again. The folder is really renamed away.
  */
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class PrunePrefixReplayUncertainRootTest
     extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 

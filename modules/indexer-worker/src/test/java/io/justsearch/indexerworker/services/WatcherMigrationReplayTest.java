@@ -37,6 +37,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Strict production replay with real SQLite receipts, held filesystem witnesses and Lucene. */
 @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
@@ -388,6 +389,8 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       f.debt();
       Files.delete(source);
     }
+    assertTrue(RootWitness.of(RootVolumeLedger.under(base), ignored -> null, ignored -> false)
+        .recordAdded(root));
     Path arguments = temporary.resolve("crash.args");
     Files.writeString(arguments, "-cp\n\"" + System.getProperty("java.class.path")
         .replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n");
@@ -445,6 +448,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
 
   public static final class CrashWorker {
     public static void main(String[] args) throws Exception {
+      NoVolumeIdentityExtension.installVolumeLookupIfAbsent();
       String cut = args[0];
       Path root = Path.of(args[1]), database = Path.of(args[2]), base = Path.of(args[3]);
       Path target = Path.of(args[4]);
@@ -616,6 +620,10 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
     Fixture(Path root, Path database, Path targetPath, String generation) throws Exception {
       this.root = root;
       this.generation = generation;
+      var volumes = RootVolumeLedger.under(temporary);
+      if (volumes.recordedFor(root).isEmpty()) {
+        assertTrue(RootWitness.of(volumes, ignored -> null, ignored -> false).recordAdded(root));
+      }
       roots = List.of(new ResolvedConfig.FileSource(root, "notes"));
       queue = new SqliteJobQueue(database);
       queue.open();

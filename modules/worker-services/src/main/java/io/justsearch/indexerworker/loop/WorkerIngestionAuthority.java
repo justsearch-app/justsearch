@@ -105,10 +105,9 @@ final class WorkerIngestionAuthority {
       };
     }
 
-    // Round 5 (S8): a present source is added, updated or retired only while its root is the one
-    // it was. Another volume at the same drive letter, or a root that cannot be read, defers the
-    // source with the root-level back-off; the original's indexed content is untouched. Round 8
-    // (refined decision 2): admission records nothing for a root; only the person's add does.
+    // Present regular files use admission authority. Retirement below requires deletion proof
+    // even when present-file admission can proceed without a platform volume identity. A changed
+    // volume or unreadable root defers the source; its indexed content stays untouched.
     Path normalizedFile = filePath.toAbsolutePath().normalize();
     Path answering = SourcePresence.vouchingFolder(normalizedFile, root);
     boolean rooted = SourcePresence.answersAsRoot(normalizedFile, root);
@@ -122,6 +121,11 @@ final class WorkerIngestionAuthority {
       if (exactRecovery) {
         return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
             sourceUnreadable(filePath, null));
+      }
+      boolean canRetire = rooted ? rootCheck.vouches(answering) : rootCheck.vouchesForFile(answering);
+      if (!canRetire || io.justsearch.adapters.lucene.runtime.PathPresence.absentBeneathListableFolder(
+          normalizedFile, answering, null) == io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN) {
+        return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
       }
       // #758: a file replaced by a folder or a link (dangling or not) is no
       // longer the indexed source. Its old text is retired instead of staying searchable forever;

@@ -305,6 +305,19 @@ final class EngineTestHarness implements AutoCloseable {
     return false;
   }
 
+  static AutoCloseable knownVolume() throws Exception {
+    // Reuse the volume-evidence seam used by NoVolumeIdentityExtension. Native directory
+    // identity, watcher registration, event routing, queue, indexing and commits stay real.
+    var field = Class.forName("io.justsearch.indexerworker.services.RootIdentity")
+        .getDeclaredField("VOLUME_IDENTITY_LOOKUP");
+    field.setAccessible(true);
+    Object previous = field.get(null);
+    String volume = System.getProperty("os.name", "").startsWith("Windows")
+        ? "windows-volume:739" : "linux-volume-v1:739:ext4:Lw";
+    field.set(null, (java.util.function.Function<Path, String>) ignored -> volume);
+    return () -> field.set(null, previous);
+  }
+
   /** Hold the actual published Worker view across a cutover in lifetime tests. */
   KnowledgeServer.ServingLease captureServingView() throws ReflectiveOperationException {
     Field serverField = EngineRoot.class.getDeclaredField("server");

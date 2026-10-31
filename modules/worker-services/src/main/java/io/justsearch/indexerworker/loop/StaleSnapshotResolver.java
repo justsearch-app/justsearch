@@ -163,15 +163,10 @@ public final class StaleSnapshotResolver {
     IngestionOutcome staleOutcome = ingestionAuthority.staleOutcome(validation, timing);
     if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED) {
       indexedDelta.accept(observation.deletedCount());
-      journal.recordOutcomeSafely(
-          filePath,
-          "STALE_DELETED",
-          () ->
-              jobQueue.markClaimDone(
-                  claim,
-                  staleOutcome,
-                  LedgerEntryFactory.forEnvelope(
-                      envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance)));
+      journal.enqueueTransition(new JobQueue.IngestionLedgerTransition(claim,
+          LedgerEntryFactory.forEnvelope(
+              envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance)),
+          staleOutcome);
       return true;
     }
     journal.recordOutcomeSafely(
