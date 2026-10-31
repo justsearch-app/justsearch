@@ -72,7 +72,7 @@ import {
   __resetAiStateForTest,
 } from '../../state/aiStateStore.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
-import { getConversationListState, restoreActiveConversation, setActiveConversation, loadConversations, __resetConversationListForTest } from '../../state/conversationListStore.js';
+import { getConversationListState, restoreActiveConversation, setActiveConversation, subscribeConversationList, loadConversations, __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
 import { __resetContextInspectorDrawer } from '../../state/contextInspectorDrawer.js';
@@ -2041,4 +2041,114 @@ it('a rerun abandoned by leaving the screen cannot claim or resend its late fork
     release();
     await settle(reloaded);
   }
+});
+
+it.each(['unavailable', 'unacknowledged'])('a %s first rerun save refuses the fork even when subsequent writes succeed', async fault => {
+  twoTurnConversation(); knownModelForkInputs();
+  const el = await mount();
+  await openConversation(el);
+  const storage = sessionStorage;
+  const set = storage.setItem.bind(storage);
+  const descriptor = Object.getOwnPropertyDescriptor(storage, 'setItem')
+    ?? { configurable: true, writable: true, value: set };
+  let taskWrites = 0;
+  Object.defineProperty(storage, 'setItem', { ...descriptor, value: (key: string, value: string) => {
+    if (key.startsWith('justsearch.draft.attachment.') && JSON.parse(value).payload?.task != null
+      && ++taskWrites === 1) {
+      if (fault === 'unavailable') throw new DOMException('unavailable', 'QuotaExceededError');
+      return;
+    }
+    set(key, value);
+  } });
+  try {
+    await editTurn(el, 1, 'retain this rewrite after one failed save');
+    expect(backend.branches).toEqual([]);
+    expect(backend.dispatches).toEqual([]);
+    expect(el.sessions.activeId).toBe('uc-branch');
+    expect(getConversationListState().activeId).toBe('uc-branch');
+    expect((await region(el, 'jf-sv3-main')).shadowRoot?.querySelector<HTMLTextAreaElement>(
+      '[data-testid="sv3-turn-edit-input"]')?.value).toBe('retain this rewrite after one failed save');
+    expect(taskWrites).toBe(1);
+  } finally {
+    Object.defineProperty(storage, 'setItem', descriptor);
+  }
+});
+
+it('a rerun abandoned by disconnecting and reconnecting the same view cannot claim its late fork', async () => {
+  twoTurnConversation(); knownModelForkInputs();
+  const el = await mount();
+  await openConversation(el);
+  const claims: Array<string | null> = [];
+  const unsubscribe = subscribeConversationList((state, change) => {
+    if (change === 'claim') claims.push(state.activeId);
+  });
+  const threadReads: string[] = [];
+  const serve = fetchMock.getMockImplementation() as (url: unknown, init: unknown) => unknown;
+  fetchMock.mockImplementation((url: unknown, init: unknown) => {
+    const path = new URL(String(url), 'http://engine.test').pathname;
+    if (path.startsWith('/api/thread/')) threadReads.push(path);
+    return serve(url, init);
+  });
+  let release!: () => void;
+  backend.branchGate = new Promise<void>(resolve => { release = resolve; });
+  try {
+    await chooseFromTurnMenu(el, 1, BRANCH_MENU_RETRY);
+    expect(backend.branches).toHaveLength(1);
+    expect(backend.minted).toBe(0);
+    el.remove();
+    await settle(el);
+    document.body.appendChild(el);
+    await settle(el);
+    expect(el.isConnected).toBe(true);
+    expect(el.sessions.activeId).toBe('uc-branch');
+    release();
+    await settle(el);
+    expect(backend.minted).toBe(1);
+    expect(claims).not.toContain('uc-branch-branch-1');
+    expect(el.sessions.activeId).toBe('uc-branch');
+    expect(getConversationListState().activeId).toBe('uc-branch');
+    expect(threadReads).not.toContain('/api/thread/uc-branch-branch-1');
+    expect(backend.historyReads).not.toContain('uc-branch-branch-1');
+    expect(backend.dispatches).toEqual([]);
+  } finally {
+    release();
+    await settle(el);
+    unsubscribe();
+  }
+});
+
+it('a rerun waits for the child thread response even after the child history response completes', async () => {
+  twoTurnConversation(); knownModelForkInputs();
+  const el = await mount();
+  await openConversation(el);
+  let release!: () => void;
+  const threadGate = new Promise<void>(resolve => { release = resolve; });
+  let threadHeld = false;
+  let historyCompleted = false;
+  const serve = fetchMock.getMockImplementation() as (url: unknown, init: unknown) => Promise<unknown>;
+  fetchMock.mockImplementation(async (url: unknown, init: unknown) => {
+    const path = new URL(String(url), 'http://engine.test').pathname;
+    const response = await serve(url, init);
+    if (path === '/api/thread/uc-branch-branch-1') {
+      threadHeld = true;
+      await threadGate;
+      threadHeld = false;
+    }
+    if (path === '/api/chat/conversations/uc-branch-branch-1/history') historyCompleted = true;
+    return response;
+  });
+  try {
+    await chooseFromTurnMenu(el, 1, BRANCH_MENU_RETRY);
+    expect(backend.branches).toHaveLength(1);
+    expect(el.sessions.activeId).toBe('uc-branch-branch-1');
+    expect(getConversationListState().activeId).toBe('uc-branch-branch-1');
+    expect(threadHeld).toBe(true);
+    expect(historyCompleted).toBe(true);
+    expect(backend.dispatches).toEqual([]);
+  } finally {
+    release();
+    await settle(el);
+  }
+  expect(threadHeld).toBe(false);
+  expect(backend.dispatches).toEqual([{ conversationId: 'uc-branch-branch-1', question: 'and the second one?' }]);
 });

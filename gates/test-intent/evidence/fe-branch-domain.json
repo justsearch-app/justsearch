@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-10-31T05:51:23.943Z",
-  "revision": "5aff3acd2868b57bd1f057b67477d64244929f95",
-  "tree": "b9a0e9514247933490949c95f2e607ad3d141b46",
+  "createdAt": "2026-10-31T06:57:34.632Z",
+  "revision": "11600e464d05a5480e662cefbea75ed9c833fcb5",
+  "tree": "4a51961c18ff204a78dfcee6f7638cff90c8fbe9",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/fe-branch-domain/tmp/ui-checks/scratch/test-intent-vitest-5-1793425869487.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ueqlh51u/tmp/test-intent-vitest-3-1793429844192.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 14454
+      "durationMs": 10438
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c3e61dc0f84b5255a3edfa4772f8685d169aee7e38ddea83a512d3e7d1d052",
+      "contentDigest": "sha256:94151b1e9549acd5f0d54c56f0ebbbbc61e2e04b5eda01cdd97308efb06ef354",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -261,6 +261,22 @@
         {
           "name": "a rerun abandoned by leaving the screen cannot claim or resend its late fork after reload",
           "status": "passed"
+        },
+        {
+          "name": "a unavailable first rerun save refuses the fork even when subsequent writes succeed",
+          "status": "passed"
+        },
+        {
+          "name": "a unacknowledged first rerun save refuses the fork even when subsequent writes succeed",
+          "status": "passed"
+        },
+        {
+          "name": "a rerun abandoned by disconnecting and reconnecting the same view cannot claim its late fork",
+          "status": "passed"
+        },
+        {
+          "name": "a rerun waits for the child thread response even after the child history response completes",
+          "status": "passed"
         }
       ]
     },
@@ -421,5 +437,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:4c5b0585b804ead5f9255afdb9821bd0a86e854f005b214106747f36cd442993"
+  "digest": "sha256:9cf362cc86dca2fdf970fdcf1f9172f2dfaaa0c604ab37400343b87e3f5739e3"
 }
