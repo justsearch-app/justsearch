@@ -66,3 +66,13 @@ and the baseline scaffold are temporary checks; production files in this candida
 ## Acceptance records
 
 Left to the independent verifier.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1913d-6317-7612-b650-0828dd0592f6",
+  "verdict": "accept",
+  "digest": "sha256:8e74f89fe4edd536d9342bd60ada559ba8ba1a2a0568e01f021334e1c72779b8"
+}
+```
